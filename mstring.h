@@ -1,0 +1,33 @@
+#ifndef __MSTRING_H__
+#define __MSTRING_H__
+
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define BLOCK_SIZE 8
+
+typedef struct{
+    char* chars;
+    char last_char; // conveniently remembering the last appended character!!!
+    uint16_t length;
+    uint8_t blocks;
+}mstring;
+
+mstring* string_create();
+
+void string_dispose(mstring* str);
+
+bool string_empty(mstring* str);
+uint16_t string_length(mstring* str);
+char string_char(mstring* str,uint16_t pos);
+char string_last_char(mstring* str);
+char* string_remainder(mstring* str,uint16_t pos);
+char* string(mstring* str);
+int16_t string_find(mstring* str,char c);
+
+void string_insert_char(mstring* str,uint16_t pos,char c);
+void string_append_char(mstring* str,char c);
+
+#endif /* __MSTRING_H__ */
