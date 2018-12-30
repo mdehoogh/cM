@@ -133,8 +133,8 @@ void oneLineUp(){printf("\033[1A");} // ascertain that the previous line is visi
 void oneLineDown(){printf("\033[1B");} // one line down
 void toStartOfLine(){putchar('\r');}
 void clearLine(){printf("\033[K");}
-void moveCursorLeft(uint16_t pos){printf("\033[%huD",pos);}
-void moveCursorRight(uint16_t pos){printf("\033[%huC",pos);}
+void moveCursorLeft(uint16_t pos){if(pos)printf("\033[%huD",pos);}
+void moveCursorRight(uint16_t pos){if(pos)printf("\033[%huC",pos);}
 void clearScreenFromCursor(){printf("\033[J");}
 /*
 void saveCursor(){printf("\033[s");} // TODO might not work
@@ -152,7 +152,10 @@ void backspace(){ // means go one position to the left on the current line, and 
 }
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 uint32_t commandCount=0; // the total number of command input
-uint16_t cursorPosition=0;
+
+// keeping track of both the cursor position and the total command length
+uint16_t cursorPosition=0,commandLength=0;
+
 uint8_t promptLength=0;
 void prompt(){
 	resetOutputColor();
@@ -214,7 +217,7 @@ void outputTokenColor(Token* pToken){
 void outputToken(Token* pToken){
 	outputTokenColor(pToken);
 	printf("%s",string(pToken->text));
-	///resetOutputColor();
+	if(assisting){resetOutputColor();putchar('|');}
 }
 void outputLastTokenChar(Token* pToken){
 	///////outputTokenColor(pToken);
@@ -274,8 +277,8 @@ enum TOKENTYPE_ENUM {
 
 Token* newToken(Token* prevToken){
 	Token* pNewToken=malloc(sizeof(Token));
+	if(prevToken!=NULL)prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
 	if(pNewToken!=NULL){
-		if(prevToken)prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
 		pNewToken->offset=(prevToken!=NULL?prevToken->offset+string_length(prevToken->text):0);
 		pNewToken->prev=prevToken;
 		pNewToken->type=TT_WHITESPACE; // start with a whitespace token (currently empty!!)
@@ -290,10 +293,11 @@ Token* newToken(Token* prevToken){
 #define COMMAND_BLOCKSIZE 8
 
 // keep track of the user input count
+Token* pCommand=NULL; // the current command
 Token** commands=NULL; // array for storing the pointers to the first token of all commands entered
 unsigned long commandBlocks=0;
 unsigned long commandIndex=0;
-bool registerCommand(Token* pCommand){
+bool registerCommand(){
 	if(!pCommand)return false;
 	if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 		// I have to copy all first token pointers to a new array large enough
@@ -320,7 +324,7 @@ static const char* TOKENTYPE_STRING[]={
 // O=operator that can be either unary or binary depending on its position (+ and - characters)
 // use x for eXit (e.g. with Ctrl-C and Ctrl-Z), c for cancel command, and m for going into M (control) mode
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="----c---btn--n------------xm----WUDCLBBS()BO,O.BNNNNNNNNNN:;BAB?@LLLLLLLLLLLLLLLLLLLLLLLLLL[B]BLoLLLLELLLLLLLLLLLLLLLLLLLLL{B}Ud";
+const char INPUTCHARACTERTYPES[]="---c----btn--n------------xm----WUDCLBBS()BO,O.BNNNNNNNNNN:;BAB?@LLLLLLLLLLLLLLLLLLLLLLLLLL[B]BLoLLLLELLLLLLLLLLLLLLLLLLLLL{B}Ud";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
 // NOTE this can be organized in many ways perhaps it's easiest to tell per input character what the transformation is
@@ -413,16 +417,64 @@ bool continuesOperator(Token* pToken,char inputChar){
 // keep track of the state of entering a command
 
 Token* pToken=NULL; // the current token
+void removeToken(){
+	// ASSERT pToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
+	Token* pPrevToken=pToken->prev;
+	Token* pNextToken=pToken->next; // remember the previous and next token (we have to link to each other)
+	// fix links
+	if(pPrevToken!=NULL)pPrevToken->next=pNextToken;
+	if(pNextToken!=NULL)pNextToken->prev=pPrevToken;
+	freeToken(pToken); // get rid of the token
+	pToken=pPrevToken; // replace pToken by the previous token
+	// TODO the following does not seem to work!!!!
+	if(pToken==NULL){
+		pCommand=NULL;
+#ifdef __DEBUG__
+		putchar('Q');
+#endif
+	}
+}
+char removedTokenCharacter(uint16_t behindCursor){
+#ifdef __DEBUG__
+		printf("%d",behindCursor);
+#endif
+	uint16_t tokenCharacterPosition;
+	// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
+	while(true){
+		if(pToken==NULL)return '\0';
+		tokenCharacterPosition=cursorPosition-pToken->offset;
+#ifdef __DEBUG__
+		printf("%d",tokenCharacterPosition);
+#endif
+		if(tokenCharacterPosition>=behindCursor)break;
+#ifdef __DEBUG__
+		putchar('.');
+#endif		
+		pToken=pToken->prev;
+	}
+#ifdef __DEBUG__
+		printf("%d",tokenCharacterPosition-behindCursor);
+#endif	
+	// if failing to remove the character serious error
+	char c=string_removed_char(pToken->text,tokenCharacterPosition-behindCursor);
+#ifdef __DEBUG__
+		putchar(c);
+#endif		
+	if(c)if(string_empty(pToken->text))removeToken(); // the token could now be empty, in which case we should remove it from the command
+	return c;
+}
 
 // anything the user types is a sequence of tokens which we can store in a linked list
-bool evaluateCommand(Token* pCommand){
+bool evaluateCommand(){
 	if(pCommand==NULL)return false;
 	printf("\nEvaluating '");
 	Token* pCommandToken=pCommand; // TODO can we get rid of using commandcount-1 here????
 	while(pCommandToken!=NULL){
+/*
 #ifdef __DEBUG__
 		printf("{%p}",pCommandToken);
 #endif
+*/
 		printf("%s",string(pCommandToken->text));
 		if(assisting)putchar('|');
 		pCommandToken=pCommandToken->next;
@@ -455,14 +507,19 @@ void cursorRight(){
 	moveCursorRight(1);
 }
 ////////void moveCursorLeft(uint8_t positions){while(--positions>=0)cursorLeft();}
-void writeRestOfCommand(Token* pToken){
-	Token* pCommandToken=pToken;
-	uint8_t position=cursorPosition-pToken->offset; // left to write of current token
-	outputTokenColor(pCommandToken);
-	printf("%s",string_remainder(pToken->text,position));
-	// write the rest of the tokens
-	pCommandToken=pToken->next;
-	while(pCommandToken!=NULL){outputToken(pCommandToken);pCommandToken=pCommandToken->next;}
+// write rest of command will return the number of characters written
+void writeTokens(Token* pFirstToken){
+	Token* token=pFirstToken;
+	while(token!=NULL){outputToken(token);token=token->next;}
+}
+void writeRestOfCommand(){
+	uint16_t leftToWrite=commandLength-cursorPosition;
+	if(leftToWrite){		
+		outputTokenColor(pToken);printf("%s",string_remainder(pToken->text,cursorPosition-pToken->offset));
+		// write the rest of the tokens
+		writeTokens(pToken->next);
+		moveCursorLeft(leftToWrite);
+	}
 }
 Token* commandDown(){
 	commandIndex--;
@@ -472,7 +529,14 @@ Token* commandUp(){
 	commandIndex++;
 	return commands[commandIndex];
 }
+void clearCommand(){
+	freeToken(pCommand);
+	pCommand=NULL;
+	pToken=NULL; // we shouldn't have a current token if we do not have a command anymore
+}
 void switchToControlMode(char* message){
+	if(pCommand!=NULL)clearCommand();
+	resetOutputColor();
 	if(message!=NULL)printf("\n%s",message);
 	if(!commandInput)return;
 	commandInput=false;
@@ -481,9 +545,7 @@ void switchToControlMode(char* message){
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
-	if(cursorPosition==0)return;
-	moveCursorLeft(cursorPosition);
-	cursorPosition=0;
+	if(cursorPosition>0){moveCursorLeft(cursorPosition);cursorPosition=0;}
 	clearScreenFromCursor();
 	/* replacing:
 	while(characterCount>0){
@@ -492,17 +554,66 @@ void backToPrompt(){
 	}
 	*/
 }
+
+void newCommand(){
+	commandLength=0;
+	pCommand=newToken(NULL);
+	pToken=pCommand;
+	resetOutputColor(); // TODO do we need this here?????
+}
+void echoCommand(){
+	Token* token=pCommand;
+	resetOutputColor();
+	while(token){printf("%s",string(token->text));token=token->next;}
+}
+/**
+ * setCommand() is used to either create a new empty command or copy the given command, and start at the end of that command on the screen
+ * ASSUMPTION should only be called when at the prompt (cursorPosition=0) ready for starting or changing a command
+ */
+void setCommand(Token* pNewCommand){
+	// ASSERT let's assume we're at the prompt (i.e. cursorPosition==0 and pCommand==NULL)
+	// NO we cannot assume that because there might be a command currently showing at the prompt
+	if(pCommand){clearCommand();backToPrompt();} // if we have a command get rid of it and ascertain to be at the prompt!!
+	// the problem is that we do NOT want to actually change the new command, so we have to copy it somehow
+	newCommand(); // NOTE might fail, in which case pToken will be NULL!!
+	if(pNewCommand){ // something to copy
+		// at least once we need to set pToken!!!
+		Token* pNewToken=pNewCommand; // first token to copy!!
+		// NOTE theoretically pToken could be NULL due to newToken() failing to create a new token
+		while(pToken){
+			// if failing to copy the text over get rid of the command constructed so far, and break
+			if(!string_copy(pNewToken->text,pToken->text)){clearCommand();break;}
+			commandLength+=string_length(pToken->text);
+			// some additional fields to copy over (NOT the offset is that is set automatically)
+			pToken->type=pNewToken->type;
+#ifdef __DEBUG__
+            printf("%d:%s",pToken->type,string(pToken->text));
+#endif
+			pNewToken=pNewToken->next;
+			if(!pNewToken)break;
+			// we're going to need another token!!!
+			pToken=newToken(pToken);
+		}
+#ifdef __DEBUG__
+		echoCommand();
+#endif
+	}else // a new command!!
+		commandIndex=commandCount;
+	// if we end up with a command, show it...
+	cursorPosition=commandLength;
+	if(cursorPosition>0)writeTokens(pCommand);
+}
 int main(){
 
 	// TODO allow non-interactive mode i.e. execute commands from an M source file
 	prepareForUserInput();
 
-	//////////outputColor(ERROR_COLOR);
+	resetOutputColor(); // just in case
 	printf("\nWelcome to M.\n");
 	printf("\nUse Ctrl-Z to exit M immediately at any time.\n");
 
-	Token* pCommand=NULL; // the current command (token)
-	uint16_t commandLength=0; // keep track of the total command length...
+	pCommand=NULL; // the current command (token)
+	commandLength=0; // keep track of the total command length...
 	commandInput=true; // TODO should this go into promptForUserInput()?
 	char inputCharacterType;
 	while(1){
@@ -525,20 +636,34 @@ int main(){
 			////////putchar('@');
 			if(inputChar>127)continue; // undefined input character
 			inputCharacterType=INPUTCHARACTERTYPES[inputChar];
-/*
 #ifdef __DEBUG__
 			printf("(%c)",inputCharacterType);
 #endif
-*/
 			// special (control) input character types
 			// first the ones that will break
 			if(inputCharacterType=='n')break; // end-of-line (CR of LF) character
 			if(inputCharacterType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
 			if(inputCharacterType=='-')continue; // input character without specific purpose
+			if(inputCharacterType=='b'||inputCharacterType=='d'){ // backspace or delete
+				// something to remove?
+				if(commandLength){ // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
+					char removedCharacter=removedTokenCharacter(1);
+					if(removedCharacter){
+						commandLength--; // decrement the total command length
+						if(commandLength==0)pCommand=NULL;
+						// on screen as well please
+						cursorLeft(); // will decrement cursorPosition
+						clearScreenFromCursor(); // will clear what's behind the cursor
+						if(pCommand)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
+					}else
+						switchToControlMode("Switching to control mode, due to failing to remove the intended character!");
+				}else // nothing to remove
+					beep();
+				continue;
+			}
 			if(inputCharacterType=='c'){ // cancel command (Ctrl-D)
 				if(pCommand!=NULL){
-					freeToken(pCommand);
-					pCommand=NULL; // TODO why do I need to do this???
+					clearCommand();
 					backToPrompt();
 				}else
 					beep();
@@ -549,12 +674,22 @@ int main(){
 					if(inputChar==91){
 						if(inputCharRead()){
 							if(inputChar==65){ // up arrow
+								if(!commandLength)
+									beep();
+								else
 								if(commandIndex>0)
-									pCommand=commandDown();
+									setCommand(commandDown());
+								else
+									outputInfo("No previous command!");
 							}else
 							if(inputChar==66){ // down arrow
-								if(commandIndex<commandCount)
-									pCommand=commandUp();
+								if(!commandLength)
+									beep();
+								else
+								if(commandIndex+1<commandCount)
+									setCommand(commandUp());
+								else
+									outputInfo("No next command!");
 							}else
 							if(inputChar==67){ // right arrow
 								if(cursorPosition<commandLength){
@@ -587,11 +722,12 @@ int main(){
 				////////printf(" (%d)",inputChar);
 				// we need to have a token (to append the input character to) which initializes to pCommand
 				if(pCommand==NULL){ // no first command token
-					commandLength=0;
-					pCommand=pToken=newToken(NULL); // the fist token in the command does not have a predecessor
+					setCommand(NULL); // will also set commandLength!!!
+/*
 #ifdef __DEBUG__
 					printf("@%p",pCommand);
 #endif
+*/
 					//////////if(pToken==NULL)printf("?");
 				}
 				// if still NULL (also when we fail to actually create a new first command token)
@@ -607,9 +743,11 @@ int main(){
 					// TODO will be different if we're inserting characters
 					if(newTokenType>=0&&newTokenType!=pToken->type){ // character ends the current token
 						pToken=newToken(pToken);
+/*
 #ifdef __DEBUG__
 						printf("@%p=%p?:%s",pCommand,pToken,string(pCommand->text));
 #endif
+*/
 						pToken->type=newTokenType;
 						// TODO should we write the associated colors here?????
 						outputTokenColor(pToken);
@@ -623,11 +761,7 @@ int main(){
 					putchar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
 					cursorPosition++; // increment the current cursor position
 					// write all remaining characters in the command after which we should return to the current position
-					uint16_t leftToWrite=commandLength-cursorPosition;
-					if(leftToWrite>0){
-						writeRestOfCommand(pToken);
-						moveCursorLeft(leftToWrite);
-					}
+					writeRestOfCommand();
 				}else
 					switchToControlMode("Switching to control mode, due to failing to create a new command!");
 			}else{
@@ -644,14 +778,20 @@ int main(){
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				// if the command ended with a normal end-of-line character, evaluate and register the command
 				if(pCommand!=NULL){
-					if(!evaluateCommand(pCommand))
-						switchToControlMode("Switching to control mode, due to failing to evaluate the command.");
-					else
-					if(!registerCommand(pCommand))
+					// typically the command will not evaluate if it is not complete
+					if(!evaluateCommand()){
+						printf("\nFailed to evaluate the command!");
+						clearCommand();
+					}else
+					if(!registerCommand()){
 						switchToControlMode("Switching to control mode, due to failing to register the command.");
+						clearCommand();
+					}else{ // evaluated AND registered, go back to the top
+						commandIndex=commandCount;
+						pCommand=NULL; // prepare for a new command BUT do not clear the command because it was registered!!!
+					}
 				}else
 					printf("\nNo command to evaluate.");
-				pCommand=NULL; // prepare for a new command TODO should this not be part of prompting????
 			}else // always to return to command input!!
 				commandInput=true;
 		}

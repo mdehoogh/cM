@@ -22,6 +22,25 @@ mstring* string_create(){
     return ans;
 }
 
+bool string_copy(mstring* src,mstring* dst){
+    if(src!=NULL&&dst!=NULL){
+        if(src->length){ // there needs to be something to copy (NOTE we're not allocating down ever!!!!)
+            // if we have more blocks for chars in src we have to realloc
+            if(src->blocks>dst->blocks){
+                char* new_str=realloc(dst->chars,BLOCK_SIZE*(src->blocks)*sizeof *(src->chars));
+                if(!new_str)return false; // re-allocation failed!!!
+                dst->blocks=src->blocks;
+                dst->chars=new_str;
+            }
+            // ready to copy the characters over (one more than the length!)
+            dst->length=src->length;
+            strcpy(dst->chars,src->chars); // probably better than using memcpy as we do NOT have to tell where src->chars ends!!
+        }
+        return true;
+    }
+    return false;
+}
+
 /** Free the memory associated with a String */
 void string_dispose(mstring *str){
     if(str!= NULL){
@@ -47,6 +66,22 @@ char string_char(mstring* str,uint16_t pos){
 
 char string_last_char(mstring *str){
     return(str!=NULL?(str->length>0?str->chars[str->length-1]:'\0'):'\0');
+}
+
+char string_removed_char(mstring* str,uint16_t pos){
+    char rc='\0';
+    if(str!=NULL){
+        uint16_t l=str->length;
+        if(pos<l){
+            --(str->length); // one less long
+            rc=str->chars[pos]; // remember the character that is being removed!!
+            // we have to move characters pos through str->length down
+            // NOTE we have \0 at position str->length, so we have to move that one as well!!!    
+            char c;     
+            while(l>pos){c=str->chars[l];str->chars[--l]=c;}
+        }
+    }
+    return rc;
 }
 
 /** insert char c at position pos in the given string */
