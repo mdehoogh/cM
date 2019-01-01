@@ -152,13 +152,14 @@ void backspace(){ // means go one position to the left on the current line, and 
 }
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 uint32_t commandCount=0; // the total number of command input
-
+uint32_t commandIndex=0;
 // keeping track of both the cursor position and the total command length
 uint16_t cursorPosition=0,commandLength=0;
 
 uint8_t promptLength=0;
 void prompt(){
 	resetOutputColor();
+	///////////printf("%d-",commandIndex);
 	char str[11]; // with a maximum of 2,xxx,xxx,xxx 11 positions would suffice
 	sprintf(str,"%u",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
 	printf("%s%s",str," >> ");
@@ -190,9 +191,10 @@ void outputText(char* text){
 }
 void outputInfo(char* info){
 	oneLineUp();
+	toStartOfLine();
 	clearLine();
 	toStartOfLine();
-	outputText(info);
+	if(strlen(info))outputText(info);
 	oneLineDown();
 	toStartOfLine();
 	moveCursorRight(promptLength+cursorPosition);
@@ -307,8 +309,7 @@ Token* newToken(Token* prevToken){
 // keep track of the user input count
 Token* pCommand=NULL; // the current command
 Token** commands=NULL; // array for storing the pointers to the first token of all commands entered
-unsigned long commandBlocks=0;
-unsigned long commandIndex=0;
+uint32_t commandBlocks=0;
 bool registerCommand(){
 	if(!pCommand)return false;
 	if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
@@ -318,8 +319,7 @@ bool registerCommand(){
 		if(newCommands==NULL)return false;
         commands=newCommands;
 	}
-	commands[commandCount]=pCommand;
-	commandCount++;
+	commands[commandCount++]=pCommand;
 	return true;
 }
 
@@ -564,16 +564,17 @@ void backToPrompt(){
  * setCommandIndex() accepts @newCommandIndex between 0 and commandCount at most
  * but 0 is now also accepted, returning to show pCommand (if any)
  */
-void setCommandIndex(uint16_t newCommandIndex){
+void setCommandIndex(uint32_t newCommandIndex){
 	commandIndex=newCommandIndex;
 	if(commandIndex){
-		char infoText[80];snprintf(infoText,80,"Showing registered command #%lu.",(commandCount-commandIndex+1));
+		char infoText[80];snprintf(infoText,80,"Showing registered command #%u.",(commandCount-commandIndex+1));
 		outputInfo(infoText);
 	}else
 		outputInfo("");
 	// we're supposed to show one of the remembered commands
 	backToPrompt();
 	commandLength=cursorPosition=writeTokens(commandIndex?commands[commandCount-commandIndex]:pCommand);
+	/////////////printf("(%d)",commandLength);
 }
 bool commandDown(){
 	if(commandIndex>=commandCount)return false;
@@ -596,7 +597,9 @@ void echoCommand(){
 	resetOutputColor();
 	while(token){printf("%s",string(token->text));token=token->next;}
 }
-
+Token* getCommand(){
+	return(commandIndex?commands[commandCount-commandIndex]:pCommand);
+}
 // NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual newCommand
 /**
  * setCommand() creates a new (empty) command (in pCommand) and initializes it to the token in pNewCommand (the command pointed to by commandIndex)
@@ -709,7 +712,10 @@ int main(){
 					if(inputChar==91){
 						if(inputCharRead()){
 							if(inputChar==65){ // up arrow i.e. show previous command if any
-								if(!commandLength||!commandDown())
+								if(pCommand)
+									outputInfo("Won't show previous commands when one is being entered.");
+								else
+								if(!commandDown())
 									beep();
 								/*
 								else
@@ -718,7 +724,10 @@ int main(){
 								*/
 							}else
 							if(inputChar==66){ // down arrow
-								if(!commandLength||!commandUp())
+								if(pCommand)
+									outputInfo("No next command!");
+								else 
+								if(!commandUp())
 									beep();
 								/*
 								else
@@ -813,7 +822,10 @@ int main(){
 			if(commandInput){ // the newline character ends the command to be evaluated!!
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				// if the command ended with a normal end-of-line character, evaluate and register the command
-				if(pCommand!=NULL){
+				// NOTE if pCommand is not set yet, but the user retrieved a previously executed command, that one should be reexecuted
+				//      and registered (of course it will be pointing to the same chain of tokens but it might evaluated differently now)
+				if(!pCommand)if(commandIndex)pCommand=commands[commandCount-commandIndex];
+				if(pCommand){
 					// typically the command will not evaluate if it is not complete
 					if(!evaluateCommand()){
 						printf("\nFailed to evaluate the command!");
@@ -826,8 +838,9 @@ int main(){
 						commandIndex=0;
 						pCommand=NULL; // prepare for a new command BUT do not clear the command because it was registered!!!
 					}
-				}else
+				}else{
 					printf("\nNo command to evaluate.");
+				}
 			}else // always to return to command input!!
 				commandInput=true;
 		}
