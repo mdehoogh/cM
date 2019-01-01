@@ -184,11 +184,15 @@ void prompt(){
  *   ESC [nm enables rendition n (0=normal, 4=bold, 5=blinking, 7=reverse)
  *   ESC M scrolls the screen backwards if the cursor is on the top line
  */
+void outputText(char* text){	
+	resetOutputColor(); 
+	printf("%s",text);
+}
 void outputInfo(char* info){
 	oneLineUp();
 	clearLine();
 	toStartOfLine();
-	printf("%s",info);
+	outputText(info);
 	oneLineDown();
 	toStartOfLine();
 	moveCursorRight(promptLength+cursorPosition);
@@ -224,13 +228,21 @@ void outputLastTokenChar(Token* pToken){
 	putchar(string_last_char(pToken->text));
 	//////////resetOutputColor();
 }
-
-void freeToken(Token* pToken){
-	if(pToken==NULL)return;
-	// free text and next fields FIRST
-	if(pToken->text!=NULL)free(pToken->text);
-	if(pToken->next!=NULL)freeToken(pToken->next);
-	free(pToken);
+/**
+ * freeToken() frees the memory @pToken points to and returns true on successfully removing the entire chain of tokens it points to
+ * will only return false if failing to actually free the token pointed to!!!
+ */
+bool freeToken(Token* pToken){
+	if(pToken!=NULL){
+		// free text and next fields FIRST // NOTE apparently in C there's no need to test for the pointer being NULL as free() will do that for us
+		// next() first, because when that feels we still want the text to be around!!
+		// if pToken->next is NULL will return true so should be OK in that situation (we don't want to check twice)
+		// NOTE that we do not NULL the pointer anywhere, but the structure with the pointer is freed so the next field will not be around anymore!!
+		if(!freeToken(pToken->next))return false;
+		free(pToken->text);
+		free(pToken);
+	}
+	return true;
 }
 
 // MDH@19DEC2018: I want to represent the state transition from the current token type to the next token type
@@ -508,9 +520,11 @@ void cursorRight(){
 }
 ////////void moveCursorLeft(uint8_t positions){while(--positions>=0)cursorLeft();}
 // write rest of command will return the number of characters written
-void writeTokens(Token* pFirstToken){
+uint16_t writeTokens(Token* pFirstToken){
+	uint16_t tokenCharactersWritten=0;
 	Token* token=pFirstToken;
-	while(token!=NULL){outputToken(token);token=token->next;}
+	while(token!=NULL){outputToken(token);tokenCharactersWritten+=string_length(token->text);token=token->next;}
+	return tokenCharactersWritten;
 }
 void writeRestOfCommand(){
 	uint16_t leftToWrite=commandLength-cursorPosition;
@@ -521,21 +535,13 @@ void writeRestOfCommand(){
 		moveCursorLeft(leftToWrite);
 	}
 }
-Token* commandDown(){
-	commandIndex--;
-	return commands[commandIndex];
-}
-Token* commandUp(){
-	commandIndex++;
-	return commands[commandIndex];
-}
 void clearCommand(){
-	freeToken(pCommand);
+	if(!freeToken(pCommand))return;
 	pCommand=NULL;
 	pToken=NULL; // we shouldn't have a current token if we do not have a command anymore
 }
 void switchToControlMode(char* message){
-	if(pCommand!=NULL)clearCommand();
+	clearCommand();
 	resetOutputColor();
 	if(message!=NULL)printf("\n%s",message);
 	if(!commandInput)return;
@@ -554,7 +560,31 @@ void backToPrompt(){
 	}
 	*/
 }
-
+/**
+ * setCommandIndex() accepts @newCommandIndex between 0 and commandCount at most
+ * but 0 is now also accepted, returning to show pCommand (if any)
+ */
+void setCommandIndex(uint16_t newCommandIndex){
+	commandIndex=newCommandIndex;
+	if(commandIndex){
+		char infoText[80];snprintf(infoText,80,"Showing registered command #%lu.",(commandCount-commandIndex+1));
+		outputInfo(infoText);
+	}else
+		outputInfo("");
+	// we're supposed to show one of the remembered commands
+	backToPrompt();
+	commandLength=cursorPosition=writeTokens(commandIndex?commands[commandCount-commandIndex]:pCommand);
+}
+bool commandDown(){
+	if(commandIndex>=commandCount)return false;
+	setCommandIndex(commandIndex+1);
+	return true;
+}
+bool commandUp(){
+	if(commandIndex==0)return false;
+	setCommandIndex(commandIndex-1);
+	return true;
+}
 void newCommand(){
 	commandLength=0;
 	pCommand=newToken(NULL);
@@ -566,9 +596,13 @@ void echoCommand(){
 	resetOutputColor();
 	while(token){printf("%s",string(token->text));token=token->next;}
 }
+
+// NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual newCommand
 /**
- * setCommand() is used to either create a new empty command or copy the given command, and start at the end of that command on the screen
+ * setCommand() creates a new (empty) command (in pCommand) and initializes it to the token in pNewCommand (the command pointed to by commandIndex)
+ *              which is supposedly showing behind the cursor!!!
  * ASSUMPTION should only be called when at the prompt (cursorPosition=0) ready for starting or changing a command
+ * setCommand() won't show the command anymore as we assume that any registered command passed in is already showing!!!
  */
 void setCommand(Token* pNewCommand){
 	// ASSERT let's assume we're at the prompt (i.e. cursorPosition==0 and pCommand==NULL)
@@ -597,11 +631,12 @@ void setCommand(Token* pNewCommand){
 #ifdef __DEBUG__
 		echoCommand();
 #endif
-	}else // a new command!!
-		commandIndex=commandCount;
+	}/*else commandIndex=0; // don't think we need this anymore, as pNewCommand will only be NULL when commandIndex==0 */
+	/* won't echo what is supposedly already there!!!)
 	// if we end up with a command, show it...
 	cursorPosition=commandLength;
 	if(cursorPosition>0)writeTokens(pCommand);
+	*/
 }
 int main(){
 
@@ -673,23 +708,23 @@ int main(){
 				if(inputCharRead()){
 					if(inputChar==91){
 						if(inputCharRead()){
-							if(inputChar==65){ // up arrow
-								if(!commandLength)
+							if(inputChar==65){ // up arrow i.e. show previous command if any
+								if(!commandLength||!commandDown())
 									beep();
+								/*
 								else
-								if(commandIndex>0)
-									setCommand(commandDown());
-								else
+								if(!commandDown())
 									outputInfo("No previous command!");
+								*/
 							}else
 							if(inputChar==66){ // down arrow
-								if(!commandLength)
+								if(!commandLength||!commandUp())
 									beep();
+								/*
 								else
-								if(commandIndex+1<commandCount)
-									setCommand(commandUp());
-								else
+								if(!commandUp())
 									outputInfo("No next command!");
+								*/
 							}else
 							if(inputChar==67){ // right arrow
 								if(cursorPosition<commandLength){
@@ -722,7 +757,8 @@ int main(){
 				////////printf(" (%d)",inputChar);
 				// we need to have a token (to append the input character to) which initializes to pCommand
 				if(pCommand==NULL){ // no first command token
-					setCommand(NULL); // will also set commandLength!!!
+					// if commandIndex we should one of the registered commands
+					setCommand(commandIndex?commands[commandCount-commandIndex]:NULL); // will also set commandLength!!!
 /*
 #ifdef __DEBUG__
 					printf("@%p",pCommand);
@@ -787,7 +823,7 @@ int main(){
 						switchToControlMode("Switching to control mode, due to failing to register the command.");
 						clearCommand();
 					}else{ // evaluated AND registered, go back to the top
-						commandIndex=commandCount;
+						commandIndex=0;
 						pCommand=NULL; // prepare for a new command BUT do not clear the command because it was registered!!!
 					}
 				}else
