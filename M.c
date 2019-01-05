@@ -308,6 +308,7 @@ Token* newToken(Token* prevToken){
 
 // keep track of the user input count
 Token* pCommand=NULL; // the current command
+
 Token** commands=NULL; // array for storing the pointers to the first token of all commands entered
 uint32_t commandBlocks=0;
 bool registerCommand(){
@@ -335,6 +336,16 @@ static const char* TOKENTYPE_STRING[]={
 // all lowercase characters represent control characters, like t=tab, n=newline, x=escape control character,o=switch to control mode,d=delete,b=backspace
 // O=operator that can be either unary or binary depending on its position (+ and - characters)
 // use x for eXit (e.g. with Ctrl-C and Ctrl-Z), c for cancel command, and m for going into M (control) mode
+// as for operators: there are 8 different groups of operators
+// !     not unary operator or first character of binary operator !=
+// ~     pure unary operator
+// -+    sign unary operator or binary minus/plus operator
+// %^    pure binary operator
+// */    binary operator extensible to make ** power operator or // integer division operator
+// <>    binary operator extensible to make << or >> operator but can also be followed by an = sign (is this not the same as */?)
+// =     assignment operator that can follow most of the binary operators (except < and >)
+// |&    binary or and operator extensible to make || logical or or && logical and operator but the latter cannot be followed by =
+
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
 const char INPUTCHARACTERTYPES[]="---c----btn--n------------xm----WUDCLBBS()BO,O.BNNNNNNNNNN:;BAB?@LLLLLLLLLLLLLLLLLLLLLLLLLL[B]BLoLLLLELLLLLLLLLLLLLLLLLLLLL{B}Ud";
 
@@ -526,6 +537,33 @@ uint16_t writeTokens(Token* pFirstToken){
 	while(token!=NULL){outputToken(token);tokenCharactersWritten+=string_length(token->text);token=token->next;}
 	return tokenCharactersWritten;
 }
+
+uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
+uint32_t commandPages=0; // the total number of command pages
+void setCommandPage(uint32_t newCommandPage){
+	commandPage=newCommandPage;
+	int32_t commandToShowIndex=10,lastCommandToShowIndex=commandCount-(commandPage*10);
+	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
+		resetOutputColor();printf("\n%d. ",lastCommandToShowIndex+commandToShowIndex+1);
+		writeTokens(commands[lastCommandToShowIndex+commandToShowIndex]);
+	}
+	resetOutputColor();
+	printf("\nSelect the last digit of the command to use, or the up/down key to show the next/previous page.");
+	printf("\n>> "); // TODO what kind of prompting do we want to do???
+}
+void showNextCommandPage(){
+	if(commandPage<commandPages)
+		setCommandPage(commandPage+1);
+	else
+		printf("\nNo further commands to show.");
+}
+void showPreviousCommandPage(){
+	if(commandPage>1)
+		setCommandPage(commandPage-1);
+	else
+		printf("\nNo further commands to show.");
+}
+
 void writeRestOfCommand(){
 	uint16_t leftToWrite=commandLength-cursorPosition;
 	if(leftToWrite){		
@@ -546,7 +584,7 @@ void switchToControlMode(char* message){
 	if(message!=NULL)printf("\n%s",message);
 	if(!commandInput)return;
 	commandInput=false;
-	printf("\nAvailable control options: eXit Assist.\n>> ");
+	printf("\nAvailable control options: eXit Assist History.\n>> ");
 }
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
@@ -711,12 +749,16 @@ int main(){
 				if(inputCharRead()){
 					if(inputChar==91){
 						if(inputCharRead()){
-							if(inputChar==65){ // up arrow i.e. show previous command if any
-								if(pCommand)
-									outputInfo("Won't show previous commands when one is being entered.");
-								else
-								if(!commandDown())
-									beep();
+							if(inputChar==65){ // up arrow 
+								if(commandInput){ // i.e. show previous command if any
+									if(pCommand)
+										outputInfo("Won't show previous commands when one is being entered.");
+									else
+									if(!commandDown())
+										beep();
+								}else
+								if(!commandPage)
+									showPreviousCommandPage();
 								/*
 								else
 								if(!commandDown())
@@ -724,11 +766,15 @@ int main(){
 								*/
 							}else
 							if(inputChar==66){ // down arrow
-								if(pCommand)
-									outputInfo("No next command!");
-								else 
-								if(!commandUp())
-									beep();
+								if(commandInput){									
+									if(pCommand)
+										outputInfo("No next command!");
+									else 
+									if(!commandUp())
+										beep();
+								}else
+								if(!commandPage)
+									showNextCommandPage();
 								/*
 								else
 								if(!commandUp())
@@ -811,9 +857,24 @@ int main(){
 					switchToControlMode("Switching to control mode, due to failing to create a new command!");
 			}else{
 				putchar(inputChar); // nice to see the character we typed...
-				// an option character!!!
-				if(inputChar=='x'||inputChar=='X')exit(0);else
-				if(inputChar=='a'||inputChar=='A'){assisting=!assisting;printf("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));}
+				// might be paging through the commands
+				if(!commandPage){ // not currently paging through the commands
+					// an option character!!!
+					if(inputChar=='x'||inputChar=='X')exit(0);else
+					if(inputChar=='a'||inputChar=='A'){assisting=!assisting;printf("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));}
+					if(inputChar=='h'||inputChar=='H'){
+						// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
+						// we could call them a, b, c etc.
+						if(commandCount){
+							commandPages=1+(commandCount-1)/10;
+							showNextCommandPage(); // as soon as commandPage>0 we are paging...
+						}else
+							printf("\nNo previous commands to show.");
+					}
+				}else{
+					// user might have selected one of the commands (letter a through j)
+					commandPage=0; // stop paging
+				}
 			}
 		}
 		// if eXit input character(s) received...
