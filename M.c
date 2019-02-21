@@ -212,6 +212,7 @@ typedef struct Token{
 	uint8_t /*TokenType*/ type; // actually the index into the TOKENTYPES array!!!
 	uint8_t offset; // number of character in front of this token in the command
 	mstring* text;
+	struct Token* expr; // the expression this token is part of
 	struct Token* prev; // we need this during user input
 	struct Token* next;
 }Token;
@@ -293,6 +294,7 @@ Token* newToken(Token* prevToken){
 	Token* pNewToken=malloc(sizeof(Token));
 	if(prevToken!=NULL)prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
 	if(pNewToken!=NULL){
+		pNewToken->expr=(prevToken!=NULL?prevToken->expr:NULL); // copy the pointer to the expression this token is part of
 		pNewToken->offset=(prevToken!=NULL?prevToken->offset+string_length(prevToken->text):0);
 		pNewToken->prev=prevToken;
 		pNewToken->type=TT_WHITESPACE; // start with a whitespace token (currently empty!!)
@@ -347,7 +349,7 @@ static const char* TOKENTYPE_STRING[]={
 // |&    binary or and operator extensible to make || logical or or && logical and operator but the latter cannot be followed by =
 
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="---c----btn--n------------xm----WUDCLBBS()BO,O.BNNNNNNNNNN:;BAB?@LLLLLLLLLLLLLLLLLLLLLLLLLL[B]BLoLLLLELLLLLLLLLLLLLLLLLLLLL{B}Ud";
+const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%|S()*+,-.*NNNNNNNNNN:;<=<?@LLLLLLLLLLLLLLLLLLLLLLLLLL[%]%LoLLLLELLLLLLLLLLLLLLLLLLLLL{B}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
 // NOTE this can be organized in many ways perhaps it's easiest to tell per input character what the transformation is
@@ -358,36 +360,38 @@ const char INPUTCHARACTERTYPES[]="---c----btn--n------------xm----WUDCLBBS()BO,O
 // it's easier to tell for any possible resulting token type which input character types will result in that type
 // it's a hell of a job to create the token type transitions matrix
 char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={
-	"*","!#","","","W",
+	" ","!#","","","W",
 	"LEN","N","N","N","!D",
 	"!S","","","","",
-	"","","","","",
+	"","","","%*<|","",
 	"","",""
 };
+// operator input type characters: ! ~ + - % * < = | (8 different operator groups)
+// ! ~ and + start a unary operator when a value is expected
 const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* ERROR */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* COMMENT */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* ENDOFCOMMENT */ \
-	{"BOU  ","C"," "," "," "," ","N"," "," ","","","","","",""," "," "," "," ","","","",""}, /* EXPRESSION */ \
-	{"BOU  ","C"," "," "," ","L","N"," "," ","","","","","",""," "," "," "," ","","","",""}, /* WHITESPACE */ \
-	{"     ","C"," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* VARIABLE: some identifier not yet recognized as function name */ \
-	{"LDS  ","C"," "," "," "," "," ",".","E","","","","","",""," ","U","O","B","","","",""}, /* INTEGER: (signless) list of digits */ \
-	{"LDS. ","C"," "," "," "," "," "," ","E","","","","","",""," "," "," "," ","","","",""}, /* REAL: part behind a decimal period */ \
-	{"LDS.E","C"," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* DQSTRING: double quoted string */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* SQSTRING: single quoted string */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* END_SQSTRING single quoted string at end of single quoted string */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* LIST: [ opens a list */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* LIST_ELEMEMT: , in list */ \
-	{"     ","C"," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* END_OF_LIST: behind ] that ends a list */ \
-	{"     ","C"," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* UNARY_OPERATOR: a single-character uniquely defining a unary operator: ! and ~ */ \
-	{"     ","C"," "," "," "," ","N"," "," ","","","","","",""," "," "," "," ","","","",""}, /* OPERATOR: a single character defining either a unary or binary operator: + or - */ \
-	{"     ","C"," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* BINARY_OPERATOR: characters defining a binary operator */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* FUNCTION: some identifier recognized as function name */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* FUNCTION_CALL ( following the name of a function */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
-	{"     "," "," "," "," "," "," "," "," ","","","","","",""," "," "," "," ","","","",""}, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+	{"       "," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* ERROR */ \
+	{"       "," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* COMMENT */ \
+	{"       "," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* ENDOFCOMMENT */ \
+	{"%*<|   ","C"," "," "," ","  ","N"," "," ","","","","","",""," ","!~+-"," ","       ","","","",""}, /* EXPRESSION */ \
+	{"%*<|   ","C"," "," "," ","LE","N"," "," ","","","","","",""," ","!~+-"," ","       ","","","",""}, /* WHITESPACE */ \
+	{"~DS.   ","C"," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","!+-%*<|","","","",""}, /* VARIABLE: some identifier not yet recognized as function name */ \
+	{"~LDS   ","C"," "," "," ","  "," ",".","E","","","","","",""," ","    ","O","!+-%*<|","","","",""}, /* INTEGER: (signless) list of digits */ \
+	{"~LDS.  ","C"," "," "," ","  "," "," ","E","","","","","",""," ","    "," ","!+-%*<|","","","",""}, /* REAL: part behind a decimal period */ \
+	{"~LDS.E ","C"," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","!+-%*<|","","","",""}, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
+	{"!~-%*<|"," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","+      ","","","",""}, /* DQSTRING: double quoted string */ \
+	{"!~-%*<|"," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","+      ","","","",""}, /* SQSTRING: single quoted string */ \
+	{"!~     "," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+	{"|~     "," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* END_SQSTRING single quoted string at end of single quoted string */ \
+	{"%*<|   "," "," "," "," ","  "," "," "," ","","","","","",""," ","!~+-"," ","       ","","","",""}, /* LIST: [ opens a list */ \
+	{"%*<|   "," "," "," "," ","  "," "," "," ","","","","","",""," ","!~+-"," ","       ","","","",""}, /* LIST_ELEMEMT: , in list */ \
+	{"!~     ","C"," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","+-%*<| ","","","",""}, /* END_OF_LIST: behind ] that ends a list */ \
+	{"%*<|   ","C"," "," "," ","LE","N"," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* UNARY_OPERATOR: a single-character uniquely defining a unary operator: ! and ~ */ \
+	{"       ","C"," "," "," ","LE","N"," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* OPERATOR: a single character defining either a unary or binary operator: + or - */ \
+	{"       ","C"," "," "," ","LE","N"," "," ","","","","","",""," ","!~+-"," ","       ","","","",""}, /* BINARY_OPERATOR: characters defining a binary operator */ \
+	{"%*<|   "," "," "," "," ","LE","N"," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* FUNCTION: some identifier recognized as function name */ \
+	{"       "," "," "," "," ","LE","N"," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* FUNCTION_CALL ( following the name of a function */ \
+	{"       "," "," "," "," ","LE","N"," "," ","","","","","",""," ","    "," ","       ","","","",""}, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
+	{"~      "," "," "," "," ","  "," "," "," ","","","","","",""," ","    "," ","!+-%<=|","","","",""}, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -719,7 +723,7 @@ int main(){
 			// first the ones that will break
 			if(inputCharacterType=='n')break; // end-of-line (CR of LF) character
 			if(inputCharacterType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
-			if(inputCharacterType=='-')continue; // input character without specific purpose
+			if(inputCharacterType=='i')continue; // insignificant input character without specific purpose
 			if(inputCharacterType=='b'||inputCharacterType=='d'){ // backspace or delete
 				// something to remove?
 				if(commandLength){ // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
