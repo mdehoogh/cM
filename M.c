@@ -86,7 +86,11 @@ bool commandInput; // whether or not in command mode
 char inputChar; // the last read input character
 int inputCharRead(){
 	if(!rawMode)enableRawMode();
-	return(read(STDIN_FILENO,&inputChar,1)==1);
+	if(read(STDIN_FILENO,&inputChar,1)==1){
+		//printf("{%i}",inputChar);
+		return 1;
+	}
+	return 0;
 }
 
 const char DEBUG_COLOR[]="8"; // light gray
@@ -683,6 +687,19 @@ void setCommand(Token* pNewCommand){
 	if(cursorPosition>0)writeTokens(pCommand);
 	*/
 }
+void removePreviousTokenCharacter(){
+	char removedCharacter=removedTokenCharacter(1);
+	if(removedCharacter){
+		commandLength--; // decrement the total command length
+		if(commandLength==0)pCommand=NULL;
+		// on screen as well please
+		cursorLeft(); // will decrement cursorPosition
+		clearScreenFromCursor(); // will clear what's behind the cursor
+		if(pCommand)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
+	}else
+		switchToControlMode("Switching to control mode, due to failing to remove the intended character!");
+}
+
 int main(){
 
 	// TODO allow non-interactive mode i.e. execute commands from an M source file
@@ -714,6 +731,7 @@ int main(){
 		// Ctrl-D to exit M
 		while(inputCharRead()){
 			////////putchar('@');
+			////printf("[%i]",inputChar);
 			if(inputChar>127)continue; // undefined input character
 			inputCharacterType=INPUTCHARACTERTYPES[inputChar];
 #ifdef __DEBUG__
@@ -726,18 +744,9 @@ int main(){
 			if(inputCharacterType=='i')continue; // insignificant input character without specific purpose
 			if(inputCharacterType=='b'||inputCharacterType=='d'){ // backspace or delete
 				// something to remove?
-				if(commandLength){ // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
-					char removedCharacter=removedTokenCharacter(1);
-					if(removedCharacter){
-						commandLength--; // decrement the total command length
-						if(commandLength==0)pCommand=NULL;
-						// on screen as well please
-						cursorLeft(); // will decrement cursorPosition
-						clearScreenFromCursor(); // will clear what's behind the cursor
-						if(pCommand)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
-					}else
-						switchToControlMode("Switching to control mode, due to failing to remove the intended character!");
-				}else // nothing to remove
+				if(commandLength) // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
+					removePreviousTokenCharacter();
+				else // nothing to remove
 					beep();
 				continue;
 			}
@@ -753,6 +762,18 @@ int main(){
 				if(inputCharRead()){
 					if(inputChar==91){
 						if(inputCharRead()){
+							if(inputChar==51){
+								if(inputCharRead()){
+									if(inputChar==126){ // delete
+										if(cursorPosition<commandLength){
+											// we could go one to the right and do a backspace!!
+											cursorRight();
+											removePreviousTokenCharacter();
+										}else // nothing under the cursor to delete
+											beep();
+									}
+								}
+							}else
 							if(inputChar==65){ // up arrow 
 								if(commandInput){ // i.e. show previous command if any
 									if(pCommand)
@@ -801,7 +822,8 @@ int main(){
 									}
 								}else
 									beep();
-							}
+							}else
+								beep();
 						}
 					}
 				}
