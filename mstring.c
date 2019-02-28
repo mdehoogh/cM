@@ -59,6 +59,16 @@ bool string_empty(mstring *str){
 uint16_t string_length(mstring* str){
     return(str==NULL?0:str->length);
 }
+ // MDH@26FEB2018: we might want to set the length (to a smaller one)
+bool string_setlength(mstring* str, uint16_t length){
+    if(str==NULL)return false;
+    if(length>str->length)return false;
+    if(length<str->length){
+        str->length=length;
+        str->chars[str->length]='\0';
+    }
+    return true;
+}
 
 char string_char(mstring* str,uint16_t pos){
     return(str!=NULL?(pos<str->length?str->chars[pos]:'\0'):'\0');
@@ -78,7 +88,7 @@ char string_removed_char(mstring* str,uint16_t pos){
             // we have to move characters pos through str->length down
             // NOTE we have \0 at position str->length, so we have to move that one as well!!!    
             char c;     
-            while(l>pos){c=str->chars[l];str->chars[--l]=c;}
+            while(pos<l){str->chars[pos]=str->chars[pos+1];pos++;}
         }
     }
     return rc;
@@ -102,9 +112,11 @@ void string_insert_char(mstring* str,uint16_t pos,char c){
                     }
                 }
                 if(l<str->blocks*BLOCK_SIZE){
+                    ///printf("%s",str->chars);
                     // we have to move characters at position pos onward one position up
-                    while(--l>=pos)str->chars[l+1]=str->chars[l];
+                    while(l>pos){str->chars[l]=str->chars[l-1];l--;}
                     str->chars[pos]=c;
+                    ///printf("->%s",str->chars);
                     ++(str->length);
                 }
             }else // at end, we have to call string_append_char because str->last_char will change
@@ -128,9 +140,16 @@ void string_append_char(mstring *str,char c){
         }
         if(l<str->blocks*BLOCK_SIZE){
             str->chars[str->length]=c;
-            str->chars[++(str->length)]='\0';
+            ++(str->length);
+            str->chars[str->length]='\0';
         }
     }
+}
+
+// MDH@26FEB2019: assuming cs is a zero-terminated character array
+void string_append(mstring *str,char* pc){
+    if(str==NULL)return;
+    while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 }
 
 char* string_remainder(mstring* str,uint16_t firstpos){
