@@ -305,7 +305,8 @@ void outputInfo(const char* fmt,...){
 void outputStatus(){
 	////////printf("[%u,%u]",cursorPosition,commandLength);
 	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
-	outputInfo("Status: Cursor position=%" PRIu16 " - command length=%" PRIu16 " - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
+	if(assisting)
+		outputInfo("Status: Cursor position=%" PRIu16 " - command length=%" PRIu16 " - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
 }
 
@@ -375,8 +376,8 @@ Token* pCommand=NULL; // the current command
 
 Token** commands=NULL; // array for storing the pointers to the first token of all commands entered
 uint32_t commandBlocks=0;
-bool registerCommand(){
-	if(!pCommand)return false;
+bool registerCommand(Token* pCommandToRegister){
+	if(!pCommandToRegister)return false;
 	if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 		// I have to copy all first token pointers to a new array large enough
 		commandBlocks++;
@@ -384,7 +385,7 @@ bool registerCommand(){
 		if(newCommands==NULL)return false;
         commands=newCommands;
 	}
-	commands[commandCount++]=pCommand;
+	commands[commandCount++]=pCommandToRegister;
 	return true;
 }
 
@@ -553,10 +554,10 @@ char removedTokenCharacter(uint16_t behindCursor){
 }
 
 // anything the user types is a sequence of tokens which we can store in a linked list
-bool evaluateCommand(){
-	if(pCommand==NULL)return false;
+bool evaluateCommand(Token* pCommandToEvaluate){
+	if(pCommandToEvaluate==NULL)return false;
 	printf("\nEvaluating '");
-	Token* pCommandToken=pCommand; // TODO can we get rid of using commandcount-1 here????
+	Token* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
 	while(pCommandToken!=NULL){
 /*
 #ifdef __DEBUG__
@@ -611,7 +612,7 @@ void writeCommand(){
 	// MDH@27FEB2019: before actually writing the current command (if any) we clear the behindCursorText as we are assumed to be at the end of the command
 	string_setlength(behindCursorText,0);
 	commandLength=cursorPosition=writeTokens(pCommand);
-	if(assisting)outputStatus();
+	outputStatus();
 }
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
 uint32_t commandPages=0; // the total number of command pages
@@ -673,10 +674,12 @@ void writeRestOfCommand(){ // writes rest of command assuming pToken is not NULL
 		moveCursorLeft(leftToWrite);
 	}
 }
-void clearCommand(){
-	if(!freeToken(pCommand))return;
+bool clearCommand(){
+	// MDH@
+	bool result=freeToken(pCommand);
 	pCommand=NULL;
 	pToken=NULL; // we shouldn't have a current token if we do not have a command anymore
+	return result;
 }
 void switchToControlMode(char* message){
 	clearCommand();
@@ -967,6 +970,8 @@ int main(int argc, char **argv){
 							}else
 							if(inputChar==68){ // left arrow
 								if(cursorPosition>0){
+									// TODO apparently pCommand will still be NULL when we're scrolling through the list of previous commands...
+									if(pCommand==NULL)if(commandIndex)setCommand(commands[commandCount-commandIndex]); // will also set commandLength!!!
 									// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into behindCursorText
 									bool success=false;
 									char c=removedTokenCharacter(1);
@@ -1052,9 +1057,11 @@ int main(int argc, char **argv){
 #endif
 					commandLength++; // increment total command length
 					putchar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
+					debugWrite("Command length after inserting %c: %" PRIu16 ".",inputChar,commandLength);
 					cursorPosition++; // increment the current cursor position
 
 					writeBehindCursorText();
+					debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength);
 					/* replacing:
 					// write all remaining characters in the command after which we should return to the current position
 					writeRestOfCommand();
@@ -1082,7 +1089,7 @@ int main(int argc, char **argv){
 					commandPage=0; // stop paging
 				}
 			}
-			if(commandInput)if(assisting)outputStatus();
+			if(commandInput)outputStatus();
 		}
 		// if eXit input character(s) received...
 		if(inputCharacterType=='x')break;
@@ -1092,23 +1099,29 @@ int main(int argc, char **argv){
 				// if the command ended with a normal end-of-line character, evaluate and register the command
 				// NOTE if pCommand is not set yet, but the user retrieved a previously executed command, that one should be reexecuted
 				//      and registered (of course it will be pointing to the same chain of tokens but it might evaluated differently now)
-				if(!pCommand)if(commandIndex)pCommand=commands[commandCount-commandIndex];
-				if(pCommand!=NULL&&cursorPosition>0){ // MDH@28FEB2019: cursorPosition indicates the position of the cursor (ending the command!!!)
-					// typically the command will not evaluate if it is not complete
-					if(!evaluateCommand()){
-						output("%s\n","Failed to evaluate the command!");
-						clearCommand();
-					}else
-					if(!registerCommand()){
-						switchToControlMode("Switching to control mode, due to failing to register the command.");
-						clearCommand();
-					}else{ // evaluated AND registered, go back to the top
-						commandIndex=0;
-						pCommand=NULL; // prepare for a new command BUT do not clear the command because it was registered!!!
-					}
+				Token* pCommandToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
+				if(pCommand){ // a current command being edited
+					if(cursorPosition>0)pCommandToEvaluate=pCommand; // but only when not at start of command!!!
 				}else{
-					output("%s\n","No command to evaluate.");
+					if(commandIndex)pCommandToEvaluate=commands[commandCount-commandIndex];
 				}
+				// if we succeeded in evaluating a command we should register it
+				if(pCommandToEvaluate!=NULL){
+					// typically the command will not evaluate if it is not complete
+					if(!evaluateCommand(pCommandToEvaluate)){
+						outputInfo("Failed to evaluate the command!");
+					}else
+					if(registerCommand(pCommandToEvaluate))
+						pCommand=NULL; // loose the reference to pCommand to prevent all its tokens to be removed... NOTE it could've been NULL already
+					else
+						switchToControlMode("Switching to control mode, due to failing to register the command.");
+				}else
+					output("\n%s","No command to evaluate.");
+				// prepare for accepting the next command
+				commandIndex=0; // MDH@16MAR2019: pretty essential otherwise it would keep evaluating previous commands
+				if(pCommand) // if we still have a command to free, free it entirely
+					if(!clearCommand())
+						switchToControlMode("Switching to control mode, due to failing to remove the command."); 
 			}else // always to return to command input!!
 				commandInput=true;
 		}
