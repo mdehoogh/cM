@@ -607,13 +607,15 @@ uint16_t writeTokens(Token* pFirstToken){
 	while(token!=NULL){outputToken(token);tokenCharactersWritten+=string_length(token->text);token=token->next;}
 	return tokenCharactersWritten;
 }
-// MDH@26FEB2019: convenience method that takes care of writing the current command (and NOT returning to the start of the command!)
+
+/* MDH@26FEB2019: convenience method that takes care of writing the current command (and NOT returning to the start of the command!)
 void writeCommand(){
 	// MDH@27FEB2019: before actually writing the current command (if any) we clear the behindCursorText as we are assumed to be at the end of the command
 	string_setlength(behindCursorText,0);
 	commandLength=cursorPosition=writeTokens(pCommand);
 	outputStatus();
 }
+*/
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
 uint32_t commandPages=0; // the total number of command pages
 void setCommandPage(uint32_t newCommandPage){
@@ -836,14 +838,35 @@ int main(int argc, char **argv){
 
 	behindCursorText=string_create(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
 	pCommand=NULL; // the current command (token)
-	commandLength=0; // keep track of the total command length...
+	///// writeCommand() will take care of this!!!! commandLength=0; // keep track of the total command length...
 	commandInput=true; // TODO should this go into promptForUserInput()?
+
 	char inputCharacterType;
 	while(1){
 
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
 		promptForUserInput();
-		writeCommand(); // write the current command (if any)
+
+		/* MDH@16MAR2019: we're behind the prompt now and should start out without a current command (in pCommnad)
+		//                if pCommand is NOT null, we have to make it NULL
+		commandIndex=0; // MDH@16MAR2019: pretty essential otherwise it would keep evaluating previous commands
+		if(pCommand) // if we still have a command to free, free it entirely
+			if(!clearCommand())
+				switchToControlMode("Switching to control mode, due to failing to remove the command.");
+		*/
+		/* replacing (there shouldn't be a command to write right now, unless perhaps when someone entered an invalid command???? to be continued)
+		   point: an evaluated command should be discarded??? in which case a user cannot correct it and has to type it in again
+		   so it makes sense to be allowed to complete a command (that failed to evaluate)
+		*/
+		// TODO what if we're not in commandInput here??????
+		if(commandInput){
+			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
+			if(pCommand==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
+			commandLength=cursorPosition=writeTokens(pCommand);
+			outputStatus();
+		}
+		// which used to be: writeCommand(); // write the current command (if any)
+
 		/* replacing:
 		pToken=pCommand;
 		// an existing command to show
@@ -921,7 +944,7 @@ int main(int argc, char **argv){
 							if(inputChar==66){ // down arrow
 								if(commandInput){									
 									if(pCommand)
-										outputInfo("%s","No next command!");
+										outputInfo("%s","Won't show next commands when one is being entered!");
 									else 
 									if(!commandUp())
 										beep();
@@ -1099,6 +1122,8 @@ int main(int argc, char **argv){
 				// if the command ended with a normal end-of-line character, evaluate and register the command
 				// NOTE if pCommand is not set yet, but the user retrieved a previously executed command, that one should be reexecuted
 				//      and registered (of course it will be pointing to the same chain of tokens but it might evaluated differently now)
+				// NOTE we need to think what to do with pCommand in different situations
+				//      only discard it when the command was evaluated and not registered
 				Token* pCommandToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
 				if(pCommand){ // a current command being edited
 					if(cursorPosition>0)pCommandToEvaluate=pCommand; // but only when not at start of command!!!
@@ -1108,20 +1133,34 @@ int main(int argc, char **argv){
 				// if we succeeded in evaluating a command we should register it
 				if(pCommandToEvaluate!=NULL){
 					// typically the command will not evaluate if it is not complete
-					if(!evaluateCommand(pCommandToEvaluate)){
-						outputInfo("Failed to evaluate the command!");
-					}else
-					if(registerCommand(pCommandToEvaluate))
-						pCommand=NULL; // loose the reference to pCommand to prevent all its tokens to be removed... NOTE it could've been NULL already
+					// in which case we should allow the user to correct it or make it complete
+					if(!evaluateCommand(pCommandToEvaluate))
+						outputInfo("Failed to evaluate the command! Complete, correct or discard the command please.");
 					else
-						switchToControlMode("Switching to control mode, due to failing to register the command.");
-				}else
+					// ASSERTION command to evaluate 
+					// if we fail to register the command we should attempt to get rid of the command (and the memory it occupies)
+					if(!registerCommand(pCommandToEvaluate)){
+						if(pCommand&&!clearCommand())
+							switchToControlMode("Switching to control mode, due to failing to register and clear the command.");
+						else
+							output("\n%s","WARNING: Failed to register the evaluated command. Out of memory?");
+					}else{ // command registered successfully, which means we have to keep its tokens (and not free them)
+						pCommand=NULL; // pointer is stored in memory, so we can get rid of the current command pointer!!
+						output("\n%s","Command pointer cleared.");
+					}
+				}else{
 					output("\n%s","No command to evaluate.");
+					if(pCommand&&!clearCommand())output("\nWARNING: %s","Failed to clear the command pointer.");
+					pCommand=NULL;
+				}
+				/* MDH@16MAR2019: preparation for the next command is not required here, it's better to do that at the beginning
+				                  of this outer loop
 				// prepare for accepting the next command
 				commandIndex=0; // MDH@16MAR2019: pretty essential otherwise it would keep evaluating previous commands
 				if(pCommand) // if we still have a command to free, free it entirely
 					if(!clearCommand())
-						switchToControlMode("Switching to control mode, due to failing to remove the command."); 
+						switchToControlMode("Switching to control mode, due to failing to remove the command.");
+				*/
 			}else // always to return to command input!!
 				commandInput=true;
 		}

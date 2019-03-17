@@ -60,7 +60,7 @@ uint16_t string_length(mstring* str){
     return(str==NULL?0:str->length);
 }
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
-bool string_setlength(mstring* str, uint16_t length){
+bool string_setlength(mstring* str,uint16_t length){
     if(str==NULL)return false;
     if(length>str->length)return false;
     if(length<str->length){
