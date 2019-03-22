@@ -55,9 +55,10 @@ void enableRawMode(){
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&raw);
 }
 
-bool assisting=true; // assist flag can be turned on to guide the user
+bool assisting=false; // assist flag can be turned on to guide the user
+bool debugging=true; // program debugging flag so it will show the token information before evaluation of a command
 
-char* promptinfo="\nType ` to enter the menu; cancel the input command with Ctrl-D.\n";
+char* promptinfo="\nCommand mode: type ` to enter control mode; cancel the current command with Ctrl-C.\n";
 /**
 call prompt() when ready to receive a new command
  */
@@ -237,7 +238,8 @@ typedef struct{
 */
 typedef struct Token{
 	uint8_t /*TokenType*/ type; // actually the index into the TOKENTYPES array!!!
-	uint8_t offset; // number of character in front of this token in the command
+	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
+	uint16_t offset; // number of characters in front of this token in the command
 	mstring* text;
 	struct Token* expr; // the expression this token is part of
 	struct Token* prev; // we need this during user input
@@ -360,12 +362,16 @@ enum TOKENTYPE_ENUM {
 
 Token* newToken(Token* prevToken){
 	Token* pNewToken=malloc(sizeof(Token));
-	if(prevToken!=NULL)prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
+	if(prevToken!=NULL){
+		prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
+		if(prevToken->significantCharacterCount==0)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
+	}
 	if(pNewToken!=NULL){
 		pNewToken->expr=(prevToken!=NULL?prevToken->expr:NULL); // copy the pointer to the expression this token is part of
 		pNewToken->offset=(prevToken!=NULL?prevToken->offset+string_length(prevToken->text):0);
 		pNewToken->prev=prevToken;
 		pNewToken->type=TT_WHITESPACE; // makes more sense to start as expression (same as what we get after a ( or [
+		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->text=string_create();
 		pNewToken->next=NULL;
 	}
@@ -452,7 +458,7 @@ const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES-2]={
 	{"ERROR"                   ,"!-+","=","+-^~%","&|","*/","!=","?:","<>","COMMENT","ENDOFCOMMENT","EXPRESSION","WHITESPACE","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
 	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* UNARY */ \
 	{"%&()*/,.:;<>=?@E%]"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ASSIGNMENT */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=","+-^~%",""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_UNEXT_ASSIGNABLE */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_UNEXT_ASSIGNABLE */ \
 	{"D%&S),.:;<>?@E%]{}"      ,"!-+","=",""     ,""  ,"*/",""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_ASSIGNABLE */ \
 	{"D%S)*/,.:;<>?@E%]{}"     ,"!-+","=",""     ,"&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_OR_ASSIGNABLE */ \
 	{"`="                      ,""   ,"" ,"+-^~%","&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EQ_OR_NEQ */ \
@@ -489,7 +495,7 @@ uint8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 	printf("'%s'",noTransition);
 #endif
 	if(strlen(noTransition)==0||(noTransition[0]=='!'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
-		uint8_t tokenType=NUMBER_OF_TOKEN_TYPES;
+		uint8_t tokenType=NUMBER_OF_TOKEN_TYPES-1;
 		while(tokenType>0){
 			tokenType--;
 /*
@@ -571,7 +577,14 @@ char removedTokenCharacter(uint16_t behindCursor){
 #ifdef __DEBUG__
 		putchar(c);
 #endif		
-	if(c)if(string_empty(pToken->text))removeToken(); // the token could now be empty, in which case we should remove it from the command
+	if(c){
+		if(string_empty(pToken->text))
+			removeToken(); // the token could now be empty, in which case we should remove it from the command
+		else
+		if(pToken->type!=TT_UNARY&&INPUTCHARACTERTYPES[c]=='W') // a whitespace is removed
+			if(string_length(pToken->text)==pToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
+				pToken->significantCharacterCount=0;
+	}
 	return c;
 }
 
@@ -605,8 +618,8 @@ void endOfUserInput(){
 #endif
 	// return to the 'right' colors
 	resetOutputColor();
+	output("\n\n%s\n\n","Thanks for using M.");
 	if(rawMode)disableRawMode();
-	printf("\nThanks for using M.\n\n");
 }
 
 // cursorLeft() will return the token under the cursor
@@ -711,7 +724,7 @@ void switchToControlMode(char* message){
 	if(message!=NULL)printf("\n%s",message);
 	if(!commandInput)return;
 	commandInput=false;
-	printf("\nAvailable control options: eXit Assist History.\n>> ");
+	output("\n%s\n >> ","Control flags: Assist Debug - Options: eXit History");
 }
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
@@ -841,14 +854,36 @@ void removePreviousTokenCharacter(){
 		switchToControlMode("Switching to control mode, due to failing to remove the intended character!");
 }
 
+void outputTokenInfo(){
+	Token* token=pCommand;
+	uint16_t tokenIndex=0;
+	output("\n%s:","Tokens");
+	output("\n%s\t%s\t%s\t%s\t%s\t\t\t%s","#","OFFSET","USED","LENGTH","TYPE","TEXT");
+	while(token!=NULL){
+		tokenIndex++;
+		output("\n%u\t%u\t%u\t%u\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),TOKENTYPE_STRING[token->type],string(token->text));
+		token=token->next;
+	}
+}
+
 int main(int argc, char **argv){
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
 	if(argc>1){
 		printf("Arguments:\n");
-		for(int arg=1;arg<argc;arg++)
+		for(int arg=1;arg<argc;arg++){
 			printf("%i. %s\n",arg,argv[arg]);
+			if(argv[arg][0]=='-'){ // a flag (or flags)
+				int i=0;
+				while(argv[arg][++i]){
+					if(argv[arg][i]=='d')debugging=false;else
+					if(argv[arg][i]=='D')debugging=true;else
+					if(argv[arg][i]=='a')assisting=false;else
+					if(argv[arg][i]=='A')assisting=true;
+				}
+			}
+		}
 	}
 
 	// TODO allow non-interactive mode i.e. execute commands from an M source file
@@ -990,14 +1025,19 @@ int main(int argc, char **argv){
 										// start a new token
 										if(!pToken)pToken=newToken(NULL); // we need a token!!!
 										inputCharacterType=INPUTCHARACTERTYPES[c];
-										int16_t newTokenType=nextTokenType(pToken->type,inputCharacterType);
-										if(newTokenType>=0&&newTokenType!=pToken->type){ // character ends current token
+										int16_t newTokenType=(inputCharacterType=='W'?-1:nextTokenType(pToken->type,inputCharacterType));
+										// MDH@22MAR2019: the next token type might be the same BUT if the current token already ended (due to whitespace) we should always start a new token
+										if(newTokenType>=0&&(newTokenType!=pToken->type||pToken->significantCharacterCount>0)){ // character ends current token
 											pToken=newToken(pToken);
 											pToken->type=newTokenType;
+											if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1; // MDH@22MAR2019: every unary token has at most one significant character
 											// TODO should we write the associated colors here?????
-										}
+										}else // no change to the token type (so character did not start a new token)
+										if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_WHITESPACE) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+											pToken->significantCharacterCount=string_length(pToken->text);
 										debugWrite("%s","Inserting character!");
 										string_insert_char(pToken->text,cursorPosition-pToken->offset,c);
+										
 										// MDH@28FEB2019: does NOT change commandLength, so NOT doing: commandLength++;
 										outputTokenColor(pToken);
 										putchar(c);
@@ -1076,7 +1116,7 @@ int main(int argc, char **argv){
 					char* removed=removedRestOfCommand();
 					*/
 					// determine the token type associated with the newly inputted character
-					int16_t newTokenType=nextTokenType(pToken->type,inputCharacterType);
+					int16_t newTokenType=(inputCharacterType!='W'?nextTokenType(pToken->type,inputCharacterType):-1); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 					resetOutputColor();
 					printf("[%d+%c->%d]",pToken->type,inputCharacterType,newTokenType);
@@ -1092,9 +1132,12 @@ int main(int argc, char **argv){
 #endif
 */
 						pToken->type=newTokenType;
+						if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
 						// TODO should we write the associated colors here?????
 						outputTokenColor(pToken);
-					}
+					}else
+					if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_WHITESPACE) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+						pToken->significantCharacterCount=string_length(pToken->text);
 					// insert the typed character at cursorPosition minus current token offset in pToken->text
 					string_insert_char(pToken->text,cursorPosition-pToken->offset,inputChar);
 #ifdef __DEBUG__
@@ -1123,6 +1166,7 @@ int main(int argc, char **argv){
 					// an option character!!!
 					if(inputChar=='x'||inputChar=='X')exit(0);else
 					if(inputChar=='a'||inputChar=='A'){assisting=!assisting;output("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));}
+					if(inputChar=='d'||inputChar=='D'){debugging=!debugging;output("\n%s\n>> ",(debugging?"Will debug!":"Will not debug!"));}
 					if(inputChar=='h'||inputChar=='H'){
 						// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
 						// we could call them a, b, c etc.
@@ -1151,7 +1195,13 @@ int main(int argc, char **argv){
 				//      only discard it when the command was evaluated and not registered
 				Token* pCommandToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
 				if(pCommand){ // a current command being edited
-					if(cursorPosition>0)pCommandToEvaluate=pCommand; // but only when not at start of command!!!
+					// MDH@22MAR2019: currently the first token is a WHITESPACE token
+					if(cursorPosition>string_length(pCommand->text)){
+						// finish the last token???
+						if(pToken->significantCharacterCount==0)pToken->significantCharacterCount=string_length(pToken->text);
+						pCommandToEvaluate=pCommand; // but only when not at start of command!!!
+						if(debugging)outputTokenInfo();
+					}
 				}else{
 					if(commandIndex)pCommandToEvaluate=commands[commandCount-commandIndex];
 				}
