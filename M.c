@@ -55,6 +55,10 @@ void enableRawMode(){
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&raw);
 }
 
+// MDH@28FEB2019: most conveniently to be able to output to the console through a single method that will allow a format string, and any number of arguments
+//                TODO delegate all functions that output to the output device to this function
+void output(const char *fmt,...){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);} // NOTE use vprintf here, NOT printf!!!!
+
 bool assisting=false; // assist flag can be turned on to guide the user
 bool debugging=true; // program debugging flag so it will show the token information before evaluation of a command
 
@@ -67,7 +71,7 @@ const char OPTION_CHAR='`'; // TODO should this character become part of options
 void prompt(); // prototype of prompt!!
 void promptForUserInput(){
 	if(!rawMode)enableRawMode();
-	printf("%s",promptinfo);
+	output("\n%s",promptinfo);
 	prompt();
 }
 /*
@@ -157,10 +161,6 @@ const char* TOKEN_BACKCOLORS[]={ERROR_COLOR,COMMENT_COLOR,COMMENT_COLOR,INFO_COL
 						  };
 
 #define ESCAPE_CHARACTER 27
-
-// MDH@28FEB2019: most conveniently to be able to output to the console through a single method that will allow a format string, and any number of arguments
-//                TODO delegate all functions that output to the output device to this function
-void output(const char *fmt,...){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);} // NOTE use vprintf here, NOT printf!!!!
 
 void setColor(const char* colortext){printf("\033[38;5;%sm",colortext);}
 void setBackColor(const char* colortext){printf("\033[48;5%sm",colortext);}
@@ -454,35 +454,35 @@ char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={" ","","","","","","","","","
 */
 // operator input type characters: ! ~ + - % * < = | (8 different operator groups)
 // ! ~ and + start a unary operator when a value is expected
-const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES-2]={ \
-	{"ERROR"                   ,"!-+","=","+-^~%","&|","*/","!=","?:","<>","COMMENT","ENDOFCOMMENT","EXPRESSION","WHITESPACE","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* UNARY */ \
-	{"%&()*/,.:;<>=?@E%]"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ASSIGNMENT */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_UNEXT_ASSIGNABLE */ \
-	{"D%&S),.:;<>?@E%]{}"      ,"!-+","=",""     ,""  ,"*/",""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_ASSIGNABLE */ \
-	{"D%S)*/,.:;<>?@E%]{}"     ,"!-+","=",""     ,"&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_OR_ASSIGNABLE */ \
-	{"`="                      ,""   ,"" ,"+-^~%","&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EQ_OR_NEQ */ \
-	{"D%&S)*/,.:;<>=?@E%]{}"   ,"!-+","" ,"+-^~%",""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* (ARITHMETIC) BINARY */ \
-	{"%&)*/,.:;?@E%]{}"        ,"!-+","" ,"+-^~%",""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMPARISON */ \
-	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ,""       ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMMENT */ \
-	{""                        ,""   ,"" ,"+-^~%","&|",""  ,""  ,""  ,""  ,""       ,"C"           ,""          ,"W"         ,"LE"      ,""       ,""    ,""     ,"D"       ,"S"       ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* ENDOFCOMMENT */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
-	{""                        ,""   ,"" ,"+-^~%","&|","*/","!=",""  ,""  ,"C"      ,""            ,"("         ,""          ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* (INSIGNIFICANT) WHITESPACE */ \
-	{"!DS({"                   ,""   ,"=","+-^~%","&|","*/","!" ,"?:","<>","C"      ,""            ,""          ,"W"         ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-	{"!DS(@{"                  ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
-	{"!DS(.@{"                 ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,"E"    ,""        ,""        ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* REAL: part behind a decimal period */ \
-	{"!DS(.@E{"                ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
-	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
-	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SQSTRING: single quoted string */ \
-	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""     ,""  ,""  ,"!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""     ,""  ,""  ,"!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-	{"%&)*/,.:;<>=?@E%}"       ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                }, /* LIST: [ opens a list */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* LIST_ELEMEMT: , in list */ \
-	{"!DL(.N@E{"               ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_LIST: behind ] that ends a list */ \
-	{"!D%&S)*/+-,.:;<>=?@[%]{}",""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 }, /* FUNCTION: some identifier recognized as function name */ \
-	{"%&*/,.:;<>=?@E%]}"       ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL ( following the name of a function */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
-	{"!DLS(.N@E{"              ,""   ,"" ,"+-~~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
+	{"ERROR"                   ,"!-+","=","+-^~%","&|","*/","!=","?:","<>","COMMENT","ENDOFCOMMENT","EXPRESSION","WHITESPACE","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","ENDOFDQSTRING","ENDOFSQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* UNARY */ \
+	{"%&()*/,.:;<>=?@E%]"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ASSIGNMENT */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_UNEXT_ASSIGNABLE */ \
+	{"D%&S),.:;<>?@E%]{}"      ,"!-+","=",""     ,""  ,"*/",""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_ASSIGNABLE */ \
+	{"D%S)*/,.:;<>?@E%]{}"     ,"!-+","=",""     ,"&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_OR_ASSIGNABLE */ \
+	{"`="                      ,""   ,"" ,"+-^~%","&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EQ_OR_NEQ */ \
+	{"D%&S)*/,.:;<>=?@E%]{}"   ,"!-+","" ,"+-^~%",""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* (ARITHMETIC) BINARY */ \
+	{"%&)*/,.:;?@E%]{}"        ,"!-+","" ,"+-^~%",""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMPARISON */ \
+	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ,""       ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMMENT */ \
+	{""                        ,""   ,"" ,"+-^~%","&|",""  ,""  ,""  ,""  ,""       ,"C"           ,""          ,"W"         ,"LE"      ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* ENDOFCOMMENT */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
+	{""                        ,""   ,"" ,"+-^~%","&|","*/","!=",""  ,""  ,"C"      ,""            ,"("         ,""          ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* (INSIGNIFICANT) WHITESPACE */ \
+	{"!DS({"                   ,""   ,"=","+-^~%","&|","*/","!" ,"?:","<>","C"      ,""            ,""          ,"W"         ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+	{"!DS(@{"                  ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
+	{"!DS(.@{"                 ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* REAL: part behind a decimal period */ \
+	{"!DS(.@E{"                ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
+	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
+	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SQSTRING: single quoted string */ \
+	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""     ,""  ,""  ,"!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""     ,""  ,""  ,"!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+	{"%&)*/,.:;<>=?@E%}"       ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                }, /* LIST: [ opens a list */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* LIST_ELEMEMT: , in list */ \
+	{"!DL(.N@E{"               ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_LIST: behind ] that ends a list */ \
+	{"!D%&S)*/+-,.:;<>=?@[%]{}",""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 }, /* FUNCTION: some identifier recognized as function name */ \
+	{"%&*/,.:;<>=?@E%]}"       ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL ( following the name of a function */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
+	{"!DLS(.N@E{"              ,""   ,"" ,"+-~~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -514,9 +514,9 @@ uint8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 	return inputTokenType; // if no match was found assume no change to the token type!!
 }
 
-// first operator characters (0=assignment character, 1-6: binary 1 and 2-character operators, 7-8: 1-character binary, 9-10: unary/binary, 11-12: 1-character unary)
-const char ASSIGNMENT_CHARACTER='=';
-const char FIRST_OPERATOR_CHARACTERS[]={ASSIGNMENT_CHARACTER,'<','>','|','&','*','/','^','%','+','-','~','!','\0'}; // i.e. "=<>|&*/^%+-~!";
+//// first operator characters (0=assignment character, 1-6: binary 1 and 2-character operators, 7-8: 1-character binary, 9-10: unary/binary, 11-12: 1-character unary)
+//const char ASSIGNMENT_CHARACTER='=';
+//const char FIRST_OPERATOR_CHARACTERS[]={ASSIGNMENT_CHARACTER,'<','>','|','&','*','/','^','%','+','-','~','!','\0'}; // i.e. "=<>|&*/^%+-~!";
 // continuation of 2-character operators
 const char* SECOND_OPERATOR_CHARACTERS[]={"=","=<>","=<>","|","&","*","/"};
 /* if we have a token representing an operator we can check whether a new character is acceptable as continuation
@@ -871,7 +871,7 @@ int main(int argc, char **argv){
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
 	if(argc>1){
-		printf("Arguments:\n");
+		printf("%s\n","Arguments");
 		for(int arg=1;arg<argc;arg++){
 			printf("%i. %s\n",arg,argv[arg]);
 			if(argv[arg][0]=='-'){ // a flag (or flags)
@@ -890,8 +890,8 @@ int main(int argc, char **argv){
 	prepareForUserInput();
 
 	resetOutputColor(); // just in case
-	printf("\nWelcome to M.\n");
-	printf("\nUse Ctrl-Z to exit M immediately at any time.\n");
+	output("\n%s\n","Welcome to M.");
+	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
 
 	behindCursorText=string_create(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
 	pCommand=NULL; // the current command (token)
@@ -941,159 +941,178 @@ int main(int argc, char **argv){
 			////////putchar('@');
 			////printf("[%i]",inputChar);
 			if(inputChar>127)continue; // undefined input character
+
 			inputCharacterType=INPUTCHARACTERTYPES[inputChar];
-#ifdef __DEBUG__
-			printf("(%c)",inputCharacterType);
-#endif
+
 			// special (control) input character types
-			// first the ones that will break
+			// first the ones that will break in any input mode!!!!
 			if(inputCharacterType=='n')break; // end-of-line (CR of LF) character
 			if(inputCharacterType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
-			if(inputCharacterType=='i')continue; // insignificant input character without specific purpose
-			if(inputCharacterType=='b'||inputCharacterType=='d'){ // backspace or delete
-				// something to remove?
-				if(commandLength) // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
-					removePreviousTokenCharacter();
-				else // nothing to remove
-					beep();
-				continue;
-			}
-			if(inputCharacterType=='c'){ // cancel command (Ctrl-D)
-				if(pCommand!=NULL){
-					clearCommand();
-					backToPrompt();
-				}else
-					beep();
-				continue;
-			}
-			if(inputCharacterType=='m'){
-				if(inputCharRead()){
-					if(inputChar==91){
-						if(inputCharRead()){
-							if(inputChar==51){
-								if(inputCharRead()){
-									if(inputChar==126){ // delete
-										if(cursorPosition<commandLength){
-											// we could go one to the right and do a backspace!!
-											cursorRight();
-											removePreviousTokenCharacter();
-										}else // nothing under the cursor to delete
-											beep();
+
+			if(commandInput){
+
+#ifdef __DEBUG__
+				printf("(%c)",inputCharacterType);
+#endif
+				if(inputCharacterType=='i')continue; // insignificant input character without specific purpose
+				
+				if(inputCharacterType=='b'||inputCharacterType=='d'){ // backspace or delete
+					// something to remove?
+					if(commandLength) // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
+						removePreviousTokenCharacter();
+					else // nothing to remove
+						beep();
+					continue;
+				}
+
+				if(inputCharacterType=='c'){ // cancel command (Ctrl-D)
+					if(pCommand!=NULL){
+						clearCommand();
+						backToPrompt();
+					}else
+						beep();
+					continue;
+				}
+				
+				if(inputCharacterType=='m'){ // Esc character...
+					char newInputChar='\0'; // if c ends up being something else it should be processed as a normal character!!!
+					if(inputCharRead()){
+						if(inputChar==91){
+							if(inputCharRead()){
+								if(inputChar==51){
+									if(inputCharRead()){
+										if(inputChar==126){ // delete
+											if(cursorPosition<commandLength){
+												// we could go one to the right and do a backspace!!
+												cursorRight();
+												removePreviousTokenCharacter();
+											}else // nothing under the cursor to delete
+												beep();
+										}
 									}
-								}
-							}else
-							if(inputChar==65){ // up arrow 
-								if(commandInput){ // i.e. show previous command if any
-									if(pCommand)
-										outputInfo("%s","Won't show previous commands when one is being entered.");
+								}else
+								if(inputChar==65){ // up arrow 
+									if(commandInput){ // i.e. show previous command if any
+										if(pCommand)
+											outputInfo("%s","Won't show previous commands when one is being entered.");
+										else
+										if(!commandDown())
+											beep();
+									}else
+									if(!commandPage)
+										showPreviousCommandPage();
+									/*
 									else
 									if(!commandDown())
-										beep();
+										outputInfo("%s","No previous command!");
+									*/
 								}else
-								if(!commandPage)
-									showPreviousCommandPage();
-								/*
-								else
-								if(!commandDown())
-									outputInfo("%s","No previous command!");
-								*/
-							}else
-							if(inputChar==66){ // down arrow
-								if(commandInput){									
-									if(pCommand)
-										outputInfo("%s","Won't show next commands when one is being entered!");
-									else 
+								if(inputChar==66){ // down arrow
+									if(commandInput){									
+										if(pCommand)
+											outputInfo("%s","Won't show next commands when one is being entered!");
+										else 
+										if(!commandUp())
+											beep();
+									}else
+									if(!commandPage)
+										showNextCommandPage();
+									/*
+									else
 									if(!commandUp())
+										outputInfo("%s","No next command!");
+									*/
+								}else
+								if(inputChar==67){ // right arrow
+									if(cursorPosition<commandLength){
+										// MDH@22MAR2019: instead of doing everything here (duplicating all code that is down below), we can find a way to use the 'normal' code
+										////////////bool success=false;
+										newInputChar=string_removed_char(behindCursorText,0);
+										if(!newInputChar)
+											debugWrite("%s","Failed to remove the first behind cursor text character.");
+										/* MDH@22MAR2019: we can stop doing the following...										
+											debugWrite("Character %c to be appended!",c);
+											// this is complex in that it's not just about appending c
+											// but also determining what the next token will be and if need be
+											// start a new token
+											if(!pToken)pToken=newToken(NULL); // we need a token!!!
+											inputCharacterType=INPUTCHARACTERTYPES[c];
+											int16_t newTokenType=(inputCharacterType=='W'?-1:nextTokenType(pToken->type,inputCharacterType));
+											// MDH@22MAR2019: the next token type might be the same BUT if the current token already ended (due to whitespace) we should always start a new token
+											if(newTokenType>=0&&(newTokenType!=pToken->type||pToken->significantCharacterCount>0)){ // character ends current token
+												pToken=newToken(pToken);
+												pToken->type=newTokenType;
+												if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1; // MDH@22MAR2019: every unary token has at most one significant character
+												// TODO should we write the associated colors here?????
+											}else // no change to the token type (so character did not start a new token)
+											if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_WHITESPACE) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+												pToken->significantCharacterCount=string_length(pToken->text);
+											debugWrite("%s","Inserting character!");
+											string_insert_char(pToken->text,cursorPosition-pToken->offset,c);
+											
+											// MDH@28FEB2019: does NOT change commandLength, so NOT doing: commandLength++;
+											outputTokenColor(pToken);
+											putchar(c);
+											success=true;
+										}else
+											debugWrite("%s","Failed to remove the first behind cursor text character.");
+										if(success){
+											cursorPosition++; /////////cursorRight();
+											debugWrite("%s","Cursor position incremented!");
+											///////writeBehindCursorText();
+										}else
+											switchToControlMode("Failed to move the cursor right.");
+										*/
+									}else
 										beep();
 								}else
-								if(!commandPage)
-									showNextCommandPage();
-								/*
-								else
-								if(!commandUp())
-									outputInfo("%s","No next command!");
-								*/
-							}else
-							if(inputChar==67){ // right arrow
-								if(cursorPosition<commandLength){
-									bool success=false;
-									char c=string_removed_char(behindCursorText,0);
-									if(c){
-										debugWrite("Character %c to be appended!",c);
-										// this is complex in that it's not just about appending c
-										// but also determining what the next token will be and if need be
-										// start a new token
-										if(!pToken)pToken=newToken(NULL); // we need a token!!!
-										inputCharacterType=INPUTCHARACTERTYPES[c];
-										int16_t newTokenType=(inputCharacterType=='W'?-1:nextTokenType(pToken->type,inputCharacterType));
-										// MDH@22MAR2019: the next token type might be the same BUT if the current token already ended (due to whitespace) we should always start a new token
-										if(newTokenType>=0&&(newTokenType!=pToken->type||pToken->significantCharacterCount>0)){ // character ends current token
-											pToken=newToken(pToken);
-											pToken->type=newTokenType;
-											if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1; // MDH@22MAR2019: every unary token has at most one significant character
-											// TODO should we write the associated colors here?????
-										}else // no change to the token type (so character did not start a new token)
-										if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_WHITESPACE) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
-											pToken->significantCharacterCount=string_length(pToken->text);
-										debugWrite("%s","Inserting character!");
-										string_insert_char(pToken->text,cursorPosition-pToken->offset,c);
-										
-										// MDH@28FEB2019: does NOT change commandLength, so NOT doing: commandLength++;
-										outputTokenColor(pToken);
-										putchar(c);
-										success=true;
-									}else
-										debugWrite("%s","Failed to remove the first behind cursor text character.");
-									if(success){
-										cursorPosition++; /////////cursorRight();
-										debugWrite("%s","Cursor position incremented!");
-										///////writeBehindCursorText();
-									}else
-										switchToControlMode("Failed to move the cursor right.");
-								}else
-									beep();
-							}else
-							if(inputChar==68){ // left arrow
-								if(cursorPosition>0){
-									// TODO apparently pCommand will still be NULL when we're scrolling through the list of previous commands...
-									if(pCommand==NULL)if(commandIndex)setCommand(commands[commandCount-commandIndex]); // will also set commandLength!!!
-									// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into behindCursorText
-									bool success=false;
-									char c=removedTokenCharacter(1);
-									if(c){ // removing the character behind the cursor succeeded
-										debugWrite("Character '%c' removed.",c);
-										// prefix it to behindCursorText
-										string_insert_char(behindCursorText,0,c);
-										debugWrite("Behind cursor text: '%s'.",string(behindCursorText));
-										success=true;
-									}
-									if(success){
-										cursorLeft();
-										/* NO going back and forth with the cursor does NOT change commandLength!!!!
-										commandLength--; // MDH@28FEB2019: essential bro' otherwise when we go back to the end, cursorPosition will stay below commandLength
-										*/
-										// if the cursor position now matches the offset of the current token
-										// we're at the end of the previous token
-										if(cursorPosition==pToken->offset){
-											// we have to be careful here, because if this is the first token (cursorPosition==0), we should NOT NULL the token!!!
-											if(cursorPosition)pToken=pToken->prev;else pToken->type=TT_WHITESPACE;
+								if(inputChar==68){ // left arrow
+									if(cursorPosition>0){
+										// TODO apparently pCommand will still be NULL when we're scrolling through the list of previous commands...
+										if(pCommand==NULL)if(commandIndex)setCommand(commands[commandCount-commandIndex]); // will also set commandLength!!!
+										// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into behindCursorText
+										bool success=false;
+										char c=removedTokenCharacter(1);
+										if(c){ // removing the character behind the cursor succeeded
+											debugWrite("Character '%c' removed.",c);
+											// prefix it to behindCursorText
+											string_insert_char(behindCursorText,0,c);
+											debugWrite("Behind cursor text: '%s'.",string(behindCursorText));
+											success=true;
 										}
-										writeBehindCursorText();
+										if(success){
+											cursorLeft();
+											/* NO going back and forth with the cursor does NOT change commandLength!!!!
+											commandLength--; // MDH@28FEB2019: essential bro' otherwise when we go back to the end, cursorPosition will stay below commandLength
+											*/
+											// if the cursor position now matches the offset of the current token
+											// we're at the end of the previous token
+											if(cursorPosition==pToken->offset){
+												// we have to be careful here, because if this is the first token (cursorPosition==0), we should NOT NULL the token!!!
+												if(cursorPosition)pToken=pToken->prev;else pToken->type=TT_WHITESPACE;
+											}
+											writeBehindCursorText();
+										}else
+											switchToControlMode("Failed to move the cursor left.");
 									}else
-										switchToControlMode("Failed to move the cursor left.");
+										beep();
 								}else
 									beep();
-							}else
-								beep();
+							}
 						}
 					}
+					if(!newInputChar)continue;
+					// update inputChar and inputCharacterType for further processing...
+					inputCharacterType=INPUTCHARACTERTYPES[inputChar=newInputChar];
 				}
-				//////////continue;
-			}else
-			if(inputCharacterType=='o'){
-				switchToControlMode(NULL);
-				//////continue;
-			}else
+				
+				if(inputCharacterType=='o'){
+					switchToControlMode(NULL);
+					continue;
+				} // MDH@22MAR2019 in certain situation we should NOT skip the remainder: else
+			}
+
+			// ASSERTION if we get here inputChar and inputCharacterType are available!!!!
 			// in command input we allow to do things with the command
 			if(commandInput){
 				////////printf(" (%d)",inputChar);
@@ -1221,7 +1240,7 @@ int main(int argc, char **argv){
 							output("\n%s","WARNING: Failed to register the evaluated command. Out of memory?");
 					}else{ // command registered successfully, which means we have to keep its tokens (and not free them)
 						pCommand=NULL; // pointer is stored in memory, so we can get rid of the current command pointer!!
-						output("\n%s","Command pointer cleared.");
+						debugWrite("\n%s","Command pointer cleared.");
 					}
 				}else{
 					output("\n%s","No command to evaluate.");
