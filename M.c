@@ -324,18 +324,16 @@ void outputStatus(){
 // I suppose an expression starts with an E token and ends with an e token; this way we can tell when an expression starts
 // we can store [ and , as an E token 
 
-#define NUMBER_OF_TOKEN_TYPES 28
+#define NUMBER_OF_TOKEN_TYPES 26
 #define FOREACH_TOKENTYPE(TOKENTYPE) \
-		TOKENTYPE(TT_ERROR) \
-		TOKENTYPE(TT_UNARY) \
-		TOKENTYPE(TT_ASSIGNMENT) \
-		TOKENTYPE(TT_BIN_UNEXT_ASSIGNABLE) \
-		TOKENTYPE(TT_BIN_EXT_ASSIGNABLE) \
-		TOKENTYPE(TT_BIN_EXT_OR_ASSIGNABLE) \
-		TOKENTYPE(TT_BIN_EQ_OR_NEQ) \
-		TOKENTYPE(TT_BINARY) \
-		TOKENTYPE(TT_COMPARISON) \
-		TOKENTYPE(TT_COMMENT) \
+		TOKENTYPE(TT_ERROR=0b00000000) \
+		TOKENTYPE(TT_ONE_CHAR_UNARY=0b10000001) \
+		TOKENTYPE(TT_ONE_CHAR_BINARY=0b10100001) \
+		TOKENTYPE(TT_ONE_CHAR_ASSIGNABLE_BINARY=0b10101010) \
+		TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110) \
+		TOKENTYPE(TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY=0b10101011) \
+		TOKENTYPE(TT_TWO_CHAR_ASSIGNABLE_BINARY=0b10111011) \
+		TOKENTYPE(TT_COMMENT=0b00000010) \
 		TOKENTYPE(TT_ENDOFCOMMENT) \
 		TOKENTYPE(TT_EXPRESSION) \
 		TOKENTYPE(TT_WHITESPACE) \
@@ -433,7 +431,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
 // we can make an array of transitions with each element corresponding to the character in TOKENTYPES, so the first entry contains all responses to E, the second entry the responses to W etc.
 // it's easier to tell for any possible resulting token type which input character types will result in that type
 // it's a hell of a job to create the token type transitions matrix
-char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={" ","","","","","","","","","!#","","","W","LEN","N","N","N","!D","!S","","","","","","","","%*<|",""};
+char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={" ","","","","","","","!#","","","W","LEN","N","N","N","!D","!S","","","","","","","","%*<|",""};
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -452,37 +450,43 @@ char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={" ","","","","","","","","","
    We can code these characters with digits 1, 2, 3, 4, 5, 6, 7, 8 unary could be encoded with 1 
    Well characters with multiple meanings like ! - + and = could be represented by themselves but the first letter of the token type that would be U A B C which leaves us with four additional for which we can use % / & 
 */
+/* MDH@23MAR2019: syntacticly we have less operators
+	TOKENTYPE(TT_ONE_CHAR_UNARY=0b10000001) 						!(un) -(un) +(un)
+	TOKENTYPE(TT_ONE_CHAR_BINARY_=0b10100001)      					? :
+	TOKENTYPE(TT_ONE_CHAR_ASSIGNABLE_BIANRY=0b10101010)  			= ~ ^ % \ -(bin) +(bin)
+	TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110)      					! (followed by =)
+	TOKENTYPE(TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY=0b10101011)		& | (interesting =+= and &+= and |+= and itself)
+	TOKENTYPE(TT_TWO_CHAR_ASSIGNABLE_BINARY=0b10111011)				< > * /
+*/
 // operator input type characters: ! ~ + - % * < = | (8 different operator groups)
 // ! ~ and + start a unary operator when a value is expected
 const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-	{"ERROR"                   ,"!-+","=","+-^~%","&|","*/","!=","?:","<>","COMMENT","ENDOFCOMMENT","EXPRESSION","WHITESPACE","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","ENDOFDQSTRING","ENDOFSQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* UNARY */ \
-	{"%&()*/,.:;<>=?@E%]"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ASSIGNMENT */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","=",""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_UNEXT_ASSIGNABLE */ \
-	{"D%&S),.:;<>?@E%]{}"      ,"!-+","=",""     ,""  ,"*/",""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_ASSIGNABLE */ \
-	{"D%S)*/,.:;<>?@E%]{}"     ,"!-+","=",""     ,"&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EXT_OR_ASSIGNABLE */ \
-	{"`="                      ,""   ,"" ,"+-^~%","&|",""  ,""  ,""  ,""  ,"C"      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BIN_EQ_OR_NEQ */ \
-	{"D%&S)*/,.:;<>=?@E%]{}"   ,"!-+","" ,"+-^~%",""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* (ARITHMETIC) BINARY */ \
-	{"%&)*/,.:;?@E%]{}"        ,"!-+","" ,"+-^~%",""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMPARISON */ \
-	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ,""       ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMMENT */ \
-	{""                        ,""   ,"" ,"+-^~%","&|",""  ,""  ,""  ,""  ,""       ,"C"           ,""          ,"W"         ,"LE"      ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* ENDOFCOMMENT */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
-	{""                        ,""   ,"" ,"+-^~%","&|","*/","!=",""  ,""  ,"C"      ,""            ,"("         ,""          ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* (INSIGNIFICANT) WHITESPACE */ \
-	{"!DS({"                   ,""   ,"=","+-^~%","&|","*/","!" ,"?:","<>","C"      ,""            ,""          ,"W"         ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-	{"!DS(@{"                  ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
-	{"!DS(.@{"                 ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* REAL: part behind a decimal period */ \
-	{"!DS(.@E{"                ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
-	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
-	{""                        ,""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SQSTRING: single quoted string */ \
-	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""     ,""  ,""  ,"!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""     ,""  ,""  ,"!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-	{"%&)*/,.:;<>=?@E%}"       ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                }, /* LIST: [ opens a list */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* LIST_ELEMEMT: , in list */ \
-	{"!DL(.N@E{"               ,""   ,"" ,"+-^~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_LIST: behind ] that ends a list */ \
-	{"!D%&S)*/+-,.:;<>=?@[%]{}",""   ,"" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 }, /* FUNCTION: some identifier recognized as function name */ \
-	{"%&*/,.:;<>=?@E%]}"       ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL ( following the name of a function */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""     ,""  ,""  ,""  ,""  ,""  ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
-	{"!DLS(.N@E{"              ,""   ,"" ,"+-~~%","&|","*/","!=","?:","<>","C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+	{"ERROR"                   ,"OCUO","OCBO","OCAO","TCBO","TCOABO","TCAO","COMMENT","ENDOFCOMMENT","EXPRESSION","WHITESPACE","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","ENDOFDQSTRING","ENDOFSQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SINGLE CHARACTER UNARY */ \
+	{"%&()*/,.:;<>=?@E%]"      ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SINGLE CHARACTER BINARY */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SINGLE CHARACTER ASSIGNABLE BINARY */ \
+	{"D%&S),.:;<>?@E%]{}"      ,"!-+" ,""    ,""    ,""    ,"*/"    ,""    ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* UNEQUALITY */ \
+	{"D%S)*/,.:;<>?@E%]{}"     ,"!-+" ,""    ,""    ,"&|"  ,""      ,""    ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMPARISON */ \
+	{"D%&S)*/,.:;<>=?@E%]{}"   ,"!-+" ,""    ,"+-^~",""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* (ARITHMETIC) BINARY */ \
+	{""                        ,""    ,""    ,""    ,""    ,""      ,""    ,""       ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMMENT */ \
+	{""                        ,""    ,""    ,"+-^%","&|"  ,""      ,""    ,""       ,"C"           ,""          ,"W"         ,"LE"      ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* ENDOFCOMMENT */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
+	{""                        ,""    ,""    ,"+-~%","&|"  ,"*/"    ,"!="  ,"C"      ,""            ,"("         ,""          ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* (INSIGNIFICANT) WHITESPACE */ \
+	{"!DS({"                   ,""    ,"="   ,"+-~%","&|"  ,"*/"    ,"!"   ,"C"      ,""            ,""          ,"W"         ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+	{"!DS(@{"                  ,""    ,""    ,"+-~%","&|"  ,"*/"    ,"!="  ,"C"      ,""            ,""          ,"W"         ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
+	{"!DS(.@{"                 ,""    ,""    ,"+-~%","&|"  ,"*/"    ,"!="  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* REAL: part behind a decimal period */ \
+	{"!DS(.@E{"                ,""    ,""    ,"+-~%","&|"  ,"*/"    ,"!="  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
+	{""                        ,""    ,""    ,""    ,""    ,""      ,""    ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
+	{""                        ,""    ,""    ,""    ,""    ,""      ,""    ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SQSTRING: single quoted string */ \
+	{"!DL%&S(*/,.@E[{"         ,""    ,""    ,""    ,""    ,""      ,"!="  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+	{"!DL%&S(*/,.@E[{"         ,""    ,""    ,""    ,""    ,""      ,"!="  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+	{"%&)*/,.:;<>=?@E%}"       ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                }, /* LIST: [ opens a list */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* LIST_ELEMEMT: , in list */ \
+	{"!DL(.N@E{"               ,""    ,""    ,"+^~%","&|"  ,"*/"    ,"!="  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_LIST: behind ] that ends a list */ \
+	{"!D%&S)*/+-,.:;<>=?@[%]{}",""    ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 }, /* FUNCTION: some identifier recognized as function name */ \
+	{"%&*/,.:;<>=?@E%]}"       ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL ( following the name of a function */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,"!-+" ,""    ,""    ,""    ,""      ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
+	{"!DLS(.N@E{"              ,""    ,""    ,"+-~%","&|"  ,"*/"    ,"!="  ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -581,7 +585,7 @@ char removedTokenCharacter(uint16_t behindCursor){
 		if(string_empty(pToken->text))
 			removeToken(); // the token could now be empty, in which case we should remove it from the command
 		else
-		if(pToken->type!=TT_UNARY&&INPUTCHARACTERTYPES[c]=='W') // a whitespace is removed
+		if(pToken->type!=TT_ONE_CHAR_UNARY&&INPUTCHARACTERTYPES[c]=='W') // a whitespace is removed
 			if(string_length(pToken->text)==pToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
 				pToken->significantCharacterCount=0;
 	}
@@ -868,6 +872,12 @@ void outputTokenInfo(){
 
 int main(int argc, char **argv){
 
+#ifdef __DEBUG__
+	printf("\n%s","Operators:");
+	printf("\nOne character unary operator: %d.",TT_ONE_CHAR_UNARY);
+	printf("\nOne character binary operator: %d.",TT_ONE_CHAR_BINARY);
+#endif
+
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
 	if(argc>1){
@@ -1042,7 +1052,7 @@ int main(int argc, char **argv){
 											if(newTokenType>=0&&(newTokenType!=pToken->type||pToken->significantCharacterCount>0)){ // character ends current token
 												pToken=newToken(pToken);
 												pToken->type=newTokenType;
-												if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1; // MDH@22MAR2019: every unary token has at most one significant character
+												if(pToken->type==TT_SINGLE_CHARACTER_UNARY_OPERATOR)pToken->significantCharacterCount=1; // MDH@22MAR2019: every unary token has at most one significant character
 												// TODO should we write the associated colors here?????
 											}else // no change to the token type (so character did not start a new token)
 											if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_WHITESPACE) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
@@ -1151,7 +1161,7 @@ int main(int argc, char **argv){
 #endif
 */
 						pToken->type=newTokenType;
-						if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
+						if(pToken->type==TT_ONE_CHAR_UNARY)pToken->significantCharacterCount=1;
 						// TODO should we write the associated colors here?????
 						outputTokenColor(pToken);
 					}else
