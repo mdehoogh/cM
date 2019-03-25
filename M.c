@@ -887,9 +887,16 @@ void outputTokenInfo(){
 int main(int argc, char **argv){
 
 #ifdef __DEBUG__
-	printf("\n%s","Operators:");
-	printf("\nOne character unary operator: %d.",TT_ONE_CHAR_UNARY);
-	printf("\nOne character binary operator: %d.",TT_ONE_CHAR_BINARY);
+	printf("\n%s","Token types:");
+	printf("\nError                                        : %d.",TT_ERROR);
+	printf("\nOne character unary operator                 : %d.",TT_ONE_CHAR_UNARY);
+	printf("\nAssignment operator                          : %d.",TT_ASSIGNMENT);
+	printf("\nOne character binary operator                : %d.",TT_ONE_CHAR_BINARY);
+	printf("\nOne character assignable binary operator     : %d.",TT_ONE_CHAR_ASSIGNABLE_BINARY);
+	printf("\nTwo character binary operator                : %d.",TT_TWO_CHAR_BINARY);
+	printf("\nTwo character once assignable binary operator: %d.",TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY);
+	printf("\nTwo character assignable binary operator     : %d.",TT_TWO_CHAR_ASSIGNABLE_BINARY);
+	printf("\nComparison or shift operator                 : %d.",TT_COMPARISON_OR_SHIFT_BINARY);
 #endif
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
