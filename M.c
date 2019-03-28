@@ -123,15 +123,23 @@ int inputCharRead(){
 	return 0;
 }
 
+// text colors
 const char DEBUG_COLOR[]="8"; // light gray
 const char INFO_COLOR[]="0"; // black
+// for tokens
 const char COMMENT_COLOR[]="8"; // light gray
 const char ERROR_COLOR[]="9"; // red
-const char IDENTIFIER_COLOR[]="202"; // orange for unknown identifiers (although these would be used for assignments)
+const char ASSIGNMENT_COLOR[]="202"; // orange for assignment operator
 const char VARIABLE_COLOR[]="13"; // magenta
-// FUNCTION_COLOR=93 # something more blueish
-const char LITERAL_COLOR[]="22"; // green
-const char OPERATOR_COLOR[]="12"; // blue
+const char FUNCTION_COLOR[]="93"; // something more blueish
+const char FUNCTIONARG_COLOR[]="12";
+const char LIST_COLOR[]="12";
+const char NUMBER_COLOR[]="22"; // green
+const char STRING_COLOR[]="12"; // blue
+const char UNARY_COLOR[]="93"; // like a function I suppose
+const char BINARY_COLOR[]="93"; // like a function I suppose
+const char TERNARY_COLOR[]="93"; // like a function I suppose
+
 const char RESULT_COLOR[]="15"; // quite dark
 const char OPTION_COLOR[]="15"; // RESULT_COLOR
 const char* PROMPT_COLOR=INFO_COLOR; // same as the info color
@@ -139,31 +147,42 @@ const char* PROMPT_COLOR=INFO_COLOR; // same as the info color
 // the back colors
 const char DEBUG_BACKCOLOR[]="255"; // light-gray
 const char INFO_BACKCOLOR[]="231"; // white
+// for tokens
 const char ERROR_BACKCOLOR[]="231";
+const char ASSIGNMENT_BACKCOLOR[]="0";
+const char COMMENT_BACKCOLOR[]="0";
+const char VARIABLE_BACKCOLOR[]="0";
+const char FUNCTION_BACKCOLOR[]="0";
+const char FUNCTIONARG_BACKCOLOR[]="0";
+const char LIST_BACKCOLOR[]="0";
+const char NUMBER_BACKCOLOR[]="0";
+const char STRING_BACKCOLOR[]="0";
+const char UNARY_BACKCOLOR[]="0";
+const char BINARY_BACKCOLOR[]="0";
+const char TERNARY_BACKCOLOR[]="0";
+
 const char IDENTIFIER_BACKCOLOR[]="231";
+/*
 const char LITERAL_BACKCOLOR[]="231";
 const char OPERATOR_BACKCOLOR[]="231";
+*/
 const char RESULT_BACKCOLOR[]="69";
 const char* OPTION_BACKCOLOR=RESULT_BACKCOLOR;
 const char BEHIND_CURSOR_TEXT_COLOR[]="250"; // MDH@27FEB2019: same as DEBUG_BACKCOLOR (which we're NOT using?)
 
-const char* TOKEN_COLORS[]={ERROR_COLOR,COMMENT_COLOR,COMMENT_COLOR,INFO_COLOR,INFO_COLOR,VARIABLE_COLOR
-						  ,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR
-						  ,INFO_COLOR,INFO_COLOR,INFO_COLOR
-						  ,OPERATOR_COLOR,OPERATOR_COLOR,OPERATOR_COLOR
-						  ,OPERATOR_COLOR,INFO_COLOR,INFO_COLOR,INFO_COLOR,INFO_COLOR
-						  };
-const char* TOKEN_BACKCOLORS[]={ERROR_COLOR,COMMENT_COLOR,COMMENT_COLOR,INFO_COLOR,INFO_COLOR,VARIABLE_COLOR
-						  ,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR,LITERAL_COLOR
-						  ,INFO_COLOR,INFO_COLOR,INFO_COLOR
-						  ,OPERATOR_COLOR,OPERATOR_COLOR,OPERATOR_COLOR
-						  ,OPERATOR_COLOR,INFO_COLOR,INFO_COLOR,INFO_COLOR,INFO_COLOR
-						  };
+// operator token colors
+const char* OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLOR,UNARY_COLOR,BINARY_COLOR,TERNARY_COLOR};
+const char* OPERATOR_TOKEN_BACKCOLORS[]={INFO_COLOR,INFO_COLOR,INFO_COLOR,INFO_COLOR};
+
+// value token colors
+const char* VALUE_TOKEN_COLORS[]={COMMENT_COLOR,INFO_COLOR,VARIABLE_COLOR,NUMBER_COLOR,STRING_COLOR,STRING_COLOR,STRING_COLOR,STRING_COLOR,LIST_COLOR,LIST_COLOR,LIST_COLOR,FUNCTION_COLOR,FUNCTIONARG_COLOR,FUNCTIONARG_COLOR,FUNCTIONARG_COLOR};
+const char* VALUE_TOKEN_BACKCOLORS[]={COMMENT_BACKCOLOR,INFO_BACKCOLOR,VARIABLE_BACKCOLOR,NUMBER_BACKCOLOR,STRING_BACKCOLOR,STRING_BACKCOLOR,STRING_BACKCOLOR,LIST_BACKCOLOR,LIST_BACKCOLOR,LIST_BACKCOLOR,FUNCTION_BACKCOLOR,FUNCTIONARG_BACKCOLOR,FUNCTIONARG_BACKCOLOR,FUNCTIONARG_BACKCOLOR};
 
 #define ESCAPE_CHARACTER 27
 
 void setColor(const char* colortext){printf("\033[38;5;%sm",colortext);}
 void setBackColor(const char* colortext){printf("\033[48;5%sm",colortext);}
+
 void oneLineUp(){printf("\033[1A");} // ascertain that the previous line is visible
 void oneLineDown(){printf("\033[1B");} // one line down
 void toStartOfLine(){putchar('\r');}
@@ -228,6 +247,124 @@ void outputText(char* fmt,char* text){
 	resetOutputColor(); 
 	output(fmt,text);
 }
+
+
+
+// MDH@19DEC2018: I want to represent the state transition from the current token type to the next token type
+// the list of possible token types
+// E=expression,W=whitespace,C=comment
+// operators: U=unary operator (always one character),B=binary,b=binary ended,A=assignment,
+// symbolic values: V=variable,F=function call,f=end of function call,
+// numeric values: I=integer,R=real,E=extended integer/real,F=function(call),f=end of function call,L=list start,l=list end
+//	text values: D=double quoted string, d=end of double quoted string,S=single quoted string,s=end of single quoted string
+//  list: L=list,l=end of list
+// I suppose an expression starts with an E token and ends with an e token; this way we can tell when an expression starts
+// we can store [ and , as an E token 
+
+/* MDH@25MAR2019: 
+   - technically an assignment is a binary operator that requires a variable identifier to the left of it
+     for now we define the assignment token to be the only operator with length, although we could've categorized it in TT_ONE_CHAR_BINARY as well
+     but I separate the assignment operator from any other binary operator in front of it (for shortcutting certain binary operations)
+     bit 0-1: maximum length
+     bit 2  : minimum length 0=1 1=2
+     bit 3  : 1-assignable
+     bit 4  : 2-assignable
+     bit 5  : unary (0) or binary (1) 
+*/
+/* MDH@28MAR2019: 
+   - after creating a state diagram of the possible operators I have made a new categorization of binary operators which typically are sequences of characters of a restricted length
+     most of which are 1 character operators that are extensible with another character (often the same), but are operators already, some are not extensible, some need two characters in which case the one character operator is not complete yet, which means it is not finished yet
+     in the state diagram we end up with a total of 11 possible states 
+     the general idea is that the assignment is NOT part of the operator in front of it, i.e. an assignment token is a separate token which may follow certain binary operators in particular arithmetic operators
+     some of the operators may be combined at some point, which means we might not need all of them at the end
+     let's first write down all tokens that we would end up in when the first token character is entered:
+     FIRST TOKEN CHARACTER TOKENS:
+     < >         SMALLER_OR_LARGER_THEN = COMPARISON (EQUALIZABLE,REPEATABLE) is an operator already by itself (so a complete operator) which can be followed by either = to become a (finished) comparison operator (non assignable) or by the same character (< or >) to become a shift operator (which is assignable)
+     & |         BITWISE = ARITHMETIC (REPEATABLE)                            is an operator already by itself (a bitwise operator) which can be followed by the same character (extensible, assignable) to become the && or || logical operator (AND_OR_OR or LOGICAL) wich is not assignable
+     ! =         UNEQUAL_OR_EQUAL = COMPARISON (UNFINISHED,EQUALIZABLE)       is not yet an operator by itself has to be followed by = to become a finished non assignable comparison operator (IDEA is this the same operator we end up with coming from < and >??????????)
+     =           ASSIGNMENT                                                   a single character binary operator that should be preceded by optionally a binary operator that is assignable (ARITHMETIC probably) and something that can be assigned to (variable or list element), in all other situations it should be assumed to be UNEQUAL_OR_EQUAL (to be completed with another =)
+     ? :         TERNARY                                                      a single character binary operator which is not extensible and not assignable (so its a completed binary operator that cannot be extended) IDEA: is TERNARY a binary operator we have or should we split it up in TERNARY FIRST and TERNARY LAST????? I guess we can check for another ternary in front and determine if ? or : is acceptable!!!
+     - + ~ ^ %   ARITHMETIC (FINISHED)                                        by itself already a binary operator which is assignable but not extensible (with the same character), so a finished binary operator which yet we could call ARITHMETIC perhaps when + is used behind something that represents a string we should can it CONCATENATION unless we decide to use another character for concatenation like .
+     +           CONCATENATION                                                when preceded by something that represents a string value + should be considered a CONCATENATION operator (which may be difficult to determine when a function is called in front of the + sign (we could force functions that result in string results to start with STR_ or end with $ or something like that)
+     * /         MULT_OR_DIVIDE = ARITHMETIC REPEATABLE                       by itself a binary operator which is assignable AND extensible with the same character, this could be an intermediate binary operator that we turn into ARITHMETIC after the next character which means that MULT_OR_DIVIDE is NOT a token that we have when we evaluate the expression
+     SECOND TOKEN EXTENSION CHARACTERS: after the first token a second token can be entered as part of an operator that allows for continuation or transformation of the operator to another operator, in this case always a finished operator (that does not allow further continuation)
+	 < >         SHIFT = ARITHMETHIC                                          when < or > is repeated we end up with a (completed) SHIFT ARITHMETIC operator which is assignable, so we could have ARITHMETIC EXTENSIBLE and ARITHMETIC (UNEXTENSIBLE) the latter when it's finished
+	 & |         LOGICAL = ARITHMETIC                                         when & or | is repeated we end up with a (completed) LOGICAL operator that is NOT assignable although we could allow it to be assignable in which case it is ARITHMETIC (UNEXTENSIBLE)
+	 SECOND TOKEN CHARACTERS:
+	 =           COMPARISON (NON ASSIGNABLE,NON REPEATABLE,NOT EQUALIZABLE)   when ! or = is followed by = we end up with a completed COMPARISON operator that is not assignable and not extensible, but note that = is either an UNEQUAL_OR_EQUAL or ASSIGNMENT which means that unless = is assignment, it should be treated as UNEQUAL_OR_EQUAL we should start with assignment when another = is NOT required per se
+	 * /         ARITHMETIC                                                   follows the same character to remain an assignable complete arithmetic operator
+
+     So, we have one unfinished comparison operator (! or =), and a COMPARISON operator could also be called arithmetic theoretically, so ARITHMETIC is one end type of binary operator but a comparison operator is not assignable (that's because you can have <= and >= and != and ==), so COMPARISON=ARITHMETIC NOT ASSIGNABLE, ARITHMETIC ASSIGNABLE
+     So, COMPARISON is < or > which becomes ARITHMETIC NOT ASSIGNABLE when followed by = although the = is not obligatory, as compared with ! and = which is COMPARISON UNFINISHED or ARITHMETIC UNFINISHED 
+     So, if we rebuild the token results
+     FIRST TOKEN CHARACTER TOKENS:
+     < >         COMPARISON = ARITHMETIC NONASSIGNABLE EQUALIZABLE (something you can put an equal sign behind to become an finished not assignable arithmetic operator or the same character to become an assignable arithmetic operator)
+     & |         BITWISE = ARITHMETIC REPEATABLE (something you can assign to immediately or repeat and still be assignable)
+     ! =         NOT_OR_EQUAL = ARITMETIC NONASSIGNABLE EQUALIZABLE UNFINISHED = COMPARISON (UNFINISHED,UNREPEATABLE) (something you MUST put an equal sign behind to become a finished not assignable arithmetic operator)
+     =           ASSIGNMENT (a finished binary operator) that could become a ARITHMETIC UNASSIGNABLE operator when equal sign is appended to it
+     ? :         TERNARY (a finished one character binary operator, not assignable, non repeatable, not equalizable) operator
+     - + ~ ^ %   ARITHMETIC ASSIGNABLE operator
+     * /         ARITHMETIC ASSIGNABLE REPEATABLE operator
+     Two character operators:
+     << >>		 SHIFT = ARITHMETIC ASSIGNABLE
+     <= >=       ARITHMETIC NOTASSIGNABLE 
+     && ||       LOGICAL = ARITHMETHIC ASSIGNABLE
+     != ==       ARITHMETIC NOTASSIGNABLE
+     ** //       ARITHMETIC ASSIGNABLE
+     So main categories: ASSIGNMENT (1xxx xx01) ARITHMETIC (1xxx xx10) TERNARY FIRST (1xxx xx11), in addition to UNARY (1xxx xx00), unless we use the uppermost flags to denote the three categories non-operator, unary operator, binary operator, ternary operator, so 00xx xxxx (non-operators), 01xx xxxx (unary operators), 10xx xxxx (binary operators), 11xx xxxx (ternary operators)
+     And the flags on operators are in the uppermost bits from right to left alphabetic
+     Flags: ASSIGNABLE, REPEATABLE, FINISHED, EQUALIZABLE but those are only applicable to binary operators??????
+     Are we putting an error flag in the type?????? forcing to display the token in red (overriding any basic color we would have...), because then we would still recognized the type of token even though there's an error somewhere in front of the token sequence... which ends when the subexpression ends, which would be nice to have
+     At the moment all zeroes (0b00000000) means error, should we start with an ERROR token????? that would make sense because an empty token is erroneous or it could represent the undefined null token like (undefined)==(undefined), in which case we should have an UNDEFINED token type (an assignment like 'x=' could define x but keep it undefined')
+     I think that would be an elegant expression, in which case the result of an expression would also represent the undefined value, which could be represented textual as (undefined) or something similar, or just the text undefined because a string value should be enclosed in quotes.
+     So the top bit could be the error bit, so error is not a separate token but a token property although I'd prefer starting an error token when an error occurs!! so TT_WHITESPACE is actually TT_UNDEFINED, any TT_UNDEFINED should change to something else after entering a non whitespace character!!!
+     Ok, we could use the upmost 4 token type bits for the operator flags UNFINISHED REPEATABLE EQUALIZABLE ASSIGNABLE 
+     The next two bits are for the operator type, 00 for assignment, 01 for unary, 10 for arithmetic, 11 for ternary
+     Which means that we end up with:
+		ASSIGNMENT                       1111 1111 =                                     because this is a special operator we use the special value 0xFF to indicate the assignment operator (bit 7 is the operator bit)
+		UNARY                            1001 0000 ! - + when a value is expected next behind operator or at start of expression
+		BINARY aeru                      1010 0000 <= >=
+		BINARY aErU                      1010 0101 ! =
+		BINARY AeRu                      1010 1010 & | * /
+		BINARY aERu                      1010 0110 < >
+		BINARY Aeru                      1010 1000 - + ^ ~ % \    TWO CHARACTER: << >> ** // && ||           
+        TERNARY aeru                     1100 0000 ? :
+
+*/
+#define NUMBER_OF_TOKEN_TYPES 27
+#define FOREACH_TOKENTYPE(TOKENTYPE) \
+		TOKENTYPE(TT_ERROR=0b00111111) \
+		TOKENTYPE(TT_COMMENT=0b11111111) \
+		TOKENTYPE(TT_ENDOFCOMMENT=0b00000000) \
+		TOKENTYPE(TT_UNARY=0b01010000) \
+		TOKENTYPE(TT_ASSIGNMENT=0b01000000) \
+		TOKENTYPE(TT_BINARY_aeru=0b01100000) \
+		TOKENTYPE(TT_BINARY_aErU=0b01101010) \
+		TOKENTYPE(TT_BINARY_AeRu=0b01101010) \
+		TOKENTYPE(TT_BINARY_aERu=0b01100110) \
+		TOKENTYPE(TT_BINARY_Aeru=0b01101000) \
+		TOKENTYPE(TT_EXPRESSION=0b00000001) \
+		TOKENTYPE(TT_VARIABLE) \
+		TOKENTYPE(TT_INTEGER) \
+		TOKENTYPE(TT_REAL) \
+		TOKENTYPE(TT_EREAL) \
+		TOKENTYPE(TT_DQSTRING) \
+		TOKENTYPE(TT_SQSTRING) \
+		TOKENTYPE(TT_END_OF_DQSTRING) \
+		TOKENTYPE(TT_END_OF_SQSTRING) \
+		TOKENTYPE(TT_LIST) \
+		TOKENTYPE(TT_LIST_ELEMENT) \
+		TOKENTYPE(TT_END_OF_LIST) \
+		TOKENTYPE(TT_FUNCTION) \
+		TOKENTYPE(TT_FUNCTION_CALL) \
+		TOKENTYPE(TT_FUNCTION_ARGUMENT) \
+		TOKENTYPE(TT_END_OF_FUNCTION_CALL)
+#define GENERATE_TOKENTYPE_ENUM(ENUM) ENUM,
+#define GENERATE_STRING(STRING) #STRING,
+enum TOKENTYPE_ENUM {
+	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
+};
+
 /*
 typedef struct{
 	unsigned int ended:1; // one flag to indicate whether or not the Token has ended
@@ -237,7 +374,7 @@ typedef struct{
 }TokenType;
 */
 typedef struct Token{
-	uint8_t /*TokenType*/ type; // actually the index into the TOKENTYPES array!!!
+	enum TOKENTYPE_ENUM type; // actually the index into the TOKENTYPES array!!!
 	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
 	uint16_t offset; // number of characters in front of this token in the command
 	mstring* text;
@@ -245,12 +382,28 @@ typedef struct Token{
 	struct Token* prev; // we need this during user input
 	struct Token* next;
 }Token;
-void outputTokenColor(Token* pToken){	
-	setColor(TOKEN_COLORS[pToken->type]);
-	setBackColor(TOKEN_BACKCOLORS[pToken->type]);
+
+void outputTokenColor(Token* pToken){
+	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
+	if(pToken->type==TT_COMMENT){ // a comment
+		setColor(COMMENT_COLOR);
+		setBackColor(COMMENT_BACKCOLOR);
+	}else
+	if(pToken->type==TT_ERROR){ // an error
+		setColor(ERROR_COLOR);
+		setBackColor(ERROR_BACKCOLOR);
+	}else
+	if(pToken->type&0x40){ // an operator
+		setColor(OPERATOR_TOKEN_COLORS[pToken->type>>4]);
+		setBackColor(OPERATOR_TOKEN_BACKCOLORS[pToken->type>>4]);
+	}else{
+		setColor(VALUE_TOKEN_COLORS[pToken->type&0x1F]);
+		setBackColor(VALUE_TOKEN_BACKCOLORS[pToken->type&0x1F]);
+	}
 }
 void outputToken(Token* pToken){
 	outputTokenColor(pToken);
+	// if we allow comments in tokens we're in trouble!!!
 	printf("%s",string(pToken->text));
 	/////////if(assisting){resetOutputColor();putchar('|');}
 }
@@ -312,64 +465,6 @@ void outputStatus(){
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
 }
 
-
-// MDH@19DEC2018: I want to represent the state transition from the current token type to the next token type
-// the list of possible token types
-// E=expression,W=whitespace,C=comment
-// operators: U=unary operator (always one character),B=binary,b=binary ended,A=assignment,
-// symbolic values: V=variable,F=function call,f=end of function call,
-// numeric values: I=integer,R=real,E=extended integer/real,F=function(call),f=end of function call,L=list start,l=list end
-//	text values: D=double quoted string, d=end of double quoted string,S=single quoted string,s=end of single quoted string
-//  list: L=list,l=end of list
-// I suppose an expression starts with an E token and ends with an e token; this way we can tell when an expression starts
-// we can store [ and , as an E token 
-
-#define NUMBER_OF_TOKEN_TYPES 28
-/* MDH@25MAR2019: 
-   - technically an assignment is a binary operator that requires a variable identifier to the left of it
-     for now we define the assignment token to be the only operator with length, although we could've categorized it in TT_ONE_CHAR_BINARY as well
-     but I separate the assignment operator from any other binary operator in front of it (for shortcutting certain binary operations)
-     bit 0-1: maximum length
-     bit 2  : minimum length 0=1 1=2
-     bit 3  : 1-assignable
-     bit 4  : 2-assignable
-     bit 5  : unary (0) or binary (1) 
-*/
-#define FOREACH_TOKENTYPE(TOKENTYPE) \
-		TOKENTYPE(TT_ERROR=0b00000000) \
-		TOKENTYPE(TT_ONE_CHAR_UNARY=0b10000001) \
-		TOKENTYPE(TT_ASSIGNMENT=0b10100000) \
-		TOKENTYPE(TT_ONE_CHAR_BINARY=0b10100001) \
-		TOKENTYPE(TT_ONE_CHAR_ASSIGNABLE_BINARY=0b10101010) \
-		TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110) \
-		TOKENTYPE(TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY=0b10101011) \
-		TOKENTYPE(TT_TWO_CHAR_ASSIGNABLE_BINARY=0b10111011) \
-		TOKENTYPE(TT_COMPARISON_OR_SHIFT_BINARY=0b10110011) \
-		TOKENTYPE(TT_COMMENT=0b00000010) \
-		TOKENTYPE(TT_ENDOFCOMMENT) \
-		TOKENTYPE(TT_EXPRESSION) \
-		TOKENTYPE(TT_WHITESPACE) \
-		TOKENTYPE(TT_VARIABLE) \
-		TOKENTYPE(TT_INTEGER) \
-		TOKENTYPE(TT_REAL) \
-		TOKENTYPE(TT_EREAL) \
-		TOKENTYPE(TT_DQSTRING) \
-		TOKENTYPE(TT_SQSTRING) \
-		TOKENTYPE(TT_END_OF_DQSTRING) \
-		TOKENTYPE(TT_END_OF_SQSTRING) \
-		TOKENTYPE(TT_LIST) \
-		TOKENTYPE(TT_LIST_ELEMENT) \
-		TOKENTYPE(TT_END_OF_LIST) \
-		TOKENTYPE(TT_FUNCTION) \
-		TOKENTYPE(TT_FUNCTION_CALL) \
-		TOKENTYPE(TT_FUNCTION_ARGUMENT) \
-		TOKENTYPE(TT_END_OF_FUNCTION_CALL)
-#define GENERATE_TOKENTYPE_ENUM(ENUM) ENUM,
-#define GENERATE_STRING(STRING) #STRING,
-enum TOKENTYPE_ENUM {
-	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
-};
-
 Token* newToken(Token* prevToken){
 	Token* pNewToken=malloc(sizeof(Token));
 	if(prevToken!=NULL){
@@ -380,7 +475,7 @@ Token* newToken(Token* prevToken){
 		pNewToken->expr=(prevToken!=NULL?prevToken->expr:NULL); // copy the pointer to the expression this token is part of
 		pNewToken->offset=(prevToken!=NULL?prevToken->offset+string_length(prevToken->text):0);
 		pNewToken->prev=prevToken;
-		pNewToken->type=TT_WHITESPACE; // makes more sense to start as expression (same as what we get after a ( or [
+		pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->text=string_create();
 		pNewToken->next=NULL;
@@ -433,7 +528,7 @@ static const char* TOKENTYPE_STRING[]={
 // |&    binary or and operator extensible to make || logical or or && logical and operator but the latter cannot be followed by =
 
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%LoLLLLELLLLLLLLLLLLLLLLLLLLL{&}~d";
+const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%LoLLLLELLLLLLLLLLLLLLLLLLLLL{&}%d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
 // NOTE this can be organized in many ways perhaps it's easiest to tell per input character what the transformation is
@@ -469,38 +564,45 @@ char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={" ","","","","","","","!#",""
 	TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110)      					! (followed by =)
 	TOKENTYPE(TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY=0b10101011)		& | (interesting =+= and &+= and |+= and itself)
 	TOKENTYPE(TT_TWO_CHAR_ASSIGNABLE_BINARY=0b10111011)				< > * /
+	printf("\nError                                        : %d.",TT_ERROR);
+	printf("\nOne character unary operator                 : %d.",TT_ONE_CHAR_UNARY);
+	printf("\nAssignment operator                          : %d.",TT_ASSIGNMENT);
+	printf("\nOne character binary operator                : %d.",TT_ONE_CHAR_BINARY);
+	printf("\nOne character assignable binary operator     : %d.",TT_ONE_CHAR_ASSIGNABLE_BINARY);
+	printf("\nTwo character binary operator                : %d.",TT_TWO_CHAR_BINARY);
+	printf("\nTwo character once assignable binary operator: %d.",TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY);
+	printf("\nTwo character assignable binary operator     : %d.",TT_TWO_CHAR_ASSIGNABLE_BINARY);
+	printf("\nComparison or shift operator                 : %d.",TT_COMPARISON_OR_SHIFT_BINARY);
 */
 // operator input type characters: ! ~ + - % * < = | (8 different operator groups)
 // ! ~ and + start a unary operator when a value is expected
 const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-	{"ERROR"                   ,"OCU","A","OCB","OCAB","TCB","TCOAB","TCAB"  ,"COSB","COMMENT","ENDOFCOMMENT","EXPRESSION","WHITESPACE","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","ENDOFDQSTRING","ENDOFSQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
-	{"D%&S)*/,.:;<>?@E%]{}="   ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ONE CHARACTER UNARY !-+ */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","" ,""   ,""    ,"="   ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ASSIGNMENT = */ \
-	{"%&()*/,.:;<>=?@E%]"      ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ONE CHAR BINARY ?: */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ONE CHAR ASSIGNABLE BINARY ~^\%-+ */ \
-	{"D%&S),.:;<>?@E%]{}"      ,"!-+","" ,""   ,""    ,""    ,"*/"    ,""    ,""    ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* TWO CHAR BINARY != */ \
-	{"D%S)*/,.:;<>?@E%]{}"     ,"!-+","" ,""   ,""    ,"&|"  ,""      ,""    ,""    ,"C"      ,""            ,""          ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* TWO CHAR ONCE ASSIGNABLE BINARY &| */ \
-	{"D%&S)*/,.:;<>=?@E%]{}"   ,"!-+","" ,""   ,"+-^~",""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* TWO CHAR ASSIGNABLE BINARY / * */ \
-	{"D%&S)*/,.:;<>=?@E%]{}"   ,"!-+","" ,""   ,"+-^~",""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMPARISON OR SHIFT BINARY <> */ \
-	{""                        ,""   ,"" ,""   ,""    ,""    ,""      ,""    ,""    ,""       ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMMENT */ \
-	{""                        ,""   ,"" ,""   ,"+-^%","&|"  ,""      ,""    ,""    ,""       ,"C"           ,""          ,"W"         ,"LE"      ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* ENDOFCOMMENT */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
-	{""                        ,""   ,"" ,""   ,"+-~%","&|"  ,"*/"    ,"!="  ,""    ,"C"      ,""            ,"("         ,""          ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* (INSIGNIFICANT) WHITESPACE */ \
-	{"!DS({"                   ,""   ,"" ,"="  ,"+-~%","&|"  ,"*/"    ,"!"   ,""    ,"C"      ,""            ,""          ,"W"         ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-	{"!DS(@{"                  ,""   ,"" ,""   ,"+-~%","&|"  ,"*/"    ,"!="  ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
-	{"!DS(.@{"                 ,""   ,"" ,""   ,"+-~%","&|"  ,"*/"    ,"!="  ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* REAL: part behind a decimal period */ \
-	{"!DS(.@E{"                ,""   ,"" ,""   ,"+-~%","&|"  ,"*/"    ,"!="  ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
-	{""                        ,""   ,"" ,""   ,""    ,""    ,""      ,""    ,""    ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
-	{""                        ,""   ,"" ,""   ,""    ,""    ,""      ,""    ,""    ," "      ,""            ,""          ," "         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SQSTRING: single quoted string */ \
-	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""   ,""    ,""    ,""      ,"!="  ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-	{"!DL%&S(*/,.@E[{"         ,""   ,"" ,""   ,""    ,""    ,""      ,"!="  ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-	{"%&)*/,.:;<>=?@E%}"       ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                }, /* LIST: [ opens a list */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* LIST_ELEMEMT: , in list */ \
-	{"!DL(.N@E{"               ,""   ,"" ,""   ,"+^~%","&|"  ,"*/"    ,"!="  ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_LIST: behind ] that ends a list */ \
-	{"!D%&S)*/+-,.:;<>=?@[%]{}",""   ,"" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 }, /* FUNCTION: some identifier recognized as function name */ \
-	{"%&*/,.:;<>=?@E%]}"       ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL ( following the name of a function */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"!-+","" ,""   ,""    ,""    ,""      ,""    ,""    ,"C"      ,""            ,"("         ,"W"         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
-	{"!DLS(.N@E{"              ,""   ,"" ,""   ,"+-~%","&|"  ,"*/"    ,"!="  ,""    ,"C"      ,""            ,""          ,"W"         ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+	{"ERROR"                   ,"COMMENT","ENDOFCOMMENT","UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru","Taeru","EXPRESSION","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","ENDOFDQSTRING","ENDOFSQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
+	{""                        ,""       ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
+	{""                        ,""       ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
+	{"D%&S)*/,.:;<>?@E%]{}="   ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ONE CHARACTER UNARY !-+ */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,""       ,""            ,"!-+","" ,""     ,""     ,"="    ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ASSIGNMENT = */ \
+	{"%&()*/,.:;<>=?@E%]"      ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* Baeru */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,""       ,""            ,"!-+","" ,"="    ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BaErU */ \
+	{"D%&S),.:;<>?@E%]{}"      ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BAeRu */ \
+	{"D%S)*/,.:;<>?@E%]{}"     ,""       ,""            ,"!-+","" ,"="    ,""     ,"&|*/" ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BaERu */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,""       ,""            ,"!-+","=",""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BAeru */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
+	{"!DS({"                   ,""       ,""            ,""   ,"=",""     ,"!"    ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+	{"!DS(@{="                 ,""       ,""            ,""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
+	{"!DS(.@{="                ,""       ,""            ,""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* REAL: part behind a decimal period */ \
+	{"!DS(.@E{="               ,""       ,""            ,""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
+	{""                        ,""       ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
+	{""                        ,""       ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SQSTRING: single quoted string */ \
+	{"!DL%&S(*/,.@E[{%-"       ,""       ,""            ,""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+	{"!DL%&S(*/,.@E[{%-"       ,""       ,""            ,""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+	{"%&)*/,.:;<>=?@E%}"       ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                }, /* LIST: [ opens a list */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* LIST_ELEMEMT: , in list */ \
+	{"!DL(.N@E{"               ,""       ,""            ,""   ,"" ,"?:"   ,"%-+"  ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_LIST: behind ] that ends a list */ \
+	{"!D%&S)*/+-,.:;<>=?@[%]{}",""       ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 }, /* FUNCTION: some identifier recognized as function name */ \
+	{"%&*/,.:;<>=?@E%]}"       ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL ( following the name of a function */ \
+	{"%&)*/,.:;<>=?@E%]}"      ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
+	{"!DLS(.N@E{"              ,""       ,""            ,""   ,"" ,"?:"   ,"%-+"  ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -599,7 +701,7 @@ char removedTokenCharacter(uint16_t behindCursor){
 		if(string_empty(pToken->text))
 			removeToken(); // the token could now be empty, in which case we should remove it from the command
 		else
-		if(pToken->type!=TT_ONE_CHAR_UNARY&&INPUTCHARACTERTYPES[c]=='W') // a whitespace is removed
+		if(pToken->type!=TT_UNARY&&INPUTCHARACTERTYPES[c]=='W') // a whitespace is removed
 			if(string_length(pToken->text)==pToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
 				pToken->significantCharacterCount=0;
 	}
@@ -889,14 +991,14 @@ int main(int argc, char **argv){
 #ifdef __DEBUG__
 	printf("\n%s","Token types:");
 	printf("\nError                                        : %d.",TT_ERROR);
-	printf("\nOne character unary operator                 : %d.",TT_ONE_CHAR_UNARY);
+	printf("\nUnary operator                               : %d.",TT_UNARY);
 	printf("\nAssignment operator                          : %d.",TT_ASSIGNMENT);
-	printf("\nOne character binary operator                : %d.",TT_ONE_CHAR_BINARY);
-	printf("\nOne character assignable binary operator     : %d.",TT_ONE_CHAR_ASSIGNABLE_BINARY);
-	printf("\nTwo character binary operator                : %d.",TT_TWO_CHAR_BINARY);
-	printf("\nTwo character once assignable binary operator: %d.",TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY);
-	printf("\nTwo character assignable binary operator     : %d.",TT_TWO_CHAR_ASSIGNABLE_BINARY);
-	printf("\nComparison or shift operator                 : %d.",TT_COMPARISON_OR_SHIFT_BINARY);
+	printf("\nOBinary operator                             : %d.",TT_BINARY_aeru);
+	printf("\nAssignable repeatable binary operator        : %d.",TT_BINARY_AeRu);
+	printf("\nEqualizable repeatable binary operator       : %d.",TT_BINARY_aERu);
+	printf("\nTEqualizable unfinished binary operator      : %d.",TT_BINARY_aErU);
+	printf("\nAssignable binary operator                   : %d.",TT_BINARY_Aeru);
+	//printf("\nUndefined                                    : %d.",TT_UNDEFINED);
 #endif
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
@@ -1120,7 +1222,7 @@ int main(int argc, char **argv){
 											// we're at the end of the previous token
 											if(cursorPosition==pToken->offset){
 												// we have to be careful here, because if this is the first token (cursorPosition==0), we should NOT NULL the token!!!
-												if(cursorPosition)pToken=pToken->prev;else pToken->type=TT_WHITESPACE;
+												if(cursorPosition)pToken=pToken->prev;else pToken->type=TT_EXPRESSION;
 											}
 											writeBehindCursorText();
 										}else
@@ -1160,12 +1262,23 @@ int main(int argc, char **argv){
 				}
 				// if still NULL (also when we fail to actually create a new first command token)
 				if(pToken!=NULL){
+					/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
+					if(inputCharacterType=='C'){
+						pToken->type^=0x70; // toggling bit 7
+						// a comment character will NEVER change the (actual) token type but it should change the color to use
+						if(pToken->type&0x70){commenting=true;outputTokenColor(pToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
+					}else // not a comment character
+					if((pToken->type&0x70)==0){ // not in a comment
+						if(notCommenting){notCommenting=false;outputTokenColor(pToken);} // if behind coming out of a comment, we have to reset the output token color
+					*/
 					/*
 					// MDH@26FEB2019: when a user starts inserting characters instead of appending them we can cut off the rest of the characters in the command
 					//                and put it in a single mstring instance and append these one at a time 
 					char* removed=removedRestOfCommand();
 					*/
 					// determine the token type associated with the newly inputted character
+					// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
+					if((pToken->type&0xA2)==0xA2)if(inputChar==string_char(pToken->text,0))inputCharacterType='R';
 					int16_t newTokenType=(inputCharacterType!='W'?nextTokenType(pToken->type,inputCharacterType):-1); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 					resetOutputColor();
@@ -1182,12 +1295,13 @@ int main(int argc, char **argv){
 #endif
 */
 						pToken->type=newTokenType;
-						if(pToken->type==TT_ONE_CHAR_UNARY)pToken->significantCharacterCount=1;
+						if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
 						// TODO should we write the associated colors here?????
 						outputTokenColor(pToken);
 					}else
-					if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_WHITESPACE) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+					if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
 						pToken->significantCharacterCount=string_length(pToken->text);
+
 					// insert the typed character at cursorPosition minus current token offset in pToken->text
 					string_insert_char(pToken->text,cursorPosition-pToken->offset,inputChar);
 #ifdef __DEBUG__
