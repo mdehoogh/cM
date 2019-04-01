@@ -343,6 +343,7 @@ void outputText(char* fmt,char* text){
 		TOKENTYPE(TT_BINARY_AeRu) \
 		TOKENTYPE(TT_BINARY_aERu) \
 		TOKENTYPE(TT_BINARY_Aeru) \
+		TOKENTYPE(TT_TERNARY_aeru) \
 		TOKENTYPE(TT_EXPRESSION) \
 		TOKENTYPE(TT_VARIABLE) \
 		TOKENTYPE(TT_INTEGER) \
@@ -365,7 +366,7 @@ enum TOKENTYPE_ENUM {
 	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
 };
 // the list of token type ids in the corresponding order!!!
-const uint8_t TOKENTYPE_IDS[]={0b00111111,0b11111111,0b11111110,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01010110,0b01101000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+const uint8_t TOKENTYPE_IDS[]={0b11111111,0b1000000,0b10111111,0b01010000,0b010000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 /*
 typedef struct{
 	unsigned int ended:1; // one flag to indicate whether or not the Token has ended
@@ -387,24 +388,25 @@ typedef struct Token{
 void outputTokenColor(Token* pToken){
 	///////printf("[%d]",pToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
-	if(pToken->type==TT_COMMENT||pToken->type==TT_END_OF_COMMENT){ // a comment
-		//putchar('C');
-		setColor(COMMENT_COLOR);
-		setBackColor(COMMENT_BACKCOLOR);
-	}else
-	if(pToken->type==TT_ERROR){ // an error
-		//putchar('E');
-		setColor(ERROR_COLOR);
-		setBackColor(ERROR_BACKCOLOR);
-	}else
-	if(TOKENTYPE_IDS[pToken->type]&0x40){ // an operator
-		//putchar('O');
-		setColor(OPERATOR_TOKEN_COLORS[(pToken->type&0x30)>>4]);
-		setBackColor(OPERATOR_TOKEN_BACKCOLORS[(pToken->type&0x30)>>4]);
-	}else{
-		//putchar('V');
-		setColor(VALUE_TOKEN_COLORS[pToken->type&0x0F]);
-		setBackColor(VALUE_TOKEN_BACKCOLORS[pToken->type&0x0F]);
+	uint8_t tokentype_id=TOKENTYPE_IDS[pToken->type];
+	switch(tokentype_id>>6){
+		case 0: // value token
+			setColor(VALUE_TOKEN_COLORS[tokentype_id]);
+			setBackColor(VALUE_TOKEN_BACKCOLORS[tokentype_id]);
+			break;
+		case 1: // operator: unary, binary, ternary, assignment
+			setColor(OPERATOR_TOKEN_COLORS[(pToken->type&0x30)>>4]);
+			setBackColor(OPERATOR_TOKEN_BACKCOLORS[(pToken->type&0x30)>>4]);
+			break;
+		case 2: // comment or end of comment
+			setColor(COMMENT_COLOR);
+			setBackColor(COMMENT_BACKCOLOR);
+			break;
+		case 3: // error token
+			//putchar('E');
+			setColor(ERROR_COLOR);
+			setBackColor(ERROR_BACKCOLOR);
+			break;
 	}
 }
 void outputToken(Token* pToken){
@@ -593,6 +595,7 @@ const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
 	{"D%&S),.:;<>?@E%]{}"      ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BAeRu */ \
 	{"D%S)*/,.:;<>?@E%]{}"     ,"C"      ,""            ,"!-+","" ,"="    ,""     ,"&|*/" ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BaERu */ \
 	{"D%&S)*/,.:;<>?@E%]{}"    ,"C"      ,""            ,"!-+","=",""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BAeru */ \
+	{"D%&S)*/,.:;<>?@E%]{}"    ,"C"      ,""            ,"!-+","=",""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* Taeru */ \
 	{"%&)*/,.:;<>=?@E%]}"      ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
 	{"!DS({"                   ,"C"      ,""            ,""   ,"=",""     ,"!"    ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
 	{"!DS(@{="                 ,"C"      ,""            ,""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
@@ -1284,7 +1287,7 @@ int main(int argc, char **argv){
 					*/
 					// determine the token type associated with the newly inputted character
 					// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
-					if((pToken->type&0xA2)==0xA2)if(inputChar==string_char(pToken->text,0))inputCharacterType='R';
+					if((TOKENTYPE_IDS[pToken->type]&0x62)==0x62)if(inputChar==string_char(pToken->text,0))inputCharacterType='R';
 					int16_t newTokenType=(inputCharacterType!='W'?nextTokenType(pToken->type,inputCharacterType):-1); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 					resetOutputColor();
