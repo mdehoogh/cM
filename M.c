@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
 //#include <cstdlib>
 
@@ -67,7 +68,11 @@ bool assisting=false; // assist flag can be turned on to guide the user
 bool debugging=false; // program debugging flag so it will show the token information before evaluation of a command
 #endif
 
-char* promptinfo="\nCommand mode: type ` to enter control mode; cancel the current command with Ctrl-C.\n";
+enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input modes: command, control, and shell
+
+enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
+
+char* promptinfo[]={"Command mode: type ` to enter control mode; cancel the current command with Ctrl-C.","Control mode: Flags: Assist Debug - Options: eXit History Shell.","Shell mode: enter the shell command to execute on pressing the Return key."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -76,7 +81,7 @@ const char OPTION_CHAR='`'; // TODO should this character become part of options
 void prompt(); // prototype of prompt!!
 void promptForUserInput(){
 	if(!rawMode)enableRawMode();
-	output("\n%s",promptinfo);
+	output("\n\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
 	prompt();
 }
 /*
@@ -117,8 +122,7 @@ void evaluateExpression(){
 */
 
 // USER INPUT STUFF
-bool commandInput; // whether or not in command mode
-char inputChar; // the last read input character
+char inputChar,inputCharType; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
 int inputCharRead(){
 	if(!rawMode)enableRawMode();
 	if(read(STDIN_FILENO,&inputChar,1)==1){
@@ -222,12 +226,24 @@ void prompt(){
 	resetOutputColor();
 	///////////printf("%d-",commandIndex);
 	char str[11]; // with a maximum of 2,xxx,xxx,xxx 11 positions would suffice
-	sprintf(str,"%u",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-	printf("%s%s",str," >> ");
+	switch(inputMode){
+		case IM_COMMAND:
+			sprintf(str,"%u",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
+			printf("%s%s",str," >> ");
+			clearScreenFromCursor();
+			promptLength=strlen(str)+4;
+			break;
+		case IM_CONTROL:
+			printf(" >> ");
+			promptLength=4;
+			break;
+		case IM_SHELL:
+			printf( " $ ");
+			promptLength=3;
+			break;
+	}
 	///////saveCursor();
-	clearScreenFromCursor();
-	promptLength=strlen(str)+4;
-	commandInput=true; // expecting a command (until the option character is received)
+	///////////inputMode=true; // expecting a command (until the option character is received)
 	/* MDH@26FEB2019: we do not need the following because that's taken care of in writeTokens(pCommand) right after promptForUserInput()
 	cursorPosition=0; // starting at position 0
 	*/
@@ -336,6 +352,7 @@ void outputText(char* fmt,char* text){
         TERNARY aeru                     1100 0000 ? :
 
 */
+
 // MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
 #define NUMBER_OF_FINISHABLE_TOKEN_TYPES 24
 #define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
@@ -611,12 +628,12 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}" }, /* BAeru */ \
 {"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}" }, /* Taeru */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," C  %~ )&|*/  ,.:;<>?@ E  ] }="}, /* EXPRESSION */ \
-{""   ,"=",""     ,"!"    ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,"LN" ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (                  {"    }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,""   ,"N"  ,"."   ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (            @     { ="  }, /* INTEGER: (signless) list of digits */ \
+{""   ,"=",""     ,"!"    ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,"LN" ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (                    {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,""   ,"N"  ,"."   ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (              @     { ="}, /* INTEGER: (signless) list of digits */ \
 {""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (        .     @     { ="}, /* REAL: part behind a decimal period */ \
 {""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (        .     @ E   { ="}, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,"D"      ,""       ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ,""                             }, /* DQSTRING: double quoted string */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,"S"      ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ,""                             }, /* SQSTRING: single quoted string */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,"D"      ,""       ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ,""                              }, /* DQSTRING: double quoted string */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,"S"      ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ,""                              }, /* SQSTRING: single quoted string */ \
 {""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS%~&(  */ -,.     @LE [ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
 {""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS%~&(  */ -,.     @LE [ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,"]"    ,""        ,""      ,""      ,")"    ,""  ," C  %~& )*/  ,.:;<>=?@ E    }" }, /* LIST: [ opens a list */ \
@@ -855,14 +872,18 @@ bool clearCommand(){
 	pToken=NULL; // we shouldn't have a current token if we do not have a command anymore
 	return result;
 }
+
 void switchToControlMode(char* message){
-	clearCommand();
+	if(inputMode==IM_CONTROL)return; // already in control mode thank you
+	putchar('X');
+	if(inputMode==IM_COMMAND)clearCommand();
 	resetOutputColor();
 	if(message!=NULL)printf("\n%s",message);
-	if(!commandInput)return;
-	commandInput=false;
-	output("\n%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History");
+	inputMode=IM_CONTROL;
+	inputCharType='o'; // to make the loop know to quit
+	//output("\n%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History Shell");
 }
+
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
@@ -1010,7 +1031,7 @@ bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType
 //                the endofinput flag is used to indicate whether this is the end of the input
 bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput){
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
-	if(inputCharacterType=='C'){
+	if(inputCharType=='C'){
 		pToken->type^=0x70; // toggling bit 7
 		// a comment character will NEVER change the (actual) token type but it should change the color to use
 		if(pToken->type&0x70){commenting=true;outputTokenColor(pToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
@@ -1050,7 +1071,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// TODO should we write the associated colors here?????
 		outputTokenColor(pToken);
 	}else
-	if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+	if(inputCharType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
 		pToken->significantCharacterCount=string_length(pToken->text);
 
 	// insert the typed character at cursorPosition minus current token offset in pToken->text
@@ -1077,7 +1098,35 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	return true;
 }
 
+bool COMMAND_PROCESSOR_AVAILABLE=0;
+mstring* shellCommand=NULL;
+void clearShellCommand(){
+	string_setlength(behindCursorText,0);
+	string_setlength(shellCommand,0);
+	cursorPosition=0;
+}
+void executeShellCommand(){
+	if(string_length(shellCommand)){
+		output("\n"); // get a new line before we see the result of executing this command!!
+		int result=system(string(shellCommand));
+		clearShellCommand(); // ready for the next execution
+	}else
+		switchToControlMode("No shell command to execute!");
+}
+void switchToShellMode(char* message){
+	clearCommand();
+	resetOutputColor();
+	if(message!=NULL)output("\n%s",message);
+	inputMode=IM_SHELL;
+	clearShellCommand();
+	inputCharType='s';
+	//output("\n%s\n $ ","Enter your shell command, and press the Return button to execute.");
+}
+
+
 int main(int argc, char **argv){
+
+	COMMAND_PROCESSOR_AVAILABLE=system(NULL); // check if there's a command processor available
 
 #ifdef __DEBUG__
 	printf("\n%s","Operator token types:");
@@ -1120,12 +1169,13 @@ int main(int argc, char **argv){
 	output("\n%s\n","Welcome to M.");
 	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
 
+	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
+
 	behindCursorText=string_create(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
 	pCommand=NULL; // the current command (token)
 	///// writeCommand() will take care of this!!!! commandLength=0; // keep track of the total command length...
-	commandInput=true; // TODO should this go into promptForUserInput()?
+	inputMode=IM_COMMAND; // TODO should this go into promptForUserInput()?
 
-	char inputCharacterType;
 	while(1){
 
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
@@ -1142,8 +1192,8 @@ int main(int argc, char **argv){
 		   point: an evaluated command should be discarded??? in which case a user cannot correct it and has to type it in again
 		   so it makes sense to be allowed to complete a command (that failed to evaluate)
 		*/
-		// TODO what if we're not in commandInput here??????
-		if(commandInput){
+		// TODO what if we're not in inputMode here??????
+		if(inputMode==IM_COMMAND){
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
 			if(pCommand==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
 			commandLength=cursorPosition=writeTokens(pCommand);
@@ -1166,42 +1216,52 @@ int main(int argc, char **argv){
 		// Ctrl-D to exit M
 		while(inputCharRead()){
 
-			////////putchar('@');
-			////printf("[%i]",inputChar);
 			if(inputChar>127)continue; // undefined input character
 
-			inputCharacterType=INPUTCHARACTERTYPES[inputChar];
+			inputCharType=INPUTCHARACTERTYPES[inputChar];
+
+			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE cursorPosition is only defined in the other two modes)
+			if(inputCharType=='o'){
+				if(inputMode==IM_CONTROL){
+					inputMode=IM_COMMAND;
+					break;
+				}
+				// not in control mode, go to control mode if first character on line
+				if(!cursorPosition){
+					switchToControlMode(NULL);
+					break;
+				}
+				// accept (might be an acceptable character in string literal in commands or in shell commands)
+			}
+			//////////putchar(inputCharType);
 
 			// special (control) input character types
 			// first the ones that will break in any input mode!!!!
-			if(inputCharacterType=='n')break; // end-of-line (CR of LF) character
-			if(inputCharacterType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
+			if(inputCharType=='i')continue; // insignificant input character without specific purpose
 
-			if(commandInput){
+			if(inputCharType=='n')break; // end-of-line (CR of LF) character
+			if(inputCharType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
+
+			// from now on no continue's anymore, because at the end of the loop we want to check for inputCharType equaling o
+			if(inputMode==IM_COMMAND){
 #ifdef __DEBUG__
-				printf("(%c)",inputCharacterType);
+				putchar(inputCharacterType);
 #endif
-				if(inputCharacterType=='i')continue; // insignificant input character without specific purpose
-				
-				if(inputCharacterType=='b'||inputCharacterType=='d'){ // backspace or delete
+				if(inputCharType=='b'||inputCharType=='d'){ // backspace or delete
 					// something to remove?
 					if(commandLength) // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
 						removePreviousTokenCharacter();
 					else // nothing to remove
 						beep();
-					continue;
-				}
-
-				if(inputCharacterType=='c'){ // cancel command (Ctrl-D)
+				}else
+				if(inputCharType=='c'){ // cancel command (Ctrl-D)
 					if(pCommand!=NULL){
 						clearCommand();
 						backToPrompt();
 					}else
 						beep();
-					continue;
-				}
-				
-				if(inputCharacterType=='t'){ // Tab character
+				}else
+				if(inputCharType=='t'){ // Tab character
 					// if there's a preview (well, code completion by way of a behindCursorText)
 					if(cursorPosition<commandLength){
 						while(cursorPosition<commandLength){
@@ -1217,10 +1277,8 @@ int main(int argc, char **argv){
 						}
 					}else
 						beep();
-					continue;
-				}
-
-				if(inputCharacterType=='m'){ // Esc character...
+				}else
+				if(inputCharType=='m'){ // Esc character...
 					char newInputChar='\0'; // if c ends up being something else it should be processed as a normal character!!!
 					if(inputCharRead()){
 						if(inputChar==91){
@@ -1238,7 +1296,7 @@ int main(int argc, char **argv){
 									}
 								}else
 								if(inputChar==65){ // up arrow 
-									if(commandInput){ // i.e. show previous command if any
+									if(inputMode==IM_COMMAND){ // i.e. show previous command if any
 										if(pCommand)
 											outputInfo("%s","Won't show previous commands when one is being entered.");
 										else
@@ -1254,7 +1312,7 @@ int main(int argc, char **argv){
 									*/
 								}else
 								if(inputChar==66){ // down arrow
-									if(commandInput){									
+									if(inputMode==IM_COMMAND){									
 										if(pCommand)
 											outputInfo("%s","Won't show next commands when one is being entered!");
 										else 
@@ -1318,16 +1376,11 @@ int main(int argc, char **argv){
 							}
 						}
 					}
-					continue;
-				}
-				
-				if(inputCharacterType=='o'){
+				}else
+				if(inputCharType=='o') // explicit switching to control mode!!
 					switchToControlMode(NULL);
-					continue;
-				}
-
 				// ASSERTION if we get here and we are in command input mode process
-				if(commandInput){
+				if(inputMode==IM_COMMAND){
 					// we need to have a token (to append the input character to) which initializes to pCommand
 					if(pCommand==NULL){ // no first command token
 						// if commandIndex we should one of the registered commands
@@ -1335,16 +1388,15 @@ int main(int argc, char **argv){
 					}
 					// if still NULL (also when we fail to actually create a new first command token)
 					if(pToken!=NULL){
-						if(commandCharacterAccepted(inputChar,inputCharacterType,true))
+						if(commandCharacterAccepted(inputChar,inputCharType,true))
 							outputStatus();
 						else
 							switchToControlMode("Switching to control moe, due to failing to accept the input character.");
 					}else
 						switchToControlMode("Switching to control mode, due to failing to create a new command!");
 				}
-
-			}else{ // inputChar received in control mode
-
+			}else
+			if(inputMode==IM_CONTROL){ // inputChar received in control mode
 				putchar(inputChar); // nice to see the character we typed...
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
@@ -1361,18 +1413,119 @@ int main(int argc, char **argv){
 						}else
 							output("%s\n","No previous commands to show.");
 					}
-				}else{
+					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
+				}else
 					// user might have selected one of the commands (letter a through j)
 					commandPage=0; // stop paging
+			}else{ // Shell command input mode
+				// we still allow using certain 'special' characters for composing the command (much like we did with a command)
+				if(inputCharType=='b'){ // backspace
+					if(cursorPosition>0){
+						if(string_removed_char(shellCommand,cursorPosition-1)){
+							cursorLeft();
+							writeBehindCursorText();
+						}else
+							switchToControlMode("Failed to remove the shell command character!");
+					}else // nothing to remove
+						beep();
+				}else
+				if(inputCharType=='d'){
+					if(string_length(behindCursorText)){ // something behind the cursor that we can remove
+						if(string_removed_char(behindCursorText,0))
+							writeBehindCursorText();
+						else
+							switchToControlMode("Failed to remove the shell command character!");
+					}else // nothing to remove
+						beep();
+				}else
+				if(inputCharType=='c'){ // cancel command (Ctrl-D)
+					if(pCommand!=NULL){
+						clearShellCommand();
+						backToPrompt();
+					}else
+						beep();
+				}else
+				if(inputCharType=='t'){ // Tab character
+					// if there's a preview (well, code completion by way of a behindCursorText)
+					if(cursorPosition<string_length(shellCommand)){
+						while(cursorPosition<string_length(shellCommand)){
+							char newInputChar=string_removed_char(behindCursorText,0);
+							if(!newInputChar){
+								writeBehindCursorText();
+								switchToControlMode("Failed to accept all suggested characters.");
+								break;
+							}
+							string_insert_char(shellCommand,cursorPosition,newInputChar);
+						}
+					}else
+						beep();
+				}else
+				if(inputCharType=='m'){ // Esc character...
+					char newInputChar='\0'; // if c ends up being something else it should be processed as a normal character!!!
+					if(inputCharRead()){
+						if(inputChar==91){
+							if(inputCharRead()){
+								if(inputChar==51){
+									if(inputCharRead()){
+										if(inputChar==126){ // delete
+											if(cursorPosition<string_length(shellCommand)){
+												// we could go one to the right and do a backspace!!
+												cursorRight();
+												// TODO what to do here??? removePreviousTokenCharacter();
+											}else // nothing under the cursor to delete
+												beep();
+										}
+									}
+								}else
+								if(inputChar==65){ // up arrow 
+									beep();
+								}else
+								if(inputChar==66){ // down arrow
+									beep();
+								}else
+								if(inputChar==67){ // right arrow
+									if(cursorPosition<string_length(shellCommand)){
+										char newInputChar=string_removed_char(behindCursorText,0);
+										if(!newInputChar){
+											writeBehindCursorText();
+											switchToControlMode("Failed to accept the suggested characters.");
+										}else
+											string_insert_char(shellCommand,cursorPosition,newInputChar);
+									}else
+										beep();
+								}else
+								if(inputChar==68){ // left arrow
+									if(cursorPosition>0){
+										bool success=false;
+										char c=string_removed_char(shellCommand,cursorPosition-1);
+										if(c){ // removing the character behind the cursor succeeded
+											// prefix it to behindCursorText
+											string_insert_char(behindCursorText,0,c);
+											cursorLeft();
+											writeBehindCursorText();
+										}else
+											switchToControlMode("Failed to move the cursor left.");
+									}else
+										beep();
+								}else
+									beep();
+							}
+						}
+					}
+				}else{
+					putchar(inputChar);
+					string_insert_char(shellCommand,cursorPosition,inputChar);
+					cursorPosition++;
 				}
 			}
-
+			// if switched to control mode, inputCharType will be equal to 'o' and we break out of this input loop!!!
+			if(inputCharType=='o'||inputCharType=='s')break;
 		} // end of character input 
 
 		// if eXit input character(s) received...
-		if(inputCharacterType=='x')break;
-		if(inputCharacterType=='n'){
-			if(commandInput){ // the newline character ends the command to be evaluated!!
+		if(inputCharType=='x')break;
+		if(inputCharType=='n'){
+			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				// if the command ended with a normal end-of-line character, evaluate and register the command
 				// NOTE if pCommand is not set yet, but the user retrieved a previously executed command, that one should be reexecuted
@@ -1422,8 +1575,11 @@ int main(int argc, char **argv){
 					if(!clearCommand())
 						switchToControlMode("Switching to control mode, due to failing to remove the command.");
 				*/
-			}else // always to return to command input!!
-				commandInput=true;
+			}else
+			if(inputMode==IM_SHELL)
+				executeShellCommand();
+			else // always to return to command input!!
+				inputMode=IM_COMMAND;
 		}
 	}
 	// 'normal' exit
