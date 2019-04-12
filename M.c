@@ -59,8 +59,13 @@ void enableRawMode(){
 //                TODO delegate all functions that output to the output device to this function
 void output(const char *fmt,...){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);} // NOTE use vprintf here, NOT printf!!!!
 
-bool assisting=false; // assist flag can be turned on to guide the user
+#ifdef __DEBUG__
+bool assisting=true; // assist flag can be turned on to guide the user
 bool debugging=true; // program debugging flag so it will show the token information before evaluation of a command
+#else
+bool assisting=false; // assist flag can be turned on to guide the user
+bool debugging=false; // program debugging flag so it will show the token information before evaluation of a command
+#endif
 
 char* promptinfo="\nCommand mode: type ` to enter control mode; cancel the current command with Ctrl-C.\n";
 /**
@@ -331,11 +336,10 @@ void outputText(char* fmt,char* text){
         TERNARY aeru                     1100 0000 ? :
 
 */
-#define NUMBER_OF_TOKEN_TYPES 27
+// MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
+#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 24
+#define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
 #define FOREACH_TOKENTYPE(TOKENTYPE) \
-		TOKENTYPE(TT_ERROR) \
-		TOKENTYPE(TT_COMMENT) \
-		TOKENTYPE(TT_END_OF_COMMENT) \
 		TOKENTYPE(TT_UNARY) \
 		TOKENTYPE(TT_ASSIGNMENT) \
 		TOKENTYPE(TT_BINARY_aeru) \
@@ -359,14 +363,16 @@ void outputText(char* fmt,char* text){
 		TOKENTYPE(TT_FUNCTION) \
 		TOKENTYPE(TT_FUNCTION_CALL) \
 		TOKENTYPE(TT_FUNCTION_ARGUMENT) \
-		TOKENTYPE(TT_END_OF_FUNCTION_CALL)
+		TOKENTYPE(TT_END_OF_FUNCTION_CALL) \
+		TOKENTYPE(TT_COMMENT) \
+		TOKENTYPE(TT_ERROR)
 #define GENERATE_TOKENTYPE_ENUM(ENUM) ENUM,
 #define GENERATE_STRING(STRING) #STRING,
 enum TOKENTYPE_ENUM {
 	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
 };
 // the list of token type ids in the corresponding order!!!
-const uint8_t TOKENTYPE_IDS[]={0b11111111,0b1000000,0b10111111,0b01010000,0b010000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+const uint8_t TOKENTYPE_IDS[]={0b01010000,0b010000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,0b1000000,0b11111111};
 /*
 typedef struct{
 	unsigned int ended:1; // one flag to indicate whether or not the Token has ended
@@ -546,7 +552,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
 // we can make an array of transitions with each element corresponding to the character in TOKENTYPES, so the first entry contains all responses to E, the second entry the responses to W etc.
 // it's easier to tell for any possible resulting token type which input character types will result in that type
 // it's a hell of a job to create the token type transitions matrix
-char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={"","","","","","","","","","","","","","","","","","","","","","","","","","",""};
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","`D","`S","","","","","","","","",""};
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -582,63 +588,60 @@ char* const NO_TRANSITIONS[NUMBER_OF_TOKEN_TYPES]={"","","","","","","","","",""
 	printf("\nTwo character assignable binary operator     : %d.",TT_TWO_CHAR_ASSIGNABLE_BINARY);
 	printf("\nComparison or shift operator                 : %d.",TT_COMPARISON_OR_SHIFT_BINARY);
 */
+/* MDH@10APR2019: 
+- some transitions only change the type but do not start a new token, but this is true for all binary operators, so I guess we can force that programmatically
+- if we put ERROR at the end we do not need to add an array for dealing with error transitions (as we cannot leave an error!!)
+*/
 // operator input type characters: ! ~ + - % * < = | (8 different operator groups)
 // ! ~ and + start a unary operator when a value is expected
-const char * const TRANSITIONS[NUMBER_OF_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-	{"ERROR"                   ,"COMMENT","ENDOFCOMMENT","UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru","Taeru","EXPRESSION","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","ENDOFDQSTRING","ENDOFSQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL"}, /* ERROR */ \
-	{""                        ,"C"      ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* COMMENT */ \
-	{""                        ,""       ,"C"           ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* END OF COMMENT */ \
-	{"D%&S)*/,.:;<>?@E%]{}="   ,""       ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ONE CHARACTER UNARY !-+ */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"C"      ,""            ,"!-+","" ,""     ,""     ,"="    ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* ASSIGNMENT = */ \
-	{"%&()*/,.:;<>=?@E%]"      ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* Baeru */ \
-	{"D%&S)*/,.:;<>?@E%]{}C"   ,""       ,""            ,"!-+","" ,"="    ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BaErU */ \
-	{"D%&S),.:;<>?@E%]{}"      ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BAeRu */ \
-	{"D%S)*/,.:;<>?@E%]{}"     ,"C"      ,""            ,"!-+","" ,"="    ,""     ,"&|*/" ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BaERu */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"C"      ,""            ,"!-+","=",""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* BAeru */ \
-	{"D%&S)*/,.:;<>?@E%]{}"    ,"C"      ,""            ,"!-+","=",""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* Taeru */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* EXPRESSION */ \
-	{"!DS({"                   ,"C"      ,""            ,""   ,"=",""     ,"!"    ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-	{"!DS(@{="                 ,"C"      ,""            ,""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* INTEGER: (signless) list of digits */ \
-	{"!DS(.@{="                ,"C"      ,""            ,""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* REAL: part behind a decimal period */ \
-	{"!DS(.@E{="               ,"C"      ,""            ,""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
-	{""                        ,"C"      ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* DQSTRING: double quoted string */ \
-	{""                        ,"C"      ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* SQSTRING: single quoted string */ \
-	{"!DL%&S(*/,.@E[{%-"       ,"C"      ,""            ,""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-	{"!DL%&S(*/,.@E[{%-"       ,"C"      ,""            ,""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-	{"%&)*/,.:;<>=?@E%}"       ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                }, /* LIST: [ opens a list */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* LIST_ELEMEMT: , in list */ \
-	{"!DL(.N@E{"               ,"C"      ,""            ,""   ,"" ,"?:"   ,"%-+"  ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_LIST: behind ] that ends a list */ \
-	{"!D%&S)*/+-,.:;<>=?@[%]{}","C"      ,""            ,""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 }, /* FUNCTION: some identifier recognized as function name */ \
-	{"%&*/,.:;<>=?@E%]}"       ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL ( following the name of a function */ \
-	{"%&)*/,.:;<>=?@E%]}"      ,"C"      ,""            ,"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
-	{"!DLS(.N@E{"              ,"C"      ,""            ,""   ,"" ,"?:"   ,"%-+"  ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+//   "UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru","Taeru","EXPRESSION","VARIABLE","INTEGER","REAL","EREAL","DQSTRING","SQSTRING","ENDOFDQSTRING","ENDOFSQSTRING","LIST","LIST_ELEMENT","ENDOFLIST","FUNCTION","FUNCTIONCALL","FUNCTIONCALLARGUMENT","ENDOFFUNCTIONCALL","COMMENT","ERROR"},
+const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"CD%S)&|*/,.:;<>?@E]{}="}, /* ONE CHARACTER UNARY !-+ */ \
+	{"!-+","" ,""     ,""     ,"="    ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"CD%S)&|*/,.:;<>?@E]{}"}, /* ASSIGNMENT = */ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"C%()&|*/,.:;<>=?@E]"}, /* Baeru */ \
+	{"!-+","" ,"="    ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"CD%S)&|*/,.:;<>?@E]{}C"}, /* BaErU */ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"CD%S)&|*/,.:;<>?@E]{}"}, /* BAeRu */ \
+	{"!-+","" ,"="    ,""     ,""     ,""      ,"R"   ,""     ,""          ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"CD%S)&|*/,.:;<>?@E]{}"}, /* BaERu */ \
+	{"!-+","=",""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"CD%S)&|*/,.:;<>?@E]{}"}, /* BAeru */ \
+	{"!-+","=",""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,""        ,""        ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"CD%S)&|*/,.:;<>?@E]{}"}, /* Taeru */ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"C%)&|*/,.:;<>=?@E%]}"}, /* EXPRESSION */ \
+	{""   ,"=",""     ,"!"    ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,"LEN"     ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DS({"}, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+	{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,"N"      ,"."   ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DS(@{="}, /* INTEGER: (signless) list of digits */ \
+	{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,"E"    ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DS(.@{="}, /* REAL: part behind a decimal period */ \
+	{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DS(.@E{="}, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
+	{""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,"D"            ,""             ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,""}, /* DQSTRING: double quoted string */ \
+	{""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,"S"            ,""    ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,""}, /* SQSTRING: single quoted string */ \
+	{""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DL%&S(*/,.@E[{%-"}, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+	{""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DL%&S(*/,.@E[{%-"}, /* END_SQSTRING single quoted string at end of single quoted string */ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,"]"        ,""        ,""            ,""                    ,")"                ,""       ,"C%&)*/,.:;<>=?@E%}"}, /* LIST: [ opens a list */ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"C%&)*/,.:;<>=?@E%]}"}, /* LIST_ELEMEMT: , in list */ \
+	{""   ,"" ,"?:"   ,"%-+"  ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DL(.N@E{"}, /* END_OF_LIST: behind ] that ends a list */ \
+	{""   ,"" ,""     ,""     ,""     ,""      ,""    ,""     ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,""            ,""         ,""        ,"("           ,""                    ,""                 ,""       ,"C!D%&S)*/+-,.:;<>=?@[%]{}"}, /* FUNCTION: some identifier recognized as function name */ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"C%&*/,.:;<>=?@E%]}"}, /* FUNCTION_CALL ( following the name of a function */ \
+	{"!-+","" ,""     ,""     ,""     ,""      ,""    ,""     ,"("         ,"LE"      ,"N"      ,""    ,""     ,"D"       ,"S"       ,""             ,""             ,"["   ,""            ,""         ,""        ,""            ,""                    ,""                 ,""       ,"C%&)*/,.:;<>=?@E%]}"}, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
+	{""   ,"" ,"?:"   ,"%-+"  ,"&|*/" ,"<>"    ,"-+%" ,"?:"   ,""          ,""        ,""       ,""    ,""     ,""        ,""        ,""             ,""             ,""    ,","           ,"]"        ,""        ,""            ,""                    ,")"                ,"C"      ,"!DLS(.N@E{"}, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
 // if we put the error info in the error token
 
 uint8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
-	// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
-	char* noTransition=NO_TRANSITIONS[inputTokenType];
+	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
+		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
+		char* noTransition=NO_TRANSITIONS[inputTokenType];
 #ifdef __DEBUG__
-	printf("'%s'",noTransition);
+		printf("'%s'",noTransition);
 #endif
-	if(strlen(noTransition)==0||(noTransition[0]=='`'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
-		uint8_t tokenType=NUMBER_OF_TOKEN_TYPES-1;
-		while(--tokenType>=0){
-/*
-#ifdef __DEBUG__
-			printf("(%d)",tokenType);
-#endif
-*/
-			if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)return tokenType;
+		if(strlen(noTransition)==0||(noTransition[0]=='`'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
+			int8_t tokenType=NUMBER_OF_TOKEN_TYPES; // MDH@10APR2019: BUG FIX uint8_t changed to int8_t otherwise would circle around
+			while(--tokenType>=0)if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)return tokenType;
 		}
-	}
 #ifdef __DEBUG__
-	else{
-		putchar('=');
-	}
+		else{
+			putchar('=');
+		}
 #endif
+	}
 	return inputTokenType; // if no match was found assume no change to the token type!!
 }
 
@@ -852,7 +855,7 @@ void switchToControlMode(char* message){
 	if(message!=NULL)printf("\n%s",message);
 	if(!commandInput)return;
 	commandInput=false;
-	output("\n%s\n >> ","Control flags: Assist Debug - Options: eXit History");
+	output("\n%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History");
 }
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
@@ -994,20 +997,96 @@ void outputTokenInfo(){
 	}
 }
 
+bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
+
+// MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
+//       		  ASSERTION pCommand and pToken are  NOT  NULL
+//                the endofinput flag is used to indicate whether this is the end of the input
+bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput){
+	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
+	if(inputCharacterType=='C'){
+		pToken->type^=0x70; // toggling bit 7
+		// a comment character will NEVER change the (actual) token type but it should change the color to use
+		if(pToken->type&0x70){commenting=true;outputTokenColor(pToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
+	}else // not a comment character
+	if((pToken->type&0x70)==0){ // not in a comment
+		if(notCommenting){notCommenting=false;outputTokenColor(pToken);} // if behind coming out of a comment, we have to reset the output token color
+	*/
+	/*
+	// MDH@26FEB2019: when a user starts inserting characters instead of appending them we can cut off the rest of the characters in the command
+	//                and put it in a single mstring instance and append these one at a time 
+	char* removed=removedRestOfCommand();
+	*/
+	// determine the token type associated with the newly inputted character
+	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
+	if((TOKENTYPE_IDS[pToken->type]&0x62)==0x62)if(inputChar==string_char(pToken->text,0))inputCharacterType='R';
+	int16_t newTokenType=(inputCharacterType!='W'?nextTokenType(pToken->type,inputCharacterType):-1); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+#ifdef __DEBUG__
+	resetOutputColor();
+	printf("[%d+%c->%d]",pToken->type,inputCharacterType,newTokenType);
+	outputTokenColor(pToken);
+#endif
+	// if this is not the same token type we have to start a new token
+	// TODO will be different if we're inserting characters
+	if(newTokenType>=0&&newTokenType!=pToken->type){ // character ends the current token
+		// MDH@10APR2019: NOT every new token type starts a new token:
+		//                if we're in a binary operator and move to another binary operator type it's an extension
+		//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
+		///////if(!isBinaryOperatorTokenType(pToken->type)||!isBinaryOperatorTokenType(newTokenType))
+		pToken=newToken(pToken);
+/*
+#ifdef __DEBUG__
+		printf("@%p=%p?:%s",pCommand,pToken,string(pCommand->text));
+#endif
+*/
+		pToken->type=newTokenType;
+		if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
+		// TODO should we write the associated colors here?????
+		outputTokenColor(pToken);
+	}else
+	if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+		pToken->significantCharacterCount=string_length(pToken->text);
+
+	// insert the typed character at cursorPosition minus current token offset in pToken->text
+	string_insert_char(pToken->text,cursorPosition-pToken->offset,inputChar);
+#ifdef __DEBUG__
+	printf("[%s]",string(pToken->text));
+#endif
+	commandLength++; // increment total command length
+	putchar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
+	
+	if(endOfInput){
+		if(assisting)output(":%c",inputCharacterType);
+		debugWrite("Command length after inserting %c: %" PRIu16 ".",inputChar,commandLength);
+	}
+
+	cursorPosition++; // increment the current cursor position
+
+	if(endOfInput){
+		writeBehindCursorText();
+		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength);
+		outputStatus();
+	}
+
+	return true;
+}
+
 int main(int argc, char **argv){
 
 #ifdef __DEBUG__
-	printf("\n%s","Token types:");
-	printf("\nError                                   : %d.",TT_ERROR);
-	printf("\nUnary operator                          : %d.",TT_UNARY);
-	printf("\nAssignment operator                     : %d.",TT_ASSIGNMENT);
-	printf("\nOBinary operator                        : %d.",TT_BINARY_aeru);
-	printf("\nAssignable repeatable binary operator   : %d.",TT_BINARY_AeRu);
-	printf("\nEqualizable repeatable binary operator  : %d.",TT_BINARY_aERu);
-	printf("\nTEqualizable unfinished binary operator : %d.",TT_BINARY_aErU);
-	printf("\nAssignable binary operator              : %d.",TT_BINARY_Aeru);
-	printf("\nComment                                 : %d.",TT_COMMENT);
-	printf("\nEnd of comment                          : %d.",TT_END_OF_COMMENT);
+	printf("\n%s","Operator token types:");
+	printf("\nUnary operator                            : %d.",TT_UNARY);
+	printf("\nAssignment operator                       : %d.",TT_ASSIGNMENT);
+	printf("\nBinary operator                           : %d.",TT_BINARY_aeru);
+	printf("\nAssignable repeatable binary operator     : %d.",TT_BINARY_AeRu);
+	printf("\nEqualizable repeatable binary operator    : %d.",TT_BINARY_aERu);
+	printf("\nTEqualizable unfinished binary operator   : %d.",TT_BINARY_aErU);
+	printf("\nAssignable binary operator                : %d.",TT_BINARY_Aeru);
+	printf("\nTernary operator                          : %d.",TT_TERNARY_aeru);
+	printf("\n%s","Unfinishable token types:");
+	printf("\nComment (allowed when command is complete): %d.",TT_COMMENT);
+	printf("\nError                                     : %d.",TT_ERROR);
+
 #endif
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
@@ -1080,6 +1159,7 @@ int main(int argc, char **argv){
 		// now we need to read characters one at a time and echo them from the command line
 		// Ctrl-D to exit M
 		while(inputCharRead()){
+
 			////////putchar('@');
 			////printf("[%i]",inputChar);
 			if(inputChar>127)continue; // undefined input character
@@ -1092,7 +1172,6 @@ int main(int argc, char **argv){
 			if(inputCharacterType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
 
 			if(commandInput){
-
 #ifdef __DEBUG__
 				printf("(%c)",inputCharacterType);
 #endif
@@ -1116,6 +1195,25 @@ int main(int argc, char **argv){
 					continue;
 				}
 				
+				if(inputCharacterType=='t'){ // Tab character
+					// if there's a preview (well, code completion by way of a behindCursorText)
+					if(cursorPosition<commandLength){
+						while(cursorPosition<commandLength){
+							char newInputChar=string_removed_char(behindCursorText,0);
+							if(newInputChar){
+								commandLength--; // until we manage to insert the character removed, we have one less character in the total command length
+								if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],cursorPosition==commandLength-1))
+									switchToControlMode("Failed to accept the suggested character.");
+							}else{
+								writeBehindCursorText(); // there will be characters behind the cursor left to show
+								switchToControlMode("Failed to remove the suggested character.");
+							}
+						}
+					}else
+						beep();
+					continue;
+				}
+
 				if(inputCharacterType=='m'){ // Esc character...
 					char newInputChar='\0'; // if c ends up being something else it should be processed as a normal character!!!
 					if(inputCharRead()){
@@ -1170,41 +1268,12 @@ int main(int argc, char **argv){
 										// MDH@22MAR2019: instead of doing everything here (duplicating all code that is down below), we can find a way to use the 'normal' code
 										////////////bool success=false;
 										newInputChar=string_removed_char(behindCursorText,0);
-										if(!newInputChar)
-											debugWrite("%s","Failed to remove the first behind cursor text character.");
-										/* MDH@22MAR2019: we can stop doing the following...										
-											debugWrite("Character %c to be appended!",c);
-											// this is complex in that it's not just about appending c
-											// but also determining what the next token will be and if need be
-											// start a new token
-											if(!pToken)pToken=newToken(NULL); // we need a token!!!
-											inputCharacterType=INPUTCHARACTERTYPES[c];
-											int16_t newTokenType=(inputCharacterType=='W'?-1:nextTokenType(pToken->type,inputCharacterType));
-											// MDH@22MAR2019: the next token type might be the same BUT if the current token already ended (due to whitespace) we should always start a new token
-											if(newTokenType>=0&&(newTokenType!=pToken->type||pToken->significantCharacterCount>0)){ // character ends current token
-												pToken=newToken(pToken);
-												pToken->type=newTokenType;
-												if(pToken->type==TT_SINGLE_CHARACTER_UNARY_OPERATOR)pToken->significantCharacterCount=1; // MDH@22MAR2019: every unary token has at most one significant character
-												// TODO should we write the associated colors here?????
-											}else // no change to the token type (so character did not start a new token)
-											if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_WHITESPACE) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
-												pToken->significantCharacterCount=string_length(pToken->text);
-											debugWrite("%s","Inserting character!");
-											string_insert_char(pToken->text,cursorPosition-pToken->offset,c);
-											
-											// MDH@28FEB2019: does NOT change commandLength, so NOT doing: commandLength++;
-											outputTokenColor(pToken);
-											putchar(c);
-											success=true;
+										if(newInputChar){
+											commandLength--;
+											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true))
+												switchToControlMode("Suggested character extracted, but not accepted.");
 										}else
-											debugWrite("%s","Failed to remove the first behind cursor text character.");
-										if(success){
-											cursorPosition++; /////////cursorRight();
-											debugWrite("%s","Cursor position incremented!");
-											///////writeBehindCursorText();
-										}else
-											switchToControlMode("Failed to move the cursor right.");
-										*/
+											switchToControlMode("Suggested character not extracted!");
 									}else
 										beep();
 								}else
@@ -1243,96 +1312,33 @@ int main(int argc, char **argv){
 							}
 						}
 					}
-					if(!newInputChar)continue;
-					// update inputChar and inputCharacterType for further processing...
-					inputCharacterType=INPUTCHARACTERTYPES[inputChar=newInputChar];
+					continue;
 				}
 				
 				if(inputCharacterType=='o'){
 					switchToControlMode(NULL);
 					continue;
-				} // MDH@22MAR2019 in certain situation we should NOT skip the remainder: else
-			}
-
-			// ASSERTION if we get here inputChar and inputCharacterType are available!!!!
-			// in command input we allow to do things with the command
-			if(commandInput){
-				////////printf(" (%d)",inputChar);
-				// we need to have a token (to append the input character to) which initializes to pCommand
-				if(pCommand==NULL){ // no first command token
-					// if commandIndex we should one of the registered commands
-					setCommand(commandIndex?commands[commandCount-commandIndex]:NULL); // will also set commandLength!!!
-/*
-#ifdef __DEBUG__
-					printf("@%p",pCommand);
-#endif
-*/
-					//////////if(pToken==NULL)printf("?");
 				}
-				// if still NULL (also when we fail to actually create a new first command token)
-				if(pToken!=NULL){
-					/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
-					if(inputCharacterType=='C'){
-						pToken->type^=0x70; // toggling bit 7
-						// a comment character will NEVER change the (actual) token type but it should change the color to use
-						if(pToken->type&0x70){commenting=true;outputTokenColor(pToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
-					}else // not a comment character
-					if((pToken->type&0x70)==0){ // not in a comment
-						if(notCommenting){notCommenting=false;outputTokenColor(pToken);} // if behind coming out of a comment, we have to reset the output token color
-					*/
-					/*
-					// MDH@26FEB2019: when a user starts inserting characters instead of appending them we can cut off the rest of the characters in the command
-					//                and put it in a single mstring instance and append these one at a time 
-					char* removed=removedRestOfCommand();
-					*/
-					// determine the token type associated with the newly inputted character
-					// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
-					if((TOKENTYPE_IDS[pToken->type]&0x62)==0x62)if(inputChar==string_char(pToken->text,0))inputCharacterType='R';
-					int16_t newTokenType=(inputCharacterType!='W'?nextTokenType(pToken->type,inputCharacterType):-1); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
-#ifdef __DEBUG__
-					resetOutputColor();
-					printf("[%d+%c->%d]",pToken->type,inputCharacterType,newTokenType);
-					outputTokenColor(pToken);
-#endif
-					// if this is not the same token type we have to start a new token
-					// TODO will be different if we're inserting characters
-					if(newTokenType>=0&&newTokenType!=pToken->type){ // character ends the current token
-						pToken=newToken(pToken);
-/*
-#ifdef __DEBUG__
-						printf("@%p=%p?:%s",pCommand,pToken,string(pCommand->text));
-#endif
-*/
-						pToken->type=newTokenType;
-						if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
-						// TODO should we write the associated colors here?????
-						outputTokenColor(pToken);
+
+				// ASSERTION if we get here and we are in command input mode process
+				if(commandInput){
+					// we need to have a token (to append the input character to) which initializes to pCommand
+					if(pCommand==NULL){ // no first command token
+						// if commandIndex we should one of the registered commands
+						setCommand(commandIndex?commands[commandCount-commandIndex]:NULL); // will also set commandLength!!!
+					}
+					// if still NULL (also when we fail to actually create a new first command token)
+					if(pToken!=NULL){
+						if(commandCharacterAccepted(inputChar,inputCharacterType,true))
+							outputStatus();
+						else
+							switchToControlMode("Switching to control moe, due to failing to accept the input character.");
 					}else
-					if(inputCharacterType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
-						pToken->significantCharacterCount=string_length(pToken->text);
+						switchToControlMode("Switching to control mode, due to failing to create a new command!");
+				}
 
-					// insert the typed character at cursorPosition minus current token offset in pToken->text
-					string_insert_char(pToken->text,cursorPosition-pToken->offset,inputChar);
-#ifdef __DEBUG__
-					printf("[%s]",string(pToken->text));
-#endif
-					commandLength++; // increment total command length
-					putchar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
-					
-					if(assisting)output(":%c",inputCharacterType);
+			}else{ // inputChar received in control mode
 
-					debugWrite("Command length after inserting %c: %" PRIu16 ".",inputChar,commandLength);
-					cursorPosition++; // increment the current cursor position
-
-					writeBehindCursorText();
-					debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength);
-					/* replacing:
-					// write all remaining characters in the command after which we should return to the current position
-					writeRestOfCommand();
-					*/
-				}else
-					switchToControlMode("Switching to control mode, due to failing to create a new command!");
-			}else{
 				putchar(inputChar); // nice to see the character we typed...
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
@@ -1354,8 +1360,9 @@ int main(int argc, char **argv){
 					commandPage=0; // stop paging
 				}
 			}
-			if(commandInput)outputStatus();
-		}
+
+		} // end of character input 
+
 		// if eXit input character(s) received...
 		if(inputCharacterType=='x')break;
 		if(inputCharacterType=='n'){
