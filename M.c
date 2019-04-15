@@ -354,7 +354,7 @@ void outputText(char* fmt,char* text){
 */
 
 // MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
-#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 24
+#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 25
 #define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
 #define FOREACH_TOKENTYPE(TOKENTYPE) \
 		TOKENTYPE(TT_UNARY) \
@@ -367,19 +367,20 @@ void outputText(char* fmt,char* text){
 		TOKENTYPE(TT_TERNARY_aeru) \
 		TOKENTYPE(TT_EXPRESSION) \
 		TOKENTYPE(TT_VARIABLE) \
+		TOKENTYPE(TT_LISTELEMENT) \
 		TOKENTYPE(TT_INTEGER) \
 		TOKENTYPE(TT_REAL) \
-		TOKENTYPE(TT_EREAL) \
 		TOKENTYPE(TT_DQSTRING) \
 		TOKENTYPE(TT_SQSTRING) \
 		TOKENTYPE(TT_END_OF_DQSTRING) \
 		TOKENTYPE(TT_END_OF_SQSTRING) \
 		TOKENTYPE(TT_LIST) \
-		TOKENTYPE(TT_LIST_ELEMENT) \
 		TOKENTYPE(TT_END_OF_LIST) \
+		TOKENTYPE(TT_MAP) \
+		TOKENTYPE(TT_MAP_VALUE) \
+		TOKENTYPE(TT_END_OF_MAP) \
 		TOKENTYPE(TT_FUNCTION) \
 		TOKENTYPE(TT_FUNCTION_CALL) \
-		TOKENTYPE(TT_FUNCTION_ARGUMENT) \
 		TOKENTYPE(TT_END_OF_FUNCTION_CALL) \
 		TOKENTYPE(TT_COMMENT) \
 		TOKENTYPE(TT_ERROR)
@@ -389,7 +390,7 @@ enum TOKENTYPE_ENUM {
 	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
 };
 // the list of token type ids in the corresponding order!!!
-const uint8_t TOKENTYPE_IDS[]={0b01010000,0b010000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,0b1000000,0b11111111};
+const uint8_t TOKENTYPE_IDS[]={0b01010000,0b010000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,0b1000000,0b11111111};
 /*
 typedef struct{
 	unsigned int ended:1; // one flag to indicate whether or not the Token has ended
@@ -557,9 +558,12 @@ static const char* TOKENTYPE_STRING[]={
 // <>    binary operator extensible to make << or >> operator but can also be followed by an = sign (is this not the same as */?)
 // =     assignment operator that can follow most of the binary operators (except < and >)
 // |&    binary or and operator extensible to make || logical or or && logical and operator but the latter cannot be followed by =
-
+// MDH@16APR2019: removing the o input character type (for switching explicitly to or from control mode), replacing it by n, so we can use the backtick for certain purposes...
+//                in certain languages it means evaluate this (or the result of a system command??????)
+//                furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%LoLLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
+const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}%d";
+// replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
 // NOTE this can be organized in many ways perhaps it's easiest to tell per input character what the transformation is
@@ -574,7 +578,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
      E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
-char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","-+!","`D","`S","","","","","","","","",""};
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","-+!","`D","`S","","","","","","","","",""};
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -595,7 +599,7 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 */
 /* MDH@23MAR2019: syntacticly we have less operators
 	TOKENTYPE(TT_ONE_CHAR_UNARY=0b10000001) 						!(un) -(un) +(un)
-	TOKENTYPE(TT_ONE_CHAR_BINARY_=0b10100001)      					? :
+	TOKENTYPE(TT_ONE_CHAR_BINARY_=0b10100001)      					?
 	TOKENTYPE(TT_ONE_CHAR_ASSIGNABLE_BIANRY=0b10101010)  			= ~ ^ % \ -(bin) +(bin)
 	TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110)      					! (followed by =)
 	TOKENTYPE(TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY=0b10101011)		& | (interesting =+= and &+= and |+= and itself)
@@ -616,33 +620,36 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 */
 // operator input type characters: ! ~ + - % * < = | (8 different operator groups)
 // ! ~ and + start a unary operator when a value is expected
+// MDH@15APR2019: still to determine what to do with @ and ` (the latter for system commands????)
+//                inserting macro's should also be possible somehow...
 /*
- "UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","EXPR","VAR","INT","REAL","EREAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","L_EL","END_L","FUNCTION","F_CALL","FC_ARG","END_FC","CM","ERROR"},*/
+ "UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","EXPR","VAR" ,"L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
-{"!-+","" ,""     ,""     ,"="    ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{} "}, /* ASSIGNMENT = */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," C  %~()&|*/  ,.:;<>?@ E  ]  ="}, /* Baeru */ \
-{"!-+","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}" }, /* BaErU */ \
-{"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}" }, /* BAeRu */ \
-{"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}" }, /* BaERu */ \
-{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}" }, /* BAeru */ \
-{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,""        ,""        ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," CDS%~ )&|*/  ,.:;<>?@ E  ]{}" }, /* Taeru */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," C  %~ )&|*/  ,.:;<>?@ E  ] }="}, /* EXPRESSION */ \
-{""   ,"=",""     ,"!"    ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,"LN" ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (                    {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,""   ,"N"  ,"."   ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (              @     { ="}, /* INTEGER: (signless) list of digits */ \
-{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%~E","?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (        .     @     { ="}, /* REAL: part behind a decimal period */ \
-{""   ,"" ,"?:"   ,"!="   ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS  (        .     @ E   { ="}, /* EREAL part behind character 'e' in integer or real (only digits allowed) */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,"D"      ,""       ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ,""                              }, /* DQSTRING: double quoted string */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,"S"      ,""    ,""    ,""     ,""        ,""      ,""      ,""     ,""  ,""                              }, /* SQSTRING: single quoted string */ \
-{""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS%~&(  */ -,.     @LE [ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{""   ,"" ,"?:+"  ,""     ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS%~&(  */ -,.     @LE [ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,"]"    ,""        ,""      ,""      ,")"    ,""  ," C  %~& )*/  ,.:;<>=?@ E    }" }, /* LIST: [ opens a list */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," C  %~& )*/  ,.:;<>=?@ E  ] }" }, /* LIST_ELEMEMT: , in list */ \
-{""   ,"" ,"?:"   ,""     ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS   (      .      @LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,""    ,""     ,""        ,"("     ,""      ,""     ,""  ,"!CDS%~& )*/+-,.:;<>=?@   []{}" }, /* FUNCTION: some identifier recognized as function name */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," C  %~&  */  ,.:;<>=?@ E  ] }" }, /* FUNCTION_CALL ( following the name of a function */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE" ,"N"  ,""    ,""     ,"D"       ,"S"       ,""       ,""       ,"["   ,""    ,""     ,""        ,""      ,""      ,""     ,""  ," C  %~& )*/  ,.:;<>=?@ E  ] }" }, /* FUNCTION_CALL_ARGUMENT , in front of a new argument in a function call */ \
-{""   ,"" ,"?:"   ,""     ,"&|*/" ,"<>"    ,"-+%~" ,"?:"   ,""    ,""   ,""   ,""    ,""     ,""        ,""        ,""       ,""       ,""    ,","   ,"]"    ,""        ,""      ,""      ,")"    ,"C" ,"! DS   (      .      @LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
+{"!-+","" ,"="    ,""     ,""     ,""      ,"%"    ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C    )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  %()&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
+{""   ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
+{"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"  ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
+{"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
+{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
+{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:    ] }="}, /* EXPRESSION */ \
+{""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,"LEN.","["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}}="}, /* LIST ELEMENT (similar to expression) */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (               {"  }, /* INTEGER: (signless) list of digits */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   LE [ {"  }, /* REAL: part behind a decimal period */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
+{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,","   ,""    ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;! DS%&( * -,.   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,","   ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;! DS%&( * -,.   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
+{""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
+{""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"  ,""    ,"N"  ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *  ,.>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -1106,12 +1113,11 @@ void clearShellCommand(){
 	cursorPosition=0;
 }
 void executeShellCommand(){
-	if(string_length(shellCommand)){
-		output("\n"); // get a new line before we see the result of executing this command!!
-		int result=system(string(shellCommand));
-		clearShellCommand(); // ready for the next execution
-	}else
-		switchToControlMode("No shell command to execute!");
+	// ASSERTION string_length(shellCommand) should be positive
+	output("\n"); // get a new line before we see the result of executing this command!!
+	int result=system(string(shellCommand));
+	if(result)output("Result: %d.\n",result); // non-zero result
+	clearShellCommand(); // ready for the next execution
 }
 void switchToShellMode(char* message){
 	clearCommand();
@@ -1221,6 +1227,8 @@ int main(int argc, char **argv){
 			inputCharType=INPUTCHARACTERTYPES[inputChar];
 
 			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE cursorPosition is only defined in the other two modes)
+			// MDH@16APR2019: I want to use the Enter key (ASCII 13) to switch to the next mode, because the associated input character type is n which will ALWAYS break
+			//                in that case we do NOT need the o input character type!!!
 			if(inputCharType=='o'){
 				if(inputMode==IM_CONTROL){
 					inputMode=IM_COMMAND;
@@ -1524,6 +1532,8 @@ int main(int argc, char **argv){
 
 		// if eXit input character(s) received...
 		if(inputCharType=='x')break;
+
+		// MDH@16APR2019: now if we use n to switch modes as well, we can do that if there's no command
 		if(inputCharType=='n'){
 			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
@@ -1563,9 +1573,12 @@ int main(int argc, char **argv){
 						debugWrite("\n%s","Command pointer cleared.");
 					}
 				}else{
-					output("\n%s","No command to evaluate.");
+					// MDH@16APR2019: instead of telling the user that there's no command to evaluate (as we did before), we're switching to control mode
+					// replacing: output("\n%s","No command to evaluate.");
 					if(pCommand&&!clearCommand())output("\nWARNING: %s","Failed to clear the command pointer.");
 					pCommand=NULL;
+					// MDH@16APR2019: here
+					switchToControlMode(NULL);
 				}
 				/* MDH@16MAR2019: preparation for the next command is not required here, it's better to do that at the beginning
 				                  of this outer loop
@@ -1576,9 +1589,12 @@ int main(int argc, char **argv){
 						switchToControlMode("Switching to control mode, due to failing to remove the command.");
 				*/
 			}else
-			if(inputMode==IM_SHELL)
-				executeShellCommand();
-			else // always to return to command input!!
+			if(inputMode==IM_SHELL){
+				if(string_length(shellCommand))
+					executeShellCommand();
+				else // MDH@16APR2019: back to command mode
+					inputMode=IM_COMMAND;
+			}else // Return key in control mode, always to return to command input!!
 				inputMode=IM_COMMAND;
 		}
 	}
