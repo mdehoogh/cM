@@ -60,6 +60,8 @@ void enableRawMode(){
 //                TODO delegate all functions that output to the output device to this function
 void output(const char *fmt,...){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);} // NOTE use vprintf here, NOT printf!!!!
 
+bool matchparentheses=true;  // by default will 'match' parentheses
+
 #ifdef __DEBUG__
 bool assisting=true; // assist flag can be turned on to guide the user
 bool debugging=true; // program debugging flag so it will show the token information before evaluation of a command
@@ -72,7 +74,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: type ` to enter control mode; cancel the current command with Ctrl-C.","Control mode: Flags: Assist Debug - Options: eXit History Shell.","Shell mode: enter the shell command to execute on pressing the Return key."};
+char* promptinfo[]={"Command mode: type ` to enter control mode; cancel the current command with Ctrl-C.","Control mode: Flags: Assist Debug Match parentheses - Options: eXit History Shell.","Shell mode: enter the shell command to execute on pressing the Return key."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -578,7 +580,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
      E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
-char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","-+!","`D","`S","","","","","","","","",""};
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","-+!","`D","`S","","","","","","","","",""};
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -633,15 +635,15 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
 {"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
 {"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:    ] }="}, /* EXPRESSION */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:    ] }="}, /* EXPRESSION */ \
 {""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,"LEN.","["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
 {""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (               {"  }, /* INTEGER: (signless) list of digits */ \
 {""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   LE [ {"  }, /* REAL: part behind a decimal period */ \
 {""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
 {""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,","   ,""    ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;! DS%&( * -,.   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,","   ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;! DS%&( * -,.   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
 {""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
@@ -1075,6 +1077,11 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 */
 		pToken->type=newTokenType;
 		if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
+		// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
+		if(pToken->significantCharacterCount==0)
+			if(pToken->type!=TT_ERROR&&pToken->type!=TT_COMMENT&&pToken->type!=TT_DQSTRING&&pToken->type!=TT_SQSTRING)
+				if(inputCharacterType=='('||inputCharacterType=='['||inputCharacterType=='{'||inputCharacterType==','||inputCharacterType==';'||inputCharacterType==':')
+					pToken->significantCharacterCount=1;
 		// TODO should we write the associated colors here?????
 		outputTokenColor(pToken);
 	}else
@@ -1090,13 +1097,19 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	putchar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
 	
 	if(endOfInput){
-		if(assisting)output(":%c",inputCharacterType);
+		//////if(assisting)output(":%c",inputCharacterType);
 		debugWrite("Command length after inserting %c: %" PRIu16 ".",inputChar,commandLength);
 	}
 
 	cursorPosition++; // increment the current cursor position
 
 	if(endOfInput){
+		// MDH@16APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
+		if(matchparentheses){
+			if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');commandLength++;}else
+			if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');commandLength++;}else
+			if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');commandLength++;}
+		}
 		writeBehindCursorText();
 		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength);
 		outputStatus();
@@ -1241,7 +1254,8 @@ int main(int argc, char **argv){
 				}
 				// accept (might be an acceptable character in string literal in commands or in shell commands)
 			}
-			//////////putchar(inputCharType);
+
+			/////////printf("(%d)",inputChar);
 
 			// special (control) input character types
 			// first the ones that will break in any input mode!!!!
@@ -1287,10 +1301,11 @@ int main(int argc, char **argv){
 						beep();
 				}else
 				if(inputCharType=='m'){ // Esc character...
-					char newInputChar='\0'; // if c ends up being something else it should be processed as a normal character!!!
 					if(inputCharRead()){
+						///printf("(%d)",inputChar);
 						if(inputChar==91){
 							if(inputCharRead()){
+								///printf("(%d)",inputChar);
 								if(inputChar==51){
 									if(inputCharRead()){
 										if(inputChar==126){ // delete
@@ -1339,7 +1354,7 @@ int main(int argc, char **argv){
 									if(cursorPosition<commandLength){
 										// MDH@22MAR2019: instead of doing everything here (duplicating all code that is down below), we can find a way to use the 'normal' code
 										////////////bool success=false;
-										newInputChar=string_removed_char(behindCursorText,0);
+										char newInputChar=string_removed_char(behindCursorText,0);
 										if(newInputChar){
 											commandLength--;
 											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true))
@@ -1384,24 +1399,17 @@ int main(int argc, char **argv){
 							}
 						}
 					}
-				}else
-				if(inputCharType=='o') // explicit switching to control mode!!
-					switchToControlMode(NULL);
-				// ASSERTION if we get here and we are in command input mode process
-				if(inputMode==IM_COMMAND){
+				}else{
 					// we need to have a token (to append the input character to) which initializes to pCommand
-					if(pCommand==NULL){ // no first command token
+					if(pCommand==NULL) // no first command token
 						// if commandIndex we should one of the registered commands
 						setCommand(commandIndex?commands[commandCount-commandIndex]:NULL); // will also set commandLength!!!
-					}
 					// if still NULL (also when we fail to actually create a new first command token)
 					if(pToken!=NULL){
-						if(commandCharacterAccepted(inputChar,inputCharType,true))
-							outputStatus();
-						else
-							switchToControlMode("Switching to control moe, due to failing to accept the input character.");
+						if(!commandCharacterAccepted(inputChar,inputCharType,true))
+							switchToControlMode("Failed to accept the character.");
 					}else
-						switchToControlMode("Switching to control mode, due to failing to create a new command!");
+						switchToControlMode("Failed to create a new command!");
 				}
 			}else
 			if(inputMode==IM_CONTROL){ // inputChar received in control mode
@@ -1409,9 +1417,11 @@ int main(int argc, char **argv){
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
 					// an option character!!!
-					if(inputChar=='x'||inputChar=='X')exit(0);else
+					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
 					if(inputChar=='a'||inputChar=='A'){assisting=!assisting;output("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));}
 					if(inputChar=='d'||inputChar=='D'){debugging=!debugging;output("\n%s\n>> ",(debugging?"Will debug!":"Will not debug!"));}
+					if(inputChar=='m'||inputChar=='M'){matchparentheses=!matchparentheses;output("\n%s\n>> ",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));}
+					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
 					if(inputChar=='h'||inputChar=='H'){
 						// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
 						// we could call them a, b, c etc.
@@ -1421,7 +1431,6 @@ int main(int argc, char **argv){
 						}else
 							output("%s\n","No previous commands to show.");
 					}
-					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
 				}else
 					// user might have selected one of the commands (letter a through j)
 					commandPage=0; // stop paging
@@ -1469,7 +1478,6 @@ int main(int argc, char **argv){
 						beep();
 				}else
 				if(inputCharType=='m'){ // Esc character...
-					char newInputChar='\0'; // if c ends up being something else it should be processed as a normal character!!!
 					if(inputCharRead()){
 						if(inputChar==91){
 							if(inputCharRead()){
@@ -1575,10 +1583,11 @@ int main(int argc, char **argv){
 				}else{
 					// MDH@16APR2019: instead of telling the user that there's no command to evaluate (as we did before), we're switching to control mode
 					// replacing: output("\n%s","No command to evaluate.");
-					if(pCommand&&!clearCommand())output("\nWARNING: %s","Failed to clear the command pointer.");
-					pCommand=NULL;
-					// MDH@16APR2019: here
-					switchToControlMode(NULL);
+					if(pCommand){
+						if(!clearCommand())output("\nWARNING: %s","Failed to clear the command pointer.");
+						pCommand=NULL;
+					}else // MDH@16APR2019: without a command to evaluate to start, we know nothing happened on the command line!!!
+						switchToControlMode("No command to evaluate!");
 				}
 				/* MDH@16MAR2019: preparation for the next command is not required here, it's better to do that at the beginning
 				                  of this outer loop
