@@ -74,54 +74,11 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: type ` to enter control mode; cancel the current command with Ctrl-C.","Control mode: Flags: Assist Debug Match parentheses - Options: eXit History Shell.","Shell mode: enter the shell command to execute on pressing the Return key."};
+char* promptinfo[]={"Command mode: cancel the current command with Ctrl-C.","Control mode: Flags: Assist | Color scheme | Debug | Match parentheses - Options: eXit | History | Shell.","Shell mode: enter a shell command to execute on pressing the Enter key."};
 /**
 call prompt() when ready to receive a new command
  */
 const char OPTION_CHAR='`'; // TODO should this character become part of options????
-
-void prompt(); // prototype of prompt!!
-void promptForUserInput(){
-	if(!rawMode)enableRawMode();
-	output("\n\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
-	prompt();
-}
-/*
-// we can take the original implementation (as used in pyM) of Token and Expression
-class Token{
-public:
-	Token(){
-
-	}
-	~Token(){
-
-	}
-};
-class Expression{
-public:
-	Expression(){
-
-	}
-	~Expression(){
-
-	}
-};
-*/
-/*
-mstring * expressionUserInputString=NULL;
-void evaluateExpression(){
-	if(expressionUserInputString==NULL)return;
-	// TODO do I need to expose of the result of get_all myself?????
-	char * expressionUserInputText=string_get_all(expressionUserInputString);
-	if(expressionUserInputText!=NULL){		
-		printf("\nEvaluating expression '%s'.",expressionUserInputText);
-		// as soon as we're dont with the expression user input text, we dispose it...
-		free(expressionUserInputText); // get rid of the user input text...
-	}
-	string_dispose(expressionUserInputString);
-	expressionUserInputString=NULL;
-}
-*/
 
 // USER INPUT STUFF
 char inputChar,inputCharType; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
@@ -134,60 +91,57 @@ int inputCharRead(){
 	return 0;
 }
 
-// text colors
-const char DEBUG_COLOR[]="8"; // light gray
-const char INFO_COLOR[]="0"; // black
-// for tokens
-const char COMMENT_COLOR[]="8"; // light gray
-const char ERROR_COLOR[]="9"; // red
-const char ASSIGNMENT_COLOR[]="202"; // orange for assignment operator
-const char VARIABLE_COLOR[]="13"; // magenta
-const char FUNCTION_COLOR[]="93"; // something more blueish
-const char FUNCTIONARG_COLOR[]="12";
-const char LIST_COLOR[]="12";
-const char NUMBER_COLOR[]="22"; // green
-const char STRING_COLOR[]="12"; // blue
-const char UNARY_COLOR[]="93"; // like a function I suppose
-const char BINARY_COLOR[]="93"; // like a function I suppose
-const char TERNARY_COLOR[]="93"; // like a function I suppose
+// MDH@16APR2019: let's define the standard colors and high-itensity colors which are dark and light versions
+const char BLACK[]="0";
+const char DARK_RED[]="1";
+const char DARK_GREEN[]="2";
+const char DARK_YELLOW[]="3";
+const char DARK_BLUE[]="4";
+const char DARK_PURPLE[]="5";
+const char DARK_CYAN[]="6";
+const char DARK_GREY[]="7";
+const char LIGHT_GREY[]="8";
+const char LIGHT_RED[]="9";
+const char LIGHT_GREEN[]="10";
+const char LIGHT_YELLOW[]="11";
+const char LIGHT_BLUE[]="12";
+const char LIGHT_PURPLE[]="13";
+const char LIGHT_CYAN[]="14";
+const char WHITE[]="15";
 
-const char RESULT_COLOR[]="15"; // quite dark
-const char OPTION_COLOR[]="15"; // RESULT_COLOR
-const char* PROMPT_COLOR=INFO_COLOR; // same as the info color
+// colors
+const char* BACKGROUND_COLORS[2]={WHITE,BLACK}; // assuming either a black or white background
 
-// the back colors
-const char DEBUG_BACKCOLOR[]="255"; // light-gray
-const char INFO_BACKCOLOR[]="231"; // white
-// for tokens
-const char ERROR_BACKCOLOR[]="231";
-const char ASSIGNMENT_BACKCOLOR[]="0";
-const char COMMENT_BACKCOLOR[]="0";
-const char VARIABLE_BACKCOLOR[]="0";
-const char FUNCTION_BACKCOLOR[]="0";
-const char FUNCTIONARG_BACKCOLOR[]="0";
-const char LIST_BACKCOLOR[]="0";
-const char NUMBER_BACKCOLOR[]="0";
-const char STRING_BACKCOLOR[]="0";
-const char UNARY_BACKCOLOR[]="0";
-const char BINARY_BACKCOLOR[]="0";
-const char TERNARY_BACKCOLOR[]="0";
+const char* DEBUG_COLORS[2]={DARK_GREY,LIGHT_GREY}; // light gray
+const char* INFO_COLORS[2]={BLACK,WHITE}; // black
 
-const char IDENTIFIER_BACKCOLOR[]="231";
-/*
-const char LITERAL_BACKCOLOR[]="231";
-const char OPERATOR_BACKCOLOR[]="231";
-*/
-const char RESULT_BACKCOLOR[]="69";
-const char* OPTION_BACKCOLOR=RESULT_BACKCOLOR;
-const char BEHIND_CURSOR_TEXT_COLOR[]="250"; // MDH@27FEB2019: same as DEBUG_BACKCOLOR (which we're NOT using?)
+const char* COMMENT_COLORS[2]={DARK_GREY,LIGHT_GREY}; // light gray
+const char* ERROR_COLORS[2]={DARK_RED,LIGHT_RED}; // red
 
-// operator token colors
-const char* OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLOR,UNARY_COLOR,BINARY_COLOR,TERNARY_COLOR};
-const char* OPERATOR_TOKEN_BACKCOLORS[]={INFO_BACKCOLOR,INFO_BACKCOLOR,INFO_BACKCOLOR,INFO_BACKCOLOR};
+const char* ASSIGNMENT_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE}; // "202"; // orange for assignment operator
+const char* UNARY_OPERATOR_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE};
+const char* BINARY_OPERATOR_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE};
+const char* TERNARY_OPERATOR_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE};
+
+const char* EXPRESSION_COLORS[2]={BLACK,WHITE}; // black
+const char* VARIABLE_COLORS[2]={DARK_BLUE,LIGHT_BLUE}; ////"13"; // magenta
+const char* FUNCTION_COLORS[2]={DARK_CYAN,LIGHT_CYAN}; /////"93"; // something more blueish
+const char* LIST_COLORS[2]={BLACK,WHITE};
+const char* MAP_COLORS[2]={BLACK,WHITE};
+const char* NUMBER_COLORS[2]={DARK_GREEN,LIGHT_GREEN}; //"22"; // green
+const char* STRING_COLORS[2]={DARK_YELLOW,LIGHT_YELLOW}; //////12"; // blue
+
+const char* RESULT_COLORS[2]={BLACK,WHITE};
+///////const char* OPTION_COLORS[]={BLACK,WHITE};
+const char* PROMPT_COLORS[2]={BLACK,WHITE}; // same as the info color
+
+const char* BEHIND_CURSOR_TEXT_COLORS[2]={DARK_GREY,LIGHT_GREY};
+
+// operator token colors (all the same)
+const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
 
 // value token colors
-const char* VALUE_TOKEN_COLORS[]={COMMENT_COLOR,INFO_COLOR,VARIABLE_COLOR,NUMBER_COLOR,STRING_COLOR,STRING_COLOR,STRING_COLOR,STRING_COLOR,LIST_COLOR,LIST_COLOR,LIST_COLOR,FUNCTION_COLOR,FUNCTIONARG_COLOR,FUNCTIONARG_COLOR,FUNCTIONARG_COLOR};
-const char* VALUE_TOKEN_BACKCOLORS[]={COMMENT_BACKCOLOR,INFO_BACKCOLOR,VARIABLE_BACKCOLOR,NUMBER_BACKCOLOR,STRING_BACKCOLOR,STRING_BACKCOLOR,STRING_BACKCOLOR,LIST_BACKCOLOR,LIST_BACKCOLOR,LIST_BACKCOLOR,FUNCTION_BACKCOLOR,FUNCTIONARG_BACKCOLOR,FUNCTIONARG_BACKCOLOR,FUNCTIONARG_BACKCOLOR};
+const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
 
 #define ESCAPE_CHARACTER 27
 
@@ -201,11 +155,14 @@ void clearLine(){printf("\033[K");}
 void moveCursorLeft(uint16_t pos){if(pos)printf("\033[%huD",pos);}
 void moveCursorRight(uint16_t pos){if(pos)printf("\033[%huC",pos);}
 void clearScreenFromCursor(){printf("\033[J");}
-/*
-void saveCursor(){printf("\033[s");} // TODO might not work
-void restoreCursor(){printf("\033[u");} // TODO might not work
-*/
-void resetOutputColor(){printf("\033[0m");}
+// VT100 codes...
+void storeCursor(){printf("\0337");}
+void restoreCursor(){printf("\0338");}
+
+uint8_t colorScheme=0; // the active color scheme (either 0 for white, or 1 for black background), toggle with C in control mode
+
+void resetOutputColor(){setColor(INFO_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);}
+
 void beep(){putchar('\a');}
 void removeLastCharacter(){putchar('\b');}
 void hidecursor(){printf("\033[?25l");}
@@ -231,25 +188,33 @@ void prompt(){
 	switch(inputMode){
 		case IM_COMMAND:
 			sprintf(str,"%u",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-			printf("%s%s",str," >> ");
+			printf("M[%s]%s",str," = ");
 			clearScreenFromCursor();
-			promptLength=strlen(str)+4;
+			promptLength=strlen(str)+3;
 			break;
 		case IM_CONTROL:
-			printf(" >> ");
-			promptLength=4;
-			break;
-		case IM_SHELL:
-			printf( " $ ");
+			printf(">> ");
 			promptLength=3;
 			break;
+		case IM_SHELL:
+			printf("$ ");
+			promptLength=2;
+			break;
 	}
-	///////saveCursor();
+	storeCursor();
 	///////////inputMode=true; // expecting a command (until the option character is received)
 	/* MDH@26FEB2019: we do not need the following because that's taken care of in writeTokens(pCommand) right after promptForUserInput()
 	cursorPosition=0; // starting at position 0
 	*/
 }
+
+void promptForUserInput(){
+	if(!rawMode)enableRawMode();
+	resetOutputColor();
+	output("\n\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
+	prompt();
+}
+
 /* The following ANSI escape sequences are currently supported.
  * If n and/or m are omitted, they default to 1.
  *   ESC [nA moves up n lines
@@ -392,7 +357,7 @@ enum TOKENTYPE_ENUM {
 	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
 };
 // the list of token type ids in the corresponding order!!!
-const uint8_t TOKENTYPE_IDS[]={0b01010000,0b010000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,0b1000000,0b11111111};
+const uint8_t TOKENTYPE_IDS[]={0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,0b1000000,0b11111111};
 /*
 typedef struct{
 	unsigned int ended:1; // one flag to indicate whether or not the Token has ended
@@ -414,24 +379,26 @@ typedef struct Token{
 void outputTokenColor(Token* pToken){
 	///////printf("[%d]",pToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
+	setBackColor(BACKGROUND_COLORS[colorScheme]);
 	uint8_t tokentype_id=TOKENTYPE_IDS[pToken->type];
+	///////printf("(%d)",tokentype_id);
 	switch(tokentype_id>>6){
 		case 0: // value token
-			setColor(VALUE_TOKEN_COLORS[tokentype_id]);
-			setBackColor(VALUE_TOKEN_BACKCOLORS[tokentype_id]);
+			setColor(VALUE_TOKEN_COLORS[tokentype_id][colorScheme]);
 			break;
 		case 1: // operator: unary, binary, ternary, assignment
-			setColor(OPERATOR_TOKEN_COLORS[(pToken->type&0x30)>>4]);
-			setBackColor(OPERATOR_TOKEN_BACKCOLORS[(pToken->type&0x30)>>4]);
+			{
+			uint8_t opCategory=(tokentype_id&0x30)>>4;
+			/////////printf("(%d,%d)",tokentype_id,opCategory);
+			setColor(OPERATOR_TOKEN_COLORS[opCategory][colorScheme]);
 			break;
+			}
 		case 2: // comment or end of comment
-			setColor(COMMENT_COLOR);
-			setBackColor(COMMENT_BACKCOLOR);
+			setColor(COMMENT_COLORS[colorScheme]);
 			break;
 		case 3: // error token
-			//putchar('E');
-			setColor(ERROR_COLOR);
-			setBackColor(ERROR_BACKCOLOR);
+			/////////putchar('E');
+			setColor(ERROR_COLORS[colorScheme]);
 			break;
 	}
 }
@@ -645,7 +612,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
 {""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
 {""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
@@ -884,7 +851,7 @@ bool clearCommand(){
 
 void switchToControlMode(char* message){
 	if(inputMode==IM_CONTROL)return; // already in control mode thank you
-	putchar('X');
+	/////////putchar('X');
 	if(inputMode==IM_COMMAND)clearCommand();
 	resetOutputColor();
 	if(message!=NULL)printf("\n%s",message);
@@ -896,8 +863,12 @@ void switchToControlMode(char* message){
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
+	restoreCursor();clearScreenFromCursor();
+	/////////while(cursorPosition>0){cursorPosition--;backspace();}
+	/*
 	if(cursorPosition>0){moveCursorLeft(cursorPosition);cursorPosition=0;}
 	clearScreenFromCursor();
+	*/
 	/* replacing:
 	while(characterCount>0){
 		characterCount--;
@@ -998,7 +969,7 @@ void writeBehindCursorText(){
 	if(l){
 		debugWrite("Behind cursor text to write: '%s'.",string(behindCursorText));
 		resetOutputColor();
-		setColor(BEHIND_CURSOR_TEXT_COLOR);
+		setColor(BEHIND_CURSOR_TEXT_COLORS[colorScheme]);
 		printf("%s",string(behindCursorText));
 		moveCursorLeft(l); // back to where we started to write the behind cursor text
 		if(pToken)outputTokenColor(pToken); // return to the color of the current token
@@ -1056,36 +1027,60 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
 	if((TOKENTYPE_IDS[pToken->type]&0x62)==0x62)if(inputChar==string_char(pToken->text,0))inputCharacterType='R';
-	int16_t newTokenType=(inputCharacterType!='W'?nextTokenType(pToken->type,inputCharacterType):-1); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
+	if(inputCharacterType=='W')if(pToken->type==TT_ERROR||pToken->type==TT_COMMENT||pToken->type==TT_DQSTRING||pToken->type==TT_SQSTRING)inputCharacterType='w';
+	if(inputCharacterType!='W'){ // only characters that are not whitespace can start a new token
+		int16_t newTokenType=nextTokenType(pToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 	resetOutputColor();
 	printf("[%d+%c->%d]",pToken->type,inputCharacterType,newTokenType);
 	outputTokenColor(pToken);
 #endif
-	// if this is not the same token type we have to start a new token
-	// TODO will be different if we're inserting characters
-	if(newTokenType>=0&&newTokenType!=pToken->type){ // character ends the current token
-		// MDH@10APR2019: NOT every new token type starts a new token:
-		//                if we're in a binary operator and move to another binary operator type it's an extension
-		//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
-		///////if(!isBinaryOperatorTokenType(pToken->type)||!isBinaryOperatorTokenType(newTokenType))
-		pToken=newToken(pToken);
+		// MDH@16APR2019: most tokens cannot follow each other directly except for unary and ternary operators
+		if(newTokenType==pToken->type&&pToken->type!=TT_UNARY&&pToken->type!=TT_TERNARY_aeru&&pToken->significantCharacterCount>0)newTokenType=TT_ERROR;
+		if(newTokenType!=pToken->type||pToken->significantCharacterCount>0){
+			// MDH@10APR2019: NOT every new token type starts a new token:
+			//                if we're in a binary operator and move to another binary operator type it's an extension
+			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
+			///////if(!isBinaryOperatorTokenType(pToken->type)||!isBinaryOperatorTokenType(newTokenType))
+
+			// MDH@16APR2019: a character that is assumed to indicate the assignment operator has to be checked because it could well be the = that starts the binary equality operator
+			//                which means we have to switch from assignment token to BearU token (which is unfinished)
+			if(newTokenType==TT_ASSIGNMENT){
+				// checking for validity of accepting as assignment is not that easy
+				// we can allow a binary operator in front of the assignment of course in that case it definitely is an assignment if it is not the = is an error!!
+				bool behindBinaryOperator=(pToken->type==TT_BINARY_AeRu||pToken->type==TT_BINARY_Aeru);
+				// NOTE if behind binary operator there must always be a token in front of it, so pTokenToCheck cannot be NULL!!
+				Token* pTokenToCheck=(behindBinaryOperator?pToken->prev:pToken);
+				// ASSERT pTokenToCheck should either represent a variable or the end of a list element to allow for operator
+				if(pTokenToCheck->type==TT_END_OF_LIST){ // end of a list
+					// we have to find the associated start of the list, and the token in front of that (which should be a variable!!!)
+					// unfortunately we might come across other list and we need to skip them
+					int listCounter=1;
+					while(listCounter>0){pTokenToCheck=pTokenToCheck->prev;if(pTokenToCheck==NULL)break;if(pTokenToCheck->type==TT_END_OF_LIST)listCounter++;else if(pTokenToCheck->type==TT_LIST||pTokenToCheck->type==TT_LISTELEMENT)listCounter--;}
+				}
+				// two options: = behind a binary operator without variable (or list element) in front of it is not allowed, i.e. an error, otherwise we assume that = represents the first = of == the equality operator...
+				if(pTokenToCheck==NULL||(pTokenToCheck->type!=TT_VARIABLE&&pTokenToCheck->type!=TT_LISTELEMENT))newTokenType=(behindBinaryOperator?TT_ERROR:TT_BINARY_aErU);
+			}
+
+			pToken=newToken(pToken);
 /*
 #ifdef __DEBUG__
-		printf("@%p=%p?:%s",pCommand,pToken,string(pCommand->text));
+			printf("@%p=%p?:%s",pCommand,pToken,string(pCommand->text));
 #endif
 */
-		pToken->type=newTokenType;
-		if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
-		// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
-		if(pToken->significantCharacterCount==0)
-			if(pToken->type!=TT_ERROR&&pToken->type!=TT_COMMENT&&pToken->type!=TT_DQSTRING&&pToken->type!=TT_SQSTRING)
-				if(inputCharacterType=='('||inputCharacterType=='['||inputCharacterType=='{'||inputCharacterType==','||inputCharacterType==';'||inputCharacterType==':')
-					pToken->significantCharacterCount=1;
-		// TODO should we write the associated colors here?????
-		outputTokenColor(pToken);
-	}else
-	if(inputCharType=='W'&&pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+			pToken->type=newTokenType;
+			if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
+			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
+			if(pToken->significantCharacterCount==0)
+				if(pToken->type!=TT_ERROR&&pToken->type!=TT_COMMENT&&pToken->type!=TT_DQSTRING&&pToken->type!=TT_SQSTRING)
+					if(inputCharacterType=='('||inputCharacterType=='['||inputCharacterType=='{'||inputCharacterType==','||inputCharacterType==';'||inputCharacterType==':'||inputCharacterType=='?')
+						pToken->significantCharacterCount=1;
+			// TODO should we write the associated colors here?????
+			outputTokenColor(pToken);
+		}
+	}else // a functional whitespace character, ends a current token!!
+	if(pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
 		pToken->significantCharacterCount=string_length(pToken->text);
 
 	// insert the typed character at cursorPosition minus current token offset in pToken->text
@@ -1104,7 +1099,9 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	cursorPosition++; // increment the current cursor position
 
 	if(endOfInput){
-		// MDH@16APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
+		// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
+		if(pToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');commandLength++;}else
+		// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 		if(matchparentheses){
 			if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');commandLength++;}else
 			if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');commandLength++;}else
@@ -1175,7 +1172,11 @@ int main(int argc, char **argv){
 					if(argv[arg][i]=='d')debugging=false;else
 					if(argv[arg][i]=='D')debugging=true;else
 					if(argv[arg][i]=='a')assisting=false;else
-					if(argv[arg][i]=='A')assisting=true;
+					if(argv[arg][i]=='A')assisting=true;else
+					if(argv[arg][i]=='m')matchparentheses=false;else
+					if(argv[arg][i]=='M')matchparentheses=true;else
+					if(argv[arg][i]=='W')colorScheme=0;else
+					if(argv[arg][i]=='B')colorScheme=1;
 				}
 			}
 		}
@@ -1187,6 +1188,7 @@ int main(int argc, char **argv){
 	resetOutputColor(); // just in case
 	output("\n%s\n","Welcome to M.");
 	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
+	output("\n%s","In any mode press the Enter key on an empty line to switch modes.");
 
 	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
 
@@ -1277,11 +1279,8 @@ int main(int argc, char **argv){
 						beep();
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-D)
-					if(pCommand!=NULL){
-						clearCommand();
-						backToPrompt();
-					}else
-						beep();
+					if(pCommand!=NULL){clearCommand();break;} // MDH@16APR2019: replacing: clearCommand();backToPrompt();
+				 	beep();
 				}else
 				if(inputCharType=='t'){ // Tab character
 					// if there's a preview (well, code completion by way of a behindCursorText)
@@ -1418,9 +1417,10 @@ int main(int argc, char **argv){
 				if(!commandPage){ // not currently paging through the commands
 					// an option character!!!
 					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
-					if(inputChar=='a'||inputChar=='A'){assisting=!assisting;output("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));}
-					if(inputChar=='d'||inputChar=='D'){debugging=!debugging;output("\n%s\n>> ",(debugging?"Will debug!":"Will not debug!"));}
-					if(inputChar=='m'||inputChar=='M'){matchparentheses=!matchparentheses;output("\n%s\n>> ",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));}
+					if(inputChar=='a'||inputChar=='A'){assisting=!assisting;output("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
+					if(inputChar=='c'||inputChar=='C'){colorScheme=1-colorScheme;resetOutputColor();output("\n%s\n>> ",(colorScheme?"Will assume white background!":"Will assume black background!"));inputCharType='n';break;}
+					if(inputChar=='d'||inputChar=='D'){debugging=!debugging;output("\n%s\n>> ",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
+					if(inputChar=='m'||inputChar=='M'){matchparentheses=!matchparentheses;output("\n%s\n>> ",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
 					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
 					if(inputChar=='h'||inputChar=='H'){
 						// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
@@ -1455,7 +1455,7 @@ int main(int argc, char **argv){
 					}else // nothing to remove
 						beep();
 				}else
-				if(inputCharType=='c'){ // cancel command (Ctrl-D)
+				if(inputCharType=='c'){ // cancel command (Ctrl-C)
 					if(pCommand!=NULL){
 						clearShellCommand();
 						backToPrompt();
@@ -1552,7 +1552,7 @@ int main(int argc, char **argv){
 				//      only discard it when the command was evaluated and not registered
 				Token* pCommandToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
 				if(pCommand){ // a current command being edited
-					// MDH@22MAR2019: currently the first token is a WHITESPACE token
+					// MDH@22MAR2019: currently the first token is an EXPRESSION token
 					if(cursorPosition>string_length(pCommand->text)){
 						// finish the last token???
 						if(pToken->significantCharacterCount==0)pToken->significantCharacterCount=string_length(pToken->text);
