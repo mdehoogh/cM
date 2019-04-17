@@ -74,7 +74,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: cancel the current command with Ctrl-C.","Control mode: Flags: Assist | Color scheme | Debug | Match parentheses - Options: eXit | History | Shell.","Shell mode: enter a shell command to execute on pressing the Enter key."};
+char* promptinfo[]={"Command mode: cancel the current command with Ctrl-C.","Control mode: Flags: Assist|Color scheme|Debug|Match parentheses|Wrap - Options: eXit|History|Shell.","Shell mode: enter a shell command to execute on pressing the Enter key."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -108,6 +108,7 @@ const char LIGHT_BLUE[]="12";
 const char LIGHT_PURPLE[]="13";
 const char LIGHT_CYAN[]="14";
 const char WHITE[]="15";
+const char ORANGE[]="202"; // instead of DARK_YELLOW use (a dark version of) ORANGE
 
 // colors
 const char* BACKGROUND_COLORS[2]={WHITE,BLACK}; // assuming either a black or white background
@@ -129,7 +130,7 @@ const char* FUNCTION_COLORS[2]={DARK_CYAN,LIGHT_CYAN}; /////"93"; // something m
 const char* LIST_COLORS[2]={BLACK,WHITE};
 const char* MAP_COLORS[2]={BLACK,WHITE};
 const char* NUMBER_COLORS[2]={DARK_GREEN,LIGHT_GREEN}; //"22"; // green
-const char* STRING_COLORS[2]={DARK_YELLOW,LIGHT_YELLOW}; //////12"; // blue
+const char* STRING_COLORS[2]={ORANGE,LIGHT_YELLOW}; //////12"; // blue
 
 const char* RESULT_COLORS[2]={BLACK,WHITE};
 ///////const char* OPTION_COLORS[]={BLACK,WHITE};
@@ -144,33 +145,62 @@ const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BI
 const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
 
 #define ESCAPE_CHARACTER 27
+#define ES "\033["
 
 void setColor(const char* colortext){printf("\033[38;5;%sm",colortext);}
 void setBackColor(const char* colortext){printf("\033[48;5%sm",colortext);}
 
-void oneLineUp(){printf("\033[1A");} // ascertain that the previous line is visible
-void oneLineDown(){printf("\033[1B");} // one line down
+void oneLineUp(){printf(ES"1A");} // ascertain that the previous line is visible
+void oneLineDown(){printf(ES"1B");} // one line down
 void toStartOfLine(){putchar('\r');}
-void clearLine(){printf("\033[K");}
-void moveCursorLeft(uint16_t pos){if(pos)printf("\033[%huD",pos);}
-void moveCursorRight(uint16_t pos){if(pos)printf("\033[%huC",pos);}
-void clearScreenFromCursor(){printf("\033[J");}
+void clearLine(){printf(ES"K");}
+void clearDisplay(){printf(ES"2J");}
+void setDisplayBackgroundColor(char* backgroundColor){
+}
+void moveCursorLeft(uint16_t pos){if(pos)printf(ES"%huD",pos);}
+void moveCursorRight(uint16_t pos){if(pos)printf(ES"%huC",pos);}
+void clearScreenFromCursor(){printf(ES"J");}
 // VT100 codes...
 void storeCursor(){printf("\0337");}
 void restoreCursor(){printf("\0338");}
 
+// display flags
 uint8_t colorScheme=0; // the active color scheme (either 0 for white, or 1 for black background), toggle with C in control mode
+void setColorScheme(uint8_t newColorScheme){
+	colorScheme=newColorScheme;
+	printf(ES"%sm",(colorScheme!=0?"40":"47"));
+	clearDisplay();
+	/////// user will see!!!! output("\n%s\n>> ",(colorScheme?"Will assume dark background!":"Will assume white background!"));
+}
+
+bool wrapMode=false; // by default use 'Origin' mode, not wrap mode
+void setWrapMode(bool newWrapMode){
+	wrapMode=newWrapMode;
+	printf(ES"?%sl",(wrapMode?"7":"6")); // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
+	if(wrapMode)output("\nWrap mode enabled!\n");else output("\nWrap mode disabled!\n");
+}
+void displayFlags(){output("\nEdit flags: %c%c%c - Display flags: %c%c.",assisting?'A':'a',debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w',colorScheme!=0?'c':'C');}
+
+void outputFlags(){output("%c%c%c%c%c",assisting?'A':'a',colorScheme!=0?'c':'C',debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w');}
+
+void initDisplay(){
+	printf(ES"=3h"); // 80x25 color mode
+	printf(ES"?3l"); // switch to 132 column mode (if possible)
+	printf(ES"0m");
+	setWrapMode(wrapMode);
+	setColorScheme(colorScheme); // will also clear the display screen
+}
 
 void resetOutputColor(){setColor(INFO_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);}
 
 void beep(){putchar('\a');}
 void removeLastCharacter(){putchar('\b');}
-void hidecursor(){printf("\033[?25l");}
-void showcursor(){printf("\033[?25h");}
-void emptyline(){printf("\033[2K\r");}
+void hidecursor(){printf(ES"?25l");}
+void showcursor(){printf(ES"?25h");}
+void emptyline(){printf(ES"2K\r");}
 void backspace(){ // means go one position to the left on the current line, and clear the rest of the line
-	printf("\033[D"); // go left one character
-	printf("\033[K"); // clear the rest of the line
+	printf(ES"D"); // go left one character
+	printf(ES"K"); // clear the rest of the line
 }
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 uint32_t commandCount=0; // the total number of command input
@@ -188,16 +218,18 @@ void prompt(){
 	switch(inputMode){
 		case IM_COMMAND:
 			sprintf(str,"%u",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-			printf("M[%s]%s",str," = ");
+			output("M[%s]%s",str," = ");
 			clearScreenFromCursor();
-			promptLength=strlen(str)+3;
+			promptLength=strlen(str)+3+3;
 			break;
 		case IM_CONTROL:
-			printf(">> ");
-			promptLength=3;
+			// how about showing the flags?????
+			outputFlags();
+			output(" > ");
+			promptLength=5+4; // the flags and the control mode prompt
 			break;
 		case IM_SHELL:
-			printf("$ ");
+			output("$ ");
 			promptLength=2;
 			break;
 	}
@@ -741,7 +773,9 @@ void prepareForUserInput(){
 	//enableRawMode();
 	// disable output buffering on printf (as in raw input mode it would not write at all)
 	setbuf(stdout,NULL);
+	initDisplay();
 }
+
 void endOfUserInput(){
 #ifdef __DEBUG__
 	printf("\nEnd of user input.");
@@ -856,6 +890,7 @@ void switchToControlMode(char* message){
 	resetOutputColor();
 	if(message!=NULL)printf("\n%s",message);
 	inputMode=IM_CONTROL;
+	///////////outputFlags(); // show the user the current flags!!
 	inputCharType='o'; // to make the loop know to quit
 	//output("\n%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History Shell");
 }
@@ -863,8 +898,8 @@ void switchToControlMode(char* message){
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
-	restoreCursor();clearScreenFromCursor();
-	/////////while(cursorPosition>0){cursorPosition--;backspace();}
+	// replacing: restoreCursor();clearScreenFromCursor();
+	while(cursorPosition>0){cursorPosition--;backspace();}
 	/*
 	if(cursorPosition>0){moveCursorLeft(cursorPosition);cursorPosition=0;}
 	clearScreenFromCursor();
@@ -1175,20 +1210,22 @@ int main(int argc, char **argv){
 					if(argv[arg][i]=='A')assisting=true;else
 					if(argv[arg][i]=='m')matchparentheses=false;else
 					if(argv[arg][i]=='M')matchparentheses=true;else
-					if(argv[arg][i]=='W')colorScheme=0;else
-					if(argv[arg][i]=='B')colorScheme=1;
+					if(argv[arg][i]=='C')colorScheme=0;else // light color scheme
+					if(argv[arg][i]=='c')colorScheme=1;else // dark color scheme
+					if(argv[arg][i]=='W')wrapMode=true;else
+					if(argv[arg][i]=='w')wrapMode=false;
 				}
 			}
 		}
 	}
 
-	// TODO allow non-interactive mode i.e. execute commands from an M source file
-	prepareForUserInput();
+	prepareForUserInput(); // AFTER using the command-line parameters (will effectuate wrap mode and color scheme)
 
 	resetOutputColor(); // just in case
 	output("\n%s\n","Welcome to M.");
 	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
 	output("\n%s","In any mode press the Enter key on an empty line to switch modes.");
+	displayFlags();
 
 	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
 
@@ -1279,8 +1316,13 @@ int main(int argc, char **argv){
 						beep();
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-D)
-					if(pCommand!=NULL){clearCommand();break;} // MDH@16APR2019: replacing: clearCommand();backToPrompt();
-				 	beep();
+					// replacing: if(pCommand!=NULL){clearCommand();break;}beep(); 
+					if(pCommand!=NULL){
+						backToPrompt();
+						clearCommand();
+						/////////if(wrapMode)break; // if in wrapmode can't guarantee backspace() to move into the previous line which means just prompt again...
+					}else
+						beep();
 				}else
 				if(inputCharType=='t'){ // Tab character
 					// if there's a preview (well, code completion by way of a behindCursorText)
@@ -1415,12 +1457,14 @@ int main(int argc, char **argv){
 				putchar(inputChar); // nice to see the character we typed...
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
-					// an option character!!!
+					// flags
+					if(inputChar=='a'||inputChar=='A'){assisting=(inputChar=='A');output("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
+					if(inputChar=='c'||inputChar=='C'){setColorScheme(inputChar=='c');inputCharType='n';break;}
+					if(inputChar=='d'||inputChar=='D'){debugging=(inputChar=='D');output("\n%s\n>> ",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
+					if(inputChar=='m'||inputChar=='M'){matchparentheses=(inputChar=='M');output("\n%s\n>> ",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
+					if(inputChar=='w'||inputChar=='W'){setWrapMode(inputChar=='W');inputCharType='n';break;}
+					// options
 					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
-					if(inputChar=='a'||inputChar=='A'){assisting=!assisting;output("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
-					if(inputChar=='c'||inputChar=='C'){colorScheme=1-colorScheme;resetOutputColor();output("\n%s\n>> ",(colorScheme?"Will assume white background!":"Will assume black background!"));inputCharType='n';break;}
-					if(inputChar=='d'||inputChar=='D'){debugging=!debugging;output("\n%s\n>> ",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
-					if(inputChar=='m'||inputChar=='M'){matchparentheses=!matchparentheses;output("\n%s\n>> ",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
 					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
 					if(inputChar=='h'||inputChar=='H'){
 						// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
@@ -1457,8 +1501,9 @@ int main(int argc, char **argv){
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-C)
 					if(pCommand!=NULL){
-						clearShellCommand();
 						backToPrompt();
+						clearShellCommand();
+						//////////if(wrapMode)break;
 					}else
 						beep();
 				}else
