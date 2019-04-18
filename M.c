@@ -59,7 +59,20 @@ void enableRawMode(){
 // MDH@28FEB2019: most conveniently to be able to output to the console through a single method that will allow a format string, and any number of arguments
 //                TODO delegate all functions that output to the output device to this function
 void output(const char *fmt,...){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);} // NOTE use vprintf here, NOT printf!!!!
+// convenience methods delegating to output() so all output (to stdout by default) goes through function output()
+void outputChar(char c){output("%c",c);} // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
 
+// all output to the display has to go through output!!
+#define ES "\033["
+void outputControlText(char* s){output(ES"%s",s);}
+/* sometimes we want to preformat text
+char* getFormattedText(char* fmt,uint8_t maxlength,...){
+	char str[maxlength+1];
+	va_list args;va_start(args,fmt);sprintf(str,fmt,args);va_end(args);
+	return str;
+}
+*/
+// Edit flags
 bool matchparentheses=true;  // by default will 'match' parentheses
 
 #ifdef __DEBUG__
@@ -74,7 +87,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: cancel the current command with Ctrl-C.","Control mode: Flags: Assist|Color scheme|Debug|Match parentheses|Wrap - Options: eXit|History|Shell.","Shell mode: enter a shell command to execute on pressing the Enter key."};
+char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap - Options: eXit|History|Shell.","Shell mode: enter a system command to execute."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -104,39 +117,44 @@ const char LIGHT_GREY[]="8";
 const char LIGHT_RED[]="9";
 const char LIGHT_GREEN[]="10";
 const char LIGHT_YELLOW[]="11";
-const char LIGHT_BLUE[]="12";
+const char LIGHT_BLUE[]="45"; // "12" is really TOO dark!!
 const char LIGHT_PURPLE[]="13";
 const char LIGHT_CYAN[]="14";
 const char WHITE[]="15";
 const char ORANGE[]="202"; // instead of DARK_YELLOW use (a dark version of) ORANGE
+// the background colors (which are not used behind 38;5 or 48;5 but directly )
+const char BACKGROUND_BLACK[]="40";
+const char BACKGROUND_WHITE[]="47";
+
+#define NUMBER_OF_COLOR_SCHEMES 2
 
 // colors
-const char* BACKGROUND_COLORS[2]={WHITE,BLACK}; // assuming either a black or white background
+const char* BACKGROUND_COLORS[NUMBER_OF_COLOR_SCHEMES]={BACKGROUND_BLACK,BACKGROUND_WHITE}; // assuming either a black or white background
 
-const char* DEBUG_COLORS[2]={DARK_GREY,LIGHT_GREY}; // light gray
-const char* INFO_COLORS[2]={BLACK,WHITE}; // black
+const char* DEBUG_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY}; // light gray
+const char* INFO_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // black
 
-const char* COMMENT_COLORS[2]={DARK_GREY,LIGHT_GREY}; // light gray
-const char* ERROR_COLORS[2]={DARK_RED,LIGHT_RED}; // red
+const char* COMMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY}; // light gray
+const char* ERROR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,LIGHT_RED}; // red
 
-const char* ASSIGNMENT_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE}; // "202"; // orange for assignment operator
-const char* UNARY_OPERATOR_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE};
-const char* BINARY_OPERATOR_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE};
-const char* TERNARY_OPERATOR_COLORS[2]={DARK_PURPLE,LIGHT_PURPLE};
+const char* ASSIGNMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
+const char* UNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
+const char* BINARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
+const char* TERNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
 
-const char* EXPRESSION_COLORS[2]={BLACK,WHITE}; // black
-const char* VARIABLE_COLORS[2]={DARK_BLUE,LIGHT_BLUE}; ////"13"; // magenta
-const char* FUNCTION_COLORS[2]={DARK_CYAN,LIGHT_CYAN}; /////"93"; // something more blueish
-const char* LIST_COLORS[2]={BLACK,WHITE};
-const char* MAP_COLORS[2]={BLACK,WHITE};
-const char* NUMBER_COLORS[2]={DARK_GREEN,LIGHT_GREEN}; //"22"; // green
-const char* STRING_COLORS[2]={ORANGE,LIGHT_YELLOW}; //////12"; // blue
+const char* EXPRESSION_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // black
+const char* VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_BLUE,DARK_BLUE}; ////"13"; // magenta
+const char* FUNCTION_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_CYAN,DARK_CYAN}; /////"93"; // something more blueish
+const char* LIST_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+const char* MAP_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+const char* NUMBER_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //"22"; // green
+const char* STRING_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,ORANGE}; //////12"; // blue
 
-const char* RESULT_COLORS[2]={BLACK,WHITE};
+const char* RESULT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
 ///////const char* OPTION_COLORS[]={BLACK,WHITE};
-const char* PROMPT_COLORS[2]={BLACK,WHITE}; // same as the info color
+const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the info color
 
-const char* BEHIND_CURSOR_TEXT_COLORS[2]={DARK_GREY,LIGHT_GREY};
+const char* BEHIND_CURSOR_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
 
 // operator token colors (all the same)
 const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
@@ -145,63 +163,63 @@ const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BI
 const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
 
 #define ESCAPE_CHARACTER 27
-#define ES "\033["
 
-void setColor(const char* colortext){printf("\033[38;5;%sm",colortext);}
-void setBackColor(const char* colortext){printf("\033[48;5%sm",colortext);}
+void setColor(const char* colortext){output("\033[38;5;%sm",colortext);}
+void setBackColor(const char* colortext){output("\033[48;5%sm",colortext);}
 
-void oneLineUp(){printf(ES"1A");} // ascertain that the previous line is visible
-void oneLineDown(){printf(ES"1B");} // one line down
-void toStartOfLine(){putchar('\r');}
-void clearLine(){printf(ES"K");}
-void clearDisplay(){printf(ES"2J");}
-void setDisplayBackgroundColor(char* backgroundColor){
-}
-void moveCursorLeft(uint16_t pos){if(pos)printf(ES"%huD",pos);}
-void moveCursorRight(uint16_t pos){if(pos)printf(ES"%huC",pos);}
-void clearScreenFromCursor(){printf(ES"J");}
+void oneLineUp(){outputControlText("1A");} // ascertain that the previous line is visible
+void oneLineDown(){outputControlText("1B");} // one line down
+void toStartOfLine(){outputChar('\r');}
+void clearLine(){outputControlText("K");}
+void clearDisplay(){outputControlText("2J");}
+void moveCursorLeft(uint16_t pos){if(pos)output(ES"%huD",pos);} // TODO can't use outputControlText here!!!
+void moveCursorRight(uint16_t pos){if(pos)output(ES"%huC",pos);} // TODO can't use outputControlText here!!!
+void clearScreenFromCursor(){outputControlText("J");}
+/* TODO are we using the storeCursor() and restoreCursor() sometime?
 // VT100 codes...
 void storeCursor(){printf("\0337");}
 void restoreCursor(){printf("\0338");}
+*/
 
 // display flags
 uint8_t colorScheme=0; // the active color scheme (either 0 for white, or 1 for black background), toggle with C in control mode
 void setColorScheme(uint8_t newColorScheme){
-	colorScheme=newColorScheme;
-	printf(ES"%sm",(colorScheme!=0?"40":"47"));
+	colorScheme=(newColorScheme%NUMBER_OF_COLOR_SCHEMES);
+	output(ES"%sm",BACKGROUND_COLORS[colorScheme]); // TODO can't use outputControlText here!!!
 	clearDisplay();
 	/////// user will see!!!! output("\n%s\n>> ",(colorScheme?"Will assume dark background!":"Will assume white background!"));
 }
 
-bool wrapMode=false; // by default use 'Origin' mode, not wrap mode
+bool wrapMode=true; // by default use 'wrap' mode, not 'Origin' mode
 void setWrapMode(bool newWrapMode){
 	wrapMode=newWrapMode;
-	printf(ES"?%sl",(wrapMode?"7":"6")); // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
+	outputControlText(wrapMode?"?6l":"?7l"); // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
 	if(wrapMode)output("\nWrap mode enabled!\n");else output("\nWrap mode disabled!\n");
 }
-void displayFlags(){output("\nEdit flags: %c%c%c - Display flags: %c%c.",assisting?'A':'a',debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w',colorScheme!=0?'c':'C');}
+void displayFlags(){output("\nEdit flags: %c%c%c - Display flags: %c%c.",assisting?'A':'a',debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w',48+colorScheme);}
 
-void outputFlags(){output("%c%c%c%c%c",assisting?'A':'a',colorScheme!=0?'c':'C',debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w');}
+void outputFlags(){output("%c%c%c%c%c",assisting?'A':'a',(48+colorScheme),debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w');}
 
 void initDisplay(){
-	printf(ES"=3h"); // 80x25 color mode
-	printf(ES"?3l"); // switch to 132 column mode (if possible)
-	printf(ES"0m");
-	setWrapMode(wrapMode);
+	outputControlText("=3h"); // 80x25 color mode
+	outputControlText("?3l"); // switch to 132 column mode (if possible)
+	outputControlText("0m");
 	setColorScheme(colorScheme); // will also clear the display screen
+	setWrapMode(wrapMode);
 }
 
 void resetOutputColor(){setColor(INFO_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);}
 
-void beep(){putchar('\a');}
-void removeLastCharacter(){putchar('\b');}
-void hidecursor(){printf(ES"?25l");}
-void showcursor(){printf(ES"?25h");}
-void emptyline(){printf(ES"2K\r");}
+void beep(){outputChar('\a');}
+void removeLastCharacter(){outputChar('\b');}
+void hidecursor(){outputControlText("?25l");}
+void showcursor(){outputControlText("?25h");}
+void emptyline(){outputControlText("2K\r");}
 void backspace(){ // means go one position to the left on the current line, and clear the rest of the line
-	printf(ES"D"); // go left one character
-	printf(ES"K"); // clear the rest of the line
+	outputControlText("D"); // go left one character
+	outputControlText("K"); // clear the rest of the line
 }
+
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 uint32_t commandCount=0; // the total number of command input
 uint32_t commandIndex=0;
@@ -226,14 +244,14 @@ void prompt(){
 			// how about showing the flags?????
 			outputFlags();
 			output(" > ");
-			promptLength=5+4; // the flags and the control mode prompt
+			promptLength=5+3; // the flags and the control mode prompt
 			break;
 		case IM_SHELL:
 			output("$ ");
 			promptLength=2;
 			break;
 	}
-	storeCursor();
+	/////////storeCursor();
 	///////////inputMode=true; // expecting a command (until the option character is received)
 	/* MDH@26FEB2019: we do not need the following because that's taken care of in writeTokens(pCommand) right after promptForUserInput()
 	cursorPosition=0; // starting at position 0
@@ -429,7 +447,7 @@ void outputTokenColor(Token* pToken){
 			setColor(COMMENT_COLORS[colorScheme]);
 			break;
 		case 3: // error token
-			/////////putchar('E');
+			/////////outputChar('E');
 			setColor(ERROR_COLORS[colorScheme]);
 			break;
 	}
@@ -437,12 +455,12 @@ void outputTokenColor(Token* pToken){
 void outputToken(Token* pToken){
 	outputTokenColor(pToken);
 	// if we allow comments in tokens we're in trouble!!!
-	printf("%s",string(pToken->text));
-	/////////if(assisting){resetOutputColor();putchar('|');}
+	output("%s",string(pToken->text));
+	/////////if(assisting){resetOutputColor();outputChar('|');}
 }
 void outputLastTokenChar(Token* pToken){
 	///////outputTokenColor(pToken);
-	putchar(string_last_char(pToken->text));
+	outputChar(string_last_char(pToken->text));
 	//////////resetOutputColor();
 }
 /**
@@ -490,11 +508,11 @@ void outputInfo(const char* fmt,...){
 	}
 }
 
-void outputStatus(){
+void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition,commandLength);
 	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
-	if(assisting)
-		outputInfo("Status: Cursor position=%" PRIu16 " - command length=%" PRIu16 " - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
+	if(debugging)
+		outputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pToken!=NULL?pToken->type:255),cursorPosition,commandLength,string(behindCursorText));
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
 }
 
@@ -563,7 +581,7 @@ static const char* TOKENTYPE_STRING[]={
 //                in certain languages it means evaluate this (or the result of a system command??????)
 //                furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}%d";
+const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}%b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
@@ -669,7 +687,7 @@ uint8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 		}
 #ifdef __DEBUG__
 		else{
-			putchar('=');
+			outputChar('=');
 		}
 #endif
 	}
@@ -709,7 +727,7 @@ void removeToken(){
 	if(pToken==NULL){
 		pCommand=NULL;
 #ifdef __DEBUG__
-		putchar('Q');
+		outputChar('Q');
 #endif
 	}
 }
@@ -727,7 +745,7 @@ char removedTokenCharacter(uint16_t behindCursor){
 #endif
 		if(tokenCharacterPosition>=behindCursor)break;
 #ifdef __DEBUG__
-		putchar('.');
+		outputChar('.');
 #endif		
 		pToken=pToken->prev;
 	}
@@ -737,7 +755,7 @@ char removedTokenCharacter(uint16_t behindCursor){
 	// if failing to remove the character serious error
 	char c=string_removed_char(pToken->text,tokenCharacterPosition-behindCursor);
 #ifdef __DEBUG__
-		putchar(c);
+		outputChar(c);
 #endif		
 	if(c){
 		if(string_empty(pToken->text))
@@ -825,20 +843,20 @@ void setCommandPage(uint32_t newCommandPage){
 		writeTokens(commands[lastCommandToShowIndex+commandToShowIndex]);
 	}
 	resetOutputColor();
-	printf("\nSelect the last digit of the command to use, or the up/down key to show the next/previous page.");
-	printf("\n>> "); // TODO what kind of prompting do we want to do???
+	output("\n%s","Select the last digit of the command to use, or the up/down key to show the next/previous page.");
+	output("\n%s",">> "); // TODO what kind of prompting do we want to do???
 }
 void showNextCommandPage(){
 	if(commandPage<commandPages)
 		setCommandPage(commandPage+1);
 	else
-		printf("\nNo further commands to show.");
+		output("\n%s","No further commands to show.");
 }
 void showPreviousCommandPage(){
 	if(commandPage>1)
 		setCommandPage(commandPage-1);
 	else
-		printf("\nNo further commands to show.");
+		output("\n%s","No further commands to show.");
 }
 
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
@@ -885,7 +903,7 @@ bool clearCommand(){
 
 void switchToControlMode(char* message){
 	if(inputMode==IM_CONTROL)return; // already in control mode thank you
-	/////////putchar('X');
+	/////////outputChar('X');
 	if(inputMode==IM_COMMAND)clearCommand();
 	resetOutputColor();
 	if(message!=NULL)printf("\n%s",message);
@@ -907,7 +925,7 @@ void backToPrompt(){
 	/* replacing:
 	while(characterCount>0){
 		characterCount--;
-		cursorLeft();resetOutputColor();putchar(' ');cursorLeft();
+		cursorLeft();resetOutputColor();outputChar(' ');cursorLeft();
 	}
 	*/
 }
@@ -999,20 +1017,25 @@ void setCommand(Token* pNewCommand){
 	*/
 }
 
-void writeBehindCursorText(){
+void writeBehindCursorText(bool clearAfterBehindCursorText){
 	uint16_t l=string_length(behindCursorText);
-	if(l){
+	if(l||clearAfterBehindCursorText){
 		debugWrite("Behind cursor text to write: '%s'.",string(behindCursorText));
 		resetOutputColor();
 		setColor(BEHIND_CURSOR_TEXT_COLORS[colorScheme]);
-		printf("%s",string(behindCursorText));
-		moveCursorLeft(l); // back to where we started to write the behind cursor text
+		if(l)output("%s",string(behindCursorText));
+		if(clearAfterBehindCursorText){
+			outputChar(' ');
+			moveCursorLeft(l+1);
+		}else
+		if(l)
+			moveCursorLeft(l); // back to where we started to write the behind cursor text
 		if(pToken)outputTokenColor(pToken); // return to the color of the current token
 	}
 }
 
 // in response to backspace the previous token character is to be removed
-void removePreviousTokenCharacter(){
+void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 	char removedCharacter=removedTokenCharacter(1);
 	if(removedCharacter){
 		commandLength--; // decrement the total command length
@@ -1021,10 +1044,10 @@ void removePreviousTokenCharacter(){
 		cursorLeft(); // will decrement cursorPosition
 		clearScreenFromCursor(); // will clear what's behind the cursor
 		// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
-		writeBehindCursorText();
+		writeBehindCursorText(false);
 		// replacing: if(pCommand)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
 	}else
-		switchToControlMode("Switching to control mode, due to failing to remove the intended character!");
+		switchToControlMode("Failed to remove the character in response to pressing the backspace key.");
 }
 
 void outputTokenInfo(){
@@ -1071,8 +1094,14 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	printf("[%d+%c->%d]",pToken->type,inputCharacterType,newTokenType);
 	outputTokenColor(pToken);
 #endif
-		// MDH@16APR2019: most tokens cannot follow each other directly except for unary and ternary operators
-		if(newTokenType==pToken->type&&pToken->type!=TT_UNARY&&pToken->type!=TT_TERNARY_aeru&&pToken->significantCharacterCount>0)newTokenType=TT_ERROR;
+		// some combinations are (still) not allowed...
+		if(newTokenType==pToken->type){
+			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators
+			if(pToken->type!=TT_UNARY&&pToken->type!=TT_TERNARY_aeru&&pToken->significantCharacterCount>0)newTokenType=TT_ERROR;
+		}else{ // different token types
+			// a shortcut assignment can NOT be turned into a equality comparison
+			if(inputCharacterType=='='&&pToken->type==TT_ASSIGNMENT&&(pToken->prev->type==TT_BINARY_AeRu||pToken->prev->type==TT_BINARY_Aeru))newTokenType=TT_ERROR;
+		}
 		if(newTokenType!=pToken->type||pToken->significantCharacterCount>0){
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
@@ -1124,7 +1153,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	printf("[%s]",string(pToken->text));
 #endif
 	commandLength++; // increment total command length
-	putchar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
+	outputChar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
 	
 	if(endOfInput){
 		//////if(assisting)output(":%c",inputCharacterType);
@@ -1142,9 +1171,9 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');commandLength++;}else
 			if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');commandLength++;}
 		}
-		writeBehindCursorText();
+		writeBehindCursorText(false);
 		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength);
-		outputStatus();
+		outputStatus(inputChar,inputCharacterType);
 	}
 
 	return true;
@@ -1255,7 +1284,7 @@ int main(int argc, char **argv){
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
 			if(pCommand==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
 			commandLength=cursorPosition=writeTokens(pCommand);
-			outputStatus();
+			/////////outputStatus();
 		}
 		// which used to be: writeCommand(); // write the current command (if any)
 
@@ -1294,7 +1323,7 @@ int main(int argc, char **argv){
 				// accept (might be an acceptable character in string literal in commands or in shell commands)
 			}
 
-			/////////printf("(%d)",inputChar);
+			/////if(inputChar!=ESCAPE_CHARACTER)printf("(%d)",inputChar);
 
 			// special (control) input character types
 			// first the ones that will break in any input mode!!!!
@@ -1306,9 +1335,21 @@ int main(int argc, char **argv){
 			// from now on no continue's anymore, because at the end of the loop we want to check for inputCharType equaling o
 			if(inputMode==IM_COMMAND){
 #ifdef __DEBUG__
-				putchar(inputCharacterType);
+				outputChar(inputCharType);
 #endif
-				if(inputCharType=='b'||inputCharType=='d'){ // backspace or delete
+				//////////outputStatus(inputChar,inputCharType);
+				if(inputCharType=='d'){ // MDH@18APR2019: delete now always deletes the first character in the behind cursor text
+					/////debugWrite("DELETE");
+					if(string_length(behindCursorText)){
+						if(string_removed_char(behindCursorText,0)){ // success!!!
+							writeBehindCursorText(true);
+						}else
+							switchToControlMode("Failed to remove the first character in the auto-complete text.");	
+					}else
+						beep();
+				}else
+				if(inputCharType=='b'){ // backspace
+					///////debugWrite("BACKSPACE");
 					// something to remove?
 					if(commandLength) // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
 						removePreviousTokenCharacter();
@@ -1334,7 +1375,7 @@ int main(int argc, char **argv){
 								if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],cursorPosition==commandLength-1))
 									switchToControlMode("Failed to accept the suggested character.");
 							}else{
-								writeBehindCursorText(); // there will be characters behind the cursor left to show
+								writeBehindCursorText(false); // there will be characters behind the cursor left to show
 								switchToControlMode("Failed to remove the suggested character.");
 							}
 						}
@@ -1350,10 +1391,11 @@ int main(int argc, char **argv){
 								if(inputChar==51){
 									if(inputCharRead()){
 										if(inputChar==126){ // delete
-											if(cursorPosition<commandLength){
-												// we could go one to the right and do a backspace!!
-												cursorRight();
-												removePreviousTokenCharacter();
+											if(string_length(behindCursorText)){
+												if(string_removed_char(behindCursorText,0))
+													writeBehindCursorText(true);
+												else
+													switchToControlMode("Failed to remove the first character of the auto-completion text.");	
 											}else // nothing under the cursor to delete
 												beep();
 										}
@@ -1430,7 +1472,7 @@ int main(int argc, char **argv){
 												// we have to be careful here, because if this is the first token (cursorPosition==0), we should NOT NULL the token!!!
 												if(cursorPosition)pToken=pToken->prev;else pToken->type=TT_EXPRESSION;
 											}
-											writeBehindCursorText();
+											writeBehindCursorText(false);
 										}else
 											switchToControlMode("Failed to move the cursor left.");
 									}else
@@ -1452,16 +1494,17 @@ int main(int argc, char **argv){
 					}else
 						switchToControlMode("Failed to create a new command!");
 				}
+				outputStatus(inputChar,inputCharType);
 			}else
 			if(inputMode==IM_CONTROL){ // inputChar received in control mode
-				putchar(inputChar); // nice to see the character we typed...
+				outputChar(inputChar); // nice to see the character we typed...
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
 					// flags
-					if(inputChar=='a'||inputChar=='A'){assisting=(inputChar=='A');output("\n%s\n>> ",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
-					if(inputChar=='c'||inputChar=='C'){setColorScheme(inputChar=='c');inputCharType='n';break;}
-					if(inputChar=='d'||inputChar=='D'){debugging=(inputChar=='D');output("\n%s\n>> ",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
-					if(inputChar=='m'||inputChar=='M'){matchparentheses=(inputChar=='M');output("\n%s\n>> ",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
+					if(inputChar=='a'||inputChar=='A'){assisting=(inputChar=='A');output("\n%s",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
+					if(inputChar=='d'||inputChar=='D'){debugging=(inputChar=='D');output("\n%s",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
+					if(inputChar=='m'||inputChar=='M'){matchparentheses=(inputChar=='M');output("\n%s",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
+					if(inputChar>='0'&&inputChar<='9'){setColorScheme(inputChar-'0');inputCharType='n';break;}
 					if(inputChar=='w'||inputChar=='W'){setWrapMode(inputChar=='W');inputCharType='n';break;}
 					// options
 					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
@@ -1484,7 +1527,7 @@ int main(int argc, char **argv){
 					if(cursorPosition>0){
 						if(string_removed_char(shellCommand,cursorPosition-1)){
 							cursorLeft();
-							writeBehindCursorText();
+							writeBehindCursorText(false);
 						}else
 							switchToControlMode("Failed to remove the shell command character!");
 					}else // nothing to remove
@@ -1493,9 +1536,9 @@ int main(int argc, char **argv){
 				if(inputCharType=='d'){
 					if(string_length(behindCursorText)){ // something behind the cursor that we can remove
 						if(string_removed_char(behindCursorText,0))
-							writeBehindCursorText();
+							writeBehindCursorText(true);
 						else
-							switchToControlMode("Failed to remove the shell command character!");
+							switchToControlMode("Failed to remove the first autocompletion character!");
 					}else // nothing to remove
 						beep();
 				}else
@@ -1513,7 +1556,7 @@ int main(int argc, char **argv){
 						while(cursorPosition<string_length(shellCommand)){
 							char newInputChar=string_removed_char(behindCursorText,0);
 							if(!newInputChar){
-								writeBehindCursorText();
+								writeBehindCursorText(false);
 								switchToControlMode("Failed to accept all suggested characters.");
 								break;
 							}
@@ -1548,7 +1591,7 @@ int main(int argc, char **argv){
 									if(cursorPosition<string_length(shellCommand)){
 										char newInputChar=string_removed_char(behindCursorText,0);
 										if(!newInputChar){
-											writeBehindCursorText();
+											writeBehindCursorText(false);
 											switchToControlMode("Failed to accept the suggested characters.");
 										}else
 											string_insert_char(shellCommand,cursorPosition,newInputChar);
@@ -1563,7 +1606,7 @@ int main(int argc, char **argv){
 											// prefix it to behindCursorText
 											string_insert_char(behindCursorText,0,c);
 											cursorLeft();
-											writeBehindCursorText();
+											writeBehindCursorText(false);
 										}else
 											switchToControlMode("Failed to move the cursor left.");
 									}else
@@ -1574,7 +1617,7 @@ int main(int argc, char **argv){
 						}
 					}
 				}else{
-					putchar(inputChar);
+					outputChar(inputChar);
 					string_insert_char(shellCommand,cursorPosition,inputChar);
 					cursorPosition++;
 				}
