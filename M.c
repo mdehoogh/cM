@@ -36,6 +36,17 @@ void debugWrite(const char* fmt,...){
 // Mexecution includes mstring.h
 #include "Mexecution.h"
 
+// there will be a root (M) environment
+struct Menvironment* mEnvironment;
+bool initEnvironment(){
+	mEnvironment=malloc(sizeof(Menvironment));
+	if(mEnvironment){
+		// we're going to store all commands in a list called M
+		addVariable(mEnvironment,"M",VT_LIST);
+	}
+}
+
+// user interaction stuff
 // terminal input stuff
 #include <termios.h>
 struct termios orig_termios;
@@ -1116,10 +1127,13 @@ int main(int argc, char **argv){
 	prepareForUserInput(); // AFTER using the command-line parameters (will effectuate wrap mode and color scheme)
 
 	resetOutputColor(); // just in case
-	output("\n%s\n","Welcome to M.");
+	output("\n%s\n","Welcome to the M interpreter.");
 	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
 	output("\n%s","In any mode press the Enter key on an empty line to switch modes.");
 	displayFlags();
+	output("\nNumber of predefined variables: %d.",getNumberOfVariables(mEnvironment));
+
+	initEnvironment(); // ascertain to have an execution environment!!!
 
 	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
 

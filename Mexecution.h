@@ -30,10 +30,11 @@ typedef struct Mvaluelistelement{
 typedef struct{
     Mvaluelistelement* first;
     Mvaluelistelement* last;
+    uint32_t numberOfValues; // keep track of the total number of variables
 }Mvaluelist;
 
 typedef struct Mvaluemapelement{
-    mstring* name;
+    char* name;
     struct Mvalue* value;
     struct Mvaluemapelement* next;
 }Mvaluemapelement;
@@ -41,6 +42,7 @@ typedef struct Mvaluemapelement{
 typedef struct Mvaluemap{
     Mvaluemapelement* first;
     Mvaluemapelement* last;
+    uint32_t numberOfValues; // keep track of the total number of variables
 }Mvaluemap;
 
 typedef union{
@@ -54,7 +56,7 @@ typedef union{
 // you could say that a map is a list of variables, as such Menvironment holds a map of variables and a map of functions
 // and we could make a separate struct to hold a map
 typedef struct{
-    enum Mvaluetype Type;
+    enum Mvaluetype type;
     Mvalueunion value;
 }Mvalue;
 
@@ -97,3 +99,6 @@ typedef struct Menvironment{
     struct Menvironment* parent;
 }Menvironment;
 
+// function prototypes
+bool addVariable(Menvironment* environment,char* name,enum Mvaluetype valueType);
+uint32_t getNumberOfVariables(Menvironment* environment);
