@@ -39,11 +39,17 @@ void debugWrite(const char* fmt,...){
 // there will be a root (M) environment
 struct Menvironment* mEnvironment;
 bool initEnvironment(){
-	mEnvironment=malloc(sizeof(Menvironment));
+	mEnvironment=calloc(1,sizeof(Menvironment));
 	if(mEnvironment){
-		// we're going to store all commands in a list called M
-		addVariable(mEnvironment,"M",VT_LIST);
+		Mvaluemap* environmentVariableMap=calloc(1,sizeof(Mvaluemap));
+		if(environmentVariableMap){
+			mEnvironment->variableMap=environmentVariableMap;
+			// we're going to store all commands in a list called M
+			if(addVariable(mEnvironment,"M",VT_LIST))
+				return true;
+		}
 	}
+	return false;
 }
 
 // user interaction stuff
@@ -1128,12 +1134,16 @@ int main(int argc, char **argv){
 
 	resetOutputColor(); // just in case
 	output("\n%s\n","Welcome to the M interpreter.");
+
+	if(!initEnvironment()){ // ascertain to have an execution environment!!!
+		output("\n%s","Failed to create the M execution environment!");
+		exit(1);
+	}
+	output("\nNumber of predefined variables: %d.",getNumberOfVariables(mEnvironment));
+	
 	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
 	output("\n%s","In any mode press the Enter key on an empty line to switch modes.");
 	displayFlags();
-	output("\nNumber of predefined variables: %d.",getNumberOfVariables(mEnvironment));
-
-	initEnvironment(); // ascertain to have an execution environment!!!
 
 	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
 

@@ -21,13 +21,29 @@ typedef union Mnumber{
     double d;
 }Mnumber;
 
-struct Mvalue;
+struct Mvaluelist;
+struct Mvaluemap;
+typedef union Mvalueunion{
+    Mnumber* n;
+    mstring* s;
+    struct Mvaluelist* vl;
+    struct Mvaluemap* vm;
+}Mvalueunion;
+
+// a Value is either a number (numeric literal), a string literal, a list of values or a map
+// you could say that a map is a list of variables, as such Menvironment holds a map of variables and a map of functions
+// and we could make a separate struct to hold a map
+typedef struct Mvalue{
+    enum Mvaluetype type;
+    Mvalueunion value;
+}Mvalue;
+
 typedef struct Mvaluelistelement{
-    struct Mvalue* value;
+    Mvalue* mValue;
     struct Mvaluelistelement* next;
 }Mvaluelistelement;
 
-typedef struct{
+typedef struct Mvaluelist{
     Mvaluelistelement* first;
     Mvaluelistelement* last;
     uint32_t numberOfValues; // keep track of the total number of variables
@@ -35,7 +51,7 @@ typedef struct{
 
 typedef struct Mvaluemapelement{
     char* name;
-    struct Mvalue* value;
+    Mvalue* mValue;
     struct Mvaluemapelement* next;
 }Mvaluemapelement;
 
@@ -45,21 +61,6 @@ typedef struct Mvaluemap{
     uint32_t numberOfValues; // keep track of the total number of variables
 }Mvaluemap;
 
-typedef union{
-    union Mnumber* n;
-    mstring* s;
-    Mvaluelist* vl;
-    Mvaluemap* vm;
-}Mvalueunion;
-
-// a Value is either a number (numeric literal), a string literal, a list of values or a map
-// you could say that a map is a list of variables, as such Menvironment holds a map of variables and a map of functions
-// and we could make a separate struct to hold a map
-typedef struct{
-    enum Mvaluetype type;
-    Mvalueunion value;
-}Mvalue;
-
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
 
 typedef struct Mexpressionlistelement{
@@ -67,13 +68,13 @@ typedef struct Mexpressionlistelement{
     struct Mexpressionlistelement* next;
 }Mexpressionlistelement;
 
-typedef struct{
+typedef struct Mexpressionlist{
     Mexpressionlistelement* first;
     Mexpressionlistelement* last;
 }Mexpressionlist;
 
 // functions
-typedef struct{
+typedef struct Mfunction{
     Mvaluemap* parameters; // a map of values defines the parameters and their default values (implicitly defining the expected types)
     Mexpressionlist* body;
 }Mfunction;
@@ -84,7 +85,7 @@ typedef struct Mfunctionmapelement{
     struct Mfunctionmapelement* next;
 }Mfunctionmapelement;
 
-typedef struct{
+typedef struct MfunctionMap{
     Mfunctionmapelement* first;
     Mfunctionmapelement* last;
 }Mfunctionmap;
