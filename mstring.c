@@ -147,9 +147,12 @@ void string_append_char(mstring *str,char c){
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array
-void string_append(mstring *str,char* pc){
+void string_append(mstring* str,char* pc){
     if(str==NULL)return;
-    while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
+    char c;
+    uint16_t index=0;
+    while((c=pc[index++]))string_append_char(str,c);
+    /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
 }
 
 char* string_remainder(mstring* str,uint16_t firstpos){
