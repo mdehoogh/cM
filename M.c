@@ -719,6 +719,8 @@ void cursorRight(){
 	moveCursorRight(1);
 }
 ////////void moveCursorLeft(uint8_t positions){while(--positions>=0)cursorLeft();}
+
+// TODO do we still need writeTokens()???
 // write rest of command will return the number of characters written
 uint16_t writeTokens(Token* pFirstToken){
 	uint16_t tokenCharactersWritten=0;
@@ -727,6 +729,10 @@ uint16_t writeTokens(Token* pFirstToken){
 	return tokenCharactersWritten;
 }
 
+void writeCommandTokens(){
+	pToken=pCommand;
+	while(1){outputToken(pToken);if(!pToken->next)break;pToken=pToken->next;}
+}
 /* MDH@26FEB2019: convenience method that takes care of writing the current command (and NOT returning to the start of the command!)
 void writeCommand(){
 	// MDH@27FEB2019: before actually writing the current command (if any) we clear the behindCursorText as we are assumed to be at the end of the command
@@ -849,16 +855,46 @@ void backToPrompt(){
 	}
 	*/
 }
+
+Token* pNewCommand=NULL; // MDH@22APR2019: pNewCommand points to the new command (as opposed to an existing ('remembered') command)
+Token* newCommand(){
+	if(!pNewCommand)pNewCommand=newToken(NULL);
+	return(pNewCommand);
+}/**
+ * MDH@22APR2019: setCommandBeingEdited() is called with the first token of the command that is to be edited (replacing: setCommand()) 
+ *                and is to be called from setCommandIndex()
+ */
+void setCommandToEdit(Token* pCommandToEdit){
+	/* get rid of what we are currently seeing...
+	if(cursorPosition()||behindCursor()){
+		backToPrompt();
+		clearScreenFromCursor();
+		// MDH@22APR2019 obsolete: commandLength()=cursorPosition()=0; // do we need this????
+		string_setlength(behindCursorText,0); // clear the behind cursor text (in any situation)
+	}
+	*/
+	if(!pCommandToEdit)pCommandToEdit=newCommand(); // if we do not have a command to edit try to create a new command
+	pCommand=pCommandToEdit;
+	// if we have a command to edit, we can do it, otherwise we switch
+	if(pCommand){
+		writeCommandTokens(); // will also make pToken point to the last token
+		writeBehindCursorText(true);
+	}else
+		switchToControlMode("No command to edit!");
+	// we're supposed to show one of the remembered commands
+	//////////backToPrompt();
+	// the problem here is that we cannot write pCommand (as that is supposedly containing the current command being edited)
+	// now, we may decide to not demand that pCommand is NULL at the moment that a user is using the up and down arrows
+	// however, up and down arrow are executed in the inner loop so it's OK to have pCommand not equal to NULL
+	// MDH@22APR2019 obsolete: commandLength()=cursorPosition()=
+}
 /**
  * setCommandIndex() accepts @newCommandIndex between 0 and commandCount at most
  * but 0 is now also accepted, returning to show pCommand (if any)
  */
 void setCommandIndex(uint32_t newCommandIndex){
 	commandIndex=newCommandIndex;
-	backToPrompt();
-	clearScreenFromCursor();
-	// MDH@22APR2019 obsolete: commandLength()=cursorPosition()=0; // do we need this????
-	string_setlength(behindCursorText,0); // clear the behind cursor text (in any situation)
+	Token* pCommandToEdit=NULL;
 	if(commandIndex){
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		if(!accepthistorycommand){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
@@ -874,23 +910,13 @@ void setCommandIndex(uint32_t newCommandIndex){
 			char infoText[80];
 			snprintf(infoText,80,"Showing %d characters of registered command #%u.",commandLength(),(commandCount-commandIndex+1));
 			outputInfo("%s",infoText);
-			writeBehindCursorText(false);
-			return;
-		}
-		char infoText[80];
-		snprintf(infoText,80,"Showing registered command #%u.",(commandCount-commandIndex+1));
-		outputInfo("%s",infoText);
+			setCommandToEdit(NULL);
+		}else
+			setCommandToEdit(commands[commandCount-commandIndex]);
 	}else
-		outputInfo("%s","");
-	// we're supposed to show one of the remembered commands
-	//////////backToPrompt();
-	// the problem here is that we cannot write pCommand (as that is supposedly containing the current command being edited)
-	// now, we may decide to not demand that pCommand is NULL at the moment that a user is using the up and down arrows
-	// however, up and down arrow are executed in the inner loop so it's OK to have pCommand not equal to NULL
-	// MDH@22APR2019 obsolete: commandLength()=cursorPosition()=
-	writeTokens(commandIndex?commands[commandCount-commandIndex]:pCommand);
-	/////////////printf("(%d)",commandLength());
+		setCommandToEdit(NULL);
 }
+
 bool commandDown(){
 	if(commandCount==0)return false;
 	setCommandIndex(commandIndex<commandCount?commandIndex+1:0);
@@ -902,12 +928,7 @@ bool commandUp(){
 	setCommandIndex(commandIndex>0?commandIndex-1:commandCount);
 	return true;
 }
-void newCommand(){
-	// MDH@22APR2019: commandLength()=string_length(behindCursorText); // MDH@21APR2019: oops was 0 before...
-	pCommand=newToken(NULL);
-	pToken=pCommand;
-	resetOutputColor(); // TODO do we need this here?????
-}
+
 void echoCommand(){
 	Token* token=pCommand;
 	resetOutputColor();
@@ -916,6 +937,7 @@ void echoCommand(){
 Token* getCommand(){
 	return(commandIndex&&cursorPosition()?commands[commandCount-commandIndex]:pCommand);
 }
+
 // NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual newCommand
 /**
  * setCommand() creates a new (empty) command (in pCommand) and initializes it to the token in pNewCommand (the command pointed to by commandIndex)
@@ -1211,25 +1233,15 @@ int main(int argc, char **argv){
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
 		promptForUserInput();
 
-		/* MDH@16MAR2019: we're behind the prompt now and should start out without a current command (in pCommnad)
-		//                if pCommand is NOT null, we have to make it NULL
-		commandIndex=0; // MDH@16MAR2019: pretty essential otherwise it would keep evaluating previous commands
-		if(pCommand) // if we still have a command to free, free it entirely
-			if(!clearCommand())
-				switchToControlMode("Switching to control mode, due to failing to remove the command.");
-		*/
-		/* replacing (there shouldn't be a command to write right now, unless perhaps when someone entered an invalid command???? to be continued)
-		   point: an evaluated command should be discarded??? in which case a user cannot correct it and has to type it in again
-		   so it makes sense to be allowed to complete a command (that failed to evaluate)
-		*/
-		// TODO what if we're not in inputMode here??????
-		if(inputMode==IM_COMMAND){
-			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
-			if(pCommand==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
-			// MDH@22APR2019 obsolete: commandLength()=cursorPosition()=
-			writeTokens(pCommand);
-			/////////outputStatus();
-		}
+		// NOTE there's nothing behind the cursor, so ...
+		string_setlength(behindCursorText,0); // 'get rid' of behindCursorText
+		// calling setCommandIndex() will ascertain to have a new command (if we haven't got one yet!)
+		if(inputMode==IM_COMMAND)
+			setCommandIndex(0);
+		else
+		if(inputMode==IM_SHELL)
+			string_setlength(shellCommand,0);
+		
 		// which used to be: writeCommand(); // write the current command (if any)
 
 		/* replacing:
@@ -1352,7 +1364,7 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==65){ // up arrow 
 									if(inputMode==IM_COMMAND){ // i.e. show previous command if any
-										if(pCommand)
+										if(commandIndex==0&&cursorPosition())
 											outputInfo("%s","Won't show previous commands when one is being entered.");
 										else
 										if(!commandDown())
@@ -1368,7 +1380,7 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==66){ // down arrow
 									if(inputMode==IM_COMMAND){									
-										if(pCommand)
+										if(commandIndex==0&&cursorPosition())
 											outputInfo("%s","Won't show next commands when one is being entered!");
 										else 
 										if(!commandUp())
@@ -1595,6 +1607,17 @@ int main(int argc, char **argv){
 				//      and registered (of course it will be pointing to the same chain of tokens but it might evaluated differently now)
 				// NOTE we need to think what to do with pCommand in different situations
 				//      only discard it when the command was evaluated and not registered
+				// MDH@22APR2019: always to evaluate pCommand which is NEVER NULL
+				if(!evaluateCommand(pCommand))
+					outputInfo("Failed to evaluate the command! Complete, correct or discard the command please.");
+				else // if we fail to register the command we should attempt to get rid of the command (and the memory it occupies)
+				if(!registerCommand(pCommand)){
+					if(pCommand&&!clearCommand())
+						switchToControlMode("Switching to control mode, due to failing to register and clear the command.");
+					else
+						output("\n%s","WARNING: Failed to register the evaluated command. Out of memory?");
+				}
+				/*
 				Token* pCommandToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
 				if(pCommand){ // a current command being edited
 					// MDH@22MAR2019: currently the first token is an EXPRESSION token
@@ -1635,6 +1658,7 @@ int main(int argc, char **argv){
 					if(string_empty(behindCursorText))	
 						switchToControlMode("No command to evaluate!");
 				}
+				*/
 				/* MDH@16MAR2019: preparation for the next command is not required here, it's better to do that at the beginning
 				                  of this outer loop
 				// prepare for accepting the next command
