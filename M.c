@@ -242,9 +242,15 @@ void backspace(){ // means go one position to the left on the current line, and 
 uint32_t commandCount=0; // the total number of command input
 uint32_t commandIndex=0;
 
-// keeping track of both the cursor position and the total command length
-uint16_t cursorPosition=0,commandLength=0;
 mstring* behindCursorText=NULL; // MDH@27FEB2019: we keep track of the characters behind the cursor
+mstring* shellCommand=NULL;
+Token* pCommandToEvaluate=NULL;
+Token* pToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
+
+// keeping track of both the cursor position and the total command length
+uint16_t cursorPosition(){return(inputMode==IM_COMMAND?(pToken?pToken->offset+string_length(pToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));}
+uint16_t behindCursor(){return string_length(behindCursorText);}
+uint16_t commandLength(){return cursorPosition()+behindCursor();}
 
 uint8_t promptLength=0;
 void prompt(){
@@ -271,8 +277,8 @@ void prompt(){
 	}
 	/////////storeCursor();
 	///////////inputMode=true; // expecting a command (until the option character is received)
-	/* MDH@26FEB2019: we do not need the following because that's taken care of in writeTokens(pCommand) right after promptForUserInput()
-	cursorPosition=0; // starting at position 0
+	/* MDH@26FEB2019: we do not need the following because that's taken care of in writeTokens(pCommandToEvaluate) right after promptForUserInput()
+	cursorPosition()=0; // starting at position 0
 	*/
 }
 
@@ -363,8 +369,6 @@ bool freeToken(Token* pToken){
 	return true;
 }
 
-Token* pToken=NULL; // the current token
-
 // output functions that require access to the current token
 void toStartOfPreviousLine(){
 	oneLineUp();
@@ -377,7 +381,7 @@ void toStartOfNextLine(){
 	toStartOfLine();
 }
 void toCursorPosition(){
-	moveCursorRight(promptLength+cursorPosition);
+	moveCursorRight(promptLength+cursorPosition());
 	if(pToken)outputTokenColor(pToken); // return to the current token color
 }
 void outputInfo(const char* fmt,...){
@@ -392,11 +396,11 @@ void outputInfo(const char* fmt,...){
 }
 
 void outputStatus(char inputChar,char inputCharType){
-	////////printf("[%u,%u]",cursorPosition,commandLength);
-	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
+	////////printf("[%u,%u]",cursorPosition(),commandLength());
+	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 	if(debugging)
-		outputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pToken!=NULL?pToken->type:255),cursorPosition,commandLength,string(behindCursorText));
-	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition,commandLength,string(behindCursorText));
+		outputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pToken!=NULL?pToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
+	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 }
 
 Token* newToken(Token* prevToken){
@@ -418,16 +422,11 @@ Token* newToken(Token* prevToken){
 }
 
 // keep track of all commands so far
-
 #define COMMAND_BLOCKSIZE 8
-
-// keep track of the user input count
-Token* pCommand=NULL; // the current command
-
 Token** commands=NULL; // array for storing the pointers to the first token of all commands entered
 uint32_t commandBlocks=0;
-bool registerCommand(Token* pCommandToRegister){
-	if(!pCommandToRegister)return false;
+bool registerCommand(){
+	if(!pCommandToEvaluate)return false;
 	if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 		// I have to copy all first token pointers to a new array large enough
 		commandBlocks++;
@@ -435,7 +434,7 @@ bool registerCommand(Token* pCommandToRegister){
 		if(newCommands==NULL)return false;
         commands=newCommands;
 	}
-	commands[commandCount++]=pCommandToRegister;
+	commands[commandCount++]=pCommandToEvaluate;
 	return true;
 }
 
@@ -608,7 +607,7 @@ void removeToken(){
 	pToken=pPrevToken; // replace pToken by the previous token
 	// TODO the following does not seem to work!!!!
 	if(pToken==NULL){
-		pCommand=NULL;
+		pCommandToEvaluate=NULL;
 #ifdef __DEBUG__
 		outputChar('Q');
 #endif
@@ -622,7 +621,7 @@ char removedTokenCharacter(uint16_t behindCursor){
 	// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
 	while(true){
 		if(pToken==NULL)return '\0';
-		tokenCharacterPosition=cursorPosition-pToken->offset;
+		tokenCharacterPosition=string_length(pToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-pToken->offset;
 #ifdef __DEBUG__
 		printf("%d",tokenCharacterPosition);
 #endif
@@ -652,14 +651,14 @@ char removedTokenCharacter(uint16_t behindCursor){
 }
 
 // anything the user types is a sequence of tokens which we can store in a linked list
-bool evaluateCommand(Token* pCommandToEvaluate){
+bool evaluateCommand(){
 	if(pCommandToEvaluate==NULL)return false;
 	printf("\nEvaluating '");
 	Token* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
-	while(pCommandToken!=NULL){
+	while(pCommandToken){
 /*
 #ifdef __DEBUG__
-		printf("{%p}",pCommandToken);
+		printf("{%p}",pCommandToEvaluateToken);
 #endif
 */
 		output("%s",string(pCommandToken->text));
@@ -689,41 +688,30 @@ void endOfUserInput(){
 
 // cursorLeft() will return the token under the cursor
 void cursorLeft(){
-	// ASSERT cursorPosition is assumed to be positive
+	// ASSERT cursorPosition() is assumed to be positive
 	// MDH@27FEB2019: if we decide to move the text under the cursor into behindCursorText, this means removing the current token character
 	//                as before BUT removePreviousTokenCharacter() already does that, so
-	cursorPosition--;
+	// MDH@24APR2019 obsolete: cursorPosition()--;
 	moveCursorLeft(1);
 }
 void cursorRight(){
-	cursorPosition++;
+	// MDH@24APR2019 obsolete: cursorPosition()++;
 	moveCursorRight(1);
 }
-////////void moveCursorLeft(uint8_t positions){while(--positions>=0)cursorLeft();}
-// write rest of command will return the number of characters written
-uint16_t writeTokens(Token* pFirstToken){
-	uint16_t tokenCharactersWritten=0;
-	Token* token=pFirstToken;
-	while(token!=NULL){outputToken(token);tokenCharactersWritten+=string_length(token->text);token=token->next;}
-	return tokenCharactersWritten;
-}
 
-/* MDH@26FEB2019: convenience method that takes care of writing the current command (and NOT returning to the start of the command!)
-void writeCommand(){
-	// MDH@27FEB2019: before actually writing the current command (if any) we clear the behindCursorText as we are assumed to be at the end of the command
-	string_setlength(behindCursorText,0);
-	commandLength=cursorPosition=writeTokens(pCommand);
-	outputStatus();
-}
-*/
+// MDH@24APR2019: writeCommand() writes the command to evaluate, and sets pToken in the process
+void writeCommand(){Token* token=pCommandToEvaluate;while(token){outputToken(pToken=token);token=token->next;}}
+
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
 uint32_t commandPages=0; // the total number of command pages
 void setCommandPage(uint32_t newCommandPage){
 	commandPage=newCommandPage;
 	int32_t commandToShowIndex=10,lastCommandToShowIndex=commandCount-(commandPage*10);
 	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
-		resetOutputColor();printf("\n%d. ",lastCommandToShowIndex+commandToShowIndex+1);
-		writeTokens(commands[lastCommandToShowIndex+commandToShowIndex]);
+		resetOutputColor();
+		output("\n%d. ",lastCommandToShowIndex+commandToShowIndex+1);
+		Token* token=commands[lastCommandToShowIndex+commandToShowIndex];
+		while(token){outputToken(token);token=token->next;}
 	}
 	resetOutputColor();
 	output("\n%s","Select the last digit of the command to use, or the up/down key to show the next/previous page.");
@@ -744,10 +732,10 @@ void showPreviousCommandPage(){
 /*
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
 char* removedRestOfCommand(){
-	if(cursorPosition<commandLength){
+	if(cursorPosition()<commandLength()){
 		mstring* restOfCommand=string_create();
 		if(restOfCommand!=NULL){
-			uint16_t tokenPosition=cursorPosition-pToken->offset;
+			uint16_t tokenPosition=cursorPosition()-pToken->offset;
 			if(tokenPosition)string_append(restOfCommand,string_remainder(pToken->text,tokenPosition));
 			string_setlength(pToken->text,tokenPosition); // the new length of the token (cutting off what's behind it)
 			// now to append the text in the rest of the tokens
@@ -764,23 +752,23 @@ char* removedRestOfCommand(){
 	return NULL;
 } 
 */
+/*
 void writeRestOfCommand(){ // writes rest of command assuming pToken is not NULL and we are to return to the current cursor position adterwards!!
-	uint16_t leftToWrite=commandLength-cursorPosition;
+	uint16_t leftToWrite=commandLength()-cursorPosition();
 	if(leftToWrite>0){ // something left to write
 		// something of the current token to write?
-		if(cursorPosition>pToken->offset){ // part of current token to write
-			outputTokenColor(pToken);printf("%s",string_remainder(pToken->text,cursorPosition-pToken->offset));
+		if(cursorPosition()>pToken->offset){ // part of current token to write
+			outputTokenColor(pToken);printf("%s",string_remainder(pToken->text,cursorPosition()-pToken->offset));
 		}
 		// write the rest of the tokens
 		writeTokens(pToken->next);
 		moveCursorLeft(leftToWrite);
 	}
 }
+*/
 bool clearCommand(){
-	// MDH@
-	bool result=freeToken(pCommand);
-	pCommand=NULL;
-	pToken=NULL; // we shouldn't have a current token if we do not have a command anymore
+	bool result=freeToken(pCommandToEvaluate);
+	pToken=pCommandToEvaluate=NULL;
 	return result;
 }
 
@@ -817,9 +805,9 @@ void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
 	// replacing: restoreCursor();clearScreenFromCursor();
-	while(cursorPosition>0){cursorPosition--;backspace();}
+	uint16_t cp=cursorPosition();while(cp--)backspace(); // MDH@24APR2019 replacing: while(cursorPosition()>0){cursorPosition()--;backspace();}
 	/*
-	if(cursorPosition>0){moveCursorLeft(cursorPosition);cursorPosition=0;}
+	if(cursorPosition()>0){moveCursorLeft(cursorPosition());cursorPosition()=0;}
 	clearScreenFromCursor();
 	*/
 	/* replacing:
@@ -829,46 +817,42 @@ void backToPrompt(){
 	}
 	*/
 }
+
+void setCommandToEvaluate(Token* pCommand){
+	pToken=pCommandToEvaluate=pCommand;
+	writeCommand();
+	writeBehindCursorText(false);
+}
 /**
  * setCommandIndex() accepts @newCommandIndex between 0 and commandCount at most
- * but 0 is now also accepted, returning to show pCommand (if any)
+ * but 0 is now also accepted, returning to show pCommandToEvaluate (if any)
  */
 void setCommandIndex(uint32_t newCommandIndex){
 	commandIndex=newCommandIndex;
 	backToPrompt();
 	clearScreenFromCursor();
-	commandLength=cursorPosition=0; // do we need this????
+	// MDH@24APR2019 obsolete: commandLength()=cursorPosition()=0; // do we need this????
 	string_setlength(behindCursorText,0); // clear the behind cursor text (in any situation)
 	if(commandIndex){
+		Token* token=commands[commandCount-commandIndex];
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
-		if(!accepthistorycommand){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
-			Token* token=commands[commandCount-commandIndex];
-			char* tokenText;
-			while(token!=NULL){
-				tokenText=string(token->text);
-				//outputText("(%s)",tokenText);
-				string_append(behindCursorText,tokenText);
-				token=token->next;
-			}
-			commandLength=string_length(behindCursorText); // essential as commandLength is the length of the command plus the length of the behind cursor text	
+		if(accepthistorycommand){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
+			setCommandToEvaluate(token);
 			char infoText[80];
-			snprintf(infoText,80,"Showing %d characters of registered command #%u.",commandLength,(commandCount-commandIndex+1));
+			snprintf(infoText,80,"Showing registered command #%u.",(commandCount-commandIndex+1));
 			outputInfo("%s",infoText);
-			writeBehindCursorText(false);
 			return;
 		}
-		char infoText[80];
-		snprintf(infoText,80,"Showing registered command #%u.",(commandCount-commandIndex+1));
-		outputInfo("%s",infoText);
-	}else
-		outputInfo("%s","");
-	// we're supposed to show one of the remembered commands
-	//////////backToPrompt();
-	// the problem here is that we cannot write pCommand (as that is supposedly containing the current command being edited)
-	// now, we may decide to not demand that pCommand is NULL at the moment that a user is using the up and down arrows
-	// however, up and down arrow are executed in the inner loop so it's OK to have pCommand not equal to NULL
-	commandLength=cursorPosition=writeTokens(commandIndex?commands[commandCount-commandIndex]:pCommand);
-	/////////////printf("(%d)",commandLength);
+		// the previous command will be used as behind cursor text!!
+		while(token){
+			///////outputText("(%s)",tokenText);
+			string_append(behindCursorText,string(token->text));
+			token=token->next;
+		}
+	}
+	//////outputInfo("%s","");
+	setCommandToEvaluate(NULL);
+	/////////////printf("(%d)",commandLength());
 }
 bool commandDown(){
 	if(commandCount==0)return false;
@@ -881,33 +865,60 @@ bool commandUp(){
 	setCommandIndex(commandIndex>0?commandIndex-1:commandCount);
 	return true;
 }
+
 void newCommand(){
-	commandLength=string_length(behindCursorText); // MDH@21APR2019: oops was 0 before...
-	pCommand=newToken(NULL);
-	pToken=pCommand;
+	// MDH@24APR2019 obsolete: commandLength()=string_length(behindCursorText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
+	pToken=pCommandToEvaluate=newToken(NULL);
+}
+
+void copyCommand(){
+	// if fails to copy pCommandToEvaluate pToken should end up as NULL
+	pToken=NULL;
+	Token* pTokenToCopy=pCommandToEvaluate;
+	pCommandToEvaluate=NULL;
+	// the essence is that pToken points to the last token in pCommandToEvaluate
+	Token* pCommandCopy=NULL;
+	// NOTE theoretically pToken could be NULL due to newToken() failing to create a new token
+	while(pTokenToCopy){
+		pToken=newToken(pToken);
+		pToken->type=pTokenToCopy->type;
+		pToken->significantCharacterCount=pTokenToCopy->significantCharacterCount;
+		// if failing to copy the text over get rid of the command constructed so far, and break
+		if(!string_copy(pTokenToCopy->text,pToken->text)){pToken=NULL;break;}
+		// MDH@24APR2019 obsolete: commandLength()+=string_length(pToken->text);
+		// some additional fields to copy over (NOT the offset is that is set automatically)
+#ifdef __DEBUG__
+        printf("%d:%s",pToken->type,string(pToken->text));
+#endif
+		if(!pCommandToEvaluate)pCommandToEvaluate=pToken;
+		// get the next token to copy...
+		pTokenToCopy=pTokenToCopy->next;
+	}
+}
+
+// NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual newCommand
+/**
+ * setCommand() creates a new (empty) command (in pCommandToEvaluate) and initializes it to the token in pNewCommand (the command pointed to by commandIndex)
+ *              which is supposedly showing behind the cursor!!!
+ * ASSUMPTION should only be called when at the prompt (cursorPosition()=0) ready for starting or changing a command
+ * setCommand() won't show the command anymore as we assume that any registered command passed in is already showing!!!
+ */
+/*
+Token* getCommand(){
+	return(commandIndex&&cursorPosition()?commands[commandCount-commandIndex]:pCommandToEvaluate);
 }
 void echoCommand(){
-	Token* token=pCommand;
+	Token* token=pCommandToEvaluate;
 	resetOutputColor();
 	while(token){printf("%s",string(token->text));token=token->next;}
 }
-Token* getCommand(){
-	return(commandIndex&&cursorPosition?commands[commandCount-commandIndex]:pCommand);
-}
-// NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual newCommand
-/**
- * setCommand() creates a new (empty) command (in pCommand) and initializes it to the token in pNewCommand (the command pointed to by commandIndex)
- *              which is supposedly showing behind the cursor!!!
- * ASSUMPTION should only be called when at the prompt (cursorPosition=0) ready for starting or changing a command
- * setCommand() won't show the command anymore as we assume that any registered command passed in is already showing!!!
- */
 void setCommand(Token* pNewCommand){
-	// ASSERT let's assume we're at the prompt (i.e. cursorPosition==0 and pCommand==NULL)
+	// ASSERT let's assume we're at the prompt (i.e. cursorPosition()==0 and pCommandToEvaluate==NULL)
 	// NO we cannot assume that because there might be a command currently showing at the prompt
-	if(pCommand){clearCommand();backToPrompt();} // if we have a command get rid of it and ascertain to be at the prompt!!
+	if(pCommandToEvaluate){clearCommand();backToPrompt();} // if we have a command get rid of it and ascertain to be at the prompt!!
 	// the problem is that we do NOT want to actually change the new command, so we have to copy it somehow
-	newCommand(); // NOTE might fail, in which case pToken will be NULL!!
+	newCommandToEvaluate(); // NOTE might fail, in which case pToken will be NULL!!
 	if(pNewCommand){ // something to copy
 		// at least once we need to set pToken!!!
 		Token* pNewToken=pNewCommand; // first token to copy!!
@@ -915,7 +926,7 @@ void setCommand(Token* pNewCommand){
 		while(pToken){
 			// if failing to copy the text over get rid of the command constructed so far, and break
 			if(!string_copy(pNewToken->text,pToken->text)){clearCommand();break;}
-			commandLength+=string_length(pToken->text);
+			// MDH@24APR2019 obsolete: commandLength()+=string_length(pToken->text);
 			// some additional fields to copy over (NOT the offset is that is set automatically)
 			pToken->type=pNewToken->type;
 #ifdef __DEBUG__
@@ -931,32 +942,28 @@ void setCommand(Token* pNewCommand){
 #ifdef __DEBUG__
 		echoCommand();
 #endif
-	}/*else commandIndex=0; // don't think we need this anymore, as pNewCommand will only be NULL when commandIndex==0 */
-	/* won't echo what is supposedly already there!!!)
-	// if we end up with a command, show it...
-	cursorPosition=commandLength;
-	if(cursorPosition>0)writeTokens(pCommand);
-	*/
+	}
 }
+*/
 
 // in response to backspace the previous token character is to be removed
 void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 	char removedCharacter=removedTokenCharacter(1);
 	if(removedCharacter){
-		commandLength--; // decrement the total command length
-		if(commandLength==0)pCommand=NULL;
+		// MDH@24APR2019 obsolete: commandLength()--; // decrement the total command length
+		if(cursorPosition()==0)pCommandToEvaluate=NULL;
 		// on screen as well please
-		cursorLeft(); // will decrement cursorPosition
+		cursorLeft(); // will decrement cursorPosition() // MDH@24APR2019: NOT anymore...
 		clearScreenFromCursor(); // will clear what's behind the cursor
 		// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
 		writeBehindCursorText(false);
-		// replacing: if(pCommand)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
+		// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
 	}else
 		switchToControlMode("Failed to remove the character in response to pressing the backspace key.");
 }
 
 void outputTokenInfo(){
-	Token* token=pCommand;
+	Token* token=pCommandToEvaluate;
 	uint16_t tokenIndex=0;
 	output("\n%s:","Tokens");
 	output("\n%s\t%s\t%s\t%s\t%s\t\t\t%s","#","OFFSET","USED","LENGTH","TYPE","TEXT");
@@ -970,18 +977,20 @@ void outputTokenInfo(){
 bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
 
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
-//       		  ASSERTION pCommand and pToken are  NOT  NULL
+//       		  ASSERTION pCommandToEvaluate and pToken are  NOT  NULL
 //                the endofinput flag is used to indicate whether this is the end of the input
 bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput){
-	// MDH@21APR2019: we need to ascertain to have a command here (which is JIT command creation apparently)
-	//                NOTE commandIndex!=0 by itself does not mean that we should choose that command!!!
-	//                     as this requires accepthistorycommand to be True
-	//                     alternatively testing cursorPosition is perhaps a better test because either cursorPosition>0 if the tokens
-	//                     of a previous command was selected!!!
-	if(pCommand==NULL) // no first command token
-		// if commandIndex we should one of the registered commands
-		setCommand(commandIndex&&cursorPosition?commands[commandCount-commandIndex]:NULL); // will also set commandLength!!!
+	// MDH@21APR2019: there are two situation where we need to get a command
+	//                1. we haven't got one 2. we have got a registered command which hasn't changed yet (in which case commandIndex will still be positive)
+	if(!pCommandToEvaluate) // no current command
+		newCommand(); // we need to make a new token (to start the command to evaluate)
+	else // we have a current command BUT 
+	if(commandIndex)
+		copyCommand();
+	// if pToken is now NULL something went wrong (in copyCommand or newCommand most likely)
 	if(pToken==NULL)return false;
+	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
+
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
 	if(inputCharType=='C'){
 		pToken->type^=0x70; // toggling bit 7
@@ -1044,7 +1053,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			pToken=newToken(pToken);
 /*
 #ifdef __DEBUG__
-			printf("@%p=%p?:%s",pCommand,pToken,string(pCommand->text));
+			printf("@%p=%p?:%s",pCommandToEvaluate,pToken,string(pCommandToEvaluate->text));
 #endif
 */
 			pToken->type=newTokenType;
@@ -1061,32 +1070,32 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	if(pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
 		pToken->significantCharacterCount=string_length(pToken->text);
 
-	// insert the typed character at cursorPosition minus current token offset in pToken->text
-	string_insert_char(pToken->text,cursorPosition-pToken->offset,inputChar);
+	// append the typed character at cursorPosition() minus current token offset in pToken->text
+	string_append_char(pToken->text,inputChar);
 #ifdef __DEBUG__
 	printf("[%s]",string(pToken->text));
 #endif
-	commandLength++; // increment total command length
+	// MDH@24APR2019 obsolete: commandLength()++; // increment total command length
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
 	
 	if(endOfInput){
 		//////if(assisting)output(":%c",inputCharacterType);
-		debugWrite("Command length after inserting %c: %" PRIu16 ".",inputChar,commandLength);
+		debugWrite("Command length after inserting %c: %" PRIu16 ".",inputChar,commandLength());
 	}
 
-	cursorPosition++; // increment the current cursor position
+	// MDH@24APR2019 obsolete: cursorPosition()++; // increment the current cursor position
 
 	if(endOfInput){
 		// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
-		if(pToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');commandLength++;}else
+		if(pToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
 		// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 		if(matchparentheses){
-			if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');commandLength++;}else
-			if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');commandLength++;}else
-			if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');commandLength++;}
+			if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+			if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+			if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');/* MDH@24APR2019 obsolete: commandLength()++;*/}
 		}
 		writeBehindCursorText(false);
-		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength);
+		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength());
 		outputStatus(inputChar,inputCharacterType);
 	}
 
@@ -1094,11 +1103,10 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 }
 
 bool COMMAND_PROCESSOR_AVAILABLE=0;
-mstring* shellCommand=NULL;
 void clearShellCommand(){
 	string_setlength(behindCursorText,0);
 	string_setlength(shellCommand,0);
-	cursorPosition=0;
+	// MDH@24APR2019 obsolete: cursorPosition()=0;
 }
 void executeShellCommand(){
 	// ASSERTION string_length(shellCommand) should be positive
@@ -1116,7 +1124,11 @@ void switchToShellMode(char* message){
 	inputCharType='s';
 	//output("\n%s\n $ ","Enter your shell command, and press the Return button to execute.");
 }
-
+void switchToCommandMode(){
+	if(inputMode==IM_COMMAND)return;
+	inputMode=IM_COMMAND;
+	string_setlength(behindCursorText,0); // ascertain to not have autocompletion text
+}
 
 int main(int argc, char **argv){
 
@@ -1177,11 +1189,12 @@ int main(int argc, char **argv){
 	output("\n%s","In any mode press the Enter key on an empty line to switch modes.");
 	displayFlags();
 
+	// initialize commands and input mode
 	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
-
 	behindCursorText=string_create(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
-	pCommand=NULL; // the current command (token)
-	///// writeCommand() will take care of this!!!! commandLength=0; // keep track of the total command length...
+	pCommandToEvaluate=NULL; // the current command (token)
+
+	///// writeCommand() will take care of this!!!! commandLength()=0; // keep track of the total command length...
 	inputMode=IM_COMMAND; // TODO should this go into promptForUserInput()?
 
 	while(1){
@@ -1190,9 +1203,9 @@ int main(int argc, char **argv){
 		promptForUserInput();
 
 		/* MDH@16MAR2019: we're behind the prompt now and should start out without a current command (in pCommnad)
-		//                if pCommand is NOT null, we have to make it NULL
+		//                if pCommandToEvaluate is NOT null, we have to make it NULL
 		commandIndex=0; // MDH@16MAR2019: pretty essential otherwise it would keep evaluating previous commands
-		if(pCommand) // if we still have a command to free, free it entirely
+		if(pCommandToEvaluate) // if we still have a command to free, free it entirely
 			if(!clearCommand())
 				switchToControlMode("Switching to control mode, due to failing to remove the command.");
 		*/
@@ -1203,19 +1216,25 @@ int main(int argc, char **argv){
 		// TODO what if we're not in inputMode here??????
 		if(inputMode==IM_COMMAND){
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
-			if(pCommand==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
-			commandLength=cursorPosition=writeTokens(pCommand);
+			// MDH@24APR2019: pCommandToEvaluate could be non-null if we failed to evaluate it (e.g. when being imcomplete), and we allow a retry
+			//                NOTE registered commands should always be successfully evaluated, so do NOT get rid of any pending command!!!!
+			if(pCommandToEvaluate){writeCommand();writeBehindCursorText(false);}
+			/////////////// if(pCommandToEvaluate)clearCommand(); // TODO do we need this????
+			/* replacing:
+			if(pCommandToEvaluate==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
+			commandLength()=cursorPosition()=writeTokens(pCommandToEvaluate);
+			*/
 			/////////outputStatus();
 		}
 		// which used to be: writeCommand(); // write the current command (if any)
 
 		/* replacing:
-		pToken=pCommand;
+		pToken=pCommandToEvaluate;
 		// an existing command to show
 		while(pToken!=NULL){
 			outputToken(pToken);
 			// the cursor will move along with every printf()
-			cursorPosition+=string_length(pToken->text);
+			cursorPosition()+=string_length(pToken->text);
 			pToken=pToken->next;
 		}
 		*/
@@ -1228,16 +1247,16 @@ int main(int argc, char **argv){
 
 			inputCharType=INPUTCHARACTERTYPES[inputChar];
 
-			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE cursorPosition is only defined in the other two modes)
+			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE cursorPosition() is only defined in the other two modes)
 			// MDH@16APR2019: I want to use the Enter key (ASCII 13) to switch to the next mode, because the associated input character type is n which will ALWAYS break
 			//                in that case we do NOT need the o input character type!!!
 			if(inputCharType=='o'){
 				if(inputMode==IM_CONTROL){
-					inputMode=IM_COMMAND;
+					switchToCommandMode();
 					break;
 				}
 				// not in control mode, go to control mode if first character on line
-				if(!cursorPosition){
+				if(!cursorPosition()){
 					switchToControlMode(NULL);
 					break;
 				}
@@ -1272,14 +1291,14 @@ int main(int argc, char **argv){
 				if(inputCharType=='b'){ // backspace
 					///////debugWrite("BACKSPACE");
 					// something to remove?
-					if(commandLength) // TODO pCommand should be NULL at the same time commandLength becomes 0!!!
+					if(cursorPosition()) // TODO pCommandToEvaluate should be NULL at the same time commandLength() becomes 0!!!
 						removePreviousTokenCharacter();
 					else // nothing to remove
 						beep();
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-D)
-					// replacing: if(pCommand!=NULL){clearCommand();break;}beep(); 
-					if(pCommand!=NULL){
+					// replacing: if(pCommandToEvaluate!=NULL){clearCommand();break;}beep(); 
+					if(pCommandToEvaluate!=NULL){
 						backToPrompt();
 						clearCommand();
 						/////////if(wrapMode)break; // if in wrapmode can't guarantee backspace() to move into the previous line which means just prompt again...
@@ -1288,16 +1307,20 @@ int main(int argc, char **argv){
 				}else
 				if(inputCharType=='t'){ // Tab character
 					// if there's a preview (well, code completion by way of a behindCursorText)
-					if(cursorPosition<commandLength){
-						while(cursorPosition<commandLength){
+					uint16_t bc=behindCursor();
+					if(bc){
+						// normally all will be Ok, and we can (post)decrement bc until it's zero
+						while(bc--){
 							char newInputChar=string_removed_char(behindCursorText,0);
-							if(newInputChar){
-								commandLength--; // until we manage to insert the character removed, we have one less character in the total command length
-								if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],cursorPosition==commandLength-1))
-									switchToControlMode("Failed to accept the suggested character.");
-							}else{
+							if(!newInputChar){
 								writeBehindCursorText(false); // there will be characters behind the cursor left to show
 								switchToControlMode("Failed to remove the suggested character.");
+								break;
+							}
+							// MDH@24APR2019 obsolete: commandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
+							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],bc==0)){
+								switchToControlMode("Failed to accept the suggested character.");
+								break;
 							}
 						}
 					}else
@@ -1324,7 +1347,7 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==65){ // up arrow 
 									if(inputMode==IM_COMMAND){ // i.e. show previous command if any
-										if(pCommand)
+										if(pCommandToEvaluate)
 											outputInfo("%s","Won't show previous commands when one is being entered.");
 										else
 										if(!commandDown())
@@ -1340,7 +1363,7 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==66){ // down arrow
 									if(inputMode==IM_COMMAND){									
-										if(pCommand)
+										if(pCommandToEvaluate)
 											outputInfo("%s","Won't show next commands when one is being entered!");
 										else 
 										if(!commandUp())
@@ -1355,12 +1378,12 @@ int main(int argc, char **argv){
 									*/
 								}else
 								if(inputChar==67){ // right arrow
-									if(cursorPosition<commandLength){
+									if(behindCursor()){
 										// MDH@22MAR2019: instead of doing everything here (duplicating all code that is down below), we can find a way to use the 'normal' code
 										////////////bool success=false;
 										char newInputChar=string_removed_char(behindCursorText,0);
 										if(newInputChar){
-											commandLength--;
+											// MDH@24APR2019: commandLength()--;
 											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true))
 												switchToControlMode("Suggested character extracted, but not accepted.");
 										}else
@@ -1369,9 +1392,9 @@ int main(int argc, char **argv){
 										beep();
 								}else
 								if(inputChar==68){ // left arrow
-									if(cursorPosition>0){
-										// TODO apparently pCommand will still be NULL when we're scrolling through the list of previous commands...
-										if(pCommand==NULL)if(commandIndex)setCommand(commands[commandCount-commandIndex]); // will also set commandLength!!!
+									if(cursorPosition()){
+										// TODO apparently pCommandToEvaluate will still be NULL when we're scrolling through the list of previous commands...
+										if(commandIndex)copyCommand(); // will also set commandLength()!!!
 										// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into behindCursorText
 										bool success=false;
 										char c=removedTokenCharacter(1);
@@ -1384,14 +1407,14 @@ int main(int argc, char **argv){
 										}
 										if(success){
 											cursorLeft();
-											/* NO going back and forth with the cursor does NOT change commandLength!!!!
-											commandLength--; // MDH@28FEB2019: essential bro' otherwise when we go back to the end, cursorPosition will stay below commandLength
+											/* NO going back and forth with the cursor does NOT change commandLength()!!!!
+											commandLength()--; // MDH@28FEB2019: essential bro' otherwise when we go back to the end, cursorPosition() will stay below commandLength()
 											*/
 											// if the cursor position now matches the offset of the current token
-											// we're at the end of the previous token
-											if(cursorPosition==pToken->offset){
-												// we have to be careful here, because if this is the first token (cursorPosition==0), we should NOT NULL the token!!!
-												if(cursorPosition)pToken=pToken->prev;else pToken->type=TT_EXPRESSION;
+											// i.e. the current token is now empty!!!!
+											if(string_length(pToken->text)==0){
+												// we have to be careful here, because if this is the first token (and there's NO previous token), we should NOT NULL the token!!!
+												if(pToken->prev)pToken=pToken->prev;else pToken->type=TT_EXPRESSION;
 											}
 											writeBehindCursorText(false);
 										}else
@@ -1407,12 +1430,12 @@ int main(int argc, char **argv){
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//                we always need a command (being edited)
 					if(!commandCharacterAccepted(inputChar,inputCharType,true))
-						switchToControlMode(pCommand?"Failed to accept the character.":"Failed to create a new command");
+						switchToControlMode(pCommandToEvaluate?"Failed to accept the character.":"Failed to create a new command");
 					/*
-					// we need to have a token (to append the input character to) which initializes to pCommand
-					if(pCommand==NULL) // no first command token
+					// we need to have a token (to append the input character to) which initializes to pCommandToEvaluate
+					if(pCommandToEvaluate==NULL) // no first command token
 						// if commandIndex we should one of the registered commands
-						setCommand(commandIndex?commands[commandCount-commandIndex]:NULL); // will also set commandLength!!!
+						setCommand(commandIndex?commands[commandCount-commandIndex]:NULL); // will also set commandLength()!!!
 					// if still NULL (also when we fail to actually create a new first command token)
 					if(pToken!=NULL){
 						if(!commandCharacterAccepted(inputChar,inputCharType,true))
@@ -1451,8 +1474,9 @@ int main(int argc, char **argv){
 			}else{ // Shell command input mode
 				// we still allow using certain 'special' characters for composing the command (much like we did with a command)
 				if(inputCharType=='b'){ // backspace
-					if(cursorPosition>0){
-						if(string_removed_char(shellCommand,cursorPosition-1)){
+					uint16_t cp=cursorPosition();
+					if(cp){
+						if(string_removed_char(shellCommand,cp-1)){
 							cursorLeft();
 							writeBehindCursorText(false);
 						}else
@@ -1470,7 +1494,7 @@ int main(int argc, char **argv){
 						beep();
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-C)
-					if(pCommand!=NULL){
+					if(pCommandToEvaluate!=NULL){
 						backToPrompt();
 						clearShellCommand();
 						//////////if(wrapMode)break;
@@ -1479,15 +1503,16 @@ int main(int argc, char **argv){
 				}else
 				if(inputCharType=='t'){ // Tab character
 					// if there's a preview (well, code completion by way of a behindCursorText)
-					if(cursorPosition<string_length(shellCommand)){
-						while(cursorPosition<string_length(shellCommand)){
+					uint16_t bc=behindCursor();
+					if(bc){
+						while(bc--){
 							char newInputChar=string_removed_char(behindCursorText,0);
 							if(!newInputChar){
 								writeBehindCursorText(false);
 								switchToControlMode("Failed to accept all suggested characters.");
 								break;
 							}
-							string_insert_char(shellCommand,cursorPosition,newInputChar);
+							string_append_char(shellCommand,newInputChar);
 						}
 					}else
 						beep();
@@ -1499,7 +1524,8 @@ int main(int argc, char **argv){
 								if(inputChar==51){
 									if(inputCharRead()){
 										if(inputChar==126){ // delete
-											if(cursorPosition<string_length(shellCommand)){
+											// TODO FIX this does not seem to be right!!!!!
+											if(behindCursor()){
 												// we could go one to the right and do a backspace!!
 												cursorRight();
 												// TODO what to do here??? removePreviousTokenCharacter();
@@ -1515,20 +1541,21 @@ int main(int argc, char **argv){
 									beep();
 								}else
 								if(inputChar==67){ // right arrow
-									if(cursorPosition<string_length(shellCommand)){
+									if(behindCursor()){
 										char newInputChar=string_removed_char(behindCursorText,0);
 										if(!newInputChar){
 											writeBehindCursorText(false);
 											switchToControlMode("Failed to accept the suggested characters.");
 										}else
-											string_insert_char(shellCommand,cursorPosition,newInputChar);
+											string_insert_char(shellCommand,cursorPosition(),newInputChar);
 									}else
 										beep();
 								}else
 								if(inputChar==68){ // left arrow
-									if(cursorPosition>0){
+									uint16_t cp=cursorPosition();
+									if(cp){
 										bool success=false;
-										char c=string_removed_char(shellCommand,cursorPosition-1);
+										char c=string_removed_char(shellCommand,cp-1);
 										if(c){ // removing the character behind the cursor succeeded
 											// prefix it to behindCursorText
 											string_insert_char(behindCursorText,0,c);
@@ -1544,9 +1571,9 @@ int main(int argc, char **argv){
 						}
 					}
 				}else{
+					string_append_char(shellCommand,inputChar);
 					outputChar(inputChar);
-					string_insert_char(shellCommand,cursorPosition,inputChar);
-					cursorPosition++;
+					// MDH@24APR2019: cursorPosition()++;
 				}
 			}
 			// if switched to control mode, inputCharType will be equal to 'o' and we break out of this input loop!!!
@@ -1560,67 +1587,53 @@ int main(int argc, char **argv){
 		if(inputCharType=='n'){
 			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
-				// if the command ended with a normal end-of-line character, evaluate and register the command
-				// NOTE if pCommand is not set yet, but the user retrieved a previously executed command, that one should be reexecuted
-				//      and registered (of course it will be pointing to the same chain of tokens but it might evaluated differently now)
-				// NOTE we need to think what to do with pCommand in different situations
-				//      only discard it when the command was evaluated and not registered
-				Token* pCommandToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
-				if(pCommand){ // a current command being edited
+				// if pCommandToEvaluate is set, we have a command to evaluate
+				/*
+				Token* pCommandToEvaluateToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
+				if(pCommandToEvaluate){ // a current command being edited
 					// MDH@22MAR2019: currently the first token is an EXPRESSION token
-					if(cursorPosition>string_length(pCommand->text)){
+					if(cursorPosition()>string_length(pCommandToEvaluate->text)){
 						// finish the last token???
 						if(pToken->significantCharacterCount==0)pToken->significantCharacterCount=string_length(pToken->text);
-						pCommandToEvaluate=pCommand; // but only when not at start of command!!!
+						pCommandToEvaluateToEvaluate=pCommandToEvaluate; // but only when not at start of command!!!
 						if(debugging)outputTokenInfo();
 					}
 				}else // no command yet, although we might be looking at a previous command
-				if(commandIndex&&cursorPosition) // NOTE using cursorPosition is better than using accepthistorycommand (causing it!!)
-					pCommandToEvaluate=commands[commandCount-commandIndex];
+				if(commandIndex&&cursorPosition()) // NOTE using cursorPosition() is better than using accepthistorycommand (causing it!!)
+					pCommandToEvaluateToEvaluate=commands[commandCount-commandIndex];
+				*/
+
 				// if we succeeded in evaluating a command we should register it
 				if(pCommandToEvaluate!=NULL){
-					// typically the command will not evaluate if it is not complete
-					// in which case we should allow the user to correct it or make it complete
-					if(!evaluateCommand(pCommandToEvaluate))
-						outputInfo("Failed to evaluate the command! Complete, correct or discard the command please.");
-					else
-					// ASSERTION command to evaluate 
-					// if we fail to register the command we should attempt to get rid of the command (and the memory it occupies)
-					if(!registerCommand(pCommandToEvaluate)){
-						if(pCommand&&!clearCommand())
-							switchToControlMode("Switching to control mode, due to failing to register and clear the command.");
-						else
-							output("\n%s","WARNING: Failed to register the evaluated command. Out of memory?");
-					}else{ // command registered successfully, which means we have to keep its tokens (and not free them)
-						pCommand=NULL; // pointer is stored in memory, so we can get rid of the current command pointer!!
-						debugWrite("\n%s","Command pointer cleared.");
+					if(!evaluateCommand()){
+						output("\n%s","Failed to evaluate the command! Please complete, correct or cancel the command.");
+						continue;
 					}
-				}else{
-					// MDH@16APR2019: instead of telling the user that there's no command to evaluate (as we did before), we're switching to control mode
-					// replacing: output("\n%s","No command to evaluate.");
-					if(pCommand){
-						if(!clearCommand())output("\nWARNING: %s","Failed to clear the command pointer.");
-						pCommand=NULL;
-					}else // MDH@16APR2019: without a command to evaluate to start, we know nothing happened on the command line!!!
-					if(string_empty(behindCursorText))	
-						switchToControlMode("No command to evaluate!");
-				}
-				/* MDH@16MAR2019: preparation for the next command is not required here, it's better to do that at the beginning
-				                  of this outer loop
-				// prepare for accepting the next command
-				commandIndex=0; // MDH@16MAR2019: pretty essential otherwise it would keep evaluating previous commands
-				if(pCommand) // if we still have a command to free, free it entirely
-					if(!clearCommand())
-						switchToControlMode("Switching to control mode, due to failing to remove the command.");
-				*/
+					string_setlength(behindCursorText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
+					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
+					if(!registerCommand()){
+						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
+						if(commandIndex)
+							output("\n%s","ERROR: Failed to register the command again! Out of memory?");
+						else
+						if(freeToken(pCommandToEvaluate))
+							output("\n%s","ERROR: Failed to register the command! Out of memory?");
+						else
+							output("\n%s","ERROR: Failed to register and remove the command! Out of memory?");
+					}
+					// start anew (without a current command to evaluate!!!!)
+					pToken=pCommandToEvaluate=NULL; // remove reference to current command
+				}else
+				if(behindCursor()==0)
+					switchToControlMode(NULL);
 			}else
 			if(inputMode==IM_SHELL){
 				if(string_length(shellCommand))
 					executeShellCommand();
 				else // MDH@16APR2019: back to command mode
-					inputMode=IM_COMMAND;
+					switchToCommandMode();
 			}else // Return key in control mode, always to return to command input!!
-				inputMode=IM_COMMAND;
+				switchToCommandMode();
 		}
 	}
 	// 'normal' exit
