@@ -7,27 +7,39 @@ MDH@18APR2019:
   The pointer to the name of the variable/function does not need to be 
 */
 #include <math.h>
+#include <float.h>
 
 // Token and Mexpression is provided in Mexpression.h
 #include "Mexpression.h"
 
 // defining VALUE_TYPES as an enum defining all possible value types
-enum Mvaluetype {VT_NUMBER,VT_STRING,VT_LIST,VT_MAP};
+enum Mvaluetype {VT_INTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP};
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
-typedef union Mnumber{
-    long long l;
-    double d;
-}Mnumber;
+// TODO Minteger could become a union if we're storing multiple types of integers in it
+typedef struct Minteger{
+    long long ll; // signed 64-bit integer (for now)
+}Minteger;
 
-struct Mvaluelist;
-struct Mvaluemap;
+// TODO Mreal could become a union if we're storing multiple types of reals in it
+typedef struct Mreal{
+    long double ld; // double precision floating point binary number (for now)
+}Mreal;
+
+typedef struct Mstring{
+    char presuffix;
+    mstring* m;
+}Mstring;
+
+struct Mlist;
+struct Mmap;
 typedef union Mvalueunion{
-    Mnumber* n;
-    mstring* s;
-    struct Mvaluelist* vl;
-    struct Mvaluemap* vm;
+    Minteger* i;
+    Mreal* r;
+    Mstring* s;
+    struct Mlist* l;
+    struct Mmap* m;
 }Mvalueunion;
 
 // a Value is either a number (numeric literal), a string literal, a list of values or a map
@@ -38,28 +50,28 @@ typedef struct Mvalue{
     Mvalueunion value;
 }Mvalue;
 
-typedef struct Mvaluelistelement{
+typedef struct Mlistelement{
     Mvalue* mValue;
-    struct Mvaluelistelement* next;
-}Mvaluelistelement;
+    struct Mlistelement* next;
+}Mlistelement;
 
-typedef struct Mvaluelist{
-    Mvaluelistelement* first;
-    Mvaluelistelement* last;
-    uint32_t numberOfValues; // keep track of the total number of variables
-}Mvaluelist;
+typedef struct Mlist{
+    Mlistelement* first;
+    Mlistelement* last;
+    uint32_t numberOfElements; // keep track of the total number of elements
+}Mlist;
 
-typedef struct Mvaluemapelement{
+typedef struct Mmapelement{
     char* name;
     Mvalue* mValue;
-    struct Mvaluemapelement* next;
-}Mvaluemapelement;
+    struct Mmapelement* next;
+}Mmapelement;
 
-typedef struct Mvaluemap{
-    Mvaluemapelement* first;
-    Mvaluemapelement* last;
-    uint32_t numberOfValues; // keep track of the total number of variables
-}Mvaluemap;
+typedef struct Mmap{
+    Mmapelement* first;
+    Mmapelement* last;
+    uint32_t numberOfElements; // keep track of the total number of variables
+}Mmap;
 
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
 
@@ -75,7 +87,7 @@ typedef struct Mexpressionlist{
 
 // functions
 typedef struct Mfunction{
-    Mvaluemap* parameters; // a map of values defines the parameters and their default values (implicitly defining the expected types)
+    Mmap* parameters; // a map of values defines the parameters and their default values (implicitly defining the expected types)
     Mexpressionlist* body;
 }Mfunction;
 
@@ -95,11 +107,18 @@ typedef struct MfunctionMap{
 
 // an environment is a bag of variables and functions
 typedef struct Menvironment{
-    Mvaluemap* variableMap; // variables are stored by name
+    Mmap* variableMap; // variables are stored by name
     Mfunctionmap* functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
     struct Menvironment* parent;
 }Menvironment;
 
 // function prototypes
-bool addVariable(Menvironment* environment,char* name,enum Mvaluetype valueType);
+// read access
 uint32_t getNumberOfVariables(Menvironment* environment);
+mstring* getVariableNames(const Menvironment* environment,char* sep);
+// write access
+Mmapelement* addVariable(Menvironment* environment,char* name,enum Mvaluetype valueType);
+// if you want to set a value you have to pass in a pointer to the contents
+bool setValueOfRealVariable(Mmapelement* pVariable,Mreal* pMreal);
+bool setValueOfIntegerVariable(Mmapelement* pVariable,Minteger* pMinteger);
+

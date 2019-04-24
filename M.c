@@ -21,7 +21,7 @@ void debugWrite(const char* fmt,...){
     va_list args;
     va_start(args,fmt);
 	/*
-    time_t now; 
+    time_t now;
     char buffer[20];
     time(&now);
     strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",gmtime(&now));
@@ -36,18 +36,49 @@ void debugWrite(const char* fmt,...){
 // Mexecution includes mstring.h
 #include "Mexecution.h"
 
+// helper functions
+Mreal* getMreal(long double ld){
+	Mreal* pMreal=(Mreal*)malloc(sizeof(Mreal));
+	if(pMreal)pMreal->ld=ld;
+	return pMreal;
+}
+Minteger* getMinteger(long long ll){
+	Minteger* pMinteger=(Minteger*)malloc(sizeof(Minteger));
+	if(pMinteger)pMinteger->ll=ll;
+	return pMinteger;
+}
+/*
+Mvalueunion* getMNumberValueunion(Mnumber* pMnumber){
+	if(!pMnumber)return NULL;
+	Mvalueunion* pMnumberValueunion=(Mvalueunion*)malloc(sizeof(Mvalueunion));
+	if(pMnumberValueunion){pMnumberValueunion->n=pMnumber;} // store the Mnumber instance
+	return pMnumberValueunion; // redirection operator
+}
+bool initVariable(Menvironment* pMenvironment,char* name,double d){
+	Mvalueunion* pMValueunion=getMNumberValueUnion(getDoubleMnumber(d)); // dynamically allocated value union (i.e. on the heap)
+	return setVariableValue(addVariable(pMenvironment,name,VT_NUMBER),*pMValueunion); // pass the union itself (can you actually assign a union???)
+}
+*/
 // there will be a root (M) environment
-struct Menvironment* mEnvironment;
+
+const long double LD_PI=3.141592653589793238462643383279L; // 30 decimal digits of PI
+const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
+
+struct Menvironment* pMenvironment;
 bool initEnvironment(){
-	mEnvironment=calloc(1,sizeof(Menvironment));
-	if(mEnvironment){
-		Mvaluemap* environmentVariableMap=calloc(1,sizeof(Mvaluemap));
+	pMenvironment=calloc(1,sizeof(Menvironment));
+	if(pMenvironment){
+		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
 		if(environmentVariableMap){
-			mEnvironment->variableMap=environmentVariableMap;
+			pMenvironment->variableMap=environmentVariableMap;
+			// create and add PI and E constants!!!
+			if(!setValueOfRealVariable(addVariable(pMenvironment,"PI",VT_REAL),getMreal(LD_PI))){printf("\nERROR: Failed to add PI.");return false;}
+			if(!setValueOfRealVariable(addVariable(pMenvironment,"E",VT_REAL),getMreal(LD_E))){printf("\nERROR: Failed to add E.");return false;} 
+			///// which is: 2.71828182845904523536)); // MDH@24APR2019: this is an approximation but the next decimal digits is a 0 as in 0287471352662497757247 (before the next 0)
 			// we're going to store all commands in a list called M
-			if(addVariable(mEnvironment,"M",VT_LIST))
-				return true;
+			if(!addVariable(pMenvironment,"M",VT_LIST))return false;
 		}
+		return true;
 	}
 	return false;
 }
@@ -89,8 +120,73 @@ char* getFormattedText(char* fmt,uint8_t maxlength,...){
 	return str;
 }
 */
+
+/* source: https://stackoverflow.com/questions/16839658/printf-width-specifier-to-maintain-precision-of-floating-point-value
+#ifdef DBL_DECIMAL_DIG
+  #define OP_DBL_Digs (LDBL_DECIMAL_DIG)
+#else  
+  #ifdef DECIMAL_DIG
+    #define OP_DBL_Digs (LDECIMAL_DIG)
+  #else  
+    #define OP_DBL_Digs (LDBL_DIG + 3)
+  #endif
+#endif
+*/
+
+void outputVariables(){
+	// we're going to write all the variables and their values in the M environment
+	// this means iterating over the variables in the environment
+	Mmap* variableMap=pMenvironment->variableMap;
+	Mmapelement* variable=variableMap->first;
+	Mvalue* pMvalue;
+	Minteger* pMinteger;
+	Mreal* pMreal;
+	Mstring* pMstring;
+	Mlist* pMlist;
+	Mmap* pMmap;
+	long long ll;
+	long double ld;
+	output("\n%s:","Variables");
+	while(variable){
+		output(" %s",variable->name);
+		pMvalue=variable->mValue;
+		if(pMvalue){ // we're got a value to write
+			////outputChar(':');output("%i",pMvalue->type);outputChar('=');
+			switch(pMvalue->type){
+				case VT_INTEGER:
+					ll=pMvalue->value.i->ll;
+					output(":%lu=%ll",sizeof(ll),ll);
+					break;
+				case VT_REAL:
+					ld=pMvalue->value.r->ld;
+					output("=%.*Lf",LDBL_DIG,ld); // TODO how to determine the number of significant decimal digits (of my long double??)
+					break;
+				case VT_STRING:
+					pMstring=pMvalue->value.s;
+					output("=%c%s%c",pMstring->presuffix,string(pMstring->m),pMstring->presuffix); // wrap in single quotes (unless we put the quotes around the text as well, or we store the prefix/postfix char separately in Mstring)
+					break;
+				case VT_MAP:
+					pMmap=pMvalue->value.m;
+					outputChar('=');
+					outputChar('{');
+					// TODO write map elements
+					outputChar('}');
+					break;
+				case VT_LIST:
+					pMlist=pMvalue->value.l;
+					outputChar('=');
+					outputChar('[');
+					// TODO write list elements
+					outputChar(']');
+					break;
+			}
+		}
+		variable=variable->next;
+	}
+}
+
 // Edit flags
-bool accepthistorycommand=false; // whether to immediately accept a history command
+bool accepthistorycommand=true; // whether to immediately accept a history command
 bool matchparentheses=true;  // by default will 'match' parentheses
 
 #ifdef __DEBUG__
@@ -105,7 +201,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap - Options: eXit|History|Shell.","Shell mode: enter a system command to execute."};
+char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap|Use history command - Options: eXit|History|Shell.","Shell mode: enter a system command to execute."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -193,6 +289,13 @@ void clearDisplay(){outputControlText("2J");}
 void moveCursorLeft(uint16_t pos){if(pos)output(ES"%huD",pos);} // TODO can't use outputControlText here!!!
 void moveCursorRight(uint16_t pos){if(pos)output(ES"%huC",pos);} // TODO can't use outputControlText here!!!
 void clearScreenFromCursor(){outputControlText("J");}
+void beep(){outputChar('\a');}
+void removeLastCharacter(){outputChar('\b');}
+void hidecursor(){outputControlText("?25l");}
+void showcursor(){outputControlText("?25h");}
+void emptyline(){outputControlText("2K\r");}
+void backspace(){outputControlText("D"); /* go left one character */ outputControlText("K"); /* clear the rest of the line */}
+
 /* TODO are we using the storeCursor() and restoreCursor() sometime?
 // VT100 codes...
 void storeCursor(){printf("\0337");}
@@ -208,15 +311,19 @@ void setColorScheme(uint8_t newColorScheme){
 	/////// user will see!!!! output("\n%s\n>> ",(colorScheme?"Will assume dark background!":"Will assume white background!"));
 }
 
+void resetOutputColor(){setColor(INFO_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);}
+void outputLine(char* s){resetOutputColor();output("\n%s",s);} // for writing a single line of output text in the info color
+
+// M settings
 bool wrapMode=true; // by default use 'wrap' mode, not 'Origin' mode
 void setWrapMode(bool newWrapMode){
 	wrapMode=newWrapMode;
 	outputControlText(wrapMode?"?6l":"?7l"); // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
 	if(wrapMode)output("\nWrap mode enabled!\n");else output("\nWrap mode disabled!\n");
 }
-void displayFlags(){output("\nEdit flags: %c%c%c - Display flags: %c%c.",assisting?'A':'a',debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w',48+colorScheme);}
+void displayFlags(){output("\nEdit flags: %c%c%c%c - Display flags: %c%c.",assisting?'A':'a',debugging?'D':'d',matchparentheses?'M':'m',accepthistorycommand?'U':'u',wrapMode?'W':'w',48+colorScheme);}
 
-void outputFlags(){output("%c%c%c%c%c",assisting?'A':'a',(48+colorScheme),debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w');}
+void outputFlags(){output("%c%c%c%c%c%c",assisting?'A':'a',(48+colorScheme),debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w',accepthistorycommand?'U':'u');}
 
 void initDisplay(){
 	outputControlText("=3h"); // 80x25 color mode
@@ -224,18 +331,6 @@ void initDisplay(){
 	outputControlText("0m");
 	setColorScheme(colorScheme); // will also clear the display screen
 	setWrapMode(wrapMode);
-}
-
-void resetOutputColor(){setColor(INFO_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);}
-
-void beep(){outputChar('\a');}
-void removeLastCharacter(){outputChar('\b');}
-void hidecursor(){outputControlText("?25l");}
-void showcursor(){outputControlText("?25h");}
-void emptyline(){outputControlText("2K\r");}
-void backspace(){ // means go one position to the left on the current line, and clear the rest of the line
-	outputControlText("D"); // go left one character
-	outputControlText("K"); // clear the rest of the line
 }
 
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
@@ -305,10 +400,7 @@ void promptForUserInput(){
  *   ESC [nm enables rendition n (0=normal, 4=bold, 5=blinking, 7=reverse)
  *   ESC M scrolls the screen backwards if the cursor is on the top line
  */
-void outputText(char* fmt,char* text){	
-	resetOutputColor(); 
-	output(fmt,text);
-}
+void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
@@ -354,46 +446,38 @@ void outputLastTokenChar(Token* pToken){
 }
 /**
  * freeToken() frees the memory @pToken points to and returns true on successfully removing the entire chain of tokens it points to
- * will only return false if failing to actually free the token pointed to!!!
+ * @returns the previous token (as we need that )  
  */
-bool freeToken(Token* pToken){
-	if(pToken!=NULL){
-		// free text and next fields FIRST // NOTE apparently in C there's no need to test for the pointer being NULL as free() will do that for us
-		// next() first, because when that feels we still want the text to be around!!
-		// if pToken->next is NULL will return true so should be OK in that situation (we don't want to check twice)
-		// NOTE that we do not NULL the pointer anywhere, but the structure with the pointer is freed so the next field will not be around anymore!!
-		if(!freeToken(pToken->next))return false;
-		free(pToken->text);
-		free(pToken);
-	}
-	return true;
+Token* freeToken(Token* pToken){
+	if(!pToken)return NULL;
+	free(pToken->text); // free the (mstring) text (every new token should have a text it points to)
+	freeToken(pToken->next); // free all this token points to
+	Token* pPrevToken=pToken->prev; // remember what to return
+	free(pToken);
+	return pPrevToken;
 }
 
 // output functions that require access to the current token
-void toStartOfPreviousLine(){
-	oneLineUp();
-	toStartOfLine();
-	clearLine();
-	toStartOfLine();
-}
-void toStartOfNextLine(){
-	oneLineDown();
-	toStartOfLine();
-}
+void toStartOfPreviousLine(){oneLineUp();toStartOfLine();clearLine();toStartOfLine();}
+void toStartOfNextLine(){oneLineDown();toStartOfLine();}
 void toCursorPosition(){
 	moveCursorRight(promptLength+cursorPosition());
 	if(pToken)outputTokenColor(pToken); // return to the current token color
 }
+
 void outputInfo(const char* fmt,...){
 	if(strlen(fmt)){ // we have a format
-		toStartOfPreviousLine();
-		resetOutputColor(); // get the default output color!!
+		toStartOfPreviousLine();resetOutputColor(); // get the default output color!!
 		// NOTE we have to call vprintf here NOT printf!!!
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toStartOfNextLine();
-		toCursorPosition();
+		toStartOfNextLine();toCursorPosition();
 	}
 }
+void outputError(char* error){
+	if(!strlen(error))return;
+	toStartOfPreviousLine();setColor(ERROR_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);output("%s",error);toStartOfNextLine();toCursorPosition();
+}
+void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();toCursorPosition();}
 
 void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),commandLength());
@@ -537,8 +621,8 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:    ] }="}, /* EXPRESSION */ \
 {""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,"LEN.","["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
 {"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (               {"  }, /* INTEGER: (signless) list of digits */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   LE [ {"  }, /* REAL: part behind a decimal period */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
 {""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
 {""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
 {""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
@@ -595,23 +679,17 @@ bool continuesOperator(Token* pToken,char inputChar){
 }
 */
 // keep track of the state of entering a command
-
-void removeToken(){
+void removeToken(){		
 	// ASSERT pToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
-	Token* pPrevToken=pToken->prev;
-	Token* pNextToken=pToken->next; // remember the previous and next token (we have to link to each other)
-	// fix links
-	if(pPrevToken!=NULL)pPrevToken->next=pNextToken;
-	if(pNextToken!=NULL)pNextToken->prev=pPrevToken;
-	freeToken(pToken); // get rid of the token
-	pToken=pPrevToken; // replace pToken by the previous token
-	// TODO the following does not seem to work!!!!
-	if(pToken==NULL){
-		pCommandToEvaluate=NULL;
-#ifdef __DEBUG__
-		outputChar('Q');
-#endif
-	}
+	// NOTE if we call freeToken() to free this token all forwardly connected tokens are also freed, so pPrevToken->next should become NULL
+	pToken=freeToken(pToken); // pToken now equals its own previous token!!
+	if(pToken)pToken->next=NULL;else pCommandToEvaluate=NULL;
+}
+void unfinishToken(){
+	// for all non-unary token that we are in now that is finished, unfinish it!!
+	if(pToken->type!=TT_UNARY) // not a unary operator (of length 1) we ended up in
+		if(string_length(pToken->text)==pToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
+			pToken->significantCharacterCount=0;
 }
 char removedTokenCharacter(uint16_t behindCursor){
 #ifdef __DEBUG__
@@ -640,22 +718,40 @@ char removedTokenCharacter(uint16_t behindCursor){
 		outputChar(c);
 #endif		
 	if(c){
-		if(string_empty(pToken->text))
-			removeToken(); // the token could now be empty, in which case we should remove it from the command		else // we removed an actual token character, and we need to unfinish the token
-		// for all non-unary token that we are in now that is finished, unfinish it!!
-		if(pToken->type!=TT_UNARY) // not a unary operator (of length 1) we ended up in
-			if(string_length(pToken->text)==pToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
-				pToken->significantCharacterCount=0;
+		if(string_empty(pToken->text))removeToken(); // text now empty, remove the token entirely...
+		unfinishToken();
 	}
 	return c;
 }
 
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
-	if(pCommandToEvaluate==NULL)return false;
+	// 1. if no command nothing evaluated TODO don't call when this is the case though
+	if(pCommandToEvaluate==NULL){outputError("Nothing to evaluate!");return false;}
+	
+	// 2. if the last token is an error, can't evaluate (well, better not)
+	// TODO it makes sense to remove the error token
+	if(pToken->type==TT_ERROR){outputError("Can't evaluate erroneous command.");removeToken();unfinishToken();return false;}
+
+	// if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
+	if(pToken->type==TT_COMMENT)removeToken();
+
+	// 3. if the last token is an operator of sorts the command is incomplete
+	if(pToken->type<=8){outputError("Value behind operator at end of command missing.");return false;}
+
+	// 4. can't end with function of function call
+	if(pToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
+	if(pToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call.");return false;}
+	if(pToken->type==TT_LIST||pToken->type==TT_LISTELEMENT){outputError("Unfinished list.");return false;}
+	if(pToken->type==TT_DQSTRING||pToken->type==TT_SQSTRING){outputError("Unfinished string literal.");return false;}
+	if(pToken->type==TT_EXPRESSION){outputError("Unfinished expression.");return false;}
+	if(pToken->type==TT_MAP||pToken->type==TT_MAP_VALUE){outputError("Unfinished map.");return false;}
+
 	printf("\nEvaluating '");
 	Token* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
 	while(pCommandToken){
+		// if we bump into a comment we're done!!!
+		if(pCommandToken->type==TT_COMMENT)break;
 /*
 #ifdef __DEBUG__
 		printf("{%p}",pCommandToEvaluateToken);
@@ -684,19 +780,6 @@ void endOfUserInput(){
 	resetOutputColor();
 	output("\n\n%s\n\n","Thanks for using M.");
 	if(rawMode)disableRawMode();
-}
-
-// cursorLeft() will return the token under the cursor
-void cursorLeft(){
-	// ASSERT cursorPosition() is assumed to be positive
-	// MDH@27FEB2019: if we decide to move the text under the cursor into behindCursorText, this means removing the current token character
-	//                as before BUT removePreviousTokenCharacter() already does that, so
-	// MDH@24APR2019 obsolete: cursorPosition()--;
-	moveCursorLeft(1);
-}
-void cursorRight(){
-	// MDH@24APR2019 obsolete: cursorPosition()++;
-	moveCursorRight(1);
 }
 
 // MDH@24APR2019: writeCommand() writes the command to evaluate, and sets pToken in the process
@@ -805,7 +888,8 @@ void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
 	// replacing: restoreCursor();clearScreenFromCursor();
-	uint16_t cp=cursorPosition();while(cp--)backspace(); // MDH@24APR2019 replacing: while(cursorPosition()>0){cursorPosition()--;backspace();}
+	uint16_t cp=cursorPosition();
+	while(cp--)backspace(); // MDH@24APR2019 replacing: while(cursorPosition()>0){cursorPosition()--;backspace();}
 	/*
 	if(cursorPosition()>0){moveCursorLeft(cursorPosition());cursorPosition()=0;}
 	clearScreenFromCursor();
@@ -813,7 +897,7 @@ void backToPrompt(){
 	/* replacing:
 	while(characterCount>0){
 		characterCount--;
-		cursorLeft();resetOutputColor();outputChar(' ');cursorLeft();
+		moveCursorLeft(1);resetOutputColor();outputChar(' ');moveCursorLeft(1);
 	}
 	*/
 }
@@ -829,6 +913,8 @@ void setCommandToEvaluate(Token* pCommand){
  */
 void setCommandIndex(uint32_t newCommandIndex){
 	commandIndex=newCommandIndex;
+	// it's easier to go to the beginning of the line although we could be on the line below!!!!
+	// replacing: 
 	backToPrompt();
 	clearScreenFromCursor();
 	// MDH@24APR2019 obsolete: commandLength()=cursorPosition()=0; // do we need this????
@@ -838,9 +924,7 @@ void setCommandIndex(uint32_t newCommandIndex){
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		if(accepthistorycommand){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
 			setCommandToEvaluate(token);
-			char infoText[80];
-			snprintf(infoText,80,"Showing registered command #%u.",(commandCount-commandIndex+1));
-			outputInfo("%s",infoText);
+			outputInfo("Showing registered command #%u.",(commandCount-commandIndex+1));
 			return;
 		}
 		// the previous command will be used as behind cursor text!!
@@ -850,8 +934,8 @@ void setCommandIndex(uint32_t newCommandIndex){
 			token=token->next;
 		}
 	}
-	//////outputInfo("%s","");
 	setCommandToEvaluate(NULL);
+	clearInfo();
 	/////////////printf("(%d)",commandLength());
 }
 bool commandDown(){
@@ -953,7 +1037,7 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 		// MDH@24APR2019 obsolete: commandLength()--; // decrement the total command length
 		if(cursorPosition()==0)pCommandToEvaluate=NULL;
 		// on screen as well please
-		cursorLeft(); // will decrement cursorPosition() // MDH@24APR2019: NOT anymore...
+		moveCursorLeft(1); // will decrement cursorPosition() // MDH@24APR2019: NOT anymore...
 		clearScreenFromCursor(); // will clear what's behind the cursor
 		// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
 		writeBehindCursorText(false);
@@ -990,6 +1074,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	// if pToken is now NULL something went wrong (in copyCommand or newCommand most likely)
 	if(pToken==NULL)return false;
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
+	clearInfo(); // TODO make a separate function to do this???
 
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
 	if(inputCharType=='C'){
@@ -1177,18 +1262,25 @@ int main(int argc, char **argv){
 	prepareForUserInput(); // AFTER using the command-line parameters (will effectuate wrap mode and color scheme)
 
 	resetOutputColor(); // just in case
-	output("\n%s\n","Welcome to the M interpreter.");
-
-	if(!initEnvironment()){ // ascertain to have an execution environment!!!
-		output("\n%s","Failed to create the M execution environment!");
-		exit(1);
-	}
-	output("\nNumber of predefined variables: %d.",getNumberOfVariables(mEnvironment));
-	
+	output("\n%s\n","Welcome to M, the fancy interpreter.");
 	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
 	output("\n%s","In any mode press the Enter key on an empty line to switch modes.");
 	displayFlags();
 
+	if(!initEnvironment()){ // ascertain to have an execution environment!!!
+		setColor(ERROR_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);
+		output("\n%s","Exiting, due to failing to initialize the M execution environment!");
+		exit(1);
+	}
+
+	mstring* predefinedVariableNames=getVariableNames(pMenvironment,", ");
+	if(predefinedVariableNames){
+		output("\nPredefined variables: %s.",string(predefinedVariableNames));
+		free(predefinedVariableNames); // TODO or keep it around?????
+	}else
+		outputLine("No predefined variables!");
+	//////////output("\nNumber of predefined variables: %d.",getNumberOfVariables(mEnvironment));
+	
 	// initialize commands and input mode
 	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
 	behindCursorText=string_create(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
@@ -1218,7 +1310,7 @@ int main(int argc, char **argv){
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
 			// MDH@24APR2019: pCommandToEvaluate could be non-null if we failed to evaluate it (e.g. when being imcomplete), and we allow a retry
 			//                NOTE registered commands should always be successfully evaluated, so do NOT get rid of any pending command!!!!
-			if(pCommandToEvaluate){writeCommand();writeBehindCursorText(false);}
+			if(pCommandToEvaluate){writeCommand();writeBehindCursorText(false);}else string_setlength(behindCursorText,0);
 			/////////////// if(pCommandToEvaluate)clearCommand(); // TODO do we need this????
 			/* replacing:
 			if(pCommandToEvaluate==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
@@ -1347,8 +1439,8 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==65){ // up arrow 
 									if(inputMode==IM_COMMAND){ // i.e. show previous command if any
-										if(pCommandToEvaluate)
-											outputInfo("%s","Won't show previous commands when one is being entered.");
+										if(!commandIndex&&pCommandToEvaluate)
+											outputError("Won't show previous commands when one is being entered.");
 										else
 										if(!commandDown())
 											beep();
@@ -1363,8 +1455,8 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==66){ // down arrow
 									if(inputMode==IM_COMMAND){									
-										if(pCommandToEvaluate)
-											outputInfo("%s","Won't show next commands when one is being entered!");
+										if(!commandIndex&&pCommandToEvaluate)
+											outputError("Won't show next commands when one is being entered!");
 										else 
 										if(!commandUp())
 											beep();
@@ -1406,15 +1498,20 @@ int main(int argc, char **argv){
 											success=true;
 										}
 										if(success){
-											cursorLeft();
+											moveCursorLeft(1);
 											/* NO going back and forth with the cursor does NOT change commandLength()!!!!
 											commandLength()--; // MDH@28FEB2019: essential bro' otherwise when we go back to the end, cursorPosition() will stay below commandLength()
 											*/
 											// if the cursor position now matches the offset of the current token
 											// i.e. the current token is now empty!!!!
-											if(string_length(pToken->text)==0){
-												// we have to be careful here, because if this is the first token (and there's NO previous token), we should NOT NULL the token!!!
-												if(pToken->prev)pToken=pToken->prev;else pToken->type=TT_EXPRESSION;
+											if(!string_length(pToken->text)){
+												// we can check the offset to see if this is the first token, but pToken->prev is a little more secure
+												
+												if(pToken->prev){ // NOT the first token
+
+												}else{ // the first token
+													clearCommand();
+												}
 											}
 											writeBehindCursorText(false);
 										}else
@@ -1454,6 +1551,7 @@ int main(int argc, char **argv){
 					if(inputChar=='a'||inputChar=='A'){assisting=(inputChar=='A');output("\n%s",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
 					if(inputChar=='d'||inputChar=='D'){debugging=(inputChar=='D');output("\n%s",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
 					if(inputChar=='m'||inputChar=='M'){matchparentheses=(inputChar=='M');output("\n%s",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
+					if(inputChar=='u'||inputChar=='U'){accepthistorycommand=(inputChar=='U');output("\n%s",(accepthistorycommand?"Will use history command immediately!":"Will use history command in auto-completion!"));inputCharType='n';break;}
 					if(inputChar>='0'&&inputChar<='9'){setColorScheme(inputChar-'0');inputCharType='n';break;}
 					if(inputChar=='w'||inputChar=='W'){setWrapMode(inputChar=='W');inputCharType='n';break;}
 					// options
@@ -1468,6 +1566,9 @@ int main(int argc, char **argv){
 						}else
 							output("%s\n","No previous commands to show.");
 					}
+					if(inputChar=='v'||inputChar=='V'){
+						outputVariables();
+					}
 				}else
 					// user might have selected one of the commands (letter a through j)
 					commandPage=0; // stop paging
@@ -1477,7 +1578,7 @@ int main(int argc, char **argv){
 					uint16_t cp=cursorPosition();
 					if(cp){
 						if(string_removed_char(shellCommand,cp-1)){
-							cursorLeft();
+							moveCursorLeft(1);
 							writeBehindCursorText(false);
 						}else
 							switchToControlMode("Failed to remove the shell command character!");
@@ -1527,7 +1628,7 @@ int main(int argc, char **argv){
 											// TODO FIX this does not seem to be right!!!!!
 											if(behindCursor()){
 												// we could go one to the right and do a backspace!!
-												cursorRight();
+												moveCursorRight(1);
 												// TODO what to do here??? removePreviousTokenCharacter();
 											}else // nothing under the cursor to delete
 												beep();
@@ -1559,7 +1660,7 @@ int main(int argc, char **argv){
 										if(c){ // removing the character behind the cursor succeeded
 											// prefix it to behindCursorText
 											string_insert_char(behindCursorText,0,c);
-											cursorLeft();
+											moveCursorLeft(1);
 											writeBehindCursorText(false);
 										}else
 											switchToControlMode("Failed to move the cursor left.");
@@ -1606,7 +1707,7 @@ int main(int argc, char **argv){
 				// if we succeeded in evaluating a command we should register it
 				if(pCommandToEvaluate!=NULL){
 					if(!evaluateCommand()){
-						output("\n%s","Failed to evaluate the command! Please complete, correct or cancel the command.");
+						outputLine("Failed to evaluate the command! Please complete, correct or cancel the command.");
 						continue;
 					}
 					string_setlength(behindCursorText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
@@ -1614,12 +1715,12 @@ int main(int argc, char **argv){
 					if(!registerCommand()){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(commandIndex)
-							output("\n%s","ERROR: Failed to register the command again! Out of memory?");
+							outputLine("ERROR: Failed to register the command again! Out of memory?");
 						else
 						if(freeToken(pCommandToEvaluate))
-							output("\n%s","ERROR: Failed to register the command! Out of memory?");
+							outputLine("ERROR: Failed to register the command! Out of memory?");
 						else
-							output("\n%s","ERROR: Failed to register and remove the command! Out of memory?");
+							outputLine("ERROR: Failed to register and remove the command! Out of memory?");
 					}
 					// start anew (without a current command to evaluate!!!!)
 					pToken=pCommandToEvaluate=NULL; // remove reference to current command
