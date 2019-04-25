@@ -36,7 +36,7 @@ void debugWrite(const char* fmt,...){
 // Mexecution includes mstring.h
 #include "Mexecution.h"
 
-// helper functions
+// helper functions to wrap literals for storage in M
 Mreal* getMreal(long double ld){
 	Mreal* pMreal=(Mreal*)malloc(sizeof(Mreal));
 	if(pMreal)pMreal->ld=ld;
@@ -46,6 +46,17 @@ Minteger* getMinteger(long long ll){
 	Minteger* pMinteger=(Minteger*)malloc(sizeof(Minteger));
 	if(pMinteger)pMinteger->ll=ll;
 	return pMinteger;
+}
+// mstring* is assumed to start with the same prefix/suffix character
+Mstring* getMstring(mstring* s){
+	Mstring* pMstring=(s?(Mstring*)malloc(sizeof(Mstring)):NULL);
+	if(pMstring){
+		pMstring->presuffix=string_char(s,0);
+		pMstring->_m=string_create();
+		if(pMstring->_m==NULL)return NULL;
+		string_append(pMstring->_m,string_remainder(s,1)); // NOTE string_remainder might return NULL of course
+	}
+	return pMstring;
 }
 /*
 Mvalueunion* getMNumberValueunion(Mnumber* pMnumber){
@@ -70,7 +81,7 @@ bool initEnvironment(){
 	if(pMenvironment){
 		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
 		if(environmentVariableMap){
-			pMenvironment->variableMap=environmentVariableMap;
+			pMenvironment->_variableMap=environmentVariableMap;
 			// create and add PI and E constants!!!
 			if(!setValueOfRealVariable(addVariable(pMenvironment,"PI",VT_REAL),getMreal(LD_PI))){printf("\nERROR: Failed to add PI.");return false;}
 			if(!setValueOfRealVariable(addVariable(pMenvironment,"E",VT_REAL),getMreal(LD_E))){printf("\nERROR: Failed to add E.");return false;} 
@@ -133,23 +144,115 @@ char* getFormattedText(char* fmt,uint8_t maxlength,...){
 #endif
 */
 
+// whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
+mstring* getIntegerText(Minteger* _integer){
+	char integerText[80];snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
+	mstring* s=string_create();if(!string_append(s,integerText)){free(s);s=NULL;}
+	return s;
+}
+mstring* getRealText(Mreal* _real){
+	char realText[80];snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
+	mstring* s=string_create();if(!string_append(s,realText)){free(s);s=NULL;}
+	return s;
+}
+mstring* getStringText(Mstring* _string){
+	mstring* s=string_create();
+	if(!string_append_char(s,_string->presuffix)||!string_append(s,string(_string->_m))||!string_append_char(s,_string->presuffix)){free(s);s=NULL;}
+	return s;
+}
+mstring* getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
+mstring* getListText(Mlist* _list){
+	mstring* s=string_create();
+	if(s){
+		mstring* p=string_append_char(s,'['); // switch to using p in appends
+		Mvalue* _listelementValue;
+		Mlistelement* _listelement=_list->_first;
+		while(_listelement){
+			_listelementValue=_listelement->_value;
+			if(_listelementValue){
+				mstring* mapelementValueText=getValueText(_listelementValue);
+				if(!mapelementValueText)break; // too bad
+				p=string_append(p,string(mapelementValueText));
+				free(mapelementValueText); // release AFTER copying over
+			}
+			_listelement=_listelement->_next;
+			if(_listelement)p=string_append(p,", "); // additional space behind comma!!
+		}
+		p=string_append_char(p,']');
+		// if appending failed somewhere free s
+		if(!p){free(s);s=NULL;}
+	}
+	return s;
+}
+mstring* getMapText(Mmap* _map){
+	mstring* s=string_create();
+	if(s){
+		mstring* p=string_append_char(s,'{');
+		///printf("\n%s",string(p));
+		Mmapelement* _mapelement=_map->_first;
+		while(_mapelement){
+			///printf("\n%s","start");
+			Mvariable* _variable=_mapelement->_variable;
+			if(!_variable)continue;
+			p=string_append(p,_variable->name);
+			///printf("\n%s",string(p));
+			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+			mstring* mapelementValueText=getValueText(_variable->_value);
+			if(!mapelementValueText)continue;
+			p=string_append(p,string(mapelementValueText)); // append 
+			free(mapelementValueText); // release AFTER copying over
+			_mapelement=_mapelement->_next;
+			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
+			////printf("\n%s","next");
+		}
+		/////printf("\n%s(%d)",string(p),string_length(p));
+		p=string_append_char(p,'}');
+		/////printf("\n%s",string(p));
+		// if we failed, we have to free s here!!!
+		if(!p){free(s);s=NULL;}
+	}
+	return s;
+}
+
+const char* UNDEFINED_VALUETEXT="?"; // NOTE without the quotes that would surround an M string literal!!!
+
+mstring* getValueText(Mvalue* _value){
+	// NOTE whatever is returned should be freed
+	if(_value){
+		////////printf("\nTYPE: %d",_value->type);
+		switch(_value->type){
+			case VT_UNDEFINED:
+				break;
+			case VT_INTEGER:
+				return getIntegerText(_value->value._integer);
+			case VT_REAL:
+				return getRealText(_value->value._real);
+			case VT_STRING:
+				return getStringText(_value->value._string);
+			case VT_MAP:
+				return getMapText(_value->value._map);
+			case VT_LIST:
+				return getListText(_value->value._list);
+		}
+	}
+	return string_append(string_create(),UNDEFINED_VALUETEXT);
+}
 void outputVariables(){
+	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
+	mstring* variablesText=getMapText(pMenvironment->_variableMap);
+	output("\nVariables: %s.",string(variablesText));
+	free(variablesText);
+	/* replacing:
 	// we're going to write all the variables and their values in the M environment
 	// this means iterating over the variables in the environment
-	Mmap* variableMap=pMenvironment->variableMap;
-	Mmapelement* variable=variableMap->first;
-	Mvalue* pMvalue;
-	Minteger* pMinteger;
-	Mreal* pMreal;
-	Mstring* pMstring;
-	Mlist* pMlist;
-	Mmap* pMmap;
-	long long ll;
-	long double ld;
+	Mvariable* _variable;
 	output("\n%s:","Variables");
-	while(variable){
-		output(" %s",variable->name);
-		pMvalue=variable->mValue;
+	Mmap* _variableMap=pMenvironment->_variableMap;
+	Mmapelement* _variableMapelement=_variableMap->_first;
+	while(_variableMapelement){
+		_variable=_variableMapelement->_variable;
+		output(" %s=%s",_variableMapelement->name,getValueText(_variable->_value,undefinedValueText));
+		pMvalue=_variable->mValue;
 		if(pMvalue){ // we're got a value to write
 			////outputChar(':');output("%i",pMvalue->type);outputChar('=');
 			switch(pMvalue->type){
@@ -183,6 +286,7 @@ void outputVariables(){
 		}
 		variable=variable->next;
 	}
+	*/
 }
 
 // Edit flags
@@ -340,10 +444,10 @@ uint32_t commandIndex=0;
 mstring* behindCursorText=NULL; // MDH@27FEB2019: we keep track of the characters behind the cursor
 mstring* shellCommand=NULL;
 Token* pCommandToEvaluate=NULL;
-Token* pToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
+Token* pLastCommandToEvaluateToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
 
 // keeping track of both the cursor position and the total command length
-uint16_t cursorPosition(){return(inputMode==IM_COMMAND?(pToken?pToken->offset+string_length(pToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));}
+uint16_t cursorPosition(){return(inputMode==IM_COMMAND?(pLastCommandToEvaluateToken?pLastCommandToEvaluateToken->offset+string_length(pLastCommandToEvaluateToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));}
 uint16_t behindCursor(){return string_length(behindCursorText);}
 uint16_t commandLength(){return cursorPosition()+behindCursor();}
 
@@ -407,11 +511,11 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 // the list of token type ids in the corresponding order!!!
 const uint8_t TOKENTYPE_IDS[]={0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,0b1000000,0b11111111};
 
-void outputTokenColor(Token* pToken){
-	///////printf("[%d]",pToken->type);
+void outputTokenColor(Token* pLastCommandToEvaluateToken){
+	///////printf("[%d]",pLastCommandToEvaluateToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
 	setBackColor(BACKGROUND_COLORS[colorScheme]);
-	uint8_t tokentype_id=TOKENTYPE_IDS[pToken->type];
+	uint8_t tokentype_id=TOKENTYPE_IDS[pLastCommandToEvaluateToken->type];
 	///////printf("(%d)",tokentype_id);
 	switch(tokentype_id>>6){
 		case 0: // value token
@@ -433,27 +537,27 @@ void outputTokenColor(Token* pToken){
 			break;
 	}
 }
-void outputToken(Token* pToken){
-	outputTokenColor(pToken);
+void outputToken(Token* pLastCommandToEvaluateToken){
+	outputTokenColor(pLastCommandToEvaluateToken);
 	// if we allow comments in tokens we're in trouble!!!
-	output("%s",string(pToken->text));
+	output("%s",string(pLastCommandToEvaluateToken->text));
 	/////////if(assisting){resetOutputColor();outputChar('|');}
 }
-void outputLastTokenChar(Token* pToken){
-	///////outputTokenColor(pToken);
-	outputChar(string_last_char(pToken->text));
+void outputLastTokenChar(Token* pLastCommandToEvaluateToken){
+	///////outputTokenColor(pLastCommandToEvaluateToken);
+	outputChar(string_last_char(pLastCommandToEvaluateToken->text));
 	//////////resetOutputColor();
 }
 /**
- * freeToken() frees the memory @pToken points to and returns true on successfully removing the entire chain of tokens it points to
+ * freeToken() frees the memory @pLastCommandToEvaluateToken points to and returns true on successfully removing the entire chain of tokens it points to
  * @returns the previous token (as we need that )  
  */
-Token* freeToken(Token* pToken){
-	if(!pToken)return NULL;
-	free(pToken->text); // free the (mstring) text (every new token should have a text it points to)
-	freeToken(pToken->next); // free all this token points to
-	Token* pPrevToken=pToken->prev; // remember what to return
-	free(pToken);
+Token* freeToken(Token* pLastCommandToEvaluateToken){
+	if(!pLastCommandToEvaluateToken)return NULL;
+	free(pLastCommandToEvaluateToken->text); // free the (mstring) text (every new token should have a text it points to)
+	freeToken(pLastCommandToEvaluateToken->next); // free all this token points to
+	Token* pPrevToken=pLastCommandToEvaluateToken->prev; // remember what to return
+	free(pLastCommandToEvaluateToken);
 	return pPrevToken;
 }
 
@@ -462,7 +566,7 @@ void toStartOfPreviousLine(){oneLineUp();toStartOfLine();clearLine();toStartOfLi
 void toStartOfNextLine(){oneLineDown();toStartOfLine();}
 void toCursorPosition(){
 	moveCursorRight(promptLength+cursorPosition());
-	if(pToken)outputTokenColor(pToken); // return to the current token color
+	if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken); // return to the current token color
 }
 
 void outputInfo(const char* fmt,...){
@@ -483,7 +587,7 @@ void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),commandLength());
 	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 	if(debugging)
-		outputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pToken!=NULL?pToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
+		outputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 }
 
@@ -666,30 +770,30 @@ uint8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 // continuation of 2-character operators
 ////////const char* SECOND_OPERATOR_CHARACTERS[]={"=","=<>","=<>","|","&","*","/"};
 /* if we have a token representing an operator we can check whether a new character is acceptable as continuation
-bool continuesOperator(Token* pToken,char inputChar){
-	unsigned int l=string_get_length(pToken->text);
+bool continuesOperator(Token* pLastCommandToEvaluateToken,char inputChar){
+	unsigned int l=string_get_length(pLastCommandToEvaluateToken->text);
 	if(inputChar==ASSIGNMENT_CHARACTER){ // appending the 'assignment' operator
-		return(l==1||string_get_last_char(pToken->text)!=ASSIGNMENT_CHARACTER);
+		return(l==1||string_get_last_char(pLastCommandToEvaluateToken->text)!=ASSIGNMENT_CHARACTER);
 	}else{
 		if(l>1)return false; // cannot continue a two-character operator
 		// if subtype is assumed to represent the index into the first operator character set
-		unsigned int operatorType=pToken->type.subtype;
+		unsigned int operatorType=pLastCommandToEvaluateToken->type.subtype;
 		return(operatorType<=6&&strchr(SECOND_OPERATOR_CHARACTERS[operatorType],inputChar)!=NULL);
 	}
 }
 */
 // keep track of the state of entering a command
 void removeToken(){		
-	// ASSERT pToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
+	// ASSERT pLastCommandToEvaluateToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
 	// NOTE if we call freeToken() to free this token all forwardly connected tokens are also freed, so pPrevToken->next should become NULL
-	pToken=freeToken(pToken); // pToken now equals its own previous token!!
-	if(pToken)pToken->next=NULL;else pCommandToEvaluate=NULL;
+	pLastCommandToEvaluateToken=freeToken(pLastCommandToEvaluateToken); // pLastCommandToEvaluateToken now equals its own previous token!!
+	if(pLastCommandToEvaluateToken)pLastCommandToEvaluateToken->next=NULL;else pCommandToEvaluate=NULL;
 }
 void unfinishToken(){
 	// for all non-unary token that we are in now that is finished, unfinish it!!
-	if(pToken->type!=TT_UNARY) // not a unary operator (of length 1) we ended up in
-		if(string_length(pToken->text)==pToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
-			pToken->significantCharacterCount=0;
+	if(pLastCommandToEvaluateToken->type!=TT_UNARY) // not a unary operator (of length 1) we ended up in
+		if(string_length(pLastCommandToEvaluateToken->text)==pLastCommandToEvaluateToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
+			pLastCommandToEvaluateToken->significantCharacterCount=0;
 }
 char removedTokenCharacter(uint16_t behindCursor){
 #ifdef __DEBUG__
@@ -698,8 +802,8 @@ char removedTokenCharacter(uint16_t behindCursor){
 	uint16_t tokenCharacterPosition;
 	// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
 	while(true){
-		if(pToken==NULL)return '\0';
-		tokenCharacterPosition=string_length(pToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-pToken->offset;
+		if(pLastCommandToEvaluateToken==NULL)return '\0';
+		tokenCharacterPosition=string_length(pLastCommandToEvaluateToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-pLastCommandToEvaluateToken->offset;
 #ifdef __DEBUG__
 		printf("%d",tokenCharacterPosition);
 #endif
@@ -707,22 +811,132 @@ char removedTokenCharacter(uint16_t behindCursor){
 #ifdef __DEBUG__
 		outputChar('.');
 #endif		
-		pToken=pToken->prev;
+		pLastCommandToEvaluateToken=pLastCommandToEvaluateToken->prev;
 	}
 #ifdef __DEBUG__
 		printf("%d",tokenCharacterPosition-behindCursor);
 #endif	
 	// if failing to remove the character serious error
-	char c=string_removed_char(pToken->text,tokenCharacterPosition-behindCursor);
+	char c=string_removed_char(pLastCommandToEvaluateToken->text,tokenCharacterPosition-behindCursor);
 #ifdef __DEBUG__
 		outputChar(c);
 #endif		
 	if(c){
-		if(string_empty(pToken->text))removeToken(); // text now empty, remove the token entirely...
+		if(string_empty(pLastCommandToEvaluateToken->text))removeToken(); // text now empty, remove the token entirely...
 		unfinishToken();
 	}
 	return c;
 }
+
+// HERE THE EVALUATION OF EXPRESSIONS TAKE PLACE
+Mvalue* getListValue(Mlist* _list){
+	Mvalue* _listValue=(Mvalue*)calloc(1,sizeof(Mvalue*));
+	if(_listValue)_listValue->value._list=_list;
+	return _listValue;
+}
+
+typedef struct Mexpressionvalue{
+	Mvalue* _value;
+	Token* _token; // supposed to be the token the evaluation ended with (so the token in front of the first in the next evaluation)
+}Mexpressionvalue;
+
+Mexpressionvalue* getExpressionValue(Token* _offsetToken){
+	// typically the offset token determines what the expression ends with!!
+	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.         	
+	if(_offsetToken){
+		Mlist* _list;
+		Mmap* _map;
+		Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
+		enum TOKENTYPE_ENUM endTokenType=TT_COMMENT; // any comment will definitely end this expression
+		char tokenChar=string_char(_offsetToken->text,0);
+		if(tokenChar=='['){
+			_list=(Mlist*)calloc(1,sizeof(Mlist));
+			endTokenType=TT_END_OF_LIST;
+		}else
+		if(tokenChar=='{'){
+			_map=(Mmap*)calloc(1,sizeof(Mmap));
+			endTokenType=TT_END_OF_MAP;
+		}else 
+		if(tokenChar=='('){
+			_list=(Mlist*)calloc(1,sizeof(Mlist));
+			endTokenType=TT_END_OF_FUNCTION_CALL;
+		}
+
+		// the current expression value ends up as the first item in a list of expression arguments
+		Mlist* _expressionstack=(Mlist*)calloc(1,sizeof(Mlist));
+		
+		char* variableName=NULL; // keep track of the current variable name (that we might need when we run into an assignment)
+		char* variableOperator=NULL; // the variable operator applicable to the variable name (right behind the variable and possibly in front of the assignment operator)
+
+		// READY TO PROCESS THE TOKENS
+		Token* _token=_offsetToken->next; // the first token to process
+		while(_token&&_token->type!=endTokenType){
+
+			// values are easy, just push them on the expression stack
+			if(_token->type==TT_VARIABLE){
+				variableName=string(_token->text);
+			}else
+			if(_token->type<=8){
+			}
+			
+			if(_token->type==TT_LISTELEMENT){ // ends the current value
+
+			}
+			_token=_token->next;
+		}
+
+		// remember the token that stopped the evaluation (which might be NULL)
+		_expressionvalue->_token=_token;
+		switch(endTokenType){
+			case TT_END_OF_LIST:
+			case TT_END_OF_FUNCTION_CALL: // store the list we have been composing...
+				_expressionvalue->_value->type=VT_LIST;
+				_expressionvalue->_value->value._list=_list;
+				break;
+			case TT_END_OF_MAP: // store the map we composed...
+				_expressionvalue->_value->type=VT_MAP;
+				_expressionvalue->_value->value._map=_map;
+				break;
+		}
+		return _expressionvalue;
+	}
+	return NULL;
+}
+/**
+ * getExpressionValue() is the work horse for evaluating individual (simple i.e. non composite expressions) expressions 
+ * the first token is being passed in which of course should represent a value somehow, evaluateExpression needs 
+ */
+/*
+Mexpressionvalue* getFunctionValue(Token* _offsetToken,char* functionName){
+	if(_offsetToken&&functionName){
+		Mexpressionvalue* _functionExpressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
+		_functionExpressionvalue->_token=_offsetToken->next;
+		// pFirstToken is the first token in the argument list, arguments are separated by commas
+		// 1. compose the list of arguments
+		Mlist* arguments=(Mlist*)calloc(1,sizeof(Mlist*));
+		char* variableName=NULL; // keep track of the current variable name (that we might need when we run into an assignment)
+		char* variableOperator=NULL; // the variable operator applicable to the variable name (right behind the variable and possibly in front of the assignment operator)
+		while(pToken!=NULL){
+			if(pToken->type==TT_VARIABLE){
+				variableName=
+			}
+			pToken=pToken->next;
+		}
+		// 2. apply the function to the arguments and return it's result
+		if(functionName){
+		
+		}
+		// ASSERT if we get here arguments is the result
+		if(arguments->numberOfElements){ 
+			// we have arguments left
+			if(arguments->numberOfElements==1)return arguments->_first->_value; // the first argument's value is the result
+			// wrap the list in an Mvalue!!
+			return getListValue(arguments);
+	}
+	// no result!!!
+	return NULL;
+}
+*/
 
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
@@ -731,23 +945,23 @@ bool evaluateCommand(){
 	
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
-	if(pToken->type==TT_ERROR){outputError("Can't evaluate erroneous command.");removeToken();unfinishToken();return false;}
+	if(pLastCommandToEvaluateToken->type==TT_ERROR){outputError("Can't evaluate erroneous command.");removeToken();unfinishToken();return false;}
 
 	// if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
-	if(pToken->type==TT_COMMENT)removeToken();
+	if(pLastCommandToEvaluateToken->type==TT_COMMENT)removeToken();
 
 	// 3. if the last token is an operator of sorts the command is incomplete
-	if(pToken->type<=8){outputError("Value behind operator at end of command missing.");return false;}
+	if(pLastCommandToEvaluateToken->type<=8){outputError("Value behind operator at end of command missing.");return false;}
 
 	// 4. can't end with function of function call
-	if(pToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
-	if(pToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call.");return false;}
-	if(pToken->type==TT_LIST||pToken->type==TT_LISTELEMENT){outputError("Unfinished list.");return false;}
-	if(pToken->type==TT_DQSTRING||pToken->type==TT_SQSTRING){outputError("Unfinished string literal.");return false;}
-	if(pToken->type==TT_EXPRESSION){outputError("Unfinished expression.");return false;}
-	if(pToken->type==TT_MAP||pToken->type==TT_MAP_VALUE){outputError("Unfinished map.");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call.");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_LIST||pLastCommandToEvaluateToken->type==TT_LISTELEMENT){outputError("Unfinished list.");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_DQSTRING||pLastCommandToEvaluateToken->type==TT_SQSTRING){outputError("Unfinished string literal.");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_EXPRESSION){outputError("Unfinished expression.");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_MAP||pLastCommandToEvaluateToken->type==TT_MAP_VALUE){outputError("Unfinished map.");return false;}
 
-	printf("\nEvaluating '");
+	printf("\n%s","'");
 	Token* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
 	while(pCommandToken){
 		// if we bump into a comment we're done!!!
@@ -761,7 +975,13 @@ bool evaluateCommand(){
 		if(assisting)output("(%s) ",TOKENTYPE_STRING[pCommandToken->type]);
 		pCommandToken=pCommandToken->next;
 	}
-	printf("'");
+	// evaluating means getting the value of the expression that pCommandToEvaluate points to
+	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
+	Mexpressionvalue* _commandExpressionvalue=getExpressionValue(pCommandToEvaluate);
+	if(_commandExpressionvalue)
+		output("' evaluates to: '%s'.",getValueText(_commandExpressionvalue->_value));
+	else
+		output("' is undefined!");
 	return true;
 }
 
@@ -782,8 +1002,8 @@ void endOfUserInput(){
 	if(rawMode)disableRawMode();
 }
 
-// MDH@24APR2019: writeCommand() writes the command to evaluate, and sets pToken in the process
-void writeCommand(){Token* token=pCommandToEvaluate;while(token){outputToken(pToken=token);token=token->next;}}
+// MDH@24APR2019: writeCommand() writes the command to evaluate, and sets pLastCommandToEvaluateToken in the process
+void writeCommand(){Token* token=pCommandToEvaluate;while(token){outputToken(pLastCommandToEvaluateToken=token);token=token->next;}}
 
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
 uint32_t commandPages=0; // the total number of command pages
@@ -818,15 +1038,15 @@ char* removedRestOfCommand(){
 	if(cursorPosition()<commandLength()){
 		mstring* restOfCommand=string_create();
 		if(restOfCommand!=NULL){
-			uint16_t tokenPosition=cursorPosition()-pToken->offset;
-			if(tokenPosition)string_append(restOfCommand,string_remainder(pToken->text,tokenPosition));
-			string_setlength(pToken->text,tokenPosition); // the new length of the token (cutting off what's behind it)
+			uint16_t tokenPosition=cursorPosition()-pLastCommandToEvaluateToken->offset;
+			if(tokenPosition)string_append(restOfCommand,string_remainder(pLastCommandToEvaluateToken->text,tokenPosition));
+			string_setlength(pLastCommandToEvaluateToken->text,tokenPosition); // the new length of the token (cutting off what's behind it)
 			// now to append the text in the rest of the tokens
-			Token* token=pToken->next;
+			Token* token=pLastCommandToEvaluateToken->next;
 			if(token!=NULL){
-				while(token!=NULL){string_append(restOfCommand,string(pToken->text));token=token->next;}
-				freeToken(token); // we'll free all the token starting at the successor of pToken
-				pToken->next=NULL;
+				while(token!=NULL){string_append(restOfCommand,string(pLastCommandToEvaluateToken->text));token=token->next;}
+				freeToken(token); // we'll free all the token starting at the successor of pLastCommandToEvaluateToken
+				pLastCommandToEvaluateToken->next=NULL;
 			}
 			outputInfo("Rest of command: '%s'.",string(restOfCommand));
 			return string(restOfCommand);
@@ -836,22 +1056,22 @@ char* removedRestOfCommand(){
 } 
 */
 /*
-void writeRestOfCommand(){ // writes rest of command assuming pToken is not NULL and we are to return to the current cursor position adterwards!!
+void writeRestOfCommand(){ // writes rest of command assuming pLastCommandToEvaluateToken is not NULL and we are to return to the current cursor position adterwards!!
 	uint16_t leftToWrite=commandLength()-cursorPosition();
 	if(leftToWrite>0){ // something left to write
 		// something of the current token to write?
-		if(cursorPosition()>pToken->offset){ // part of current token to write
-			outputTokenColor(pToken);printf("%s",string_remainder(pToken->text,cursorPosition()-pToken->offset));
+		if(cursorPosition()>pLastCommandToEvaluateToken->offset){ // part of current token to write
+			outputTokenColor(pLastCommandToEvaluateToken);printf("%s",string_remainder(pLastCommandToEvaluateToken->text,cursorPosition()-pLastCommandToEvaluateToken->offset));
 		}
 		// write the rest of the tokens
-		writeTokens(pToken->next);
+		writeTokens(pLastCommandToEvaluateToken->next);
 		moveCursorLeft(leftToWrite);
 	}
 }
 */
 bool clearCommand(){
 	bool result=freeToken(pCommandToEvaluate);
-	pToken=pCommandToEvaluate=NULL;
+	pLastCommandToEvaluateToken=pCommandToEvaluate=NULL;
 	return result;
 }
 
@@ -880,7 +1100,7 @@ void writeBehindCursorText(bool clearAfterBehindCursorText){
 		}else
 		if(l)
 			moveCursorLeft(l); // back to where we started to write the behind cursor text
-		if(pToken)outputTokenColor(pToken); // return to the color of the current token
+		if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken); // return to the color of the current token
 	}
 }
 
@@ -903,7 +1123,7 @@ void backToPrompt(){
 }
 
 void setCommandToEvaluate(Token* pCommand){
-	pToken=pCommandToEvaluate=pCommand;
+	pLastCommandToEvaluateToken=pCommandToEvaluate=pCommand;
 	writeCommand();
 	writeBehindCursorText(false);
 }
@@ -953,31 +1173,31 @@ bool commandUp(){
 void newCommand(){
 	// MDH@24APR2019 obsolete: commandLength()=string_length(behindCursorText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
-	pToken=pCommandToEvaluate=newToken(NULL);
+	pLastCommandToEvaluateToken=pCommandToEvaluate=newToken(NULL);
 }
 
 void copyCommand(){
-	// if fails to copy pCommandToEvaluate pToken should end up as NULL
-	pToken=NULL;
-	Token* pTokenToCopy=pCommandToEvaluate;
+	// if fails to copy pCommandToEvaluate pLastCommandToEvaluateToken should end up as NULL
+	pLastCommandToEvaluateToken=NULL;
+	Token* pLastCommandToEvaluateTokenToCopy=pCommandToEvaluate;
 	pCommandToEvaluate=NULL;
-	// the essence is that pToken points to the last token in pCommandToEvaluate
+	// the essence is that pLastCommandToEvaluateToken points to the last token in pCommandToEvaluate
 	Token* pCommandCopy=NULL;
-	// NOTE theoretically pToken could be NULL due to newToken() failing to create a new token
-	while(pTokenToCopy){
-		pToken=newToken(pToken);
-		pToken->type=pTokenToCopy->type;
-		pToken->significantCharacterCount=pTokenToCopy->significantCharacterCount;
+	// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to newToken() failing to create a new token
+	while(pLastCommandToEvaluateTokenToCopy){
+		pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
+		pLastCommandToEvaluateToken->type=pLastCommandToEvaluateTokenToCopy->type;
+		pLastCommandToEvaluateToken->significantCharacterCount=pLastCommandToEvaluateTokenToCopy->significantCharacterCount;
 		// if failing to copy the text over get rid of the command constructed so far, and break
-		if(!string_copy(pTokenToCopy->text,pToken->text)){pToken=NULL;break;}
-		// MDH@24APR2019 obsolete: commandLength()+=string_length(pToken->text);
+		if(!string_copy(pLastCommandToEvaluateTokenToCopy->text,pLastCommandToEvaluateToken->text)){pLastCommandToEvaluateToken=NULL;break;}
+		// MDH@24APR2019 obsolete: commandLength()+=string_length(pLastCommandToEvaluateToken->text);
 		// some additional fields to copy over (NOT the offset is that is set automatically)
 #ifdef __DEBUG__
-        printf("%d:%s",pToken->type,string(pToken->text));
+        printf("%d:%s",pLastCommandToEvaluateToken->type,string(pLastCommandToEvaluateToken->text));
 #endif
-		if(!pCommandToEvaluate)pCommandToEvaluate=pToken;
+		if(!pCommandToEvaluate)pCommandToEvaluate=pLastCommandToEvaluateToken;
 		// get the next token to copy...
-		pTokenToCopy=pTokenToCopy->next;
+		pLastCommandToEvaluateTokenToCopy=pLastCommandToEvaluateTokenToCopy->next;
 	}
 }
 
@@ -1002,27 +1222,27 @@ void setCommand(Token* pNewCommand){
 	// NO we cannot assume that because there might be a command currently showing at the prompt
 	if(pCommandToEvaluate){clearCommand();backToPrompt();} // if we have a command get rid of it and ascertain to be at the prompt!!
 	// the problem is that we do NOT want to actually change the new command, so we have to copy it somehow
-	newCommandToEvaluate(); // NOTE might fail, in which case pToken will be NULL!!
+	newCommandToEvaluate(); // NOTE might fail, in which case pLastCommandToEvaluateToken will be NULL!!
 	if(pNewCommand){ // something to copy
-		// at least once we need to set pToken!!!
+		// at least once we need to set pLastCommandToEvaluateToken!!!
 		Token* pNewToken=pNewCommand; // first token to copy!!
-		// NOTE theoretically pToken could be NULL due to newToken() failing to create a new token
-		while(pToken){
+		// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to newToken() failing to create a new token
+		while(pLastCommandToEvaluateToken){
 			// if failing to copy the text over get rid of the command constructed so far, and break
-			if(!string_copy(pNewToken->text,pToken->text)){clearCommand();break;}
-			// MDH@24APR2019 obsolete: commandLength()+=string_length(pToken->text);
+			if(!string_copy(pNewToken->text,pLastCommandToEvaluateToken->text)){clearCommand();break;}
+			// MDH@24APR2019 obsolete: commandLength()+=string_length(pLastCommandToEvaluateToken->text);
 			// some additional fields to copy over (NOT the offset is that is set automatically)
-			pToken->type=pNewToken->type;
+			pLastCommandToEvaluateToken->type=pNewToken->type;
 #ifdef __DEBUG__
-            printf("%d:%s",pToken->type,string(pToken->text));
+            printf("%d:%s",pLastCommandToEvaluateToken->type,string(pLastCommandToEvaluateToken->text));
 #endif
 			pNewToken=pNewToken->next;
 			if(!pNewToken)break;
 			// we're going to need another token!!!
-			pToken=newToken(pToken);
+			pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
 		}
 		// if the user decides to start typing ascertain to show it in the right color!!
-		if(pToken)outputTokenColor(pToken);
+		if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken);
 #ifdef __DEBUG__
 		echoCommand();
 #endif
@@ -1061,7 +1281,7 @@ void outputTokenInfo(){
 bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
 
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
-//       		  ASSERTION pCommandToEvaluate and pToken are  NOT  NULL
+//       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
 //                the endofinput flag is used to indicate whether this is the end of the input
 bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput){
 	// MDH@21APR2019: there are two situation where we need to get a command
@@ -1071,19 +1291,19 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	else // we have a current command BUT 
 	if(commandIndex)
 		copyCommand();
-	// if pToken is now NULL something went wrong (in copyCommand or newCommand most likely)
-	if(pToken==NULL)return false;
+	// if pLastCommandToEvaluateToken is now NULL something went wrong (in copyCommand or newCommand most likely)
+	if(pLastCommandToEvaluateToken==NULL)return false;
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	clearInfo(); // TODO make a separate function to do this???
 
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
 	if(inputCharType=='C'){
-		pToken->type^=0x70; // toggling bit 7
+		pLastCommandToEvaluateToken->type^=0x70; // toggling bit 7
 		// a comment character will NEVER change the (actual) token type but it should change the color to use
-		if(pToken->type&0x70){commenting=true;outputTokenColor(pToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
+		if(pLastCommandToEvaluateToken->type&0x70){commenting=true;outputTokenColor(pLastCommandToEvaluateToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
 	}else // not a comment character
-	if((pToken->type&0x70)==0){ // not in a comment
-		if(notCommenting){notCommenting=false;outputTokenColor(pToken);} // if behind coming out of a comment, we have to reset the output token color
+	if((pLastCommandToEvaluateToken->type&0x70)==0){ // not in a comment
+		if(notCommenting){notCommenting=false;outputTokenColor(pLastCommandToEvaluateToken);} // if behind coming out of a comment, we have to reset the output token color
 	*/
 	/*
 	// MDH@26FEB2019: when a user starts inserting characters instead of appending them we can cut off the rest of the characters in the command
@@ -1092,76 +1312,76 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	*/
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
-	if((TOKENTYPE_IDS[pToken->type]&0x62)==0x62)if(inputChar==string_char(pToken->text,0))inputCharacterType='R';
+	if((TOKENTYPE_IDS[pLastCommandToEvaluateToken->type]&0x62)==0x62)if(inputChar==string_char(pLastCommandToEvaluateToken->text,0))inputCharacterType='R';
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
-	if(inputCharacterType=='W')if(pToken->type==TT_ERROR||pToken->type==TT_COMMENT||pToken->type==TT_DQSTRING||pToken->type==TT_SQSTRING)inputCharacterType='w';
+	if(inputCharacterType=='W')if(pLastCommandToEvaluateToken->type==TT_ERROR||pLastCommandToEvaluateToken->type==TT_COMMENT||pLastCommandToEvaluateToken->type==TT_DQSTRING||pLastCommandToEvaluateToken->type==TT_SQSTRING)inputCharacterType='w';
 	if(inputCharacterType!='W'){ // only characters that are not whitespace can start a new token
-		int16_t newTokenType=nextTokenType(pToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		int16_t newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 	resetOutputColor();
-	printf("[%d+%c->%d]",pToken->type,inputCharacterType,newTokenType);
-	outputTokenColor(pToken);
+	printf("[%d+%c->%d]",pLastCommandToEvaluateToken->type,inputCharacterType,newTokenType);
+	outputTokenColor(pLastCommandToEvaluateToken);
 #endif
 		// some combinations are (still) not allowed...
-		if(newTokenType==pToken->type){
+		if(newTokenType==pLastCommandToEvaluateToken->type){
 			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators
-			if(pToken->type!=TT_UNARY&&pToken->type!=TT_TERNARY_aeru&&pToken->significantCharacterCount>0)newTokenType=TT_ERROR;
+			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->significantCharacterCount>0)newTokenType=TT_ERROR;
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
-			if(inputCharacterType=='='&&pToken->type==TT_ASSIGNMENT&&(pToken->prev->type==TT_BINARY_AeRu||pToken->prev->type==TT_BINARY_Aeru))newTokenType=TT_ERROR;
+			if(inputCharacterType=='='&&pLastCommandToEvaluateToken->type==TT_ASSIGNMENT&&(pLastCommandToEvaluateToken->prev->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->prev->type==TT_BINARY_Aeru))newTokenType=TT_ERROR;
 		}
-		if(newTokenType!=pToken->type||pToken->significantCharacterCount>0){
+		if(newTokenType!=pLastCommandToEvaluateToken->type||pLastCommandToEvaluateToken->significantCharacterCount>0){
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
 			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
-			///////if(!isBinaryOperatorTokenType(pToken->type)||!isBinaryOperatorTokenType(newTokenType))
+			///////if(!isBinaryOperatorTokenType(pLastCommandToEvaluateToken->type)||!isBinaryOperatorTokenType(newTokenType))
 
 			// MDH@16APR2019: a character that is assumed to indicate the assignment operator has to be checked because it could well be the = that starts the binary equality operator
 			//                which means we have to switch from assignment token to BearU token (which is unfinished)
 			if(newTokenType==TT_ASSIGNMENT){
 				// checking for validity of accepting as assignment is not that easy
 				// we can allow a binary operator in front of the assignment of course in that case it definitely is an assignment if it is not the = is an error!!
-				bool behindBinaryOperator=(pToken->type==TT_BINARY_AeRu||pToken->type==TT_BINARY_Aeru);
-				// NOTE if behind binary operator there must always be a token in front of it, so pTokenToCheck cannot be NULL!!
-				Token* pTokenToCheck=(behindBinaryOperator?pToken->prev:pToken);
-				// ASSERT pTokenToCheck should either represent a variable or the end of a list element to allow for operator
-				if(pTokenToCheck->type==TT_END_OF_LIST){ // end of a list
+				bool behindBinaryOperator=(pLastCommandToEvaluateToken->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->type==TT_BINARY_Aeru);
+				// NOTE if behind binary operator there must always be a token in front of it, so pLastCommandToEvaluateTokenToCheck cannot be NULL!!
+				Token* pLastCommandToEvaluateTokenToCheck=(behindBinaryOperator?pLastCommandToEvaluateToken->prev:pLastCommandToEvaluateToken);
+				// ASSERT pLastCommandToEvaluateTokenToCheck should either represent a variable or the end of a list element to allow for operator
+				if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST){ // end of a list
 					// we have to find the associated start of the list, and the token in front of that (which should be a variable!!!)
 					// unfortunately we might come across other list and we need to skip them
 					int listCounter=1;
-					while(listCounter>0){pTokenToCheck=pTokenToCheck->prev;if(pTokenToCheck==NULL)break;if(pTokenToCheck->type==TT_END_OF_LIST)listCounter++;else if(pTokenToCheck->type==TT_LIST||pTokenToCheck->type==TT_LISTELEMENT)listCounter--;}
+					while(listCounter>0){pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;if(pLastCommandToEvaluateTokenToCheck==NULL)break;if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST)listCounter++;else if(pLastCommandToEvaluateTokenToCheck->type==TT_LIST||pLastCommandToEvaluateTokenToCheck->type==TT_LISTELEMENT)listCounter--;}
 				}
 				// two options: = behind a binary operator without variable (or list element) in front of it is not allowed, i.e. an error, otherwise we assume that = represents the first = of == the equality operator...
-				if(pTokenToCheck==NULL||(pTokenToCheck->type!=TT_VARIABLE&&pTokenToCheck->type!=TT_LISTELEMENT))newTokenType=(behindBinaryOperator?TT_ERROR:TT_BINARY_aErU);
+				if(pLastCommandToEvaluateTokenToCheck==NULL||(pLastCommandToEvaluateTokenToCheck->type!=TT_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_LISTELEMENT))newTokenType=(behindBinaryOperator?TT_ERROR:TT_BINARY_aErU);
 			}
 
-			pToken=newToken(pToken);
+			pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
 /*
 #ifdef __DEBUG__
-			printf("@%p=%p?:%s",pCommandToEvaluate,pToken,string(pCommandToEvaluate->text));
+			printf("@%p=%p?:%s",pCommandToEvaluate,pLastCommandToEvaluateToken,string(pCommandToEvaluate->text));
 #endif
 */
-			pToken->type=newTokenType;
-			if(pToken->type==TT_UNARY)pToken->significantCharacterCount=1;
+			pLastCommandToEvaluateToken->type=newTokenType;
+			if(pLastCommandToEvaluateToken->type==TT_UNARY)pLastCommandToEvaluateToken->significantCharacterCount=1;
 			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
-			if(pToken->significantCharacterCount==0)
-				if(pToken->type!=TT_ERROR&&pToken->type!=TT_COMMENT&&pToken->type!=TT_DQSTRING&&pToken->type!=TT_SQSTRING)
+			if(pLastCommandToEvaluateToken->significantCharacterCount==0)
+				if(pLastCommandToEvaluateToken->type!=TT_ERROR&&pLastCommandToEvaluateToken->type!=TT_COMMENT&&pLastCommandToEvaluateToken->type!=TT_DQSTRING&&pLastCommandToEvaluateToken->type!=TT_SQSTRING)
 					if(inputCharacterType=='('||inputCharacterType=='['||inputCharacterType=='{'||inputCharacterType==','||inputCharacterType==';'||inputCharacterType==':'||inputCharacterType=='?')
-						pToken->significantCharacterCount=1;
+						pLastCommandToEvaluateToken->significantCharacterCount=1;
 			// TODO should we write the associated colors here?????
-			outputTokenColor(pToken);
+			outputTokenColor(pLastCommandToEvaluateToken);
 		}
 	}else // a functional whitespace character, ends a current token!!
-	if(pToken->significantCharacterCount==0&&pToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
-		pToken->significantCharacterCount=string_length(pToken->text);
+	if(pLastCommandToEvaluateToken->significantCharacterCount==0&&pLastCommandToEvaluateToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+		pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
 
-	// append the typed character at cursorPosition() minus current token offset in pToken->text
-	string_append_char(pToken->text,inputChar);
+	// append the typed character at cursorPosition() minus current token offset in pLastCommandToEvaluateToken->text
+	string_append_char(pLastCommandToEvaluateToken->text,inputChar);
 #ifdef __DEBUG__
-	printf("[%s]",string(pToken->text));
+	printf("[%s]",string(pLastCommandToEvaluateToken->text));
 #endif
 	// MDH@24APR2019 obsolete: commandLength()++; // increment total command length
-	outputChar(inputChar); ///////// replacing: outputLastTokenChar(pToken); // echo the last token character
+	outputChar(inputChar); ///////// replacing: outputLastTokenChar(pLastCommandToEvaluateToken); // echo the last token character
 	
 	if(endOfInput){
 		//////if(assisting)output(":%c",inputCharacterType);
@@ -1172,7 +1392,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 
 	if(endOfInput){
 		// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
-		if(pToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+		if(pLastCommandToEvaluateToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
 		// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 		if(matchparentheses){
 			if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
@@ -1321,13 +1541,13 @@ int main(int argc, char **argv){
 		// which used to be: writeCommand(); // write the current command (if any)
 
 		/* replacing:
-		pToken=pCommandToEvaluate;
+		pLastCommandToEvaluateToken=pCommandToEvaluate;
 		// an existing command to show
-		while(pToken!=NULL){
-			outputToken(pToken);
+		while(pLastCommandToEvaluateToken!=NULL){
+			outputToken(pLastCommandToEvaluateToken);
 			// the cursor will move along with every printf()
-			cursorPosition()+=string_length(pToken->text);
-			pToken=pToken->next;
+			cursorPosition()+=string_length(pLastCommandToEvaluateToken->text);
+			pLastCommandToEvaluateToken=pLastCommandToEvaluateToken->next;
 		}
 		*/
 		// we do NOT need a command until after the first character which makes sense because we allow ` and arrow up and down to switch to option mode or select another command
@@ -1504,10 +1724,10 @@ int main(int argc, char **argv){
 											*/
 											// if the cursor position now matches the offset of the current token
 											// i.e. the current token is now empty!!!!
-											if(!string_length(pToken->text)){
-												// we can check the offset to see if this is the first token, but pToken->prev is a little more secure
+											if(!string_length(pLastCommandToEvaluateToken->text)){
+												// we can check the offset to see if this is the first token, but pLastCommandToEvaluateToken->prev is a little more secure
 												
-												if(pToken->prev){ // NOT the first token
+												if(pLastCommandToEvaluateToken->prev){ // NOT the first token
 
 												}else{ // the first token
 													clearCommand();
@@ -1534,7 +1754,7 @@ int main(int argc, char **argv){
 						// if commandIndex we should one of the registered commands
 						setCommand(commandIndex?commands[commandCount-commandIndex]:NULL); // will also set commandLength()!!!
 					// if still NULL (also when we fail to actually create a new first command token)
-					if(pToken!=NULL){
+					if(pLastCommandToEvaluateToken!=NULL){
 						if(!commandCharacterAccepted(inputChar,inputCharType,true))
 							switchToControlMode("Failed to accept the character.");
 					}else
@@ -1547,13 +1767,14 @@ int main(int argc, char **argv){
 				outputChar(inputChar); // nice to see the character we typed...
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
-					// flags
+					// single character responses (and out again)
 					if(inputChar=='a'||inputChar=='A'){assisting=(inputChar=='A');output("\n%s",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
 					if(inputChar=='d'||inputChar=='D'){debugging=(inputChar=='D');output("\n%s",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
 					if(inputChar=='m'||inputChar=='M'){matchparentheses=(inputChar=='M');output("\n%s",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
 					if(inputChar=='u'||inputChar=='U'){accepthistorycommand=(inputChar=='U');output("\n%s",(accepthistorycommand?"Will use history command immediately!":"Will use history command in auto-completion!"));inputCharType='n';break;}
 					if(inputChar>='0'&&inputChar<='9'){setColorScheme(inputChar-'0');inputCharType='n';break;}
 					if(inputChar=='w'||inputChar=='W'){setWrapMode(inputChar=='W');inputCharType='n';break;}
+					if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
 					// options
 					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
 					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
@@ -1564,10 +1785,7 @@ int main(int argc, char **argv){
 							commandPages=1+(commandCount-1)/10;
 							showNextCommandPage(); // as soon as commandPage>0 we are paging...
 						}else
-							output("%s\n","No previous commands to show.");
-					}
-					if(inputChar=='v'||inputChar=='V'){
-						outputVariables();
+							output("\n%s\n","No previous commands to show.");
 					}
 				}else
 					// user might have selected one of the commands (letter a through j)
@@ -1695,7 +1913,7 @@ int main(int argc, char **argv){
 					// MDH@22MAR2019: currently the first token is an EXPRESSION token
 					if(cursorPosition()>string_length(pCommandToEvaluate->text)){
 						// finish the last token???
-						if(pToken->significantCharacterCount==0)pToken->significantCharacterCount=string_length(pToken->text);
+						if(pLastCommandToEvaluateToken->significantCharacterCount==0)pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
 						pCommandToEvaluateToEvaluate=pCommandToEvaluate; // but only when not at start of command!!!
 						if(debugging)outputTokenInfo();
 					}
@@ -1723,7 +1941,7 @@ int main(int argc, char **argv){
 							outputLine("ERROR: Failed to register and remove the command! Out of memory?");
 					}
 					// start anew (without a current command to evaluate!!!!)
-					pToken=pCommandToEvaluate=NULL; // remove reference to current command
+					pLastCommandToEvaluateToken=pCommandToEvaluate=NULL; // remove reference to current command
 				}else
 				if(behindCursor()==0)
 					switchToControlMode(NULL);

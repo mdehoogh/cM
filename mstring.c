@@ -43,7 +43,7 @@ bool string_copy(mstring* src,mstring* dst){
 
 /** Free the memory associated with a String */
 void string_dispose(mstring *str){
-    if(str!= NULL){
+    if(str!=NULL){
         free(str->chars);
         free(str);
     }
@@ -51,9 +51,12 @@ void string_dispose(mstring *str){
 
 /** Is the String empty? */
 bool string_empty(mstring *str){
+    return(str==NULL||str->chars[0]=='\0'); // MDH@25APR2019: checking the first character probably is easiest
+    /* replacing:
     if(str==NULL)return true;
     if(str->length==0)return true;
     return false;
+    */
 }
 
 uint16_t string_length(mstring* str){
@@ -94,65 +97,71 @@ char string_removed_char(mstring* str,uint16_t pos){
     return rc;
 }
 
-/** insert char c at position pos in the given string */
-void string_insert_char(mstring* str,uint16_t pos,char c){
+/** 
+ * insert char c at position pos in the given string 
+ * NOTE: returns NULL on failure, @str otherwise 
+ */
+mstring* string_insert_char(mstring* str,uint16_t pos,char c){
     if(str!=NULL){
         uint16_t l=str->length+1; // the 'length' of the text plus 1
-       // pos should never be larger than l
+        // pos should never be larger than l
         if(pos<l){
             if(pos<l-1){ // a true insert, i.e. NOT replacing the last character!!
                 ////////printf("{%hu-%d}",l,str->blocks);
                 // do we need to get another block?    
                 if(l==str->blocks*BLOCK_SIZE){
                     char *new_str=realloc(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars));
-                    if (new_str!=NULL){
-                        ++(str->blocks);
-                        ////// can't know the size of what new_str points to!!! printf("YY%lu-%dYY",sizeof(new_str),str->blocks);
-                        str->chars=new_str;
-                    }
+                    if (new_str==NULL)return NULL;
+                    ++(str->blocks);
+                    ////// can't know the size of what new_str points to!!! printf("YY%lu-%dYY",sizeof(new_str),str->blocks);
+                    str->chars=new_str;
                 }
-                if(l<str->blocks*BLOCK_SIZE){
-                    ///printf("%s",str->chars);
-                    // we have to move characters at position pos onward one position up
-                    while(l>pos){str->chars[l]=str->chars[l-1];l--;}
-                    str->chars[pos]=c;
-                    ///printf("->%s",str->chars);
-                    ++(str->length);
-                }
+                if(l>=str->blocks*BLOCK_SIZE)return NULL;
+                ///printf("%s",str->chars);
+                // we have to move characters at position pos onward one position up
+                while(l>pos){str->chars[l]=str->chars[l-1];l--;}
+                str->chars[pos]=c;
+                ///printf("->%s",str->chars);
+                ++(str->length);
             }else // at end, we have to call string_append_char because str->last_char will change
-                string_append_char(str,c);
+            if(string_append_char(str,c)==NULL)return NULL;
         }
     }
+    return str;
 }
 
-/** Add a character to the end of the String */
-void string_append_char(mstring *str,char c){
+/** 
+ * Add a character to the end of the String 
+ * NOTE: returns NULL on failure
+ */
+mstring* string_append_char(mstring* str,char c){
     if(str!=NULL){
         uint16_t l=str->length+1;
         /////printf("{%hu-%d}",l,str->blocks);
         if(l==str->blocks*BLOCK_SIZE){
             char *new_str=realloc(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars));
-            if (new_str!=NULL){
-                ++(str->blocks);
-                ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);
-                str->chars=new_str;
-            }
+            if (new_str==NULL)return NULL; // failure!!
+            ++(str->blocks);
+            ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);
+            str->chars=new_str;
         }
-        if(l<str->blocks*BLOCK_SIZE){
-            str->chars[str->length]=c;
-            ++(str->length);
-            str->chars[str->length]='\0';
-        }
+        if(l>=str->blocks*BLOCK_SIZE)return NULL;
+        str->chars[str->length]=c;
+        ++(str->length);
+        str->chars[str->length]='\0';
     }
+    return str;
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array
-void string_append(mstring* str,char* pc){
-    if(str==NULL)return;
-    char c;
-    uint16_t index=0;
-    while((c=pc[index++]))string_append_char(str,c);
-    /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
+mstring* string_append(mstring* str,const char* pc){
+    if(str!=NULL&&pc!=NULL){ // something to append
+        char c;
+        uint16_t index=0;
+        while((c=pc[index++]))if(string_append_char(str,c)==NULL)return NULL;
+        /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
+    }
+    return str;
 }
 
 char* string_remainder(mstring* str,uint16_t firstpos){
@@ -163,8 +172,8 @@ char* string_remainder(mstring* str,uint16_t firstpos){
 }
 
 /** Get a C-String with the proper null-terminator */
-char* string(mstring *str){
-    char *res=NULL;
+char* string(mstring* str){
+    char *res=NULL; 
     if (str!=NULL){
         res=str->chars;
         /*

@@ -21,19 +21,23 @@ void string_dispose(mstring* str);
 bool string_empty(mstring* str);
 uint16_t string_length(mstring* str);
 bool string_setlength(mstring* str, uint16_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
+
 char string_char(mstring* str,uint16_t pos);
 char string_last_char(mstring* str);
+
 char* string_remainder(mstring* str,uint16_t pos);
 char* string(mstring* str);
+
 int16_t string_find(mstring* str,char c);
 
 // changing the string
 char string_removed_char(mstring* str,uint16_t pos);
-void string_insert_char(mstring* str,uint16_t pos,char c);
-void string_append_char(mstring* str,char c);
+
+mstring* string_insert_char(mstring* str,uint16_t pos,char c);
+mstring* string_append_char(mstring* str,char c);
 
 // MDH@26FEB2019: can we append a text as a whole???
-void string_append(mstring* str,char* pc);
+mstring* string_append(mstring* str,const char* pc);
 
 // copying 
 bool string_copy(mstring* src,mstring* dst);
