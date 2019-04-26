@@ -11,13 +11,9 @@
 mstring* string_create(){
     mstring* ans=calloc(1,sizeof *ans);
     if(ans!=NULL){
-        ans->length=0;
-        ans->blocks=0;
+        // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         ans->chars=malloc(BLOCK_SIZE*sizeof *(ans->chars));
-        if(ans->chars!=NULL){
-            ans->blocks=1;
-            ans->chars[0]='\0'; // end of character string!!
-        }
+        if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
     return ans;
 }
@@ -41,13 +37,10 @@ bool string_copy(mstring* src,mstring* dst){
     return false;
 }
 
-/** Free the memory associated with a String */
-void string_dispose(mstring *str){
-    if(str!=NULL){
-        free(str->chars);
-        free(str);
-    }
-}
+/** 
+ * Free the memory associated with a String
+ */
+void string_dispose(mstring* str){if(str){if(str->chars)free(str->chars);free(str);}}
 
 /** Is the String empty? */
 bool string_empty(mstring *str){
@@ -165,31 +158,21 @@ mstring* string_append(mstring* str,const char* pc){
 }
 
 char* string_remainder(mstring* str,uint16_t firstpos){
-    if(firstpos==0)return string(str);
-    if(str==NULL)return NULL;
+    if(!str)return NULL;
+    if(!firstpos)return string(str);
     if(firstpos>str->length)return NULL;
     return str->chars+firstpos;
 }
 
-/** Get a C-String with the proper null-terminator */
-char* string(mstring* str){
-    char *res=NULL; 
-    if (str!=NULL){
-        res=str->chars;
-        /*
-        res=malloc((str->length+1)*sizeof *str->chars);
-        if(res!=NULL){
-            memcpy(res,str->chars,str->length);
-            res[str->length]='\0';
-        }
-        */
-    }
-    return res;
-}
+/** 
+ * Get a C-String with the proper null-terminator 
+ * NOTE: returning the pointer to the characters stored in the mstring (which is str->chars)
+*/
+char* string(mstring* str){return (str?str->chars:NULL);}
 
 /** Get where the first occurrence of a character in the String is */
 int16_t string_find(mstring *str,char c){
-    if(str!=NULL){
+    if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
         int16_t pos=0; // first character to check
         while(pos<str->length){ // still within the text

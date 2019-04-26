@@ -48,10 +48,11 @@ Mvariable* createVariable(char* name,enum Mvaluetype valueType){
         _variable->name=name;
         _variable->_value=NULL;
         if(valueType!=VT_UNDEFINED){
-            _variable->_value=(Mvalue*)malloc(sizeof(Mvalue));
-            if(_variable->_value!=NULL){
+            _variable->_value=(Mvalue*)calloc(1,sizeof(Mvalue));
+            if(_variable->_value){
                 _variable->_value->type=valueType;
                 // I do NOT need to set the values of the atomic elements (integer, real), so basically these are not initialized to start with
+                // NOTE using calloc() instead of malloc() is essential for everything with pointers in it that should be NULL initially!!
                 switch(valueType){
                     case VT_UNDEFINED:
                     case VT_INTEGER:
@@ -141,4 +142,49 @@ bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string){
     if(_variableValue->type!=VT_STRING)return false; // wrong type!!!
     _variableValue->value._string=_string;
     return true;
+}
+
+// functions
+// the internal functions (from math) can be registered with a given (most likely root) environment
+// these internal functions do NOT have a body as M defined functions have...
+void registerInternalFunctions(Menvironment* _environment){
+
+}
+
+Mfunction* getFunction(Menvironment* _environment,char* functionName){
+    if(_environment&&functionName&&strlen(functionName)){
+        Mfunctionmap* _functionmap=_environment->_functionMap;
+        if(_functionMap){
+            Mfunctionmapelement* _functionMapelement=_functionmap->_first;
+            while(_functionMapelement&&!strcmp(_functionMapelement->_function->name,functionName))
+                _functionMapelement=_functionMapelement->_next;
+            if(_functionMapelement)return _functionMapelement->_function;
+        }
+    }
+    return NULL;    
+}
+
+Mmap* getFunctionCallArgumentMap(Mfunction* _function,Mlist* _argumentList){
+    if(_function){
+        Mmap* _argumentMap=(Mmap*)calloc(1,sizeof(Mmap));
+        Mmap* _functionParameterMap=_function->_parameterMap;
+        Mmapelement* _functionParameterMapelement=_functionParameterMap->_first;
+        Mvalue* _argumentListelement=_argumentList->_first;
+        while(_functionParameterMapelement){
+            _argumentMapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            _argumentMapelement->name=_functionParameterMapelement->name;
+            // associate the argument list element value (if available)
+            if(_argumentListelement){
+                _argumentMapelement->_value=_argumentListelement;
+                _argumentListelement=_argumentListelement->next;
+            }else // use the default!!!
+                _argumentMapelement->_value=_functionParameterMapelement->_value;
+            // append to _argumentMap
+            if(_argumentMap->last)_argumentMap->last->next=_argumentMapelement;else _argumentMap->first=_argumentMapelement;
+            _argumentMap->last=_argumentMapelement;_argumentMap->numberOfElements++;
+            _functionParameterMapelement=_functionParameterMapelement->_next;
+        }
+        return _argumentMap;
+    }
+    return NULL;
 }

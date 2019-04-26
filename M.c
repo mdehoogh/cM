@@ -840,7 +840,82 @@ typedef struct Mexpressionvalue{
 	Token* _token; // supposed to be the token the evaluation ended with (so the token in front of the first in the next evaluation)
 }Mexpressionvalue;
 
-Mexpressionvalue* getExpressionValue(Token* _offsetToken){
+// helper function to get an expression value of hold a value of a specific type
+Mexpressionvalue* getExpressionvalueOfType(enum Mvaluetype valuetype){
+	Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue));
+	// allocate the value to hold, if a composite type (map or list), initialize the map and list to an empty map or list (integer, real and string are not set in advance)
+	if(valuetype!=VT_UNDEFINED){
+		Mvalue* _value=(Mvalue*)calloc(1,sizeof(Mvalue));_value->type=valuetype;
+		switch(_value->type){
+			case VT_INTEGER:_value->value._integer=(Minteger*)calloc(1,sizeof(Minteger));break; // initialized to 0 I presume
+			case VT_REAL:_value->value._real=(Mreal*)calloc(1,sizeof(Mreal));break; // initialized to 0.0 I presume
+			case VT_LIST:_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
+			case VT_MAP:_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
+			default:break;
+		}
+		_expressionvalue->_value=_value;
+	}
+	return _expressionvalue;
+}
+
+Mexpressionvalue* getExpressionvalue(Token* _offsetToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getExpressionValue() so we can call it from getListValue() and getMapValue()
+Mexpressionvalue* getListExpressionvalue(Token* _firstToken){
+	Mexpressionvalue* _listExpressionValue=getExpressionvalueOfType(VT_LIST);
+	Mlist* _list=_listExpressionValue->_value->value._list; // grab the list to fill
+	Token* _token=_firstToken;
+	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
+	// NOTE a list can be empty in which case _firstToken will immediately be of type TT_END_OF_LIST
+	while(_token&&_token->type!=TT_END_OF_LIST){
+		// get the next list element value
+		Mexpressionvalue* _listElementExpressionvalue=getExpressionvalue(_token,(enum TOKENTYPE_ENUM[]){TT_END_OF_LIST,TT_LISTELEMENT},2);
+		_token=_listElementExpressionvalue->_token; // update the current token
+		Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement)); // NOTE no need to set _next because it is now NULL
+		_listelement->_value=_listElementExpressionvalue->_value; // store the _value pointer of the attributeValueExpressionvalue
+		if(_list->numberOfElements)_list->_last->_next=_listelement;else _list->_first=_listelement;
+		_list->_last=_listelement;_list->numberOfElements++;
+	}
+	_listExpressionValue->_token=_token;
+	return _listExpressionValue;
+}
+Mexpressionvalue* getMapExpressionvalue(Token* _firstToken){
+	Mexpressionvalue* _mapExpressionValue=getExpressionvalueOfType(VT_MAP);
+	Mmap* _map=_mapExpressionValue->_value->value._map; // grab the map to fill
+	Token* _token=_firstToken;
+	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
+	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
+	// NOTE a map can be empty in which case _firstToken will immediately be of type TT_END_OF_MAP
+	while(_token&&_token->type!=TT_END_OF_MAP){
+		// get the next attribute name, value pair
+		// obviously the name should be something that evaluates to a string
+		Mexpressionvalue* _attributeNameExpressionvalue=getExpressionvalue(_token,(enum TOKENTYPE_ENUM[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
+		_token=_attributeNameExpressionvalue->_token; // update the current token
+		if(_attributeNameExpressionvalue->_token->type==TT_END_OF_MAP)break;
+		// for now let's decide to simply not store the attribute if the name is not of type string
+		if(_attributeNameExpressionvalue->_token->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
+		Mexpressionvalue* _attributeValueExpressionvalue=getExpressionvalue(_token,(enum TOKENTYPE_ENUM[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
+		_token=_attributeValueExpressionvalue->_token; // update the current token
+		char* attributeName=getValueText(_attributeNameExpressionvalue->_value); // parse the attribute name value 
+		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
+		Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
+		_mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
+		_mapelement->_variable->name=attributeName; // TODO do we need to free attributeName here, NO I don't think so!!!
+		_mapelement->_variable->_value=_attributeValueExpressionvalue->_value; // store the _value pointer of the attributeValueExpressionvalue
+		if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
+		_map->_last=_mapelement;_map->numberOfElements++;
+	}
+	_mapExpressionValue->_token=_token;
+	return _mapExpressionValue;
+}
+/**
+ * MDH@Jacky=65yrs:
+ * getExpressionValue() returns the value of the tokens behind _offsetToken together with the token that ends the expression in an Mexpressionvalue*
+ * the general idea is to make it recursive so it delegates getting specific subvalues from getExpressionValue()
+ * let's analyze evaluating an expression:
+ * an expression 'evaluates' to a value means that we have to apply functions (or unary operators) to arguments, and binary operators to arguments as well
+ * this value can also be a composite value like a list or a map, nevertheless a list or a map is a single value
+ * it makes sense to delegate getting a list or a map literal to another function
+ */
+Mexpressionvalue* getExpressionvalue(Token* _offsetToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount){
 	// typically the offset token determines what the expression ends with!!
 	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.         	
 	if(_offsetToken){
@@ -849,19 +924,19 @@ Mexpressionvalue* getExpressionValue(Token* _offsetToken){
 		Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
 		enum TOKENTYPE_ENUM endTokenType=TT_COMMENT; // any comment will definitely end this expression
 		char tokenChar=string_char(_offsetToken->text,0);
-		if(tokenChar=='['){
+		// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
+		if(tokenChar=='['){ // constructing a list
 			_list=(Mlist*)calloc(1,sizeof(Mlist));
 			endTokenType=TT_END_OF_LIST;
 		}else
-		if(tokenChar=='{'){
+		if(tokenChar=='{'){ // constructing a map
 			_map=(Mmap*)calloc(1,sizeof(Mmap));
 			endTokenType=TT_END_OF_MAP;
-		}else 
-		if(tokenChar=='('){
+		}else
+		if(tokenChar=='('){ // constructing an (argument) list
 			_list=(Mlist*)calloc(1,sizeof(Mlist));
 			endTokenType=TT_END_OF_FUNCTION_CALL;
 		}
-
 		// the current expression value ends up as the first item in a list of expression arguments
 		Mlist* _expressionstack=(Mlist*)calloc(1,sizeof(Mlist));
 		
@@ -870,8 +945,10 @@ Mexpressionvalue* getExpressionValue(Token* _offsetToken){
 
 		// READY TO PROCESS THE TOKENS
 		Token* _token=_offsetToken->next; // the first token to process
-		while(_token&&_token->type!=endTokenType){
-
+		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
+		while(_token){
+			// does this token end the expression????
+			endTokenTypeIndex=endTokenTypeCount;while(--endTokenTypeIndex>=0&&_token->type!=endTokenTypes[endTokenTypeIndex]);if(endTokenTypeIndex)break;
 			// values are easy, just push them on the expression stack
 			if(_token->type==TT_VARIABLE){
 				variableName=string(_token->text);
@@ -887,17 +964,6 @@ Mexpressionvalue* getExpressionValue(Token* _offsetToken){
 
 		// remember the token that stopped the evaluation (which might be NULL)
 		_expressionvalue->_token=_token;
-		switch(endTokenType){
-			case TT_END_OF_LIST:
-			case TT_END_OF_FUNCTION_CALL: // store the list we have been composing...
-				_expressionvalue->_value->type=VT_LIST;
-				_expressionvalue->_value->value._list=_list;
-				break;
-			case TT_END_OF_MAP: // store the map we composed...
-				_expressionvalue->_value->type=VT_MAP;
-				_expressionvalue->_value->value._map=_map;
-				break;
-		}
 		return _expressionvalue;
 	}
 	return NULL;
@@ -977,7 +1043,7 @@ bool evaluateCommand(){
 	}
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
-	Mexpressionvalue* _commandExpressionvalue=getExpressionValue(pCommandToEvaluate);
+	Mexpressionvalue* _commandExpressionvalue=getExpressionvalue(pCommandToEvaluate,(enum TOKENTYPE_ENUM[]){},0);
 	if(_commandExpressionvalue)
 		output("' evaluates to: '%s'.",getValueText(_commandExpressionvalue->_value));
 	else
