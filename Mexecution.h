@@ -1,4 +1,7 @@
 /**
+ * MDH@29APR2019:
+ * - every struct that allocates dynamic memory needs to have an explicit free function, otherwise you could free a pointer to it without freeing internal pointers
+ * 
  * MDH@25APR2019:
  * - all M<something>* fields will be called _<something> so _ is like short for pointer to M<something>
  *
@@ -93,14 +96,33 @@ typedef struct Mexpressionlist{
     Mexpressionlistelement* _last;
 }Mexpressionlist;
 
-// functions
+// functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
+typedef Mvalue* (*NoArgumentFunction)(void);
+typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
+typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
+
+typedef enum Mfunctiontype{FT_M,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
+
+typedef struct Mfunctiondefinition{
+    Mmap* _parameterMap;
+    Mexpressionlist* _expressionlist;
+}Mfunctiondefinition;
+
+typedef union Mfunctionunion{
+    NoArgumentFunction noArgumentFunction;
+    OneArgumentFunction oneArgumentFunction;
+    TwoArgumentFunction twoArgumentFunction;
+    Mfunctiondefinition* _functiondefinition; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
+}Mfunctionunion;
+
 typedef struct Mfunction{
+    mstring* _name;
     Mmap* _parameterMap; // a map of values defines the parameters and their default values (implicitly defining the expected types)
-    Mexpressionlist* _body;
+    Mfunctiontype type; // whether internal or external
+    Mfunctionunion functionunion; // where either the internal function to call with the arguments is placed or 
 }Mfunction;
 
 typedef struct Mfunctionmapelement{
-    mstring* _name;
     Mfunction* _function;
     struct Mfunctionmapelement* _next;
 }Mfunctionmapelement;
@@ -109,6 +131,7 @@ typedef struct MfunctionMap{
     Mfunctionmapelement* _first;
     Mfunctionmapelement* _last;
 }Mfunctionmap;
+
 //Mvalue* getFunction(Mfunctionlist functionlist,char* name);
 
 // environments
@@ -119,6 +142,32 @@ typedef struct Menvironment{
     Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
     struct Menvironment* _parent;
 }Menvironment;
+
+// pointer to these structs releasers
+void free_string(Mstring* _string);
+void free_value(Mvalue* _value);
+void free_listelement(Mlistelement* listelement);
+void free_list(Mlist* _list);
+void free_variable(Mvariable* _variable);
+void free_mapelement(Mmapelement* _mapelement);
+void free_map(Mmap* _map);
+void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement);
+void free_expressionlist(Mexpressionlist* _expressionlist);
+void free_functiondefinition(Mfunctiondefinition* _functiondefinition);
+// NOTE typically you're not supposed to free internal functions safe M function definitions 
+bool free_function(Mfunction* _function);
+bool free_functionmapelement(Mfunctionmapelement* _functionmapelement);
+void free_functionmap(Mfunctionmap* _functionmap);
+void free_environment(Menvironment* _environment);
+
+// helper function
+Mreal* get_real(long double ld);
+Mvalue* getRealValue(Mreal* _real);
+Minteger* get_integer(long long ll);
+Mvalue* getIntegerValue(Minteger* _integer);
+// mstring* is assumed to start with the same prefix/suffix character
+Mstring* get_string(mstring* s);
+Mvalue* getStringValue(Mstring* _string);
 
 // function prototypes
 // read access
@@ -134,3 +183,9 @@ bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real);
 bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer);
 bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string);
 
+// functions
+Mfunction* newFunction(Menvironment* _environment,const char* functionName);
+void registerInternalFunctions(Menvironment* _environment);
+// helper function to return the function
+Mfunction* getFunction(Menvironment* _environment,const char* functionName);
+Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);

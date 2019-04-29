@@ -40,7 +40,7 @@ bool string_copy(mstring* src,mstring* dst){
 /** 
  * Free the memory associated with a String
  */
-void string_dispose(mstring* str){if(str){if(str->chars)free(str->chars);free(str);}}
+void free_mstring(mstring* str){if(str){if(str->chars)free(str->chars);free(str);}}
 
 /** Is the String empty? */
 bool string_empty(mstring *str){

@@ -1,4 +1,176 @@
+#include <math.h>
 #include "Mexecution.h"
+
+// RELEASERS
+// however we can only NULL them if we have the address of the pointer)
+// but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
+void free_string(Mstring* _string){
+    if(_string){if(_string->_m)free_mstring(_string->_m);_string->_m=NULL;free(_string);}
+}
+void free_value(Mvalue* _value){
+    if(_value){
+        // I do not need to free the value itself, only the pointers inside it
+        switch(_value->type){
+            case VT_UNDEFINED:break;
+            case VT_INTEGER:if(_value->value._integer)free(_value->value._integer);break;
+            case VT_REAL:if(_value->value._real)free(_value->value._real);break;
+            case VT_STRING:free_string(_value->value._string);break;
+            case VT_LIST:free_list(_value->value._list);break;
+            case VT_MAP:free_map(_value->value._map);break;
+        }
+        free(_value);
+    }
+}
+void free_listelement(Mlistelement* _listelement){
+    if(_listelement){
+        if(_listelement->_next)free_listelement(_listelement->_next);
+        free_value(_listelement->_value);
+        free(_listelement);
+    }
+}
+void free_list(Mlist* _list){
+    if(_list){
+        if(_list->numberOfElements){
+            free_listelement(_list->_first);
+            _list->numberOfElements=0; // just a precaution to not do it again
+        }
+        free(_list);
+    }
+}
+void free_variable(Mvariable* _variable){
+    if(_variable){
+        if(_variable->name)free(_variable->name);
+        free_value(_variable->_value);
+        free(_variable);
+    }
+}
+void free_mapelement(Mmapelement* _mapelement){
+    if(_mapelement){
+        free_mapelement(_mapelement->_next);
+        free_variable(_mapelement->_variable);
+        free(_mapelement);
+    }
+}
+void free_map(Mmap* _map){
+    if(_map){
+        if(_map->numberOfElements){
+            free_mapelement(_map->_first);
+            _map->numberOfElements=0;
+        }
+        free(_map);
+    }
+}
+void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
+    if(_expressionlistelement){
+        free_expressionlistelement(_expressionlistelement->_next);
+        free_expression(_expressionlistelement->_expression);
+        free(_expressionlistelement);
+    }
+}
+void free_expressionlist(Mexpressionlist* _expressionlist){
+    if(_expressionlist){
+        free_expressionlistelement(_expressionlist->_first);
+        free(_expressionlist);
+    }
+}
+void free_functiondefinition(Mfunctiondefinition* _functiondefinition){
+    if(_functiondefinition){
+        free_map(_functiondefinition->_parameterMap);
+        free_expressionlist(_functiondefinition->_expressionlist);
+        free(_functiondefinition);
+    }
+}
+// NOTE typically you're not supposed to free internal functions safe M function definitions 
+bool free_function(Mfunction* _function){
+    if(_function){
+        if(_function->type==FT_M){
+            free_functiondefinition(_function->functionunion._functiondefinition);
+            free(_function);
+            return true;
+        }
+    }
+    return false;
+}
+bool free_functionmapelement(Mfunctionmapelement* _functionmapelement){
+    if(_functionmapelement){
+        if(free_functionmapelement(_functionmapelement->_next))_functionmapelement->_next=NULL;
+        if(free_function(_functionmapelement->_function)){
+            free(_functionmapelement);
+            return true;
+        }
+    }
+    return false;
+}
+void free_functionmap(Mfunctionmap* _functionmap){
+    if(_functionmap){
+        free_functionmapelement(_functionmap->_first);
+        free(_functionmap);
+    }
+}
+void free_environment(Menvironment* _environment){
+    if(_environment){
+        free_map(_environment->_variableMap);
+        free_functionmap(_environment->_functionMap);
+        free(_environment);
+    }
+}
+// END RELEASERS
+
+// helper functions
+// helper functions to wrap literals for storage in M
+Mreal* get_real(long double ld){
+	Mreal* _real=(Mreal*)malloc(sizeof(Mreal));
+	if(_real)_real->ld=ld;
+	return _real;
+}
+Mvalue* getRealValue(Mreal* _real){
+    if(_real){
+        Mvalue* _value=calloc(1,sizeof(Mvalue));
+        if(_value){
+            _value->type=VT_REAL;
+            _value->value._real=_real;
+        }
+    }
+    return NULL;
+}
+Minteger* get_integer(long long ll){
+	Minteger* _integer=(Minteger*)malloc(sizeof(Minteger));
+	if(_integer)_integer->ll=ll;
+	return _integer;
+}
+Mvalue* getIntegerValue(Minteger* _integer){
+    if(_integer){
+        Mvalue* _value=calloc(1,sizeof(Mvalue));
+        if(_integer){
+            _value->type=VT_INTEGER;
+            _value->value._integer=_integer;
+        }
+    }
+    return NULL;
+}
+
+// mstring* is assumed to start with the same prefix/suffix character
+Mstring* get_string(mstring* s){
+	Mstring* _string=(s?(Mstring*)malloc(sizeof(Mstring)):NULL);
+	if(_string){
+		_string->presuffix=string_char(s,0);
+		_string->_m=string_create();
+		if(_string->_m==NULL)return NULL;
+		string_append(_string->_m,string_remainder(s,1)); // NOTE string_remainder might return NULL of course
+	}
+	return _string;
+}
+Mvalue* getStringValue(Mstring* _string){
+    if(_string){
+        Mvalue* _value=calloc(1,sizeof(Mvalue));
+        if(_value){
+            _value->type=VT_STRING;
+            _value->value._string=_string;
+        }
+    }
+    return NULL;
+}
+// end helper functions
 
 // read access to the elements defined in an environment
 uint32_t getNumberOfVariables(Menvironment* _environment){
@@ -145,18 +317,13 @@ bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string){
 }
 
 // functions
-// the internal functions (from math) can be registered with a given (most likely root) environment
-// these internal functions do NOT have a body as M defined functions have...
-void registerInternalFunctions(Menvironment* _environment){
-
-}
-
-Mfunction* getFunction(Menvironment* _environment,char* functionName){
+Mfunction* getFunction(Menvironment* _environment,const char* functionName){
     if(_environment&&functionName&&strlen(functionName)){
         Mfunctionmap* _functionmap=_environment->_functionMap;
-        if(_functionMap){
+        if(_functionmap){
             Mfunctionmapelement* _functionMapelement=_functionmap->_first;
-            while(_functionMapelement&&!strcmp(_functionMapelement->_function->name,functionName))
+            // we need string() on the function name as function name is an mstring*
+            while(_functionMapelement&&!strcmp(string(_functionMapelement->_function->_name),functionName))
                 _functionMapelement=_functionMapelement->_next;
             if(_functionMapelement)return _functionMapelement->_function;
         }
@@ -164,27 +331,78 @@ Mfunction* getFunction(Menvironment* _environment,char* functionName){
     return NULL;    
 }
 
-Mmap* getFunctionCallArgumentMap(Mfunction* _function,Mlist* _argumentList){
+Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
     if(_function){
         Mmap* _argumentMap=(Mmap*)calloc(1,sizeof(Mmap));
         Mmap* _functionParameterMap=_function->_parameterMap;
         Mmapelement* _functionParameterMapelement=_functionParameterMap->_first;
-        Mvalue* _argumentListelement=_argumentList->_first;
+        Mlistelement* _argumentListelement=_argumentList->_first;
         while(_functionParameterMapelement){
-            _argumentMapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
-            _argumentMapelement->name=_functionParameterMapelement->name;
+            Mmapelement* _argumentmapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            _argumentmapelement->_variable->name=_functionParameterMapelement->_variable->name;
             // associate the argument list element value (if available)
             if(_argumentListelement){
-                _argumentMapelement->_value=_argumentListelement;
-                _argumentListelement=_argumentListelement->next;
+                _argumentmapelement->_variable->_value=_argumentListelement->_value;
+                _argumentListelement=_argumentListelement->_next;
             }else // use the default!!!
-                _argumentMapelement->_value=_functionParameterMapelement->_value;
+                _argumentmapelement->_variable->_value=_functionParameterMapelement->_variable->_value;
             // append to _argumentMap
-            if(_argumentMap->last)_argumentMap->last->next=_argumentMapelement;else _argumentMap->first=_argumentMapelement;
-            _argumentMap->last=_argumentMapelement;_argumentMap->numberOfElements++;
+            if(_argumentMap->_last)_argumentMap->_last->_next=_argumentmapelement;else _argumentMap->_first=_argumentmapelement;
+            _argumentMap->_last=_argumentmapelement;_argumentMap->numberOfElements++;
             _functionParameterMapelement=_functionParameterMapelement->_next;
         }
         return _argumentMap;
     }
     return NULL;
 }
+
+Mfunction* newFunction(Menvironment* _environment,const char* name){
+    Mfunction* _function=NULL;
+    if(_environment&&name&&strlen(name)){
+        _function=getFunction(_environment,name);
+        if(!_function){ // doesn't exist yet
+            _function=(Mfunction*)calloc(1,sizeof(Mfunction));
+            if(_function){
+                mstring* _functionName=string_append(string_create(),name);
+                if(_functionName){
+                    // try to append it to the functionMap, if we succeed store _functioName in ->_name
+                    Mfunctionmap* _functionmap=_environment->_functionMap;
+                    if(_functionmap){
+                        Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)calloc(1,sizeof(Mfunctionmapelement));
+                        if(_functionmapelement){
+                            _functionmapelement->_function=_function; // no worries here
+                            Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
+                            if(_lastFunctionmapelement)_functionmap->_last=_functionmapelement;else _functionmap->_first=_functionmapelement;
+                            _functionmap->_last=_functionmapelement;
+                            _function->_name=_functionName; // success!!!!!
+                        }
+                    }
+                }        
+                // if we fail to register the name and/or the function with the environment free the function!!
+                if(!_function->_name){free_function(_function);_function=NULL;}   
+            }
+        }
+    }
+    return _function;
+}
+
+// the internal functions (from math) can be registered with a given (most likely root) environment
+Mvalue* Msin(Mvalue* _value){
+    if(_value){
+        if(_value->type==VT_REAL)return getRealValue(get_real(sin(_value->value._real->ld)));
+        if(_value->type==VT_INTEGER)return getRealValue(get_real(sin(_value->value._integer->ll)));
+    }
+    return NULL;
+}
+
+bool registerOneArgumentFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+    if(_function){_function->type=FT_INTERNAL_ONE_ARGUMENT;_function->functionunion.oneArgumentFunction=oneArgumentFunction;}return(!!_function);
+}
+
+// these internal functions do NOT have a body as M defined functions have...
+void registerInternalFunctions(Menvironment* _environment){
+    // let's try to register the sine function
+    registerOneArgumentFunction(newFunction(_environment,"sin"),Msin);
+
+}
+

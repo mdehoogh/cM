@@ -147,4 +147,7 @@ typedef struct Mexpression{
     Token* first;
 }Mexpression;
 
+void free_token(Token* _token);
+void free_expression(Mexpression* _expression);
+
 
