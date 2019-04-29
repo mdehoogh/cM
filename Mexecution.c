@@ -177,16 +177,16 @@ uint32_t getNumberOfVariables(Menvironment* _environment){
     return(_environment?_environment->_variableMap->numberOfElements:0);
 }
 // the names of the variables may be requested
-mstring* getVariableNames(const Menvironment* _environment,char* sep){
+mstring* _getVariableNames(const Menvironment* _environment,char* sep){
     if(_environment!=NULL&&sep!=NULL){
         mstring* variableNames=string_create();
         if(variableNames!=NULL){
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                mstring* parentVariableNames=getVariableNames(_environment->_parent,sep);
+                mstring* parentVariableNames=_getVariableNames(_environment->_parent,sep);
                 if(parentVariableNames){
                     string_append(variableNames,string(parentVariableNames));
-                    free(parentVariableNames); // don't keep it hanging around!!
+                    free_mstring(parentVariableNames); // we can do this because string_append copies the characters
                 }
             }
             // we'll be appending the names of the variables in the environment itself
@@ -234,7 +234,7 @@ Mvariable* createVariable(char* name,enum Mvaluetype valueType){
                     case VT_MAP:_variable->_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
                 }
             }else{ // failed to allocate memory for the value
-                free(_variable);
+                free_variable(_variable);
                 _variable=NULL;
             }
         }
@@ -317,15 +317,47 @@ bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string){
 }
 
 // functions
+// the names of the variables may be requested
+mstring* _getFunctionNames(const Menvironment* _environment,char* sep){
+    if(_environment&&sep){
+        mstring* _functionNames=string_create();
+        if(_functionNames){
+            // first append the names of the variables in the parent
+            if(_environment->_parent){
+                mstring* parentFunctionNames=_getFunctionNames(_environment->_parent,sep);
+                if(parentFunctionNames){
+                    string_append(_functionNames,string(parentFunctionNames));
+                    free_mstring(parentFunctionNames); // we can do this because string_append copies the characters that string() points to!!
+                }
+            }
+            // we'll be appending the names of the variables in the environment itself
+            if(_environment->_functionMap){
+                Mfunctionmapelement* _functionmapelement=_environment->_functionMap->_first;
+                while(_functionmapelement){
+                    if(strlen(sep))if(!string_empty(_functionNames))string_append(_functionNames,sep);
+                    string_append(_functionNames,string(_functionmapelement->_function->_name));
+                    _functionmapelement=_functionmapelement->_next;
+                }
+                return _functionNames;
+            }
+        }
+    }
+    return NULL;
+}
+
 Mfunction* getFunction(Menvironment* _environment,const char* functionName){
     if(_environment&&functionName&&strlen(functionName)){
         Mfunctionmap* _functionmap=_environment->_functionMap;
         if(_functionmap){
-            Mfunctionmapelement* _functionMapelement=_functionmap->_first;
+            Mfunctionmapelement* _functionmapelement=_functionmap->_first;
             // we need string() on the function name as function name is an mstring*
-            while(_functionMapelement&&!strcmp(string(_functionMapelement->_function->_name),functionName))
-                _functionMapelement=_functionMapelement->_next;
-            if(_functionMapelement)return _functionMapelement->_function;
+            while(_functionmapelement){
+                if(_functionmapelement->_function&&!strcmp(string(_functionmapelement->_function->_name),functionName)){
+                    //////////printf("\nFunction '%s' matches '%s'.",string(_functionmapelement->_function->_name),functionName);
+                    return _functionmapelement->_function;
+                }
+                _functionmapelement=_functionmapelement->_next;
+            }
         }
     }
     return NULL;    
@@ -372,19 +404,58 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
                         if(_functionmapelement){
                             _functionmapelement->_function=_function; // no worries here
                             Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
-                            if(_lastFunctionmapelement)_functionmap->_last=_functionmapelement;else _functionmap->_first=_functionmapelement;
+                            if(_lastFunctionmapelement){
+                                _lastFunctionmapelement->_next=_functionmapelement;
+                                _functionmap->_last=_functionmapelement;
+                            }else
+                                _functionmap->_first=_functionmapelement;
                             _functionmap->_last=_functionmapelement;
-                            _function->_name=_functionName; // success!!!!!
+                            _functionmap->numberOfFunctions++;
+                             _function->_name=_functionName; // success!!!!!
+                            printf("\nFunction '%s' registered as function #%d.",string(_function->_name),_functionmap->numberOfFunctions);
                         }
                     }
-                }        
+                }else
+                    printf("\nERROR: Failed to store function name '%s'.",name);
                 // if we fail to register the name and/or the function with the environment free the function!!
                 if(!_function->_name){free_function(_function);_function=NULL;}   
             }
-        }
+            if(!_function)printf("\nERROR: Failed to create function '%s'.",name);
+        }else
+            printf("\nFunction '%s' already exists.",name);
     }
     return _function;
 }
+
+// helper function to create a parameter map with a single value
+// the following is a nuisance
+Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
+    if(name&&_realValue){
+        Mvariable* _realVariable=createVariable(name,VT_REAL);
+        if(_realVariable){
+            _realVariable->_value=_realValue;
+            Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            if(_mapelement){
+                _mapelement->_variable=_realVariable;
+                Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
+                if(_map){
+                    _map->numberOfElements=1;
+                    _map->_first=_mapelement;
+                    printf("\n%s","Returning the single real map!");
+                    return _map;
+                }
+                printf("\nERROR: %s.","Failed to create the real variable map!");
+               free_mapelement(_mapelement);
+            }else{
+                printf("\nERROR: %s.","Failed to create the real variable map element!");
+                free_variable(_realVariable);
+            }
+        }else
+            printf("\nERROR: %s.","Failed to create the real variable!");
+    }
+    return NULL;
+}
+// end helper functions 
 
 // the internal functions (from math) can be registered with a given (most likely root) environment
 Mvalue* Msin(Mvalue* _value){
@@ -394,15 +465,30 @@ Mvalue* Msin(Mvalue* _value){
     }
     return NULL;
 }
+Mvalue* Mcos(Mvalue* _value){
+    if(_value){
+        if(_value->type==VT_REAL)return getRealValue(get_real(cos(_value->value._real->ld)));
+        if(_value->type==VT_INTEGER)return getRealValue(get_real(cos(_value->value._integer->ll)));
+    }
+    return NULL;
+}
 
-bool registerOneArgumentFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
-    if(_function){_function->type=FT_INTERNAL_ONE_ARGUMENT;_function->functionunion.oneArgumentFunction=oneArgumentFunction;}return(!!_function);
+bool completedOneArgumentFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_ONE_ARGUMENT;
+        _function->functionunion.oneArgumentFunction=oneArgumentFunction;
+        _function->_parameterMap=_getSingleRealMap("x",getRealValue(get_real(0.0)));
+        printf("\nRegistered function '%s' completed.",string(_function->_name));
+        return true;
+    }
+    return false;
 }
 
 // these internal functions do NOT have a body as M defined functions have...
-void registerInternalFunctions(Menvironment* _environment){
+bool registerInternalFunctions(Menvironment* _environment){
     // let's try to register the sine function
-    registerOneArgumentFunction(newFunction(_environment,"sin"),Msin);
-
+    if(!completedOneArgumentFunction(newFunction(_environment,"cos"),Mcos))return false;
+    if(!completedOneArgumentFunction(newFunction(_environment,"sin"),Msin))return false;
+    return true;
 }
 

@@ -130,6 +130,7 @@ typedef struct Mfunctionmapelement{
 typedef struct MfunctionMap{
     Mfunctionmapelement* _first;
     Mfunctionmapelement* _last;
+    uint32_t numberOfFunctions;  // keeping track of the total number of functions...
 }Mfunctionmap;
 
 //Mvalue* getFunction(Mfunctionlist functionlist,char* name);
@@ -172,7 +173,7 @@ Mvalue* getStringValue(Mstring* _string);
 // function prototypes
 // read access
 uint32_t getNumberOfVariables(Menvironment* _environment);
-mstring* getVariableNames(const Menvironment* _environment,char* sep);
+mstring* _getVariableNames(const Menvironment* _environment,char* sep);
 
 // write access
 Mvariable* addVariable(Menvironment* _environment,char* name,enum Mvaluetype valueType);
@@ -184,8 +185,9 @@ bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer);
 bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string);
 
 // functions
+mstring* _getFunctionNames(const Menvironment* _environment,char* sep);
 Mfunction* newFunction(Menvironment* _environment,const char* functionName);
-void registerInternalFunctions(Menvironment* _environment);
+bool registerInternalFunctions(Menvironment* _environment);
 // helper function to return the function
 Mfunction* getFunction(Menvironment* _environment,const char* functionName);
 Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);

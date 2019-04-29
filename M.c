@@ -57,8 +57,10 @@ struct Menvironment* pMenvironment;
 bool initEnvironment(){
 	pMenvironment=calloc(1,sizeof(Menvironment));
 	if(pMenvironment){
+		// 
 		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
-		if(environmentVariableMap){
+		Mfunctionmap* environmentFunctionMap=calloc(1,sizeof(Mfunctionmap));
+		if(environmentVariableMap&&environmentFunctionMap){
 			pMenvironment->_variableMap=environmentVariableMap;
 			// create and add PI and E constants!!!
 			if(!setValueOfRealVariable(addVariable(pMenvironment,"PI",VT_REAL),get_real(LD_PI))){printf("\nERROR: Failed to add PI.");return false;}
@@ -66,9 +68,9 @@ bool initEnvironment(){
 			///// which is: 2.71828182845904523536)); // MDH@24APR2019: this is an approximation but the next decimal digits is a 0 as in 0287471352662497757247 (before the next 0)
 			// we're going to store all commands in a list called M
 			if(!addVariable(pMenvironment,"M",VT_LIST))return false;
-			registerInternalFunctions(pMenvironment);
+			pMenvironment->_functionMap=environmentFunctionMap;
+			return registerInternalFunctions(pMenvironment);
 		}
-		return true;
 	}
 	return false;
 }
@@ -124,23 +126,23 @@ char* getFormattedText(char* fmt,uint8_t maxlength,...){
 */
 
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
-mstring* getIntegerText(Minteger* _integer){
+mstring* _getIntegerText(Minteger* _integer){
 	char integerText[80];snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
 	mstring* s=string_create();if(!string_append(s,integerText)){free(s);s=NULL;}
 	return s;
 }
-mstring* getRealText(Mreal* _real){
+mstring* _getRealText(Mreal* _real){
 	char realText[80];snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
 	mstring* s=string_create();if(!string_append(s,realText)){free(s);s=NULL;}
 	return s;
 }
-mstring* getStringText(Mstring* _string){
+mstring* _getStringText(Mstring* _string){
 	mstring* s=string_create();
 	if(!string_append_char(s,_string->presuffix)||!string_append(s,string(_string->_m))||!string_append_char(s,_string->presuffix)){free(s);s=NULL;}
 	return s;
 }
-mstring* getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
-mstring* getListText(Mlist* _list){
+mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
+mstring* _getListText(Mlist* _list){
 	mstring* s=string_create();
 	if(s){
 		mstring* p=string_append_char(s,'['); // switch to using p in appends
@@ -149,10 +151,10 @@ mstring* getListText(Mlist* _list){
 		while(_listelement){
 			_listelementValue=_listelement->_value;
 			if(_listelementValue){
-				mstring* mapelementValueText=getValueText(_listelementValue);
+				mstring* mapelementValueText=_getValueText(_listelementValue);
 				if(!mapelementValueText)break; // too bad
 				p=string_append(p,string(mapelementValueText));
-				free(mapelementValueText); // release AFTER copying over
+				free_mstring(mapelementValueText); // release AFTER copying over
 			}
 			_listelement=_listelement->_next;
 			if(_listelement)p=string_append(p,", "); // additional space behind comma!!
@@ -163,7 +165,7 @@ mstring* getListText(Mlist* _list){
 	}
 	return s;
 }
-mstring* getMapText(Mmap* _map){
+mstring* _getMapText(Mmap* _map){
 	mstring* s=string_create();
 	if(s){
 		mstring* p=string_append_char(s,'{');
@@ -176,10 +178,10 @@ mstring* getMapText(Mmap* _map){
 			p=string_append(p,_variable->name);
 			///printf("\n%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
-			mstring* mapelementValueText=getValueText(_variable->_value);
+			mstring* mapelementValueText=_getValueText(_variable->_value);
 			if(!mapelementValueText)continue;
 			p=string_append(p,string(mapelementValueText)); // append 
-			free(mapelementValueText); // release AFTER copying over
+			free_mstring(mapelementValueText); // release AFTER copying over
 			_mapelement=_mapelement->_next;
 			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
 			////printf("\n%s","next");
@@ -192,10 +194,49 @@ mstring* getMapText(Mmap* _map){
 	}
 	return s;
 }
+mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
+	mstring* s=string_create();
+	if(s){
+		mstring* p=string_append_char(s,'[');
+		if(_functionmap){
+			///printf("\n%s(%d)",string(p),_functionmap->numberOfFunctions);
+			Mfunctionmapelement* _functionmapelement=_functionmap->_first;
+			while(_functionmapelement){
+				///printf("\n%s","start");
+				Mfunction* _function=_functionmapelement->_function;
+				if(!_function)continue;
+				///printf("\n%s","func");
+				p=string_append(p,string(_function->_name));
+				if(!p)break;
+				///printf("\n%s","name");
+				// I guess we might show the parameter map (if any)
+				string_append_char(p,'(');
+				if(_function->_parameterMap){
+					mstring* parameterMapText=_getMapText(_function->_parameterMap);
+					if(parameterMapText){
+						string_append(p,string(parameterMapText));
+						free_mstring(parameterMapText);
+					}
+				}
+				///printf("\n%s","params");
+				string_append_char(p,')');
+				_functionmapelement=_functionmapelement->_next;
+				if(_functionmapelement)p=string_append(p,", "); // only when there's a next map element to process
+				///printf("\n%s","next");
+			}
+		}
+		//printf("\n%s(%d)",string(p),string_length(p));
+		p=string_append_char(p,']');
+		///printf("\n%s",string(p));
+		// if we failed, we have to free s here!!!
+		if(!p){free_mstring(s);s=NULL;}
+	}
+	return s;
+}
 
 const char* UNDEFINED_VALUETEXT="?"; // NOTE without the quotes that would surround an M string literal!!!
 
-mstring* getValueText(Mvalue* _value){
+mstring* _getValueText(Mvalue* _value){
 	// NOTE whatever is returned should be freed
 	if(_value){
 		////////printf("\nTYPE: %d",_value->type);
@@ -203,24 +244,29 @@ mstring* getValueText(Mvalue* _value){
 			case VT_UNDEFINED:
 				break;
 			case VT_INTEGER:
-				return getIntegerText(_value->value._integer);
+				return _getIntegerText(_value->value._integer);
 			case VT_REAL:
-				return getRealText(_value->value._real);
+				return _getRealText(_value->value._real);
 			case VT_STRING:
-				return getStringText(_value->value._string);
+				return _getStringText(_value->value._string);
 			case VT_MAP:
-				return getMapText(_value->value._map);
+				return _getMapText(_value->value._map);
 			case VT_LIST:
-				return getListText(_value->value._list);
+				return _getListText(_value->value._list);
 		}
 	}
 	return string_append(string_create(),UNDEFINED_VALUETEXT);
 }
+void outputFunctions(){
+	mstring* functionsText=_getFunctionMapText(pMenvironment->_functionMap);
+	output("\nFunctions: %s.",string(functionsText));
+	free_mstring(functionsText);
+}
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
-	mstring* variablesText=getMapText(pMenvironment->_variableMap);
+	mstring* variablesText=_getMapText(pMenvironment->_variableMap);
 	output("\nVariables: %s.",string(variablesText));
-	free(variablesText);
+	free_mstring(variablesText);
 	/* replacing:
 	// we're going to write all the variables and their values in the M environment
 	// this means iterating over the variables in the environment
@@ -230,7 +276,7 @@ void outputVariables(){
 	Mmapelement* _variableMapelement=_variableMap->_first;
 	while(_variableMapelement){
 		_variable=_variableMapelement->_variable;
-		output(" %s=%s",_variableMapelement->name,getValueText(_variable->_value,undefinedValueText));
+		output(" %s=%s",_variableMapelement->name,_getValueText(_variable->_value,undefinedValueText));
 		pMvalue=_variable->mValue;
 		if(pMvalue){ // we're got a value to write
 			////outputChar(':');output("%i",pMvalue->type);outputChar('=');
@@ -284,7 +330,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap|Use history command - Options: eXit|History|Shell.","Shell mode: enter a system command to execute."};
+char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap|Use history command - Options: eXit|Functions|History|Shell|Variables.","Shell mode: enter a system command to execute."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -882,11 +928,11 @@ Mexpressionvalue* getMapExpressionvalue(Token* _firstToken){
 		if(_attributeNameExpressionvalue->token->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
 		Mexpressionvalue* _attributeValueExpressionvalue=getExpressionvalue(token,(enum TOKENTYPE_ENUM[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
 		token=_attributeValueExpressionvalue->token; // update the current token
-		mstring* attributeName=getValueText(_attributeNameExpressionvalue->_value); // parse the attribute name value 
+		mstring* attributeName=_getValueText(_attributeNameExpressionvalue->_value); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
 		Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
 		_mapelement->_variable->name=string(attributeName); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
-		free(attributeName); // NOTE freeing attributeName does NOT free the character array mstring* points to (which is now used by the variable's name!!!! replacing: string_dispose(attributeName);
+		free_mstring(attributeName); // NOTE freeing attributeName does NOT free the character array mstring* points to (which is now used by the variable's name!!!! replacing: string_dispose(attributeName);
 		_mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
 		_mapelement->_variable->_value=_attributeValueExpressionvalue->_value; // store the _value pointer of the attributeValueExpressionvalue
 		if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
@@ -1065,9 +1111,12 @@ bool evaluateCommand(){
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	Mexpressionvalue* _commandExpressionvalue=getExpressionvalue(pCommandToEvaluate,(enum TOKENTYPE_ENUM[]){},0);
-	if(_commandExpressionvalue)
-		output("' evaluates to: '%s'.",getValueText(_commandExpressionvalue->_value));
-	else
+	if(_commandExpressionvalue){
+		mstring* commandExpressionValueText=_getValueText(_commandExpressionvalue->_value);
+		output("' evaluates to: '%s'.",commandExpressionValueText);
+		free_mstring(commandExpressionValueText);
+		free_expressionvalue(_commandExpressionvalue); // TODO do we need to do this?????
+	}else
 		output("' is undefined!");
 	return true;
 }
@@ -1478,15 +1527,34 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	// MDH@24APR2019 obsolete: cursorPosition()++; // increment the current cursor position
 
 	if(endOfInput){
+		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
+		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){
+			// is it a function (now)?
+			if(getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // yes, it is
+				// the minimum we can do is put an opening parenthesis in the behind cursor text
+				pLastCommandToEvaluateToken->type=TT_FUNCTION;
+				string_insert_char(behindCursorText,0,'(');
+			}
+		}else
+		if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
+			// is it (still) a function?
+			if(!getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // no, it ain't
+				// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
+				pLastCommandToEvaluateToken->type=TT_VARIABLE;
+				if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
+			}
+		}else
 		// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 		if(pLastCommandToEvaluateToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
 		// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 		if(matchparentheses){
-			if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
-			if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
-			if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');/* MDH@24APR2019 obsolete: commandLength()++;*/}
+			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
+				if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+				if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+				if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');/* MDH@24APR2019 obsolete: commandLength()++;*/}
+			}
 		}
-		writeBehindCursorText(false);
+		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength());
 		outputStatus(inputChar,inputCharacterType);
 	}
@@ -1580,10 +1648,10 @@ int main(int argc, char **argv){
 		exit(1);
 	}
 
-	mstring* predefinedVariableNames=getVariableNames(pMenvironment,", ");
+	mstring* predefinedVariableNames=_getVariableNames(pMenvironment,", ");
 	if(predefinedVariableNames){
 		output("\nPredefined variables: %s.",string(predefinedVariableNames));
-		free(predefinedVariableNames); // TODO or keep it around?????
+		free_mstring(predefinedVariableNames); // no get rid of it!!!
 	}else
 		outputLine("No predefined variables!");
 	//////////output("\nNumber of predefined variables: %d.",getNumberOfVariables(mEnvironment));
@@ -1862,6 +1930,7 @@ int main(int argc, char **argv){
 					if(inputChar>='0'&&inputChar<='9'){setColorScheme(inputChar-'0');inputCharType='n';break;}
 					if(inputChar=='w'||inputChar=='W'){setWrapMode(inputChar=='W');inputCharType='n';break;}
 					if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
+					if(inputChar=='f'||inputChar=='F'){outputFunctions();inputCharType='n';break;}
 					// options
 					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
 					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
