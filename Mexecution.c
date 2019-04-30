@@ -39,7 +39,7 @@ void free_list(Mlist* _list){
 }
 void free_variable(Mvariable* _variable){
     if(_variable){
-        if(_variable->name)free(_variable->name);
+        if(_variable->_name)free(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
         free_value(_variable->_value);
         free(_variable);
     }
@@ -63,13 +63,13 @@ void free_map(Mmap* _map){
 void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
     if(_expressionlistelement){
         free_expressionlistelement(_expressionlistelement->_next);
-        free_expression(_expressionlistelement->_expression);
+        free_value(_expressionlistelement->_value);
         free(_expressionlistelement);
     }
 }
 void free_expressionlist(Mexpressionlist* _expressionlist){
     if(_expressionlist){
-        free_expressionlistelement(_expressionlist->_first);
+        free_expressionlistelement(_expressionlist->_next);
         free(_expressionlist);
     }
 }
@@ -125,14 +125,13 @@ Mreal* get_real(long double ld){
 }
 Mvalue* getRealValue(Mreal* _real){
     if(_real){
-        Mvalue* _value=calloc(1,sizeof(Mvalue));
-        if(_value){
-            _value->type=VT_REAL;
-            _value->value._real=_real;
-        }
-    }
+        Mvalue* _realValue=calloc(1,sizeof(Mvalue));
+        if(_realValue){_realValue->type=VT_REAL;_realValue->value._real=_real;return _realValue;}
+    }else
+        printf("\nERROR: No real to wrap.");  
     return NULL;
 }
+
 Minteger* get_integer(long long ll){
 	Minteger* _integer=(Minteger*)malloc(sizeof(Minteger));
 	if(_integer)_integer->ll=ll;
@@ -140,12 +139,14 @@ Minteger* get_integer(long long ll){
 }
 Mvalue* getIntegerValue(Minteger* _integer){
     if(_integer){
-        Mvalue* _value=calloc(1,sizeof(Mvalue));
-        if(_integer){
-            _value->type=VT_INTEGER;
-            _value->value._integer=_integer;
+        Mvalue* _integerValue=calloc(1,sizeof(Mvalue));
+        if(_integerValue){
+            _integerValue->type=VT_INTEGER;
+            _integerValue->value._integer=_integer;
+            return _integerValue;
         }
-    }
+    }else
+        printf("\nERROR: No integer to wrap.");  
     return NULL;
 }
 
@@ -162,12 +163,14 @@ Mstring* get_string(mstring* s){
 }
 Mvalue* getStringValue(Mstring* _string){
     if(_string){
-        Mvalue* _value=calloc(1,sizeof(Mvalue));
-        if(_value){
-            _value->type=VT_STRING;
-            _value->value._string=_string;
+        Mvalue* _stringValue=calloc(1,sizeof(Mvalue));
+        if(_stringValue){
+            _stringValue->type=VT_STRING;
+            _stringValue->value._string=_string;
+            return _stringValue;
         }
-    }
+    }else
+        printf("\nERROR: No string to wrap!");
     return NULL;
 }
 // end helper functions
@@ -193,7 +196,7 @@ mstring* _getVariableNames(const Menvironment* _environment,char* sep){
             Mmapelement* _variableMapelement=_environment->_variableMap->_first;
             while(_variableMapelement){
                 if(strlen(sep))if(!string_empty(variableNames))string_append(variableNames,sep);
-                string_append(variableNames,_variableMapelement->_variable->name);
+                string_append(variableNames,_variableMapelement->_variable->_name);
                 _variableMapelement=_variableMapelement->_next;
             }
             return variableNames;
@@ -202,11 +205,11 @@ mstring* _getVariableNames(const Menvironment* _environment,char* sep){
     return NULL;
 }
 
-Mvariable* getVariable(Menvironment* _environment,char* name){
-    if(_environment!=NULL&&name!=NULL&&strlen(name)>0){ // input valid        
+Mvariable* getVariable(Menvironment* _environment,const char* name){
+    if(_environment&&name&&strlen(name)){ // input valid        
         Mmapelement*_variableMapelement=_environment->_variableMap->_first;
         // as long as variable is defined, and the variable's name is not equal to the given name, continue
-        while(_variableMapelement!=NULL&&strcmp(_variableMapelement->_variable->name,name))_variableMapelement=_variableMapelement->_next;
+        while(_variableMapelement!=NULL&&strcmp(_variableMapelement->_variable->_name,name))_variableMapelement=_variableMapelement->_next;
         if(_variableMapelement!=NULL)return _variableMapelement->_variable;
     }
     return NULL;
@@ -214,41 +217,53 @@ Mvariable* getVariable(Menvironment* _environment,char* name){
 
 // write access
 // helper function to create a new variable with a given name and of a given type
-Mvariable* createVariable(char* name,enum Mvaluetype valueType){
-    Mvariable* _variable=(Mvariable*)malloc(sizeof(Mvariable));
-    if(_variable!=NULL){
-        _variable->name=name;
-        _variable->_value=NULL;
-        if(valueType!=VT_UNDEFINED){
-            _variable->_value=(Mvalue*)calloc(1,sizeof(Mvalue));
-            if(_variable->_value){
-                _variable->_value->type=valueType;
-                // I do NOT need to set the values of the atomic elements (integer, real), so basically these are not initialized to start with
-                // NOTE using calloc() instead of malloc() is essential for everything with pointers in it that should be NULL initially!!
-                switch(valueType){
-                    case VT_UNDEFINED:
-                    case VT_INTEGER:
-                    case VT_REAL:break;
-                    case VT_STRING:_variable->_value->value._string=(Mstring*)calloc(1,sizeof(Mstring));break;
-                    case VT_LIST:_variable->_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
-                    case VT_MAP:_variable->_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
-                }
-            }else{ // failed to allocate memory for the value
-                free_variable(_variable);
-                _variable=NULL;
-            }
-        }
+Mvariable* _createVariable(char* name,enum Mvaluetype valueType){
+    if(!name||!strlen(name)){
+        printf("\nERROR: No variable name defined.");
+        return NULL;
     }
+    Mvariable* _variable=(Mvariable*)malloc(sizeof(Mvariable));
+    if(!_variable){
+        printf("\nERROR: Failed to allocate memory to store variable '%s'.",name);
+        return NULL;
+    }
+    _variable->_name=heap_string_copy(name);
+    if(!_variable->_name){
+        free_variable(_variable);
+        printf("\nERROR: Failed to allocate memory to store name '%s' of the new variable.",name);
+        return NULL;
+    }
+    // a ha, here we have an issue: we cannot just use the char pointer, if we want to free the name later on
+    if(valueType!=VT_UNDEFINED){
+        _variable->_value=(Mvalue*)calloc(1,sizeof(Mvalue));
+        if(!_variable->_value){
+            free_variable(_variable);
+            printf("\nERROR: Failed to allocate memory to store the value of variable '%s'.",name);
+            return NULL;
+        }
+        _variable->_value->type=valueType;
+        // I do NOT need to set the values of the atomic elements (integer, real), so basically these are not initialized to start with
+        // NOTE using calloc() instead of malloc() is essential for everything with pointers in it that should be NULL initially!!
+        switch(valueType){
+            case VT_UNDEFINED:
+            case VT_INTEGER:
+            case VT_REAL:break;
+            case VT_STRING:_variable->_value->value._string=(Mstring*)calloc(1,sizeof(Mstring));break;
+            case VT_LIST:_variable->_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
+            case VT_MAP:_variable->_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
+        }
+    }else
+        _variable->_value=NULL;
     return _variable;
 }
 
 // addVariable returns the value map element that was created (if successful)
 Mvariable* addVariable(Menvironment* _environment,char* name,enum Mvaluetype valueType){
     Mvariable* _variable=NULL;
-    if(_environment!=NULL&&name!=NULL&&strlen(name)>0){ // input valid   
+    if(_environment&&name){ // input valid 
         _variable=getVariable(_environment,name);
         if(!_variable){ // non-existing...
-            _variable=createVariable(name,valueType);
+            _variable=_createVariable(name,valueType);
             //////printf("\nVariable created!");
             if(_variable){
                 Mmapelement* _variableMapelement=(Mmapelement*)malloc(sizeof(Mmapelement));
@@ -260,61 +275,55 @@ Mvariable* addVariable(Menvironment* _environment,char* name,enum Mvaluetype val
                     if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else _environment->_variableMap->_first=_variableMapelement;
                     _environment->_variableMap->_last=_variableMapelement;
                     _environment->_variableMap->numberOfElements++;
-                }else{
-                    // ASSERT creating a map element to store the variable reference in failed, so free _variable
-                    free(_variable);
-                    _variable=NULL;
+                    return _variable;
                 }
-            }
+                // ASSERT failed to link the variable to the variable map!!
+                free(_variable);
+                printf("\nERROR: Failed to link variable '%s'.",name);
+            }else
+                printf("\nERROR: Failed to create variable '%s'.",name);
         }
     }
-    ///////printf("\nConnected!");
-    return _variable;
+    return NULL;
 }
 
 // let's start with some simple assignments
 bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer){
-    if(_variable==NULL||_integer==NULL)return false;
-    Mvalue* _variableValue=_variable->_value;
-    // if the variable does not have a value associated with it, create one
-    if(_variableValue==NULL){
-        _variableValue=(Mvalue*)malloc(sizeof(Mvalue));
-        if(!_variableValue)return false;
-        _variableValue->type=VT_INTEGER;
-        _variable->_value=_variableValue;
-    }else // could be wrong type, so do not store variable
-    if(_variableValue->type!=VT_INTEGER)return false; // wrong type!!!
-    _variableValue->value._integer=_integer;
-    return true;
+    if(_variable){        
+        Mvalue* _integerValue=getIntegerValue(_integer);
+        if(_integerValue){
+            free_value(_variable->_value); // free current value
+            _variable->_value=_integerValue; // store new value
+            return true;
+        }
+        printf("\nERROR: Failed to store integer '%llu' in variable '%s'.",_integer->ll,_variable->_name);
+    }
+    return false;
 }
 bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real){
-    if(_variable==NULL||_real==NULL)return false;
-    Mvalue* _variableValue=_variable->_value;
-    // if the variable does not have a value associated with it, create one
-    if(_variableValue==NULL){
-        _variableValue=(Mvalue*)malloc(sizeof(Mvalue));
-        if(!_variableValue)return false;
-        _variableValue->type=VT_REAL;
-        _variable->_value=_variableValue;
-    }else // could be wrong type, so do not store variable
-    if(_variableValue->type!=VT_REAL)return false; // wrong type!!!
-    _variableValue->value._real=_real;
-    return true;
+    if(_variable){        
+        Mvalue* _realValue=getRealValue(_real); // wrap in value
+        if(_realValue){
+            free_value(_variable->_value); // release the current value
+            _variable->_value=_realValue; // store new value
+            return true;
+        }
+        printf("\nERROR: Failed to store real '%Lf' in variable '%s'.",_real->ld,_variable->_name);
+    }
+    return false;
 }
 bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string){
-    if(_variable==NULL||_string==NULL)return false;
-    Mvalue* _variableValue=_variable->_value;
-    // if the variable does not have a value associated with it, create one
-    if(_variableValue==NULL){
-        _variableValue=(Mvalue*)malloc(sizeof(Mvalue));
-        if(!_variableValue)return false;
-        _variableValue->type=VT_STRING;
-        _variable->_value=_variableValue;
-    }else // could be wrong type, so do not store variable
-    if(_variableValue->type!=VT_STRING)return false; // wrong type!!!
-    _variableValue->value._string=_string;
-    return true;
-}
+    if(_variable){        
+        Mvalue* _stringValue=getStringValue(_string); // wrap in value
+        if(_stringValue){
+            free_value(_variable->_value); // free current value
+            _variable->_value=_stringValue; // store new value
+            return true;
+        }
+        printf("\nERROR: Failed to store text '%s' in variable '%s'.",string(_string->_m),_variable->_name);
+   }
+   return false;
+ }
 
 // functions
 // the names of the variables may be requested
@@ -371,7 +380,7 @@ Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
         Mlistelement* _argumentListelement=_argumentList->_first;
         while(_functionParameterMapelement){
             Mmapelement* _argumentmapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
-            _argumentmapelement->_variable->name=_functionParameterMapelement->_variable->name;
+            _argumentmapelement->_variable->_name=_functionParameterMapelement->_variable->_name;
             // associate the argument list element value (if available)
             if(_argumentListelement){
                 _argumentmapelement->_variable->_value=_argumentListelement->_value;
@@ -431,7 +440,7 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
 // the following is a nuisance
 Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
     if(name&&_realValue){
-        Mvariable* _realVariable=createVariable(name,VT_REAL);
+        Mvariable* _realVariable=_createVariable(name,VT_REAL);
         if(_realVariable){
             _realVariable->_value=_realValue;
             Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));

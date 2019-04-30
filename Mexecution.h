@@ -15,6 +15,9 @@
 #include <math.h>
 #include <float.h>
 
+// for heap_string_copy() to copy char* stuff
+#include "Mmemory.h"
+
 // Token and Mexpression is provided in Mexpression.h
 #include "Mexpression.h"
 
@@ -69,7 +72,7 @@ typedef struct Mlist{
 }Mlist;
 
 typedef struct Mvariable{
-    char* name;
+    char* _name;
     Mvalue* _value;
 }Mvariable;
 
@@ -87,13 +90,14 @@ typedef struct Mmap{
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
 
 typedef struct Mexpressionlistelement{
-    Mexpression* _expression;
+    char* binop; // the binary operator to apply to the operands
+    Mvalue* _value; // the second operand
     struct Mexpressionlistelement* _next;
 }Mexpressionlistelement;
 
 typedef struct Mexpressionlist{
-    Mexpressionlistelement* _first;
-    Mexpressionlistelement* _last;
+    Mvalue* _value; // the first value in the expression list
+    Mexpressionlistelement* _next;
 }Mexpressionlist;
 
 // functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
@@ -174,6 +178,8 @@ Mvalue* getStringValue(Mstring* _string);
 // read access
 uint32_t getNumberOfVariables(Menvironment* _environment);
 mstring* _getVariableNames(const Menvironment* _environment,char* sep);
+Mvariable* getNewVariable(Menvironment* _environment,const char* name);
+Mvariable* getVariable(Menvironment* _environment,const char* name);
 
 // write access
 Mvariable* addVariable(Menvironment* _environment,char* name,enum Mvaluetype valueType);

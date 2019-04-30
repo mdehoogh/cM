@@ -175,7 +175,7 @@ mstring* _getMapText(Mmap* _map){
 			///printf("\n%s","start");
 			Mvariable* _variable=_mapelement->_variable;
 			if(!_variable)continue;
-			p=string_append(p,_variable->name);
+			p=string_append(p,_variable->_name);
 			///printf("\n%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
 			mstring* mapelementValueText=_getValueText(_variable->_value);
@@ -374,24 +374,25 @@ const char BACKGROUND_WHITE[]="47";
 // colors
 const char* BACKGROUND_COLORS[NUMBER_OF_COLOR_SCHEMES]={BACKGROUND_BLACK,BACKGROUND_WHITE}; // assuming either a black or white background
 
-const char* DEBUG_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY}; // light gray
-const char* INFO_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // black
+const char* DEBUG_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
+const char* INFO_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
 
-const char* COMMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY}; // light gray
-const char* ERROR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,LIGHT_RED}; // red
+const char* COMMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
+const char* ERROR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,LIGHT_RED};
 
 const char* ASSIGNMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
 const char* UNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
 const char* BINARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
 const char* TERNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
 
-const char* EXPRESSION_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // black
-const char* VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_BLUE,DARK_BLUE}; ////"13"; // magenta
-const char* FUNCTION_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_CYAN,DARK_CYAN}; /////"93"; // something more blueish
+const char* EXPRESSION_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+const char* VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_BLUE,DARK_BLUE};
+const char* NEW_VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_CYAN,DARK_CYAN};
+const char* FUNCTION_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,ORANGE}; /////"93"; // something more blueish
 const char* LIST_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
 const char* MAP_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
-const char* NUMBER_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //"22"; // green
-const char* STRING_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,ORANGE}; //////12"; // blue
+const char* NUMBER_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //"22"; // green (to indicate a literal)
+const char* STRING_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //////12"; // green (to indicate a literal)
 
 const char* RESULT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
 ///////const char* OPTION_COLORS[]={BLACK,WHITE};
@@ -403,7 +404,7 @@ const char* BEHIND_CURSOR_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_
 const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
 
 // value token colors
-const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
+const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,VARIABLE_COLORS,NEW_VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
 
 #define ESCAPE_CHARACTER 27
 
@@ -534,7 +535,7 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
 // the list of token type ids in the corresponding order!!!
-const uint8_t TOKENTYPE_IDS[]={0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,0b1000000,0b11111111};
+const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,0b1000000,0b11111111};
 
 void outputTokenColor(Token* pLastCommandToEvaluateToken){
 	///////printf("[%d]",pLastCommandToEvaluateToken->type);
@@ -562,28 +563,31 @@ void outputTokenColor(Token* pLastCommandToEvaluateToken){
 			break;
 	}
 }
-void outputToken(Token* pLastCommandToEvaluateToken){
-	outputTokenColor(pLastCommandToEvaluateToken);
+void outputToken(Token* _token){
+	if(!_token)return;
+	outputTokenColor(_token);
 	// if we allow comments in tokens we're in trouble!!!
-	output("%s",string(pLastCommandToEvaluateToken->text));
+	output("%s",string(_token->text));
 	/////////if(assisting){resetOutputColor();outputChar('|');}
 }
-void outputLastTokenChar(Token* pLastCommandToEvaluateToken){
+void outputLastTokenChar(Token* _token){
 	///////outputTokenColor(pLastCommandToEvaluateToken);
-	outputChar(string_last_char(pLastCommandToEvaluateToken->text));
+	outputChar(string_last_char(_token->text));
 	//////////resetOutputColor();
+}
+// MDH@30APR2019: when a function returns to a variable and the other way round
+void reoutputToken(Token* _token){
+	if(!_token)return;
+	moveCursorLeft(string_length(_token->text));
+	outputToken(_token); // back where we started (hopefully)
 }
 /**
  * freeToken() frees the memory @pLastCommandToEvaluateToken points to and returns true on successfully removing the entire chain of tokens it points to
  * @returns the previous token (as we need that )  
  */
-Token* freeToken(Token* pLastCommandToEvaluateToken){
-	if(!pLastCommandToEvaluateToken)return NULL;
-	free(pLastCommandToEvaluateToken->text); // free the (mstring) text (every new token should have a text it points to)
-	freeToken(pLastCommandToEvaluateToken->next); // free all this token points to
-	Token* pPrevToken=pLastCommandToEvaluateToken->prev; // remember what to return
-	free(pLastCommandToEvaluateToken);
-	return pPrevToken;
+Token* freeToken(Token* _token){
+	// MDH@30APR2019: let's delegate to free_token()
+	Token* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token);}return _prevToken;
 }
 
 // output functions that require access to the current token
@@ -692,7 +696,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
      E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
-char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","-+!","`D","`S","","","","","","","","",""};
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","-+!","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -737,33 +741,34 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 // MDH@15APR2019: still to determine what to do with @ and ` (the latter for system commands????)
 //                inserting macro's should also be possible somehow...
 /*
- "UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","EXPR","VAR" ,"L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
+ "UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","EXPR","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
-{"!-+","" ,"="    ,""     ,""     ,""      ,"%"    ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C    )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  %()&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
-{""   ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"  ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
-{"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
-{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
-{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:    ] }="}, /* EXPRESSION */ \
-{""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,"LEN.","["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
-{""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"  ,""    ,"N"  ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *  ,.>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
+{"!-+","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
+{""   ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
+{"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
+{"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
+{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
+{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:    ] }="}, /* EXPRESSION */ \
+{""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,"LEN.",""      ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,""    ,"LEN."  ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
+{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
+{""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
+{""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *  ,.>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -931,7 +936,7 @@ Mexpressionvalue* getMapExpressionvalue(Token* _firstToken){
 		mstring* attributeName=_getValueText(_attributeNameExpressionvalue->_value); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
 		Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
-		_mapelement->_variable->name=string(attributeName); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
+		_mapelement->_variable->_name=heap_string_copy(string(attributeName)); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
 		free_mstring(attributeName); // NOTE freeing attributeName does NOT free the character array mstring* points to (which is now used by the variable's name!!!! replacing: string_dispose(attributeName);
 		_mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
 		_mapelement->_variable->_value=_attributeValueExpressionvalue->_value; // store the _value pointer of the attributeValueExpressionvalue
@@ -979,12 +984,14 @@ Mvalue* getFunctionCallValue(Mfunction* _function,Mmap* _argumentMap){
  */
 Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount){
 	// typically the offset token determines what the expression ends with!!
-	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.         	
+	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.   
+	Mexpressionvalue* _expressionvalue=NULL; 	
 	if(offsetToken){
 		Token* firstToken=offsetToken->next;
 		if(firstToken){
-			Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
+			
 			char tokenChar=string_char(firstToken->text,0);
+			
 			// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
 			if(tokenChar=='[')return getListExpressionvalue(firstToken->next,TT_END_OF_LIST,0); // a real list literal with any number of elements
 			if(tokenChar=='{')return getMapExpressionvalue(firstToken->next);
@@ -995,28 +1002,63 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 				// 2. get the arguments map
 				Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsExpressionvalue->_value->value._list); // assuming to have a list returned by getListExpressionValue()
 				// 3. the result of applying the function to the arguments is the end result
+				_expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
 				_expressionvalue->_value=getFunctionCallValue(function,_functionArgumentMap);
 				_expressionvalue->token=_functionArgumentsExpressionvalue->token;
 				/// NO NEED ANYMORE as the token field is never freed!!!!! _functionArgumentsExpressionvalue->token=NULL; // to prevent it from being freed as well
 				free_expressionvalue(_functionArgumentsExpressionvalue);
 				return _expressionvalue;
 			}
-			// not a function call or a map or list literal
-			Mlist* _expressionelementList=(Mlist*)calloc(1,sizeof(Mlist));
-			
-			char* variableName=NULL; // keep track of the current variable name (that we might need when we run into an assignment)
-			char* variableOperator=NULL; // the variable operator applicable to the variable name (right behind the variable and possibly in front of the assignment operator)
 
+			// not a function call or a map or list literal
+			// it could be an assignment in which case we remove the assignee and assigned value
+			Mvariable* assignee=NULL;
+			if(firstToken->type==TT_VARIABLE||firstToken->type==TT_NEW_VARIABLE){ // something that can be assigned to
+				Token* secondToken=firstToken->next;
+				if(secondToken){
+					// an index might be defined on a variable that is a list
+					if(secondToken->type==TT_LIST){
+						// TODO locate the end of list token at the same level????
+					}
+					// TODO there might be a binary operator behind (in front of the assignment operator)
+					char* shortcutBinaryOperator=NULL;
+					if(secondToken->type==TT_BINARY_AeRu||secondToken->type==TT_BINARY_Aeru){
+						shortcutBinaryOperator=string(secondToken->text);
+						secondToken=secondToken->next;
+					}
+					if(secondToken&&secondToken->type==TT_ASSIGNMENT){
+						if(firstToken->type==TT_NEW_VARIABLE)assignee=addVariable(pMenvironment,string(firstToken->text),VT_UNDEFINED);else assignee=getVariable(pMenvironment,string(firstToken->text));
+						Mexpressionvalue* _expressionvalue=getExpressionvalue(secondToken,endTokenTypes,endTokenTypeCount);
+						if(assignee&&_expressionvalue){
+							if(shortcutBinaryOperator){ // TODO apply the shortcut binary operator to the current value of the assignee before assigning
+							}
+							assignee->_value=_expressionvalue->_value; // side-effect, because NOT returning the value of the assignee!!! // TODO should we simply 'copy' the pointer instead of the contents?????
+						}
+						return _expressionvalue;
+					}
+					// not an assignment, so we carry on below
+				}else{ // this means only a single variable is in this expression, so we may return it's value
+					Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
+					if(firstToken->type==TT_VARIABLE)_expressionvalue->_value=getVariable(pMenvironment,string(firstToken->text))->_value; // obviously a new variable does not have a value!!!
+					return _expressionvalue;
+				}
+			}
+
+			// how about storing a list of expression elements where each element contains a value and optional a binary operator?????? I guess the binary operator is only in the following elements
+			// we might associate a 
+			Mlist* _expressionelementList=(Mlist*)calloc(1,sizeof(Mlist)); // the expression list to populate with arguments!!!
+			
 			mstring* unaryOperators=NULL; // collecting any unary operators to apply (in front of any value (which might be a function call mind!!!!))
+			char* variableName;
 
 			// READY TO PROCESS THE TOKENS
-			Token* token=offsetToken->next; // the first token to process
+			Token* token=firstToken; // the first token to process
 			int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 			while(token){
 				// does this token end the expression????
 				endTokenTypeIndex=endTokenTypeCount;while(--endTokenTypeIndex>=0&&token->type!=endTokenTypes[endTokenTypeIndex]);if(endTokenTypeIndex)break;
 				// values are easy, just push them on the expression stack
-				if(token->type==TT_VARIABLE){
+				if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
 					variableName=string(token->text);
 				}else
 				if(token->type<=8){
@@ -1027,6 +1069,9 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 				}
 				token=token->next;
 			}
+
+			_expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
+			// ready to evaluate the expression list
 
 			// remember the token that stopped the evaluation (which might be NULL)
 			_expressionvalue->token=token;
@@ -1205,10 +1250,10 @@ void writeRestOfCommand(){ // writes rest of command assuming pLastCommandToEval
 	}
 }
 */
-bool clearCommand(){
-	bool result=freeToken(pCommandToEvaluate);
-	pLastCommandToEvaluateToken=pCommandToEvaluate=NULL;
-	return result;
+void clearCommand(){
+	pLastCommandToEvaluateToken=NULL;
+	freeToken(pCommandToEvaluate);
+	pCommandToEvaluate=NULL;
 }
 
 void switchToControlMode(char* message){
@@ -1386,20 +1431,75 @@ void setCommand(Token* pNewCommand){
 }
 */
 
+// MDH@30APR2019: if the current token is a variable/function check whether it still is
+//                call whenever the current token changes (in removePreviousTokenCharacter() and commandCharacterAccepted())
+bool tokenCheckedForBeingAFunction(){
+	bool result=false;
+	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){
+		result=true;
+		// is it a function (now)?
+		if(getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // yes, it is
+			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
+			if(matchparentheses)if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+			// the minimum we can do is put an opening parenthesis in the behind cursor text
+			pLastCommandToEvaluateToken->type=TT_FUNCTION;
+			reoutputToken(pLastCommandToEvaluateToken);
+			// insert an opening parenthesis for the function call
+			if(matchparentheses)if(string_char(behindCursorText,0)!='(')string_insert_char(behindCursorText,0,'(');
+		}
+	}else
+	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
+		result=true;
+		// is it (still) a function?
+		if(!getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // no, it ain't
+			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
+			pLastCommandToEvaluateToken->type=TT_VARIABLE;
+			reoutputToken(pLastCommandToEvaluateToken);
+			//////////outputInfo("Variable redrawn!");
+			// remove any opening parenthesis from the behind cursor text
+			if(matchparentheses)if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
+		}
+	}
+	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
+	if(result){ // a variable or function
+		// check whether the variable exists or not
+		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
+			if(!getVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
+				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
+				reoutputToken(pLastCommandToEvaluateToken);
+				if(matchparentheses)if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
+			}
+		}else
+		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
+			if(getVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
+				pLastCommandToEvaluateToken->type=TT_VARIABLE;
+				reoutputToken(pLastCommandToEvaluateToken);
+				if(matchparentheses)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+			}
+		}
+	}
+	return result;
+}
+
 // in response to backspace the previous token character is to be removed
 void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 	char removedCharacter=removedTokenCharacter(1);
 	if(removedCharacter){
-		// MDH@24APR2019 obsolete: commandLength()--; // decrement the total command length
-		if(cursorPosition()==0)pCommandToEvaluate=NULL;
-		// on screen as well please
+		// adapt screen
 		moveCursorLeft(1); // will decrement cursorPosition() // MDH@24APR2019: NOT anymore...
 		clearScreenFromCursor(); // will clear what's behind the cursor
-		// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
-		writeBehindCursorText(false);
-		// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
+		// MDH@24APR2019 obsolete: commandLength()--; // decrement the total command length
+		if(cursorPosition()){ // still something left of the command (that we might check for being a function or not)
+			// on screen as well please
+			// before writing the behind cursor text we're going to check whether the current token still is a function or variable
+			tokenCheckedForBeingAFunction();
+			// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
+			writeBehindCursorText(false);
+			// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
+		}else
+			clearCommand();
 	}else
-		switchToControlMode("Failed to remove the character in response to pressing the backspace key.");
+		switchToControlMode("Failed to remove the last entered character.");
 }
 
 void outputTokenInfo(){
@@ -1488,7 +1588,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 					while(listCounter>0){pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;if(pLastCommandToEvaluateTokenToCheck==NULL)break;if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST)listCounter++;else if(pLastCommandToEvaluateTokenToCheck->type==TT_LIST||pLastCommandToEvaluateTokenToCheck->type==TT_LISTELEMENT)listCounter--;}
 				}
 				// two options: = behind a binary operator without variable (or list element) in front of it is not allowed, i.e. an error, otherwise we assume that = represents the first = of == the equality operator...
-				if(pLastCommandToEvaluateTokenToCheck==NULL||(pLastCommandToEvaluateTokenToCheck->type!=TT_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_LISTELEMENT))newTokenType=(behindBinaryOperator?TT_ERROR:TT_BINARY_aErU);
+				if(pLastCommandToEvaluateTokenToCheck==NULL||(pLastCommandToEvaluateTokenToCheck->type!=TT_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_NEW_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_LISTELEMENT))newTokenType=(behindBinaryOperator?TT_ERROR:TT_BINARY_aErU);
 			}
 
 			pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
@@ -1528,30 +1628,16 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 
 	if(endOfInput){
 		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
-		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){
-			// is it a function (now)?
-			if(getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // yes, it is
-				// the minimum we can do is put an opening parenthesis in the behind cursor text
-				pLastCommandToEvaluateToken->type=TT_FUNCTION;
-				string_insert_char(behindCursorText,0,'(');
-			}
-		}else
-		if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
-			// is it (still) a function?
-			if(!getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // no, it ain't
-				// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
-				pLastCommandToEvaluateToken->type=TT_VARIABLE;
-				if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
-			}
-		}else
-		// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
-		if(pLastCommandToEvaluateToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
-		// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
-		if(matchparentheses){
-			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
-				if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
-				if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
-				if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');/* MDH@24APR2019 obsolete: commandLength()++;*/}
+		if(!tokenCheckedForBeingAFunction()){
+			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
+			if(pLastCommandToEvaluateToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
+			if(matchparentheses){
+				if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
+					if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+					if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
+					if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');/* MDH@24APR2019 obsolete: commandLength()++;*/}
+				}
 			}
 		}
 		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
@@ -1881,12 +1967,8 @@ int main(int argc, char **argv){
 											// i.e. the current token is now empty!!!!
 											if(!string_length(pLastCommandToEvaluateToken->text)){
 												// we can check the offset to see if this is the first token, but pLastCommandToEvaluateToken->prev is a little more secure
-												
-												if(pLastCommandToEvaluateToken->prev){ // NOT the first token
-
-												}else{ // the first token
-													clearCommand();
-												}
+												pLastCommandToEvaluateToken=freeToken(pLastCommandToEvaluateToken);
+												if(!pLastCommandToEvaluateToken)pCommandToEvaluate=NULL; // if no last command token anymore, we apparently released the first command token
 											}
 											writeBehindCursorText(false);
 										}else
@@ -2088,13 +2170,11 @@ int main(int argc, char **argv){
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					if(!registerCommand()){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
-						if(commandIndex)
-							outputLine("ERROR: Failed to register the command again! Out of memory?");
-						else
-						if(freeToken(pCommandToEvaluate))
+						if(!commandIndex){ // a new command being registered!!!
+							freeToken(pCommandToEvaluate);
 							outputLine("ERROR: Failed to register the command! Out of memory?");
-						else
-							outputLine("ERROR: Failed to register and remove the command! Out of memory?");
+						}else
+							outputLine("ERROR: Failed to register the command again! Out of memory?");
 					}
 					// start anew (without a current command to evaluate!!!!)
 					pLastCommandToEvaluateToken=pCommandToEvaluate=NULL; // remove reference to current command

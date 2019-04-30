@@ -87,8 +87,9 @@
 
 */
 
+// MDH@30APR2019: inserted TT_NEW_VARIABLE to indicate a variable that does not yet exist (which means it cannot be compared with, and should be assigned first)
 // MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
-#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 25
+#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 26
 #define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
 #define FOREACH_TOKENTYPE(TOKENTYPE) \
 		TOKENTYPE(TT_UNARY) \
@@ -101,6 +102,7 @@
 		TOKENTYPE(TT_TERNARY_aeru) \
 		TOKENTYPE(TT_EXPRESSION) \
 		TOKENTYPE(TT_VARIABLE) \
+        TOKENTYPE(TT_NEW_VARIABLE) \
 		TOKENTYPE(TT_LISTELEMENT) \
 		TOKENTYPE(TT_INTEGER) \
 		TOKENTYPE(TT_REAL) \
@@ -140,14 +142,14 @@ typedef struct Token{
 	struct Token* prev; // we need this during user input
 	struct Token* next;
 }Token;
+void free_token(Token* _token);
 
-// a list of Mexpressions holds the body of an M function
+/* a list of Mexpressions holds the body of an M function
 typedef struct Mexpression{
     // a tokenized list of tokens, which means we have to move the definition of an Mtoken out of M.c to e.g. Mcommand or Mexpression even!!!
     Token* first;
 }Mexpression;
-
-void free_token(Token* _token);
 void free_expression(Mexpression* _expression);
+*/
 
 

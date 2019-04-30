@@ -7,10 +7,12 @@ void free_token(Token* _token){
         free(_token);
     }
 }
-
+/*
 void free_expression(Mexpression* _expression){
     if(_expression){
-        free_token(_expression->first);
+        free_expression(_expression->next);
+        free_value(_expression->_value);
         free(_expression);
     }
 }
+*/
