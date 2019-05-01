@@ -63,6 +63,7 @@ typedef union Mvalueunion{
 // you could say that a map is a list of variables, as such Menvironment holds a map of variables and a map of functions
 // and we could make a separate struct to hold a map
 typedef struct Mvalue{
+    size_t count; // keep track of the number of reference
     Mvaluetype type;
     Mvalueunion value;
 }Mvalue;
@@ -241,3 +242,5 @@ bool registerInternalFunctions(Menvironment* _environment);
 // helper function to return the function
 Mfunction* getFunction(Menvironment* _environment,const char* functionName);
 Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
+
+size_t getNumberOfRemovedValues();

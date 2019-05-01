@@ -63,9 +63,35 @@ bool initEnvironment(){
 			pMenvironment->_variableMap=environmentVariableMap;
 			// create and add PI and E constants!!!
 			Mvalue* PI_value=_getRealValue(LD_PI);
-			if(!addVariable(pMenvironment,"PI",VT_REAL,true))printf("\nERROR: Failed to add PI.");else if(!setValue(pMenvironment,"PI",PI_value)){free_value(PI_value);printf("\nERROR: Failed to initialize PI.");return false;}
+			if(!PI_value){
+				printf("\nERROR: Failed to create PI.");
+				return false;
+			}
+			if(!addVariable(pMenvironment,"PI",VT_REAL,true)){
+				printf("\nERROR: Failed to add PI.");
+				free_value(PI_value);
+				return false;
+			}
+			if(!setValue(pMenvironment,"PI",PI_value)){
+				free_value(PI_value);
+				printf("\nERROR: Failed to initialize PI.");
+				return false;
+			}
 			Mvalue* E_value=_getRealValue(LD_E);
-			if(!addVariable(pMenvironment,"E",VT_REAL,true))printf("\nERROR: Failed to add E.");else if(!setValue(pMenvironment,"E",E_value)){free_value(E_value);printf("\nERROR: Failed to initialize E.");return false;}
+			if(!E_value){
+				free_value(E_value);
+				printf("\nERROR: Failed to create E.");
+				return false;
+			}
+			if(!addVariable(pMenvironment,"E",VT_REAL,true)){
+				printf("\nERROR: Failed to add E.");
+				return false;
+			}
+			if(!setValue(pMenvironment,"E",E_value)){
+				free_value(E_value);
+				printf("\nERROR: Failed to initialize E.");
+				return false;
+			}
 			// we're going to store all commands in a list called M
 			if(!addVariable(pMenvironment,"M",VT_LIST,true))return false;
 			pMenvironment->_functionMap=environmentFunctionMap;
@@ -892,6 +918,7 @@ void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 		appendToListVariable(pMenvironment,"M",_expressionvalue->_value); // 'save' the value... TODO if we fail here what do we do???????
 		//// NEVER free what does not have an underscore at the start!!!! free_token(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
 		////////output("\nFreeing expression!");
+		_expressionvalue->_value->count--; // as where freeing _expressionvalue!!!!
 		free(_expressionvalue);
 	}
 };
@@ -1053,9 +1080,10 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 					default:
 						break;
 				}
-				if(_expressionvalue->_value)
-					output("\nReturning expression value '%s'.",string(_getValueText(_expressionvalue->_value)));
-				else
+				if(_expressionvalue->_value){
+					_expressionvalue->_value->count++; // increment the reference count of the value!!!
+					output("\nReturning expression value '%s' (count: %u.).",string(_getValueText(_expressionvalue->_value)),_expressionvalue->_value->count);
+				}else
 					output("\nNo value to return!");
 				return _expressionvalue;
 			}
@@ -1214,12 +1242,16 @@ bool evaluateCommand(){
 		if(commandExpressionValueText){
 			output("\n'%s' evaluates to '%s'.",string(commandText),string(commandExpressionValueText));
 			free_mstring(commandExpressionValueText);
+			outputLine("Released!");
 		}else
 			output("\nNo value represented by '%s'!",string(commandText));
 		free_expressionvalue(_commandExpressionvalue); // TODO do we need to do this?????
+		outputLine("Expression value released!");
 	}else
 		output("\n'%s' is undefined!",string(commandText));
+	outputLine("Command to release!");
 	free_mstring(commandText);
+	outputLine("Command released!");
 	return true;
 }
 
@@ -2223,9 +2255,11 @@ int main(int argc, char **argv){
 						outputLine("Failed to evaluate the command! Please complete, correct or cancel the command.");
 						continue;
 					}
+					outputLine("Command evaluated!");
 					string_setlength(behindCursorText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					if(!registerCommand()){
+						outputLine("Command registered!");
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(!commandIndex){ // a new command being registered!!!
 							freeToken(pCommandToEvaluate);
@@ -2235,6 +2269,11 @@ int main(int argc, char **argv){
 					}
 					// start anew (without a current command to evaluate!!!!)
 					pLastCommandToEvaluateToken=pCommandToEvaluate=NULL; // remove reference to current command
+
+					// remove any values not used anymore...
+					size_t removedValueCount=getNumberOfRemovedValues();
+					output("\nNumber of removed values: %lu.",removedValueCount);
+
 				}else
 				if(behindCursor()==0)
 					switchToControlMode(NULL);

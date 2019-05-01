@@ -1,6 +1,62 @@
 #include <math.h>
 #include "Mexecution.h"
 
+// keep a list of allocated values
+Mlist* _valueList=NULL;
+Mvalue* _newValue(){
+    Mvalue* _value=NULL;
+    if(!_valueList)_valueList=(Mlist*)calloc(1,sizeof(Mlist));
+    if(_valueList){
+        Mlistelement* _valueListelement=(Mlistelement*)calloc(1,sizeof(Mlistelement)); // both pointers NULL
+        if(_valueListelement){
+            _value=(Mvalue*)calloc(1,sizeof(Mvalue));
+            if(_value){
+                // shouldn't pose a problem now...
+               _valueListelement->_value=_value;
+                 if(_valueList->_last)_valueList->_last->_next=_valueListelement;else _valueList->_first=_valueListelement;
+                _valueList->_last=_valueListelement;
+                _valueList->numberOfElements++;
+            }else // couldn't get a new value, so free the value list element immediately
+                free(_valueListelement);
+        }
+    }
+    if(!_value)printf("\nERROR: Failed to create value!");
+    return _value;
+}
+// can be asked to remove unused values
+size_t getNumberOfRemovedValues(){
+    size_t removed=0;
+    if(_valueList){
+        printf("\nNumber of values to check: %u.",_valueList->numberOfElements);
+        Mlistelement* _lastValueListelement=NULL; // the last value list element processed that is still present
+        Mlistelement* _nextValueListelement;
+        Mlistelement* _valueListelement=_valueList->_first;
+        size_t checked=0;
+        while(_valueListelement){
+            checked++;
+            if(_valueListelement->_value&&!_valueListelement->_value->count){ // unused
+                printf("\nNOTE: Removing a value.");
+                removed++;
+                free_value(_valueListelement->_value);
+                _valueListelement->_value=NULL; // just in case
+                // make the previous list element point to the next (skipping the unused value)
+                if(_lastValueListelement) // at least one value in the value list
+                    _lastValueListelement->_next=_valueListelement->_next;
+                else // no values before this element in the list, so make _first point to the next element!!!
+                    _valueList->_first=_valueListelement->_next;
+                // one down
+                _valueList->numberOfElements--;
+                free(_valueListelement);
+            }else // keeping the current value list element, which therefore is the last value list element
+                _lastValueListelement=_valueListelement;
+            // if there is no last value list element at the moment we should continue with the first element
+            _valueListelement=(_lastValueListelement?_lastValueListelement->_next:_valueList->_first);
+        }
+        printf("\nNumber of values checked: %lu.",checked);
+    }
+    return removed;
+}
+
 // ALLOCATORS (private)
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
@@ -24,19 +80,19 @@ Mstring* new_string(char* _text){ // _text assumed to be string(mstring*), so we
 Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
 Mvalue* _getIntegerValue(long long ll){
     Minteger* _integer=new_integer(ll);
-    Mvalue* _integervalue=(_integer?malloc(sizeof(Mvalue)):NULL);
+    Mvalue* _integervalue=(_integer?_newValue():NULL);
     if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
     return _integervalue;
 }
 Mvalue* _getRealValue(long double ld){
     Mreal* _real=new_real(ld);
-    Mvalue* _realvalue=(_real?malloc(sizeof(Mvalue)):NULL);
+    Mvalue* _realvalue=(_real?_newValue():NULL);
     if(_realvalue){_realvalue->type=VT_REAL;_realvalue->value._real=_real;}
     return _realvalue;
 }
 Mvalue* _getStringValue(char* _s){
     Mstring* _string=(_s?new_string(_s):NULL); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
-    Mvalue* _stringvalue=(_string?malloc(sizeof(Mvalue)):NULL);
+    Mvalue* _stringvalue=(_string?_newValue():NULL);
     if(_stringvalue){_stringvalue->type=VT_REAL;_stringvalue->value._string=_string;}
     return _stringvalue;
 }
@@ -44,14 +100,14 @@ Mvalue* _getStringValue(char* _s){
 Mvalue* _getListValue(Mvaluetype listValuetype){
     Mlist* _list=(Mlist*)malloc(sizeof(Mlist));
     _list->valuetype=listValuetype; // register what type of elements this list should have
-    Mvalue* _listvalue=(_list?malloc(sizeof(Mvalue)):NULL);
+    Mvalue* _listvalue=(_list?_newValue():NULL);
     if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}
     return _listvalue;
 }
 Mvalue* _getMapValue(Mvaluetype mapValuetype){
     Mmap* _map=(Mmap*)malloc(sizeof(Mmap));
     _map->valuetype=mapValuetype;
-    Mvalue* _mapvalue=(_map?malloc(sizeof(Mvalue)):NULL);
+    Mvalue* _mapvalue=(_map?_newValue():NULL);
     if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}
     return _mapvalue;
 }
@@ -364,17 +420,17 @@ bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetyp
     return false;
 }
 
-
 bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
-    if(!_environment||!name||!_value)return false;
+    if(!_environment||!name||!_value){printf("\nERROR: Cannot set the value: no environment, name or value.");return false;}
     Mvariable* _variable=getVariable(_environment,name);
     if(_variable){
         if(!_variable->_value||!_variable->immutable){
             // _value needs to be of the right type
             if(!_value||_variable->valuetype==VT_UNDEFINED||_variable->valuetype==_value->type){
-                if(_variable->_value)free_value(_variable->_value); // free the current value before replacing the pointer!!!
-                _variable->_value=_value;
+                if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
+                _variable->_value=_value; // store the reference
+                if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }
             printf("\nERROR: Cannot set the value of variable '%s': the new value is of the wrong type.",name);
@@ -389,6 +445,7 @@ bool appendedToList(Mlist* _list,Mvalue* _value){
         Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement*));
         if(_listelement){
             _listelement->_value=_value;
+            if(_listelement->_value)_listelement->_value->count++; // increment the reference count of the stored value
             if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
             _list->_last=_listelement;
             _list->numberOfElements++;
