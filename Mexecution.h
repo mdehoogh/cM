@@ -1,4 +1,11 @@
 /**
+ * MDH@01MAY2019:
+ * - we need rules of 'engagement': 
+ *   . all dynamic memory management of structure pointers defined here has to be done inside Mexecution.c, so only raw data should be provided to the methods
+ *   . external parties can use the structures but should not change them
+ *   . if M needs a list to store stuff in it should request value of that type, than it can use that to populate the list, but NEVER ever change the list itself i.e. treat a value as immutable
+ *     this way free_value() can always free the integer, real, string, list or map it contains
+ * 
  * MDH@29APR2019:
  * - every struct that allocates dynamic memory needs to have an explicit free function, otherwise you could free a pointer to it without freeing internal pointers
  * 
@@ -22,8 +29,8 @@
 #include "Mexpression.h"
 
 // defining VALUE_TYPES as an enum defining all possible value types
-// VT_UNDEFINED indicates that no value is currently to be associated 
-enum Mvaluetype {VT_UNDEFINED,VT_INTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP};
+// VT_UNDEFINED indicates that no value is currently to be associated
+typedef enum Mvaluetype {VT_UNDEFINED,VT_INTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -39,7 +46,7 @@ typedef struct Mreal{
 
 typedef struct Mstring{
     char presuffix;
-    mstring* _m;
+    char _c[]; // by using an array and not a pointer, it's easy to make one out of an mstring* by strcpy from string(mstring)
 }Mstring;
 
 struct Mlist;
@@ -56,7 +63,7 @@ typedef union Mvalueunion{
 // you could say that a map is a list of variables, as such Menvironment holds a map of variables and a map of functions
 // and we could make a separate struct to hold a map
 typedef struct Mvalue{
-    enum Mvaluetype type;
+    Mvaluetype type;
     Mvalueunion value;
 }Mvalue;
 
@@ -66,13 +73,16 @@ typedef struct Mlistelement{
 }Mlistelement;
 
 typedef struct Mlist{
+    uint32_t numberOfElements; // keep track of the total number of elements
+    Mvaluetype valuetype; // we can force a list to have elements of the same type
     Mlistelement* _first;
     Mlistelement* _last;
-    uint32_t numberOfElements; // keep track of the total number of elements
 }Mlist;
 
 typedef struct Mvariable{
     char* _name;
+    bool immutable; // whether or not mutable
+    Mvaluetype valuetype; // MDH@01MAY2019: fixed type variables can only be assigned once, after that any value that is assigned to it has to have the same type as the first value
     Mvalue* _value;
 }Mvariable;
 
@@ -82,9 +92,10 @@ typedef struct Mmapelement{
 }Mmapelement;
 
 typedef struct Mmap{
+    uint32_t numberOfElements; // keep track of the total number of variables
+    Mvaluetype valuetype; // the type all values in the map should have
     Mmapelement* _first;
     Mmapelement* _last;
-    uint32_t numberOfElements; // keep track of the total number of variables
 }Mmap;
 
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
@@ -132,9 +143,9 @@ typedef struct Mfunctionmapelement{
 }Mfunctionmapelement;
 
 typedef struct MfunctionMap{
+    uint32_t numberOfFunctions;  // keeping track of the total number of functions...
     Mfunctionmapelement* _first;
     Mfunctionmapelement* _last;
-    uint32_t numberOfFunctions;  // keeping track of the total number of functions...
 }Mfunctionmap;
 
 //Mvalue* getFunction(Mfunctionlist functionlist,char* name);
@@ -148,6 +159,7 @@ typedef struct Menvironment{
     struct Menvironment* _parent;
 }Menvironment;
 
+/* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside
 // pointer to these structs releasers
 void free_string(Mstring* _string);
 void free_value(Mvalue* _value);
@@ -167,28 +179,60 @@ void free_environment(Menvironment* _environment);
 
 // helper function
 Mreal* get_real(long double ld);
+
 Mvalue* getRealValue(Mreal* _real);
 Minteger* get_integer(long long ll);
 Mvalue* getIntegerValue(Minteger* _integer);
 // mstring* is assumed to start with the same prefix/suffix character
 Mstring* get_string(mstring* s);
 Mvalue* getStringValue(Mstring* _string);
+*/
+
+// MDH@01MAY2019: it's possible to somehow hide the structure pointers within an Menvironment that point to the variables and functions
+//                which basically means that only raw data should go in and out of public functions
 
 // function prototypes
 // read access
 uint32_t getNumberOfVariables(Menvironment* _environment);
-mstring* _getVariableNames(const Menvironment* _environment,char* sep);
+mstring* _getVariableNames(const Menvironment* _environment,char* sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
+/* replacing:
 Mvariable* getNewVariable(Menvironment* _environment,const char* name);
 Mvariable* getVariable(Menvironment* _environment,const char* name);
+*/
+bool containsVariable(Menvironment* _environment,const char* name);
+Mvaluetype getVariableType(Menvironment* _environment,const char* name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
+Mvaluetype getVariableValueType(Menvironment* _environment,const char* name); // same as getVariableType() if a type is defined for the given variable
 
 // write access
-Mvariable* addVariable(Menvironment* _environment,char* name,enum Mvaluetype valueType);
-Mvalue* getValueOfVariable(Menvironment* _environment,char* name);
+bool setVariableType(Menvironment* _environment,const char* name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type
+// create a value of a certain value type initialized with either value NULL (atomic values) or an empty list or map (VT_LIST,VT_MAP)
+// NOTE when using VT_UNDEFINED, the value remains NULL but any value can be stored in it subsequently
+bool createVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype);
 
+// anybody can ask for a specific type of value (wrapping certain contents) and the pointer in it should be considered immutable i.e. Mvalue itself should be considered immutable
+// NOTE this doesn't mean that 
+Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
+Mvalue* _getIntegerValue(long long ll);
+Mvalue* _getRealValue(long double ld);
+Mvalue* _getStringValue(char* text);
+Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
+Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
+void free_value(Mvalue* _value);
+
+// once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
+// NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
+// decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mstring, Mlist or Mmap pointer)
+bool setValue(Menvironment* _environment,const char* name,Mvalue* _value);
+bool appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);
+
+bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype,bool immutable);
+Mvalue* getValue(Menvironment* _environment,const char* name);
+/*
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real);
 bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer);
 bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string);
+*/
 
 // functions
 mstring* _getFunctionNames(const Menvironment* _environment,char* sep);

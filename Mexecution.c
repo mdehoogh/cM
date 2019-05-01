@@ -1,25 +1,79 @@
 #include <math.h>
 #include "Mexecution.h"
 
+// ALLOCATORS (private)
+// value wrappers
+// typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
+Minteger* new_integer(long long ll){
+    Minteger* _integer=malloc(sizeof(Minteger));
+    if(_integer)_integer->ll=ll;
+    return _integer;
+}
+Mreal* new_real(long double ld){
+    Mreal* _real=malloc(sizeof(Mreal));
+    if(_real)_real->ld=ld;
+    return _real;
+}
+// Mstring is an immutable version of mstring* in that it cannot be changed
+Mstring* new_string(char* _text){ // _text assumed to be string(mstring*), so we can simply copy it over with the starting quote character (" or ')
+    return (Mstring*)_strdup(_text);
+}
+
+// interface functions that use the above functions
+// wrapping the different value type instances
+Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
+Mvalue* _getIntegerValue(long long ll){
+    Minteger* _integer=new_integer(ll);
+    Mvalue* _integervalue=(_integer?malloc(sizeof(Mvalue)):NULL);
+    if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
+    return _integervalue;
+}
+Mvalue* _getRealValue(long double ld){
+    Mreal* _real=new_real(ld);
+    Mvalue* _realvalue=(_real?malloc(sizeof(Mvalue)):NULL);
+    if(_realvalue){_realvalue->type=VT_REAL;_realvalue->value._real=_real;}
+    return _realvalue;
+}
+Mvalue* _getStringValue(char* _s){
+    Mstring* _string=(_s?new_string(_s):NULL); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
+    Mvalue* _stringvalue=(_string?malloc(sizeof(Mvalue)):NULL);
+    if(_stringvalue){_stringvalue->type=VT_REAL;_stringvalue->value._string=_string;}
+    return _stringvalue;
+}
+// we can force all listelements to have the same type????
+Mvalue* _getListValue(Mvaluetype listValuetype){
+    Mlist* _list=(Mlist*)malloc(sizeof(Mlist));
+    _list->valuetype=listValuetype; // register what type of elements this list should have
+    Mvalue* _listvalue=(_list?malloc(sizeof(Mvalue)):NULL);
+    if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}
+    return _listvalue;
+}
+Mvalue* _getMapValue(Mvaluetype mapValuetype){
+    Mmap* _map=(Mmap*)malloc(sizeof(Mmap));
+    _map->valuetype=mapValuetype;
+    Mvalue* _mapvalue=(_map?malloc(sizeof(Mvalue)):NULL);
+    if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}
+    return _mapvalue;
+}
+/*
+void free_list(Mlist* _list);
+void free_variable(Mvariable* _variable);
+void free_mapelement(Mmapelement* _mapelement);
+void free_map(Mmap* _map);
+void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement);
+void free_expressionlist(Mexpressionlist* _expressionlist);
+void free_functiondefinition(Mfunctiondefinition* _functiondefinition);
+// NOTE typically you're not supposed to free internal functions safe M function definitions 
+bool free_function(Mfunction* _function);
+bool free_functionmapelement(Mfunctionmapelement* _functionmapelement);
+void free_functionmap(Mfunctionmap* _functionmap);
+void free_environment(Menvironment* _environment);
+*/
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
 void free_string(Mstring* _string){
-    if(_string){if(_string->_m)free_mstring(_string->_m);_string->_m=NULL;free(_string);}
-}
-void free_value(Mvalue* _value){
-    if(_value){
-        // I do not need to free the value itself, only the pointers inside it
-        switch(_value->type){
-            case VT_UNDEFINED:break;
-            case VT_INTEGER:if(_value->value._integer)free(_value->value._integer);break;
-            case VT_REAL:if(_value->value._real)free(_value->value._real);break;
-            case VT_STRING:free_string(_value->value._string);break;
-            case VT_LIST:free_list(_value->value._list);break;
-            case VT_MAP:free_map(_value->value._map);break;
-        }
-        free(_value);
-    }
+    free(_string); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_mstring(_string->_m);_string->_m=NULL;free(_string);}
 }
 void free_listelement(Mlistelement* _listelement){
     if(_listelement){
@@ -37,6 +91,7 @@ void free_list(Mlist* _list){
         free(_list);
     }
 }
+void free_value(Mvalue* _value); // forward declaration!!
 void free_variable(Mvariable* _variable){
     if(_variable){
         if(_variable->_name)free(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
@@ -60,6 +115,22 @@ void free_map(Mmap* _map){
         free(_map);
     }
 }
+// MDH@01MAY2019: any value now supposedly owns it's own pointer 
+void free_value(Mvalue* _value){
+    if(_value){
+        // I do not need to free the value itself, only the pointers inside it
+        switch(_value->type){
+            case VT_UNDEFINED:break;
+            case VT_INTEGER:if(_value->value._integer)free(_value->value._integer);break;
+            case VT_REAL:if(_value->value._real)free(_value->value._real);break;
+            case VT_STRING:free_string(_value->value._string);break;
+            case VT_LIST:free_list(_value->value._list);break;
+            case VT_MAP:free_map(_value->value._map);break;
+        }
+        free(_value);
+    }
+}
+
 void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
     if(_expressionlistelement){
         free_expressionlistelement(_expressionlistelement->_next);
@@ -115,7 +186,7 @@ void free_environment(Menvironment* _environment){
     }
 }
 // END RELEASERS
-
+/*
 // helper functions
 // helper functions to wrap literals for storage in M
 Mreal* get_real(long double ld){
@@ -174,6 +245,7 @@ Mvalue* getStringValue(Mstring* _string){
     return NULL;
 }
 // end helper functions
+*/
 
 // read access to the elements defined in an environment
 uint32_t getNumberOfVariables(Menvironment* _environment){
@@ -214,27 +286,31 @@ Mvariable* getVariable(Menvironment* _environment,const char* name){
     }
     return NULL;
 }
+bool containsVariable(Menvironment* _environment,const char* name){return(getVariable(_environment,name)!=NULL);}
 
 // write access
 // helper function to create a new variable with a given name and of a given type
-Mvariable* _createVariable(char* name,enum Mvaluetype valueType){
+Mvariable* _createVariable(const char* name,Mvaluetype valuetype,bool immutable){
     if(!name||!strlen(name)){
         printf("\nERROR: No variable name defined.");
         return NULL;
     }
-    Mvariable* _variable=(Mvariable*)malloc(sizeof(Mvariable));
+    Mvariable* _variable=(Mvariable*)calloc(1,sizeof(Mvariable)); // all pointers will be NULL!!
     if(!_variable){
         printf("\nERROR: Failed to allocate memory to store variable '%s'.",name);
         return NULL;
     }
-    _variable->_name=heap_string_copy(name);
+    _variable->immutable=immutable;
+    _variable->_name=_strdup(name); // create a dynamic pointer on the heap
     if(!_variable->_name){
         free_variable(_variable);
         printf("\nERROR: Failed to allocate memory to store name '%s' of the new variable.",name);
         return NULL;
     }
+    _variable->valuetype=valuetype;
+    /* MDH@01MAY2019: we're NOT setting the value here!!!!
     // a ha, here we have an issue: we cannot just use the char pointer, if we want to free the name later on
-    if(valueType!=VT_UNDEFINED){
+    if(_variable->valuetype!=VT_UNDEFINED){
         _variable->_value=(Mvalue*)calloc(1,sizeof(Mvalue));
         if(!_variable->_value){
             free_variable(_variable);
@@ -244,7 +320,7 @@ Mvariable* _createVariable(char* name,enum Mvaluetype valueType){
         _variable->_value->type=valueType;
         // I do NOT need to set the values of the atomic elements (integer, real), so basically these are not initialized to start with
         // NOTE using calloc() instead of malloc() is essential for everything with pointers in it that should be NULL initially!!
-        switch(valueType){
+        switch(_variable->valueType){
             case VT_UNDEFINED:
             case VT_INTEGER:
             case VT_REAL:break;
@@ -254,16 +330,17 @@ Mvariable* _createVariable(char* name,enum Mvaluetype valueType){
         }
     }else
         _variable->_value=NULL;
+    */
     return _variable;
 }
 
 // addVariable returns the value map element that was created (if successful)
-Mvariable* addVariable(Menvironment* _environment,char* name,enum Mvaluetype valueType){
+bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
     if(_environment&&name){ // input valid 
         _variable=getVariable(_environment,name);
         if(!_variable){ // non-existing...
-            _variable=_createVariable(name,valueType);
+            _variable=_createVariable(name,valuetype,immutable);
             //////printf("\nVariable created!");
             if(_variable){
                 Mmapelement* _variableMapelement=(Mmapelement*)malloc(sizeof(Mmapelement));
@@ -275,18 +352,77 @@ Mvariable* addVariable(Menvironment* _environment,char* name,enum Mvaluetype val
                     if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else _environment->_variableMap->_first=_variableMapelement;
                     _environment->_variableMap->_last=_variableMapelement;
                     _environment->_variableMap->numberOfElements++;
-                    return _variable;
+                    return true;
                 }
                 // ASSERT failed to link the variable to the variable map!!
-                free(_variable);
+                free_variable(_variable);
                 printf("\nERROR: Failed to link variable '%s'.",name);
             }else
                 printf("\nERROR: Failed to create variable '%s'.",name);
         }
     }
-    return NULL;
+    return false;
 }
 
+
+bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
+    // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
+    if(!_environment||!name||!_value)return false;
+    Mvariable* _variable=getVariable(_environment,name);
+    if(_variable){
+        if(!_variable->_value||!_variable->immutable){
+            // _value needs to be of the right type
+            if(!_value||_variable->valuetype==VT_UNDEFINED||_variable->valuetype==_value->type){
+                if(_variable->_value)free_value(_variable->_value); // free the current value before replacing the pointer!!!
+                _variable->_value=_value;
+                return true; // releasing the value is my responsibility now...
+            }
+            printf("\nERROR: Cannot set the value of variable '%s': the new value is of the wrong type.",name);
+        }else
+            printf("\nERROR: Cannot set the value of variable '%s': it is not mutable!",name);
+    }else
+        printf("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
+    return false;
+}
+bool appendedToList(Mlist* _list,Mvalue* _value){
+    if(_list&&!_value){
+        Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement*));
+        if(_listelement){
+            _listelement->_value=_value;
+            if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
+            _list->_last=_listelement;
+            _list->numberOfElements++;
+            return true;
+        }
+    }
+    return false;
+}
+bool appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
+    if(!_environment||!name||!_value)return false;
+    Mvariable* _variable=getVariable(_environment,name);
+    if(_variable){
+        Mvalue* _value=_variable->_value;
+        if(_value->type==VT_LIST){ // yes a list we can append to
+            Mlist* _list=_value->value._list;
+            if(appendedToList(_list,_value)){
+                return true; // releasing the value is my responsibility now...
+            }
+            printf("\nERROR: Cannot append the value to the list stored in variable '%s': the new value is of the wrong type.",name);
+        }else
+            printf("\nERROR: Cannot append the value to variable '%s': it does not contain a list!",name);
+    }else
+        printf("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
+    return false;
+}
+
+Mvalue* getValue(Menvironment* _environment,const char* name){
+    if(_environment&&name){
+        Mvariable* _variable=getVariable(_environment,name);
+        if(_variable)return _variable->_value;
+    }
+    return NULL;
+}
+/*
 // let's start with some simple assignments
 bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer){
     if(_variable){        
@@ -324,6 +460,7 @@ bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string){
    }
    return false;
  }
+*/
 
 // functions
 // the names of the variables may be requested
@@ -440,7 +577,7 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
 // the following is a nuisance
 Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
     if(name&&_realValue){
-        Mvariable* _realVariable=_createVariable(name,VT_REAL);
+        Mvariable* _realVariable=_createVariable(name,VT_REAL,true);
         if(_realVariable){
             _realVariable->_value=_realValue;
             Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
@@ -469,15 +606,15 @@ Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
 // the internal functions (from math) can be registered with a given (most likely root) environment
 Mvalue* Msin(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return getRealValue(get_real(sin(_value->value._real->ld)));
-        if(_value->type==VT_INTEGER)return getRealValue(get_real(sin(_value->value._integer->ll)));
+        if(_value->type==VT_REAL)return _getRealValue(sin(_value->value._real->ld));
+        if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
     }
     return NULL;
 }
 Mvalue* Mcos(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return getRealValue(get_real(cos(_value->value._real->ld)));
-        if(_value->type==VT_INTEGER)return getRealValue(get_real(cos(_value->value._integer->ll)));
+        if(_value->type==VT_REAL)return _getRealValue(cos(_value->value._real->ld));
+        if(_value->type==VT_INTEGER)return _getRealValue(cos(_value->value._integer->ll));
     }
     return NULL;
 }
@@ -486,7 +623,7 @@ bool completedOneArgumentFunction(Mfunction* _function,OneArgumentFunction oneAr
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
-        _function->_parameterMap=_getSingleRealMap("x",getRealValue(get_real(0.0)));
+        _function->_parameterMap=_getSingleRealMap("x",_getRealValue(0.0));
         printf("\nRegistered function '%s' completed.",string(_function->_name));
         return true;
     }

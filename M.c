@@ -57,17 +57,17 @@ struct Menvironment* pMenvironment;
 bool initEnvironment(){
 	pMenvironment=calloc(1,sizeof(Menvironment));
 	if(pMenvironment){
-		// 
 		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
 		Mfunctionmap* environmentFunctionMap=calloc(1,sizeof(Mfunctionmap));
 		if(environmentVariableMap&&environmentFunctionMap){
 			pMenvironment->_variableMap=environmentVariableMap;
 			// create and add PI and E constants!!!
-			if(!setValueOfRealVariable(addVariable(pMenvironment,"PI",VT_REAL),get_real(LD_PI))){printf("\nERROR: Failed to add PI.");return false;}
-			if(!setValueOfRealVariable(addVariable(pMenvironment,"E",VT_REAL),get_real(LD_E))){printf("\nERROR: Failed to add E.");return false;} 
-			///// which is: 2.71828182845904523536)); // MDH@24APR2019: this is an approximation but the next decimal digits is a 0 as in 0287471352662497757247 (before the next 0)
+			Mvalue* PI_value=_getRealValue(LD_PI);
+			if(!addVariable(pMenvironment,"PI",VT_REAL,true))printf("\nERROR: Failed to add PI.");else if(!setValue(pMenvironment,"PI",PI_value)){free_value(PI_value);printf("\nERROR: Failed to initialize PI.");return false;}
+			Mvalue* E_value=_getRealValue(LD_E);
+			if(!addVariable(pMenvironment,"E",VT_REAL,true))printf("\nERROR: Failed to add E.");else if(!setValue(pMenvironment,"E",E_value)){free_value(E_value);printf("\nERROR: Failed to initialize E.");return false;}
 			// we're going to store all commands in a list called M
-			if(!addVariable(pMenvironment,"M",VT_LIST))return false;
+			if(!addVariable(pMenvironment,"M",VT_LIST,true))return false;
 			pMenvironment->_functionMap=environmentFunctionMap;
 			return registerInternalFunctions(pMenvironment);
 		}
@@ -127,18 +127,29 @@ char* getFormattedText(char* fmt,uint8_t maxlength,...){
 
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer){
-	char integerText[80];snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
-	mstring* s=string_create();if(!string_append(s,integerText)){free(s);s=NULL;}
+	mstring* s=string_create();
+	if(_integer){
+		char integerText[80];
+		snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
+		/////output("\nStringifying integer '%s'.",integerText);
+		string_append(s,integerText);
+	}
 	return s;
 }
 mstring* _getRealText(Mreal* _real){
-	char realText[80];snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
-	mstring* s=string_create();if(!string_append(s,realText)){free(s);s=NULL;}
+	mstring* s=string_create();
+	if(_real){
+		char realText[80];
+		snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
+		/////output("\nStringified real '%s'.",realText);
+		string_append(s,realText);
+	}
 	return s;
 }
 mstring* _getStringText(Mstring* _string){
 	mstring* s=string_create();
-	if(!string_append_char(s,_string->presuffix)||!string_append(s,string(_string->_m))||!string_append_char(s,_string->presuffix)){free(s);s=NULL;}
+	if(!string_append_char(s,_string->presuffix)||!string_append(s,_string->_c)||!string_append_char(s,_string->presuffix))
+	;
 	return s;
 }
 mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
@@ -169,14 +180,14 @@ mstring* _getMapText(Mmap* _map){
 	mstring* s=string_create();
 	if(s){
 		mstring* p=string_append_char(s,'{');
-		///printf("\n%s",string(p));
+		printf("\n%s",string(p));
 		Mmapelement* _mapelement=_map->_first;
 		while(_mapelement){
-			///printf("\n%s","start");
+			printf("\n%s","start");
 			Mvariable* _variable=_mapelement->_variable;
 			if(!_variable)continue;
 			p=string_append(p,_variable->_name);
-			///printf("\n%s",string(p));
+			printf("\n%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
 			mstring* mapelementValueText=_getValueText(_variable->_value);
 			if(!mapelementValueText)continue;
@@ -184,11 +195,11 @@ mstring* _getMapText(Mmap* _map){
 			free_mstring(mapelementValueText); // release AFTER copying over
 			_mapelement=_mapelement->_next;
 			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
-			////printf("\n%s","next");
+			printf("\n%s","next");
 		}
-		/////printf("\n%s(%d)",string(p),string_length(p));
+		printf("\n%s(%d)",string(p),string_length(p));
 		p=string_append_char(p,'}');
-		/////printf("\n%s",string(p));
+		printf("\n%s",string(p));
 		// if we failed, we have to free s here!!!
 		if(!p){free(s);s=NULL;}
 	}
@@ -254,7 +265,8 @@ mstring* _getValueText(Mvalue* _value){
 			case VT_LIST:
 				return _getListText(_value->value._list);
 		}
-	}
+	}/*else
+		output("\nNo value to evaluate.");*/
 	return string_append(string_create(),UNDEFINED_VALUETEXT);
 }
 void outputFunctions(){
@@ -872,9 +884,17 @@ typedef struct Mexpressionvalue{
 // free_expressionvalue does NOT free the token as it will probably be passed on...
 void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 	if(_expressionvalue){
+		/* TODO should I free the expression value if it is assigned, I should never have to do that do I???? well, not if it was assigned!!!! i.e. bound!!!
+		   besides we should store result in M, and use the length of M in determining the prompt!!!
+		output("\nFreeing expression value!");
 		free_value(_expressionvalue->_value);
+		*/
+		appendToListVariable(pMenvironment,"M",_expressionvalue->_value); // 'save' the value... TODO if we fail here what do we do???????
 		//// NEVER free what does not have an underscore at the start!!!! free_token(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
-		free(_expressionvalue);}};
+		////////output("\nFreeing expression!");
+		free(_expressionvalue);
+	}
+};
 
 // helper function to get an expression value of hold a value of a specific type
 Mexpressionvalue* getExpressionvalueOfType(enum Mvaluetype valuetype){
@@ -936,7 +956,7 @@ Mexpressionvalue* getMapExpressionvalue(Token* _firstToken){
 		mstring* attributeName=_getValueText(_attributeNameExpressionvalue->_value); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
 		Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
-		_mapelement->_variable->_name=heap_string_copy(string(attributeName)); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
+		_mapelement->_variable->_name=_strdup(string(attributeName)); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
 		free_mstring(attributeName); // NOTE freeing attributeName does NOT free the character array mstring* points to (which is now used by the variable's name!!!! replacing: string_dispose(attributeName);
 		_mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
 		_mapelement->_variable->_value=_attributeValueExpressionvalue->_value; // store the _value pointer of the attributeValueExpressionvalue
@@ -985,11 +1005,10 @@ Mvalue* getFunctionCallValue(Mfunction* _function,Mmap* _argumentMap){
 Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount){
 	// typically the offset token determines what the expression ends with!!
 	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.   
-	Mexpressionvalue* _expressionvalue=NULL; 	
+	Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*)); 	
 	if(offsetToken){
 		Token* firstToken=offsetToken->next;
 		if(firstToken){
-			
 			char tokenChar=string_char(firstToken->text,0);
 			
 			// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
@@ -1002,7 +1021,6 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 				// 2. get the arguments map
 				Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsExpressionvalue->_value->value._list); // assuming to have a list returned by getListExpressionValue()
 				// 3. the result of applying the function to the arguments is the end result
-				_expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
 				_expressionvalue->_value=getFunctionCallValue(function,_functionArgumentMap);
 				_expressionvalue->token=_functionArgumentsExpressionvalue->token;
 				/// NO NEED ANYMORE as the token field is never freed!!!!! _functionArgumentsExpressionvalue->token=NULL; // to prevent it from being freed as well
@@ -1010,39 +1028,71 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 				return _expressionvalue;
 			}
 
-			// not a function call or a map or list literal
+			char* firstTokenText=string(firstToken->text);
+			// ASSERTION not a function call or a map or list literal
+		
+			// it makes sense to check if there's a second token, if not we can speed things up
+			Token* secondToken=firstToken->next;
+			if(!secondToken){
+				switch(firstToken->type){
+					case TT_NEW_VARIABLE:
+						addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false); // NO retrieves the undefined value subsequently!!
+					case TT_VARIABLE:
+						_expressionvalue->_value=getValue(pMenvironment,firstTokenText);
+						break;
+					case TT_INTEGER:
+						_expressionvalue->_value=_getIntegerValue(atoll(firstTokenText));
+						break;
+					case TT_REAL:
+						_expressionvalue->_value=_getRealValue(_strtold(firstTokenText));
+						break;
+					case TT_SQSTRING:
+					case TT_DQSTRING:
+						_expressionvalue->_value=_getStringValue(firstTokenText);
+						break;
+					default:
+						break;
+				}
+				if(_expressionvalue->_value)
+					output("\nReturning expression value '%s'.",string(_getValueText(_expressionvalue->_value)));
+				else
+					output("\nNo value to return!");
+				return _expressionvalue;
+			}
+
+			// ASSERTION at least two tokens
+
 			// it could be an assignment in which case we remove the assignee and assigned value
-			Mvariable* assignee=NULL;
 			if(firstToken->type==TT_VARIABLE||firstToken->type==TT_NEW_VARIABLE){ // something that can be assigned to
-				Token* secondToken=firstToken->next;
-				if(secondToken){
-					// an index might be defined on a variable that is a list
-					if(secondToken->type==TT_LIST){
-						// TODO locate the end of list token at the same level????
-					}
-					// TODO there might be a binary operator behind (in front of the assignment operator)
-					char* shortcutBinaryOperator=NULL;
-					if(secondToken->type==TT_BINARY_AeRu||secondToken->type==TT_BINARY_Aeru){
-						shortcutBinaryOperator=string(secondToken->text);
-						secondToken=secondToken->next;
-					}
-					if(secondToken&&secondToken->type==TT_ASSIGNMENT){
-						if(firstToken->type==TT_NEW_VARIABLE)assignee=addVariable(pMenvironment,string(firstToken->text),VT_UNDEFINED);else assignee=getVariable(pMenvironment,string(firstToken->text));
-						Mexpressionvalue* _expressionvalue=getExpressionvalue(secondToken,endTokenTypes,endTokenTypeCount);
-						if(assignee&&_expressionvalue){
-							if(shortcutBinaryOperator){ // TODO apply the shortcut binary operator to the current value of the assignee before assigning
-							}
-							assignee->_value=_expressionvalue->_value; // side-effect, because NOT returning the value of the assignee!!! // TODO should we simply 'copy' the pointer instead of the contents?????
+				// an index might be defined on a variable that is a list
+				if(secondToken->type==TT_LIST){
+					// TODO locate the end of list token at the same level????
+				}
+				// TODO there might be a binary operator behind (in front of the assignment operator)
+				char* shortcutBinaryOperator=NULL;
+				if(secondToken->type==TT_BINARY_AeRu||secondToken->type==TT_BINARY_Aeru){
+					shortcutBinaryOperator=string(secondToken->text);
+					secondToken=secondToken->next;
+				}
+				if(secondToken&&secondToken->type==TT_ASSIGNMENT){
+					if(firstToken->type==TT_NEW_VARIABLE)addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false);
+					Mexpressionvalue* _expressionvalue=getExpressionvalue(secondToken,endTokenTypes,endTokenTypeCount);
+					if(_expressionvalue){
+						if(shortcutBinaryOperator){ 
+							// TODO apply the shortcut binary operator to the current value of the assignee before assigning
 						}
-						return _expressionvalue;
+						// if we failed to create the variable (see above), the following obviously will fail!!! (or of course when the type of the value is wrong)
+						output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
+						if(!setValue(pMenvironment,firstTokenText,_expressionvalue->_value)){
+							output("\nValue '%s' not stored.",string(_getValueText(_expressionvalue->_value)));free_value(_expressionvalue->_value);_expressionvalue->_value=NULL;
+						}else
+							output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(pMenvironment,firstTokenText))));
 					}
-					// not an assignment, so we carry on below
-				}else{ // this means only a single variable is in this expression, so we may return it's value
-					Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
-					if(firstToken->type==TT_VARIABLE)_expressionvalue->_value=getVariable(pMenvironment,string(firstToken->text))->_value; // obviously a new variable does not have a value!!!
 					return _expressionvalue;
 				}
 			}
+
+			// ASSERTION not an assignment
 
 			// how about storing a list of expression elements where each element contains a value and optional a binary operator?????? I guess the binary operator is only in the following elements
 			// we might associate a 
@@ -1056,7 +1106,10 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 			int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 			while(token){
 				// does this token end the expression????
-				endTokenTypeIndex=endTokenTypeCount;while(--endTokenTypeIndex>=0&&token->type!=endTokenTypes[endTokenTypeIndex]);if(endTokenTypeIndex)break;
+				endTokenTypeIndex=endTokenTypeCount;
+				while(--endTokenTypeIndex>=0&&token->type!=endTokenTypes[endTokenTypeIndex])
+				;
+				if(endTokenTypeIndex)break;
 				// values are easy, just push them on the expression stack
 				if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
 					variableName=string(token->text);
@@ -1116,6 +1169,19 @@ Mexpressionvalue* getFunctionValue(Token* _offsetToken,char* functionName){
 }
 */
 
+mstring* _getCommandText(){
+	mstring* commandText=string_create();
+	Token* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
+	while(pCommandToken){
+		// if we bump into a comment we're done!!!
+		if(pCommandToken->type==TT_COMMENT)break;
+		string_append(commandText,string(pCommandToken->text));
+		if(assisting){string_append_char(commandText,'(');string_append(commandText,TOKENTYPE_STRING[pCommandToken->type]);string_append(commandText,") ");}
+		pCommandToken=pCommandToken->next;
+	}
+	return commandText;
+}
+
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
@@ -1139,30 +1205,21 @@ bool evaluateCommand(){
 	if(pLastCommandToEvaluateToken->type==TT_EXPRESSION){outputError("Unfinished expression.");return false;}
 	if(pLastCommandToEvaluateToken->type==TT_MAP||pLastCommandToEvaluateToken->type==TT_MAP_VALUE){outputError("Unfinished map.");return false;}
 
-	printf("\n%s","'");
-	Token* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
-	while(pCommandToken){
-		// if we bump into a comment we're done!!!
-		if(pCommandToken->type==TT_COMMENT)break;
-/*
-#ifdef __DEBUG__
-		printf("{%p}",pCommandToEvaluateToken);
-#endif
-*/
-		output("%s",string(pCommandToken->text));
-		if(assisting)output("(%s) ",TOKENTYPE_STRING[pCommandToken->type]);
-		pCommandToken=pCommandToken->next;
-	}
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
+	mstring* commandText=_getCommandText();
 	Mexpressionvalue* _commandExpressionvalue=getExpressionvalue(pCommandToEvaluate,(enum TOKENTYPE_ENUM[]){},0);
 	if(_commandExpressionvalue){
 		mstring* commandExpressionValueText=_getValueText(_commandExpressionvalue->_value);
-		output("' evaluates to: '%s'.",commandExpressionValueText);
-		free_mstring(commandExpressionValueText);
+		if(commandExpressionValueText){
+			output("\n'%s' evaluates to '%s'.",string(commandText),string(commandExpressionValueText));
+			free_mstring(commandExpressionValueText);
+		}else
+			output("\nNo value represented by '%s'!",string(commandText));
 		free_expressionvalue(_commandExpressionvalue); // TODO do we need to do this?????
 	}else
-		output("' is undefined!");
+		output("\n'%s' is undefined!",string(commandText));
+	free_mstring(commandText);
 	return true;
 }
 
@@ -1464,14 +1521,14 @@ bool tokenCheckedForBeingAFunction(){
 	if(result){ // a variable or function
 		// check whether the variable exists or not
 		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
-			if(!getVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
+			if(!containsVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(matchparentheses)if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else
 		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
-			if(getVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
+			if(containsVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(matchparentheses)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);

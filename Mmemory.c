@@ -2,14 +2,17 @@
 #include <stdio.h>
 #include "Mmemory.h"
 
-char* heap_string_copy(char* _c){
+/**
+ * _strdup() adds writing a error message to strdup()
+ */
+char* _strdup(const char* _c){
     if(_c){
-        size_t sc=sizeof(_c);
-        if(sc){
-            char* _hc=strcpy(malloc(sc),_c);
-            if(_hc)return _hc;
-            printf("\nERROR: Failed to make a dynamic copy of '%s'.",_c);
-        }
-    }
+        char* _hc=strdup(_c);
+        if(_hc)return _hc;
+        printf("\nERROR: Failed to make a dynamic copy of '%s'.",_c);
+    }else
+        printf("\nERROR: Nothing to copy!");
     return NULL;
 }
+
+long double _strtold(char* _c){char* end=_c;return strtold(_c,&end);}
