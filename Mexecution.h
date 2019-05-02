@@ -218,7 +218,14 @@ Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
-void free_value(Mvalue* _value);
+
+// MDH@02MAY2019: not allowed to call free_value from the outside
+bool decrementReferenceCount(Mvalue* _value);
+bool incrementReferenceCount(Mvalue* _value);
+
+//////void free_value(Mvalue* _value);
+
+bool appendedToList(Mlist* _list,Mvalue* _value);
 
 // once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
@@ -242,5 +249,7 @@ bool registerInternalFunctions(Menvironment* _environment);
 // helper function to return the function
 Mfunction* getFunction(Menvironment* _environment,const char* functionName);
 Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
+
+bool completedOneArgumentIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 
 size_t getNumberOfRemovedValues();

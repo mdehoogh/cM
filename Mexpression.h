@@ -125,6 +125,10 @@
 enum TOKENTYPE_ENUM {
 	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
 };
+static const char* TOKENTYPE_STRING[]={
+	FOREACH_TOKENTYPE(GENERATE_STRING)
+};
+
 /*
 typedef struct{
 	unsigned int ended:1; // one flag to indicate whether or not the Token has ended

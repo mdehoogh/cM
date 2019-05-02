@@ -8,7 +8,9 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-//#include <cstdlib>
+#include "Msettings.h"
+#include "Moutput.h"
+#include "Msession.h"
 
 FILE* debugfile=NULL;
 #include <stdarg.h>
@@ -53,8 +55,33 @@ bool initVariable(Menvironment* pMenvironment,char* name,double d){
 const long double LD_PI=3.141592653589793238462643383279L; // 30 decimal digits of PI
 const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
+// how about storing all results here?????? instead of in the root environment????
+Mvalue* _resultListValue=NULL; // were the results are being kept
+// the function that is used to return a specific result value
+Mvalue* getResult(Mvalue* _index){
+	if(!_index)return _resultListValue;
+	// grab the list
+	Mlist* _resultList=_resultListValue->value._list;
+	size_t l=_resultList->numberOfElements; // the number of results we currently have registered
+	// find the integer index
+	if(!_index||_index->type==VT_INTEGER){
+		long long i=(_index?_index->value._integer->ll:-1);
+		if(i){ // 0 not allowed!!!
+			if(i<0)i+=l; // looking backwards not from the start
+			if(i>0&&i<=l){ // in range
+				Mlistelement* _resultListelement=_resultList->_first;
+				while(--i>0)_resultListelement=_resultListelement->_next;
+				if(_resultListelement)return _resultListelement->_value;
+			}
+		}
+	}
+	return NULL;
+}
+
 struct Menvironment* pMenvironment;
 bool initEnvironment(){
+	_resultListValue=_getListValue(VT_UNDEFINED);
+	if(!_resultListValue)outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
 	pMenvironment=calloc(1,sizeof(Menvironment));
 	if(pMenvironment){
 		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
@@ -64,73 +91,67 @@ bool initEnvironment(){
 			// create and add PI and E constants!!!
 			Mvalue* PI_value=_getRealValue(LD_PI);
 			if(!PI_value){
-				printf("\nERROR: Failed to create PI.");
+				outputLine("ERROR: Failed to create PI.");
 				return false;
 			}
 			if(!addVariable(pMenvironment,"PI",VT_REAL,true)){
-				printf("\nERROR: Failed to add PI.");
-				free_value(PI_value);
+				outputLine("ERROR: Failed to add PI.");
+				///////free_value(PI_value);
 				return false;
 			}
 			if(!setValue(pMenvironment,"PI",PI_value)){
-				free_value(PI_value);
-				printf("\nERROR: Failed to initialize PI.");
+				////////free_value(PI_value);
+				outputLine("ERROR: Failed to initialize PI.");
 				return false;
 			}
 			Mvalue* E_value=_getRealValue(LD_E);
 			if(!E_value){
-				free_value(E_value);
-				printf("\nERROR: Failed to create E.");
+				///////free_value(E_value);
+				outputLine("ERROR: Failed to create E.");
 				return false;
 			}
 			if(!addVariable(pMenvironment,"E",VT_REAL,true)){
-				printf("\nERROR: Failed to add E.");
+				outputLine("ERROR: Failed to add E.");
 				return false;
 			}
 			if(!setValue(pMenvironment,"E",E_value)){
-				free_value(E_value);
-				printf("\nERROR: Failed to initialize E.");
+				//////free_value(E_value);
+				outputLine("ERROR: Failed to initialize E.");
 				return false;
 			}
+			/*
 			// we're going to store all commands in a list called M
-			if(!addVariable(pMenvironment,"M",VT_LIST,true))return false;
+			Mvalue* Mvalue=_getListValue(VT_UNDEFINED);
+			if(!M_value){
+				outputLine("ERROR: Failed to create the M result list.");
+				return false;
+			}
+			if(!addVariable(pMenvironment,"M",VT_LIST,true)){
+				outputLine("ERROR: Failed to add the M result list.");
+				return false;
+			}
+			if(!setValue(pMenvironment,"M",M_value)){
+				outputLine("ERROR: Failed to initialize the M result list.");
+				return false;
+			}
+			*/
 			pMenvironment->_functionMap=environmentFunctionMap;
-			return registerInternalFunctions(pMenvironment);
+			if(!registerInternalFunctions(pMenvironment)){
+				outputLine("ERROR: Failed to register all internal functions.");
+				return false;
+			}
+			if(_resultListValue&&!completedOneArgumentIntegerFunction(newFunction(pMenvironment,"M"),getResult)){
+				outputLine("ERROR: Failed to register function M (for requesting previous results).");
+				return false;
+			}
 		}
 	}
-	return false;
+	return true;
 }
 
 // user interaction stuff
-// terminal input stuff
-#include <termios.h>
-struct termios orig_termios;
-bool rawMode=false;
-void disableRawMode(){
-	rawMode=false;
-	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
-}
-void endOfUserInput(); // prototype
-void enableRawMode(){
-	rawMode=true;
-	tcgetattr(STDIN_FILENO,&orig_termios);
-	atexit(endOfUserInput); // or std::atexit() in C++
-	struct termios raw=orig_termios;
+#include "Msession.h"
 
-  	// ISIG turns off Ctrl-C and Ctrl-Z
-	raw.c_lflag&=~(ECHO|ICANON|ISIG); // we kill echoing so we can first look at what we received!!
-	tcsetattr(STDIN_FILENO,TCSAFLUSH,&raw);
-}
-
-// MDH@28FEB2019: most conveniently to be able to output to the console through a single method that will allow a format string, and any number of arguments
-//                TODO delegate all functions that output to the output device to this function
-void output(const char *fmt,...){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);} // NOTE use vprintf here, NOT printf!!!!
-// convenience methods delegating to output() so all output (to stdout by default) goes through function output()
-void outputChar(char c){output("%c",c);} // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
-
-// all output to the display has to go through output!!
-#define ES "\033["
-void outputControlText(char* s){output(ES"%s",s);}
 /* sometimes we want to preformat text
 char* getFormattedText(char* fmt,uint8_t maxlength,...){
 	char str[maxlength+1];
@@ -183,20 +204,28 @@ mstring* _getListText(Mlist* _list){
 	mstring* s=string_create();
 	if(s){
 		mstring* p=string_append_char(s,'['); // switch to using p in appends
-		Mvalue* _listelementValue;
-		Mlistelement* _listelement=_list->_first;
-		while(_listelement){
-			_listelementValue=_listelement->_value;
-			if(_listelementValue){
-				mstring* mapelementValueText=_getValueText(_listelementValue);
-				if(!mapelementValueText)break; // too bad
-				p=string_append(p,string(mapelementValueText));
-				free_mstring(mapelementValueText); // release AFTER copying over
+		size_t l=_list->numberOfElements;
+		if(l){
+			output("\n%s(%d)",string(p),l);
+			Mvalue* _listelementValue;
+			Mlistelement* _listelement=_list->_first;
+			while(_listelement){
+				outputChar('.');
+				_listelementValue=_listelement->_value;
+				if(_listelementValue){
+					mstring* listelementValueText=_getValueText(_listelementValue);
+					if(listelementValueText){
+						p=string_append(p,string(listelementValueText));
+						free_mstring(listelementValueText); // release AFTER copying over
+					}
+				}
+				if(!(--l))break; // no further elements
+				_listelement=_listelement->_next;
+				if(_listelement)p=string_append(p,", "); // additional space behind comma!!
 			}
-			_listelement=_listelement->_next;
-			if(_listelement)p=string_append(p,", "); // additional space behind comma!!
 		}
 		p=string_append_char(p,']');
+		output("\nList=%s",string(p));
 		// if appending failed somewhere free s
 		if(!p){free(s);s=NULL;}
 	}
@@ -206,16 +235,18 @@ mstring* _getMapText(Mmap* _map){
 	mstring* s=string_create();
 	if(s){
 		mstring* p=string_append_char(s,'{');
-		printf("\n%s",string(p));
+		output("\n%s",string(p));
 		Mmapelement* _mapelement=_map->_first;
 		while(_mapelement){
-			printf("\n%s","start");
+			output("\n%s","start");
 			Mvariable* _variable=_mapelement->_variable;
 			if(!_variable)continue;
 			p=string_append(p,_variable->_name);
-			printf("\n%s",string(p));
+			output("\n%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+			output("\n%s",string(p));
 			mstring* mapelementValueText=_getValueText(_variable->_value);
+			output("\nMap element: %s",string(p));
 			if(!mapelementValueText)continue;
 			p=string_append(p,string(mapelementValueText)); // append 
 			free_mstring(mapelementValueText); // release AFTER copying over
@@ -271,8 +302,6 @@ mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 	return s;
 }
 
-const char* UNDEFINED_VALUETEXT="?"; // NOTE without the quotes that would surround an M string literal!!!
-
 mstring* _getValueText(Mvalue* _value){
 	// NOTE whatever is returned should be freed
 	if(_value){
@@ -305,64 +334,7 @@ void outputVariables(){
 	mstring* variablesText=_getMapText(pMenvironment->_variableMap);
 	output("\nVariables: %s.",string(variablesText));
 	free_mstring(variablesText);
-	/* replacing:
-	// we're going to write all the variables and their values in the M environment
-	// this means iterating over the variables in the environment
-	Mvariable* _variable;
-	output("\n%s:","Variables");
-	Mmap* _variableMap=pMenvironment->_variableMap;
-	Mmapelement* _variableMapelement=_variableMap->_first;
-	while(_variableMapelement){
-		_variable=_variableMapelement->_variable;
-		output(" %s=%s",_variableMapelement->name,_getValueText(_variable->_value,undefinedValueText));
-		pMvalue=_variable->mValue;
-		if(pMvalue){ // we're got a value to write
-			////outputChar(':');output("%i",pMvalue->type);outputChar('=');
-			switch(pMvalue->type){
-				case VT_INTEGER:
-					ll=pMvalue->value.i->ll;
-					output(":%lu=%ll",sizeof(ll),ll);
-					break;
-				case VT_REAL:
-					ld=pMvalue->value.r->ld;
-					output("=%.*Lf",LDBL_DIG,ld); // TODO how to determine the number of significant decimal digits (of my long double??)
-					break;
-				case VT_STRING:
-					pMstring=pMvalue->value.s;
-					output("=%c%s%c",pMstring->presuffix,string(pMstring->m),pMstring->presuffix); // wrap in single quotes (unless we put the quotes around the text as well, or we store the prefix/postfix char separately in Mstring)
-					break;
-				case VT_MAP:
-					pMmap=pMvalue->value.m;
-					outputChar('=');
-					outputChar('{');
-					// TODO write map elements
-					outputChar('}');
-					break;
-				case VT_LIST:
-					pMlist=pMvalue->value.l;
-					outputChar('=');
-					outputChar('[');
-					// TODO write list elements
-					outputChar(']');
-					break;
-			}
-		}
-		variable=variable->next;
-	}
-	*/
 }
-
-// Edit flags
-bool accepthistorycommand=true; // whether to immediately accept a history command
-bool matchparentheses=true;  // by default will 'match' parentheses
-
-#ifdef __DEBUG__
-bool assisting=true; // assist flag can be turned on to guide the user
-bool debugging=true; // program debugging flag so it will show the token information before evaluation of a command
-#else
-bool assisting=false; // assist flag can be turned on to guide the user
-bool debugging=false; // program debugging flag so it will show the token information before evaluation of a command
-#endif
 
 enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input modes: command, control, and shell
 
@@ -375,94 +347,6 @@ call prompt() when ready to receive a new command
 const char OPTION_CHAR='`'; // TODO should this character become part of options????
 
 // USER INPUT STUFF
-char inputChar,inputCharType; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
-int inputCharRead(){
-	if(!rawMode)enableRawMode();
-	if(read(STDIN_FILENO,&inputChar,1)==1){
-		//printf("{%i}",inputChar);
-		return 1;
-	}
-	return 0;
-}
-
-// MDH@16APR2019: let's define the standard colors and high-itensity colors which are dark and light versions
-const char BLACK[]="0";
-const char DARK_RED[]="1";
-const char DARK_GREEN[]="2";
-const char DARK_YELLOW[]="3";
-const char DARK_BLUE[]="4";
-const char DARK_PURPLE[]="5";
-const char DARK_CYAN[]="6";
-const char DARK_GREY[]="7";
-const char LIGHT_GREY[]="8";
-const char LIGHT_RED[]="9";
-const char LIGHT_GREEN[]="10";
-const char LIGHT_YELLOW[]="11";
-const char LIGHT_BLUE[]="45"; // "12" is really TOO dark!!
-const char LIGHT_PURPLE[]="13";
-const char LIGHT_CYAN[]="14";
-const char WHITE[]="15";
-const char ORANGE[]="202"; // instead of DARK_YELLOW use (a dark version of) ORANGE
-// the background colors (which are not used behind 38;5 or 48;5 but directly )
-const char BACKGROUND_BLACK[]="40";
-const char BACKGROUND_WHITE[]="47";
-
-#define NUMBER_OF_COLOR_SCHEMES 2
-
-// colors
-const char* BACKGROUND_COLORS[NUMBER_OF_COLOR_SCHEMES]={BACKGROUND_BLACK,BACKGROUND_WHITE}; // assuming either a black or white background
-
-const char* DEBUG_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
-const char* INFO_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
-
-const char* COMMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
-const char* ERROR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,LIGHT_RED};
-
-const char* ASSIGNMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
-const char* UNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
-const char* BINARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
-const char* TERNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
-
-const char* EXPRESSION_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
-const char* VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_BLUE,DARK_BLUE};
-const char* NEW_VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_CYAN,DARK_CYAN};
-const char* FUNCTION_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,ORANGE}; /////"93"; // something more blueish
-const char* LIST_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
-const char* MAP_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
-const char* NUMBER_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //"22"; // green (to indicate a literal)
-const char* STRING_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //////12"; // green (to indicate a literal)
-
-const char* RESULT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
-///////const char* OPTION_COLORS[]={BLACK,WHITE};
-const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the info color
-
-const char* BEHIND_CURSOR_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
-
-// operator token colors (all the same)
-const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
-
-// value token colors
-const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,VARIABLE_COLORS,NEW_VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
-
-#define ESCAPE_CHARACTER 27
-
-void setColor(const char* colortext){output("\033[38;5;%sm",colortext);}
-void setBackColor(const char* colortext){output("\033[48;5%sm",colortext);}
-
-void oneLineUp(){outputControlText("1A");} // ascertain that the previous line is visible
-void oneLineDown(){outputControlText("1B");} // one line down
-void toStartOfLine(){outputChar('\r');}
-void clearLine(){outputControlText("K");}
-void clearDisplay(){outputControlText("2J");}
-void moveCursorLeft(uint16_t pos){if(pos)output(ES"%huD",pos);} // TODO can't use outputControlText here!!!
-void moveCursorRight(uint16_t pos){if(pos)output(ES"%huC",pos);} // TODO can't use outputControlText here!!!
-void clearScreenFromCursor(){outputControlText("J");}
-void beep(){outputChar('\a');}
-void removeLastCharacter(){outputChar('\b');}
-void hidecursor(){outputControlText("?25l");}
-void showcursor(){outputControlText("?25h");}
-void emptyline(){outputControlText("2K\r");}
-void backspace(){outputControlText("D"); /* go left one character */ outputControlText("K"); /* clear the rest of the line */}
 
 /* TODO are we using the storeCursor() and restoreCursor() sometime?
 // VT100 codes...
@@ -470,36 +354,9 @@ void storeCursor(){printf("\0337");}
 void restoreCursor(){printf("\0338");}
 */
 
-// display flags
-uint8_t colorScheme=0; // the active color scheme (either 0 for white, or 1 for black background), toggle with C in control mode
-void setColorScheme(uint8_t newColorScheme){
-	colorScheme=(newColorScheme%NUMBER_OF_COLOR_SCHEMES);
-	output(ES"%sm",BACKGROUND_COLORS[colorScheme]); // TODO can't use outputControlText here!!!
-	clearDisplay();
-	/////// user will see!!!! output("\n%s\n>> ",(colorScheme?"Will assume dark background!":"Will assume white background!"));
-}
+void displayFlags(){output("\nEdit flags: %c%c%c%c - Display flags: %c%c.",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());}
 
-void resetOutputColor(){setColor(INFO_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);}
-void outputLine(char* s){resetOutputColor();output("\n%s",s);} // for writing a single line of output text in the info color
-
-// M settings
-bool wrapMode=true; // by default use 'wrap' mode, not 'Origin' mode
-void setWrapMode(bool newWrapMode){
-	wrapMode=newWrapMode;
-	outputControlText(wrapMode?"?6l":"?7l"); // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
-	if(wrapMode)output("\nWrap mode enabled!\n");else output("\nWrap mode disabled!\n");
-}
-void displayFlags(){output("\nEdit flags: %c%c%c%c - Display flags: %c%c.",assisting?'A':'a',debugging?'D':'d',matchparentheses?'M':'m',accepthistorycommand?'U':'u',wrapMode?'W':'w',48+colorScheme);}
-
-void outputFlags(){output("%c%c%c%c%c%c",assisting?'A':'a',(48+colorScheme),debugging?'D':'d',matchparentheses?'M':'m',wrapMode?'W':'w',accepthistorycommand?'U':'u');}
-
-void initDisplay(){
-	outputControlText("=3h"); // 80x25 color mode
-	outputControlText("?3l"); // switch to 132 column mode (if possible)
-	outputControlText("0m");
-	setColorScheme(colorScheme); // will also clear the display screen
-	setWrapMode(wrapMode);
-}
+void outputFlags(){output("%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');}
 
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 uint32_t commandCount=0; // the total number of command input
@@ -546,7 +403,7 @@ void prompt(){
 }
 
 void promptForUserInput(){
-	if(!rawMode)enableRawMode();
+	enableRawmode();
 	resetOutputColor();
 	output("\n\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
 	prompt();
@@ -578,26 +435,26 @@ const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0b01010000,0b01000000,0b0110
 void outputTokenColor(Token* pLastCommandToEvaluateToken){
 	///////printf("[%d]",pLastCommandToEvaluateToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
-	setBackColor(BACKGROUND_COLORS[colorScheme]);
+	setBackColor(getBackgroundColor());
 	uint8_t tokentype_id=TOKENTYPE_IDS[pLastCommandToEvaluateToken->type];
 	///////printf("(%d)",tokentype_id);
 	switch(tokentype_id>>6){
 		case 0: // value token
-			setColor(VALUE_TOKEN_COLORS[tokentype_id][colorScheme]);
+			setColor(getValueTokenColor(tokentype_id));
 			break;
 		case 1: // operator: unary, binary, ternary, assignment
 			{
 			uint8_t opCategory=(tokentype_id&0x30)>>4;
 			/////////printf("(%d,%d)",tokentype_id,opCategory);
-			setColor(OPERATOR_TOKEN_COLORS[opCategory][colorScheme]);
+			setColor(getOperatorTokenColor(opCategory));
 			break;
 			}
 		case 2: // comment or end of comment
-			setColor(COMMENT_COLORS[colorScheme]);
+			setColor(getCommentColor());
 			break;
 		case 3: // error token
 			/////////outputChar('E');
-			setColor(ERROR_COLORS[colorScheme]);
+			setColor(getErrorColor());
 			break;
 	}
 }
@@ -606,7 +463,7 @@ void outputToken(Token* _token){
 	outputTokenColor(_token);
 	// if we allow comments in tokens we're in trouble!!!
 	output("%s",string(_token->text));
-	/////////if(assisting){resetOutputColor();outputChar('|');}
+	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
 void outputLastTokenChar(Token* _token){
 	///////outputTokenColor(pLastCommandToEvaluateToken);
@@ -645,15 +502,15 @@ void outputInfo(const char* fmt,...){
 	}
 }
 void outputError(char* error){
-	if(!strlen(error))return;
-	toStartOfPreviousLine();setColor(ERROR_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);output("%s",error);toStartOfNextLine();toCursorPosition();
+	if(!error||!strlen(error))return;
+	toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());output("%s",error);toStartOfNextLine();toCursorPosition();
 }
 void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();toCursorPosition();}
 
 void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),commandLength());
 	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
-	if(debugging)
+	if(amDebugging())
 		outputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 }
@@ -692,10 +549,6 @@ bool registerCommand(){
 	commands[commandCount++]=pCommandToEvaluate;
 	return true;
 }
-
-static const char* TOKENTYPE_STRING[]={
-	FOREACH_TOKENTYPE(GENERATE_STRING)
-};
 
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
 // t=tab(feedforward variable),n=newline(end of command),U=unary operator,D=double quoted string literal,C=comment,L=letter (in identifiers),l=letter (not at start of identifier)
@@ -910,18 +763,22 @@ typedef struct Mexpressionvalue{
 // free_expressionvalue does NOT free the token as it will probably be passed on...
 void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 	if(_expressionvalue){
+		if(amVerbose())outputLine("Releasing the result!");
 		/* TODO should I free the expression value if it is assigned, I should never have to do that do I???? well, not if it was assigned!!!! i.e. bound!!!
 		   besides we should store result in M, and use the length of M in determining the prompt!!!
 		output("\nFreeing expression value!");
 		free_value(_expressionvalue->_value);
 		*/
-		appendToListVariable(pMenvironment,"M",_expressionvalue->_value); // 'save' the value... TODO if we fail here what do we do???????
+		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_value))outputLine("ERROR: Failed to save the result.");else if(amVerbose())outputLine("Result saved.");}
+		// replacing: if(!appendToListVariable(pMenvironment,"M",_expressionvalue->_value))outputLine("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputLine("Result appended to the M list.");
 		//// NEVER free what does not have an underscore at the start!!!! free_token(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
 		////////output("\nFreeing expression!");
-		_expressionvalue->_value->count--; // as where freeing _expressionvalue!!!!
+		decrementReferenceCount(_expressionvalue->_value); // as where freeing _expressionvalue!!!!
 		free(_expressionvalue);
-	}
-};
+	}else
+	if(amVerbose())outputLine("No result to free!");
+	
+}
 
 // helper function to get an expression value of hold a value of a specific type
 Mexpressionvalue* getExpressionvalueOfType(enum Mvaluetype valuetype){
@@ -1036,6 +893,7 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 	if(offsetToken){
 		Token* firstToken=offsetToken->next;
 		if(firstToken){
+			
 			char tokenChar=string_char(firstToken->text,0);
 			
 			// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
@@ -1082,9 +940,9 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 				}
 				if(_expressionvalue->_value){
 					_expressionvalue->_value->count++; // increment the reference count of the value!!!
-					output("\nReturning expression value '%s' (count: %u.).",string(_getValueText(_expressionvalue->_value)),_expressionvalue->_value->count);
+					if(amVerbose())output("\nReturning expression value '%s' (with reference count: %u).",string(_getValueText(_expressionvalue->_value)),_expressionvalue->_value->count);
 				}else
-					output("\nNo value to return!");
+				if(amVerbose())output("\nNo value to return!");
 				return _expressionvalue;
 			}
 
@@ -1110,10 +968,15 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 							// TODO apply the shortcut binary operator to the current value of the assignee before assigning
 						}
 						// if we failed to create the variable (see above), the following obviously will fail!!! (or of course when the type of the value is wrong)
-						output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
+						if(amVerbose())output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
 						if(!setValue(pMenvironment,firstTokenText,_expressionvalue->_value)){
-							output("\nValue '%s' not stored.",string(_getValueText(_expressionvalue->_value)));free_value(_expressionvalue->_value);_expressionvalue->_value=NULL;
+							output("\nERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
+							/* no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
+							free_value(_expressionvalue->_value);
+							_expressionvalue->_value=NULL;
+							*/
 						}else
+						if(amVerbose())
 							output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(pMenvironment,firstTokenText))));
 					}
 					return _expressionvalue;
@@ -1138,6 +1001,13 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 				while(--endTokenTypeIndex>=0&&token->type!=endTokenTypes[endTokenTypeIndex])
 				;
 				if(endTokenTypeIndex)break;
+
+				if(token->type==TT_FUNCTION){ // the first token is a function name, obviously we should evaluate it
+					// we can get the value of applying the function by passing token as offset token (containing the function name so followed by a function call element (hopefully))
+					Mexpressionvalue* _expressionvalue=getExpressionvalue(token,endTokenTypes,endTokenTypeCount);
+					if(!appendedToList(_expressionelementList,_expressionvalue->_value))break;
+					token=_expressionvalue->token; // continue from the end token received!!!
+				}else
 				// values are easy, just push them on the expression stack
 				if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
 					variableName=string(token->text);
@@ -1151,11 +1021,19 @@ Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endT
 				token=token->next;
 			}
 
-			_expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*));
 			// ready to evaluate the expression list
 
 			// remember the token that stopped the evaluation (which might be NULL)
 			_expressionvalue->token=token;
+			// use the first element in the expression element list as end result (which it supposedly is)
+			if(_expressionelementList->numberOfElements){
+				if(_expressionelementList->numberOfElements>1){
+					Mvalue* _value=_getListValue(VT_UNDEFINED);
+					_value->value._list=_expressionelementList;
+					_expressionvalue->_value=_value;
+				}else
+					_expressionvalue->_value=_expressionelementList->_first->_value;
+			}
 			return _expressionvalue;
 		}
 	}
@@ -1204,7 +1082,7 @@ mstring* _getCommandText(){
 		// if we bump into a comment we're done!!!
 		if(pCommandToken->type==TT_COMMENT)break;
 		string_append(commandText,string(pCommandToken->text));
-		if(assisting){string_append_char(commandText,'(');string_append(commandText,TOKENTYPE_STRING[pCommandToken->type]);string_append(commandText,") ");}
+		if(amAssisting()){string_append_char(commandText,'(');string_append(commandText,TOKENTYPE_STRING[pCommandToken->type]);string_append(commandText,") ");}
 		pCommandToken=pCommandToken->next;
 	}
 	return commandText;
@@ -1242,16 +1120,16 @@ bool evaluateCommand(){
 		if(commandExpressionValueText){
 			output("\n'%s' evaluates to '%s'.",string(commandText),string(commandExpressionValueText));
 			free_mstring(commandExpressionValueText);
-			outputLine("Released!");
+			if(amVerbose())outputLine("Result text released!");
 		}else
 			output("\nNo value represented by '%s'!",string(commandText));
 		free_expressionvalue(_commandExpressionvalue); // TODO do we need to do this?????
-		outputLine("Expression value released!");
+		if(amVerbose())outputLine("Result released!");
 	}else
-		output("\n'%s' is undefined!",string(commandText));
-	outputLine("Command to release!");
+	if(amVerbose())output("\n'%s' is undefined!",string(commandText));
+	if(amVerbose())outputLine("Command to release!");
 	free_mstring(commandText);
-	outputLine("Command released!");
+	if(amVerbose())outputLine("Command released!");
 	return true;
 }
 
@@ -1259,17 +1137,7 @@ void prepareForUserInput(){
 	//enableRawMode();
 	// disable output buffering on printf (as in raw input mode it would not write at all)
 	setbuf(stdout,NULL);
-	initDisplay();
-}
-
-void endOfUserInput(){
-#ifdef __DEBUG__
-	printf("\nEnd of user input.");
-#endif
-	// return to the 'right' colors
-	resetOutputColor();
-	output("\n\n%s\n\n","Thanks for using M.");
-	if(rawMode)disableRawMode();
+	initSession();
 }
 
 // MDH@24APR2019: writeCommand() writes the command to evaluate, and sets pLastCommandToEvaluateToken in the process
@@ -1345,15 +1213,15 @@ void clearCommand(){
 	pCommandToEvaluate=NULL;
 }
 
-void switchToControlMode(char* message){
-	if(inputMode==IM_CONTROL)return; // already in control mode thank you
-	/////////outputChar('X');
-	if(inputMode==IM_COMMAND)clearCommand();
-	resetOutputColor();
-	if(message!=NULL)printf("\n%s",message);
-	inputMode=IM_CONTROL;
+char switchToControlMode(char* message){
+	if(inputMode!=IM_CONTROL){
+		if(inputMode==IM_COMMAND)clearCommand();
+		resetOutputColor();
+		if(message!=NULL)outputLine(message);
+		inputMode=IM_CONTROL;
+	}
 	///////////outputFlags(); // show the user the current flags!!
-	inputCharType='o'; // to make the loop know to quit
+	return 'o'; // to make the loop know to quit
 	//output("\n%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History Shell");
 }
 
@@ -1362,7 +1230,7 @@ void writeBehindCursorText(bool clearAfterBehindCursorText){
 	if(l||clearAfterBehindCursorText){
 		debugWrite("Behind cursor text to write: '%s'.",string(behindCursorText));
 		resetOutputColor();
-		setColor(BEHIND_CURSOR_TEXT_COLORS[colorScheme]);
+		setColor(getBehindCursorTextColor());
 		if(l)output("%s",string(behindCursorText));
 		if(clearAfterBehindCursorText){
 			outputChar(' ');
@@ -1412,7 +1280,7 @@ void setCommandIndex(uint32_t newCommandIndex){
 	if(commandIndex){
 		Token* token=commands[commandCount-commandIndex];
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
-		if(accepthistorycommand){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
+		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
 			setCommandToEvaluate(token);
 			outputInfo("Showing registered command #%u.",(commandCount-commandIndex+1));
 			return;
@@ -1529,12 +1397,12 @@ bool tokenCheckedForBeingAFunction(){
 		// is it a function (now)?
 		if(getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
-			if(matchparentheses)if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+			if(amMatchingparentheses())if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
 			pLastCommandToEvaluateToken->type=TT_FUNCTION;
 			reoutputToken(pLastCommandToEvaluateToken);
 			// insert an opening parenthesis for the function call
-			if(matchparentheses)if(string_char(behindCursorText,0)!='(')string_insert_char(behindCursorText,0,'(');
+			if(amMatchingparentheses())if(string_char(behindCursorText,0)!='(')string_insert_char(behindCursorText,0,'(');
 		}
 	}else
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
@@ -1546,7 +1414,7 @@ bool tokenCheckedForBeingAFunction(){
 			reoutputToken(pLastCommandToEvaluateToken);
 			//////////outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
-			if(matchparentheses)if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
+			if(amMatchingparentheses())if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
 		}
 	}
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
@@ -1556,14 +1424,14 @@ bool tokenCheckedForBeingAFunction(){
 			if(!containsVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
-				if(matchparentheses)if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
+				if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else
 		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
 			if(containsVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
-				if(matchparentheses)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+				if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			}
 		}
 	}
@@ -1709,7 +1577,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(pLastCommandToEvaluateToken); // echo the last token character
 	
 	if(endOfInput){
-		//////if(assisting)output(":%c",inputCharacterType);
+		//////if(amAssisting())output(":%c",inputCharacterType);
 		debugWrite("Command length after inserting %c: %" PRIu16 ".",inputChar,commandLength());
 	}
 
@@ -1721,7 +1589,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 			if(pLastCommandToEvaluateToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
-			if(matchparentheses){
+			if(amMatchingparentheses()){
 				if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
 					if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
 					if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
@@ -1750,13 +1618,13 @@ void executeShellCommand(){
 	if(result)output("Result: %d.\n",result); // non-zero result
 	clearShellCommand(); // ready for the next execution
 }
-void switchToShellMode(char* message){
+char switchToShellMode(char* message){
 	clearCommand();
 	resetOutputColor();
 	if(message!=NULL)output("\n%s",message);
 	inputMode=IM_SHELL;
 	clearShellCommand();
-	inputCharType='s';
+	return 's';
 	//output("\n%s\n $ ","Enter your shell command, and press the Return button to execute.");
 }
 void switchToCommandMode(){
@@ -1794,16 +1662,21 @@ int main(int argc, char **argv){
 			if(argv[arg][0]=='-'){ // a flag (or flags)
 				int i=0;
 				while(argv[arg][++i]){
-					if(argv[arg][i]=='d')debugging=false;else
-					if(argv[arg][i]=='D')debugging=true;else
-					if(argv[arg][i]=='a')assisting=false;else
-					if(argv[arg][i]=='A')assisting=true;else
-					if(argv[arg][i]=='m')matchparentheses=false;else
-					if(argv[arg][i]=='M')matchparentheses=true;else
-					if(argv[arg][i]=='C')colorScheme=0;else // light color scheme
-					if(argv[arg][i]=='c')colorScheme=1;else // dark color scheme
-					if(argv[arg][i]=='W')wrapMode=true;else
-					if(argv[arg][i]=='w')wrapMode=false;
+					if(argv[arg][i]=='s')setVerbose(true);else
+					if(argv[arg][i]=='S')setVerbose(false);else
+					if(argv[arg][i]=='d')setDebugging(false);else
+					if(argv[arg][i]=='D')setDebugging(true);else
+					if(argv[arg][i]=='a')setAssisting(false);else
+					if(argv[arg][i]=='A')setAssisting(true);else
+					if(argv[arg][i]=='m')setMatchingparentheses(false);else
+					if(argv[arg][i]=='M')setMatchingparentheses(true);else
+					/*
+					if(argv[arg][i]=='C')setColorscheme(0);else // light color scheme
+					if(argv[arg][i]=='c')setColorscheme(1);else // dark color scheme
+					*/
+					if(argv[arg][i]=='W')setWrapping(true);else
+					if(argv[arg][i]=='w')setWrapping(false);else
+					if(argv[arg][i]>='0'&&argv[arg][i]<='9')setColorscheme(argv[arg][i]-'0'); // a digit indicating the color scheme to use
 				}
 			}
 		}
@@ -1818,8 +1691,9 @@ int main(int argc, char **argv){
 	displayFlags();
 
 	if(!initEnvironment()){ // ascertain to have an execution environment!!!
-		setColor(ERROR_COLORS[colorScheme]);setBackColor(BACKGROUND_COLORS[colorScheme]);
-		output("\n%s","Exiting, due to failing to initialize the M execution environment!");
+		setColor(getErrorColor());setBackColor(getBackgroundColor());
+		outputLine("Exiting: due to failing to initialize the M execution environment!");
+		resetOutputColor();
 		exit(1);
 	}
 
@@ -1838,6 +1712,8 @@ int main(int argc, char **argv){
 
 	///// writeCommand() will take care of this!!!! commandLength()=0; // keep track of the total command length...
 	inputMode=IM_COMMAND; // TODO should this go into promptForUserInput()?
+
+	char inputChar,inputCharType;
 
 	while(1){
 
@@ -1883,11 +1759,15 @@ int main(int argc, char **argv){
 		// we do NOT need a command until after the first character which makes sense because we allow ` and arrow up and down to switch to option mode or select another command
 		// now we need to read characters one at a time and echo them from the command line
 		// Ctrl-D to exit M
-		while(inputCharRead()){
+		while(inputCharRead(&inputChar)){
+			
+			////////inputChar=getInputChar();
 
 			if(inputChar>127)continue; // undefined input character
 
 			inputCharType=INPUTCHARACTERTYPES[inputChar];
+			
+			////////printf("(%d)",inputCharType);
 
 			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE cursorPosition() is only defined in the other two modes)
 			// MDH@16APR2019: I want to use the Enter key (ASCII 13) to switch to the next mode, because the associated input character type is n which will ALWAYS break
@@ -1899,7 +1779,7 @@ int main(int argc, char **argv){
 				}
 				// not in control mode, go to control mode if first character on line
 				if(!cursorPosition()){
-					switchToControlMode(NULL);
+					inputCharType=switchToControlMode(NULL);
 					break;
 				}
 				// accept (might be an acceptable character in string literal in commands or in shell commands)
@@ -1926,7 +1806,7 @@ int main(int argc, char **argv){
 						if(string_removed_char(behindCursorText,0)){ // success!!!
 							writeBehindCursorText(true);
 						}else
-							switchToControlMode("Failed to remove the first character in the auto-complete text.");	
+							inputCharType=switchToControlMode("Failed to remove the first character in the auto-complete text.");	
 					}else
 						beep();
 				}else
@@ -1943,7 +1823,7 @@ int main(int argc, char **argv){
 					if(pCommandToEvaluate!=NULL){
 						backToPrompt();
 						clearCommand();
-						/////////if(wrapMode)break; // if in wrapmode can't guarantee backspace() to move into the previous line which means just prompt again...
+						/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
 					}else
 						beep();
 				}else
@@ -1956,12 +1836,12 @@ int main(int argc, char **argv){
 							char newInputChar=string_removed_char(behindCursorText,0);
 							if(!newInputChar){
 								writeBehindCursorText(false); // there will be characters behind the cursor left to show
-								switchToControlMode("Failed to remove the suggested character.");
+								inputCharType=switchToControlMode("Failed to remove the suggested character.");
 								break;
 							}
 							// MDH@24APR2019 obsolete: commandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],bc==0)){
-								switchToControlMode("Failed to accept the suggested character.");
+								inputCharType=switchToControlMode("Failed to accept the suggested character.");
 								break;
 							}
 						}
@@ -1969,19 +1849,19 @@ int main(int argc, char **argv){
 						beep();
 				}else
 				if(inputCharType=='m'){ // Esc character...
-					if(inputCharRead()){
+					if(inputCharRead(&inputChar)){
 						///printf("(%d)",inputChar);
 						if(inputChar==91){
-							if(inputCharRead()){
+							if(inputCharRead(&inputChar)){//inputChar=getInputChar();
 								///printf("(%d)",inputChar);
 								if(inputChar==51){
-									if(inputCharRead()){
+									if(inputCharRead(&inputChar)){//inputChar=getInputChar();
 										if(inputChar==126){ // delete
 											if(string_length(behindCursorText)){
 												if(string_removed_char(behindCursorText,0))
 													writeBehindCursorText(true);
 												else
-													switchToControlMode("Failed to remove the first character of the auto-completion text.");	
+													inputCharType=switchToControlMode("Failed to remove the first character of the auto-completion text.");	
 											}else // nothing under the cursor to delete
 												beep();
 										}
@@ -2027,9 +1907,9 @@ int main(int argc, char **argv){
 										if(newInputChar){
 											// MDH@24APR2019: commandLength()--;
 											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true))
-												switchToControlMode("Suggested character extracted, but not accepted.");
+												inputCharType=switchToControlMode("Suggested character extracted, but not accepted.");
 										}else
-											switchToControlMode("Suggested character not extracted!");
+											inputCharType=switchToControlMode("Suggested character not extracted!");
 									}else
 										beep();
 								}else
@@ -2061,7 +1941,7 @@ int main(int argc, char **argv){
 											}
 											writeBehindCursorText(false);
 										}else
-											switchToControlMode("Failed to move the cursor left.");
+											inputCharType=switchToControlMode("Failed to move the cursor left.");
 									}else
 										beep();
 								}else
@@ -2073,7 +1953,7 @@ int main(int argc, char **argv){
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//                we always need a command (being edited)
 					if(!commandCharacterAccepted(inputChar,inputCharType,true))
-						switchToControlMode(pCommandToEvaluate?"Failed to accept the character.":"Failed to create a new command");
+						inputCharType=switchToControlMode(pCommandToEvaluate?"Failed to accept the character.":"Failed to create a new command");
 					/*
 					// we need to have a token (to append the input character to) which initializes to pCommandToEvaluate
 					if(pCommandToEvaluate==NULL) // no first command token
@@ -2094,17 +1974,18 @@ int main(int argc, char **argv){
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
 					// single character responses (and out again)
-					if(inputChar=='a'||inputChar=='A'){assisting=(inputChar=='A');output("\n%s",(assisting?"Will assist!":"Will not assist!"));inputCharType='n';break;}
-					if(inputChar=='d'||inputChar=='D'){debugging=(inputChar=='D');output("\n%s",(debugging?"Will debug!":"Will not debug!"));inputCharType='n';break;}
-					if(inputChar=='m'||inputChar=='M'){matchparentheses=(inputChar=='M');output("\n%s",(matchparentheses?"Will match parentheses!":"Will not match parentheses!"));inputCharType='n';break;}
-					if(inputChar=='u'||inputChar=='U'){accepthistorycommand=(inputChar=='U');output("\n%s",(accepthistorycommand?"Will use history command immediately!":"Will use history command in auto-completion!"));inputCharType='n';break;}
-					if(inputChar>='0'&&inputChar<='9'){setColorScheme(inputChar-'0');inputCharType='n';break;}
-					if(inputChar=='w'||inputChar=='W'){setWrapMode(inputChar=='W');inputCharType='n';break;}
+					if(inputChar=='a'||inputChar=='A'){setAssisting(inputChar=='A');inputCharType='n';break;}
+					if(inputChar=='d'||inputChar=='D'){setDebugging(inputChar=='D');inputCharType='n';break;}
+					if(inputChar=='m'||inputChar=='M'){setMatchingparentheses(inputChar='M');inputCharType='n';break;}
+					if(inputChar=='s'||inputChar=='S'){setVerbose(inputChar=='s');inputCharType='n';break;} // 'amVerbose()' is implemented using 'silent' flag!!!
+					if(inputChar=='u'||inputChar=='U'){setAcceptinghistorycommand(inputChar='U');inputCharType='n';break;}
+					if(inputChar>='0'&&inputChar<='9'){setColorscheme(inputChar-'0');inputCharType='n';break;}
+					if(inputChar=='w'||inputChar=='W'){setWrapping(inputChar=='W');inputCharType='n';break;}
 					if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
 					if(inputChar=='f'||inputChar=='F'){outputFunctions();inputCharType='n';break;}
 					// options
 					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
-					if(inputChar=='s'||inputChar=='S')switchToShellMode(NULL);
+					if(inputChar=='s'||inputChar=='S')inputCharType=switchToShellMode(NULL);
 					if(inputChar=='h'||inputChar=='H'){
 						// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
 						// we could call them a, b, c etc.
@@ -2126,7 +2007,7 @@ int main(int argc, char **argv){
 							moveCursorLeft(1);
 							writeBehindCursorText(false);
 						}else
-							switchToControlMode("Failed to remove the shell command character!");
+							inputCharType=switchToControlMode("Failed to remove the shell command character!");
 					}else // nothing to remove
 						beep();
 				}else
@@ -2135,7 +2016,7 @@ int main(int argc, char **argv){
 						if(string_removed_char(behindCursorText,0))
 							writeBehindCursorText(true);
 						else
-							switchToControlMode("Failed to remove the first autocompletion character!");
+							inputCharType=switchToControlMode("Failed to remove the first autocompletion character!");
 					}else // nothing to remove
 						beep();
 				}else
@@ -2143,7 +2024,7 @@ int main(int argc, char **argv){
 					if(pCommandToEvaluate!=NULL){
 						backToPrompt();
 						clearShellCommand();
-						//////////if(wrapMode)break;
+						//////////if(amWrapping()())break;
 					}else
 						beep();
 				}else
@@ -2155,7 +2036,7 @@ int main(int argc, char **argv){
 							char newInputChar=string_removed_char(behindCursorText,0);
 							if(!newInputChar){
 								writeBehindCursorText(false);
-								switchToControlMode("Failed to accept all suggested characters.");
+								inputCharType=switchToControlMode("Failed to accept all suggested characters.");
 								break;
 							}
 							string_append_char(shellCommand,newInputChar);
@@ -2164,11 +2045,11 @@ int main(int argc, char **argv){
 						beep();
 				}else
 				if(inputCharType=='m'){ // Esc character...
-					if(inputCharRead()){
+					if(inputCharRead(&inputChar)){////inputChar=getInputChar();
 						if(inputChar==91){
-							if(inputCharRead()){
+							if(inputCharRead(&inputChar)){/////inputChar=getInputChar();
 								if(inputChar==51){
-									if(inputCharRead()){
+									if(inputCharRead(&inputChar)){///////inputChar=getInputChar();
 										if(inputChar==126){ // delete
 											// TODO FIX this does not seem to be right!!!!!
 											if(behindCursor()){
@@ -2191,7 +2072,7 @@ int main(int argc, char **argv){
 										char newInputChar=string_removed_char(behindCursorText,0);
 										if(!newInputChar){
 											writeBehindCursorText(false);
-											switchToControlMode("Failed to accept the suggested characters.");
+											inputCharType=switchToControlMode("Failed to accept the suggested characters.");
 										}else
 											string_insert_char(shellCommand,cursorPosition(),newInputChar);
 									}else
@@ -2208,7 +2089,7 @@ int main(int argc, char **argv){
 											moveCursorLeft(1);
 											writeBehindCursorText(false);
 										}else
-											switchToControlMode("Failed to move the cursor left.");
+											inputCharType=switchToControlMode("Failed to move the cursor left.");
 									}else
 										beep();
 								}else
@@ -2242,10 +2123,10 @@ int main(int argc, char **argv){
 						// finish the last token???
 						if(pLastCommandToEvaluateToken->significantCharacterCount==0)pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
 						pCommandToEvaluateToEvaluate=pCommandToEvaluate; // but only when not at start of command!!!
-						if(debugging)outputTokenInfo();
+						if(amDebugging())outputTokenInfo();
 					}
 				}else // no command yet, although we might be looking at a previous command
-				if(commandIndex&&cursorPosition()) // NOTE using cursorPosition() is better than using accepthistorycommand (causing it!!)
+				if(commandIndex&&cursorPosition()) // NOTE using cursorPosition() is better than using amAcceptinghistorycommand() (causing it!!)
 					pCommandToEvaluateToEvaluate=commands[commandCount-commandIndex];
 				*/
 
@@ -2255,11 +2136,11 @@ int main(int argc, char **argv){
 						outputLine("Failed to evaluate the command! Please complete, correct or cancel the command.");
 						continue;
 					}
-					outputLine("Command evaluated!");
+					if(amVerbose())outputLine("Command evaluated!");
 					string_setlength(behindCursorText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					if(!registerCommand()){
-						outputLine("Command registered!");
+						if(amVerbose())outputLine("Command registered!");
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(!commandIndex){ // a new command being registered!!!
 							freeToken(pCommandToEvaluate);
@@ -2272,7 +2153,7 @@ int main(int argc, char **argv){
 
 					// remove any values not used anymore...
 					size_t removedValueCount=getNumberOfRemovedValues();
-					output("\nNumber of removed values: %lu.",removedValueCount);
+					if(amVerbose())output("\nNumber of removed values: %lu.",removedValueCount);
 
 				}else
 				if(behindCursor()==0)
