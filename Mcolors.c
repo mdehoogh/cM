@@ -1,0 +1,88 @@
+#include "Mcolors.h"
+
+#include "Mconstants.h"
+#include "Moutput.h"
+
+#include <inttypes.h>
+
+// MDH@16APR2019: let's define the standard colors and high-itensity colors which are dark and light versions
+const char BLACK[]="0";
+const char DARK_RED[]="1";
+const char DARK_GREEN[]="2";
+const char DARK_YELLOW[]="3";
+const char DARK_BLUE[]="4";
+const char DARK_PURPLE[]="5";
+const char DARK_CYAN[]="6";
+const char DARK_GREY[]="7";
+const char LIGHT_GREY[]="8";
+const char LIGHT_RED[]="9";
+const char LIGHT_GREEN[]="10";
+const char LIGHT_YELLOW[]="11";
+const char LIGHT_BLUE[]="45"; // "12" is really TOO dark!!
+const char LIGHT_PURPLE[]="13";
+const char LIGHT_CYAN[]="14";
+const char WHITE[]="15";
+const char ORANGE[]="202"; // instead of DARK_YELLOW use (a dark version of) ORANGE
+// the background colors (which are not used behind 38;5 or 48;5 but directly )
+const char BACKGROUND_BLACK[]="40";
+const char BACKGROUND_WHITE[]="47";
+
+// colors
+const char* BACKGROUND_COLORS[NUMBER_OF_COLOR_SCHEMES]={BACKGROUND_BLACK,BACKGROUND_WHITE}; // assuming either a black or white background
+
+const char* DEBUG_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
+const char* INFO_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+
+const char* COMMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
+const char* ERROR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_RED,LIGHT_RED};
+
+const char* ASSIGNMENT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
+const char* UNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
+const char* BINARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
+const char* TERNARY_OPERATOR_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_PURPLE,DARK_PURPLE};
+
+const char* EXPRESSION_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+const char* VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_BLUE,DARK_BLUE};
+const char* NEW_VARIABLE_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_CYAN,DARK_CYAN};
+const char* FUNCTION_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_YELLOW,ORANGE}; /////"93"; // something more blueish
+const char* LIST_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+const char* MAP_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+const char* NUMBER_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //"22"; // green (to indicate a literal)
+const char* STRING_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREEN,DARK_GREEN}; //////12"; // green (to indicate a literal)
+
+const char* RESULT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
+///////const char* OPTION_COLORS[]={BLACK,WHITE};
+const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the info color
+
+const char* BEHIND_CURSOR_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
+
+// operator token colors (all the same)
+const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
+
+// value token colors
+const char** VALUE_TOKEN_COLORS[]={EXPRESSION_COLORS,VARIABLE_COLORS,NEW_VARIABLE_COLORS,LIST_COLORS,NUMBER_COLORS,NUMBER_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,STRING_COLORS,LIST_COLORS,LIST_COLORS,MAP_COLORS,MAP_COLORS,MAP_COLORS,FUNCTION_COLORS,FUNCTION_COLORS,FUNCTION_COLORS};
+
+uint8_t colorscheme=0; // the active color scheme (either 0 for white, or 1 for black background), toggle with C in control mode
+
+// exposing certain colors
+const char* getInfoColor(){return INFO_COLORS[colorscheme];}
+const char* getBackgroundColor(){return BACKGROUND_COLORS[colorscheme];}
+const char* getErrorColor(){return ERROR_COLORS[colorscheme];}
+const char* getBehindCursorTextColor(){return BEHIND_CURSOR_TEXT_COLORS[colorscheme];}
+const char* getCommentColor(){return COMMENT_COLORS[colorscheme];}
+const char* getOperatorTokenColor(uint8_t opid){return OPERATOR_TOKEN_COLORS[opid][colorscheme];}
+const char* getValueTokenColor(uint8_t tokentypeid){return VALUE_TOKEN_COLORS[tokentypeid][colorscheme];}
+
+void activateColorscheme(){
+	output(ES"%sm",getBackgroundColor()); // TODO can't use outputControlText here!!!
+	clearDisplay();
+	/////// user will see!!!! output("\n%s\n>> ",(colorScheme?"Will assume dark background!":"Will assume white background!"));
+}
+
+// display flags
+uint8_t getColorscheme(){return colorscheme;}
+uint8_t setColorscheme(uint8_t newColorscheme){
+	colorscheme=(newColorscheme%NUMBER_OF_COLOR_SCHEMES);
+    activateColorscheme();
+    return colorscheme;
+}
