@@ -1531,6 +1531,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	printf("[%d+%c->%d]",pLastCommandToEvaluateToken->type,inputCharacterType,newTokenType);
 	outputTokenColor(pLastCommandToEvaluateToken);
 #endif
+		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType==pLastCommandToEvaluateToken->type){
 			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators
