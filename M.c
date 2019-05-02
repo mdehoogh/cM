@@ -80,7 +80,7 @@ Mvalue* getResult(Mvalue* _index){
 
 struct Menvironment* pMenvironment;
 bool initEnvironment(){
-	_resultListValue=_getListValue(VT_UNDEFINED);
+	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
 	if(!_resultListValue)outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
 	pMenvironment=calloc(1,sizeof(Menvironment));
 	if(pMenvironment){
@@ -516,19 +516,24 @@ void outputStatus(char inputChar,char inputCharType){
 }
 
 Token* newToken(Token* prevToken){
-	Token* pNewToken=malloc(sizeof(Token));
-	if(prevToken!=NULL){
-		prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
-		if(prevToken->significantCharacterCount==0)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
-	}
-	if(pNewToken!=NULL){
-		pNewToken->expr=(prevToken!=NULL?prevToken->expr:NULL); // copy the pointer to the expression this token is part of
-		pNewToken->offset=(prevToken!=NULL?prevToken->offset+string_length(prevToken->text):0);
-		pNewToken->prev=prevToken;
+	Token* pNewToken=(Token*)calloc(1,sizeof(Token));
+	if(pNewToken){
+		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
+		if(prevToken){
+			// finish the previous token
+			prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
+			if(!prevToken->significantCharacterCount)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
+			// initialize the new token
+			pNewToken->prev=prevToken; // set the predecessor
+			pNewToken->expr=(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||prevToken->type==TT_EXPRESSION?prevToken:prevToken->expr); // point to the right start of the expression it is part of
+			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
+		}
 		pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
-		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->text=string_create();
+		/* not needed with calloc() allocation
+		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->next=NULL;
+		*/
 	}
 	return pNewToken;
 }
@@ -1103,6 +1108,9 @@ bool evaluateCommand(){
 	// 3. if the last token is an operator of sorts the command is incomplete
 	if(pLastCommandToEvaluateToken->type<=8){outputError("Value behind operator at end of command missing.");return false;}
 
+	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
+	if(pLastCommandToEvaluateToken->expr){outputError("Missing parentheses!");return false;}
+
 	// 4. can't end with function of function call
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call.");return false;}
@@ -1314,6 +1322,7 @@ void newCommand(){
 	pLastCommandToEvaluateToken=pCommandToEvaluate=newToken(NULL);
 }
 
+// TODO copyCommand() should set ->expr correctly
 void copyCommand(){
 	// if fails to copy pCommandToEvaluate pLastCommandToEvaluateToken should end up as NULL
 	pLastCommandToEvaluateToken=NULL;
@@ -1325,6 +1334,13 @@ void copyCommand(){
 	while(pLastCommandToEvaluateTokenToCopy){
 		pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
 		pLastCommandToEvaluateToken->type=pLastCommandToEvaluateTokenToCopy->type;
+		// TODO check whether the following is correct!!!
+		if(pLastCommandToEvaluateToken->type==TT_END_OF_FUNCTION_CALL||pLastCommandToEvaluateToken->type==TT_END_OF_LIST||pLastCommandToEvaluateToken->type==TT_END_OF_MAP){
+			if(pLastCommandToEvaluateTokenToCopy->expr)
+				pLastCommandToEvaluateToken->expr=pLastCommandToEvaluateToken->expr->expr;
+			else
+				outputLine("BUG: End of argument list or map encountered, but not started.");
+		}
 		pLastCommandToEvaluateToken->significantCharacterCount=pLastCommandToEvaluateTokenToCopy->significantCharacterCount;
 		// if failing to copy the text over get rid of the command constructed so far, and break
 		if(!string_copy(pLastCommandToEvaluateTokenToCopy->text,pLastCommandToEvaluateToken->text)){pLastCommandToEvaluateToken=NULL;break;}
@@ -1554,7 +1570,13 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			printf("@%p=%p?:%s",pCommandToEvaluate,pLastCommandToEvaluateToken,string(pCommandToEvaluate->text));
 #endif
 */
+			// ending a function call, list or map is only allowed with expr defined
+			if(newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_MAP){
+				if(!pLastCommandToEvaluateToken->expr){outputError("Can't end a list or map here!");newTokenType=TT_ERROR;}else pLastCommandToEvaluateToken->expr=pLastCommandToEvaluateToken->expr->expr;
+			}
+
 			pLastCommandToEvaluateToken->type=newTokenType;
+			
 			if(pLastCommandToEvaluateToken->type==TT_UNARY)pLastCommandToEvaluateToken->significantCharacterCount=1;
 			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
 			if(pLastCommandToEvaluateToken->significantCharacterCount==0)
