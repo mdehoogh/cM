@@ -91,7 +91,9 @@
 // MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
 #define NUMBER_OF_FINISHABLE_TOKEN_TYPES 26
 #define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
+// MDH@03MAY2019: TT_EXPRESSION is now the 'default' token type, so there's no need to set the token type on a new token
 #define FOREACH_TOKENTYPE(TOKENTYPE) \
+		TOKENTYPE(TT_EXPRESSION) \
 		TOKENTYPE(TT_UNARY) \
 		TOKENTYPE(TT_ASSIGNMENT) \
 		TOKENTYPE(TT_BINARY_aeru) \
@@ -100,7 +102,6 @@
 		TOKENTYPE(TT_BINARY_aERu) \
 		TOKENTYPE(TT_BINARY_Aeru) \
 		TOKENTYPE(TT_TERNARY_aeru) \
-		TOKENTYPE(TT_EXPRESSION) \
 		TOKENTYPE(TT_VARIABLE) \
         TOKENTYPE(TT_NEW_VARIABLE) \
 		TOKENTYPE(TT_LISTELEMENT) \

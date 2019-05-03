@@ -69,10 +69,13 @@ typedef struct Mvalue{
 }Mvalue;
 
 typedef struct Mlistelement{
+    long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
     Mvalue* _value;
     struct Mlistelement* _next;
 }Mlistelement;
 
+// MDH@03MAY2019: we're going to allow a list to be sparse i.e. with each element we keep an offset
+//                this may come in handy if we fail to store something in a list
 typedef struct Mlist{
     uint32_t numberOfElements; // keep track of the total number of elements
     Mvaluetype valuetype; // we can force a list to have elements of the same type
@@ -225,16 +228,19 @@ bool incrementReferenceCount(Mvalue* _value);
 
 //////void free_value(Mvalue* _value);
 
-bool appendedToList(Mlist* _list,Mvalue* _value);
+long long appendedToList(Mlist* _list,Mvalue* _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+Mvalue* getValueAtIndex(Mlist* _list,Mvalue* _indexValue); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
+
+long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);
+Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue);
 
 // once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
 // decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mstring, Mlist or Mmap pointer)
 bool setValue(Menvironment* _environment,const char* name,Mvalue* _value);
-bool appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);
+Mvalue* getValue(Menvironment* _environment,const char* name);
 
 bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype,bool immutable);
-Mvalue* getValue(Menvironment* _environment,const char* name);
 /*
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real);

@@ -51,21 +51,35 @@ void free_map(Mmap* _map){
         free(_map);
     }
 }
-
+void free_integer(Minteger* _integer){
+    if(_integer){
+        if(amVerbose())output("\nFreeing integer %llu.",_integer->ll);
+        free(_integer);
+    }else
+        output("\nBUG: No integer to free!");
+}
+void free_real(Mreal* _real){
+    if(_real){
+        if(amVerbose())output("\nFreeing real %.*Lf.",23,_real->ld);
+        free(_real);
+    }else
+        output("\nBUG: No real to free!");
+}
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
         // I do not need to free the value itself, only the pointers inside it
         switch(_value->type){
             case VT_UNDEFINED:break;
-            case VT_INTEGER:if(_value->value._integer)free(_value->value._integer);break;
-            case VT_REAL:if(_value->value._real)free(_value->value._real);break;
+            case VT_INTEGER:if(_value->value._integer)free_integer(_value->value._integer);break;
+            case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
             case VT_STRING:free_string(_value->value._string);break;
             case VT_LIST:free_list(_value->value._list);break;
             case VT_MAP:free_map(_value->value._map);break;
         }
         free(_value);
-    }
+    }else
+        output("\nBUG: No value to free!");
 }
 
 // keep a list of allocated values
@@ -90,36 +104,57 @@ Mvalue* _newValue(){
     if(!_value)if(amVerbose())outputLine("ERROR: Failed to create value!");
     return _value;
 }
+
+const char* VALUETYPENAMES[]={"unknown","integer","real","string","list","map"};
+
 // can be asked to remove unused values
 size_t getNumberOfRemovedValues(){
     size_t removed=0;
+    size_t tofree=0; // how many value elements we should free
     if(_valueList){
-        printf("\nNumber of values to check: %u.",_valueList->numberOfElements);
-        Mlistelement* _lastValueListelement=NULL; // the last value list element processed that is still present
-        Mlistelement* _nextValueListelement;
+        if(amVerbose())output("\nNumber of values to check: %u.",_valueList->numberOfElements);
         Mlistelement* _valueListelement=_valueList->_first;
         size_t checked=0;
         while(_valueListelement){
             checked++;
             if(_valueListelement->_value&&!_valueListelement->_value->count){ // unused
-                if(amVerbose())outputLine("NOTE: Removing a value.");
-                removed++;
+                if(amVerbose())output("\nAbout to free unused value #%u of type '%s'.",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                 free_value(_valueListelement->_value);
                 _valueListelement->_value=NULL; // just in case
-                // make the previous list element point to the next (skipping the unused value)
-                if(_lastValueListelement) // at least one value in the value list
-                    _lastValueListelement->_next=_valueListelement->_next;
-                else // no values before this element in the list, so make _first point to the next element!!!
-                    _valueList->_first=_valueListelement->_next;
-                // one down
-                _valueList->numberOfElements--;
-                free(_valueListelement);
-            }else // keeping the current value list element, which therefore is the last value list element
-                _lastValueListelement=_valueListelement;
-            // if there is no last value list element at the moment we should continue with the first element
-            _valueListelement=(_lastValueListelement?_lastValueListelement->_next:_valueList->_first);
+                tofree++;
+            }
+            _valueListelement=_valueListelement->_next;
         }
-        if(amVerbose())output("\nNumber of values checked: %lu.",checked);
+        if(amVerbose())output("\nNumber of values checked: %lu.\nNumber of value list elements to free: %lu.",checked,tofree);
+        // the list is now intact, are we going to correct the links??????
+        if(tofree){ // some values were freed
+            Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
+            Mlistelement* _lastValueListelement=NULL; // the last value list element remaining
+            Mlistelement* _nextValueListelement;
+            _valueListelement=_valueList->_first;
+            while(_valueListelement){
+                _nextValueListelement=_valueListelement->_next; // remember the next before freeing
+                if(_valueListelement->_value){ // this one is too remain in the list
+                    if(!_firstValueListelement)_firstValueListelement=_valueListelement;
+                    if(_lastValueListelement)_lastValueListelement->_next=_valueListelement;
+                    _valueListelement->_next=NULL; // we can do this because we've already remembered the next one in the list at the start!!
+                    _lastValueListelement=_valueListelement; // remember the last element in the list (now pointing to nothing as the last element should!!!
+                }else{ // this one is to be removed
+                    removed++;
+                    // let's be careful here!!!
+                    if(_valueList->numberOfElements)_valueList->numberOfElements--;else output("\nBUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
+                    free(_valueListelement);
+                }
+                // next to check!!!
+                _valueListelement=_nextValueListelement;
+            }
+            // update the first and last in the list (could both be NULL!!!)
+            _valueList->_first=_firstValueListelement;
+            _valueList->_last=_lastValueListelement;
+        }
+    }
+    if(tofree){
+        if(tofree>removed)output("\nWARNING: Failed to free %lu unused value list elements.",(tofree-removed));else if(amVerbose())output("\nAll unused value list elements freed!");
     }
     return removed;
 }
@@ -471,19 +506,24 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
         printf("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
     return false;
 }
-bool appendedToList(Mlist* _list,Mvalue* _value){
-    if(!_list||!_value){output("\nERROR: %s.","No list to append to or no value to append.");return false;}
+// instead of returning a boolean we could return the assigned index (0 on failure)
+long long appendedToList(Mlist* _list,Mvalue* _value,long long index){
+    if(!_list||!_value||index<0){output("\nERROR: %s.","No list to append to or no value to append or negative index");return 0;}
+    // check validity of index first
+    long long lastindex=(_list->_last?_list->_last->index:0);
+    if(index){if(index<=lastindex)return 0;}else index=lastindex+1;
     Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement*));
-    if(!_listelement){output("\nERROR: Failed to create a new list element to append.");return false;}
+    if(!_listelement){output("\nERROR: Failed to create a new list element to append.");return 0;}
     _listelement->_value=_value;
     incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value immediately
-    if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
+    if(_list->_last){_list->_last->_next=_listelement;lastindex=_list->_last->index;}else _list->_first=_listelement;
+    _listelement->index=index;
     _list->_last=_listelement;
     _list->numberOfElements++;
-    return true;
+    return _listelement->index;
 }
-bool appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
-    if(!_environment||!name||!_value){output("\nERROR: %s","No environment, variable name of value specified!");return false;}
+long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
+    if(!_environment||!name||!_value){output("\nERROR: %s","No environment, variable name of value specified!");return 0;}
     Mvariable* _variable=getVariable(_environment,name,amVerbose());
     if(_variable){
         Mvalue* _variableValue=_variable->_value; // OOPS shouldn't assign to _value (that's the parameter name DUMMY)
@@ -491,15 +531,50 @@ bool appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _v
             // we should prevent circular references
             if(_variableValue==_value)_value=NULL;
             Mlist* _list=_variableValue->value._list;
-            if(appendedToList(_list,_value)){
-                return true; // releasing the value is my responsibility now...
-            }
+            long long index=appendedToList(_list,_value,0); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
+            if(index)return index;
             output("\nERROR: Didn't append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.",name,_value->type);
         }else
             output("\nERROR: Cannot append the value to variable '%s': it does not contain a list!",name);
     }else
         output("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
-    return false;
+    return 0;
+}
+
+Mvalue* getValueAtIndex(Mlist* _list,Mvalue* _indexValue){
+    if(_list&&_indexValue){
+        if(_list->_last){
+            long long index=(_indexValue?(_indexValue->type==VT_INTEGER?_indexValue->value._integer->ll:0):0);
+            if(index>0){
+                long long maxindex=_list->_last->index;
+                if(index==maxindex)return _list->_last->_value;
+                if(index<maxindex){
+                    Mlistelement* _listelement=_list->_first;
+                    while(_listelement){
+                        if(_listelement->index==index)return _listelement->_value;
+                        if(_listelement->index>index)break; // couldn't find it!!!
+                        _listelement=_listelement->_next;
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
+}
+Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue){
+    if(_environment&&name){
+        Mvariable* _variable=getVariable(_environment,name,amVerbose());
+        if(_variable){
+            Mvalue* _variableValue=_variable->_value; // OOPS shouldn't assign to _value (that's the parameter name DUMMY)
+            if(_variableValue){
+                if(_variableValue->type==VT_LIST){ // yes a list we can look into
+                    Mlist* _list=_variableValue->value._list;
+                    return getValueAtIndex(_list,_indexValue);
+                }
+            }
+        }
+    }
+    return NULL;
 }
 
 Mvalue* getValue(Menvironment* _environment,const char* name){
@@ -595,24 +670,27 @@ Mfunction* getFunction(Menvironment* _environment,const char* functionName){
 }
 
 Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
-    if(_function){
+    if(_function&&_argumentList){
         Mmap* _argumentMap=(Mmap*)calloc(1,sizeof(Mmap));
         Mmap* _functionParameterMap=_function->_parameterMap;
-        Mmapelement* _functionParameterMapelement=_functionParameterMap->_first;
-        Mlistelement* _argumentListelement=_argumentList->_first;
-        while(_functionParameterMapelement){
-            Mmapelement* _argumentmapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
-            _argumentmapelement->_variable->_name=_functionParameterMapelement->_variable->_name;
-            // associate the argument list element value (if available)
-            if(_argumentListelement){
-                _argumentmapelement->_variable->_value=_argumentListelement->_value;
-                _argumentListelement=_argumentListelement->_next;
-            }else // use the default!!!
-                _argumentmapelement->_variable->_value=_functionParameterMapelement->_variable->_value;
-            // append to _argumentMap
-            if(_argumentMap->_last)_argumentMap->_last->_next=_argumentmapelement;else _argumentMap->_first=_argumentmapelement;
-            _argumentMap->_last=_argumentmapelement;_argumentMap->numberOfElements++;
-            _functionParameterMapelement=_functionParameterMapelement->_next;
+        if(_functionParameterMap){
+            Mmapelement* _functionParameterMapelement=_functionParameterMap->_first;
+            Mlistelement* _argumentListelement=_argumentList->_first;
+            while(_functionParameterMapelement){
+                Mmapelement* _argumentmapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+                _argumentmapelement->_variable->_name=_functionParameterMapelement->_variable->_name;
+                // associate the argument list element value (if available)
+                if(_argumentListelement){
+                    _argumentmapelement->_variable->_value=_argumentListelement->_value;
+                    _argumentListelement=_argumentListelement->_next;
+                }else // use the default!!!
+                    _argumentmapelement->_variable->_value=_functionParameterMapelement->_variable->_value;
+                // append to _argumentMap
+                if(_argumentMap->_last)_argumentMap->_last->_next=_argumentmapelement;else _argumentMap->_first=_argumentmapelement;
+                _argumentMap->_last=_argumentmapelement;
+                _argumentMap->numberOfElements++;
+                _functionParameterMapelement=_functionParameterMapelement->_next;
+            }
         }
         return _argumentMap;
     }
@@ -665,6 +743,7 @@ Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
         Mvariable* _realVariable=_createVariable(name,VT_REAL,true);
         if(_realVariable){
             _realVariable->_value=_realValue;
+            incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
             Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
             if(_mapelement){
                 _mapelement->_variable=_realVariable;
@@ -672,17 +751,17 @@ Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
                 if(_map){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    printf("\n%s","Returning the single real map!");
+                    output("\n%s","Returning the single real map!");
                     return _map;
                 }
-                printf("\nERROR: %s.","Failed to create the real variable map!");
+                output("\nERROR: %s.","Failed to create the real variable map!");
                free_mapelement(_mapelement);
             }else{
-                printf("\nERROR: %s.","Failed to create the real variable map element!");
+                output("\nERROR: %s.","Failed to create the real variable map element!");
                 free_variable(_realVariable);
             }
         }else
-            printf("\nERROR: %s.","Failed to create the real variable!");
+            output("\nERROR: %s.","Failed to create the real variable!");
     }
     return NULL;
 }
@@ -691,6 +770,7 @@ Mmap* _getSingleIntegerMap(char* name,Mvalue* _integerValue){
         Mvariable* _integerVariable=_createVariable(name,VT_INTEGER,true);
         if(_integerVariable){
             _integerVariable->_value=_integerValue;
+            incrementReferenceCount(_integerValue); // now bound to the integer variable
             Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
             if(_mapelement){
                 _mapelement->_variable=_integerVariable;
@@ -698,7 +778,7 @@ Mmap* _getSingleIntegerMap(char* name,Mvalue* _integerValue){
                 if(_map){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    printf("\n%s","Returning the single integer map!");
+                    output("\n%s","Returning the single integer map!");
                     return _map;
                 }
                 printf("\nERROR: %s.","Failed to create the integer variable map!");
@@ -735,7 +815,7 @@ bool completedOneArgumentRealFunction(Mfunction* _function,OneArgumentFunction o
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getSingleRealMap("x",_getRealValue(0.0));
-        printf("\nRegistered function '%s' completed.",string(_function->_name));
+        output("\nRegistered function '%s' completed.",string(_function->_name));
         return true;
     }
     return false;
@@ -744,8 +824,9 @@ bool completedOneArgumentIntegerFunction(Mfunction* _function,OneArgumentFunctio
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
+        // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getSingleIntegerMap("i",_getIntegerValue(0));
-        printf("\nRegistered function '%s' completed.",string(_function->_name));
+        output("\nRegistered function '%s' completed.",string(_function->_name));
         return true;
     }
     return false;

@@ -59,29 +59,16 @@ const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits o
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
 Mvalue* getResult(Mvalue* _index){
+	if(amVerbose())output("\nResult requested!");
 	if(!_index)return _resultListValue;
-	// grab the list
-	Mlist* _resultList=_resultListValue->value._list;
-	size_t l=_resultList->numberOfElements; // the number of results we currently have registered
-	// find the integer index
-	if(!_index||_index->type==VT_INTEGER){
-		long long i=(_index?_index->value._integer->ll:-1);
-		if(i){ // 0 not allowed!!!
-			if(i<0)i+=l; // looking backwards not from the start
-			if(i>0&&i<=l){ // in range
-				Mlistelement* _resultListelement=_resultList->_first;
-				while(--i>0)_resultListelement=_resultListelement->_next;
-				if(_resultListelement)return _resultListelement->_value;
-			}
-		}
-	}
-	return NULL;
+	return getValueAtIndex(_resultListValue->value._list,_index);
 }
 
-struct Menvironment* pMenvironment;
+Menvironment* pMenvironment;
 bool initEnvironment(){
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
-	if(!_resultListValue)outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
+	// ESSENTIAL not to loose this list immediately!!!
+	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
 	pMenvironment=calloc(1,sizeof(Menvironment));
 	if(pMenvironment){
 		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
@@ -359,8 +346,8 @@ void displayFlags(){output("\nEdit flags: %c%c%c%c - Display flags: %c%c.",amAss
 void outputFlags(){output("%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');}
 
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
-uint32_t commandCount=0; // the total number of command input
-uint32_t commandIndex=0;
+long long commandCount=0; // the total number of command input
+long long commandIndex=0;
 
 mstring* behindCursorText=NULL; // MDH@27FEB2019: we keep track of the characters behind the cursor
 mstring* shellCommand=NULL;
@@ -379,7 +366,7 @@ void prompt(){
 	char str[11]; // with a maximum of 2,xxx,xxx,xxx 11 positions would suffice
 	switch(inputMode){
 		case IM_COMMAND:
-			sprintf(str,"%u",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
+			sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
 			output("M[%s]%s",str," = ");
 			clearScreenFromCursor();
 			promptLength=strlen(str)+3+3;
@@ -430,33 +417,29 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
 // the list of token type ids in the corresponding order!!!
-const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,0b1000000,0b11111111};
+const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,0b1000000,0b11111111};
 
-void outputTokenColor(Token* pLastCommandToEvaluateToken){
-	///////printf("[%d]",pLastCommandToEvaluateToken->type);
-	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
-	setBackColor(getBackgroundColor());
-	uint8_t tokentype_id=TOKENTYPE_IDS[pLastCommandToEvaluateToken->type];
+const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
+	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
 	///////printf("(%d)",tokentype_id);
 	switch(tokentype_id>>6){
 		case 0: // value token
-			setColor(getValueTokenColor(tokentype_id));
-			break;
-		case 1: // operator: unary, binary, ternary, assignment
-			{
-			uint8_t opCategory=(tokentype_id&0x30)>>4;
-			/////////printf("(%d,%d)",tokentype_id,opCategory);
-			setColor(getOperatorTokenColor(opCategory));
-			break;
-			}
+			return getValueTokenColor(tokentype_id);
+		case 1: // operator: unary, binary, ternary, assignment the operator category will be: (tokentype_id&0x30)>>4
+			return getOperatorTokenColor((tokentype_id&0x30)>>4);
 		case 2: // comment or end of comment
-			setColor(getCommentColor());
-			break;
+			return getCommentColor();
 		case 3: // error token
 			/////////outputChar('E');
-			setColor(getErrorColor());
-			break;
+			return getErrorColor();
 	}
+	return "";
+}
+void outputTokenColor(Token* _token){
+	///////printf("[%d]",pLastCommandToEvaluateToken->type);
+	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
+	setBackColor(getBackgroundColor());
+	setColor(getTokenColor(_token->type));
 }
 void outputToken(Token* _token){
 	if(!_token)return;
@@ -528,7 +511,7 @@ Token* newToken(Token* prevToken){
 			pNewToken->expr=(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||prevToken->type==TT_EXPRESSION?prevToken:prevToken->expr); // point to the right start of the expression it is part of
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
 		}
-		pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
+		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
 		pNewToken->text=string_create();
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
@@ -637,34 +620,34 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 // MDH@15APR2019: still to determine what to do with @ and ` (the latter for system commands????)
 //                inserting macro's should also be possible somehow...
 /*
- "UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","EXPR","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
+ "EXPR","UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
-{"!-+","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
-{""   ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
-{"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
-{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
-{"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:    ] }="}, /* EXPRESSION */ \
-{""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,"LEN.",""      ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,","   ,""    ,"LEN."  ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,",("  ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
-{""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
-{""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
-{"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"("   ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *  ,.>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,",;"  ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{",("  ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:    ] }="}, /* EXPRESSION */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
+{"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
+{""    ,""   ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
+{"("   ,"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
+{"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
+{"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
+{"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
+{","   ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{","   ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
+{",;"  ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{",;"  ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
+{""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
+{""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
+{",;"  ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{",;"  ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{",("  ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
+{",;"  ,""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
+{",;"  ,""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *  ,.>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{",;"  ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -717,9 +700,10 @@ void removeToken(){
 }
 void unfinishToken(){
 	// for all non-unary token that we are in now that is finished, unfinish it!!
-	if(pLastCommandToEvaluateToken->type!=TT_UNARY) // not a unary operator (of length 1) we ended up in
-		if(string_length(pLastCommandToEvaluateToken->text)==pLastCommandToEvaluateToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
-			pLastCommandToEvaluateToken->significantCharacterCount=0;
+	if(pLastCommandToEvaluateToken)
+		if(pLastCommandToEvaluateToken->type!=TT_UNARY) // not a unary operator (of length 1) we ended up in
+			if(string_length(pLastCommandToEvaluateToken->text)==pLastCommandToEvaluateToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
+				pLastCommandToEvaluateToken->significantCharacterCount=0;
 }
 char removedTokenCharacter(uint16_t behindCursor){
 #ifdef __DEBUG__
@@ -774,7 +758,8 @@ void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 		output("\nFreeing expression value!");
 		free_value(_expressionvalue->_value);
 		*/
-		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_value))outputLine("ERROR: Failed to save the result.");else if(amVerbose())outputLine("Result saved.");}
+		// MDH@03MAY2019: append the result value at the proper index (as indicated by the command index)
+		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_value,commandCount+1))outputLine("ERROR: Failed to save the result.");else if(amVerbose())outputLine("Result saved.");}
 		// replacing: if(!appendToListVariable(pMenvironment,"M",_expressionvalue->_value))outputLine("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputLine("Result appended to the M list.");
 		//// NEVER free what does not have an underscore at the start!!!! free_token(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
 		////////output("\nFreeing expression!");
@@ -803,24 +788,31 @@ Mexpressionvalue* getExpressionvalueOfType(enum Mvaluetype valuetype){
 	return _expressionvalue;
 }
 
-Mexpressionvalue* getExpressionvalue(Token* _offsetToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getExpressionValue() so we can call it from getListValue() and getMapValue()
+Mexpressionvalue* getExpressionvalue(const char* info,Token* firstToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getExpressionValue() so we can call it from getListValue() and getMapValue()
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
-Mexpressionvalue* getListExpressionvalue(Token* _firstToken,enum TOKENTYPE_ENUM endTokenType,uint32_t maximumNumberOfElements){
+Mexpressionvalue* getListExpressionvalue(Token* firstToken,enum TOKENTYPE_ENUM endTokenType,uint32_t maximumNumberOfElements){
+	/////if(amVerbose())output("\nComposing a list starting with '%s'.",string(_firstToken->text));
 	Mexpressionvalue* _listExpressionValue=getExpressionvalueOfType(VT_LIST);
 	Mlist* _list=_listExpressionValue->_value->value._list; // grab the (empty) list to fill
-	Token* token=_firstToken;
+	if(!_list){output("\nFailed to create a list to return.");return NULL;}
+	Token* token=firstToken;
+	if(amVerbose())output("\nComposing a list starting with token '%s' of type '%s'.",string(firstToken->text),TOKENTYPE_STRING[firstToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// NOTE a list can be empty in which case _firstToken will immediately be of type TT_END_OF_LIST
 	while(token&&token->type!=endTokenType){
-		// get the next list element value
-		Mexpressionvalue* _listElementExpressionvalue=getExpressionvalue(token,(enum TOKENTYPE_ENUM[]){endTokenType,TT_LISTELEMENT},2);
+		if(amVerbose())output("\nProcessing list element starting with token '%s' of type '%s'.",string(token->text),TOKENTYPE_STRING[token->type]);
+		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
+		Mexpressionvalue* _listElementExpressionvalue=getExpressionvalue("list element",token,(enum TOKENTYPE_ENUM[]){endTokenType,TT_LISTELEMENT},2);
+		if(!_listElementExpressionvalue){if(amVerbose())output("\nNo list element result!");break;}
 		token=_listElementExpressionvalue->token; // update the current token
+		if(amVerbose())output("\nToken updated!");
 		// if we already have the maximum number of elements, we do not append this list element!!!
-		if(maximumNumberOfElements)if(_list->numberOfElements>=maximumNumberOfElements)continue;
-		Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement)); // NOTE no need to set _next because it is now NULL
-		_listelement->_value=_listElementExpressionvalue->_value; // store the _value pointer of the attributeValueExpressionvalue
-		if(_list->numberOfElements)_list->_last->_next=_listelement;else _list->_first=_listelement;
-		_list->_last=_listelement;_list->numberOfElements++;
+		if(maximumNumberOfElements)if(_list->numberOfElements>=maximumNumberOfElements){if(amVerbose())output("\nMaximum number of elements reached.");continue;}
+		long long listElementIndex=appendedToList(_list,_listElementExpressionvalue->_value,0);
+		if(!listElementIndex){output("\nERROR: Failed to append the list element!");break;}
+		if(amVerbose())output("\nList element appended to list!");
+		if(!token)break;
+		token=token->next; // ready to look at the next token!!!
 	}
 	_listExpressionValue->token=token;
 	return _listExpressionValue;
@@ -835,12 +827,12 @@ Mexpressionvalue* getMapExpressionvalue(Token* _firstToken){
 	while(token&&token->type!=TT_END_OF_MAP){
 		// get the next attribute name, value pair
 		// obviously the name should be something that evaluates to a string
-		Mexpressionvalue* _attributeNameExpressionvalue=getExpressionvalue(token,(enum TOKENTYPE_ENUM[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
+		Mexpressionvalue* _attributeNameExpressionvalue=getExpressionvalue("map attribute name",token,(enum TOKENTYPE_ENUM[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
 		token=_attributeNameExpressionvalue->token; // update the current token
 		if(_attributeNameExpressionvalue->token->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
 		if(_attributeNameExpressionvalue->token->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
-		Mexpressionvalue* _attributeValueExpressionvalue=getExpressionvalue(token,(enum TOKENTYPE_ENUM[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
+		Mexpressionvalue* _attributeValueExpressionvalue=getExpressionvalue("map attribute value",token,(enum TOKENTYPE_ENUM[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
 		token=_attributeValueExpressionvalue->token; // update the current token
 		mstring* attributeName=_getValueText(_attributeNameExpressionvalue->_value); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
@@ -851,21 +843,24 @@ Mexpressionvalue* getMapExpressionvalue(Token* _firstToken){
 		_mapelement->_variable->_value=_attributeValueExpressionvalue->_value; // store the _value pointer of the attributeValueExpressionvalue
 		if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
 		_map->_last=_mapelement;_map->numberOfElements++;
+		token=token->next;
 	}
 	_mapExpressionValue->token=token;
 	return _mapExpressionValue;
 }
 // a function call needs a function and a map of arguments (defining the values to use for the formal parameters of the function)
 Mvalue* getFunctionCallValue(Mfunction* _function,Mmap* _argumentMap){
-	Mvalue* _resultValue=NULL;
+	////////Mvalue* _resultValue=NULL;
 	switch(_function->type){
 		case FT_M:{
 			// TODO create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 
 				break;
 			}
-		case FT_INTERNAL_NO_ARGUMENTS:return (*_function->functionunion.noArgumentFunction)();
-		case FT_INTERNAL_ONE_ARGUMENT:return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
+		case FT_INTERNAL_NO_ARGUMENTS:
+			return (*_function->functionunion.noArgumentFunction)();
+		case FT_INTERNAL_ONE_ARGUMENT:
+			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:{
 			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 			Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
@@ -891,156 +886,186 @@ Mvalue* getFunctionCallValue(Mfunction* _function,Mmap* _argumentMap){
  * 		  if the resulting value is an variable, we should return the value of the variable, technically this means that an expressionelement cannot be a variable that makes sense
  *      so I guess we should only accept assignments at the start of an expression (which makes perfect sense)
  */
-Mexpressionvalue* getExpressionvalue(Token* offsetToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount){
+Mexpressionvalue* getExpressionvalue(const char* info,Token* firstToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount){
 	// typically the offset token determines what the expression ends with!!
 	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.   
 	Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue*)); 	
-	if(offsetToken){
-		Token* firstToken=offsetToken->next;
-		if(firstToken){
-			
-			char tokenChar=string_char(firstToken->text,0);
-			
-			// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
-			if(tokenChar=='[')return getListExpressionvalue(firstToken->next,TT_END_OF_LIST,0); // a real list literal with any number of elements
-			if(tokenChar=='{')return getMapExpressionvalue(firstToken->next);
-			if(tokenChar=='('){
-				Mfunction* function=getFunction(pMenvironment,string(offsetToken->text)); // get the function associated with the name of the function
+	if(firstToken){
+		if(amVerbose()){
+			output("\nInterpreting %s expression starting with token '%s' of type '%s'",info,string(firstToken->text),TOKENTYPE_STRING[firstToken->type]);
+			if(endTokenTypeCount){
+				output(" that ends");
+				uint8_t endTokenTypeIndex=0;
+				while(endTokenTypeIndex<endTokenTypeCount){output(endTokenTypeIndex?" or ":" with ");output(TOKENTYPE_STRING[endTokenTypes[endTokenTypeIndex++]]);}
+			}
+			outputChar('.');
+		}
+		// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
+		if(firstToken->type==TT_LIST)return getListExpressionvalue(firstToken->next,TT_END_OF_LIST,0); // a real list literal with any number of elements
+		if(firstToken->type==TT_MAP)return getMapExpressionvalue(firstToken->next);
+		if(firstToken->type==TT_FUNCTION_CALL){
+			if(amVerbose())output("\nCall of function '%s'.",string(firstToken->prev->text));
+			Mfunction* function=getFunction(pMenvironment,string(firstToken->prev->text)); // get the function associated with the name of the function
+			if(function){					
 				// 1. get the list of function arguments, which depends on the function!!
 				Mexpressionvalue* _functionArgumentsExpressionvalue=getListExpressionvalue(firstToken->next,TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
-				// 2. get the arguments map
-				Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsExpressionvalue->_value->value._list); // assuming to have a list returned by getListExpressionValue()
-				// 3. the result of applying the function to the arguments is the end result
-				_expressionvalue->_value=getFunctionCallValue(function,_functionArgumentMap);
-				_expressionvalue->token=_functionArgumentsExpressionvalue->token;
-				/// NO NEED ANYMORE as the token field is never freed!!!!! _functionArgumentsExpressionvalue->token=NULL; // to prevent it from being freed as well
-				free_expressionvalue(_functionArgumentsExpressionvalue);
-				return _expressionvalue;
-			}
-
-			char* firstTokenText=string(firstToken->text);
-			// ASSERTION not a function call or a map or list literal
-		
-			// it makes sense to check if there's a second token, if not we can speed things up
-			Token* secondToken=firstToken->next;
-			if(!secondToken){
-				switch(firstToken->type){
-					case TT_NEW_VARIABLE:
-						addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false); // NO retrieves the undefined value subsequently!!
-					case TT_VARIABLE:
-						_expressionvalue->_value=getValue(pMenvironment,firstTokenText);
-						break;
-					case TT_INTEGER:
-						_expressionvalue->_value=_getIntegerValue(atoll(firstTokenText));
-						break;
-					case TT_REAL:
-						_expressionvalue->_value=_getRealValue(_strtold(firstTokenText));
-						break;
-					case TT_SQSTRING:
-					case TT_DQSTRING:
-						_expressionvalue->_value=_getStringValue(firstTokenText);
-						break;
-					default:
-						break;
-				}
-				if(_expressionvalue->_value){
-					_expressionvalue->_value->count++; // increment the reference count of the value!!!
-					if(amVerbose())output("\nReturning expression value '%s' (with reference count: %u).",string(_getValueText(_expressionvalue->_value)),_expressionvalue->_value->count);
+				if(_functionArgumentsExpressionvalue){
+					if(amVerbose())output("\nConstructing the function call argument map!");
+					// 2. get the arguments map
+					Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsExpressionvalue->_value->value._list); // assuming to have a list returned by getListExpressionValue()
+					// 3. the result of applying the function to the arguments is the end result
+					_expressionvalue->_value=getFunctionCallValue(function,_functionArgumentMap);
+					_expressionvalue->token=_functionArgumentsExpressionvalue->token;
+					/// NO NEED ANYMORE as the token field is never freed!!!!! _functionArgumentsExpressionvalue->token=NULL; // to prevent it from being freed as well
+					free_expressionvalue(_functionArgumentsExpressionvalue);
 				}else
-				if(amVerbose())output("\nNo value to return!");
-				return _expressionvalue;
-			}
-
-			// ASSERTION at least two tokens
-
-			// it could be an assignment in which case we remove the assignee and assigned value
-			if(firstToken->type==TT_VARIABLE||firstToken->type==TT_NEW_VARIABLE){ // something that can be assigned to
-				// an index might be defined on a variable that is a list
-				if(secondToken->type==TT_LIST){
-					// TODO locate the end of list token at the same level????
-				}
-				// TODO there might be a binary operator behind (in front of the assignment operator)
-				char* shortcutBinaryOperator=NULL;
-				if(secondToken->type==TT_BINARY_AeRu||secondToken->type==TT_BINARY_Aeru){
-					shortcutBinaryOperator=string(secondToken->text);
-					secondToken=secondToken->next;
-				}
-				if(secondToken&&secondToken->type==TT_ASSIGNMENT){
-					if(firstToken->type==TT_NEW_VARIABLE)addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false);
-					Mexpressionvalue* _expressionvalue=getExpressionvalue(secondToken,endTokenTypes,endTokenTypeCount);
-					if(_expressionvalue){
-						if(shortcutBinaryOperator){ 
-							// TODO apply the shortcut binary operator to the current value of the assignee before assigning
-						}
-						// if we failed to create the variable (see above), the following obviously will fail!!! (or of course when the type of the value is wrong)
-						if(amVerbose())output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
-						if(!setValue(pMenvironment,firstTokenText,_expressionvalue->_value)){
-							output("\nERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
-							/* no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
-							free_value(_expressionvalue->_value);
-							_expressionvalue->_value=NULL;
-							*/
-						}else
-						if(amVerbose())
-							output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(pMenvironment,firstTokenText))));
-					}
-					return _expressionvalue;
-				}
-			}
-
-			// ASSERTION not an assignment
-
-			// how about storing a list of expression elements where each element contains a value and optional a binary operator?????? I guess the binary operator is only in the following elements
-			// we might associate a 
-			Mlist* _expressionelementList=(Mlist*)calloc(1,sizeof(Mlist)); // the expression list to populate with arguments!!!
-			
-			mstring* unaryOperators=NULL; // collecting any unary operators to apply (in front of any value (which might be a function call mind!!!!))
-			char* variableName;
-
-			// READY TO PROCESS THE TOKENS
-			Token* token=firstToken; // the first token to process
-			int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
-			while(token){
-				// does this token end the expression????
-				endTokenTypeIndex=endTokenTypeCount;
-				while(--endTokenTypeIndex>=0&&token->type!=endTokenTypes[endTokenTypeIndex])
-				;
-				if(endTokenTypeIndex)break;
-
-				if(token->type==TT_FUNCTION){ // the first token is a function name, obviously we should evaluate it
-					// we can get the value of applying the function by passing token as offset token (containing the function name so followed by a function call element (hopefully))
-					Mexpressionvalue* _expressionvalue=getExpressionvalue(token,endTokenTypes,endTokenTypeCount);
-					if(!appendedToList(_expressionelementList,_expressionvalue->_value))break;
-					token=_expressionvalue->token; // continue from the end token received!!!
-				}else
-				// values are easy, just push them on the expression stack
-				if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
-					variableName=string(token->text);
-				}else
-				if(token->type<=8){
-				}
-				
-				if(token->type==TT_LISTELEMENT){ // ends the current value
-
-				}
-				token=token->next;
-			}
-
-			// ready to evaluate the expression list
-
-			// remember the token that stopped the evaluation (which might be NULL)
-			_expressionvalue->token=token;
-			// use the first element in the expression element list as end result (which it supposedly is)
-			if(_expressionelementList->numberOfElements){
-				if(_expressionelementList->numberOfElements>1){
-					Mvalue* _value=_getListValue(VT_UNDEFINED);
-					_value->value._list=_expressionelementList;
-					_expressionvalue->_value=_value;
-				}else
-					_expressionvalue->_value=_expressionelementList->_first->_value;
-			}
+					output("\nERROR: No function arguments!");
+			}else
+				output("\nERROR: Function '%s' unknown!",string(firstToken->prev->text));
 			return _expressionvalue;
 		}
+
+		char* firstTokenText=string(firstToken->text);
+		// ASSERTION not a function call or a map or list literal
+	
+		// it makes sense to check if there's a second token, if not we can speed things up
+		Token* secondToken=firstToken->next;
+		if(!secondToken){
+			switch(firstToken->type){
+				case TT_NEW_VARIABLE:
+					addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false); // NO retrieves the undefined value subsequently!!
+				case TT_VARIABLE:
+					_expressionvalue->_value=getValue(pMenvironment,firstTokenText);
+					break;
+				case TT_INTEGER:
+					_expressionvalue->_value=_getIntegerValue(atoll(firstTokenText));
+					break;
+				case TT_REAL:
+					_expressionvalue->_value=_getRealValue(_strtold(firstTokenText));
+					break;
+				case TT_SQSTRING:
+				case TT_DQSTRING:
+					_expressionvalue->_value=_getStringValue(firstTokenText);
+					break;
+				default:
+					break;
+			}
+			if(_expressionvalue->_value){
+				_expressionvalue->_value->count++; // increment the reference count of the value!!!
+				if(amVerbose())output("\nReturning expression value '%s' (with reference count: %u).",string(_getValueText(_expressionvalue->_value)),_expressionvalue->_value->count);
+			}else
+			if(amVerbose())output("\nNo value to return!");
+			return _expressionvalue;
+		}
+
+		// ASSERTION at least two tokens
+
+		// it could be an assignment in which case we remove the assignee and assigned value
+		if(firstToken->type==TT_VARIABLE||firstToken->type==TT_NEW_VARIABLE){ // something that can be assigned to
+			// an index might be defined on a variable that is a list
+			if(secondToken->type==TT_LIST){
+				// TODO locate the end of list token at the same level????
+			}
+			// TODO there might be a binary operator behind (in front of the assignment operator)
+			char* shortcutBinaryOperator=NULL;
+			if(secondToken->type==TT_BINARY_AeRu||secondToken->type==TT_BINARY_Aeru){
+				shortcutBinaryOperator=string(secondToken->text);
+				secondToken=secondToken->next;
+			}
+			if(secondToken&&secondToken->type==TT_ASSIGNMENT){
+				if(firstToken->type==TT_NEW_VARIABLE)addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false);
+				Mexpressionvalue* _expressionvalue=getExpressionvalue("assignment",secondToken->next,endTokenTypes,endTokenTypeCount);
+				if(_expressionvalue){
+					if(shortcutBinaryOperator){ 
+						// TODO apply the shortcut binary operator to the current value of the assignee before assigning
+					}
+					// if we failed to create the variable (see above), the following obviously will fail!!! (or of course when the type of the value is wrong)
+					if(amVerbose())output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
+					if(!setValue(pMenvironment,firstTokenText,_expressionvalue->_value)){
+						output("\nERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
+						/* no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
+						free_value(_expressionvalue->_value);
+						_expressionvalue->_value=NULL;
+						*/
+					}else
+					if(amVerbose())
+						output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(pMenvironment,firstTokenText))));
+				}
+				return _expressionvalue;
+			}
+		}
+
+		// ASSERTION not an assignment
+
+		// how about storing a list of expression elements where each element contains a value and optional a binary operator?????? I guess the binary operator is only in the following elements
+		// we might associate a 
+		Mlist* _expressionelementList=(Mlist*)calloc(1,sizeof(Mlist)); // the expression list to populate with arguments!!!
+		
+		mstring* unaryOperators=NULL; // collecting any unary operators to apply (in front of any value (which might be a function call mind!!!!))
+		char* variableName;
+
+		// READY TO PROCESS THE TOKENS
+		Token* token=firstToken; // the first token to process
+		if(amVerbose())output("\nMore complex expression starting with token of type '%s'!",TOKENTYPE_STRING[token->type]);
+		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
+		while(token){
+			// does this token end the expression????
+			endTokenTypeIndex=endTokenTypeCount;
+			while(endTokenTypeIndex&&token->type!=endTokenTypes[endTokenTypeIndex-1])endTokenTypeIndex--;
+			if(endTokenTypeIndex){if(amVerbose())output("\nEnd of %s expression.",info);break;}
+
+			if(amVerbose())output("\nInterpreting token '%s' of type '%s'.",string(token->text),TOKENTYPE_STRING[token->type]);
+
+			if(token->type==TT_FUNCTION){ // the first token is a function name, obviously we should evaluate it
+				if(amVerbose())output("\nFunction '%s' encountered!",string(token->text));
+				// we can get the value of applying the function by passing token as offset token (containing the function name so followed by a function call element (hopefully))
+				Mexpressionvalue* _expressionvalue=getExpressionvalue("function call",token->next,endTokenTypes,endTokenTypeCount);
+				if(!appendedToList(_expressionelementList,_expressionvalue->_value,0))break;
+				token=_expressionvalue->token; // continue from the end token received!!!
+			}else
+			// values are easy, just push them on the expression stack
+			if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
+				variableName=string(token->text);
+			}else
+			if(token->type<=8){
+			}else
+			if(token->type==TT_INTEGER){
+				appendedToList(_expressionelementList,_getIntegerValue(atoll(string(token->text))),0);
+			}else
+			if(token->type==TT_REAL){
+				appendedToList(_expressionelementList,_getRealValue(_strtold(string(token->text))),0);
+			}else
+			if(token->type==TT_DQSTRING||token->type==TT_SQSTRING){
+				appendedToList(_expressionelementList,_getStringValue(string(token->text)),0);
+			}else
+			if(token->type==TT_LISTELEMENT){ // ends the current value
+
+			}
+			if(amVerbose())output("\nToken processed!");
+			if(!token)break;
+			token=token->next;
+		}
+
+		// ready to evaluate the expression list
+		if(amVerbose())output("\nStoring the expression result.");
+
+		// remember the token that stopped the evaluation (which might be NULL)
+		_expressionvalue->token=token;
+		// use the first element in the expression element list as end result (which it supposedly is)
+		if(_expressionelementList->numberOfElements){
+			if(_expressionelementList->numberOfElements>1){
+				if(amVerbose())output("\nReturning list result as expression value!");
+				Mvalue* _value=_getListValue(VT_UNDEFINED);
+				_value->value._list=_expressionelementList;
+				_expressionvalue->_value=_value;
+			}else{
+				_expressionvalue->_value=_expressionelementList->_first->_value;
+				if(amVerbose())output("\nSingle expression value stored!");
+			}
+		}else
+		if(amVerbose())output("\nNo result to store.");
+		
+		return _expressionvalue;
 	}
 	return NULL;
 }
@@ -1080,36 +1105,58 @@ Mexpressionvalue* getFunctionValue(Token* _offsetToken,char* functionName){
 }
 */
 
-mstring* _getCommandText(){
+mstring* _getCommandText(bool color){
 	mstring* commandText=string_create();
 	Token* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
 	while(pCommandToken){
 		// if we bump into a comment we're done!!!
 		if(pCommandToken->type==TT_COMMENT)break;
+		// TODO there must be a better way to do the coloring!!!
+		if(color){string_append(commandText,ES"38;5;");string_append(commandText,getTokenColor(pCommandToken->type));string_append_char(commandText,'m');} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
 		string_append(commandText,string(pCommandToken->text));
-		if(amAssisting()){string_append_char(commandText,'(');string_append(commandText,TOKENTYPE_STRING[pCommandToken->type]);string_append(commandText,") ");}
+		// MDH@03MAY2019: place an asterisk in front of the type to indicate that expr is NOT null!!
+		if(amAssisting()){
+			if(color){string_append(commandText,ES"38;5;");string_append(commandText,getInfoColor());string_append_char(commandText,'m');}
+			string_append_char(commandText,'(');if(pCommandToken->expr)string_append_char(commandText,'*');string_append(commandText,TOKENTYPE_STRING[pCommandToken->type]);string_append(commandText,") ");
+		}
 		pCommandToken=pCommandToken->next;
 	}
+	if(color)if(!amAssisting()){string_append(commandText,ES"38;5;");string_append(commandText,getInfoColor());string_append_char(commandText,'m');} // reset to info color
 	return commandText;
+}
+
+void clearCommand(){
+	pLastCommandToEvaluateToken=NULL;
+	// a small precaution here!!!
+	if(pCommandToEvaluate){freeToken(pCommandToEvaluate);pCommandToEvaluate=NULL;}
 }
 
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
-	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(pCommandToEvaluate==NULL){outputError("Nothing to evaluate!");return false;}
 	
+	// 1. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
+	//    as a result pLastCommandToEvaluateToken and pCommandToEvaluate could now both be NULL, that's why we test this first
+	if(pLastCommandToEvaluateToken->type==TT_COMMENT)removeToken();
+
+	// 2. if no command nothing evaluated TODO don't call when this is the case though
+	if(!pCommandToEvaluate){outputError("Nothing to evaluate!");return false;}
+	
+	// 3. any command always has two significant tokens TODO could compare pCommandToEvaluate with pLastCommandToEvaluateToken which should be different!!!
+	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
+	if(pCommandToEvaluate==pLastCommandToEvaluateToken){outputError("Empty command.");clearCommand();return false;}
+
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
 	if(pLastCommandToEvaluateToken->type==TT_ERROR){outputError("Can't evaluate erroneous command.");removeToken();unfinishToken();return false;}
-
-	// if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
-	if(pLastCommandToEvaluateToken->type==TT_COMMENT)removeToken();
 
 	// 3. if the last token is an operator of sorts the command is incomplete
 	if(pLastCommandToEvaluateToken->type<=8){outputError("Value behind operator at end of command missing.");return false;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
-	if(pLastCommandToEvaluateToken->expr){outputError("Missing parentheses!");return false;}
+	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
+	//                    this actually means that if expr is NULL there's one parentheses too many!!!
+	if(!pLastCommandToEvaluateToken->expr){outputError("Too many parentheses!");return false;}
+	if(pLastCommandToEvaluateToken->expr!=pCommandToEvaluate){outputError("Not enough parentheses!");return false;}
 
 	// 4. can't end with function of function call
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
@@ -1121,12 +1168,12 @@ bool evaluateCommand(){
 
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
-	mstring* commandText=_getCommandText();
-	Mexpressionvalue* _commandExpressionvalue=getExpressionvalue(pCommandToEvaluate,(enum TOKENTYPE_ENUM[]){},0);
+	mstring* commandText=_getCommandText(true);
+	Mexpressionvalue* _commandExpressionvalue=getExpressionvalue("command",pCommandToEvaluate->next,(enum TOKENTYPE_ENUM[]){},0);
 	if(_commandExpressionvalue){
 		mstring* commandExpressionValueText=_getValueText(_commandExpressionvalue->_value);
 		if(commandExpressionValueText){
-			output("\n'%s' evaluates to '%s'.",string(commandText),string(commandExpressionValueText));
+			output("\n%s evaluates to '%s'.",string(commandText),string(commandExpressionValueText));
 			free_mstring(commandExpressionValueText);
 			if(amVerbose())outputLine("Result text released!");
 		}else
@@ -1215,11 +1262,6 @@ void writeRestOfCommand(){ // writes rest of command assuming pLastCommandToEval
 	}
 }
 */
-void clearCommand(){
-	pLastCommandToEvaluateToken=NULL;
-	freeToken(pCommandToEvaluate);
-	pCommandToEvaluate=NULL;
-}
 
 char switchToControlMode(char* message){
 	if(inputMode!=IM_CONTROL){
@@ -1469,10 +1511,10 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 			// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
 			writeBehindCursorText(false);
 			// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
-		}else
-			clearCommand();
-	}else
-		switchToControlMode("Failed to remove the last entered character.");
+		}/* removedTokenCharacter() calls removeToken which will NULL the pCommandToEvaluate and pLastCommandToEvaluateToken when the first command character is removed, in which case we do not need:
+			else clearCommand();*/
+	}else // MDH@03MAY2019: can't switch to control mode here (so we just report the error!!!)
+		outputError("Failed to remove the last entered character.");
 }
 
 void outputTokenInfo(){
@@ -1540,7 +1582,10 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			// a shortcut assignment can NOT be turned into a equality comparison
 			if(inputCharacterType=='='&&pLastCommandToEvaluateToken->type==TT_ASSIGNMENT&&(pLastCommandToEvaluateToken->prev->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->prev->type==TT_BINARY_Aeru))newTokenType=TT_ERROR;
 		}
-		if(newTokenType!=pLastCommandToEvaluateToken->type||pLastCommandToEvaluateToken->significantCharacterCount>0){
+		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
+		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
+		//                this way it will always be there!!
+		if(newTokenType!=pLastCommandToEvaluateToken->type||pLastCommandToEvaluateToken->type==TT_EXPRESSION||pLastCommandToEvaluateToken->significantCharacterCount>0){
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
 			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
@@ -2154,9 +2199,15 @@ int main(int argc, char **argv){
 				*/
 
 				// if we succeeded in evaluating a command we should register it
-				if(pCommandToEvaluate!=NULL){
+				if(pCommandToEvaluate){ // technically something to evaluate
 					if(!evaluateCommand()){
-						outputLine("Failed to evaluate the command! Please complete, correct or cancel the command.");
+						mstring* commandText=_getCommandText(false);
+						if(!string_length(commandText)){
+							clearCommand();
+							output("Nothing to evaluate!");
+						}else
+							output("\nFailed to evaluate '%s'! Please complete, correct or cancel the command.",string(commandText));
+						free_mstring(commandText);
 						continue;
 					}
 					if(amVerbose())outputLine("Command evaluated!");
