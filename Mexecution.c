@@ -6,6 +6,9 @@
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
 #include "Msession.h"
 
+const char* MUTABLEVALUETYPECHARS="uirslm"; // the characters associated with each of the value types
+const char* IMMUTABLEVALUETYPECHARS="UIRSLM"; // the characters associated with each of the value types
+
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
@@ -195,7 +198,12 @@ Mreal* new_real(long double ld){
 Mstring* new_string(char* _text){ // _text assumed to be string(mstring*), so we can simply copy it over with the starting quote character (" or ')
     return (Mstring*)_strdup(_text);
 }
-
+Mstring* new_charstring(char _char){ // _text assumed to be string(mstring*), so we can simply copy it over with the starting quote character (" or ')
+    mstring* charstring=string_create();string_append_char(charstring,'"');string_append_char(charstring,_char);
+    Mstring* char_string=new_string(string(charstring));
+    free(charstring);
+    return char_string;
+}
 // interface functions that use the above functions
 // wrapping the different value type instances
 Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
@@ -214,7 +222,13 @@ Mvalue* _getRealValue(long double ld){
 Mvalue* _getStringValue(char* _s){
     Mstring* _string=(_s?new_string(_s):NULL); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
     Mvalue* _stringvalue=(_string?_newValue():NULL);
-    if(_stringvalue){_stringvalue->type=VT_REAL;_stringvalue->value._string=_string;}
+    if(_stringvalue){_stringvalue->type=VT_STRING;_stringvalue->value._string=_string;}
+    return _stringvalue;
+}
+Mvalue* _getCharStringValue(char _c){
+    Mstring* _string=(_c?new_charstring(_c):NULL); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
+    Mvalue* _stringvalue=(_string?_newValue():NULL);
+    if(_stringvalue){_stringvalue->type=VT_STRING;_stringvalue->value._string=_string;}
     return _stringvalue;
 }
 // we can force all listelements to have the same type????
@@ -738,7 +752,7 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
 
 // helper function to create a parameter map with a single value
 // the following is a nuisance
-Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
+Mmap* _getRealMap(char* name,Mvalue* _realValue){
     if(name&&_realValue){
         Mvariable* _realVariable=_createVariable(name,VT_REAL,true);
         if(_realVariable){
@@ -765,7 +779,7 @@ Mmap* _getSingleRealMap(char* name,Mvalue* _realValue){
     }
     return NULL;
 }
-Mmap* _getSingleIntegerMap(char* name,Mvalue* _integerValue){
+Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
     if(name&&_integerValue){
         Mvariable* _integerVariable=_createVariable(name,VT_INTEGER,true);
         if(_integerVariable){
@@ -792,17 +806,98 @@ Mmap* _getSingleIntegerMap(char* name,Mvalue* _integerValue){
     }
     return NULL;
 }
+Mmap* _getStringStringMap(char* name1,char* name2){
+    if(name1&&name2){
+        if(strlen(name1)&&strlen(name2)&&!strcmp(name1,name2)){
+            Mmapelement* _mapelement1=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            Mmapelement* _mapelement2=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            if(_mapelement1&&_mapelement2){
+                _mapelement1->_variable=_createVariable(name1,VT_STRING,true);
+                _mapelement2->_variable=_createVariable(name2,VT_STRING,true);
+                if(_mapelement1->_variable&&_mapelement2->_variable){
+                    Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
+                    if(_map){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _map->_last=_mapelement2;
+                        _map->numberOfElements=2;
+                        return _map;
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
+}
 // end helper functions 
 
-// the internal functions (from math) can be registered with a given (most likely root) environment
-Mvalue* Msin(Mvalue* _value){
+
+// the internal functions
+/**
+ * Msettype() to set the (value) type of a variable
+ */
+Mvalue* Msettype(Menvironment* _executionEnvironment,Mvalue* _variableName,Mvalue* _valuetype){
+    // check the types first, both should be strings
+    if(_variableName->type==VT_STRING&&_valuetype->type==VT_STRING){
+        char* variableName=_variableName->value._string->_c; // ignoring the presuffix exactly as we need to!!!
+        if(strlen(variableName)){
+            // get the value type, we can use uppercase to indicate an immutable (constant) variable?????
+            bool immutable=false;
+            Mvaluetype valuetype=VT_UNDEFINED;
+            switch(_valuetype->value._string->_c[0]){ // use the first character (which will be '\0' if the default value is used!!!)
+                case 'I':
+                    immutable=true;
+                case 'i':
+                    valuetype=VT_INTEGER;
+                    break;
+                case 'R':
+                    immutable=true;
+                case 'r':
+                    valuetype=VT_REAL;
+                    break;
+                case 'S':
+                    immutable=true;
+                case 's':
+                    valuetype=VT_STRING;
+                    break;
+                case 'L':
+                    immutable=true;
+                case 'l':
+                    valuetype=VT_LIST;
+                    break;
+                case 'M':
+                    immutable=true;
+                case 'm':
+                    valuetype=VT_MAP;
+                    break;
+            }
+            if(containsVariable(_executionEnvironment,variableName)||addVariable(_executionEnvironment,variableName,valuetype,immutable)){
+                Mvariable* _variable=getVariable(_executionEnvironment,variableName,false); // should exist
+                if(_variable){
+                    // you can change the value type if the current value is (still) NULL or when it is mutable...
+                    if(valuetype!=_variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
+                        if(!_variable->immutable||!_variable->_value){
+                            _variable->valuetype=valuetype; // update the value type
+                            _variable->_value=NULL; // clear the value (might already be the case but won't harm either)
+                        }
+                    }
+                    // return the value type as text, which means we need to wrap the value type character
+                    return _getCharStringValue(_variable->immutable?IMMUTABLEVALUETYPECHARS[_variable->valuetype]:MUTABLEVALUETYPECHARS[_variable->valuetype]);
+                }
+            }
+        }
+    }
+    return NULL;
+}
+// math functions: independent of the execution environment but still receive it...
+Mvalue* Msin(Menvironment* _executionEnvironment,Mvalue* _value){
     if(_value){
         if(_value->type==VT_REAL)return _getRealValue(sin(_value->value._real->ld));
         if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
     }
     return NULL;
 }
-Mvalue* Mcos(Mvalue* _value){
+Mvalue* Mcos(Menvironment* _executionEnvironment,Mvalue* _value){
     if(_value){
         if(_value->type==VT_REAL)return _getRealValue(cos(_value->value._real->ld));
         if(_value->type==VT_INTEGER)return _getRealValue(cos(_value->value._integer->ll));
@@ -810,22 +905,32 @@ Mvalue* Mcos(Mvalue* _value){
     return NULL;
 }
 
-bool completedOneArgumentRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
-        _function->_parameterMap=_getSingleRealMap("x",_getRealValue(0.0));
+        _function->_parameterMap=_getRealMap("x",_getRealValue(0.0));
         output("\nRegistered function '%s' completed.",string(_function->_name));
         return true;
     }
     return false;
 }
-bool completedOneArgumentIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=_getSingleIntegerMap("i",_getIntegerValue(0));
+        _function->_parameterMap=_getIntegerMap("i",_getIntegerValue(0));
+        output("\nRegistered function '%s' completed.",string(_function->_name));
+        return true;
+    }
+    return false;
+}
+bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=_getStringStringMap("variable","type");
         output("\nRegistered function '%s' completed.",string(_function->_name));
         return true;
     }
@@ -834,9 +939,12 @@ bool completedOneArgumentIntegerFunction(Mfunction* _function,OneArgumentFunctio
 
 // these internal functions do NOT have a body as M defined functions have...
 bool registerInternalFunctions(Menvironment* _environment){
-    // let's try to register the sine function
-    if(!completedOneArgumentRealFunction(newFunction(_environment,"cos"),Mcos))return false;
-    if(!completedOneArgumentRealFunction(newFunction(_environment,"sin"),Msin))return false;
+    // variable functions
+
+    // math functions
+    if(!completedRealFunction(newFunction(_environment,"cos"),Mcos))return false;
+    if(!completedRealFunction(newFunction(_environment,"sin"),Msin))return false;
+    if(!completedStringStringFunction(newFunction(_environment,"settype"),Msettype))return false;
     return true;
 }
 

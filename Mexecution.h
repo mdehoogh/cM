@@ -116,9 +116,11 @@ typedef struct Mexpressionlist{
 }Mexpressionlist;
 
 // functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
-typedef Mvalue* (*NoArgumentFunction)(void);
-typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
-typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
+// all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
+struct Menvironment;
+typedef Mvalue* (*NoArgumentFunction)(struct Menvironment* _executionEnvironment);
+typedef Mvalue* (*OneArgumentFunction)(struct Menvironment* _executionEnvironment,Mvalue* _argumentValue);
+typedef Mvalue* (*TwoArgumentFunction)(struct Menvironment* _executionEnvironment,Mvalue* _argument1Value,Mvalue* _argument2Value);
 
 typedef enum Mfunctiontype{FT_M,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
 
@@ -256,6 +258,6 @@ bool registerInternalFunctions(Menvironment* _environment);
 Mfunction* getFunction(Menvironment* _environment,const char* functionName);
 Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
 
-bool completedOneArgumentIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
+bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 
 size_t getNumberOfRemovedValues();

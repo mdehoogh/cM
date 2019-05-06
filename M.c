@@ -45,9 +45,9 @@ Mvalueunion* getMNumberValueunion(Mnumber* pMnumber){
 	if(pMnumberValueunion){pMnumberValueunion->n=pMnumber;} // store the Mnumber instance
 	return pMnumberValueunion; // redirection operator
 }
-bool initVariable(Menvironment* pMenvironment,char* name,double d){
+bool initVariable(Menvironment* _Menvironment,char* name,double d){
 	Mvalueunion* pMValueunion=getMNumberValueUnion(getDoubleMnumber(d)); // dynamically allocated value union (i.e. on the heap)
-	return setVariableValue(addVariable(pMenvironment,name,VT_NUMBER),*pMValueunion); // pass the union itself (can you actually assign a union???)
+	return setVariableValue(addVariable(_Menvironment,name,VT_NUMBER),*pMValueunion); // pass the union itself (can you actually assign a union???)
 }
 */
 // there will be a root (M) environment
@@ -58,35 +58,37 @@ const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits o
 // how about storing all results here?????? instead of in the root environment????
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
-Mvalue* getResult(Mvalue* _index){
+Mvalue* getResult(Menvironment* _executionEnvironment,Mvalue* _index){
 	if(amVerbose())output("\nResult requested!");
 	if(!_index)return _resultListValue;
 	return getValueAtIndex(_resultListValue->value._list,_index);
 }
 
-Menvironment* pMenvironment;
+Menvironment* _Menvironment; // this is the root (M) environment
+Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
+
 bool initEnvironment(){
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
-	pMenvironment=calloc(1,sizeof(Menvironment));
-	if(pMenvironment){
+	_Menvironment=calloc(1,sizeof(Menvironment));
+	if(_Menvironment){
 		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
 		Mfunctionmap* environmentFunctionMap=calloc(1,sizeof(Mfunctionmap));
 		if(environmentVariableMap&&environmentFunctionMap){
-			pMenvironment->_variableMap=environmentVariableMap;
+			_Menvironment->_variableMap=environmentVariableMap;
 			// create and add PI and E constants!!!
 			Mvalue* PI_value=_getRealValue(LD_PI);
 			if(!PI_value){
 				outputLine("ERROR: Failed to create PI.");
 				return false;
 			}
-			if(!addVariable(pMenvironment,"PI",VT_REAL,true)){
+			if(!addVariable(_Menvironment,"PI",VT_REAL,true)){
 				outputLine("ERROR: Failed to add PI.");
 				///////free_value(PI_value);
 				return false;
 			}
-			if(!setValue(pMenvironment,"PI",PI_value)){
+			if(!setValue(_Menvironment,"PI",PI_value)){
 				////////free_value(PI_value);
 				outputLine("ERROR: Failed to initialize PI.");
 				return false;
@@ -97,11 +99,11 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to create E.");
 				return false;
 			}
-			if(!addVariable(pMenvironment,"E",VT_REAL,true)){
+			if(!addVariable(_Menvironment,"E",VT_REAL,true)){
 				outputLine("ERROR: Failed to add E.");
 				return false;
 			}
-			if(!setValue(pMenvironment,"E",E_value)){
+			if(!setValue(_Menvironment,"E",E_value)){
 				//////free_value(E_value);
 				outputLine("ERROR: Failed to initialize E.");
 				return false;
@@ -113,21 +115,22 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to create the M result list.");
 				return false;
 			}
-			if(!addVariable(pMenvironment,"M",VT_LIST,true)){
+			if(!addVariable(_Menvironment,"M",VT_LIST,true)){
 				outputLine("ERROR: Failed to add the M result list.");
 				return false;
 			}
-			if(!setValue(pMenvironment,"M",M_value)){
+			if(!setValue(_Menvironment,"M",M_value)){
 				outputLine("ERROR: Failed to initialize the M result list.");
 				return false;
 			}
 			*/
-			pMenvironment->_functionMap=environmentFunctionMap;
-			if(!registerInternalFunctions(pMenvironment)){
+			_Menvironment->_functionMap=environmentFunctionMap;
+			if(!registerInternalFunctions(_Menvironment)){
 				outputLine("ERROR: Failed to register all internal functions.");
 				return false;
 			}
-			if(_resultListValue&&!completedOneArgumentIntegerFunction(newFunction(pMenvironment,"M"),getResult)){
+			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
+			if(_resultListValue&&!completedIntegerFunction(newFunction(_Menvironment,"M"),getResult)){
 				outputLine("ERROR: Failed to register function M (for requesting previous results).");
 				return false;
 			}
@@ -312,13 +315,13 @@ mstring* _getValueText(Mvalue* _value){
 	return string_append(string_create(),UNDEFINED_VALUETEXT);
 }
 void outputFunctions(){
-	mstring* functionsText=_getFunctionMapText(pMenvironment->_functionMap);
+	mstring* functionsText=_getFunctionMapText(_Menvironment->_functionMap);
 	output("\nFunctions: %s.",string(functionsText));
 	free_mstring(functionsText);
 }
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
-	mstring* variablesText=_getMapText(pMenvironment->_variableMap);
+	mstring* variablesText=_getMapText(_Menvironment->_variableMap);
 	output("\nVariables: %s.",string(variablesText));
 	free_mstring(variablesText);
 }
@@ -760,7 +763,7 @@ void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 		*/
 		// MDH@03MAY2019: append the result value at the proper index (as indicated by the command index)
 		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_value,commandCount+1))outputLine("ERROR: Failed to save the result.");else if(amVerbose())outputLine("Result saved.");}
-		// replacing: if(!appendToListVariable(pMenvironment,"M",_expressionvalue->_value))outputLine("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputLine("Result appended to the M list.");
+		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))outputLine("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputLine("Result appended to the M list.");
 		//// NEVER free what does not have an underscore at the start!!!! free_token(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
 		////////output("\nFreeing expression!");
 		decrementReferenceCount(_expressionvalue->_value); // as where freeing _expressionvalue!!!!
@@ -858,13 +861,13 @@ Mvalue* getFunctionCallValue(Mfunction* _function,Mmap* _argumentMap){
 				break;
 			}
 		case FT_INTERNAL_NO_ARGUMENTS:
-			return (*_function->functionunion.noArgumentFunction)();
+			return (*_function->functionunion.noArgumentFunction)(_Menvironment);
 		case FT_INTERNAL_ONE_ARGUMENT:
-			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
+			return (*_function->functionunion.oneArgumentFunction)(_Menvironment,_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:{
 			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 			Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
-			return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
+			return (*_function->functionunion.twoArgumentFunction)(_Menvironment,(_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																														,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL));
 		}
 	}
@@ -905,7 +908,7 @@ Mexpressionvalue* getExpressionvalue(const char* info,Token* firstToken,enum TOK
 		if(firstToken->type==TT_MAP)return getMapExpressionvalue(firstToken->next);
 		if(firstToken->type==TT_FUNCTION_CALL){
 			if(amVerbose())output("\nCall of function '%s'.",string(firstToken->prev->text));
-			Mfunction* function=getFunction(pMenvironment,string(firstToken->prev->text)); // get the function associated with the name of the function
+			Mfunction* function=getFunction(_Menvironment,string(firstToken->prev->text)); // get the function associated with the name of the function
 			if(function){					
 				// 1. get the list of function arguments, which depends on the function!!
 				Mexpressionvalue* _functionArgumentsExpressionvalue=getListExpressionvalue(firstToken->next,TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
@@ -933,9 +936,9 @@ Mexpressionvalue* getExpressionvalue(const char* info,Token* firstToken,enum TOK
 		if(!secondToken){
 			switch(firstToken->type){
 				case TT_NEW_VARIABLE:
-					addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false); // NO retrieves the undefined value subsequently!!
+					addVariable(_Menvironment,firstTokenText,VT_UNDEFINED,false); // NO retrieves the undefined value subsequently!!
 				case TT_VARIABLE:
-					_expressionvalue->_value=getValue(pMenvironment,firstTokenText);
+					_expressionvalue->_value=getValue(_Menvironment,firstTokenText);
 					break;
 				case TT_INTEGER:
 					_expressionvalue->_value=_getIntegerValue(atoll(firstTokenText));
@@ -973,7 +976,7 @@ Mexpressionvalue* getExpressionvalue(const char* info,Token* firstToken,enum TOK
 				secondToken=secondToken->next;
 			}
 			if(secondToken&&secondToken->type==TT_ASSIGNMENT){
-				if(firstToken->type==TT_NEW_VARIABLE)addVariable(pMenvironment,firstTokenText,VT_UNDEFINED,false);
+				if(firstToken->type==TT_NEW_VARIABLE)addVariable(_Menvironment,firstTokenText,VT_UNDEFINED,false);
 				Mexpressionvalue* _expressionvalue=getExpressionvalue("assignment",secondToken->next,endTokenTypes,endTokenTypeCount);
 				if(_expressionvalue){
 					if(shortcutBinaryOperator){ 
@@ -981,7 +984,7 @@ Mexpressionvalue* getExpressionvalue(const char* info,Token* firstToken,enum TOK
 					}
 					// if we failed to create the variable (see above), the following obviously will fail!!! (or of course when the type of the value is wrong)
 					if(amVerbose())output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
-					if(!setValue(pMenvironment,firstTokenText,_expressionvalue->_value)){
+					if(!setValue(_Menvironment,firstTokenText,_expressionvalue->_value)){
 						output("\nERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
 						/* no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
 						free_value(_expressionvalue->_value);
@@ -989,7 +992,7 @@ Mexpressionvalue* getExpressionvalue(const char* info,Token* firstToken,enum TOK
 						*/
 					}else
 					if(amVerbose())
-						output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(pMenvironment,firstTokenText))));
+						output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(_Menvironment,firstTokenText))));
 				}
 				return _expressionvalue;
 			}
@@ -1453,7 +1456,7 @@ bool tokenCheckedForBeingAFunction(){
 	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){
 		result=true;
 		// is it a function (now)?
-		if(getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // yes, it is
+		if(getFunction(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
 			if(amMatchingparentheses())if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
@@ -1466,7 +1469,7 @@ bool tokenCheckedForBeingAFunction(){
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
 		result=true;
 		// is it (still) a function?
-		if(!getFunction(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // no, it ain't
+		if(!getFunction(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
 			pLastCommandToEvaluateToken->type=TT_VARIABLE;
 			reoutputToken(pLastCommandToEvaluateToken);
@@ -1479,14 +1482,14 @@ bool tokenCheckedForBeingAFunction(){
 	if(result){ // a variable or function
 		// check whether the variable exists or not
 		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
-			if(!containsVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
+			if(!containsVariable(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else
 		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
-			if(containsVariable(pMenvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
+			if(containsVariable(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
@@ -1765,7 +1768,7 @@ int main(int argc, char **argv){
 		exit(1);
 	}
 
-	mstring* predefinedVariableNames=_getVariableNames(pMenvironment,", ");
+	mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
 	if(predefinedVariableNames){
 		output("\nPredefined variables: %s.",string(predefinedVariableNames));
 		free_mstring(predefinedVariableNames); // no get rid of it!!!
