@@ -123,9 +123,9 @@
 		TOKENTYPE(TT_ERROR)
 #define GENERATE_TOKENTYPE_ENUM(ENUM) ENUM,
 #define GENERATE_STRING(STRING) #STRING,
-enum TOKENTYPE_ENUM {
+typedef enum TOKENTYPE_ENUM {
 	FOREACH_TOKENTYPE(GENERATE_TOKENTYPE_ENUM)
-};
+}TokenType;
 static const char* TOKENTYPE_STRING[]={
 	FOREACH_TOKENTYPE(GENERATE_STRING)
 };
@@ -139,7 +139,7 @@ typedef struct{
 }TokenType;
 */
 typedef struct Token{
-	enum TOKENTYPE_ENUM type; // actually the index into the TOKENTYPES array!!!
+	TokenType type; // actually the index into the TOKENTYPES array!!!
 	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
 	uint16_t offset; // number of characters in front of this token in the command
 	mstring* text;
