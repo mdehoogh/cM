@@ -344,9 +344,13 @@ void storeCursor(){printf("\0337");}
 void restoreCursor(){printf("\0338");}
 */
 
-void displayFlags(){output("\nEdit flags: %c%c%c%c - Display flags: %c%c.",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());}
+void displayFlags(){
+	output("\nEdit flags: %c%c%c%c%c - Display flags: %c%c.",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'s':'S',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
+}
 
-void outputFlags(){output("%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');}
+void outputFlags(){
+	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'s':'S',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
+}
 
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 long long commandCount=0; // the total number of command input
@@ -783,11 +787,13 @@ Mvaluepointeritem* getLastValuepointeritem(Mvaluepointer* _valuepointer){
 	return _value;
 }
 */
+
 // MDH@06MAY2019: Mvaluereference stands for a variable in combination with an item id, this will allow assignments as we know the variable involved!!!!
 typedef struct Mvaluereference{
 	Mvariable* _variable; // may contain both the variable involved (or with NULL name reference if dealing with a anonymous composite value)
 	Mvalue* _itemid; // the item referenced!!!
 }Mvaluereference;
+/*
 typedef struct Mexpressionvalue{
 	Mvaluereference* _valuereference; // thre result of evaluating an expression is always a single value!!!
 	Token* token; // supposed to be the token the evaluation ended with (so the token in front of the first in the next evaluation)
@@ -796,11 +802,6 @@ typedef struct Mexpressionvalue{
 void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 	if(_expressionvalue){
 		if(amVerbose())outputLine("Releasing the result!");
-		/* TODO should I free the expression value if it is assigned, I should never have to do that do I???? well, not if it was assigned!!!! i.e. bound!!!
-		   besides we should store result in M, and use the length of M in determining the prompt!!!
-		output("\nFreeing expression value!");
-		free_value(_expressionvalue->_value);
-		*/
 		// MDH@03MAY2019: append the result value at the proper index (as indicated by the command index)
 		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_valuereference->_variable->_value,commandCount+1))outputLine("ERROR: Failed to save the result.");else if(amVerbose())outputLine("Result saved.");}
 		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))outputLine("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputLine("Result appended to the M list.");
@@ -812,13 +813,13 @@ void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 	if(amVerbose())outputLine("No result to free!");
 	
 }
-
+*/
 // helper function to get an expression value of hold a value of a specific type
-Mexpressionvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
-	Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue));
+Mvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
+	Mvalue* _value=(Mvalue*)calloc(1,sizeof(Mvalue));
 	// allocate the value to hold, if a composite type (map or list), initialize the map and list to an empty map or list (integer, real and string are not set in advance)
 	if(valuetype!=VT_UNDEFINED){
-		Mvalue* _value=(Mvalue*)calloc(1,sizeof(Mvalue));_value->type=valuetype;
+		_value->type=valuetype;
 		switch(_value->type){
 			case VT_INTEGER:_value->value._integer=(Minteger*)calloc(1,sizeof(Minteger));break; // initialized to 0 I presume
 			case VT_REAL:_value->value._real=(Mreal*)calloc(1,sizeof(Mreal));break; // initialized to 0.0 I presume
@@ -826,9 +827,8 @@ Mexpressionvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
 			case VT_MAP:_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
 			default:break;
 		}
-		_expressionvalue->_valuereference->_variable->_value=_value;
 	}
-	return _expressionvalue;
+	return _value;
 }
 
 /*
@@ -863,65 +863,61 @@ but <value><operator><value> here operator is a set of token types that separate
  * @endTokenTypeCount: the number of end tokens
  * returns: the last token processed (which should be one of the end tokens) or NULL if all tokens were processed, and the Mvalue the expression evaluates to
  */
-Mexpressionvalue* getValueOfExpression(const char* info,char resulttype,Token* firstToken,enum TOKENTYPE_ENUM endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getValueOfExpression() so we can call it from getListValue() and getMapValue()
+Token* expressionToken=NULL; // the current evaluation token
+Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getValueOfExpression() so we can call it from getListValue() and getMapValue()
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
-Mexpressionvalue* getValueOfList(Token* firstToken,TokenType endTokenType,uint32_t maximumNumberOfElements){
+Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 	/////if(amVerbose())output("\nComposing a list starting with '%s'.",string(_firstToken->text));
-	Mexpressionvalue* _listExpressionValue=getValueOfExpressionOfType(VT_LIST);
-	Mlist* _list=_listExpressionValue->_valuereference->_variable->_value->value._list; // grab the (empty) list to fill
+	Mvalue* _listValue=getValueOfExpressionOfType(VT_LIST);
+	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	if(!_list){output("\nFailed to create a list to return.");return NULL;}
-	Token* token=firstToken;
-	if(amVerbose())output("\nComposing a list starting with token '%s' of type '%s'.",string(firstToken->text),TOKENTYPE_STRING[firstToken->type]);
+	if(amVerbose())output("\nComposing a list starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// NOTE a list can be empty in which case _firstToken will immediately be of type TT_END_OF_LIST
-	while(token&&token->type!=endTokenType){
-		if(amVerbose())output("\nProcessing list element starting with token '%s' of type '%s'.",string(token->text),TOKENTYPE_STRING[token->type]);
+	while(expressionToken&&expressionToken->type!=endTokenType){
+		if(amVerbose())output("\nProcessing list element starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
-		Mexpressionvalue* _listElementExpressionvalue=getValueOfExpression("list element",'l',token,(enum TOKENTYPE_ENUM[]){endTokenType,TT_LISTELEMENT},2);
-		if(!_listElementExpressionvalue){if(amVerbose())output("\nNo list element result!");break;}
-		token=_listElementExpressionvalue->token; // update the current token
+		Mvalue* _listElementValue=getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2);
+		if(!_listElementValue){if(amVerbose())output("\nNo list element result!");break;}
 		if(amVerbose())output("\nToken updated!");
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		if(maximumNumberOfElements)if(_list->numberOfElements>=maximumNumberOfElements){if(amVerbose())output("\nMaximum number of elements reached.");continue;}
-		long long listElementIndex=appendedToList(_list,_listElementExpressionvalue->_valuereference->_variable->_value,0);
+		long long listElementIndex=appendedToList(_list,_listElementValue,0);
 		if(!listElementIndex){output("\nERROR: Failed to append the list element!");break;}
 		if(amVerbose())output("\nList element appended to list!");
-		if(!token)break;
-		token=token->next; // ready to look at the next token!!!
+		expressionToken=(expressionToken?expressionToken->next:NULL); // ready to look at the next token!!!
+		if(expressionToken&&expressionToken->prev->type==endTokenType)break;
 	}
-	_listExpressionValue->token=token;
-	return _listExpressionValue;
+	return _listValue;
 }
-Mexpressionvalue* getValueOfMap(Token* _firstToken){
-	Mexpressionvalue* _mapExpressionValue=getValueOfExpressionOfType(VT_MAP);
-	Mmap* _map=_mapExpressionValue->_valuereference->_variable->_value->value._map; // grab the map to fill
-	Token* token=_firstToken;
+Mvalue* getValueOfMap(){
+	Mvalue* _mapValue=getValueOfExpressionOfType(VT_MAP);
+	Mmap* _map=_mapValue->value._map; // grab the map to fill
 	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
 	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
 	// NOTE a map can be empty in which case _firstToken will immediately be of type TT_END_OF_MAP
-	while(token&&token->type!=TT_END_OF_MAP){
+	while(expressionToken&&expressionToken->type!=TT_END_OF_MAP){
 		// get the next attribute name, value pair
 		// obviously the name should be something that evaluates to a string
-		Mexpressionvalue* _attributeNameExpressionvalue=getValueOfExpression("map attribute name",'n',token,(enum TOKENTYPE_ENUM[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
-		token=_attributeNameExpressionvalue->token; // update the current token
-		if(_attributeNameExpressionvalue->token->type==TT_END_OF_MAP)break;
+		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'n',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
+		if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
-		if(_attributeNameExpressionvalue->token->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
-		Mexpressionvalue* _attributeValueExpressionvalue=getValueOfExpression("map attribute value",'v',token,(enum TOKENTYPE_ENUM[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
-		token=_attributeValueExpressionvalue->token; // update the current token
-		mstring* attributeName=_getValueText(_attributeNameExpressionvalue->_valuereference->_variable->_value); // parse the attribute name value 
+		if(expressionToken->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
+		Mvalue* _attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
+		mstring* attributeName=_getValueText(_attributeNameValue); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
 		Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
 		_mapelement->_variable->_name=_strdup(string(attributeName)); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
 		free_mstring(attributeName); // NOTE freeing attributeName does NOT free the character array mstring* points to (which is now used by the variable's name!!!! replacing: string_dispose(attributeName);
 		_mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
-		_mapelement->_variable->_value=_attributeValueExpressionvalue->_valuereference->_variable->_value; // store the _value pointer of the attributeValueExpressionvalue
+		_mapelement->_variable->_value=_attributeValueValue; // store the _value pointer of the attributeValueExpressionvalue
 		if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
 		_map->_last=_mapelement;_map->numberOfElements++;
-		token=token->next;
+		// the next token starts the next attribute
+		expressionToken=(expressionToken?expressionToken->next:NULL);
+		if(expressionToken&&expressionToken->prev->type==TT_END_OF_MAP)break; // end of map reached!!!
 	}
-	_mapExpressionValue->token=token;
-	return _mapExpressionValue;
+	return _mapValue;
 }
 // a function call needs a function and a map of arguments (defining the values to use for the formal parameters of the function)
 Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
@@ -962,45 +958,62 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
  * 		  if the resulting value is an variable, we should return the value of the variable, technically this means that an expressionelement cannot be a variable that makes sense
  *      so I guess we should only accept assignments at the start of an expression (which makes perfect sense)
  */
-/*
-	getValueReference() retrieves a single value reference that either ends when a binary operator token is encountered or one of the end token types
+
+/**
+ * _getValueReference() wraps a single Mvalue instance
+ */
+Mvaluereference* _getValueReference(Mvalue* _value){
+	Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+	_valuereference->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
+	_valuereference->_variable->_value=_value;
+	incrementReferenceCount(_value); // TODO is this correct???
+	return _valuereference;
+}
+
+/**
+ * getValueReference() retrieves a single value reference that either ends when a binary operator token is encountered or one of the end token types
+ * a value reference syntax: optionally a number of unary operators, optionally followed by function call with arguments, and variable or value literal
+
 */
-Mexpressionvalue* getValueReference(Token* firstToken,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
+Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTypeCount){
 	
-	Mexpressionvalue* _expressionvalue=calloc(1,sizeof(Mexpressionvalue));
-	_expressionvalue->_valuereference=calloc(1,sizeof(Mvaluereference));
-	_expressionvalue->token=firstToken;
-	
+	Mvaluereference* _valuereference=NULL;
+
+
+	Token* firstToken=expressionToken;
 	if(firstToken){
 
 		mstring* unaryOperators=NULL; // collecting any unary operators to apply (in front of any value (which might be a function call mind!!!!))
 		
 		// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
-		if(firstToken->type==TT_LIST)return getValueOfList(firstToken->next,TT_END_OF_LIST,0); // a real list literal with any number of elements
-		if(firstToken->type==TT_MAP)return getValueOfMap(firstToken->next);
+		if(firstToken->type==TT_LIST){expressionToken=firstToken->next;return _getValueReference(getValueOfList(TT_END_OF_LIST,0));} // a real list literal with any number of elements
+		if(firstToken->type==TT_MAP){expressionToken=firstToken->next;return _getValueReference(getValueOfMap());}
+		
+		_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+
 		if(firstToken->type==TT_FUNCTION_CALL){
 			if(amVerbose())output("\nCall of function '%s'.",string(firstToken->prev->text));
 			Mfunction* function=getFunction(_Menvironment,string(firstToken->prev->text)); // get the function associated with the name of the function
 			if(function){					
 				// 1. get the list of function arguments, which depends on the function!!
-				Mexpressionvalue* _functionArgumentsExpressionvalue=getValueOfList(firstToken->next,TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
-				if(_functionArgumentsExpressionvalue){
+				expressionToken=firstToken->next;
+				Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
+				if(_functionArgumentsValue){
 					if(amVerbose())output("\nConstructing the function call argument map!");
 					// 2. get the arguments map
-					Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsExpressionvalue->_valuereference->_variable->_value->value._list); // assuming to have a list returned by getListExpressionValue()
+					Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
+					/// release the original arguments list
+					decrementReferenceCount(_functionArgumentsValue); // TODO is this correct?????
 					// 3. the result of applying the function to the arguments is the end result
-					_expressionvalue->_valuereference->_variable->_value=getValueOfFunctionCall(function,_functionArgumentMap);
-					_expressionvalue->token=_functionArgumentsExpressionvalue->token;
-					/// NO NEED ANYMORE as the token field is never freed!!!!! _functionArgumentsExpressionvalue->token=NULL; // to prevent it from being freed as well
-					free_expressionvalue(_functionArgumentsExpressionvalue);
+					_valuereference->_variable->_value=getValueOfFunctionCall(function,_functionArgumentMap);
 				}else
 					output("\nERROR: No function arguments!");
 			}else
 				output("\nERROR: Function '%s' unknown!",string(firstToken->prev->text));
-			return _expressionvalue;
+			return _valuereference;
 		}
 
-		char* firstTokenText=string(firstToken->text);
+		char* firstTokenText=string(expressionToken->text);
 		// ASSERTION not a function call or a map or list literal
 		
 		// it makes sense to check if there's a second token, if not we can speed things up
@@ -1010,27 +1023,27 @@ Mexpressionvalue* getValueReference(Token* firstToken,TokenType endTokenTypes[],
 				case TT_NEW_VARIABLE:
 					addVariable(_Menvironment,firstTokenText,VT_UNDEFINED,false); // NO retrieves the undefined value subsequently!!
 				case TT_VARIABLE:
-					_expressionvalue->_valuereference->_variable->_value=getValue(_Menvironment,firstTokenText);
+					_valuereference->_variable->_value=getValue(_Menvironment,firstTokenText);
 					break;
 				case TT_INTEGER:
-					_expressionvalue->_valuereference->_variable->_value=_getIntegerValue(atoll(firstTokenText));
+					_valuereference->_variable->_value=_getIntegerValue(atoll(firstTokenText));
 					break;
 				case TT_REAL:
-					_expressionvalue->_valuereference->_variable->_value=_getRealValue(_strtold(firstTokenText));
+					_valuereference->_variable->_value=_getRealValue(_strtold(firstTokenText));
 					break;
 				case TT_SQSTRING:
 				case TT_DQSTRING:
-					_expressionvalue->_valuereference->_variable->_value=_getStringValue(firstTokenText);
+					_valuereference->_variable->_value=_getStringValue(firstTokenText);
 					break;
 				default:
 					break;
 			}
-			if(_expressionvalue->_valuereference->_variable->_value){
-				_expressionvalue->_valuereference->_variable->_value->count++; // increment the reference count of the value!!!
-				if(amVerbose())output("\nReturning expression value '%s' (with reference count: %u).",string(_getValueText(_expressionvalue->_valuereference->_variable->_value)),_expressionvalue->_valuereference->_variable->_value->count);
+			if(_valuereference->_variable->_value){
+				_valuereference->_variable->_value->count++; // increment the reference count of the value!!!
+				if(amVerbose())output("\nReturning expression value '%s' (with reference count: %u).",string(_getValueText(_valuereference->_variable->_value)),_valuereference->_variable->_value->count);
 			}else
 			if(amVerbose())output("\nNo value to return!");
-			return _expressionvalue;
+			return _valuereference;
 		}
 
 		// ASSERTION at least two tokens
@@ -1049,14 +1062,14 @@ Mexpressionvalue* getValueReference(Token* firstToken,TokenType endTokenTypes[],
 			}
 			if(secondToken&&secondToken->type==TT_ASSIGNMENT){
 				if(firstToken->type==TT_NEW_VARIABLE)addVariable(_Menvironment,firstTokenText,VT_UNDEFINED,false);
-				Mexpressionvalue* _expressionvalue=getValueOfExpression("assignment",'a',secondToken->next,endTokenTypes,endTokenTypeCount);
-				if(_expressionvalue){
+				Mvalue* _expressionValue=getValueOfExpression("assignment",'a',endTokenTypes,endTokenTypeCount);
+				if(_expressionValue){
 					if(shortcutBinaryOperator){ 
 						// TODO apply the shortcut binary operator to the current value of the assignee before assigning
 					}
 					// if we failed to create the variable (see above), the following obviously will fail!!! (or of course when the type of the value is wrong)
 					//if(amVerbose())output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
-					if(!setValue(_Menvironment,firstTokenText,_expressionvalue->_valuereference->_variable->_value)){
+					if(!setValue(_Menvironment,firstTokenText,_valuereference->_variable->_value)){
 						//output("\nERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
 						/* no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
 						free_value(_expressionvalue->_value);
@@ -1069,11 +1082,11 @@ Mexpressionvalue* getValueReference(Token* firstToken,TokenType endTokenTypes[],
 			}
 		}
 	}
-	return _expressionvalue;
+	return _valuereference;
 }
 
 typedef struct Mformulaelement{
-	Token* operatorToken; // a token storing the binary operator to apply
+	Token* operatorToken; // a token storing the binary operator to apply (if it ends with = and not start with < or > it's a shortcut operator assignment)
 	Mvaluereference* _operand; // an operand to apply the binary operator to
 	struct Mformulaelement* _next;
 }Mformulaelement;
@@ -1082,24 +1095,24 @@ typedef struct Mformula{
 	Mvaluereference* _operand;
 	Mformulaelement* _next;
 }Mformula;
+// once we have constructed a formula it needs to be computed
+
 /**
  * an expression is the top-level element of the M language hierarchy
  * which optionally starts with an assignment to a single variable, BUT it makes sense to allow for multiple assignments in a row?????
  * typically this assignee can be composite referencing indices or attributes in maps, obviously we can put this variable in some sort of structure
  * it composes a list of value references to which operators are to be applied
  */
-Mexpressionvalue* getValueOfExpression(const char* info,char resulttype,Token* firstToken,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
+Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
 	// typically the offset token determines what the expression ends with!!
 	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.   
-	Mexpressionvalue* _expressionvalue=(Mexpressionvalue*)calloc(1,sizeof(Mexpressionvalue)); // initializes
+	Mvalue* _expressionValue=NULL;
 	/////////_expressionvalue->_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference)); // create a value reference that is to hold a single value reference as result
-	// the first token could also be the final token
-	_expressionvalue->token=firstToken;
 
-	if(firstToken){
+	if(expressionToken){
 
 		if(amVerbose()){
-			output("\nInterpreting %s expression starting with token '%s' of type '%s'",info,string(firstToken->text),TOKENTYPE_STRING[firstToken->type]);
+			output("\nInterpreting %s expression starting with token '%s' of type '%s'",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			if(endTokenTypeCount){
 				output(" that ends");
 				uint8_t endTokenTypeIndex=0;
@@ -1110,59 +1123,54 @@ Mexpressionvalue* getValueOfExpression(const char* info,char resulttype,Token* f
 
 		// construct a formula
 		Mformula* formula=calloc(1,sizeof(Mformula));
-		Mformulaelement* _formulaelement=NULL;
-		Token* token=firstToken;
+		Mformulaelement* _formulaelement=NULL; // the current formula element!!!
+		Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
-		while(token){
+		while(expressionToken){
 			// does this token end the expression????
 			endTokenTypeIndex=endTokenTypeCount;
-			while(endTokenTypeIndex&&token->type!=endTokenTypes[endTokenTypeIndex-1]&&token->type>=8)endTokenTypeIndex--;
+			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]&&expressionToken->type>=8)endTokenTypeIndex--;
 			if(endTokenTypeIndex){if(amVerbose())output("\nEnd of %s expression.",info);break;}
 			
-			if(amVerbose())output("\nInterpreting token '%s' of type '%s'.",string(token->text),TOKENTYPE_STRING[token->type]);
+			if(amVerbose())output("\nInterpreting token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
-			if(token->type==TT_FUNCTION){ // the first token is a function name, obviously we should evaluate it
-				if(amVerbose())output("\nFunction '%s' encountered!",string(token->text));
+			if(expressionToken->type==TT_FUNCTION){ // the first token is a function name, obviously we should evaluate it
+				if(amVerbose())output("\nFunction '%s' encountered!",string(expressionToken->text));
 				// we can get the value of applying the function by passing token as offset token (containing the function name so followed by a function call element (hopefully))
-				Mexpressionvalue* _functionCallExpressionvalue=getValueOfList(token->next,TT_END_OF_FUNCTION_CALL,0);
-				_expressionvalue->_valuereference->_variable->_value=_functionCallExpressionvalue->_valuereference->_variable->_value;
-				token=_functionCallExpressionvalue->token; // continue from the end token received!!!
+				expressionToken=expressionToken->next; // step into the function argument list...
+				Mvalue* _functionCallValue=getValueOfList(TT_END_OF_FUNCTION_CALL,0);
+				_valuereference->_variable->_value=_functionCallValue;
+				decrementReferenceCount(_functionCallValue);
 			}else
 			// values are easy, just push them on the expression stack
-			if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
-				_expressionvalue->_valuereference->_variable->_name=_strdup(string(token->text));
+			if(expressionToken->type==TT_VARIABLE||expressionToken->type==TT_NEW_VARIABLE){
+				_valuereference->_variable->_name=_strdup(string(expressionToken->text));
 			}else
-			if(token->type<=8){
+			if(expressionToken->type<=8){
 			}else
-			if(token->type==TT_INTEGER){
+			if(expressionToken->type==TT_INTEGER){
 				//appendedToList(_formulaelement,_getIntegerValue(atoll(string(token->text))),0);
 			}else
-			if(token->type==TT_REAL){
+			if(expressionToken->type==TT_REAL){
 				//appendedToList(_formulaelement,_getRealValue(_strtold(string(token->text))),0);
 			}else
-			if(token->type==TT_DQSTRING||token->type==TT_SQSTRING){
+			if(expressionToken->type==TT_DQSTRING||expressionToken->type==TT_SQSTRING){
 				//appendedToList(_formulaelement,_getStringValue(string(token->text)),0);
 			}else
-			if(token->type==TT_LISTELEMENT){ // ends the current value
+			if(expressionToken->type==TT_LISTELEMENT){ // ends the current value
 
 			}
 			if(amVerbose())output("\nToken processed!");
-			if(!token)break;
-			token=token->next;
+			expressionToken=(expressionToken?expressionToken->next:NULL);
 		}
 
 		// ready to evaluate the expression list
 		if(amVerbose())output("\nStoring the expression result.");
 
-		// remember the token that stopped the evaluation (which might be NULL)
-		_expressionvalue->token=token;
 		// use the first element in the expression element list as end result (which it supposedly is)
 		if(formula){
 			if(formula->_next){
 				if(amVerbose())output("\nReturning list result as expression value!");
-				Mvalue* _value=_getListValue(VT_UNDEFINED);
-				//_value->value._list=_expressionelementList;
-			//	_expressionvalue->_value=_value;
 			}else{
 			  //	_expressionvalue->_value=_expressionelementList->_first->_value;
 				if(amVerbose())output("\nSingle expression value stored!");
@@ -1170,7 +1178,7 @@ Mexpressionvalue* getValueOfExpression(const char* info,char resulttype,Token* f
 		}else
 		if(amVerbose())output("\nNo result to store.");
 	}
-	return _expressionvalue;
+	return _expressionValue;
 }
 /**
  * getValueOfExpression() is the work horse for evaluating individual (simple i.e. non composite expressions) expressions 
@@ -1272,16 +1280,17 @@ bool evaluateCommand(){
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	mstring* commandText=_getCommandText(true);
-	Mexpressionvalue* _commandExpressionvalue=getValueOfExpression("command",'e',pCommandToEvaluate->next,(enum TOKENTYPE_ENUM[]){},0);
-	if(_commandExpressionvalue){
-		mstring* commandExpressionValueText=_getValueText(_commandExpressionvalue->_valuereference->_variable->_value);
+	expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
+	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
+	if(_commandExpressionValue){
+		mstring* commandExpressionValueText=_getValueText(_commandExpressionValue);
 		if(commandExpressionValueText){
 			output("\n%s evaluates to '%s'.",string(commandText),string(commandExpressionValueText));
 			free_mstring(commandExpressionValueText);
 			if(amVerbose())outputLine("Result text released!");
 		}else
 			output("\nNo value represented by '%s'!",string(commandText));
-		free_expressionvalue(_commandExpressionvalue); // TODO do we need to do this?????
+		decrementReferenceCount(_commandExpressionValue); // TODO do we need to do this?????
 		if(amVerbose())outputLine("Result released!");
 	}else
 	if(amVerbose())output("\n'%s' is undefined!",string(commandText));
@@ -1841,10 +1850,8 @@ int main(int argc, char **argv){
 					if(argv[arg][i]=='A')setAssisting(true);else
 					if(argv[arg][i]=='m')setMatchingparentheses(false);else
 					if(argv[arg][i]=='M')setMatchingparentheses(true);else
-					/*
 					if(argv[arg][i]=='C')setColorscheme(0);else // light color scheme
 					if(argv[arg][i]=='c')setColorscheme(1);else // dark color scheme
-					*/
 					if(argv[arg][i]=='W')setWrapping(true);else
 					if(argv[arg][i]=='w')setWrapping(false);else
 					if(argv[arg][i]>='0'&&argv[arg][i]<='9')setColorscheme(argv[arg][i]-'0'); // a digit indicating the color scheme to use
@@ -1856,11 +1863,11 @@ int main(int argc, char **argv){
 	prepareForUserInput(); // AFTER using the command-line parameters (will effectuate wrap mode and color scheme)
 
 	resetOutputColor(); // just in case
-	output("\n%s\n","Welcome to M, the fancy interpreter.");
-	output("\n%s","Use Ctrl-Z to exit M immediately at any time.");
-	output("\n%s","In any mode press the Enter key on an empty line to switch modes.");
+	outputLine("Welcome to M, the fancy interpreter.");
+	outputLine("");
 	displayFlags();
-
+	outputLine("");
+	
 	if(!initEnvironment()){ // ascertain to have an execution environment!!!
 		setColor(getErrorColor());setBackColor(getBackgroundColor());
 		outputLine("Exiting: due to failing to initialize the M execution environment!");
@@ -1885,6 +1892,10 @@ int main(int argc, char **argv){
 	inputMode=IM_COMMAND; // TODO should this go into promptForUserInput()?
 
 	char inputChar,inputCharType;
+
+	outputLine("");
+	outputLine("Use Ctrl-Z to exit M immediately at any time.");
+	outputLine("In any mode press the Enter key on an empty line to switch modes.");
 
 	while(1){
 

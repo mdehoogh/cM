@@ -76,7 +76,7 @@ const char* getValueTokenColor(uint8_t tokentypeid){return VALUE_TOKEN_COLORS[to
 void activateColorscheme(){
 	output(ES"%sm",getBackgroundColor()); // TODO can't use outputControlText here!!!
 	clearDisplay();
-	/////// user will see!!!! output("\n%s\n>> ",(colorScheme?"Will assume dark background!":"Will assume white background!"));
+	///////outputLine((colorscheme?"Will assume white background!":"Will assume black background!"));
 }
 
 // display flags
