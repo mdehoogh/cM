@@ -231,6 +231,8 @@ bool incrementReferenceCount(Mvalue* _value);
 //////void free_value(Mvalue* _value);
 
 long long appendedToList(Mlist* _list,Mvalue* _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue);
+
 Mvalue* getValueAtIndex(Mlist* _list,Mvalue* _indexValue); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
 
 long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);

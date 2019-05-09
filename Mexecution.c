@@ -520,6 +520,22 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
         printf("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
     return false;
 }
+
+bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue){
+    if(!_map||!attributeName)return false;
+	Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
+    if(!_mapelement)return false;
+    _mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
+    if(!_mapelement->_variable)return false;
+	_mapelement->_variable->_name=_strdup(attributeName); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
+	_mapelement->_variable->_value=_attributeValue; // store the _value pointer of the attributeValueExpressionvalue
+	incrementReferenceCount(_attributeValue); // ascertain to keep the value stored around
+	if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
+	_map->_last=_mapelement;
+    _map->numberOfElements++;
+    return true;
+}
+
 // instead of returning a boolean we could return the assigned index (0 on failure)
 long long appendedToList(Mlist* _list,Mvalue* _value,long long index){
     if(!_list||!_value||index<0){output("\nERROR: %s.","No list to append to or no value to append or negative index");return 0;}

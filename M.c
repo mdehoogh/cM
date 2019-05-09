@@ -629,7 +629,7 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 /*
  "EXPR","UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{",("  ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:    ] }="}, /* EXPRESSION */ \
+{",("  ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:    ] }="}, /* EXPRESSION */ \
 {"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
 {"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
 {"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
@@ -790,7 +790,8 @@ Mvaluepointeritem* getLastValuepointeritem(Mvaluepointer* _valuepointer){
 
 // MDH@06MAY2019: Mvaluereference stands for a variable in combination with an item id, this will allow assignments as we know the variable involved!!!!
 typedef struct Mvaluereference{
-	Mvariable* _variable; // may contain both the variable involved (or with NULL name reference if dealing with a anonymous composite value)
+	char* _name; // the name of the host variable or NULL if we're in a substructure
+	Mvalue* _value; // either the host value (if no variable name is defined), or the value of the host variable
 	Mvalue* _itemid; // the item referenced!!!
 }Mvaluereference;
 /*
@@ -865,6 +866,7 @@ but <value><operator><value> here operator is a set of token types that separate
  */
 Token* expressionToken=NULL; // the current evaluation token
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getValueOfExpression() so we can call it from getListValue() and getMapValue()
+
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 	/////if(amVerbose())output("\nComposing a list starting with '%s'.",string(_firstToken->text));
@@ -873,52 +875,51 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 	if(!_list){output("\nFailed to create a list to return.");return NULL;}
 	if(amVerbose())output("\nComposing a list starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
-	// NOTE a list can be empty in which case _firstToken will immediately be of type TT_END_OF_LIST
-	while(expressionToken&&expressionToken->type!=endTokenType){
+	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
+	while(true){
+		expressionToken=expressionToken->next; // now on the first element
+		if(expressionToken->type==endTokenType)break;
 		if(amVerbose())output("\nProcessing list element starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
+		Mvalue* _listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
-		Mvalue* _listElementValue=getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2);
-		if(!_listElementValue){if(amVerbose())output("\nNo list element result!");break;}
-		if(amVerbose())output("\nToken updated!");
+		if(!_listElementValue)if(amVerbose())output("\nNo list element result!");
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		if(maximumNumberOfElements)if(_list->numberOfElements>=maximumNumberOfElements){if(amVerbose())output("\nMaximum number of elements reached.");continue;}
 		long long listElementIndex=appendedToList(_list,_listElementValue,0);
 		if(!listElementIndex){output("\nERROR: Failed to append the list element!");break;}
 		if(amVerbose())output("\nList element appended to list!");
-		expressionToken=(expressionToken?expressionToken->next:NULL); // ready to look at the next token!!!
-		if(expressionToken&&expressionToken->prev->type==endTokenType)break;
 	}
 	return _listValue;
 }
+
 Mvalue* getValueOfMap(){
 	Mvalue* _mapValue=getValueOfExpressionOfType(VT_MAP);
 	Mmap* _map=_mapValue->value._map; // grab the map to fill
 	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
 	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
 	// NOTE a map can be empty in which case _firstToken will immediately be of type TT_END_OF_MAP
-	while(expressionToken&&expressionToken->type!=TT_END_OF_MAP){
+	while(true){
+		expressionToken=expressionToken->next;
+		if(expressionToken->type==TT_END_OF_MAP)break;
+		if(expressionToken->type==TT_LISTELEMENT)continue; // missing attribute name-value pair
 		// get the next attribute name, value pair
 		// obviously the name should be something that evaluates to a string
-		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'n',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
+		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'s',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
+		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
 		if(expressionToken->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
 		Mvalue* _attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
 		mstring* attributeName=_getValueText(_attributeNameValue); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
-		Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
-		_mapelement->_variable->_name=_strdup(string(attributeName)); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
-		free_mstring(attributeName); // NOTE freeing attributeName does NOT free the character array mstring* points to (which is now used by the variable's name!!!! replacing: string_dispose(attributeName);
-		_mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
-		_mapelement->_variable->_value=_attributeValueValue; // store the _value pointer of the attributeValueExpressionvalue
-		if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
-		_map->_last=_mapelement;_map->numberOfElements++;
-		// the next token starts the next attribute
-		expressionToken=(expressionToken?expressionToken->next:NULL);
-		if(expressionToken&&expressionToken->prev->type==TT_END_OF_MAP)break; // end of map reached!!!
+		if(!appendedToMap(_map,string(attributeName),_attributeValueValue))output("\nERROR: Failed to append the map element."); // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
+		free_mstring(attributeName); // ALWAYS free the value text 
+		if(expressionToken->type==TT_END_OF_MAP)break;
 	}
 	return _mapValue;
 }
+
 // a function call needs a function and a map of arguments (defining the values to use for the formal parameters of the function)
 Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
 	////////Mvalue* _resultValue=NULL;
@@ -962,92 +963,133 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
 /**
  * _getValueReference() wraps a single Mvalue instance
  */
-Mvaluereference* _getValueReference(Mvalue* _value){
+Mvaluereference* _getValuereference(Mvalue* _value){
 	Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
-	_valuereference->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
-	_valuereference->_variable->_value=_value;
+	_valuereference->_value=_value;
 	incrementReferenceCount(_value); // TODO is this correct???
 	return _valuereference;
 }
-
+void free_valuereference(Mvaluereference* _valuereference){
+	if(_valuereference){
+		if(_valuereference->_name)free(_valuereference->_name);
+		// values themselves are never freed!!!
+		decrementReferenceCount(_valuereference->_value);
+		decrementReferenceCount(_valuereference->_itemid);
+		free(_valuereference);
+	}
+}
 /**
  * getValueReference() retrieves a single value reference that either ends when a binary operator token is encountered or one of the end token types
  * a value reference syntax: optionally a number of unary operators, optionally followed by function call with arguments, and variable or value literal
-
+ * we need to store the value in a value reference just in case the value is the destination of an assignment, so yes, reference is an apt name
 */
 Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTypeCount){
-	
+
+	if(amVerbose())output("\nThe first value token: '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+
 	Mvaluereference* _valuereference=NULL;
 
-
-	Token* firstToken=expressionToken;
-	if(firstToken){
-
-		mstring* unaryOperators=NULL; // collecting any unary operators to apply (in front of any value (which might be a function call mind!!!!))
+	mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
 		
-		// lists, maps and function calls are lists of expressions separated by the comma i.e. a thing of type
-		if(firstToken->type==TT_LIST){expressionToken=firstToken->next;return _getValueReference(getValueOfList(TT_END_OF_LIST,0));} // a real list literal with any number of elements
-		if(firstToken->type==TT_MAP){expressionToken=firstToken->next;return _getValueReference(getValueOfMap());}
-		
+	while(expressionToken&&expressionToken->type==TT_UNARY){
+		char unaryOperatorChar=string_char(expressionToken->text,0);
+		if(unaryOperatorChar!='+'){
+			if(!unaryOperators)unaryOperators=string_create();
+			string_append_char(unaryOperators,unaryOperatorChar);
+		}
+		expressionToken=expressionToken->next;
+	}
+	// ASSERT unary operators extracted
+
+	if(expressionToken){
 		_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
-
-		if(firstToken->type==TT_FUNCTION_CALL){
-			if(amVerbose())output("\nCall of function '%s'.",string(firstToken->prev->text));
-			Mfunction* function=getFunction(_Menvironment,string(firstToken->prev->text)); // get the function associated with the name of the function
-			if(function){					
-				// 1. get the list of function arguments, which depends on the function!!
-				expressionToken=firstToken->next;
-				Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
-				if(_functionArgumentsValue){
-					if(amVerbose())output("\nConstructing the function call argument map!");
-					// 2. get the arguments map
-					Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
-					/// release the original arguments list
-					decrementReferenceCount(_functionArgumentsValue); // TODO is this correct?????
-					// 3. the result of applying the function to the arguments is the end result
-					_valuereference->_variable->_value=getValueOfFunctionCall(function,_functionArgumentMap);
-				}else
-					output("\nERROR: No function arguments!");
-			}else
-				output("\nERROR: Function '%s' unknown!",string(firstToken->prev->text));
-			return _valuereference;
-		}
-
-		char* firstTokenText=string(expressionToken->text);
-		// ASSERTION not a function call or a map or list literal
-		
-		// it makes sense to check if there's a second token, if not we can speed things up
-		Token* secondToken=firstToken->next;
-		if(!secondToken){
-			switch(firstToken->type){
-				case TT_NEW_VARIABLE:
-					addVariable(_Menvironment,firstTokenText,VT_UNDEFINED,false); // NO retrieves the undefined value subsequently!!
-				case TT_VARIABLE:
-					_valuereference->_variable->_value=getValue(_Menvironment,firstTokenText);
-					break;
-				case TT_INTEGER:
-					_valuereference->_variable->_value=_getIntegerValue(atoll(firstTokenText));
-					break;
-				case TT_REAL:
-					_valuereference->_variable->_value=_getRealValue(_strtold(firstTokenText));
-					break;
-				case TT_SQSTRING:
-				case TT_DQSTRING:
-					_valuereference->_variable->_value=_getStringValue(firstTokenText);
-					break;
-				default:
-					break;
+		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
+		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
+		if(expressionToken->type==VT_INTEGER){
+			if(expressionToken->next&&expressionToken->next->type==VT_REAL){
+				expressionToken=expressionToken->next;
+				// let's prepend the integer token text to the real (fraction) token text
+				string_prepend(string(expressionToken->prev->text),expressionToken->text);
 			}
-			if(_valuereference->_variable->_value){
-				_valuereference->_variable->_value->count++; // increment the reference count of the value!!!
-				if(amVerbose())output("\nReturning expression value '%s' (with reference count: %u).",string(_getValueText(_valuereference->_variable->_value)),_valuereference->_variable->_value->count);
-			}else
-			if(amVerbose())output("\nNo value to return!");
+		}
+		*/
+		switch(expressionToken->type){
+			case TT_FUNCTION:
+				{
+					if(amVerbose())output("\nCall of function '%s'.",string(expressionToken->text));
+					Mfunction* function=getFunction(_Menvironment,string(expressionToken->text)); // get the function associated with the name of the function
+					if(function){					
+						// 1. get the list of function arguments, which depends on the function!!
+						expressionToken=expressionToken->next;
+						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
+						if(_functionArgumentsValue){
+							if(amVerbose())output("\nConstructing the function call argument map!");
+							// 2. get the arguments map
+							Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
+							/// release the original arguments list
+							decrementReferenceCount(_functionArgumentsValue); // TODO is this correct?????
+							// 3. the result of applying the function to the arguments is the end result
+							_valuereference->_value=getValueOfFunctionCall(function,_functionArgumentMap);
+						}else
+							output("\nERROR: No function arguments!");
+					}else
+						output("\nERROR: Function '%s' unknown!",string(expressionToken->text));
+				}
+				break;
 			return _valuereference;
+				break;
+			case TT_NEW_VARIABLE:
+				// we have to create the variable first (TODO should we wait until actually assigning???)
+				if(!addVariable(_Menvironment,string(expressionToken->text),VT_UNDEFINED,false))break; // NO retrieves the undefined value subsequently!!
+			case TT_VARIABLE:
+				_valuereference->_name=_strdup(string(expressionToken->text)); // store a copy of the name of the variable being referenced
+				_valuereference->_value=getValue(_Menvironment,_valuereference->_name); // store a reference to the value
+				incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
+				break;
+			case TT_INTEGER:
+				{
+					long long ll=atoll(string(expressionToken->text));
+					if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
+						expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
+						_valuereference->_value=_getRealValue(_strtold(string(expressionToken->text))+ll);
+					}else // just an integer
+						_valuereference->_value=_getIntegerValue(ll);
+				}
+				break;
+			case TT_REAL: // unlikely without integer part in front of it though
+				_valuereference->_value=_getRealValue(_strtold(string(expressionToken->text)));
+				break;
+			case TT_DQSTRING:
+			case TT_SQSTRING:
+				_valuereference->_value=_getStringValue(string(expressionToken->text));
+				break;
+			case TT_LIST:
+				_valuereference=_getValuereference(getValueOfList(TT_END_OF_LIST,0));
+				break;
+			case TT_MAP:
+				_valuereference=_getValuereference(getValueOfMap());
+				break;
 		}
 
-		// ASSERTION at least two tokens
+		mstring* _valuereferenceText=_getValueText(_valuereference->_value);
+		output("\nValue: '%s'.",string(_valuereferenceText));
+		free_mstring(_valuereferenceText);
 
+		// apply the unary operators (backwards)
+		if(unaryOperators){
+
+		}else
+		{
+			if(amVerbose())output("\nNo unary operators to apply!");
+		}
+		
+		// move over to the next expression token (following the end token)
+		if(expressionToken)expressionToken=expressionToken->next;
+
+	}
+	return _valuereference;
+
+	/*
 		// it could be an assignment in which case we remove the assignee and assigned value
 		if(firstToken->type==TT_VARIABLE||firstToken->type==TT_NEW_VARIABLE){ // something that can be assigned to
 			// an index might be defined on a variable that is a list
@@ -1071,10 +1113,9 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 					//if(amVerbose())output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
 					if(!setValue(_Menvironment,firstTokenText,_valuereference->_variable->_value)){
 						//output("\nERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
-						/* no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
-						free_value(_expressionvalue->_value);
-						_expressionvalue->_value=NULL;
-						*/
+						// no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
+						///free_value(_expressionvalue->_value);
+						///_expressionvalue->_value=NULL;
 					}else
 					if(amVerbose())
 						output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(_Menvironment,firstTokenText))));
@@ -1083,18 +1124,132 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 		}
 	}
 	return _valuereference;
+	*/
+}
+
+Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value2){
+		char* _valuetext1=_getValueText(_value1);
+		mstring* _valuetext2=_getValueText(_value2);
+		if(amVerbose())output("\nComputing %s %s %s.",string(_valuetext1),operator,string(_valuetext2));
+		free_mstring(_valuetext1);free_mstring(_valuetext2);
+		switch(operator[0]){
+			case '+':
+				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value1->value._real->ld+_value2->value._real->ld);
+				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value1->value._real->ld+_value2->value._integer->ll);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld+_value1->value._integer->ll);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll); 
+				break;
+			case '-':
+				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value1->value._real->ld-_value2->value._real->ld);
+				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value1->value._real->ld-_value2->value._integer->ll);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(-_value2->value._real->ld+_value1->value._integer->ll);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll); 
+				break;
+			case '^': // XOR
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
+				break;
+			case '&': // bitwise and or logical and
+				if(strlen(operator)-1)
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
+				else
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
+				break;
+			case '|': // bitwise or or logical or
+				if(strlen(operator)-1)
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll||_value2->value._integer->ll);
+				else
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
+				break;
+			case '*':
+				if(strlen(operator)-1){ // power operator
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(powl(_value1->value._real->ld,_value2->value._real->ld));
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(powl(_value1->value._real->ld,_value2->value._integer->ll));
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(powl(_value1->value._integer->ll,_value2->value._real->ld));
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(powl(_value1->value._integer->ll,_value2->value._integer->ll)); 
+				}else{
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value1->value._real->ld*_value2->value._real->ld);
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value1->value._real->ld*_value2->value._integer->ll);
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld*_value1->value._integer->ll);
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll); 
+				}
+				break;
+			case '%': // modulo operator (only applicable to integers, otherwise undefined)
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll%_value2->value._integer->ll); 
+				break;
+			case '\\': // integer division
+				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._real->ld/_value2->value._real->ld):nanl(""));
+				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?truncl(_value1->value._real->ld/_value2->value._integer->ll):nanl(""));
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._integer->ll/_value2->value._real->ld):nanl(""));
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot:nanl("")); 
+				break;
+			case '/':
+				if(strlen(operator)-1){ // integer division
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._real->ld/_value2->value._real->ld):nanl(""));
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?truncl(_value1->value._real->ld/_value2->value._integer->ll):nanl(""));
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._integer->ll/_value2->value._real->ld):nanl(""));
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot:nanl("")); 
+				}else{ // real division
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld!=0?_value1->value._real->ld/_value2->value._real->ld:nanl(""));
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value2->value._integer->ll!=0?_value1->value._real->ld/_value2->value._integer->ll:nanl(""));
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld!=0?_value1->value._integer->ll/_value2->value._real->ld:nanl(""));
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getRealValue(_value2->value._integer->ll!=0?_value1->value._integer->ll/_value2->value._integer->ll:nanl("")); 
+				}
+				break;
+			// comparison operators
+			case '<':
+				if(strlen(operator)-1){ // power operator
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld<=_value2->value._real->ld?1:0);
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld<=_value2->value._integer->ll?1:0);
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld<=_value1->value._integer->ll?0:1); // operands switched!!!
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll<=_value2->value._integer->ll?1:0); 
+				}else{
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld<_value2->value._real->ld?1:0);
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld<_value2->value._integer->ll?1:0);
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld<_value1->value._integer->ll?0:1); // operands switched
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll<_value2->value._integer->ll?1:0); 
+				}
+				break;
+			case '>':
+				if(strlen(operator)-1){ // power operator
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld>=_value2->value._real->ld?1:0);
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld>=_value2->value._integer->ll?1:0);
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld>=_value1->value._integer->ll?0:1); // operands switched
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll>=_value2->value._integer->ll?1:0); 
+				}else{
+					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld>_value2->value._real->ld?1:0);
+					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld>_value2->value._integer->ll?1:0);
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld>_value1->value._integer->ll?0:1); // operands switched
+					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll>_value2->value._integer->ll?1:0); 
+				}
+				break;
+			case '!':
+				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld!=_value2->value._real->ld?1:0);
+				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld!=_value2->value._integer->ll?1:0);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=_value1->value._integer->ll?1:0);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll!=_value2->value._integer->ll?1:0); 
+				break;
+			case '=':
+				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld==_value2->value._real->ld?1:0);
+				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld==_value2->value._integer->ll?1:0);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld==_value1->value._integer->ll?1:0);
+				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll==_value2->value._integer->ll?1:0);
+		}
+	}
+	return NULL;
 }
 
 typedef struct Mformulaelement{
-	Token* operatorToken; // a token storing the binary operator to apply (if it ends with = and not start with < or > it's a shortcut operator assignment)
 	Mvaluereference* _operand; // an operand to apply the binary operator to
+	mstring* _operator; // a (shortcut) binary operator 
 	struct Mformulaelement* _next;
 }Mformulaelement;
-// any formula starts with
+/* any formula starts with
 typedef struct Mformula{
 	Mvaluereference* _operand;
 	Mformulaelement* _next;
 }Mformula;
+*/
 // once we have constructed a formula it needs to be computed
 
 /**
@@ -1122,62 +1277,89 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		}
 
 		// construct a formula
-		Mformula* formula=calloc(1,sizeof(Mformula));
-		Mformulaelement* _formulaelement=NULL; // the current formula element!!!
-		Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+		Mformulaelement* formula=calloc(1,sizeof(Mformulaelement));
+		Mformulaelement* _formulaelement=formula; // the current formula element!!!
+		Mvaluereference* _valuereference;
+
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
+
 		while(expressionToken){
+
 			// does this token end the expression????
 			endTokenTypeIndex=endTokenTypeCount;
 			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]&&expressionToken->type>=8)endTokenTypeIndex--;
 			if(endTokenTypeIndex){if(amVerbose())output("\nEnd of %s expression.",info);break;}
 			
-			if(amVerbose())output("\nInterpreting token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			_formulaelement->_operand=getValueReference(endTokenTypes,endTokenTypeCount);
 
-			if(expressionToken->type==TT_FUNCTION){ // the first token is a function name, obviously we should evaluate it
-				if(amVerbose())output("\nFunction '%s' encountered!",string(expressionToken->text));
-				// we can get the value of applying the function by passing token as offset token (containing the function name so followed by a function call element (hopefully))
-				expressionToken=expressionToken->next; // step into the function argument list...
-				Mvalue* _functionCallValue=getValueOfList(TT_END_OF_FUNCTION_CALL,0);
-				_valuereference->_variable->_value=_functionCallValue;
-				decrementReferenceCount(_functionCallValue);
+			endTokenTypeIndex=endTokenTypeCount;
+			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]&&expressionToken->type>=8)endTokenTypeIndex--;
+			if(endTokenTypeIndex){if(amVerbose())output("\nEnd of %s expression.",info);break;}
+			
+			// the next token(s) should be a binary operator
+			// NOTE some binary operators are stored in a couple of tokens!!!
+			if(expressionToken){
+				if(amVerbose())output("\nInterpreting operator token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+				_formulaelement->_operator=string_create();
+				if(!string_copy(expressionToken->text,_formulaelement->_operator)){output("\nERROR: Failed to copy the operator!");break;}
+				string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
+				// append any other binary operator behind it (like a continuation or assignment operator)
+				if(expressionToken->next->type>0&&expressionToken->next->type<=8){
+					expressionToken=expressionToken->next;
+					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0));
+				}
+				_formulaelement->_next=(Mformulaelement*)calloc(1,sizeof(Mformulaelement));
+				_formulaelement=_formulaelement->_next;
+				expressionToken=expressionToken->next;
 			}else
-			// values are easy, just push them on the expression stack
-			if(expressionToken->type==TT_VARIABLE||expressionToken->type==TT_NEW_VARIABLE){
-				_valuereference->_variable->_name=_strdup(string(expressionToken->text));
-			}else
-			if(expressionToken->type<=8){
-			}else
-			if(expressionToken->type==TT_INTEGER){
-				//appendedToList(_formulaelement,_getIntegerValue(atoll(string(token->text))),0);
-			}else
-			if(expressionToken->type==TT_REAL){
-				//appendedToList(_formulaelement,_getRealValue(_strtold(string(token->text))),0);
-			}else
-			if(expressionToken->type==TT_DQSTRING||expressionToken->type==TT_SQSTRING){
-				//appendedToList(_formulaelement,_getStringValue(string(token->text)),0);
-			}else
-			if(expressionToken->type==TT_LISTELEMENT){ // ends the current value
-
+			{
+				if(amVerbose())outputLine("No further formula elements!");
 			}
-			if(amVerbose())output("\nToken processed!");
-			expressionToken=(expressionToken?expressionToken->next:NULL);
+			
 		}
 
-		// ready to evaluate the expression list
-		if(amVerbose())output("\nStoring the expression result.");
-
-		// use the first element in the expression element list as end result (which it supposedly is)
+		// evaluate the formula
 		if(formula){
-			if(formula->_next){
-				if(amVerbose())output("\nReturning list result as expression value!");
-			}else{
-			  //	_expressionvalue->_value=_expressionelementList->_first->_value;
-				if(amVerbose())output("\nSingle expression value stored!");
+
+			// skip all assignments
+			_formulaelement=formula;
+			while(true){
+				if(string_last_char(_formulaelement->_operator)!='=')break; // no assignment for sure
+				if(string_char(_formulaelement->_operator,0)=='<'||string_char(_formulaelement->_operator,0)=='>'||string_char(_formulaelement->_operator,0)=='!'||string_char(_formulaelement->_operator,0)=='=')break;
+				_formulaelement=_formulaelement->_next;
+			}
+			
+			Mvalue* _result=_formulaelement->_operand->_value; // the last result computed
+			while(_formulaelement->_next){ // a binary operator to apply
+				_result=applyBinaryOperator(string(_formulaelement->_operator),_formulaelement->_operand->_value,_formulaelement->_next->_operand->_value);
+				decrementReferenceCount(_formulaelement->_operand->_value);
+				_formulaelement=_formulaelement->_next;
+				decrementReferenceCount(_formulaelement->_operand->_value);
+				_formulaelement->_operand->_value=_result;
+				incrementReferenceCount(_result);
+			}
+	
+			// perform assignments
+
+			// the expression value is the value of the first operand!!!
+			_expressionValue=_result;
+
+			// free the formula
+			Mformulaelement* _nextformulaelement;
+			_formulaelement=formula;
+			while(_formulaelement){
+				free_mstring(_formulaelement->_operator);
+				free_valuereference(_formulaelement->_operand);
+				_nextformulaelement=_formulaelement->_next;
+				free(_formulaelement);
+				_formulaelement=_nextformulaelement;
 			}
 		}else
 		if(amVerbose())output("\nNo result to store.");
+
+
 	}
+
 	return _expressionValue;
 }
 /**
