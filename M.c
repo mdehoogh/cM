@@ -168,18 +168,32 @@ mstring* _getIntegerText(Minteger* _integer){
 	if(_integer){
 		char integerText[80];
 		snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
-		/////output("\nStringifying integer '%s'.",integerText);
 		string_append(s,integerText);
 	}
+	if(amVerbose())output("\nInteger '%s'.",string(s));
 	return s;
 }
+
+const char* M_NAN="NaN";
+const char* M_INF="Inf";
+bool isZero(long double ld){return fpclassify(ld)==FP_ZERO;}
+
 mstring* _getRealText(Mreal* _real){
 	mstring* s=string_create();
 	if(_real){
-		char realText[80];
-		snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
-		/////output("\nStringified real '%s'.",realText);
-		string_append(s,realText);
+		switch(fpclassify(_real->ld)){
+			case FP_NAN:string_append(s,M_NAN);break;
+			case FP_INFINITE:string_append(s,M_INF);break;
+			default:
+				{
+					char realText[80];
+					// test for special real value
+					snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
+					/////output("\nStringified real '%s'.",realText);
+					string_append(s,realText);
+				}
+				break;
+		}
 	}
 	return s;
 }
@@ -294,25 +308,20 @@ mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 
 mstring* _getValueText(Mvalue* _value){
 	// NOTE whatever is returned should be freed
+	mstring* valueText;
 	if(_value){
 		////////printf("\nTYPE: %d",_value->type);
 		switch(_value->type){
-			case VT_UNDEFINED:
-				break;
-			case VT_INTEGER:
-				return _getIntegerText(_value->value._integer);
-			case VT_REAL:
-				return _getRealText(_value->value._real);
-			case VT_STRING:
-				return _getStringText(_value->value._string);
-			case VT_MAP:
-				return _getMapText(_value->value._map);
-			case VT_LIST:
-				return _getListText(_value->value._list);
+			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
+			case VT_REAL:valueText=_getRealText(_value->value._real);break;
+			case VT_STRING:valueText=_getStringText(_value->value._string);break;
+			case VT_MAP:valueText=_getMapText(_value->value._map);break;
+			case VT_LIST:valueText=_getListText(_value->value._list);break;
+			default:break;
 		}
-	}/*else
-		output("\nNo value to evaluate.");*/
-	return string_append(string_create(),UNDEFINED_VALUETEXT);
+	}
+	if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
+	return (valueText?valueText:string_append(string_create(),UNDEFINED_VALUETEXT));
 }
 void outputFunctions(){
 	mstring* functionsText=_getFunctionMapText(_Menvironment->_functionMap);
@@ -978,6 +987,22 @@ void free_valuereference(Mvaluereference* _valuereference){
 		free(_valuereference);
 	}
 }
+
+Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
+	if(amVerbose()){
+		output("\nApplying unary operator '%c'",operator);
+		mstring* _valueText=_getValueText(_value);
+		output(" to value '%s' of type '%s'.",operator,string(_valueText),_value->type);
+		//free_mstring(_valueText);
+	}
+	switch(operator){
+		case '~':if(_value->type==VT_INTEGER)return _getIntegerValue(~(_value->value._integer->ll));break;
+		case '!':if(_value->type==VT_INTEGER)return _getIntegerValue((_value->value._integer->ll?0:1));break;
+		case '-':if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);if(_value->type==VT_REAL)return _getRealValue(-_value->value._real->ld);break;
+	}
+	return NULL;
+}
+
 /**
  * getValueReference() retrieves a single value reference that either ends when a binary operator token is encountered or one of the end token types
  * a value reference syntax: optionally a number of unary operators, optionally followed by function call with arguments, and variable or value literal
@@ -1054,14 +1079,17 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 						_valuereference->_value=_getRealValue(_strtold(string(expressionToken->text))+ll);
 					}else // just an integer
 						_valuereference->_value=_getIntegerValue(ll);
+					incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
 				_valuereference->_value=_getRealValue(_strtold(string(expressionToken->text)));
+				incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_DQSTRING:
 			case TT_SQSTRING:
 				_valuereference->_value=_getStringValue(string(expressionToken->text));
+				incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST:
 				_valuereference=_getValuereference(getValueOfList(TT_END_OF_LIST,0));
@@ -1069,24 +1097,36 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 			case TT_MAP:
 				_valuereference=_getValuereference(getValueOfMap());
 				break;
+			default:
+				break;
 		}
 
-		mstring* _valuereferenceText=_getValueText(_valuereference->_value);
-		output("\nValue: '%s'.",string(_valuereferenceText));
-		free_mstring(_valuereferenceText);
-
+		if(amVerbose()){
+			if(_valuereference&&_valuereference->_value){
+				mstring* _valuereferenceText=_getValueText(_valuereference->_value);
+				output("\nValue: '%s'.",string(_valuereferenceText));
+				free_mstring(_valuereferenceText);
+			}else
+				output("\nNo result!");
+		}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
-
+			if(amVerbose())output("\nApplying unary operators: '%s'.",string(unaryOperators));
+			uint16_t l=string_length(unaryOperators);
+			while(l>0&&_valuereference->_value){
+				decrementReferenceCount(_valuereference->_value);
+				_valuereference->_value=applyUnaryOperator(string_char(unaryOperators,--l),_valuereference->_value);
+				if(_valuereference->_value)incrementReferenceCount(_valuereference->_value);
+			}
+			if(amVerbose())output("\nUnary operator applied!");
 		}else
-		{
 			if(amVerbose())output("\nNo unary operators to apply!");
-		}
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=expressionToken->next;
 
 	}
+
 	return _valuereference;
 
 	/*
@@ -1127,113 +1167,155 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 	*/
 }
 
+// two-argument arithmetic
+Mvalue* add(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll);
+		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)+(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+	}
+	return NULL;
+}
+Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
+		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+	}
+	return NULL;
+}
+Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
+		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)*(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+	}
+	return NULL;
+}
+Mvalue* power(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(pow(_value1->value._integer->ll,_value2->value._integer->ll));
+		return _getRealValue(pow(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld,_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+	}
+	return NULL;
+}
+Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*pow(10.,_value2->value._integer->ll));
+		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld))));
+	}
+	return NULL;
+}
+Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
+	// always real divide
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
+		return _getRealValue(ld1/ld2);
+	}
+	return NULL;
+}
+Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		// if both integer, use lldiv to perform the integer division
+		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot);
+		// at least one is real, perform floating point division, then trunc!!!
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
+		return _getIntegerValue(truncl(ld1/ld2));
+	}
+	return NULL;
+}
+Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+		// if both integer, use lldiv to perform the integer division
+		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).rem);
+		// at least one is real, perform floating point division, then trunc!!!
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
+		return _getRealValue(ld1-ld2*truncl(ld1/ld2)); // what's left after subtracting the truncated value
+	}
+	return NULL;
+}
+// integer arithmetic 
+Mvalue* xor(Mvalue* _value1,Mvalue* _value2){
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
+	return NULL;
+}
+Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
+	return NULL;
+}
+Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
+	return NULL;
+}
+Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
+	return NULL;
+}
+Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll||_value2->value._integer->ll);
+	return NULL;
+}
+Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll<<_value2->value._integer->ll);
+	return NULL;
+}
+Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll>>_value2->value._integer->ll);
+	return NULL;
+}
+// comparison operators
+Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	return NULL;
+}
+Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	return NULL;
+}
+Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	return NULL;
+}
+Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	return NULL;
+}
+Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	return NULL;
+}
+Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	return NULL;
+}
+
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	if(_value1&&_value2){
-		char* _valuetext1=_getValueText(_value1);
-		mstring* _valuetext2=_getValueText(_value2);
-		if(amVerbose())output("\nComputing %s %s %s.",string(_valuetext1),operator,string(_valuetext2));
-		free_mstring(_valuetext1);free_mstring(_valuetext2);
+		if(amVerbose()){mstring* _valuetext1=_getValueText(_value1);mstring* _valuetext2=_getValueText(_value2);output("\nComputing %s %s %s.",string(_valuetext1),operator,string(_valuetext2));free_mstring(_valuetext1);free_mstring(_valuetext2);}
 		switch(operator[0]){
-			case '+':
-				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value1->value._real->ld+_value2->value._real->ld);
-				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value1->value._real->ld+_value2->value._integer->ll);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld+_value1->value._integer->ll);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll); 
-				break;
-			case '-':
-				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value1->value._real->ld-_value2->value._real->ld);
-				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value1->value._real->ld-_value2->value._integer->ll);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(-_value2->value._real->ld+_value1->value._integer->ll);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll); 
-				break;
-			case '^': // XOR
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
-				break;
-			case '&': // bitwise and or logical and
-				if(strlen(operator)-1)
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
-				else
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
-				break;
-			case '|': // bitwise or or logical or
-				if(strlen(operator)-1)
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll||_value2->value._integer->ll);
-				else
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
-				break;
-			case '*':
-				if(strlen(operator)-1){ // power operator
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(powl(_value1->value._real->ld,_value2->value._real->ld));
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(powl(_value1->value._real->ld,_value2->value._integer->ll));
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(powl(_value1->value._integer->ll,_value2->value._real->ld));
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(powl(_value1->value._integer->ll,_value2->value._integer->ll)); 
-				}else{
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value1->value._real->ld*_value2->value._real->ld);
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value1->value._real->ld*_value2->value._integer->ll);
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld*_value1->value._integer->ll);
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll); 
-				}
-				break;
-			case '%': // modulo operator (only applicable to integers, otherwise undefined)
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll%_value2->value._integer->ll); 
-				break;
-			case '\\': // integer division
-				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._real->ld/_value2->value._real->ld):nanl(""));
-				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?truncl(_value1->value._real->ld/_value2->value._integer->ll):nanl(""));
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._integer->ll/_value2->value._real->ld):nanl(""));
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot:nanl("")); 
-				break;
-			case '/':
-				if(strlen(operator)-1){ // integer division
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._real->ld/_value2->value._real->ld):nanl(""));
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?truncl(_value1->value._real->ld/_value2->value._integer->ll):nanl(""));
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=0?truncl(_value1->value._integer->ll/_value2->value._real->ld):nanl(""));
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value2->value._integer->ll!=0?lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot:nanl("")); 
-				}else{ // real division
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld!=0?_value1->value._real->ld/_value2->value._real->ld:nanl(""));
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getRealValue(_value2->value._integer->ll!=0?_value1->value._real->ld/_value2->value._integer->ll:nanl(""));
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getRealValue(_value2->value._real->ld!=0?_value1->value._integer->ll/_value2->value._real->ld:nanl(""));
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getRealValue(_value2->value._integer->ll!=0?_value1->value._integer->ll/_value2->value._integer->ll:nanl("")); 
-				}
-				break;
+			// real arithmetic
+			case '+' :return add(_value1,_value2);
+			case '-' :return subtract(_value1,_value2);
+			case '*' :return (strlen(operator)-1?power(_value1,_value2):multiply(_value1,_value2));
+			case 'e' :return epower(_value1,_value2);
+			case '/' :return (strlen(operator)-1?integerdivide(_value1,_value2):divide(_value1,_value2));
+			case '\\':return integerdivide(_value1,_value2);
+			case '%' :return divideremainder(_value1,_value2);
+			// integer arithmetic
+			case '^' :return xor(_value1,_value2);
+			case '&' :return (strlen(operator)-1?logicaland(_value1,_value2):bitwiseand(_value1,_value2));
+			case '|' :return (strlen(operator)-1?logicalor(_value1,_value2):bitwiseor(_value1,_value2));
 			// comparison operators
-			case '<':
-				if(strlen(operator)-1){ // power operator
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld<=_value2->value._real->ld?1:0);
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld<=_value2->value._integer->ll?1:0);
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld<=_value1->value._integer->ll?0:1); // operands switched!!!
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll<=_value2->value._integer->ll?1:0); 
-				}else{
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld<_value2->value._real->ld?1:0);
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld<_value2->value._integer->ll?1:0);
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld<_value1->value._integer->ll?0:1); // operands switched
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll<_value2->value._integer->ll?1:0); 
-				}
-				break;
-			case '>':
-				if(strlen(operator)-1){ // power operator
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld>=_value2->value._real->ld?1:0);
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld>=_value2->value._integer->ll?1:0);
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld>=_value1->value._integer->ll?0:1); // operands switched
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll>=_value2->value._integer->ll?1:0); 
-				}else{
-					if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld>_value2->value._real->ld?1:0);
-					if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld>_value2->value._integer->ll?1:0);
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld>_value1->value._integer->ll?0:1); // operands switched
-					if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll>_value2->value._integer->ll?1:0); 
-				}
-				break;
-			case '!':
-				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld!=_value2->value._real->ld?1:0);
-				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld!=_value2->value._integer->ll?1:0);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld!=_value1->value._integer->ll?1:0);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll!=_value2->value._integer->ll?1:0); 
-				break;
-			case '=':
-				if(_value1->type==VT_REAL&&_value2->type==VT_REAL)return _getIntegerValue(_value1->value._real->ld==_value2->value._real->ld?1:0);
-				if(_value1->type==VT_REAL&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._real->ld==_value2->value._integer->ll?1:0);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_REAL)return _getIntegerValue(_value2->value._real->ld==_value1->value._integer->ll?1:0);
-				if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll==_value2->value._integer->ll?1:0);
+			case '<' :return (strlen(operator)-1?(operator[1]=='<'?shiftleft(_value1,_value2):smallerthanorequalto(_value1,_value2)):smallerthan(_value1,_value2));
+			case '>' :return (strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));
+			case '!' :return unequalto(_value1,_value2);
+			case '=' :return equalto(_value1,_value2);
 		}
 	}
 	return NULL;
