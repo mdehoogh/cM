@@ -170,7 +170,7 @@ mstring* _getIntegerText(Minteger* _integer){
 		snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
 		string_append(s,integerText);
 	}
-	if(amVerbose())output("\nInteger '%s'.",string(s));
+	////////if(amVerbose())output("\nInteger '%s'.",string(s));
 	return s;
 }
 
@@ -320,7 +320,7 @@ mstring* _getValueText(Mvalue* _value){
 			default:break;
 		}
 	}
-	if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
+	////////if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
 	return (valueText?valueText:string_append(string_create(),UNDEFINED_VALUETEXT));
 }
 void outputFunctions(){
@@ -451,11 +451,14 @@ const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
 	}
 	return "";
 }
+void outputTokenTypeColor(TokenType tokenType){
+	setBackColor(getBackgroundColor());
+	setColor(getTokenColor(tokenType));
+}
 void outputTokenColor(Token* _token){
+	if(_token)outputTokenTypeColor(_token->type);
 	///////printf("[%d]",pLastCommandToEvaluateToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
-	setBackColor(getBackgroundColor());
-	setColor(getTokenColor(_token->type));
 }
 void outputToken(Token* _token){
 	if(!_token)return;
@@ -1380,6 +1383,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			
 			// the next token(s) should be a binary operator
 			// NOTE some binary operators are stored in a couple of tokens!!!
+			if(expressionToken)if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)expressionToken=expressionToken->next;
 			if(expressionToken){
 				if(amVerbose())output("\nInterpreting operator token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				_formulaelement->_operator=string_create();
@@ -1505,7 +1509,52 @@ void clearCommand(){
 	// a small precaution here!!!
 	if(pCommandToEvaluate){freeToken(pCommandToEvaluate);pCommandToEvaluate=NULL;}
 }
-
+void outputValue(Mvalue* _value){
+	mstring* _valueText=_getValueText(_value);
+	switch(_value->type){
+		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);break;
+		case VT_REAL:outputTokenTypeColor(TT_REAL);break;
+		case VT_STRING:outputTokenTypeColor(string_char(_valueText,0)=='"'?TT_DQSTRING:TT_SQSTRING);break;
+		case VT_LIST:
+			output("[");
+			Mlist* _list=_value->value._list;
+			if(_list&&_list->numberOfElements){
+				Mlistelement* _listelement=_list->_first;
+				uint32_t listitemindex=1;
+				while(_listelement){
+					while(listitemindex<_listelement->index)output(","); // missing elements
+					outputValue(_listelement->_value);
+					if(!_listelement->_next)break;
+					output(",");listitemindex++;
+					_listelement=_listelement->_next;
+				}
+			}
+			output("]");
+			break;
+		case VT_MAP:
+			output("{");
+			Mmap* _map=_value->value._map;
+			if(_map&&_map->numberOfElements){
+				Mvariable* _mapelementvariable;
+				Mmapelement* _mapelement=_map->_first;
+				while(_mapelement){
+					_mapelementvariable=_mapelement->_variable;
+					output("%s%c",_mapelementvariable->_name,":");
+					outputValue(_mapelementvariable->_value);
+					if(!_mapelement->_next)break;
+					output(",");
+					_mapelement=_mapelement->_next;
+				}
+			}
+			output("}");
+			break;
+		default:
+			break;
+	}
+	output(string(_valueText));
+	free_mstring(_valueText);
+	resetOutputColor();
+}
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
 	
@@ -1547,13 +1596,8 @@ bool evaluateCommand(){
 	expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	if(_commandExpressionValue){
-		mstring* commandExpressionValueText=_getValueText(_commandExpressionValue);
-		if(commandExpressionValueText){
-			output("\n%s evaluates to '%s'.",string(commandText),string(commandExpressionValueText));
-			free_mstring(commandExpressionValueText);
-			if(amVerbose())outputLine("Result text released!");
-		}else
-			output("\nNo value represented by '%s'!",string(commandText));
+		output("\n%s = ",string(commandText));
+		outputValue(_commandExpressionValue);
 		decrementReferenceCount(_commandExpressionValue); // TODO do we need to do this?????
 		if(amVerbose())outputLine("Result released!");
 	}else
