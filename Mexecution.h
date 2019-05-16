@@ -263,3 +263,17 @@ Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
 bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 
 size_t getNumberOfRemovedValues();
+
+// some helper functions (TODO or should we use this on Mreal values?????)
+bool isZero(long double ld);
+bool isNaN(long double ld);
+bool isInf(long double ld);
+// Mvalue -> text
+// whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
+mstring* _getIntegerText(Minteger* _integer);
+mstring* _getRealText(Mreal* _real);
+mstring* _getStringText(Mstring* _string);
+mstring* _getListText(Mlist* _list);
+mstring* _getMapText(Mmap* _map);
+
+mstring* _getValueText(Mvalue* _value);

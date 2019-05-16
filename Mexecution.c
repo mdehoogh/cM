@@ -167,7 +167,9 @@ bool decrementReferenceCount(Mvalue* _value){
             _value->count--;
             return true;
         }
-        outputLine("BUG: Reference count already zero."); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
+        mstring* _valueText=_getValueText(_value);
+        output("\nBUG: Reference count of '%s' of type '%c' already zero.",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
+        free_mstring(_valueText);
     }else
         if(amVerbose())outputLine("No value to decrement the reference count of.");
     return true;
@@ -964,3 +966,128 @@ bool registerInternalFunctions(Menvironment* _environment){
     return true;
 }
 
+// Mvalue -> text
+// whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
+mstring* _getIntegerText(Minteger* _integer){
+	mstring* s=string_create();
+	if(_integer){
+		char integerText[80];
+		snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
+		string_append(s,integerText);
+	}
+	////////if(amVerbose())output("\nInteger '%s'.",string(s));
+	return s;
+}
+
+// part of implementing _getRealText (so not present in the header)
+const char* M_NAN="NaN";
+const char* M_INF="Inf";
+bool isZero(long double ld){return fpclassify(ld)==FP_ZERO;}
+bool isNaN(long double ld){return fpclassify(ld)==FP_NAN;}
+bool isInf(long double ld){return fpclassify(ld)==FP_INFINITE;}
+mstring* _getRealText(Mreal* _real){
+	mstring* s=string_create();
+	if(_real){
+		switch(fpclassify(_real->ld)){
+			case FP_NAN:string_append(s,M_NAN);break;
+			case FP_INFINITE:string_append(s,M_INF);break;
+			default:
+				{
+					char realText[80];
+					// test for special real value
+					snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
+					/////output("\nStringified real '%s'.",realText);
+					string_append(s,realText);
+				}
+				break;
+		}
+	}
+	return s;
+}
+mstring* _getStringText(Mstring* _string){
+	mstring* s=string_create();
+	if(!string_append_char(s,_string->presuffix)||!string_append(s,_string->_c)||!string_append_char(s,_string->presuffix))
+	;
+	return s;
+}
+//////////mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
+mstring* _getListText(Mlist* _list){
+	mstring* s=string_create();
+	if(s){
+		mstring* p=string_append_char(s,'['); // switch to using p in appends
+		size_t l=_list->numberOfElements;
+		if(l){
+			/////output("\n%s(%d)",string(p),l);
+			Mvalue* _listelementValue;
+			Mlistelement* _listelement=_list->_first;
+			while(_listelement){
+				outputChar('.');
+				_listelementValue=_listelement->_value;
+				if(_listelementValue){
+					mstring* listelementValueText=_getValueText(_listelementValue);
+					if(listelementValueText){
+						p=string_append(p,string(listelementValueText));
+						free_mstring(listelementValueText); // release AFTER copying over
+					}
+				}
+				if(!(--l))break; // no further elements
+				_listelement=_listelement->_next;
+				if(_listelement)p=string_append(p,", "); // additional space behind comma!!
+			}
+		}
+		p=string_append_char(p,']');
+		/////output("\nList=%s",string(p));
+		// if appending failed somewhere free s
+		if(!p){free(s);s=NULL;}
+	}
+	return s;
+}
+mstring* _getMapText(Mmap* _map){
+	mstring* s=string_create();
+	if(s){
+		mstring* p=string_append_char(s,'{');
+		//////output("\n%s",string(p));
+		Mmapelement* _mapelement=_map->_first;
+		while(_mapelement){
+			//////output("\n%s","start");
+			Mvariable* _variable=_mapelement->_variable;
+			if(!_variable)continue;
+			p=string_append(p,_variable->_name);
+			/////output("\n%s",string(p));
+			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+			/////output("\n%s",string(p));
+			mstring* mapelementValueText=_getValueText(_variable->_value);
+			/////output("\nMap element: %s",string(p));
+			if(!mapelementValueText)continue;
+			p=string_append(p,string(mapelementValueText)); // append 
+			free_mstring(mapelementValueText); // release AFTER copying over
+			_mapelement=_mapelement->_next;
+			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
+			////output("\n%s","next");
+		}
+		//////output("\n%s(%d)",string(p),string_length(p));
+		p=string_append_char(p,'}');
+		//////output("\n%s",string(p));
+		// if we failed, we have to free s here!!!
+		if(!p){free(s);s=NULL;}
+	}
+	return s;
+}
+
+mstring* _getValueText(Mvalue* _value){
+	// NOTE whatever is returned should be freed
+	mstring* valueText;
+	if(_value){
+		////////printf("\nTYPE: %d",_value->type);
+		switch(_value->type){
+			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
+			case VT_REAL:valueText=_getRealText(_value->value._real);break;
+			case VT_STRING:valueText=_getStringText(_value->value._string);break;
+			case VT_MAP:valueText=_getMapText(_value->value._map);break;
+			case VT_LIST:valueText=_getListText(_value->value._list);break;
+			default:break;
+		}
+	}
+	////////if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
+	return (valueText?valueText:string_append(string_create(),UNDEFINED_VALUETEXT));
+}

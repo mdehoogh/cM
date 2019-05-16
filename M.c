@@ -162,110 +162,6 @@ char* getFormattedText(char* fmt,uint8_t maxlength,...){
 #endif
 */
 
-// whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
-mstring* _getIntegerText(Minteger* _integer){
-	mstring* s=string_create();
-	if(_integer){
-		char integerText[80];
-		snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
-		string_append(s,integerText);
-	}
-	////////if(amVerbose())output("\nInteger '%s'.",string(s));
-	return s;
-}
-
-const char* M_NAN="NaN";
-const char* M_INF="Inf";
-bool isZero(long double ld){return fpclassify(ld)==FP_ZERO;}
-
-mstring* _getRealText(Mreal* _real){
-	mstring* s=string_create();
-	if(_real){
-		switch(fpclassify(_real->ld)){
-			case FP_NAN:string_append(s,M_NAN);break;
-			case FP_INFINITE:string_append(s,M_INF);break;
-			default:
-				{
-					char realText[80];
-					// test for special real value
-					snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
-					/////output("\nStringified real '%s'.",realText);
-					string_append(s,realText);
-				}
-				break;
-		}
-	}
-	return s;
-}
-mstring* _getStringText(Mstring* _string){
-	mstring* s=string_create();
-	if(!string_append_char(s,_string->presuffix)||!string_append(s,_string->_c)||!string_append_char(s,_string->presuffix))
-	;
-	return s;
-}
-mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
-mstring* _getListText(Mlist* _list){
-	mstring* s=string_create();
-	if(s){
-		mstring* p=string_append_char(s,'['); // switch to using p in appends
-		size_t l=_list->numberOfElements;
-		if(l){
-			output("\n%s(%d)",string(p),l);
-			Mvalue* _listelementValue;
-			Mlistelement* _listelement=_list->_first;
-			while(_listelement){
-				outputChar('.');
-				_listelementValue=_listelement->_value;
-				if(_listelementValue){
-					mstring* listelementValueText=_getValueText(_listelementValue);
-					if(listelementValueText){
-						p=string_append(p,string(listelementValueText));
-						free_mstring(listelementValueText); // release AFTER copying over
-					}
-				}
-				if(!(--l))break; // no further elements
-				_listelement=_listelement->_next;
-				if(_listelement)p=string_append(p,", "); // additional space behind comma!!
-			}
-		}
-		p=string_append_char(p,']');
-		output("\nList=%s",string(p));
-		// if appending failed somewhere free s
-		if(!p){free(s);s=NULL;}
-	}
-	return s;
-}
-mstring* _getMapText(Mmap* _map){
-	mstring* s=string_create();
-	if(s){
-		mstring* p=string_append_char(s,'{');
-		output("\n%s",string(p));
-		Mmapelement* _mapelement=_map->_first;
-		while(_mapelement){
-			output("\n%s","start");
-			Mvariable* _variable=_mapelement->_variable;
-			if(!_variable)continue;
-			p=string_append(p,_variable->_name);
-			output("\n%s",string(p));
-			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
-			output("\n%s",string(p));
-			mstring* mapelementValueText=_getValueText(_variable->_value);
-			output("\nMap element: %s",string(p));
-			if(!mapelementValueText)continue;
-			p=string_append(p,string(mapelementValueText)); // append 
-			free_mstring(mapelementValueText); // release AFTER copying over
-			_mapelement=_mapelement->_next;
-			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
-			printf("\n%s","next");
-		}
-		printf("\n%s(%d)",string(p),string_length(p));
-		p=string_append_char(p,'}');
-		printf("\n%s",string(p));
-		// if we failed, we have to free s here!!!
-		if(!p){free(s);s=NULL;}
-	}
-	return s;
-}
 mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 	mstring* s=string_create();
 	if(s){
@@ -304,24 +200,6 @@ mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 		if(!p){free_mstring(s);s=NULL;}
 	}
 	return s;
-}
-
-mstring* _getValueText(Mvalue* _value){
-	// NOTE whatever is returned should be freed
-	mstring* valueText;
-	if(_value){
-		////////printf("\nTYPE: %d",_value->type);
-		switch(_value->type){
-			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
-			case VT_REAL:valueText=_getRealText(_value->value._real);break;
-			case VT_STRING:valueText=_getStringText(_value->value._string);break;
-			case VT_MAP:valueText=_getMapText(_value->value._map);break;
-			case VT_LIST:valueText=_getListText(_value->value._list);break;
-			default:break;
-		}
-	}
-	////////if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
-	return (valueText?valueText:string_append(string_create(),UNDEFINED_VALUETEXT));
 }
 void outputFunctions(){
 	mstring* functionsText=_getFunctionMapText(_Menvironment->_functionMap);
@@ -503,9 +381,11 @@ void outputInfo(const char* fmt,...){
 		toStartOfNextLine();toCursorPosition();
 	}
 }
+// MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
 void outputError(char* error){
 	if(!error||!strlen(error))return;
-	toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());output("%s",error);toStartOfNextLine();toCursorPosition();
+	output("\nERROR: %s",error);
+	// replacing: toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());output("%s",error);toStartOfNextLine();toCursorPosition();
 }
 void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();toCursorPosition();}
 
@@ -894,6 +774,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 		if(amVerbose())output("\nProcessing list element starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 		Mvalue* _listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
+		if(amVerbose())output("\nList element ending token: %s.",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		if(!_listElementValue)if(amVerbose())output("\nNo list element result!");
 		// if we already have the maximum number of elements, we do not append this list element!!!
@@ -973,20 +854,20 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
  */
 
 /**
- * _getValueReference() wraps a single Mvalue instance
+ * get_valuereference() wraps a single Mvalue instance
  */
-Mvaluereference* _getValuereference(Mvalue* _value){
-	Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
-	_valuereference->_value=_value;
+Mvaluereference* get_valuereference(Mvalue* _value){
+	Mvaluereference* _valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+	_valueReference->_value=_value;
 	incrementReferenceCount(_value); // TODO is this correct???
-	return _valuereference;
+	return _valueReference;
 }
 void free_valuereference(Mvaluereference* _valuereference){
 	if(_valuereference){
 		if(_valuereference->_name)free(_valuereference->_name);
 		// values themselves are never freed!!!
-		decrementReferenceCount(_valuereference->_value);
-		decrementReferenceCount(_valuereference->_itemid);
+		if(_valuereference->_value)decrementReferenceCount(_valuereference->_value);
+		if(_valuereference->_itemid)decrementReferenceCount(_valuereference->_itemid);
 		free(_valuereference);
 	}
 }
@@ -1015,7 +896,7 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 
 	if(amVerbose())output("\nThe first value token: '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
-	Mvaluereference* _valuereference=NULL;
+	Mvaluereference* _valueReference=NULL;
 
 	mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
 		
@@ -1030,7 +911,7 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 	// ASSERT unary operators extracted
 
 	if(expressionToken){
-		_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+		_valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
@@ -1057,58 +938,60 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 							/// release the original arguments list
 							decrementReferenceCount(_functionArgumentsValue); // TODO is this correct?????
 							// 3. the result of applying the function to the arguments is the end result
-							_valuereference->_value=getValueOfFunctionCall(function,_functionArgumentMap);
+							_valueReference->_value=getValueOfFunctionCall(function,_functionArgumentMap);
 						}else
 							output("\nERROR: No function arguments!");
 					}else
 						output("\nERROR: Function '%s' unknown!",string(expressionToken->text));
 				}
 				break;
-			return _valuereference;
+			return _valueReference;
 				break;
-			case TT_NEW_VARIABLE:
+			case TT_NEW_VARIABLE: // a non-existing value reference
 				// we have to create the variable first (TODO should we wait until actually assigning???)
 				if(!addVariable(_Menvironment,string(expressionToken->text),VT_UNDEFINED,false))break; // NO retrieves the undefined value subsequently!!
-			case TT_VARIABLE:
-				_valuereference->_name=_strdup(string(expressionToken->text)); // store a copy of the name of the variable being referenced
-				_valuereference->_value=getValue(_Menvironment,_valuereference->_name); // store a reference to the value
-				incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
+			case TT_VARIABLE: // a value reference
+				_valueReference->_name=_strdup(string(expressionToken->text)); // store a copy of the name of the variable being referenced
+				_valueReference->_value=getValue(_Menvironment,_valueReference->_name); // store a reference to the value
+				incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
-			case TT_INTEGER:
+			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				{
 					long long ll=atoll(string(expressionToken->text));
 					if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 						expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
-						_valuereference->_value=_getRealValue(_strtold(string(expressionToken->text))+ll);
+						_valueReference->_value=_getRealValue(_strtold(string(expressionToken->text))+ll);
 					}else // just an integer
-						_valuereference->_value=_getIntegerValue(ll);
-					incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
+						_valueReference->_value=_getIntegerValue(ll);
+					incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
-				_valuereference->_value=_getRealValue(_strtold(string(expressionToken->text)));
-				incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
+				_valueReference->_value=_getRealValue(_strtold(string(expressionToken->text)));
+				incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_DQSTRING:
-			case TT_SQSTRING:
-				_valuereference->_value=_getStringValue(string(expressionToken->text));
-				incrementReferenceCount(_valuereference->_value); // TODO combine this with getValue to something called storeValue
+			case TT_SQSTRING: // a string literal
+				_valueReference->_value=_getStringValue(string(expressionToken->text));
+				incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
-			case TT_LIST:
-				_valuereference=_getValuereference(getValueOfList(TT_END_OF_LIST,0));
+			case TT_LIST: // a list literal
+				_valueReference=get_valuereference(getValueOfList(TT_END_OF_LIST,0));
 				break;
-			case TT_MAP:
-				_valuereference=_getValuereference(getValueOfMap());
+			case TT_MAP: // a map literal
+				_valueReference=get_valuereference(getValueOfMap());
 				break;
+			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
+				_valueReference=get_valuereference(getValueOfList(TT_END_OF_FUNCTION_CALL,1));
 			default:
 				break;
 		}
 
 		if(amVerbose()){
-			if(_valuereference&&_valuereference->_value){
-				mstring* _valuereferenceText=_getValueText(_valuereference->_value);
-				output("\nValue: '%s'.",string(_valuereferenceText));
-				free_mstring(_valuereferenceText);
+			if(_valueReference&&_valueReference->_value){
+				mstring* _valueReferenceText=_getValueText(_valueReference->_value);
+				output("\nValue: '%s'.",string(_valueReferenceText));
+				free_mstring(_valueReferenceText);
 			}else
 				output("\nNo result!");
 		}
@@ -1116,10 +999,10 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 		if(unaryOperators){
 			if(amVerbose())output("\nApplying unary operators: '%s'.",string(unaryOperators));
 			uint16_t l=string_length(unaryOperators);
-			while(l>0&&_valuereference->_value){
-				decrementReferenceCount(_valuereference->_value);
-				_valuereference->_value=applyUnaryOperator(string_char(unaryOperators,--l),_valuereference->_value);
-				if(_valuereference->_value)incrementReferenceCount(_valuereference->_value);
+			while(l>0&&_valueReference->_value){
+				decrementReferenceCount(_valueReference->_value);
+				_valueReference->_value=applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value);
+				if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 			}
 			if(amVerbose())output("\nUnary operator applied!");
 		}else
@@ -1130,7 +1013,7 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 
 	}
 
-	return _valuereference;
+	return _valueReference;
 
 	/*
 		// it could be an assignment in which case we remove the assignee and assigned value
@@ -1370,6 +1253,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 		while(expressionToken){
 
+			if(amVerbose())output("\nProcessing %s expression token '%s' of type %s.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			// does this token end the expression????
 			endTokenTypeIndex=endTokenTypeCount;
 			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]&&expressionToken->type>=8)endTokenTypeIndex--;
@@ -1377,9 +1261,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			
 			_formulaelement->_operand=getValueReference(endTokenTypes,endTokenTypeCount);
 
+			// MDH@16MAY2019: can't end an expression with an operator BRO'
 			endTokenTypeIndex=endTokenTypeCount;
-			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]&&expressionToken->type>=8)endTokenTypeIndex--;
-			if(endTokenTypeIndex){if(amVerbose())output("\nEnd of %s expression.",info);break;}
+			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
+			if(endTokenTypeIndex){if(amVerbose())output("\nToken '%s' of type %s ends the %s expression.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);break;}
 			
 			// the next token(s) should be a binary operator
 			// NOTE some binary operators are stored in a couple of tokens!!!
@@ -1415,16 +1300,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_formulaelement->_next;
 			}
 			
-			Mvalue* _result=_formulaelement->_operand->_value; // the last result computed
+			Mvalue* _result=_formulaelement->_operand->_value; // the first result computed
+			// 'applying' the binary operators left-to-right remembering the intermediate result in _result
+			// NOTE because all formula-elements are freed afterwards (see below) there's no need to so while applying the binary operators
 			while(_formulaelement->_next){ // a binary operator to apply
-				_result=applyBinaryOperator(string(_formulaelement->_operator),_formulaelement->_operand->_value,_formulaelement->_next->_operand->_value);
-				decrementReferenceCount(_formulaelement->_operand->_value);
+				_result=applyBinaryOperator(string(_formulaelement->_operator),_result,_formulaelement->_next->_operand->_value);
 				_formulaelement=_formulaelement->_next;
-				decrementReferenceCount(_formulaelement->_operand->_value);
-				_formulaelement->_operand->_value=_result;
-				incrementReferenceCount(_result);
 			}
-	
+			if(amVerbose()){mstring* _resultText=_getValueText(_result);output("\nResult: '%s'.",string(_resultText));free_mstring(_resultText);}
 			// perform assignments
 
 			// the expression value is the value of the first operand!!!
@@ -2627,8 +2510,8 @@ int main(int argc, char **argv){
 						if(!string_length(commandText)){
 							clearCommand();
 							output("Nothing to evaluate!");
-						}else
-							output("\nFailed to evaluate '%s'! Please complete, correct or cancel the command.",string(commandText));
+						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
+							output("\nPlease complete, correct or cancel the command.",string(commandText));
 						free_mstring(commandText);
 						continue;
 					}
