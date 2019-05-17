@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "Msettings.h"
 #include "Moutput.h"
@@ -17,22 +18,28 @@ FILE* debugfile=NULL;
 #ifdef __GNUC__
     __attribute__((format(printf, 1, 2)))
 #endif
+void writeTimestamp(FILE* _file){
+	if(_file){
+    time_t now=time(NULL);
+		struct tm * nowlocal=localtime(&now);
+    char buffer[50];strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",nowlocal);
+    fprintf(_file,"%s\t",buffer);
+	}
+}
 void debugWrite(const char* fmt,...){
-	if(debugfile==NULL)debugfile=fopen("./Mdebug.txt","w");
-	if(debugfile==NULL)return;
+	if(!debugfile){
+		debugfile=fopen("./Mdebug.txt","a+t"); // append (or create) in text mode
+		fputc('\n',debugfile); // start with a single empty line (separating the sessions)
+	}
+	if(debugfile){
     va_list args;
     va_start(args,fmt);
-	/*
-    time_t now;
-    char buffer[20];
-    time(&now);
-    strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",gmtime(&now));
-    fprintf(debugfile,"[%s] ",buffer);
-    */
+		writeTimestamp(debugfile);		
     vfprintf(debugfile,fmt,args);
     fputc('\n',debugfile);
     fflush(debugfile);
     va_end(args);
+	}
 }
 
 // Mexecution includes mstring.h
