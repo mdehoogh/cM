@@ -6,14 +6,14 @@
 bool acceptinghistorycommand=true; // whether to immediately accept a history command
 bool matchingparentheses=true;  // by default will 'match' parentheses
 
-bool verbose=true;
-
 #ifdef __DEBUG__
 bool assisting=true; // assist flag can be turned on to guide the user
 bool debugging=true; // program debugging flag so it will show the token information before evaluation of a command
+bool verbose=true;
 #else
 bool assisting=false; // assist flag can be turned on to guide the user
 bool debugging=false; // program debugging flag so it will show the token information before evaluation of a command
+bool verbose=false;
 #endif
 
 bool wrapping=true;

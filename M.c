@@ -716,6 +716,7 @@ Mvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
 		switch(_value->type){
 			case VT_INTEGER:_value->value._integer=(Minteger*)calloc(1,sizeof(Minteger));break; // initialized to 0 I presume
 			case VT_REAL:_value->value._real=(Mreal*)calloc(1,sizeof(Mreal));break; // initialized to 0.0 I presume
+			case VT_STRING:_value->value._string=(Mstring*)calloc(1,sizeof(Mstring));break;
 			case VT_LIST:_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
 			case VT_MAP:_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
 			default:break;
@@ -761,16 +762,18 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
-	/////if(amVerbose())output("\nComposing a list starting with '%s'.",string(_firstToken->text));
+	if(amVerbose())output("\nComposing a list starting with '%s'.",string(expressionToken->text));
 	Mvalue* _listValue=getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	if(!_list){output("\nFailed to create a list to return.");return NULL;}
+	if(_list->_first||_list->_last){output("\nSupposedly empty list not initialized correctly.");return NULL;}
 	if(amVerbose())output("\nComposing a list starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	while(true){
 		expressionToken=expressionToken->next; // now on the first element
-		if(expressionToken->type==endTokenType)break;
+		if(!expressionToken)break;
+		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		if(amVerbose())output("\nProcessing list element starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 		Mvalue* _listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
@@ -781,8 +784,10 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 		if(maximumNumberOfElements)if(_list->numberOfElements>=maximumNumberOfElements){if(amVerbose())output("\nMaximum number of elements reached.");continue;}
 		long long listElementIndex=appendedToList(_list,_listElementValue,0);
 		if(!listElementIndex){output("\nERROR: Failed to append the list element!");break;}
-		if(amVerbose())output("\nList element appended to list!");
+		if(amVerbose())output("\nList element with index %lld appended to list!",listElementIndex);
+		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
+	if(amVerbose())output("\nList extracted!");
 	return _listValue;
 }
 
@@ -794,6 +799,7 @@ Mvalue* getValueOfMap(){
 	// NOTE a map can be empty in which case _firstToken will immediately be of type TT_END_OF_MAP
 	while(true){
 		expressionToken=expressionToken->next;
+		if(!expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(expressionToken->type==TT_LISTELEMENT)continue; // missing attribute name-value pair
 		// get the next attribute name, value pair
@@ -857,9 +863,11 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
  * get_valuereference() wraps a single Mvalue instance
  */
 Mvaluereference* get_valuereference(Mvalue* _value){
+	if(amVerbose()){mstring* _valueText=_getValueText(_value);output("\nWrapping value '%s'.",string(_valueText));free_mstring(_valueText);}
 	Mvaluereference* _valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 	_valueReference->_value=_value;
-	incrementReferenceCount(_value); // TODO is this correct???
+	incrementReferenceCount(_valueReference->_value); // TODO is this correct???
+	if(amVerbose()){mstring* _valueText=_getValueText(_value);output("\nValue '%s' wrapped in value reference.",string(_valueText));free_mstring(_valueText);}
 	return _valueReference;
 }
 void free_valuereference(Mvaluereference* _valuereference){
@@ -945,8 +953,6 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 						output("\nERROR: Function '%s' unknown!",string(expressionToken->text));
 				}
 				break;
-			return _valueReference;
-				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
 				// we have to create the variable first (TODO should we wait until actually assigning???)
 				if(!addVariable(_Menvironment,string(expressionToken->text),VT_UNDEFINED,false))break; // NO retrieves the undefined value subsequently!!
@@ -982,7 +988,18 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 				_valueReference=get_valuereference(getValueOfMap());
 				break;
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
-				_valueReference=get_valuereference(getValueOfList(TT_END_OF_FUNCTION_CALL,1));
+			{
+				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1);
+				if(amVerbose())output("\nGoing to wrap the list extracted!");
+				// well, actually, we need the first element of the list that is returned!!!
+				// use only the first element if the list only has one element, otherwise use the list itself
+				if(_expressionListValue->value._list->numberOfElements==1){
+					_valueReference=get_valuereference(_expressionListValue->value._list->_first->_value);
+				}else
+					_valueReference=get_valuereference(_expressionListValue);
+				if(amVerbose())output("\nExtracted list wrapped!");
+				break;
+			}
 			default:
 				break;
 		}

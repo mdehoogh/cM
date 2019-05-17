@@ -164,7 +164,7 @@ size_t getNumberOfRemovedValues(){
 bool decrementReferenceCount(Mvalue* _value){
     if(_value){
         if(_value->count){
-            _value->count--;
+            (_value->count)--;
             return true;
         }
         mstring* _valueText=_getValueText(_value);
@@ -176,7 +176,7 @@ bool decrementReferenceCount(Mvalue* _value){
 }
 bool incrementReferenceCount(Mvalue* _value){
     if(_value){
-        _value->count++;
+        (_value->count)++;
         return true;
     }
     if(amVerbose())outputLine("No value to increment the reference count of.");
@@ -538,20 +538,52 @@ bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue)
     return true;
 }
 
+void checkList(Mlist* _list){
+    if(_list){
+        long long l=_list->numberOfElements;
+        if(l>0){
+            Mlistelement* _listelement=_list->_first;
+            if(_listelement){
+                // the number of elements in the list should match the number of counted elements
+                long long listelementindex=0;
+                while(true){
+                    if(l==0)output("\nERROR: More elements in list than accounted for.");
+                    l--;
+                    if(_listelement->index<=listelementindex)output("\nERROR: List element index (%lld) below the expected list element index (%lld).",_listelement->index,listelementindex);
+                    listelementindex=_listelement->index;
+                    if(!_listelement->_next){
+                        if(_list->_last!=_listelement)output("\nERROR: Registered last list element not equal to the actual last list element.");
+                        break;                        
+                    }
+                    output("\nList element OK.");
+                    _listelement=_listelement->_next;
+                }
+                if(l>0)output("\nERROR: Less elements in list than accounted for.");else 
+                if(l<0)output("\nERROR: %lld more elements in list than counted.",(-l));
+            }else
+                output("\nERROR: List with %lld elements without first element!",l);
+        }else{
+            if(_list->_first)output("\nERROR: Empty list with first element!");
+            if(_list->_last)output("\nERROR: Empty list with last element.");
+        }
+    }
+}
 // instead of returning a boolean we could return the assigned index (0 on failure)
 long long appendedToList(Mlist* _list,Mvalue* _value,long long index){
     if(!_list||!_value||index<0){output("\nERROR: %s.","No list to append to or no value to append or negative index");return 0;}
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0);
     if(index){if(index<=lastindex)return 0;}else index=lastindex+1;
-    Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement*));
+    Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));  // OOPS sizeof(Mlistelement) NOT sizeof(Mlistelement*) BAD BAD BOY!!!
     if(!_listelement){output("\nERROR: Failed to create a new list element to append.");return 0;}
     _listelement->_value=_value;
-    incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value immediately
-    if(_list->_last){_list->_last->_next=_listelement;lastindex=_list->_last->index;}else _list->_first=_listelement;
     _listelement->index=index;
+    _listelement->_next=NULL; // should NOT be needed!!
+    if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
     _list->_last=_listelement;
-    _list->numberOfElements++;
+    incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value once the list element is completely attached to the list
+    (_list->numberOfElements)++;
+    if(amVerbose())checkList(_list);
     return _listelement->index;
 }
 long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
@@ -970,6 +1002,7 @@ bool registerInternalFunctions(Menvironment* _environment){
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer){
 	mstring* s=string_create();
+    if(amDebugging())string_append_char(s,'i');
 	if(_integer){
 		char integerText[80];
 		snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
@@ -987,6 +1020,7 @@ bool isNaN(long double ld){return fpclassify(ld)==FP_NAN;}
 bool isInf(long double ld){return fpclassify(ld)==FP_INFINITE;}
 mstring* _getRealText(Mreal* _real){
 	mstring* s=string_create();
+    if(amDebugging())string_append_char(s,'r');
 	if(_real){
 		switch(fpclassify(_real->ld)){
 			case FP_NAN:string_append(s,M_NAN);break;
@@ -1006,6 +1040,7 @@ mstring* _getRealText(Mreal* _real){
 }
 mstring* _getStringText(Mstring* _string){
 	mstring* s=string_create();
+    if(amDebugging())string_append_char(s,'s');
 	if(!string_append_char(s,_string->presuffix)||!string_append(s,_string->_c)||!string_append_char(s,_string->presuffix))
 	;
 	return s;
@@ -1013,27 +1048,26 @@ mstring* _getStringText(Mstring* _string){
 //////////mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
 mstring* _getListText(Mlist* _list){
 	mstring* s=string_create();
+    if(amDebugging())string_append_char(s,'l');
 	if(s){
 		mstring* p=string_append_char(s,'['); // switch to using p in appends
-		size_t l=_list->numberOfElements;
-		if(l){
-			/////output("\n%s(%d)",string(p),l);
-			Mvalue* _listelementValue;
-			Mlistelement* _listelement=_list->_first;
-			while(_listelement){
-				outputChar('.');
-				_listelementValue=_listelement->_value;
-				if(_listelementValue){
-					mstring* listelementValueText=_getValueText(_listelementValue);
-					if(listelementValueText){
-						p=string_append(p,string(listelementValueText));
-						free_mstring(listelementValueText); // release AFTER copying over
-					}
+		/////////size_t l=_list->numberOfElements;
+        long long listindex=1;
+		Mlistelement* _listelement=_list->_first;
+		Mvalue* _listelementValue;
+		while(_listelement){
+            // increment listindex until it is equal to _listelement->index
+            while(listindex<_listelement->index){listindex++;p=string_append(p,", ");}
+	        //////////outputChar('.');
+			_listelementValue=_listelement->_value;
+			if(_listelementValue){
+				mstring* _listelementValueText=_getValueText(_listelementValue);
+				if(_listelementValueText){
+					p=string_append(p,string(_listelementValueText));
+					free_mstring(_listelementValueText); // release AFTER copying over
 				}
-				if(!(--l))break; // no further elements
-				_listelement=_listelement->_next;
-				if(_listelement)p=string_append(p,", "); // additional space behind comma!!
 			}
+			_listelement=_listelement->_next;
 		}
 		p=string_append_char(p,']');
 		/////output("\nList=%s",string(p));
@@ -1044,6 +1078,7 @@ mstring* _getListText(Mlist* _list){
 }
 mstring* _getMapText(Mmap* _map){
 	mstring* s=string_create();
+    if(amDebugging())string_append_char(s,'m');
 	if(s){
 		mstring* p=string_append_char(s,'{');
 		//////output("\n%s",string(p));
