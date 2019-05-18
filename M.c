@@ -13,11 +13,6 @@
 #include "Moutput.h"
 #include "Msession.h"
 
-FILE* debugfile=NULL;
-#include <stdarg.h>
-#ifdef __GNUC__
-    __attribute__((format(printf, 1, 2)))
-#endif
 void writeTimestamp(FILE* _file){
 	if(_file){
     time_t now=time(NULL);
@@ -26,6 +21,12 @@ void writeTimestamp(FILE* _file){
     fprintf(_file,"%s\t",buffer);
 	}
 }
+
+FILE* debugfile=NULL;
+#include <stdarg.h>
+#ifdef __GNUC__
+    __attribute__((format(printf, 1, 2)))
+#endif
 void debugWrite(const char* fmt,...){
 	if(!debugfile){
 		debugfile=fopen("./Mdebug.txt","a+t"); // append (or create) in text mode
@@ -380,19 +381,24 @@ void toCursorPosition(){
 	if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken); // return to the current token color
 }
 
-void outputInfo(const char* fmt,...){
-	if(strlen(fmt)){ // we have a format
+// MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
+void outputError(char* error){
+	if(!error||!strlen(error))return;
+	output("\nERROR: %s",error);
+}
+
+void inputInfo(const char* fmt,...){
+	if(fmt&&strlen(fmt)){ // we have a format
 		toStartOfPreviousLine();resetOutputColor(); // get the default output color!!
 		// NOTE we have to call vprintf here NOT printf!!!
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
 		toStartOfNextLine();toCursorPosition();
 	}
 }
-// MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
-void outputError(char* error){
-	if(!error||!strlen(error))return;
-	output("\nERROR: %s",error);
-	// replacing: toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());output("%s",error);toStartOfNextLine();toCursorPosition();
+void inputError(const char* fmt,...){
+	toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());
+	va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+	toStartOfNextLine();toCursorPosition();
 }
 void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();toCursorPosition();}
 
@@ -400,7 +406,7 @@ void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),commandLength());
 	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 	if(amDebugging())
-		outputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
+		inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 }
 
@@ -414,7 +420,12 @@ Token* newToken(Token* prevToken){
 			if(!prevToken->significantCharacterCount)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
 			// initialize the new token
 			pNewToken->prev=prevToken; // set the predecessor
-			pNewToken->expr=(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||prevToken->type==TT_EXPRESSION?prevToken:prevToken->expr); // point to the right start of the expression it is part of
+			// MDH@18MAY2019: if a , starts an expression we won't be pointing to the opening parenthesis!!!
+			//                which would mean that on verification we'd have to jump back until we found a non-comma!!!
+			//                so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
+			//                BUT the first (dummy) expression token should be included though!!!
+			pNewToken->expr=(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP?prevToken:prevToken->expr); // point to the right start of the expression it is part of
+			if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
 		}
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
@@ -1659,7 +1670,7 @@ void setCommandIndex(uint32_t newCommandIndex){
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
 			setCommandToEvaluate(token);
-			outputInfo("Showing registered command #%u.",(commandCount-commandIndex+1));
+			inputInfo("Showing registered command #%u.",(commandCount-commandIndex+1));
 			return;
 		}
 		// the previous command will be used as behind cursor text!!
@@ -1841,7 +1852,7 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 		}/* removedTokenCharacter() calls removeToken which will NULL the pCommandToEvaluate and pLastCommandToEvaluateToken when the first command character is removed, in which case we do not need:
 			else clearCommand();*/
 	}else // MDH@03MAY2019: can't switch to control mode here (so we just report the error!!!)
-		outputError("Failed to remove the last entered character.");
+		inputError("%s","Failed to remove the last entered character.");
 }
 
 void outputTokenInfo(){
@@ -1945,7 +1956,36 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 */
 			// ending a function call, list or map is only allowed with expr defined
 			if(newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_MAP){
-				if(!pLastCommandToEvaluateToken->expr){outputError("Can't end a list or map here!");newTokenType=TT_ERROR;}else pLastCommandToEvaluateToken->expr=pLastCommandToEvaluateToken->expr->expr;
+				if(pLastCommandToEvaluateToken->expr){
+					// check whether the match is correct
+					switch(newTokenType){
+						case TT_END_OF_FUNCTION_CALL:
+							if(pLastCommandToEvaluateToken->expr->type!=TT_FUNCTION_CALL&&pLastCommandToEvaluateToken->expr->type!=TT_EXPRESSION){
+								/////inputError("%s","No function call or expression to end here!");
+								inputError("End of function call/expression character does not match '%s' of type '%s'!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
+								newTokenType=TT_ERROR;
+							}
+							break;
+						case TT_END_OF_LIST:
+							if(pLastCommandToEvaluateToken->expr->type!=TT_LIST&&pLastCommandToEvaluateToken->expr->type!=TT_LISTELEMENT){
+								inputError("End of list character does not match '%s' of type '%s'!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
+								newTokenType=TT_ERROR;
+							}
+							break;
+						case TT_END_OF_MAP:
+							if(pLastCommandToEvaluateToken->expr->type!=TT_MAP){
+								inputError("End of map character does not match '%s' of type '%s'!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
+								//inputError("No map to end here!");
+								newTokenType=TT_ERROR;
+							}
+							break;
+					}
+					// TODO we can do the following even on error but what if we didn't???
+					pLastCommandToEvaluateToken->expr=pLastCommandToEvaluateToken->expr->expr;
+				}else{
+					inputError("%s","Can't end a (function argument) list or map here!");
+					newTokenType=TT_ERROR;
+				}
 			}
 
 			pLastCommandToEvaluateToken->type=newTokenType;
@@ -2267,7 +2307,7 @@ int main(int argc, char **argv){
 								if(inputChar==65){ // up arrow 
 									if(inputMode==IM_COMMAND){ // i.e. show previous command if any
 										if(!commandIndex&&pCommandToEvaluate)
-											outputError("Won't show previous commands when one is being entered.");
+											inputError("%s","Won't show previous commands when one is being entered.");
 										else
 										if(!commandDown())
 											beep();
@@ -2283,7 +2323,7 @@ int main(int argc, char **argv){
 								if(inputChar==66){ // down arrow
 									if(inputMode==IM_COMMAND){									
 										if(!commandIndex&&pCommandToEvaluate)
-											outputError("Won't show next commands when one is being entered!");
+											inputError("%s","Won't show next commands when one is being entered!");
 										else 
 										if(!commandUp())
 											beep();
