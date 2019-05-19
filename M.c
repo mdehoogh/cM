@@ -424,8 +424,8 @@ Token* newToken(Token* prevToken){
 			//                which would mean that on verification we'd have to jump back until we found a non-comma!!!
 			//                so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
 			//                BUT the first (dummy) expression token should be included though!!!
-			pNewToken->expr=(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP?prevToken:prevToken->expr); // point to the right start of the expression it is part of
-			if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
+			pNewToken->expr=(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken!=pCommandToEvaluate&&prevToken->type==TT_EXPRESSION)?prevToken:prevToken->expr); // point to the right start of the expression it is part of
+			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
 		}
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
@@ -1497,8 +1497,19 @@ bool evaluateCommand(){
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
 	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
 	//                    this actually means that if expr is NULL there's one parentheses too many!!!
+	/*
 	if(!pLastCommandToEvaluateToken->expr){outputError("Too many parentheses!");return false;}
 	if(pLastCommandToEvaluateToken->expr!=pCommandToEvaluate){outputError("Not enough parentheses!");return false;}
+	*/
+	if(pLastCommandToEvaluateToken->expr){
+		switch(pLastCommandToEvaluateToken->expr->type){
+			case TT_LIST:outputError("Missing end of list.");break;
+			case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
+			case TT_MAP:outputError("Missing end of map!");break;
+			default:outputError("Not enough parentheses.");break;
+		}
+		return false;
+	}
 
 	// 4. can't end with function of function call
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
