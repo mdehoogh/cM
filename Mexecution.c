@@ -6,8 +6,8 @@
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
 #include "Msession.h"
 
-const char* MUTABLEVALUETYPECHARS="uirslm"; // the characters associated with each of the value types
-const char* IMMUTABLEVALUETYPECHARS="UIRSLM"; // the characters associated with each of the value types
+const char* MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
+const char* IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
 
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
@@ -74,6 +74,7 @@ void free_value(Mvalue* _value){
         // I do not need to free the value itself, only the pointers inside it
         switch(_value->type){
             case VT_UNDEFINED:break;
+            case VT_TOKEN:if(_value->value._token)free_token(_value->value._token);break;
             case VT_INTEGER:if(_value->value._integer)free_integer(_value->value._integer);break;
             case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
             case VT_STRING:free_string(_value->value._string);break;
@@ -510,16 +511,16 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
         if(!_variable->_value||!_variable->immutable){
             // _value needs to be of the right type
             if(!_value||_variable->valuetype==VT_UNDEFINED||_variable->valuetype==_value->type){
-                if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
-                _variable->_value=_value; // store the reference
-                if(_variable->_value)_variable->_value->count++; // increment the reference count
+                ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
+                assignValue(&_variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
+                ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }
-            printf("\nERROR: Cannot set the value of variable '%s': the new value is of the wrong type.",name);
+            output("\nERROR: Cannot set the value of variable '%s': the new value is of the wrong type.",name);
         }else
-            printf("\nERROR: Cannot set the value of variable '%s': it is not mutable!",name);
+            output("\nERROR: Cannot set the value of variable '%s': it is not mutable!",name);
     }else
-        printf("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
+        output("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
     return false;
 }
 
@@ -530,8 +531,8 @@ bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue)
     _mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
     if(!_mapelement->_variable)return false;
 	_mapelement->_variable->_name=_strdup(attributeName); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
-	_mapelement->_variable->_value=_attributeValue; // store the _value pointer of the attributeValueExpressionvalue
-	incrementReferenceCount(_attributeValue); // ascertain to keep the value stored around
+	assignValue(&_mapelement->_variable->_value,_attributeValue); // store the _value pointer of the attributeValueExpressionvalue
+	/////////////////incrementReferenceCount(_attributeValue); // ascertain to keep the value stored around
 	if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
 	_map->_last=_mapelement;
     _map->numberOfElements++;
@@ -576,12 +577,12 @@ long long appendedToList(Mlist* _list,Mvalue* _value,long long index){
     if(index){if(index<=lastindex)return 0;}else index=lastindex+1;
     Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));  // OOPS sizeof(Mlistelement) NOT sizeof(Mlistelement*) BAD BAD BOY!!!
     if(!_listelement){output("\nERROR: Failed to create a new list element to append.");return 0;}
-    _listelement->_value=_value;
+    assignValue(&_listelement->_value,_value);
     _listelement->index=index;
     _listelement->_next=NULL; // should NOT be needed!!
     if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
     _list->_last=_listelement;
-    incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value once the list element is completely attached to the list
+    /////////////////incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value once the list element is completely attached to the list
     (_list->numberOfElements)++;
     if(amVerbose())checkList(_list);
     return _listelement->index;
@@ -745,10 +746,10 @@ Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
                 _argumentmapelement->_variable->_name=_functionParameterMapelement->_variable->_name;
                 // associate the argument list element value (if available)
                 if(_argumentListelement){
-                    _argumentmapelement->_variable->_value=_argumentListelement->_value;
+                    assignValue(&_argumentmapelement->_variable->_value,_argumentListelement->_value);
                     _argumentListelement=_argumentListelement->_next;
                 }else // use the default!!!
-                    _argumentmapelement->_variable->_value=_functionParameterMapelement->_variable->_value;
+                    assignValue(&_argumentmapelement->_variable->_value,_functionParameterMapelement->_variable->_value);
                 // append to _argumentMap
                 if(_argumentMap->_last)_argumentMap->_last->_next=_argumentmapelement;else _argumentMap->_first=_argumentmapelement;
                 _argumentMap->_last=_argumentmapelement;
@@ -806,8 +807,7 @@ Mmap* _getRealMap(char* name,Mvalue* _realValue){
     if(name&&_realValue){
         Mvariable* _realVariable=_createVariable(name,VT_REAL,true);
         if(_realVariable){
-            _realVariable->_value=_realValue;
-            incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
+            assignValue(&_realVariable->_value,_realValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
             Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
             if(_mapelement){
                 _mapelement->_variable=_realVariable;
@@ -833,8 +833,7 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
     if(name&&_integerValue){
         Mvariable* _integerVariable=_createVariable(name,VT_INTEGER,true);
         if(_integerVariable){
-            _integerVariable->_value=_integerValue;
-            incrementReferenceCount(_integerValue); // now bound to the integer variable
+            assignValue(&_integerVariable->_value,_integerValue); ///////  incrementReferenceCount(_integerValue); // now bound to the integer variable
             Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
             if(_mapelement){
                 _mapelement->_variable=_integerVariable;
@@ -928,7 +927,7 @@ Mvalue* Msettype(Menvironment* _executionEnvironment,Mvalue* _variableName,Mvalu
                     if(valuetype!=_variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
                         if(!_variable->immutable||!_variable->_value){
                             _variable->valuetype=valuetype; // update the value type
-                            _variable->_value=NULL; // clear the value (might already be the case but won't harm either)
+                            assignValue(&_variable->_value,NULL); // clear the value (might already be the case but won't harm either)
                         }
                     }
                     // return the value type as text, which means we need to wrap the value type character
@@ -1125,4 +1124,10 @@ mstring* _getValueText(Mvalue* _value){
 	}
 	////////if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
 	return (valueText?valueText:string_append(string_create(),UNDEFINED_VALUETEXT));
+}
+
+void assignValue(Mvalue** _valueholder,Mvalue* _value){
+    if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
+    *_valueholder=_value; // replace what's being pointed to
+    if(*_valueholder)incrementReferenceCount(*_valueholder); // increment what it's pointing to now (if not NULL)
 }

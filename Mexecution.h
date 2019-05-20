@@ -30,7 +30,7 @@
 
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
-typedef enum Mvaluetype {VT_UNDEFINED,VT_INTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -52,6 +52,7 @@ typedef struct Mstring{
 struct Mlist;
 struct Mmap;
 typedef union Mvalueunion{
+    Mtoken* _token;
     Minteger* _integer;
     Mreal* _real;
     Mstring* _string;
@@ -277,3 +278,6 @@ mstring* _getListText(Mlist* _list);
 mstring* _getMapText(Mmap* _map);
 
 mstring* _getValueText(Mvalue* _value);
+
+// MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
+void assignValue(Mvalue** _valueholder,Mvalue* _value);

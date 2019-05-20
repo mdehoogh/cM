@@ -1,6 +1,6 @@
 #include "Mexpression.h"
 
-void free_token(Token* _token){
+void free_token(Mtoken* _token){
     if(_token){
         free_token(_token->next);
         free_mstring(_token->text);
