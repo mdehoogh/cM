@@ -739,11 +739,15 @@ Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
         Mmap* _argumentMap=(Mmap*)calloc(1,sizeof(Mmap));
         Mmap* _functionParameterMap=_function->_parameterMap;
         if(_functionParameterMap){
+            if(amVerbose())output("\nMatching the function parameters!");
             Mmapelement* _functionParameterMapelement=_functionParameterMap->_first;
             Mlistelement* _argumentListelement=_argumentList->_first;
             while(_functionParameterMapelement){
                 Mmapelement* _argumentmapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
-                _argumentmapelement->_variable->_name=_functionParameterMapelement->_variable->_name;
+                // BUG FIX I suppose we need _variable to point to something
+                _argumentmapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
+                // probably can't simply assign??? let's use _strdup then
+                _argumentmapelement->_variable->_name=_strdup(_functionParameterMapelement->_variable->_name);
                 // associate the argument list element value (if available)
                 if(_argumentListelement){
                     assignValue(&_argumentmapelement->_variable->_value,_argumentListelement->_value);
@@ -757,6 +761,7 @@ Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
                 _functionParameterMapelement=_functionParameterMapelement->_next;
             }
         }
+        if(amVerbose())output("\nArgument map created.");
         return _argumentMap;
     }
     return NULL;

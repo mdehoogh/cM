@@ -849,6 +849,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
 		case FT_INTERNAL_NO_ARGUMENTS:
 			return (*_function->functionunion.noArgumentFunction)(_Menvironment);
 		case FT_INTERNAL_ONE_ARGUMENT:
+			if(amVerbose())output("\nCalling one-argument function %s.",_function->_name);
 			return (*_function->functionunion.oneArgumentFunction)(_Menvironment,_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:{
 			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;

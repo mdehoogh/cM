@@ -166,6 +166,8 @@ typedef struct Menvironment{
     struct Menvironment* _parent;
 }Menvironment;
 
+// MDH@20MAY2019: we need free_map to free the function argument maps!!
+void free_map(Mmap* _map);
 /* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside
 // pointer to these structs releasers
 void free_string(Mstring* _string);
@@ -174,7 +176,6 @@ void free_listelement(Mlistelement* listelement);
 void free_list(Mlist* _list);
 void free_variable(Mvariable* _variable);
 void free_mapelement(Mmapelement* _mapelement);
-void free_map(Mmap* _map);
 void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement);
 void free_expressionlist(Mexpressionlist* _expressionlist);
 void free_functiondefinition(Mfunctiondefinition* _functiondefinition);
