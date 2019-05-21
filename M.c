@@ -545,7 +545,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
 {""    ,""   ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
 {"("   ,"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
-{"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
+{"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,  ?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
 {"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
 {"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {","   ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
@@ -656,12 +656,13 @@ char removedTokenCharacter(uint16_t behindCursor){
 }
 
 // HERE THE EVALUATION OF EXPRESSIONS TAKE PLACE
+/* MDH@21MAY2019: every Mvalue* should be created on the value stack and never elsewhere, every assignment to an Mvalue should be done using assignValue() and never using =
 Mvalue* getListValue(Mlist* _list){
 	Mvalue* _listValue=(Mvalue*)calloc(1,sizeof(Mvalue)); // OOPS, not the sizeof the pointer but Mvalue itself!!!!
 	if(_listValue)_listValue->value._list=_list;
 	return _listValue;
 }
-
+*/
 // the following is not required if we only allow the x[i/a,i/a,i/a] syntax or alternatively x[i/a][i/a] etc. and we only need to keep the last value and the 'index' or 'attribute' value reference
 /* MDH@06MAY2019: expressions contain references to places where values are stored which is not a variable
 typedef struct Mvaluepointeritem{
@@ -725,7 +726,9 @@ void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 	
 }
 */
+/* MDH@21MAY2019: replaced by placing the list and map (which is what it was used for) on the main value list, so it can be removed when no longer referenced!!!!
 // helper function to get an expression value of hold a value of a specific type
+// OOPS THIS value is NOT stored on the central value list!!!
 Mvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
 	Mvalue* _value=(Mvalue*)calloc(1,sizeof(Mvalue));
 	// allocate the value to hold, if a composite type (map or list), initialize the map and list to an empty map or list (integer, real and string are not set in advance)
@@ -742,7 +745,7 @@ Mvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
 	}
 	return _value;
 }
-
+*/
 /*
 an expression represents a value, and therefore:
 <expression>::=<value>{<binary operator><value>}
@@ -776,12 +779,14 @@ but <value><operator><value> here operator is a set of token types that separate
  * returns: the last token processed (which should be one of the end tokens) or NULL if all tokens were processed, and the Mvalue the expression evaluates to
  */
 Mtoken* expressionToken=NULL; // the current evaluation token
-Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getValueOfExpression() so we can call it from getListValue() and getMapValue()
+Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
 
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 	if(amVerbose())output("\nComposing a list starting with '%s'.",string(expressionToken->text));
-	Mvalue* _listValue=getValueOfExpressionOfType(VT_LIST);
+	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
+	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
+	Mvalue* _listValue=_getListValue(VT_UNDEFINED); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	if(!_list){output("\nFailed to create a list to return.");return NULL;}
 	if(_list->_first||_list->_last){output("\nSupposedly empty list not initialized correctly.");return NULL;}
@@ -810,7 +815,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 }
 
 Mvalue* getValueOfMap(){
-	Mvalue* _mapValue=getValueOfExpressionOfType(VT_MAP);
+	Mvalue* _mapValue=_getMapValue(VT_UNDEFINED); // MDH@21MAY2019 for the same reason as above: replacing: getValueOfExpressionOfType(VT_MAP);
 	Mmap* _map=_mapValue->value._map; // grab the map to fill
 	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
 	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
@@ -847,11 +852,13 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
 				break;
 			}
 		case FT_INTERNAL_NO_ARGUMENTS:
+			if(amVerbose())output("\nCalling no-argument function %s.",string(_function->_name));
 			return (*_function->functionunion.noArgumentFunction)(_Menvironment);
 		case FT_INTERNAL_ONE_ARGUMENT:
-			if(amVerbose())output("\nCalling one-argument function %s.",_function->_name);
+			if(amVerbose())output("\nCalling one-argument function %s.",string(_function->_name));
 			return (*_function->functionunion.oneArgumentFunction)(_Menvironment,_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:{
+			if(amVerbose())output("\nCalling two-argument function %s.",string(_function->_name));
 			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 			Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 			return (*_function->functionunion.twoArgumentFunction)(_Menvironment,(_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
@@ -902,9 +909,14 @@ void free_valuereference(Mvaluereference* _valuereference){
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	if(amVerbose()){
 		output("\nApplying unary operator '%c'",operator);
-		mstring* _valueText=_getValueText(_value);
-		output(" to value '%s' of type '%s'.",operator,string(_valueText),_value->type);
-		//free_mstring(_valueText);
+		if(_value){
+			mstring* _valueText=_getValueText(_value);
+			//////////outputChar('x');
+			if(_valueText){
+				output(" to value '%s' of type '%u'.",string(_valueText),_value->type);
+				free_mstring(_valueText);
+			}
+		}
 	}
 	switch(operator){
 		case '~':if(_value->type==VT_INTEGER)return _getIntegerValue(~(_value->value._integer->ll));break;
@@ -961,11 +973,19 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 						if(_functionArgumentsValue){
 							if(amVerbose())output("\nConstructing the function call argument map!");
 							// 2. get the arguments map
-							Mmap* _functionArgumentMap=getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
-							/// release the original arguments list
+							Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
+							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
+							/*
+							if(amVerbose())output("\nDecrementing the reference count of the function arguments value!");
 							decrementReferenceCount(_functionArgumentsValue); // TODO is this correct?????
+							if(amVerbose())output("\nReference count of the function arguments value decremented!");
+							*/
 							// 3. the result of applying the function to the arguments is the end result
 							assignValue(&_valueReference->_value,getValueOfFunctionCall(function,_functionArgumentMap));
+							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
+							if(amVerbose())output("\nFreeing the function argument map!");
+							free_map(_functionArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
+							if(amVerbose())output("\nFunction argument map freed!");
 						}else
 							output("\nERROR: No function arguments!");
 					}else
@@ -1247,6 +1267,7 @@ typedef struct Mformulaelement{
 	Mvaluereference* _operand; // an operand to apply the binary operator to
 	mstring* _operator; // a (shortcut) binary operator 
 	struct Mformulaelement* _next;
+	struct Mformulaelement* _prev; // MDH@21MAY2019: unfortunately needed for moving back!!
 }Mformulaelement;
 /* any formula starts with
 typedef struct Mformula{
@@ -1313,8 +1334,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				// append any other binary operator behind it (like a continuation or assignment operator)
 				if(expressionToken->next->type>0&&expressionToken->next->type<=8){
 					expressionToken=expressionToken->next;
-					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0));
+					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
+				if(amVerbose())output("\nFormula element operator: '%s'.",string(_formulaelement->_operator));
 				_formulaelement->_next=(Mformulaelement*)calloc(1,sizeof(Mformulaelement));
 				_formulaelement=_formulaelement->_next;
 				expressionToken=expressionToken->next;
@@ -1329,13 +1351,20 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		if(formula){
 
 			// skip all assignments
+			uint16_t numberOfAssignments=0;
+			Mformulaelement* _lastAssignmentFormulaelement=NULL;
 			_formulaelement=formula;
-			while(true){
-				if(string_last_char(_formulaelement->_operator)!='=')break; // no assignment for sure
-				if(string_char(_formulaelement->_operator,0)=='<'||string_char(_formulaelement->_operator,0)=='>'||string_char(_formulaelement->_operator,0)=='!'||string_char(_formulaelement->_operator,0)=='=')break;
+			while(_formulaelement){
+				if(string_last_char(_formulaelement->_operator)!='=')break; // not ending with assignment operator character to start with
+				if(string_char(_formulaelement->_operator,0)=='<'||string_char(_formulaelement->_operator,0)=='>'||string_char(_formulaelement->_operator,0)=='!')break; // break on <=, >= and !=
+				if(string_length(_formulaelement->_operator)>1&&string_char(_formulaelement->_operator,0)=='=')break; // break on ==
+				if(_lastAssignmentFormulaelement)_formulaelement->_prev=_lastAssignmentFormulaelement; // MDH@21MAY2019: in order to be able to traverse back!!!
+				_lastAssignmentFormulaelement=_formulaelement;
+				numberOfAssignments++;
 				_formulaelement=_formulaelement->_next;
 			}
-			
+			if(amVerbose())output("\nNumber of assignments: %u.",numberOfAssignments);
+
 			Mvalue* _result=_formulaelement->_operand->_value; // the first result computed
 			// 'applying' the binary operators left-to-right remembering the intermediate result in _result
 			// NOTE because all formula-elements are freed afterwards (see below) there's no need to so while applying the binary operators
@@ -1344,10 +1373,28 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_formulaelement->_next;
 			}
 			if(amVerbose()){mstring* _resultText=_getValueText(_result);output("\nResult: '%s'.",string(_resultText));free_mstring(_resultText);}
-			// perform assignments
+			
+			// perform assignments right-to-left (which is a little problematic though)
+			if(numberOfAssignments){
+				if(amVerbose())output("\nPerforming %u assignments.",numberOfAssignments);
+				_formulaelement=_lastAssignmentFormulaelement;
+				while(_formulaelement){
+					_valuereference=_formulaelement->_operand;
+					if(amVerbose())output("\nAssignment to %s using operator %s!",_valuereference->_name,string(_formulaelement->_operator));
+					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
+					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
+						assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getValue(_Menvironment,_valuereference->_name),_result));
+					}
+					setValue(_Menvironment,_valuereference->_name,_result);
+					// use the current value of the variable assigned to as new result!!
+					assignValue(&_result,getValue(_Menvironment,_valuereference->_name)); // CHECK assign??
+					///////////if(!(--numberOfAssignments))break; // no more assignments???
+					_formulaelement=_formulaelement->_prev;
+				}
+			}
 
 			// the expression value is the value of the first operand!!!
-			_expressionValue=_result;
+			assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
 			Mformulaelement* _nextformulaelement;
@@ -1928,10 +1975,16 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// some combinations are (still) not allowed...
 		if(newTokenType==pLastCommandToEvaluateToken->type){
 			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators
-			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->significantCharacterCount>0)newTokenType=TT_ERROR;
+			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->significantCharacterCount>0){
+				newTokenType=TT_ERROR;
+				if(amVerbose())inputError("Token already finished!");
+			}
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
-			if(inputCharacterType=='='&&pLastCommandToEvaluateToken->type==TT_ASSIGNMENT&&(pLastCommandToEvaluateToken->prev->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->prev->type==TT_BINARY_Aeru))newTokenType=TT_ERROR;
+			if(inputCharacterType=='='&&pLastCommandToEvaluateToken->type==TT_ASSIGNMENT&&(pLastCommandToEvaluateToken->prev->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->prev->type==TT_BINARY_Aeru)){
+				newTokenType=TT_ERROR;
+				if(amVerbose())inputError("A shortcut operator assignment cannot change into an equality.");
+			}
 		}
 		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
 		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
@@ -1949,16 +2002,30 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				// we can allow a binary operator in front of the assignment of course in that case it definitely is an assignment if it is not the = is an error!!
 				bool behindBinaryOperator=(pLastCommandToEvaluateToken->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->type==TT_BINARY_Aeru);
 				// NOTE if behind binary operator there must always be a token in front of it, so pLastCommandToEvaluateTokenToCheck cannot be NULL!!
-				Mtoken* pLastCommandToEvaluateTokenToCheck=(behindBinaryOperator?pLastCommandToEvaluateToken->prev:pLastCommandToEvaluateToken);
+				// MDH@21MAY2019: possibly we have multiple tokens representing a binary operator (like ** << and >> which are allowed!!!) so we need to skip all binary operators in front of the assignment character
+				Mtoken* pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateToken;
+				if(behindBinaryOperator)while(pLastCommandToEvaluateTokenToCheck->type>=3&&pLastCommandToEvaluateTokenToCheck->type<=7)pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;
+				if(amVerbose())inputInfo("Type of token to check: %s.",TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]);
 				// ASSERT pLastCommandToEvaluateTokenToCheck should either represent a variable or the end of a list element to allow for operator
 				if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST){ // end of a list
 					// we have to find the associated start of the list, and the token in front of that (which should be a variable!!!)
 					// unfortunately we might come across other list and we need to skip them
 					int listCounter=1;
-					while(listCounter>0){pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;if(pLastCommandToEvaluateTokenToCheck==NULL)break;if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST)listCounter++;else if(pLastCommandToEvaluateTokenToCheck->type==TT_LIST||pLastCommandToEvaluateTokenToCheck->type==TT_LISTELEMENT)listCounter--;}
+					while(listCounter>0){
+						pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;
+						if(pLastCommandToEvaluateTokenToCheck==NULL)break;
+						if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST)listCounter++;else 
+						if(pLastCommandToEvaluateTokenToCheck->type==TT_LIST||pLastCommandToEvaluateTokenToCheck->type==TT_LISTELEMENT)listCounter--;
+					}
 				}
 				// two options: = behind a binary operator without variable (or list element) in front of it is not allowed, i.e. an error, otherwise we assume that = represents the first = of == the equality operator...
-				if(pLastCommandToEvaluateTokenToCheck==NULL||(pLastCommandToEvaluateTokenToCheck->type!=TT_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_NEW_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_LISTELEMENT))newTokenType=(behindBinaryOperator?TT_ERROR:TT_BINARY_aErU);
+				if(pLastCommandToEvaluateTokenToCheck==NULL||(pLastCommandToEvaluateTokenToCheck->type!=TT_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_NEW_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_LISTELEMENT)){
+					if(behindBinaryOperator){
+						newTokenType=TT_ERROR;
+						if(amVerbose())inputError("No variable to assign to.");
+					}else
+						newTokenType=TT_BINARY_aErU;
+				}
 			}
 
 			pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);

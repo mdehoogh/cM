@@ -260,7 +260,8 @@ Mfunction* newFunction(Menvironment* _environment,const char* functionName);
 bool registerInternalFunctions(Menvironment* _environment);
 // helper function to return the function
 Mfunction* getFunction(Menvironment* _environment,const char* functionName);
-Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
+// MDH@21MAY2019: the _ indicates that the caller has to free the map itself
+Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
 
 bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 

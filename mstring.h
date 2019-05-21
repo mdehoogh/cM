@@ -27,7 +27,7 @@ char string_last_char(mstring* str);
 
 char* string_remainder(mstring* str,uint16_t pos);
 char* string(mstring* str);
-char* string_start(mstring* str,uint16_t length);
+bool string_shorten(mstring* str,uint16_t length);
 
 int16_t string_find(mstring* str,char c);
 

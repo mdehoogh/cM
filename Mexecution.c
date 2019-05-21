@@ -166,6 +166,14 @@ bool decrementReferenceCount(Mvalue* _value){
     if(_value){
         if(_value->count){
             (_value->count)--;
+            /* all values referenced in list and maps should have their count decremented as soon as becoming zero
+            // however it's more convenient to let the 'garbage collection' take care of that, in fact the free_map/free_list should do that!!!!
+            if(!_value->count){
+                if(!_value->type==VT_LIST){
+
+                }
+            }
+            */
             return true;
         }
         mstring* _valueText=_getValueText(_value);
@@ -236,14 +244,14 @@ Mvalue* _getCharStringValue(char _c){
 }
 // we can force all listelements to have the same type????
 Mvalue* _getListValue(Mvaluetype listValuetype){
-    Mlist* _list=(Mlist*)malloc(sizeof(Mlist));
+    Mlist* _list=(Mlist*)calloc(1,sizeof(Mlist));
     _list->valuetype=listValuetype; // register what type of elements this list should have
     Mvalue* _listvalue=(_list?_newValue():NULL);
     if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}
     return _listvalue;
 }
 Mvalue* _getMapValue(Mvaluetype mapValuetype){
-    Mmap* _map=(Mmap*)malloc(sizeof(Mmap));
+    Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
     _map->valuetype=mapValuetype;
     Mvalue* _mapvalue=(_map?_newValue():NULL);
     if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}
@@ -734,7 +742,7 @@ Mfunction* getFunction(Menvironment* _environment,const char* functionName){
     return NULL;    
 }
 
-Mmap* getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
+Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
     if(_function&&_argumentList){
         Mmap* _argumentMap=(Mmap*)calloc(1,sizeof(Mmap));
         Mmap* _functionParameterMap=_function->_parameterMap;
@@ -1113,10 +1121,13 @@ mstring* _getMapText(Mmap* _map){
 	return s;
 }
 
+mstring* _UNDEFINED_VALUETEXT=NULL;
 mstring* _getValueText(Mvalue* _value){
 	// NOTE whatever is returned should be freed
-	mstring* valueText;
+	mstring* valueText=NULL;
+    //////outputChar('.');
 	if(_value){
+        ////////outputChar('+');
 		////////printf("\nTYPE: %d",_value->type);
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
@@ -1127,8 +1138,11 @@ mstring* _getValueText(Mvalue* _value){
 			default:break;
 		}
 	}
+    ////////outputChar('.');
+    if(valueText)return valueText;
 	////////if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
-	return (valueText?valueText:string_append(string_create(),UNDEFINED_VALUETEXT));
+    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
+    return _UNDEFINED_VALUETEXT;
 }
 
 void assignValue(Mvalue** _valueholder,Mvalue* _value){

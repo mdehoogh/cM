@@ -57,12 +57,19 @@ uint16_t string_length(mstring* str){
 }
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
 bool string_setlength(mstring* str,uint16_t length){
-    if(str==NULL)return false;
-    if(length>str->length)return false;
+    if(!str)return false;
+    if(length>str->length)return false; // not allowing to make longer
     if(length<str->length){
         str->length=length;
         str->chars[str->length]='\0';
     }
+    return true;
+}
+bool string_shorten(mstring* str,uint16_t length){
+    if(!str)return false;
+    if(length>str->length)return false;
+    str->length-=length;
+    str->chars[str->length]='\0';
     return true;
 }
 
