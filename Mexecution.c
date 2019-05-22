@@ -162,6 +162,9 @@ size_t getNumberOfRemovedValues(){
     }
     return removed;
 }
+
+unsigned long long getNumberOfValues(){return _valueList->numberOfElements;}
+
 bool decrementReferenceCount(Mvalue* _value){
     if(_value){
         if(_value->count){
@@ -564,13 +567,13 @@ void checkList(Mlist* _list){
                         if(_list->_last!=_listelement)output("\nERROR: Registered last list element not equal to the actual last list element.");
                         break;                        
                     }
-                    output("\nList element OK.");
+                    output("\nList element with index %llu OK.",_listelement->index);
                     _listelement=_listelement->_next;
                 }
                 if(l>0)output("\nERROR: Less elements in list than accounted for.");else 
                 if(l<0)output("\nERROR: %lld more elements in list than counted.",(-l));
             }else
-                output("\nERROR: List with %lld elements without first element!",l);
+                output("\nERROR: List with %lld elements does not have a first element!",l);
         }else{
             if(_list->_first)output("\nERROR: Empty list with first element!");
             if(_list->_last)output("\nERROR: Empty list with last element.");
@@ -578,22 +581,49 @@ void checkList(Mlist* _list){
     }
 }
 // instead of returning a boolean we could return the assigned index (0 on failure)
-long long appendedToList(Mlist* _list,Mvalue* _value,long long index){
+unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index){
     if(!_list||!_value||index<0){output("\nERROR: %s.","No list to append to or no value to append or negative index");return 0;}
+    Mlistelement* _listelement=NULL;
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0);
-    if(index){if(index<=lastindex)return 0;}else index=lastindex+1;
-    Mlistelement* _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));  // OOPS sizeof(Mlistelement) NOT sizeof(Mlistelement*) BAD BAD BOY!!!
-    if(!_listelement){output("\nERROR: Failed to create a new list element to append.");return 0;}
-    assignValue(&_listelement->_value,_value);
-    _listelement->index=index;
-    _listelement->_next=NULL; // should NOT be needed!!
-    if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
-    _list->_last=_listelement;
-    /////////////////incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value once the list element is completely attached to the list
-    (_list->numberOfElements)++;
+    // MDH@23MAY2019: let's allow inserting or replacing as well
+    if(index>0&&index<=lastindex){ // not appending, and index does not exceed the last index i.e. insert or replace
+        // NOTE this is only possible if the list has at least one element!!!
+        // find out where to insert/replace
+        // ASSERT we will always find a list element with index equal to or larger than index
+        Mlistelement* _prevlistelement=NULL;
+        _listelement=_list->_first;
+        while(index>_listelement->index){_prevlistelement=_listelement;_listelement=_listelement->_next;}
+        if(_listelement->index!=index){ // not present in list yet
+            _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));  // OOPS sizeof(Mlistelement) NOT sizeof(Mlistelement*) BAD BAD BOY!!!
+            if(!_listelement){output("\nERROR: Failed to create a list element to insert.");return 0;}
+            assignValue(&_listelement->_value,_value);
+            _listelement->index=index;
+            if(_prevlistelement){ // not in front of the first element (so first won't change)
+                _listelement->_next=_prevlistelement->_next; // successor of new list element is current successor of _prevlistelement
+                _prevlistelement->_next=_listelement; // successor of predecessor becomes _listelement
+            }else{ // in front of the first element (so first will change)
+                _listelement->_next=_list->_first; // _listelement successor will be the current _first
+                _list->_first=_listelement; // replace _first by _listelement
+            }
+            // one more element in list
+            (_list->numberOfElements)++;
+        }else // a replacement, so the only thing we need to do is replace the current value!!!
+            assignValue(&_listelement->_value,_value);
+    }else{ // append
+        if(index<=0)index=lastindex+1;
+        _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));  // OOPS sizeof(Mlistelement) NOT sizeof(Mlistelement*) BAD BAD BOY!!!
+        if(!_listelement){output("\nERROR: Failed to create a list element to append.");return 0;}
+        assignValue(&_listelement->_value,_value);
+        _listelement->index=index;
+        _listelement->_next=NULL; // should NOT be needed!!
+        if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
+        _list->_last=_listelement;
+        /////////////////incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value once the list element is completely attached to the list
+        (_list->numberOfElements)++;
+    }
     if(amVerbose())checkList(_list);
-    return _listelement->index;
+    return (_listelement?_listelement->index:0);
 }
 long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
     if(!_environment||!name||!_value){output("\nERROR: %s","No environment, variable name of value specified!");return 0;}
@@ -1010,16 +1040,25 @@ bool registerInternalFunctions(Menvironment* _environment){
     return true;
 }
 
+mstring* appendull(mstring* const ms,unsigned long long ll){
+	char llText[80];
+	snprintf(llText,80,"%lld",ll); // TODO will this fit?
+	return string_append(ms,llText);
+}
+// helper function
+mstring* appendll(mstring* const ms,long long ll){
+	char llText[80];
+	snprintf(llText,80,"%lld",ll); // TODO will this fit?
+	return string_append(ms,llText);
+}
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer){
 	mstring* s=string_create();
-    if(amDebugging())string_append_char(s,'i');
-	if(_integer){
-		char integerText[80];
-		snprintf(integerText,80,"%lld",_integer->ll); // TODO will this fit?
-		string_append(s,integerText);
-	}
+    mstring* p=s;
+    if(amDebugging())p=string_append_char(p,'i');
+	if(p&&_integer)p=appendll(p,_integer->ll);
+    if(!p){free_mstring(s);s=NULL;}
 	////////if(amVerbose())output("\nInteger '%s'.",string(s));
 	return s;
 }
@@ -1032,8 +1071,9 @@ bool isNaN(long double ld){return fpclassify(ld)==FP_NAN;}
 bool isInf(long double ld){return fpclassify(ld)==FP_INFINITE;}
 mstring* _getRealText(Mreal* _real){
 	mstring* s=string_create();
-    if(amDebugging())string_append_char(s,'r');
-	if(_real){
+    mstring* p=s;
+    if(amDebugging())p=string_append_char(p,'r');
+	if(p&&_real){
 		switch(fpclassify(_real->ld)){
 			case FP_NAN:string_append(s,M_NAN);break;
 			case FP_INFINITE:string_append(s,M_INF);break;
@@ -1047,29 +1087,40 @@ mstring* _getRealText(Mreal* _real){
 				}
 				break;
 		}
+        if(!p){free_mstring(s);s=NULL;}
 	}
 	return s;
 }
 mstring* _getStringText(Mstring* _string){
 	mstring* s=string_create();
-    if(amDebugging())string_append_char(s,'s');
-	if(!string_append_char(s,_string->presuffix)||!string_append(s,_string->_c)||!string_append_char(s,_string->presuffix))
-	;
+    mstring* p=s;
+    if(amDebugging())p=string_append_char(p,'s');
+    if(p&&_string){
+        p=string_append_char(p,_string->presuffix);
+        p=string_append(p,_string->_c);
+        p=string_append_char(p,_string->presuffix);
+        if(!p){free_mstring(s);s=NULL;}
+    }
 	return s;
 }
 //////////mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
 mstring* _getListText(Mlist* _list){
+    ///////output("\nList to output.");char c;inputCharRead(&c);
 	mstring* s=string_create();
-    if(amDebugging())string_append_char(s,'l');
-	if(s){
-		mstring* p=string_append_char(s,'['); // switch to using p in appends
+    mstring* p=s;
+    if(amDebugging())p=string_append_char(p,'l');
+	if(p){
+		p=string_append_char(p,'['); // switch to using p in appends
 		/////////size_t l=_list->numberOfElements;
-        long long listindex=1;
+        unsigned long long listindex=1;
 		Mlistelement* _listelement=_list->_first;
 		Mvalue* _listelementValue;
-		while(_listelement){
+		while(p&&_listelement){
+            ///////outputChar('$');
             // increment listindex until it is equal to _listelement->index
-            while(listindex<_listelement->index){listindex++;p=string_append(p,", ");}
+            if(!_listelement->index)break;
+            while(listindex<_listelement->index){listindex++;p=string_append_char(p,',');}
+            /////////p=appendull(p,_listelement->index);p=string_append_char(p,':');if(!p)break;
 	        //////////outputChar('.');
 			_listelementValue=_listelement->_value;
 			if(_listelementValue){
@@ -1084,18 +1135,19 @@ mstring* _getListText(Mlist* _list){
 		p=string_append_char(p,']');
 		/////output("\nList=%s",string(p));
 		// if appending failed somewhere free s
-		if(!p){free(s);s=NULL;}
+		if(!p){free_mstring(s);s=NULL;}
 	}
 	return s;
 }
 mstring* _getMapText(Mmap* _map){
 	mstring* s=string_create();
-    if(amDebugging())string_append_char(s,'m');
-	if(s){
-		mstring* p=string_append_char(s,'{');
+	mstring* p=s;
+    if(amDebugging())p=string_append_char(p,'m');
+	if(p){
+        p=string_append_char(p,'{');
 		//////output("\n%s",string(p));
 		Mmapelement* _mapelement=_map->_first;
-		while(_mapelement){
+		while(p&&_mapelement){
 			//////output("\n%s","start");
 			Mvariable* _variable=_mapelement->_variable;
 			if(!_variable)continue;
@@ -1116,13 +1168,22 @@ mstring* _getMapText(Mmap* _map){
 		p=string_append_char(p,'}');
 		//////output("\n%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){free(s);s=NULL;}
+		if(!p){free_mstring(s);s=NULL;}
 	}
 	return s;
 }
 
 mstring* _UNDEFINED_VALUETEXT=NULL;
-mstring* _getValueText(Mvalue* _value){
+// the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
+// we can solve that by returning a new undefined value text instance every time
+mstring* getUndefinedValueText(){
+    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
+    mstring* _undefinedValueText=string_create();
+    // if copying fails (however unlikely), we ourselves need to free _undefinedValueText, and return NULL (unfortunately), which indicates memory problems!!!
+    if(!string_copy(_UNDEFINED_VALUETEXT,_undefinedValueText)){if(_undefinedValueText)free_mstring(_undefinedValueText);return NULL;}
+    return _undefinedValueText;
+}
+mstring* _getValueText(const Mvalue* const _value){
 	// NOTE whatever is returned should be freed
 	mstring* valueText=NULL;
     //////outputChar('.');
@@ -1139,13 +1200,16 @@ mstring* _getValueText(Mvalue* _value){
 		}
 	}
     ////////outputChar('.');
+    return(valueText?valueText:getUndefinedValueText());
+    /* replacing:
     if(valueText)return valueText;
 	////////if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
     return _UNDEFINED_VALUETEXT;
+    */
 }
 
-void assignValue(Mvalue** _valueholder,Mvalue* _value){
+void assignValue(Mvalue** _valueholder,Mvalue* const _value){
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
     *_valueholder=_value; // replace what's being pointed to
     if(*_valueholder)incrementReferenceCount(*_valueholder); // increment what it's pointing to now (if not NULL)

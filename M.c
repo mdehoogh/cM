@@ -382,12 +382,12 @@ void toCursorPosition(){
 }
 
 // MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
-void outputError(char* error){
-	if(!error||!strlen(error))return;
-	output("\nERROR: %s",error);
-}
+// MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
+void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){if(prefix)output("%s",prefix);if(_value){mstring* _valueText=_getValueText(_value);output("%s",string(_valueText));free_mstring(_valueText);}if(postfix)output("%s",postfix);}
 
-void inputInfo(const char* fmt,...){
+void outputError(const char* const error){if(error&&!strlen(error))output("\nERROR: %s",error);}
+
+void inputInfo(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
 		toStartOfPreviousLine();resetOutputColor(); // get the default output color!!
 		// NOTE we have to call vprintf here NOT printf!!!
@@ -395,7 +395,7 @@ void inputInfo(const char* fmt,...){
 		toStartOfNextLine();toCursorPosition();
 	}
 }
-void inputError(const char* fmt,...){
+void inputError(const char* const fmt,...){
 	toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());
 	va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
 	toStartOfNextLine();toCursorPosition();
@@ -424,7 +424,11 @@ Mtoken* newToken(Mtoken* prevToken){
 			//                which would mean that on verification we'd have to jump back until we found a non-comma!!!
 			//                so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
 			//                BUT the first (dummy) expression token should be included though!!!
-			pNewToken->expr=(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken!=pCommandToEvaluate&&prevToken->type==TT_EXPRESSION)?prevToken:prevToken->expr); // point to the right start of the expression it is part of
+			// TODO having to test an expression for starting with ( is a bit of a nuisance (so we won't accidently do that on the initial expression token and any comma token!!!)
+			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_char(prevToken->text,0)=='('))
+				pNewToken->expr=prevToken;
+			else
+				pNewToken->expr=prevToken->expr;
 			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
 		}
@@ -539,7 +543,7 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 /*
  "EXPR","UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{",("  ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:    ] }="}, /* EXPRESSION */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
 {"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
 {"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
 {"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
@@ -548,23 +552,23 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,  ?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
 {"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
 {"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
-{","   ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{","   ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,"["   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,.>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
-{",;"  ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
-{",;"  ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,""    ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
+{""    ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""    ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (     ,         {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
+{";"   ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{";"   ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
 {""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
 {""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{",;"  ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,""    ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{",;"  ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{",("  ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{",;"  ,""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{";"   ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";"   ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
+{";"   ,""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
 {"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
 {"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
-{",;"  ,""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{";"   ,""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
 {""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *  ,.>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{",;"  ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *   .>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{";"   ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -793,21 +797,26 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 	if(amVerbose())output("\nComposing a list starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
+	unsigned long long listElementIndex=0;
 	while(true){
 		expressionToken=expressionToken->next; // now on the first element
 		if(!expressionToken)break;
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
-		if(amVerbose())output("\nProcessing list element starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		listElementIndex++;
+		if(amVerbose())output("\nProcessing list element #%llu starting with token '%s' of type '%s'.",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 		Mvalue* _listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
+		if(!_listElementValue){if(amVerbose())output("\nList element missing!");continue;} // undefined list elements should NEVER be added to the list
 		if(amVerbose())output("\nList element ending token: %s.",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
-		if(!_listElementValue)if(amVerbose())output("\nNo list element result!");
 		// if we already have the maximum number of elements, we do not append this list element!!!
-		if(maximumNumberOfElements)if(_list->numberOfElements>=maximumNumberOfElements){if(amVerbose())output("\nMaximum number of elements reached.");continue;}
-		long long listElementIndex=appendedToList(_list,_listElementValue,0);
-		if(!listElementIndex){output("\nERROR: Failed to append the list element!");break;}
-		if(amVerbose())output("\nList element with index %lld appended to list!",listElementIndex);
+		// we're NOT using the number of elements in the list to check agains anymore but the list element index
+		if(!maximumNumberOfElements||listElementIndex<=maximumNumberOfElements){
+			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
+			if(appendedToList(_list,_listElementValue,listElementIndex)!=listElementIndex){outputValue("\nERROR: Failed to append list element '",_listElementValue,"'.");break;}
+			if(amVerbose())output("\nList element #%lld appended to list!",listElementIndex);
+		}else
+		if(amVerbose())output("\nMaximum number of elements reached.");
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
 	if(amVerbose())output("\nList extracted!");
@@ -889,11 +898,11 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
  * get_valuereference() wraps a single Mvalue instance
  */
 Mvaluereference* get_valuereference(Mvalue* _value){
-	if(amVerbose()){mstring* _valueText=_getValueText(_value);output("\nWrapping value '%s'.",string(_valueText));free_mstring(_valueText);}
+	if(amVerbose())outputValue("\nWrapping value '",_value,"'.");
 	Mvaluereference* _valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 	assignValue(&_valueReference->_value,_value);
 	////////////////////incrementReferenceCount(_valueReference->_value); // TODO is this correct???
-	if(amVerbose()){mstring* _valueText=_getValueText(_value);output("\nValue '%s' wrapped in value reference.",string(_valueText));free_mstring(_valueText);}
+	if(amVerbose())outputValue("\nValue '",_value,"' wrapped in value reference.");
 	return _valueReference;
 }
 void free_valuereference(Mvaluereference* _valuereference){
@@ -905,18 +914,15 @@ void free_valuereference(Mvaluereference* _valuereference){
 		free(_valuereference);
 	}
 }
+Mvalue* getReferencedValue(Mvaluereference* _valuereference){
+	// TODO what if the value is not a list and it is indexed??????
+	return(_valuereference?_valuereference->_itemid?getValueAtIndex(_valuereference->_value->value._list,_valuereference->_itemid):_valuereference->_value:NULL);
+}
 
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	if(amVerbose()){
 		output("\nApplying unary operator '%c'",operator);
-		if(_value){
-			mstring* _valueText=_getValueText(_value);
-			//////////outputChar('x');
-			if(_valueText){
-				output(" to value '%s' of type '%u'.",string(_valueText),_value->type);
-				free_mstring(_valueText);
-			}
-		}
+		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.",_value->type);}
 	}
 	switch(operator){
 		case '~':if(_value->type==VT_INTEGER)return _getIntegerValue(~(_value->value._integer->ll));break;
@@ -950,6 +956,7 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 	// ASSERT unary operators extracted
 
 	if(expressionToken){
+		if(amVerbose())output("\ngetValueOfReference() interpreting first value token '%s' of type %s.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		_valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
@@ -999,6 +1006,27 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 				_valueReference->_name=_strdup(string(expressionToken->text)); // store a copy of the name of the variable being referenced
 				assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
+				// a variable can be followed by an index that we should store in the value reference's itemid field
+				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
+					expressionToken=expressionToken->next;
+					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0); // typically allow for any number of indices (although perhaps we should check!!)
+					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
+					// which means that only the last index value has to be stored and the container of that last index (map or list)
+					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->numberOfElements>0){ // a list with at least one index
+						Mlist* indexList=indexListValue->value._list;
+						Mlistelement* indexListelement=indexList->_first; // must be there!!!
+						// as long as there are successors we haven't reach the last index yet!!!!
+						// TODO what if someone does not specify ALL indices??????
+						while(indexListelement->_next){
+							// replace the current value with the value in the list (TODO map) at the current index
+							assignValue(&_valueReference->_value,getValueAtIndex(_valueReference->_value->value._list,indexListelement->_value));
+							indexListelement=indexListelement->_next;
+						}
+						if(amVerbose())outputValue("Last index: ",indexListelement->_value,"'.");
+						// TODO what is going to happen to indexListValue?????? it should be discarded as its reference count will remain zero but all elements that are used elsewhere (like the last index stored in _valueReference will persist a little longer!!)
+						assignValue(&_valueReference->_itemid,indexListelement->_value); // store the last index value in the _itemid field
+					}
+				}
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				{
@@ -1043,14 +1071,7 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 				break;
 		}
 
-		if(amVerbose()){
-			if(_valueReference&&_valueReference->_value){
-				mstring* _valueReferenceText=_getValueText(_valueReference->_value);
-				output("\nValue: '%s'.",string(_valueReferenceText));
-				free_mstring(_valueReferenceText);
-			}else
-				output("\nNo result!");
-		}
+		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("\nValue: '",_valueReference->_value,"'.");else output("\nNo result!");}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
 			if(amVerbose())output("\nApplying unary operators: '%s'.",string(unaryOperators));
@@ -1239,7 +1260,7 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	if(_value1&&_value2){
-		if(amVerbose()){mstring* _valuetext1=_getValueText(_value1);mstring* _valuetext2=_getValueText(_value2);output("\nComputing %s %s %s.",string(_valuetext1),operator,string(_valuetext2));free_mstring(_valuetext1);free_mstring(_valuetext2);}
+		if(amVerbose()){outputValue("\nComputing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.");}
 		switch(operator[0]){
 			// real arithmetic
 			case '+' :return add(_value1,_value2);
@@ -1292,7 +1313,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 	if(expressionToken){
 
 		if(amVerbose()){
-			output("\nInterpreting %s expression starting with token '%s' of type '%s'",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			output("\ngetValueOfExpression() interpreting %s expression starting with token '%s' of type '%s'",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			if(endTokenTypeCount){
 				output(" that ends");
 				uint8_t endTokenTypeIndex=0;
@@ -1365,14 +1386,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			if(amVerbose())output("\nNumber of assignments: %u.",numberOfAssignments);
 
-			Mvalue* _result=_formulaelement->_operand->_value; // the first result computed
+			Mvalue* _result=getReferencedValue(_formulaelement->_operand); // the first result computed
 			// 'applying' the binary operators left-to-right remembering the intermediate result in _result
 			// NOTE because all formula-elements are freed afterwards (see below) there's no need to so while applying the binary operators
 			while(_formulaelement->_next){ // a binary operator to apply
-				_result=applyBinaryOperator(string(_formulaelement->_operator),_result,_formulaelement->_next->_operand->_value);
+				_result=applyBinaryOperator(string(_formulaelement->_operator),_result,getReferencedValue(_formulaelement->_next->_operand));
 				_formulaelement=_formulaelement->_next;
 			}
-			if(amVerbose()){mstring* _resultText=_getValueText(_result);output("\nResult: '%s'.",string(_resultText));free_mstring(_resultText);}
+			if(amVerbose())outputValue("\nResult: '",_result,"'.");
 			
 			// perform assignments right-to-left (which is a little problematic though)
 			if(numberOfAssignments){
@@ -1408,10 +1429,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 		}else
 		if(amVerbose())output("\nNo result to store.");
-
-
 	}
-
 	return _expressionValue;
 }
 /**
@@ -1475,50 +1493,47 @@ void clearCommand(){
 	// a small precaution here!!!
 	if(pCommandToEvaluate){freeToken(pCommandToEvaluate);pCommandToEvaluate=NULL;}
 }
-void outputValue(Mvalue* _value){
-	mstring* _valueText=_getValueText(_value);
+void outputValueColored(Mvalue* _value){
 	switch(_value->type){
-		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);break;
-		case VT_REAL:outputTokenTypeColor(TT_REAL);break;
-		case VT_STRING:outputTokenTypeColor(string_char(_valueText,0)=='"'?TT_DQSTRING:TT_SQSTRING);break;
+		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
+		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
+		case VT_STRING:outputTokenTypeColor(_value->value._string->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
 		case VT_LIST:
-			output("[");
+			// TODO not using _getListText() as defined in Mexecution
+			outputChar('[');
 			Mlist* _list=_value->value._list;
 			if(_list&&_list->numberOfElements){
 				Mlistelement* _listelement=_list->_first;
-				uint32_t listitemindex=1;
+				unsigned long long listitemindex=1;
 				while(_listelement){
-					while(listitemindex<_listelement->index)output(","); // missing elements
-					outputValue(_listelement->_value);
-					if(!_listelement->_next)break;
-					output(",");listitemindex++;
+					if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;output(",");} // missing elements
+					outputValueColored(_listelement->_value);
 					_listelement=_listelement->_next;
 				}
 			}
-			output("]");
+			outputChar(']');
 			break;
 		case VT_MAP:
-			output("{");
+			outputChar('{');
 			Mmap* _map=_value->value._map;
 			if(_map&&_map->numberOfElements){
 				Mvariable* _mapelementvariable;
 				Mmapelement* _mapelement=_map->_first;
 				while(_mapelement){
 					_mapelementvariable=_mapelement->_variable;
-					output("%s%c",_mapelementvariable->_name,":");
-					outputValue(_mapelementvariable->_value);
+					// TODO are we coloring the name?????
+					output("%s%c",_mapelementvariable->_name,':');
+					outputValueColored(_mapelementvariable->_value);
 					if(!_mapelement->_next)break;
-					output(",");
+					outputChar(',');
 					_mapelement=_mapelement->_next;
 				}
 			}
-			output("}");
+			outputChar('}');
 			break;
 		default:
 			break;
 	}
-	output(string(_valueText));
-	free_mstring(_valueText);
 	resetOutputColor();
 }
 // anything the user types is a sequence of tokens which we can store in a linked list
@@ -1574,7 +1589,7 @@ bool evaluateCommand(){
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	if(_commandExpressionValue){
 		output("\n%s = ",string(commandText));
-		outputValue(_commandExpressionValue);
+		outputValueColored(_commandExpressionValue);
 		decrementReferenceCount(_commandExpressionValue); // TODO do we need to do this?????
 		if(amVerbose())outputLine("Result released!");
 	}else
@@ -1974,8 +1989,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType==pLastCommandToEvaluateToken->type){
-			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators
-			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->significantCharacterCount>0){
+			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
+			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->significantCharacterCount>0){
 				newTokenType=TT_ERROR;
 				if(amVerbose())inputError("Token already finished!");
 			}
@@ -2209,6 +2224,7 @@ int main(int argc, char **argv){
 		resetOutputColor();
 		exit(1);
 	}
+	if(amVerbose())output("\nM environment initialized with %llu predefined values.",getNumberOfValues());
 
 	mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
 	if(predefinedVariableNames){

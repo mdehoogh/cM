@@ -70,7 +70,7 @@ typedef struct Mvalue{
 }Mvalue;
 
 typedef struct Mlistelement{
-    long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
+    unsigned long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
     Mvalue* _value;
     struct Mlistelement* _next;
 }Mlistelement;
@@ -78,7 +78,7 @@ typedef struct Mlistelement{
 // MDH@03MAY2019: we're going to allow a list to be sparse i.e. with each element we keep an offset
 //                this may come in handy if we fail to store something in a list
 typedef struct Mlist{
-    uint32_t numberOfElements; // keep track of the total number of elements
+    unsigned long long numberOfElements; // keep track of the total number of elements
     Mvaluetype valuetype; // we can force a list to have elements of the same type
     Mlistelement* _first;
     Mlistelement* _last;
@@ -97,7 +97,7 @@ typedef struct Mmapelement{
 }Mmapelement;
 
 typedef struct Mmap{
-    uint32_t numberOfElements; // keep track of the total number of variables
+    unsigned long long numberOfElements; // keep track of the total number of variables
     Mvaluetype valuetype; // the type all values in the map should have
     Mmapelement* _first;
     Mmapelement* _last;
@@ -232,7 +232,7 @@ bool incrementReferenceCount(Mvalue* _value);
 
 //////void free_value(Mvalue* _value);
 
-long long appendedToList(Mlist* _list,Mvalue* _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue);
 
 Mvalue* getValueAtIndex(Mlist* _list,Mvalue* _indexValue); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
@@ -266,6 +266,7 @@ Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
 bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 
 size_t getNumberOfRemovedValues();
+unsigned long long getNumberOfValues();
 
 // some helper functions (TODO or should we use this on Mreal values?????)
 bool isZero(long double ld);
@@ -279,7 +280,7 @@ mstring* _getStringText(Mstring* _string);
 mstring* _getListText(Mlist* _list);
 mstring* _getMapText(Mmap* _map);
 
-mstring* _getValueText(Mvalue* _value);
+mstring* _getValueText(const Mvalue* const _value);
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
-void assignValue(Mvalue** _valueholder,Mvalue* _value);
+void assignValue(Mvalue** _valueholder,Mvalue* const _value);
