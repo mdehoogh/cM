@@ -425,10 +425,17 @@ Mtoken* newToken(Mtoken* prevToken){
 			//                so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
 			//                BUT the first (dummy) expression token should be included though!!!
 			// TODO having to test an expression for starting with ( is a bit of a nuisance (so we won't accidently do that on the initial expression token and any comma token!!!)
-			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_char(prevToken->text,0)=='('))
+			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_char(prevToken->text,0)=='(')){
+				///////if(amVerbose())inputInfo("%s","Start of list, map or function call remembered!");
 				pNewToken->expr=prevToken;
-			else
+			}else
+			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
+				pNewToken->expr=prevToken->expr->expr;
+			}else{
+				///////if(amVerbose()){if(prevToken->expr)inputInfo("%s","Copying the start of the list, map or function!");else inputInfo("%s","No list, map or function start to remember!");}
 				pNewToken->expr=prevToken->expr;
+			}
+			///////if(amVerbose()){if(pNewToken->expr)inputInfo("Pointing to %s of type %s.",string(pNewToken->expr->text),TOKENTYPE_STRING[pNewToken->expr->type]);else inputInfo("Nothing to point to.");}
 			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
 		}
@@ -1404,11 +1411,20 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					if(amVerbose())output("\nAssignment to %s using operator %s!",_valuereference->_name,string(_formulaelement->_operator));
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
 					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
-						assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getValue(_Menvironment,_valuereference->_name),_result));
+						// we have to be a bit careful here if the value reference uses an index id
+						// does the _value field already contain the current value of the variable, if so we may immediately use that here instead of getValue()
+						assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result));
+						// replacing:	assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getValue(_Menvironment,_valuereference->_name),_result));
 					}
-					setValue(_Menvironment,_valuereference->_name,_result);
-					// use the current value of the variable assigned to as new result!!
-					assignValue(&_result,getValue(_Menvironment,_valuereference->_name)); // CHECK assign??
+					if(_valuereference->_itemid){
+						// TODO check whether all the items are of the right type!!!
+						appendedToList(_valuereference->_value->value._list,_result,_valuereference->_itemid->value._integer->ll);
+						// TODO typically the list will be mutable, but the point here is that we need the full index list to get the right value (which we didn't store!!!!)
+					}else{
+						setValue(_Menvironment,_valuereference->_name,_result);
+						// use the current value of the variable assigned to as new result!!
+						assignValue(&_result,getValue(_Menvironment,_valuereference->_name)); // CHECK assign??
+					}
 					///////////if(!(--numberOfAssignments))break; // no more assignments???
 					_formulaelement=_formulaelement->_prev;
 				}
@@ -1564,7 +1580,8 @@ bool evaluateCommand(){
 	if(!pLastCommandToEvaluateToken->expr){outputError("Too many parentheses!");return false;}
 	if(pLastCommandToEvaluateToken->expr!=pCommandToEvaluate){outputError("Not enough parentheses!");return false;}
 	*/
-	if(pLastCommandToEvaluateToken->expr){
+	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
+	if(pLastCommandToEvaluateToken->expr&&pLastCommandToEvaluateToken->expr->expr){
 		switch(pLastCommandToEvaluateToken->expr->type){
 			case TT_LIST:outputError("Missing end of list.");break;
 			case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
@@ -2020,24 +2037,20 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				// MDH@21MAY2019: possibly we have multiple tokens representing a binary operator (like ** << and >> which are allowed!!!) so we need to skip all binary operators in front of the assignment character
 				Mtoken* pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateToken;
 				if(behindBinaryOperator)while(pLastCommandToEvaluateTokenToCheck->type>=3&&pLastCommandToEvaluateTokenToCheck->type<=7)pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;
-				if(amVerbose())inputInfo("Type of token to check: %s.",TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]);
+				if(amVerbose())inputInfo("Type of token to check: %s.",TOKENTYPE_STRING[pLastCommandToEvaluateTokenToCheck->type]);
 				// ASSERT pLastCommandToEvaluateTokenToCheck should either represent a variable or the end of a list element to allow for operator
 				if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST){ // end of a list
 					// we have to find the associated start of the list, and the token in front of that (which should be a variable!!!)
-					// unfortunately we might come across other list and we need to skip them
-					int listCounter=1;
-					while(listCounter>0){
-						pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;
-						if(pLastCommandToEvaluateTokenToCheck==NULL)break;
-						if(pLastCommandToEvaluateTokenToCheck->type==TT_END_OF_LIST)listCounter++;else 
-						if(pLastCommandToEvaluateTokenToCheck->type==TT_LIST||pLastCommandToEvaluateTokenToCheck->type==TT_LISTELEMENT)listCounter--;
-					}
+					// which is easy because the expr tells us the start of the list BUT 
+					pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->expr;
+					///////////if(amVerbose())inputInfo("Presumed list start token");
+					if(pLastCommandToEvaluateTokenToCheck)pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;else inputError("%s","Start of index list not found!");
 				}
-				// two options: = behind a binary operator without variable (or list element) in front of it is not allowed, i.e. an error, otherwise we assume that = represents the first = of == the equality operator...
-				if(pLastCommandToEvaluateTokenToCheck==NULL||(pLastCommandToEvaluateTokenToCheck->type!=TT_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_NEW_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_LISTELEMENT)){
+				// two options: = behind a binary operator without variable (or list) in front of it is not allowed, i.e. an error, otherwise we assume that = represents the first = of == the equality operator...
+				if(pLastCommandToEvaluateTokenToCheck==NULL||(pLastCommandToEvaluateTokenToCheck->type!=TT_VARIABLE&&pLastCommandToEvaluateTokenToCheck->type!=TT_NEW_VARIABLE)){
 					if(behindBinaryOperator){
 						newTokenType=TT_ERROR;
-						if(amVerbose())inputError("No variable to assign to.");
+						//if(amVerbose())inputError("No variable to assign to.");
 					}else
 						newTokenType=TT_BINARY_aErU;
 				}
@@ -2075,8 +2088,9 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							}
 							break;
 					}
+					// if we do the following we need to move 
 					// TODO we can do the following even on error but what if we didn't???
-					pLastCommandToEvaluateToken->expr=pLastCommandToEvaluateToken->expr->expr;
+					///////////////////pLastCommandToEvaluateToken->expr=pLastCommandToEvaluateToken->expr->expr;
 				}else{
 					inputError("%s","Can't end a (function argument) list or map here!");
 					newTokenType=TT_ERROR;
