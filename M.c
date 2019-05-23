@@ -66,10 +66,20 @@ const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits o
 // how about storing all results here?????? instead of in the root environment????
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
-Mvalue* getResult(Menvironment* _executionEnvironment,Mvalue* _index){
+Mvalue* getResult(Menvironment* _executionEnvironment,Mvalue* _indexValue){
 	if(amVerbose())output("\nResult requested!");
-	if(!_index)return _resultListValue;
-	return getValueAtIndex(_resultListValue->value._list,_index);
+	if(!_indexValue)return _resultListValue;
+	long long indexValueInteger=getValueInteger(_indexValue,0); // NOTE all index values should be positive!!!
+	return getValueAtIndex(_resultListValue->value._list,indexValueInteger); // TODO are we calling getResult anywhere????
+}
+// list to map conversion
+Mvalue* l2m(Menvironment* _executionEnvironment,Mvalue* _value){
+	Mvalue* _mapValue=NULL;
+	if(_value&&_value->type==VT_LIST){
+		_mapValue=_getMapValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		if(!listAppendedToMap(_mapValue->value._map,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	}
+	return _mapValue;
 }
 
 Menvironment* _Menvironment; // this is the root (M) environment
@@ -140,6 +150,10 @@ bool initEnvironment(){
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
 			if(_resultListValue&&!completedIntegerFunction(newFunction(_Menvironment,"M"),getResult)){
 				outputLine("ERROR: Failed to register function M (for requesting previous results).");
+				return false;
+			}
+			if(!completedListFunction(newFunction(_Menvironment,"l2m"),l2m)){
+				outputLine("ERROR: Failed to register function l2m (for converting a list to a map).");
 				return false;
 			}
 		}
@@ -383,7 +397,6 @@ void toCursorPosition(){
 
 // MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
 // MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
-void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){if(prefix)output("%s",prefix);if(_value){mstring* _valueText=_getValueText(_value);output("%s",string(_valueText));free_mstring(_valueText);}if(postfix)output("%s",postfix);}
 
 void outputError(const char* const error){if(error&&!strlen(error))output("\nERROR: %s",error);}
 
@@ -848,11 +861,12 @@ Mvalue* getValueOfMap(){
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
 		if(expressionToken->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
+		expressionToken=expressionToken->next; // move to first element after the colon
 		Mvalue* _attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
 		mstring* attributeName=_getValueText(_attributeNameValue); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
-		if(!appendedToMap(_map,string(attributeName),_attributeValueValue))output("\nERROR: Failed to append the map element."); // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
-		free_mstring(attributeName); // ALWAYS free the value text 
+		if(!appendedToMap(_map,string(attributeName),_attributeValueValue))outputValue("\nERROR: Failed to append the value of attribute '",_attributeNameValue,"'."); // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
+		free_mstring(attributeName); // ALWAYS free the value text
 		if(expressionToken->type==TT_END_OF_MAP)break;
 	}
 	return _mapValue;
@@ -921,9 +935,121 @@ void free_valuereference(Mvaluereference* _valuereference){
 		free(_valuereference);
 	}
 }
+// two essential methods for getting and setting referenced values
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){
-	// TODO what if the value is not a list and it is indexed??????
-	return(_valuereference?_valuereference->_itemid?getValueAtIndex(_valuereference->_value->value._list,_valuereference->_itemid):_valuereference->_value:NULL);
+	// _itemid now represents the entire list of index/attribute name combinations
+	if(!_valuereference)return NULL;
+	// if we do NOT have a name it's a literal
+	if(!_valuereference->_name)return _valuereference->_value;
+	// if there is no itemid we simply return the 'entire' value of the given variable
+	Mvalue* _value=getValue(_Menvironment,_valuereference->_name); // the value at the top level
+	// if we have index/attribute names we have to get the final subvalue
+	if(_valuereference->_itemid){
+		Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
+		// empty lists should also return the full element, so only something to do when we actually have list elements!!!
+		if(_itemidlist->_first){
+			// let's get the first index/attribute name
+			Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+			Mvalue* indexorattributenameListelementValue;
+			while(indexorattributenameListelement){
+				indexorattributenameListelementValue=indexorattributenameListelement->_value;
+				// after extracting the value increment indexorattributenameListelement, so we can use continue
+				indexorattributenameListelement=indexorattributenameListelement->_next;
+				// if no value is defined, it is ignored TODO should we????
+				if(indexorattributenameListelementValue){
+					// if we are accessing a map we have to ascertain that the attribute name in a string
+					if(_value->type==VT_MAP){
+						mstring* attributenameText=_getValueText(indexorattributenameListelementValue);
+						if(attributenameText){
+							_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
+							free_mstring(attributenameText);
+							continue;	
+						}
+						outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
+					}
+					if(_value->type==VT_LIST){
+						// try to convert the index value into a positive integer
+						long long index=getValueInteger(indexorattributenameListelementValue,0);
+						if(index>0){
+							_value=getValueAtIndex(_value->value._list,index);
+							continue;
+						}
+						outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' not a (positive) integer.");
+					}
+					// neither a list nor a map, so nothing to return!!!
+					return NULL;
+					/* replacing:
+					// check the validity of the index or attribute name against the current value
+					if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_STRING){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
+					if(indexorattributenameListelementValue->type==VT_INTEGER){
+						if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
+						_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
+					}else{
+						if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
+						_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
+					}
+					*/
+				}
+			}
+		}
+	}
+	return _value;
+}
+// when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
+bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
+	bool result=false;
+	if(_valuereference&&_valuereference->_name){
+		if(_valuereference->_itemid){ // the hard part: index/attribute name list assignment!!
+			Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
+			// let's get the first index/attribute name
+			Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+			if(indexorattributenameListelement){ // we've got one, so not an empty index/attribute name list!!
+				Mvalue* _value=getValue(_Menvironment,_valuereference->_name); // we'll be needing the value at the top level
+				// we need to find the last index or attribute name
+				Mvalue* indexorattributenameListelementValue;
+				while(indexorattributenameListelement->_next){
+					indexorattributenameListelementValue=indexorattributenameListelement->_value;
+					indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
+					// if no value is defined, it is ignored TODO should we????
+					if(indexorattributenameListelementValue){
+						// if we are accessing a map we have to ascertain that the attribute name in a string
+						if(_value->type==VT_MAP){
+							mstring* attributenameText=_getValueText(indexorattributenameListelementValue);
+							if(attributenameText){
+								_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
+								free_mstring(attributenameText);
+								continue;	
+							}
+							outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
+						}
+						if(_value->type==VT_LIST){
+							if(indexorattributenameListelementValue->type==VT_INTEGER){
+								_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue->value._integer->ll);
+								continue;
+							}
+							outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' not an integer.");
+						}
+						// neither a list nor a map, so nothing to return!!!
+						break;
+					}
+				}
+				// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
+				if(_value->type==VT_MAP){
+					mstring* _attributeName=_getValueText(indexorattributenameListelement->_value);
+					if(appendedToMap(_value->value._map,string(_attributeName),_newValue))result=true;
+					free_mstring(_attributeName);
+				}else
+				if(_value->type==VT_LIST){
+					// NOTE allow appending using 0
+					long long index=getValueInteger(indexorattributenameListelement->_value,-1);
+					if(appendedToList(_value->value._list,_newValue,index))result=true;
+				}
+			}
+		}else
+			setValue(_Menvironment,_valuereference->_name,_newValue);
+		return true;
+	}
+	return result;
 }
 
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
@@ -1019,7 +1145,9 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0); // typically allow for any number of indices (although perhaps we should check!!)
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
-					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->numberOfElements>0){ // a list with at least one index
+					if(indexListValue&&indexListValue->type==VT_LIST){ // a list (possibly empty)
+						assignValue(&_valueReference->_itemid,indexListValue); // now storing the entire index/attribute name list
+						/* replacing (storing only the last index/attribute name):
 						Mlist* indexList=indexListValue->value._list;
 						Mlistelement* indexListelement=indexList->_first; // must be there!!!
 						// as long as there are successors we haven't reach the last index yet!!!!
@@ -1032,6 +1160,7 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 						if(amVerbose())outputValue("Last index: ",indexListelement->_value,"'.");
 						// TODO what is going to happen to indexListValue?????? it should be discarded as its reference count will remain zero but all elements that are used elsewhere (like the last index stored in _valueReference will persist a little longer!!)
 						assignValue(&_valueReference->_itemid,indexListelement->_value); // store the last index value in the _itemid field
+						*/
 					}
 				}
 				break;
@@ -1059,8 +1188,12 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 				_valueReference=get_valuereference(getValueOfList(TT_END_OF_LIST,0));
 				break;
 			case TT_MAP: // a map literal
-				_valueReference=get_valuereference(getValueOfMap());
+			{	
+				Mvalue* _mapValue=getValueOfMap();
+				if(amVerbose())outputValue("\nMap extracted: '",_mapValue,"'.");
+				_valueReference=get_valuereference(_mapValue);
 				break;
+			}
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
 			{
 				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1);
@@ -1346,14 +1479,17 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			
 			_formulaelement->_operand=getValueReference(endTokenTypes,endTokenTypeCount);
 
-			// MDH@16MAY2019: can't end an expression with an operator BRO'
-			endTokenTypeIndex=endTokenTypeCount;
-			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
-			if(endTokenTypeIndex){if(amVerbose())output("\nToken '%s' of type %s ends the %s expression.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);break;}
-			
 			// the next token(s) should be a binary operator
 			// NOTE some binary operators are stored in a couple of tokens!!!
 			if(expressionToken)if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)expressionToken=expressionToken->next;
+
+			// MDH@16MAY2019: can't end an expression with an operator BRO'
+			if(amVerbose())if(expressionToken)output("\nDoes '%s' of type '%s' end the expression?",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			endTokenTypeIndex=endTokenTypeCount;
+			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
+			if(endTokenTypeIndex){if(amVerbose())output("\nToken '%s' of type %s ends the %s expression.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);break;}
+			if(amVerbose())if(expressionToken)output(" NO");
+
 			if(expressionToken){
 				if(amVerbose())output("\nInterpreting operator token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				_formulaelement->_operator=string_create();
@@ -1408,7 +1544,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_lastAssignmentFormulaelement;
 				while(_formulaelement){
 					_valuereference=_formulaelement->_operand;
-					if(amVerbose())output("\nAssignment to %s using operator %s!",_valuereference->_name,string(_formulaelement->_operator));
+					if(amVerbose()){
+						mstring* _indexidText=_getValueText(_valuereference->_itemid);
+						output("\nAssignment to %s%s using operator %s!",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
+						if(_indexidText)free_mstring(_indexidText);
+					}
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
 					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
 						// we have to be a bit careful here if the value reference uses an index id
@@ -1416,6 +1556,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result));
 						// replacing:	assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getValue(_Menvironment,_valuereference->_name),_result));
 					}
+					setReferencedValue(_valuereference,_result);
+					assignValue(&_result,getReferencedValue(_valuereference)); // should we do this???? well, in case the assignment failed!!!
+					/* replacing:
 					if(_valuereference->_itemid){
 						// TODO check whether all the items are of the right type!!!
 						appendedToList(_valuereference->_value->value._list,_result,_valuereference->_itemid->value._integer->ll);
@@ -1425,6 +1568,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						// use the current value of the variable assigned to as new result!!
 						assignValue(&_result,getValue(_Menvironment,_valuereference->_name)); // CHECK assign??
 					}
+					*/
 					///////////if(!(--numberOfAssignments))break; // no more assignments???
 					_formulaelement=_formulaelement->_prev;
 				}
@@ -1538,7 +1682,8 @@ void outputValueColored(Mvalue* _value){
 				while(_mapelement){
 					_mapelementvariable=_mapelement->_variable;
 					// TODO are we coloring the name?????
-					output("%s%c",_mapelementvariable->_name,':');
+					// quoting the name to indicate it is alphanumeric!!
+					output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
 					outputValueColored(_mapelementvariable->_value);
 					if(!_mapelement->_next)break;
 					outputChar(',');

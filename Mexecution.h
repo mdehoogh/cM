@@ -235,11 +235,13 @@ bool incrementReferenceCount(Mvalue* _value);
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue);
 
-Mvalue* getValueAtIndex(Mlist* _list,Mvalue* _indexValue); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
+Mvalue* getValueAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
+Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 
 long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);
+/*
 Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue);
-
+*/
 // once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
 // decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mstring, Mlist or Mmap pointer)
@@ -264,6 +266,9 @@ Mfunction* getFunction(Menvironment* _environment,const char* functionName);
 Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
 
 bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
+bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
+bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoArgumentFunction);
+bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 
 size_t getNumberOfRemovedValues();
 unsigned long long getNumberOfValues();
@@ -281,6 +286,11 @@ mstring* _getListText(Mlist* _list);
 mstring* _getMapText(Mmap* _map);
 
 mstring* _getValueText(const Mvalue* const _value);
+// getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
+long long getValueInteger(const Mvalue* const _value,long long invalid);
+void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
+bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
+ 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);

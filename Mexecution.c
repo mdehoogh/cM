@@ -1,5 +1,6 @@
 #include "Mexecution.h"
 
+#include <limits.h>
 #include <math.h>
 #include "Msettings.h"
 #include "Moutput.h"
@@ -535,18 +536,23 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
     return false;
 }
 
+// MDH@24MAY2019: if already in the map should replace the current value
 bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue){
     if(!_map||!attributeName)return false;
-	Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
-    if(!_mapelement)return false;
-    _mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
-    if(!_mapelement->_variable)return false;
-	_mapelement->_variable->_name=_strdup(attributeName); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
-	assignValue(&_mapelement->_variable->_value,_attributeValue); // store the _value pointer of the attributeValueExpressionvalue
-	/////////////////incrementReferenceCount(_attributeValue); // ascertain to keep the value stored around
-	if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
-	_map->_last=_mapelement;
-    _map->numberOfElements++;
+    if(amVerbose()){output("\nSetting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.");}
+    Mmapelement* _mapelement=_map->_first;
+    while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+    if(!_mapelement){ // not found
+        _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
+        if(!_mapelement)return false;
+        _mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
+        if(!_mapelement->_variable)return false;
+        _mapelement->_variable->_name=_strdup(attributeName); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
+        if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
+        _map->_last=_mapelement;
+        _map->numberOfElements++;
+    }
+    assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
     return true;
 }
 
@@ -644,26 +650,36 @@ long long appendToListVariable(Menvironment* _environment,const char* name,Mvalu
     return 0;
 }
 
-Mvalue* getValueAtIndex(Mlist* _list,Mvalue* _indexValue){
-    if(_list&&_indexValue){
+Mvalue* getValueAtIndex(Mlist* _list,long long index){
+    if(_list&&index>0){
         if(_list->_last){
-            long long index=(_indexValue?(_indexValue->type==VT_INTEGER?_indexValue->value._integer->ll:0):0);
-            if(index>0){
-                long long maxindex=_list->_last->index;
-                if(index==maxindex)return _list->_last->_value;
-                if(index<maxindex){
-                    Mlistelement* _listelement=_list->_first;
-                    while(_listelement){
-                        if(_listelement->index==index)return _listelement->_value;
-                        if(_listelement->index>index)break; // couldn't find it!!!
-                        _listelement=_listelement->_next;
-                    }
+            long long maxindex=_list->_last->index;
+            if(index==maxindex)return _list->_last->_value;
+            if(index<maxindex){
+                Mlistelement* _listelement=_list->_first;
+                while(_listelement){
+                    if(_listelement->index==index)return _listelement->_value;
+                    if(_listelement->index>index)break; // couldn't find it!!!
+                    _listelement=_listelement->_next;
                 }
             }
         }
     }
     return NULL;
 }
+Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
+    if(_map&&attributeName&&strlen(attributeName)){
+        Mmapelement* _mapelement=_map->_first;
+        if(_mapelement){            
+            // keep looking until there is a match
+            while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+            // if there is a match return the associated value
+            if(_mapelement&&_mapelement->_variable)return _mapelement->_variable->_value;
+        }
+    }
+    return NULL;
+}
+/*
 Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue){
     if(_environment&&name){
         Mvariable* _variable=getVariable(_environment,name,amVerbose());
@@ -672,14 +688,14 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
             if(_variableValue){
                 if(_variableValue->type==VT_LIST){ // yes a list we can look into
                     Mlist* _list=_variableValue->value._list;
-                    return getValueAtIndex(_list,_indexValue);
+                    return getValueAtIndex(_list,_indexValue->value._integer->ll);
                 }
             }
         }
     }
     return NULL;
 }
-
+*/
 Mvalue* getValue(Menvironment* _environment,const char* name){
     if(!_environment||!name){output("\nERROR: %s.","No environment or name specified.");return NULL;}
     Mvariable* _variable=getVariable(_environment,name,false);
@@ -921,6 +937,32 @@ Mmap* _getStringStringMap(char* name1,char* name2){
     }
     return NULL;
 }
+Mmap* _getListMap(char* name,Mvalue* _listValue){
+    if(name&&_listValue){
+        Mvariable* _listVariable=_createVariable(name,VT_LIST,true);
+        if(_listVariable){
+            assignValue(&_listVariable->_value,_listValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
+            Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            if(_mapelement){
+                _mapelement->_variable=_listVariable;
+                Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
+                if(_map){
+                    _map->numberOfElements=1;
+                    _map->_first=_mapelement;
+                    output("\n%s","Returning the single list map!");
+                    return _map;
+                }
+                output("\nERROR: %s.","Failed to create the list variable map!");
+               free_mapelement(_mapelement);
+            }else{
+                output("\nERROR: %s.","Failed to create the list variable map element!");
+                free_variable(_listVariable);
+            }
+        }else
+            output("\nERROR: %s.","Failed to create the list variable!");
+    }
+    return NULL;
+}
 // end helper functions 
 
 
@@ -1014,6 +1056,17 @@ bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgume
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getIntegerMap("i",_getIntegerValue(0));
         output("\nRegistered function '%s' completed.",string(_function->_name));
+        return true;
+    }
+    return false;
+}
+bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_ONE_ARGUMENT;
+        _function->functionunion.oneArgumentFunction=oneArgumentFunction;
+        // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
+        _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED));
+        output("\nRegistered list function '%s' completed.",string(_function->_name));
         return true;
     }
     return false;
@@ -1151,7 +1204,10 @@ mstring* _getMapText(Mmap* _map){
 			//////output("\n%s","start");
 			Mvariable* _variable=_mapelement->_variable;
 			if(!_variable)continue;
+            // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
+            p=string_append_char(p,'\'');
 			p=string_append(p,_variable->_name);
+            p=string_append_char(p,'\'');
 			/////output("\n%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
 			/////output("\n%s",string(p));
@@ -1207,6 +1263,46 @@ mstring* _getValueText(const Mvalue* const _value){
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
     return _UNDEFINED_VALUETEXT;
     */
+}
+void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
+    if(prefix)output("%s",prefix);if(_value){mstring* _valueText=_getValueText(_value);output("%s",string(_valueText));free_mstring(_valueText);}if(postfix)output("%s",postfix);
+}
+long long getValueInteger(const Mvalue* const _value,long long invalid){
+    // ASSERTION if _value can be converted to an integer,it should not equal invalid!!!!
+    if(_value){
+        if(_value->type==VT_INTEGER)return _value->value._integer->ll;
+        if(_value->type==VT_STRING){
+            // we should check for 0 explicitly, which should always be represented by a single '0' character i.e. without signs!!!
+            // TODO are we allowing other zero representations as well???
+            if(!strcmp(_value->value._string->_c,"0"))return 0;
+            long long ll=atoll(_value->value._string->_c);
+            if(ll)return ll; // valid if non-zero
+        }
+        // TODO sometimes reals can also represent integers!!!
+    }
+    return invalid;
+}
+
+bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a list to a (possibly empty) map using the indices as attribute name
+    bool result=(_map!=NULL); // no map, no result!
+    if(result){
+        if(_list){
+            Mlistelement* _listelement=_list->_first;
+            while(_listelement){
+                mstring* _indexValueText=appendll(string_create(),_listelement->index);
+                if(_indexValueText){
+                    if(!appendedToMap(_map,string(_indexValueText),_listelement->_value))result=false;
+                    free_mstring(_indexValueText);
+                }else{
+                    result=false;
+                    output("\nFailed to convert index %llu to attribute name.",_listelement->index);
+                }
+                if(!result)break;
+                _listelement=_listelement->_next;
+            }
+        }
+    }
+    return result;
 }
 
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){
