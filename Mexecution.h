@@ -265,6 +265,8 @@ Mfunction* getFunction(Menvironment* _environment,const char* functionName);
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
 Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
 
+bool completedFunction(Mfunction* _function,NoArgumentFunction noArgumentFunction);
+bool completedValueFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoArgumentFunction);
@@ -281,16 +283,23 @@ bool isInf(long double ld);
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer);
 mstring* _getRealText(Mreal* _real);
-mstring* _getStringText(Mstring* _string);
+mstring* _getStringText(Mstring* _string,bool dequoted);
 mstring* _getListText(Mlist* _list);
 mstring* _getMapText(Mmap* _map);
 
-mstring* _getValueText(const Mvalue* const _value);
+mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value,long long invalid);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
+// list to map (list) conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
- 
+bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
+bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist);
+bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
+// map to (map) list conversions
+bool mapAppendedToList(Mlist* const _list,Mmap* const _map);
+bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map);
+
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);

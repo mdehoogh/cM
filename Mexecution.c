@@ -180,7 +180,7 @@ bool decrementReferenceCount(Mvalue* _value){
             */
             return true;
         }
-        mstring* _valueText=_getValueText(_value);
+        mstring* _valueText=_getValueText(_value,false);
         output("\nBUG: Reference count of '%s' of type '%c' already zero.",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
         free_mstring(_valueText);
     }else
@@ -292,8 +292,8 @@ void free_expressionlist(Mexpressionlist* _expressionlist){
 }
 void free_functiondefinition(Mfunctiondefinition* _functiondefinition){
     if(_functiondefinition){
-        free_map(_functiondefinition->_parameterMap);
-        free_expressionlist(_functiondefinition->_expressionlist);
+        if(_functiondefinition->_parameterMap)free_map(_functiondefinition->_parameterMap);
+        if(_functiondefinition->_expressionlist)free_expressionlist(_functiondefinition->_expressionlist);
         free(_functiondefinition);
     }
 }
@@ -888,6 +888,19 @@ Mmap* _getRealMap(char* name,Mvalue* _realValue){
     }
     return NULL;
 }
+Mmap* _getMap(char *name){
+    Mvariable* _variable=_createVariable(name,VT_UNDEFINED,true);
+    Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+    if(_mapelement){
+        _mapelement->_variable=_variable;
+        Mmap* _map=calloc(1,sizeof(Mmap));
+        _map->_first=_mapelement;
+        _map->_last=_mapelement;
+        _map->numberOfElements=1;
+        return _map;
+    }
+    return NULL;
+}
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
     if(name&&_integerValue){
         Mvariable* _integerVariable=_createVariable(name,VT_INTEGER,true);
@@ -1039,6 +1052,27 @@ Mvalue* Mcos(Menvironment* _executionEnvironment,Mvalue* _value){
     return NULL;
 }
 
+bool completedFunction(Mfunction* _function,NoArgumentFunction noArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_NO_ARGUMENTS;
+        _function->functionunion.noArgumentFunction=noArgumentFunction;
+        _function->_parameterMap=NULL;
+        output("\nRegistered function '%s' completed.",string(_function->_name));
+        return true;
+    }
+    return false;
+}
+bool completedValueFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_ONE_ARGUMENT;
+        _function->functionunion.oneArgumentFunction=oneArgumentFunction;
+        _function->_parameterMap=_getMap("v");
+        // no defaults here!!!
+        output("\nRegistered function '%s' completed.",string(_function->_name));
+        return true;
+    }
+    return false;
+}
 bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
@@ -1104,6 +1138,11 @@ mstring* appendll(mstring* const ms,long long ll){
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
 	return string_append(ms,llText);
 }
+mstring* appendld(mstring* const ms,long double ld){
+	char ldText[80];
+	snprintf(ldText,80,"%.*Lf",LDBL_DIG,ld);
+	return string_append(ms,ldText);
+}
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer){
@@ -1128,30 +1167,22 @@ mstring* _getRealText(Mreal* _real){
     if(amDebugging())p=string_append_char(p,'r');
 	if(p&&_real){
 		switch(fpclassify(_real->ld)){
-			case FP_NAN:string_append(s,M_NAN);break;
-			case FP_INFINITE:string_append(s,M_INF);break;
-			default:
-				{
-					char realText[80];
-					// test for special real value
-					snprintf(realText,80,"%.*Lf",LDBL_DIG,_real->ld);
-					/////output("\nStringified real '%s'.",realText);
-					string_append(s,realText);
-				}
-				break;
+			case FP_NAN:p=string_append(p,M_NAN);break;
+			case FP_INFINITE:p=string_append(p,M_INF);break;
+			default:p=appendld(p,_real->ld);break;
 		}
         if(!p){free_mstring(s);s=NULL;}
 	}
 	return s;
 }
-mstring* _getStringText(Mstring* _string){
+mstring* _getStringText(Mstring* _string,bool dequoted){
 	mstring* s=string_create();
     mstring* p=s;
     if(amDebugging())p=string_append_char(p,'s');
     if(p&&_string){
-        p=string_append_char(p,_string->presuffix);
+        if(!dequoted)p=string_append_char(p,_string->presuffix);
         p=string_append(p,_string->_c);
-        p=string_append_char(p,_string->presuffix);
+        if(!dequoted)p=string_append_char(p,_string->presuffix);
         if(!p){free_mstring(s);s=NULL;}
     }
 	return s;
@@ -1177,7 +1208,7 @@ mstring* _getListText(Mlist* _list){
 	        //////////outputChar('.');
 			_listelementValue=_listelement->_value;
 			if(_listelementValue){
-				mstring* _listelementValueText=_getValueText(_listelementValue);
+				mstring* _listelementValueText=_getValueText(_listelementValue,false);
 				if(_listelementValueText){
 					p=string_append(p,string(_listelementValueText));
 					free_mstring(_listelementValueText); // release AFTER copying over
@@ -1211,7 +1242,7 @@ mstring* _getMapText(Mmap* _map){
 			/////output("\n%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
 			/////output("\n%s",string(p));
-			mstring* mapelementValueText=_getValueText(_variable->_value);
+			mstring* mapelementValueText=_getValueText(_variable->_value,false);
 			/////output("\nMap element: %s",string(p));
 			if(!mapelementValueText)continue;
 			p=string_append(p,string(mapelementValueText)); // append 
@@ -1239,7 +1270,7 @@ mstring* getUndefinedValueText(){
     if(!string_copy(_UNDEFINED_VALUETEXT,_undefinedValueText)){if(_undefinedValueText)free_mstring(_undefinedValueText);return NULL;}
     return _undefinedValueText;
 }
-mstring* _getValueText(const Mvalue* const _value){
+mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
 	mstring* valueText=NULL;
     //////outputChar('.');
@@ -1249,12 +1280,13 @@ mstring* _getValueText(const Mvalue* const _value){
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
-			case VT_STRING:valueText=_getStringText(_value->value._string);break;
+			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
 			case VT_LIST:valueText=_getListText(_value->value._list);break;
 			default:break;
 		}
 	}
+    if(valueText)if(amAssisting())valueText=appendll(string_append_char(valueText,'#'),_value->count); // show the reference count as well
     ////////outputChar('.');
     return(valueText?valueText:getUndefinedValueText());
     /* replacing:
@@ -1265,7 +1297,7 @@ mstring* _getValueText(const Mvalue* const _value){
     */
 }
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
-    if(prefix)output("%s",prefix);if(_value){mstring* _valueText=_getValueText(_value);output("%s",string(_valueText));free_mstring(_valueText);}if(postfix)output("%s",postfix);
+    if(prefix)output("%s",prefix);if(_value){mstring* _valueText=_getValueText(_value,false);output("%s",string(_valueText));free_mstring(_valueText);}if(postfix)output("%s",postfix);
 }
 long long getValueInteger(const Mvalue* const _value,long long invalid){
     // ASSERTION if _value can be converted to an integer,it should not equal invalid!!!!
@@ -1283,6 +1315,7 @@ long long getValueInteger(const Mvalue* const _value,long long invalid){
     return invalid;
 }
 
+// (map) list conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a list to a (possibly empty) map using the indices as attribute name
     bool result=(_map!=NULL); // no map, no result!
     if(result){
@@ -1304,6 +1337,126 @@ bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a 
     }
     return result;
 }
+bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list){
+    bool result=(_maplist&&_maplist->valuetype==VT_LIST); // the destination list should only allow for list elements
+    if(result){
+        if(_list){
+            Mlistelement* _listelement=_list->_first;
+            while(result&&_listelement){
+                // index and value of the list element are stored in a new list!!
+                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED);
+                Mlist* _maplistelement=(_maplistelementValue?_maplistelementValue->value._list:NULL);
+                // if we fail to construct the maplist element or to add it
+                if(!_maplistelement||!appendedToList(_maplistelement,_getIntegerValue(_listelement->index),0)||!appendedToList(_maplistelement,_listelement->_value,0)||!appendedToList(_maplist,_maplistelementValue,0))
+                    result=false;
+                else
+                    _listelement=_listelement->_next;
+            }
+        }
+    }
+    return result;
+}
+bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist){
+    bool result=(_list!=NULL); // no list, no result!
+    if(result){
+        if(_maplist){ // something to copy
+            Mlistelement* _maplistelement=_maplist->_first;
+            Mvalue* _maplistelementValue;
+            while(result&&_maplistelement){
+                _maplistelementValue=_maplistelement->_value;
+                // each map list element should be a list with at least two elements
+                if(_maplistelementValue&&_maplistelementValue->type==VT_LIST&&_maplistelementValue->value._list->numberOfElements>1){
+                    // the first element in the map list element should be a positive integer that we can use as index
+                    long long index=getValueInteger(_maplistelementValue->value._list->_first->_value,0);
+                    // if the index is positive AND we fail to copy the second list element over, we failed!!!
+                    if(index>0&&!appendedToList(_list,_maplistelementValue->value._list->_first->_next->_value,index))
+                        result=false;
+                }
+                _maplistelement=_maplistelement->_next;
+            }
+        }
+    }
+    return result;
+}
+bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist){
+    bool result=(_map!=NULL);
+    if(result){
+        if(_maplist){
+            Mlistelement* _maplistelement=_maplist->_first;
+            Mvalue* _maplistelementValue;
+            while(result&&_maplistelement){
+                _maplistelementValue=_maplistelement->_value;
+                // each map list element should be a list with at least two elements
+                if(_maplistelementValue&&_maplistelementValue->type==VT_LIST&&_maplistelementValue->value._list->numberOfElements>1){
+                    // the first element becomes the key the second element the attribute value
+                    // BUT I suppose composite keys (maps or lists) are not allowed
+                    Mvalue* _attributeNameValue=_maplistelementValue->value._list->_first->_value;
+                    mstring* _attributeNameValueText=NULL;
+                    if(_attributeNameValue){
+                        if(_attributeNameValue->type==VT_INTEGER)_attributeNameValueText=_getIntegerText(_attributeNameValue->value._integer);else
+                        if(_attributeNameValue->type==VT_REAL)_attributeNameValueText=_getRealText(_attributeNameValue->value._real);else
+                        if(_attributeNameValue->type==VT_STRING)_attributeNameValueText=_getStringText(_attributeNameValue->value._string,true); // effectively cutting of the presuffix character TODO other solution????????
+                    }
+                    if(_attributeNameValueText){
+                        if(!string_length(_attributeNameValueText)||!appendedToMap(_map,string(_attributeNameValueText),_maplistelementValue->value._list->_first->_next->_value))result=false;
+                        free_mstring(_attributeNameValueText);
+                    }
+                }
+                _maplistelement=_maplistelement->_next;
+            }
+        }
+    }
+    return result;
+}
+// map to (map) list conversions
+bool mapAppendedToList(Mlist* const _list,Mmap* const _map){
+    bool result=(_list!=NULL);
+    if(result){
+        if(_map&&_map->_first){
+            Mmapelement* _mapelement=_map->_first;
+            while(result&&_mapelement){
+                // only add those map elements of which the key can be converted to a positive integer
+                long long index=atoll(_mapelement->_variable->_name);
+                if(index>0&&!appendedToList(_list,_mapelement->_variable->_value,index))result=false;
+                _mapelement=_mapelement->_next;
+            }
+        }
+    }
+    return result;
+}
+bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map){
+    bool result=(_maplist&&_maplist->valuetype==VT_LIST);
+    if(result){
+        if(_map&&_map->_first){
+            Mmapelement* _mapelement=_map->_first;
+            while(result&&_mapelement){
+               // index and value of the list element are stored in a new list!!
+                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED);
+                Mlist* _maplistelement=(_maplistelementValue?_maplistelementValue->value._list:NULL);
+                if(_maplistelement){
+                    // if we fail to construct the maplist element or to add it
+                    // NOTE the attribute name does not start with a quote character wich we need to call _getStringValue
+                    mstring* _attributeName=string_create();
+                    if(_attributeName){
+                        string_append_char(_attributeName,'\'');
+                        string_append(_attributeName,_mapelement->_variable->_name);
+                        Mvalue* _attributeNameValue=_getStringValue(string(_attributeName));
+                        if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,0)){
+                            if(!appendedToList(_maplistelement,_mapelement->_variable->_value,0)||!appendedToList(_maplist,_maplistelementValue,0))result=false;
+                        }else
+                            result=false;
+                        free_mstring(_attributeName);
+                    }else
+                        result=false;                
+                }else
+                    result=false;
+                _mapelement=_mapelement->_next;
+            }
+        }
+    }
+    return result;
+}
+
 
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count

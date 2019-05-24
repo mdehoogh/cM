@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <time.h>
+#include <limits.h>
 
 #include "Msettings.h"
 #include "Moutput.h"
@@ -72,7 +73,11 @@ Mvalue* getResult(Menvironment* _executionEnvironment,Mvalue* _indexValue){
 	long long indexValueInteger=getValueInteger(_indexValue,0); // NOTE all index values should be positive!!!
 	return getValueAtIndex(_resultListValue->value._list,indexValueInteger); // TODO are we calling getResult anywhere????
 }
-// list to map conversion
+
+// LIST CONVERSIONS
+////////Mvalue* ml(Menvironment* _executionEnvironment){return _getListValue(VT_LIST);} // a list that may only contain list elements is acceptable as map list!!
+
+// list to map
 Mvalue* l2m(Menvironment* _executionEnvironment,Mvalue* _value){
 	Mvalue* _mapValue=NULL;
 	if(_value&&_value->type==VT_LIST){
@@ -81,11 +86,75 @@ Mvalue* l2m(Menvironment* _executionEnvironment,Mvalue* _value){
 	}
 	return _mapValue;
 }
+// list to map list
+Mvalue* l2ml(Menvironment* _executionEnvironment,Mvalue* _value){
+	Mvalue* _maplistValue=NULL;
+	if(_value&&_value->type==VT_LIST){
+		_maplistValue=_getListValue(VT_LIST); // a map list ALWAYS requires element of type VT_LIST
+		if(!listAppendedToMaplist(_maplistValue->value._list,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	}
+	return _maplistValue;
+}
+// map list to list conversion
+Mvalue* ml2l(Menvironment* _executionEnvironment,Mvalue* _value){
+	Mvalue* _maplistValue=NULL;
+	if(_value&&_value->type==VT_LIST){
+		_maplistValue=_getListValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		if(!maplistAppendedToList(_maplistValue->value._list,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	}
+	return _maplistValue;
+}
+Mvalue* ml2m(Menvironment* _executionEnvironment,Mvalue* _value){
+	Mvalue* _mapValue=NULL;
+	if(_value&&_value->type==VT_LIST){
+		_mapValue=_getMapValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		if(!maplistAppendedToMap(_mapValue->value._map,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	}
+	return _mapValue;
+}
+
+// map to map list conversion i.e. each list element is a attribute name - value pair
+Mvalue* m2ml(Menvironment* _executionEnvironment,Mvalue* _value){
+	Mvalue* _maplistValue=NULL;
+	if(_value&&_value->type==VT_MAP){
+		_maplistValue=_getListValue(VT_LIST); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
+		if(!mapAppendedToMaplist(_maplistValue->value._list,_value->value._map))return NULL; // TODO should we release the list that was created somehow????
+	}
+	return _maplistValue;
+}
+Mvalue* m2l(Menvironment* _executionEnvironment,Mvalue* _value){
+	Mvalue* _listValue=NULL;
+	if(_value&&_value->type==VT_MAP){
+		_listValue=_getListValue(_value->type);
+		if(!mapAppendedToList(_listValue->value._list,_value->value._map))return NULL; // TODO should we release the list that was created somehow????
+	}
+	return _listValue;
+}
+// conversion functions
+ // the value wrapper for not a real and not an integer...
+Mvalue* NAR_value=NULL;
+Mvalue* NAI_value=NULL;
+long double getNAR(){return NAR_value->value._real->ld;}
+long long getNAI(){return NAI_value->value._integer->ll;}
+
+Mvalue* i(Menvironment* _executionEnvironment,Mvalue* _value){
+	if(amVerbose())outputValue("Converting '",_value,"' to an integer.");
+	Mvalue* _integerValue=NAI_value;
+	if(_value){
+		if(_value->type==VT_INTEGER)_integerValue=_value;else
+		if(_value->type==VT_REAL)_integerValue=_getIntegerValue((long long)_value->value._real->ld);else // TODO casting to a long long is a bit crude!!
+		if(_value->type==VT_STRING)_integerValue=_getIntegerValue(_strtoll(_value->value._string->_c,getNAI()));
+	}
+	if(amVerbose())outputValue("Converted to '",_integerValue,"'.");
+	return _integerValue;
+}
 
 Menvironment* _Menvironment; // this is the root (M) environment
 Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
 bool initEnvironment(){
+	NAR_value=_getRealValue(strtold("nan",NULL)); // we'll be using the default NaN to represent Not A Real
+	NAI_value=_getIntegerValue(LLONG_MIN);
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
@@ -95,6 +164,14 @@ bool initEnvironment(){
 		Mfunctionmap* environmentFunctionMap=calloc(1,sizeof(Mfunctionmap));
 		if(environmentVariableMap&&environmentFunctionMap){
 			_Menvironment->_variableMap=environmentVariableMap;
+			if(!NAR_value||!addVariable(_Menvironment,"NAR",VT_REAL,true)||setValue(_Menvironment,"NAR",NAR_value)){
+				outputLine("WARNING: Failed to create, add or initialize Not-a-real constant NAR.");
+				////////return false;
+			}
+			if(!NAI_value||!addVariable(_Menvironment,"nai",VT_INTEGER,false)||setValue(_Menvironment,"nai",NAI_value)){
+				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default nai.");
+				////////return false;
+			}
 			// create and add PI and E constants!!!
 			Mvalue* PI_value=_getRealValue(LD_PI);
 			if(!PI_value){
@@ -152,10 +229,28 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to register function M (for requesting previous results).");
 				return false;
 			}
-			if(!completedListFunction(newFunction(_Menvironment,"l2m"),l2m)){
-				outputLine("ERROR: Failed to register function l2m (for converting a list to a map).");
+			/*
+			if(!completedFunction(newFunction(_Menvironment,"ml"),ml)){
+				outputLine("ERROR: Failed to register map list (constructor) function.");
 				return false;
 			}
+			*/
+			// conversions
+			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)){
+				outputLine("ERROR: Failed to register value type conversion functions.");
+				return false;
+			}
+			// register list conversions
+			if(!completedListFunction(newFunction(_Menvironment,"l2m"),l2m)||!completedListFunction(newFunction(_Menvironment,"l2ml"),l2ml)||!completedListFunction(newFunction(_Menvironment,"ml2l"),ml2l)||!completedListFunction(newFunction(_Menvironment,"ml2m"),ml2m)){
+				outputLine("ERROR: Failed to register list conversion functions.");
+				return false;
+			}
+			// register map conversions
+			if(!completedListFunction(newFunction(_Menvironment,"m2ml"),m2ml)||!completedListFunction(newFunction(_Menvironment,"m2l"),m2l)){
+				outputLine("ERROR: Failed to register map conversion functions.");
+				return false;
+			}
+
 		}
 	}
 	return true;
@@ -863,7 +958,7 @@ Mvalue* getValueOfMap(){
 		if(expressionToken->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
 		expressionToken=expressionToken->next; // move to first element after the colon
 		Mvalue* _attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
-		mstring* attributeName=_getValueText(_attributeNameValue); // parse the attribute name value 
+		mstring* attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
 		if(!appendedToMap(_map,string(attributeName),_attributeValueValue))outputValue("\nERROR: Failed to append the value of attribute '",_attributeNameValue,"'."); // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
 		free_mstring(attributeName); // ALWAYS free the value text
@@ -939,8 +1034,9 @@ void free_valuereference(Mvaluereference* _valuereference){
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	// _itemid now represents the entire list of index/attribute name combinations
 	if(!_valuereference)return NULL;
+	if(_valuereference->_value)return _valuereference->_value; // if we have a value return that!!!
 	// if we do NOT have a name it's a literal
-	if(!_valuereference->_name)return _valuereference->_value;
+	if(!_valuereference->_name)return NULL;
 	// if there is no itemid we simply return the 'entire' value of the given variable
 	Mvalue* _value=getValue(_Menvironment,_valuereference->_name); // the value at the top level
 	// if we have index/attribute names we have to get the final subvalue
@@ -959,7 +1055,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 				if(indexorattributenameListelementValue){
 					// if we are accessing a map we have to ascertain that the attribute name in a string
 					if(_value->type==VT_MAP){
-						mstring* attributenameText=_getValueText(indexorattributenameListelementValue);
+						mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
 						if(attributenameText){
 							_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
 							free_mstring(attributenameText);
@@ -1014,7 +1110,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 					if(indexorattributenameListelementValue){
 						// if we are accessing a map we have to ascertain that the attribute name in a string
 						if(_value->type==VT_MAP){
-							mstring* attributenameText=_getValueText(indexorattributenameListelementValue);
+							mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
 							if(attributenameText){
 								_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
 								free_mstring(attributenameText);
@@ -1035,7 +1131,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				}
 				// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
 				if(_value->type==VT_MAP){
-					mstring* _attributeName=_getValueText(indexorattributenameListelement->_value);
+					mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
 					if(appendedToMap(_value->value._map,string(_attributeName),_newValue))result=true;
 					free_mstring(_attributeName);
 				}else
@@ -1166,17 +1262,17 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				{
-					long long ll=atoll(string(expressionToken->text));
+					long long ll=_strtoll(string(expressionToken->text),NAI_value->value._integer->ll);
 					if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 						expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
-						assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text))+ll));
+						assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text),getNAR())+ll));
 					}else // just an integer
 						assignValue(&_valueReference->_value,_getIntegerValue(ll));
 					/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
-				assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text))));
+				assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text),getNAR())));
 				///////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_DQSTRING:
@@ -1221,7 +1317,7 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 				assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 			}
-			if(amVerbose())output("\nUnary operator applied!");
+			if(amVerbose())outputValue("\nResult after applying unary operators: '",_valueReference->_value,"'.");
 		}else
 			if(amVerbose())output("\nNo unary operators to apply!");
 		
@@ -1230,6 +1326,8 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 
 	}
 
+	if(amVerbose())outputValue("\nValue result: '",_valueReference->_value,"'.");
+	
 	return _valueReference;
 
 	/*
@@ -1272,7 +1370,38 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 
 // two-argument arithmetic
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+	if(_value1->type==VT_STRING){ // force string concatenation using the quote character in the Mvalue in the resulting text
+		mstring* _valueText=string_create();
+		mstring* p=_valueText;
+		p=string_append_char(p,_value1->value._string->presuffix);
+		p=string_append(p,_value1->value._string->_c);
+		mstring* _value2Text=_getValueText(_value2,true); // get the text representation of the second argument without quotes
+		if(_value2Text){p=string_append(p,string(_value2Text));free_mstring(_value2Text);}
+		Mvalue* _value=(p?_getStringValue(string(_valueText)):NULL);
+		free_mstring(_valueText);
+		return _value;
+	}
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_STRING)){
+		// if the second argument is text, convert it to a real or integer number
+		if(_value2->type==VT_STRING){
+			// are we going to convert it to an integer or a real????
+			// NOTE a real has a period in the text, so use that
+			char* valueText=_value2->value._string->_c;
+			if(strchr(valueText,'.')!=NULL){ // a period 
+				////////if(strlen(_valueText)==1)return _value1; // if a single period no need to actually add it unless someone want to change an integer in a real????
+				////// we can use _strtold!!! long double ld=0;if(strlen(valueText)>1){char *endPtr=NULL;ld=strtold(valueText,&endPtr);if(endPtr==valueText){output("\nERROR: Can't add '%s'.",valueText);return NULL;}} // failure
+				_value2=_getRealValue(_strtold(valueText,getNAR()));
+			}else{ // no period
+				_value2=_getIntegerValue(_strtoll(valueText,getNAI()));
+				/* replacing:
+				int l=strlen(valueText)-1; // the last character
+				if(l<0||(l==((valueText[0]=='-'||valueText[0]=='+'))&&valueText[l]=='0'))return _value1; // if adding zero just return _value1 (and therefore something of the same type)
+				long long ll=atoll(valueText);
+				if(!ll){output("\nERROR: Can't add '%s'!",valueText);return NULL;}; // if zero the text does not represent a valid integer!!!
+				_value2=_getIntegerValue(ll); //re-use the _value2 pointer so we can perform the requested addition
+				*/
+			}
+		}
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll);
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)+(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
 	}
@@ -1514,6 +1643,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		// evaluate the formula
 		if(formula){
 
+			if(amVerbose())outputValue("\nFirst formula value: '",formula->_operand->_value,"'.");
+
 			// skip all assignments
 			uint16_t numberOfAssignments=0;
 			Mformulaelement* _lastAssignmentFormulaelement=NULL;
@@ -1530,6 +1661,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			if(amVerbose())output("\nNumber of assignments: %u.",numberOfAssignments);
 
 			Mvalue* _result=getReferencedValue(_formulaelement->_operand); // the first result computed
+
+			if(amVerbose())outputValue("\nFirst result: '",_result,"'.");
 			// 'applying' the binary operators left-to-right remembering the intermediate result in _result
 			// NOTE because all formula-elements are freed afterwards (see below) there's no need to so while applying the binary operators
 			while(_formulaelement->_next){ // a binary operator to apply
@@ -1545,7 +1678,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				while(_formulaelement){
 					_valuereference=_formulaelement->_operand;
 					if(amVerbose()){
-						mstring* _indexidText=_getValueText(_valuereference->_itemid);
+						mstring* _indexidText=_getValueText(_valuereference->_itemid,false);
 						output("\nAssignment to %s%s using operator %s!",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
 						if(_indexidText)free_mstring(_indexidText);
 					}
