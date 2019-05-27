@@ -528,21 +528,25 @@ Mtoken* newToken(Mtoken* prevToken){
 			if(!prevToken->significantCharacterCount)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
 			// initialize the new token
 			pNewToken->prev=prevToken; // set the predecessor
+			// MDH@27MAY2019: let's by default copy prevToken-expr over
+
 			// MDH@18MAY2019: if a , starts an expression we won't be pointing to the opening parenthesis!!!
 			//                which would mean that on verification we'd have to jump back until we found a non-comma!!!
 			//                so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
 			//                BUT the first (dummy) expression token should be included though!!!
 			// TODO having to test an expression for starting with ( is a bit of a nuisance (so we won't accidently do that on the initial expression token and any comma token!!!)
-			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_char(prevToken->text,0)=='(')){
-				///////if(amVerbose())inputInfo("%s","Start of list, map or function call remembered!");
-				pNewToken->expr=prevToken;
-			}else
-			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
+			// MDH@27MAY2019: set expr NOTE the first token behind the (start of) expression token, should keep pointing to NULL
+			pNewToken->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token			
+			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP)
 				pNewToken->expr=prevToken->expr->expr;
-			}else{
-				///////if(amVerbose()){if(prevToken->expr)inputInfo("%s","Copying the start of the list, map or function!");else inputInfo("%s","No list, map or function start to remember!");}
-				pNewToken->expr=prevToken->expr;
+			else
+			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&prevToken!=pCommandToEvaluate))
+				pNewToken->expr=prevToken;
+			
+			if(amVerbose()){
+				if(pNewToken->expr)inputInfo("Matching: %s",string(pNewToken->expr->text));else inputInfo("%s","-");
 			}
+			
 			///////if(amVerbose()){if(pNewToken->expr)inputInfo("Pointing to %s of type %s.",string(pNewToken->expr->text),TOKENTYPE_STRING[pNewToken->expr->type]);else inputInfo("Nothing to point to.");}
 			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
@@ -1833,16 +1837,16 @@ void outputValueColored(Mvalue* _value){
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
 	
-	// 1. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
+	// 1. if no command nothing evaluated TODO don't call when this is the case though
+	if(!pCommandToEvaluate){outputError("Nothing to evaluate!");return false;}
+	
+	// 2. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
 	//    as a result pLastCommandToEvaluateToken and pCommandToEvaluate could now both be NULL, that's why we test this first
 	if(pLastCommandToEvaluateToken->type==TT_COMMENT)removeToken();
 
-	// 2. if no command nothing evaluated TODO don't call when this is the case though
-	if(!pCommandToEvaluate){outputError("Nothing to evaluate!");return false;}
-	
 	// 3. any command always has two significant tokens TODO could compare pCommandToEvaluate with pLastCommandToEvaluateToken which should be different!!!
 	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
-	if(pCommandToEvaluate==pLastCommandToEvaluateToken){outputError("Empty command.");clearCommand();return false;}
+	if(pCommandToEvaluate==pLastCommandToEvaluateToken->expr){outputError("Empty command.");clearCommand();return false;}
 
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
@@ -1859,14 +1863,19 @@ bool evaluateCommand(){
 	if(pLastCommandToEvaluateToken->expr!=pCommandToEvaluate){outputError("Not enough parentheses!");return false;}
 	*/
 	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
-	if(pLastCommandToEvaluateToken->expr&&pLastCommandToEvaluateToken->expr->expr){
-		switch(pLastCommandToEvaluateToken->expr->type){
-			case TT_LIST:outputError("Missing end of list.");break;
-			case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
-			case TT_MAP:outputError("Missing end of map!");break;
-			default:outputError("Not enough parentheses.");break;
+	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
+	//////////// already noticed while entering the expression!!!!: if(!pLastCommandToEvaluateToken->expr){outputError("Too many parentheses!");return false;}
+	if(pLastCommandToEvaluateToken->expr){
+		// this is allowed if this token ends something that points to NULL
+		if((pLastCommandToEvaluateToken->type!=TT_END_OF_LIST&&pLastCommandToEvaluateToken->type!=TT_END_OF_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_END_OF_MAP)||pLastCommandToEvaluateToken->expr->expr){
+			switch(pLastCommandToEvaluateToken->expr->expr->type){
+				case TT_LIST:outputError("Missing end of list.");break;
+				case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
+				case TT_MAP:outputError("Missing end of map!");break;
+				default:outputError("Not enough parentheses.");break;
+			}
+			return false;
 		}
-		return false;
 	}
 
 	// 4. can't end with function of function call
@@ -2069,6 +2078,8 @@ void newCommand(){
 	// MDH@24APR2019 obsolete: commandLength()=string_length(behindCursorText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
 	pLastCommandToEvaluateToken=pCommandToEvaluate=newToken(NULL);
+	// MDH@27MAY2019: NO let's just keep expr NULL!!!
+	pCommandToEvaluate->expr=NULL; // TODO do I need this???? YES, because we used newToken()! PERHAPS NOT as prevToken is NULL???????
 }
 
 // TODO copyCommand() should set ->expr correctly
@@ -2238,6 +2249,10 @@ void outputTokenInfo(){
 }
 
 bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
+bool isOneCharacterTokenType(uint8_t tokenType){
+	// TODO how about TT_EXPRESSION -> NO because a TT_EXPRESSION token is always considered ended, i.e. significantCharacterCount is not an issue in determining whether a new token starts there
+	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL);
+}
 
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
 //       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
@@ -2284,11 +2299,13 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType==pLastCommandToEvaluateToken->type){
+			/* MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
 			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->significantCharacterCount>0){
 				newTokenType=TT_ERROR;
 				if(amVerbose())inputError("Token already finished!");
 			}
+			*/
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
 			if(inputCharacterType=='='&&pLastCommandToEvaluateToken->type==TT_ASSIGNMENT&&(pLastCommandToEvaluateToken->prev->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->prev->type==TT_BINARY_Aeru)){
@@ -2300,6 +2317,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
 		//                this way it will always be there!!
 		if(newTokenType!=pLastCommandToEvaluateToken->type||pLastCommandToEvaluateToken->type==TT_EXPRESSION||pLastCommandToEvaluateToken->significantCharacterCount>0){
+
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
 			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
@@ -2341,8 +2359,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 #endif
 */
 			// ending a function call, list or map is only allowed with expr defined
-			if(newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_MAP){
-				if(pLastCommandToEvaluateToken->expr){
+			if(newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_LISTELEMENT||newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_MAP){
+				if(pLastCommandToEvaluateToken->expr){ // i.e. pointing to some token that should be of the right type!!!
 					// check whether the match is correct
 					switch(newTokenType){
 						case TT_END_OF_FUNCTION_CALL:
@@ -2352,6 +2370,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 								newTokenType=TT_ERROR;
 							}
 							break;
+						case TT_LISTELEMENT:
 						case TT_END_OF_LIST:
 							if(pLastCommandToEvaluateToken->expr->type!=TT_LIST&&pLastCommandToEvaluateToken->expr->type!=TT_LISTELEMENT){
 								inputError("End of list character does not match '%s' of type '%s'!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
@@ -2377,12 +2396,17 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 
 			pLastCommandToEvaluateToken->type=newTokenType;
 			
-			if(pLastCommandToEvaluateToken->type==TT_UNARY)pLastCommandToEvaluateToken->significantCharacterCount=1;
+			// MDH@27MAY2019: a lot of tokens are one-character tokens
+	
 			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
-			if(pLastCommandToEvaluateToken->significantCharacterCount==0)
+			if(pLastCommandToEvaluateToken->significantCharacterCount==0){
+				if(isOneCharacterTokenType(newTokenType))pLastCommandToEvaluateToken->significantCharacterCount=1;
+				/* replacing:
 				if(pLastCommandToEvaluateToken->type!=TT_ERROR&&pLastCommandToEvaluateToken->type!=TT_COMMENT&&pLastCommandToEvaluateToken->type!=TT_DQSTRING&&pLastCommandToEvaluateToken->type!=TT_SQSTRING)
 					if(inputCharacterType=='('||inputCharacterType=='['||inputCharacterType=='{'||inputCharacterType==','||inputCharacterType==';'||inputCharacterType==':'||inputCharacterType=='?')
 						pLastCommandToEvaluateToken->significantCharacterCount=1;
+				*/
+			}
 			// TODO should we write the associated colors here?????
 			outputTokenColor(pLastCommandToEvaluateToken);
 		}
@@ -2411,11 +2435,15 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 			if(pLastCommandToEvaluateToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
-			if(amMatchingparentheses()){
-				if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
-					if(inputCharacterType=='['){string_insert_char(behindCursorText,0,']');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
-					if(inputCharacterType=='{'){string_insert_char(behindCursorText,0,'}');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
-					if(inputCharacterType=='('){string_insert_char(behindCursorText,0,')');/* MDH@24APR2019 obsolete: commandLength()++;*/}
+			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
+				if(amMatchingparentheses()){
+					switch(inputCharacterType){
+						case '[':string_insert_char(behindCursorText,0,']');break;
+						case '{':string_insert_char(behindCursorText,0,'}');break;
+						case '(':string_insert_char(behindCursorText,0,')');break;
+						case '"':string_insert_char(behindCursorText,0,'"');break;
+						case '\'':string_insert_char(behindCursorText,0,'\'');break;
+					}
 				}
 			}
 		}
