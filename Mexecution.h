@@ -293,9 +293,9 @@ size_t getNumberOfRemovedValues();
 unsigned long long getNumberOfValues();
 
 // some helper functions (TODO or should we use this on Mreal values?????)
-bool isZero(long double ld);
-bool isNaN(long double ld);
-bool isInf(long double ld);
+bool ldIsZero(long double ld);
+bool ldIsNaN(long double ld);
+bool ldIsInf(long double ld);
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer);
@@ -318,10 +318,15 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
 bool mapAppendedToList(Mlist* const _list,Mmap* const _map);
 bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map);
 
+bool isZero(Mvalue* _value);
+bool isOne(Mvalue* _value);
+
 // unary functions
 Mvalue* Mneg(Mvalue* _value); // negate a value
 Mvalue* Mbnot(Mvalue* _value); // binary not a value
 Mvalue* Mnot(Mvalue* _value); // not a value
+
+Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);

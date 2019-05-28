@@ -148,6 +148,37 @@ Mvalue* i(Mvalue* _value){
 	if(amVerbose())outputValue("Converted to '",_integerValue,"'.");
 	return _integerValue;
 }
+Mvalue* r(Mvalue* _value){
+	if(amVerbose())outputValue("Converting '",_value,"' to a real.");
+	Mvalue* _realValue=NAR_value;
+	if(_value){
+		if(_value->type==VT_REAL)_realValue=_value;else
+		if(_value->type==VT_INTEGER)_realValue=_getRealValue((long double)_value->value._integer->ll);else // TODO casting to a long long is a bit crude!!
+		if(_value->type==VT_STRING)_realValue=_getRealValue(_strtold(_value->value._string->_c,getNAR()));
+	}
+	if(amVerbose())outputValue("Converted to '",_realValue,"'.");
+	return _realValue;
+}
+
+Mvalue* add(Mvalue* _value1,Mvalue* _value2);
+Mvalue* Msum(Mvalue* _value){
+    if(_value){
+				if(amVerbose())outputValue("\nComputing the sum of '",_value,"'.");
+        if(_value->type!=VT_LIST)return _value;
+				// all the values in the list could be integer
+				Mlist* _list=_value->value._list;
+				if(_list){
+					Mlistelement* _listelement=_list->_first;
+					if(_listelement){
+						// what if all the elements are integer????
+						Mvalue* _sumValue=_getRealValue(0);
+						while(_listelement){_sumValue=add(_sumValue,_listelement->_value);_listelement=_listelement->_next;}
+						return _sumValue;
+					}
+				}
+    }
+    return NULL;
+}
 
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
@@ -236,7 +267,7 @@ bool initEnvironment(){
 			}
 			*/
 			// conversions
-			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)){
+			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"r"),r)){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
 			}
@@ -250,6 +281,10 @@ bool initEnvironment(){
 			}
 			if(!completedValueFunction(newFunction(_Menvironment,"not"),Mnot)){
 				outputLine("ERROR: Failed to register the binary not function.");
+				return false;
+			}
+			if(!completedValueFunction(newFunction(_Menvironment,"sum"),Msum)){
+				outputLine("ERROR: Failed to register the sum function.");
 				return false;
 			}
 			// register list conversions
@@ -631,7 +666,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
      E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
-char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","-+!","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","!","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -689,7 +724,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (     ,         {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
 {""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
@@ -1288,6 +1323,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					long long ll=_strtoll(string(expressionToken->text),NAI_value->value._integer->ll);
 					if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 						expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
+						if(string_length(expressionToken->text)==1)string_append_char(expressionToken->text,'0'); // a single period is NOT considered equal to zero apparently!!!!
 						assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text),getNAR())+ll));
 					}else // just an integer
 						assignValue(&_valueReference->_value,_getIntegerValue(ll));
@@ -1453,7 +1489,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 // two-argument arithmetic
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	// if either is NULL return the other
-	if(!_value1)return _value2;if(!_value2)return _value1;
+	if(!_value1||isZero(_value1))return _value2;if(!_value2||isZero(_value2))return _value1;
 	// ASSERT neither are NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
@@ -1495,7 +1531,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
-	if(!_value1)return Mneg(_value2);if(!_value2)return _value1;
+	if(!_value1||isZero(_value1))return Mneg(_value2);if(!_value2||isZero(_value1))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
@@ -1505,6 +1541,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isZero(_value1)||isOne(_value2))return _value1;if(isZero(_value2)||isOne(_value1))return _value2;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
@@ -1514,6 +1551,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isZero(_value1))return _value1;if(isZero(_value2))return(_value2->type==VT_INTEGER?_getIntegerValue(1):_getRealValue(1)); // if the power is zero, we return 1 or 1.0
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(pow(_value1->value._integer->ll,_value2->value._integer->ll));
@@ -1523,6 +1561,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isZero(_value1)||isZero(_value2))return _value1; // NOTE if the power is zero, the multiplication factor will be 1
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*pow(10.,_value2->value._integer->ll));
@@ -1532,6 +1571,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isZero(_value1)||isOne(_value2))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
 	// always real divide
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
@@ -1543,6 +1583,7 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isZero(_value1)||isOne(_value2))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// if both integer, use lldiv to perform the integer division
@@ -1556,6 +1597,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isZero(_value1))return _value1;if(isOne(_value2))return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getRealValue(0));
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// if both integer, use lldiv to perform the integer division
@@ -1755,7 +1797,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(!string_copy(expressionToken->text,_formulaelement->_operator)){output("\nERROR: Failed to copy the operator!");break;}
 				string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
-				if(expressionToken->next->type>0&&expressionToken->next->type<=8){
+				while(expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
+					expressionToken=expressionToken->next;
+					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
+				}
+				if(expressionToken->next->type==TT_ASSIGNMENT){
 					expressionToken=expressionToken->next;
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}

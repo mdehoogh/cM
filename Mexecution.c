@@ -1189,9 +1189,9 @@ mstring* _getIntegerText(Minteger* _integer){
 // part of implementing _getRealText (so not present in the header)
 const char* M_NAN="NaN";
 const char* M_INF="Inf";
-bool isZero(long double ld){return fpclassify(ld)==FP_ZERO;}
-bool isNaN(long double ld){return fpclassify(ld)==FP_NAN;}
-bool isInf(long double ld){return fpclassify(ld)==FP_INFINITE;}
+bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}
+bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}
+bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}
 mstring* _getRealText(Mreal* _real){
 	mstring* s=string_create();
     mstring* p=s;
@@ -1509,6 +1509,20 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
         while(_mapelement&&appendedToMap(_result,_mapelement->_variable->_name,oneArgumentFunction(_mapelement->_variable->_value)))_mapelement=_mapelement->_next;
     }
     return _result;
+}
+bool isZero(Mvalue* _value){
+    if(_value){
+        if(_value->type==VT_INTEGER)return _value->value._integer->ll==0;
+        if(_value->type==VT_REAL)return ldIsZero(_value->value._real->ld);
+    }
+    return false;
+}
+bool isOne(Mvalue* _value){
+    if(_value){
+        if(_value->type==VT_INTEGER)return _value->value._integer->ll==1;
+        if(_value->type==VT_REAL)return _value->value._real->ld==1;
+    }
+    return false;
 }
 Mvalue* Mneg(Mvalue* _value){ // negate a value
     if(_value){
