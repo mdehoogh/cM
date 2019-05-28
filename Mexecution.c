@@ -261,6 +261,14 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype){
     if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}
     return _mapvalue;
 }
+
+// some other wrappers
+Mvalue* _getValueOfList(Mlist* _list){Mvalue* _value=_newValue();_value->type=VT_LIST;_value->value._list=_list;return _value;}
+Mvalue* _getValueOfInteger(Minteger* _integer){Mvalue* _value=_newValue();_value->type=VT_INTEGER;_value->value._integer=_integer;return _value;}
+Mvalue* _getValueOfReal(Mreal* _real){Mvalue* _value=_newValue();_value->type=VT_REAL;_value->value._real=_real;return _value;}
+Mvalue* _getValueOfMap(Mmap* _map){Mvalue* _value=_newValue();_value->type=VT_MAP;_value->value._map=_map;return _value;}
+Mvalue* _getValueOfToken(Mtoken* _token){Mvalue* _value=_newValue();_value->type=VT_TOKEN;_value->value._token=_token;return _value;}
+
 /*
 void free_list(Mlist* _list);
 void free_variable(Mvariable* _variable);
@@ -332,6 +340,24 @@ void free_environment(Menvironment* _environment){
     }
 }
 // END RELEASERS
+// keep track of the current execution environment
+static Menvironment* _executionEnvironment=NULL;
+bool pushExecutionEnvironment(Menvironment* _environment){
+    if(!_environment)return false;
+    if(_environment->_parent)return false; // shouldn't have a parent!!!
+    _environment->_parent=_executionEnvironment;
+    _executionEnvironment=_environment;
+    return true;
+}
+bool popExecutionEnvironment(){
+    Menvironment* _parentExecutionEnvironment=(_executionEnvironment?_executionEnvironment->_parent:NULL);
+    if(!_parentExecutionEnvironment)return false;
+    _executionEnvironment->_parent=NULL; // clear the parent of the current execution environment
+    free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
+    _executionEnvironment=_parentExecutionEnvironment;
+    return true;
+}
+
 /*
 // helper functions
 // helper functions to wrap literals for storage in M
@@ -667,6 +693,9 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index){
     }
     return NULL;
 }
+// END LIST STUFF
+
+// MAP STUFF
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
     if(_map&&attributeName&&strlen(attributeName)){
         Mmapelement* _mapelement=_map->_first;
@@ -679,6 +708,7 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
     }
     return NULL;
 }
+// END MAP STUFF
 /*
 Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue){
     if(_environment&&name){
@@ -828,6 +858,7 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
         if(!_function){ // doesn't exist yet
             _function=(Mfunction*)calloc(1,sizeof(Mfunction));
             if(_function){
+                _function->_definitionEnvironment=_environment; // TODO why would we need this?????
                 mstring* _functionName=string_append(string_create(),name);
                 if(_functionName){
                     // try to append it to the functionMap, if we succeed store _functioName in ->_name
@@ -983,7 +1014,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
 /**
  * Msettype() to set the (value) type of a variable
  */
-Mvalue* Msettype(Menvironment* _executionEnvironment,Mvalue* _variableName,Mvalue* _valuetype){
+Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
     // check the types first, both should be strings
     if(_variableName->type==VT_STRING&&_valuetype->type==VT_STRING){
         char* variableName=_variableName->value._string->_c; // ignoring the presuffix exactly as we need to!!!
@@ -1037,14 +1068,14 @@ Mvalue* Msettype(Menvironment* _executionEnvironment,Mvalue* _variableName,Mvalu
     return NULL;
 }
 // math functions: independent of the execution environment but still receive it...
-Mvalue* Msin(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* Msin(Mvalue* _value){
     if(_value){
         if(_value->type==VT_REAL)return _getRealValue(sin(_value->value._real->ld));
         if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
     }
     return NULL;
 }
-Mvalue* Mcos(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* Mcos(Mvalue* _value){
     if(_value){
         if(_value->type==VT_REAL)return _getRealValue(cos(_value->value._real->ld));
         if(_value->type==VT_INTEGER)return _getRealValue(cos(_value->value._integer->ll));
@@ -1457,6 +1488,54 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map){
     return result;
 }
 
+Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=calloc(1,sizeof(Mlist));_list->valuetype=valuetype;return _list;}
+Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=calloc(1,sizeof(Mmap));_map->valuetype=valuetype;return _map;}
+
+// applying unary operators by means of functions
+Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction){
+    Mlist* _result=NULL;
+    if(_list){
+        _result=_getListOfType(_list->valuetype);
+        Mlistelement* _listelement=_list->_first;
+        while(_listelement&&appendedToList(_result,oneArgumentFunction(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+    }
+    return _result;
+}
+Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
+    Mmap* _result=NULL;
+    if(_map){
+        _result=_getMapOfType(_map->valuetype);
+        Mmapelement* _mapelement=_map->_first;
+        while(_mapelement&&appendedToMap(_result,_mapelement->_variable->_name,oneArgumentFunction(_mapelement->_variable->_value)))_mapelement=_mapelement->_next;
+    }
+    return _result;
+}
+Mvalue* Mneg(Mvalue* _value){ // negate a value
+    if(_value){
+        if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
+        if(_value->type==VT_REAL)return _getRealValue(-_value->value._real->ld);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg));
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg));
+    }
+    return NULL;
+}
+Mvalue* Mnot(Mvalue* _value){ // not a value
+    if(_value){
+        if(_value->type==VT_INTEGER)return _getIntegerValue(!_value->value._integer->ll);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot));
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot));
+    }
+    return NULL;
+}
+// TODO can we not a string??????
+Mvalue* Mbnot(Mvalue* _value){ // not a value
+    if(_value){
+        if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot));
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot));
+    }
+    return NULL;
+}
 
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count

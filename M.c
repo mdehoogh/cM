@@ -67,7 +67,7 @@ const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits o
 // how about storing all results here?????? instead of in the root environment????
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
-Mvalue* getResult(Menvironment* _executionEnvironment,Mvalue* _indexValue){
+Mvalue* getResult(Mvalue* _indexValue){
 	if(amVerbose())output("\nResult requested!");
 	if(!_indexValue)return _resultListValue;
 	long long indexValueInteger=getValueInteger(_indexValue,0); // NOTE all index values should be positive!!!
@@ -78,7 +78,7 @@ Mvalue* getResult(Menvironment* _executionEnvironment,Mvalue* _indexValue){
 ////////Mvalue* ml(Menvironment* _executionEnvironment){return _getListValue(VT_LIST);} // a list that may only contain list elements is acceptable as map list!!
 
 // list to map
-Mvalue* l2m(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* l2m(Mvalue* _value){
 	Mvalue* _mapValue=NULL;
 	if(_value&&_value->type==VT_LIST){
 		_mapValue=_getMapValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
@@ -87,7 +87,7 @@ Mvalue* l2m(Menvironment* _executionEnvironment,Mvalue* _value){
 	return _mapValue;
 }
 // list to map list
-Mvalue* l2ml(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* l2ml(Mvalue* _value){
 	Mvalue* _maplistValue=NULL;
 	if(_value&&_value->type==VT_LIST){
 		_maplistValue=_getListValue(VT_LIST); // a map list ALWAYS requires element of type VT_LIST
@@ -96,7 +96,7 @@ Mvalue* l2ml(Menvironment* _executionEnvironment,Mvalue* _value){
 	return _maplistValue;
 }
 // map list to list conversion
-Mvalue* ml2l(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* ml2l(Mvalue* _value){
 	Mvalue* _maplistValue=NULL;
 	if(_value&&_value->type==VT_LIST){
 		_maplistValue=_getListValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
@@ -104,7 +104,7 @@ Mvalue* ml2l(Menvironment* _executionEnvironment,Mvalue* _value){
 	}
 	return _maplistValue;
 }
-Mvalue* ml2m(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* ml2m(Mvalue* _value){
 	Mvalue* _mapValue=NULL;
 	if(_value&&_value->type==VT_LIST){
 		_mapValue=_getMapValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
@@ -114,7 +114,7 @@ Mvalue* ml2m(Menvironment* _executionEnvironment,Mvalue* _value){
 }
 
 // map to map list conversion i.e. each list element is a attribute name - value pair
-Mvalue* m2ml(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* m2ml(Mvalue* _value){
 	Mvalue* _maplistValue=NULL;
 	if(_value&&_value->type==VT_MAP){
 		_maplistValue=_getListValue(VT_LIST); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
@@ -122,7 +122,7 @@ Mvalue* m2ml(Menvironment* _executionEnvironment,Mvalue* _value){
 	}
 	return _maplistValue;
 }
-Mvalue* m2l(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* m2l(Mvalue* _value){
 	Mvalue* _listValue=NULL;
 	if(_value&&_value->type==VT_MAP){
 		_listValue=_getListValue(_value->type);
@@ -137,7 +137,7 @@ Mvalue* NAI_value=NULL;
 long double getNAR(){return NAR_value->value._real->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
 
-Mvalue* i(Menvironment* _executionEnvironment,Mvalue* _value){
+Mvalue* i(Mvalue* _value){
 	if(amVerbose())outputValue("Converting '",_value,"' to an integer.");
 	Mvalue* _integerValue=NAI_value;
 	if(_value){
@@ -150,7 +150,7 @@ Mvalue* i(Menvironment* _executionEnvironment,Mvalue* _value){
 }
 
 Menvironment* _Menvironment; // this is the root (M) environment
-Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
+///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
 bool initEnvironment(){
 	NAR_value=_getRealValue(strtold("nan",NULL)); // we'll be using the default NaN to represent Not A Real
@@ -240,6 +240,18 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
 			}
+			if(!completedValueFunction(newFunction(_Menvironment,"neg"),Mneg)){
+				outputLine("ERROR: Failed to register the negate function.");
+				return false;
+			}
+			if(!completedValueFunction(newFunction(_Menvironment,"bnot"),Mbnot)){
+				outputLine("ERROR: Failed to register the binary not function.");
+				return false;
+			}
+			if(!completedValueFunction(newFunction(_Menvironment,"not"),Mnot)){
+				outputLine("ERROR: Failed to register the binary not function.");
+				return false;
+			}
 			// register list conversions
 			if(!completedListFunction(newFunction(_Menvironment,"l2m"),l2m)||!completedListFunction(newFunction(_Menvironment,"l2ml"),l2ml)||!completedListFunction(newFunction(_Menvironment,"ml2l"),ml2l)||!completedListFunction(newFunction(_Menvironment,"ml2m"),ml2m)){
 				outputLine("ERROR: Failed to register list conversion functions.");
@@ -252,6 +264,10 @@ bool initEnvironment(){
 			}
 
 		}
+	}
+	if(!pushExecutionEnvironment(_Menvironment)){
+		outputLine("ERROR: Failed to register the M environment as execution environment!");
+		return false;
 	}
 	return true;
 }
@@ -599,7 +615,7 @@ bool registerCommand(){
 //                in certain languages it means evaluate this (or the result of a system command??????)
 //                furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}%b";
+const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
@@ -660,34 +676,34 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 // MDH@15APR2019: still to determine what to do with @ and ` (the latter for system commands????)
 //                inserting macro's should also be possible somehow...
 /*
- "EXPR","UNA","A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
+ "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
-{"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
-{""    ,""   ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"("   ,"!-+","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
-{"("   ,"!-+","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,  ?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
-{"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
-{"("   ,"!-+","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
-{""    ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""    ,""   ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (     ,         {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
-{";"   ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
-{";"   ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
-{""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
-{""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{";"   ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{";"   ,""   ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{";"   ,""   ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
-{";"   ,""   ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
-{""    ,""   ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
-{"("   ,"!-+","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *   .>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{";"   ,""   ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
+{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
+{""    ,""    ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
+{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,  ?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
+{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (     ,         {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*   .>?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
+{";"   ,""    ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";"   ,""    ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
+{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
+{";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *   .>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -982,15 +998,15 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
 			}
 		case FT_INTERNAL_NO_ARGUMENTS:
 			if(amVerbose())output("\nCalling no-argument function %s.",string(_function->_name));
-			return (*_function->functionunion.noArgumentFunction)(_Menvironment);
+			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
 			if(amVerbose())output("\nCalling one-argument function %s.",string(_function->_name));
-			return (*_function->functionunion.oneArgumentFunction)(_Menvironment,_argumentMap->_first->_variable->_value);
+			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:{
 			if(amVerbose())output("\nCalling two-argument function %s.",string(_function->_name));
 			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 			Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
-			return (*_function->functionunion.twoArgumentFunction)(_Menvironment,(_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
+			return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																														,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL));
 		}
 	}
@@ -1157,10 +1173,12 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 		output("\nApplying unary operator '%c'",operator);
 		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.",_value->type);}
 	}
+	// delegating to the one argument functions that we have is best!!!
 	switch(operator){
-		case '~':if(_value->type==VT_INTEGER)return _getIntegerValue(~(_value->value._integer->ll));break;
-		case '!':if(_value->type==VT_INTEGER)return _getIntegerValue((_value->value._integer->ll?0:1));break;
-		case '-':if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);if(_value->type==VT_REAL)return _getRealValue(-_value->value._real->ld);break;
+		case '~':return Mbnot(_value);
+		case '!':return Mnot(_value);
+		case '-':return Mneg(_value);
+		case '+':return _value;
 	}
 	return NULL;
 }
@@ -1170,9 +1188,9 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
  * a value reference syntax: optionally a number of unary operators, optionally followed by function call with arguments, and variable or value literal
  * we need to store the value in a value reference just in case the value is the destination of an assignment, so yes, reference is an apt name
 */
-Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTypeCount){
+Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
 
-	if(amVerbose())output("\nThe first value token: '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(amVerbose())output("\ngetValueReference() extracting a(n) %s value that starts with token '%s' of type '%s'.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
 	Mvaluereference* _valueReference=NULL;
 
@@ -1186,10 +1204,11 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 		}
 		expressionToken=expressionToken->next;
 	}
+	if(amVerbose()){if(unaryOperators)output("\nUnary operators: '%s'.",string(unaryOperators));else output("\nNo unary operators!");}
 	// ASSERT unary operators extracted
 
 	if(expressionToken){
-		if(amVerbose())output("\ngetValueOfReference() interpreting first value token '%s' of type %s.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerbose())output("\ngetValueReference() interpreting first value token '%s' of type %s.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		_valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
@@ -1372,8 +1391,72 @@ Mvaluereference* getValueReference(TokenType endTokenTypes[],uint8_t endTokenTyp
 	*/
 }
 
+// BINARY OPERATOR + functions
+
+Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator){
+	if(!_list1)return _list2;if(!_list2)return _list1;
+	// ASSERT neither are NULL
+	Mlist* _result=_getListOfType(_list1->valuetype==_list2->valuetype?_list1->valuetype:VT_UNDEFINED); // TODO if the types are the same use that?
+	// elements with the same index are to be added and stored under that index
+	Mlistelement* _listelement1=_list1->_first;
+	Mlistelement* _listelement2=_list2->_first;
+	bool consumed1,consumed2;
+	while(_listelement1||_listelement2){
+		consumed1=false;
+		consumed2=false;
+		if(_listelement1&&_listelement2){
+			if(_listelement1->index==_listelement2->index){
+				if(appendedToList(_result,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index))consumed1=consumed2=true;
+			}else
+			if(_listelement1->index<_listelement2->index){
+				if(appendedToList(_result,_listelement1->_value,_listelement1->index))consumed1=true;
+			}else{
+				if(appendedToList(_result,_listelement2->_value,_listelement2->index))consumed2=true;
+			}
+		}else
+		if(_listelement1){
+			if(appendedToList(_result,_listelement1->_value,_listelement1->index))consumed1=true;
+		}else
+			if(appendedToList(_result,_listelement2->_value,_listelement2->index))consumed2=true;
+		// done?????
+		if(!consumed1&&!consumed2)break; // if neither consumed done
+		if(consumed1)_listelement1=_listelement1->_next;
+		if(consumed2)_listelement2=_listelement2->_next;
+	}
+	return _result;
+}
+// we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
+Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator){
+	// scalars are to be added to each element of the original list
+	// lists are to be added to the elements at the same position, so listwise
+	Mlist* _result=NULL;
+	if(_value->type!=VT_LIST){
+		_result=_getListOfType(_list->valuetype);
+		Mlistelement* _listelement=_list->_first;
+		while(_listelement&&appendedToList(_result,binaryoperator(_listelement->_value,_value),_listelement->index))_listelement=_listelement->_next;
+	}else
+		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
+	return _getValueOfList(_result);
+}
+Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator){
+	// scalars are to be added to each element of the original list
+	// lists are to be added to the elements at the same position, so listwise
+	Mlist* _result=NULL;
+	if(_value->type!=VT_LIST){
+		_result=_getListOfType(_list->valuetype);
+		Mlistelement* _listelement=_list->_first;
+		while(_listelement&&appendedToList(_result,binaryoperator(_value,_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+	}else
+		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
+	return _getValueOfList(_result);
+}
 // two-argument arithmetic
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
+	// if either is NULL return the other
+	if(!_value1)return _value2;if(!_value2)return _value1;
+	// ASSERT neither are NULL
+	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
 	if(_value1->type==VT_STRING){ // force string concatenation using the quote character in the Mvalue in the resulting text
 		mstring* _valueText=string_create();
 		mstring* p=_valueText;
@@ -1412,6 +1495,8 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1)return Mneg(_value2);if(!_value2)return _value1;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
@@ -1419,6 +1504,8 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)*(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
@@ -1426,6 +1513,8 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(pow(_value1->value._integer->ll,_value2->value._integer->ll));
 		return _getRealValue(pow(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld,_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
@@ -1433,6 +1522,8 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*pow(10.,_value2->value._integer->ll));
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld))));
@@ -1440,6 +1531,8 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
 	// always real divide
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
@@ -1449,6 +1542,8 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// if both integer, use lldiv to perform the integer division
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot);
@@ -1460,6 +1555,8 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// if both integer, use lldiv to perform the integer division
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).rem);
@@ -1472,60 +1569,86 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 }
 // integer arithmetic 
 Mvalue* xor(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,xor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,xor);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
 	return NULL;
 }
 Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseand);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseand);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
 	return NULL;
 }
 Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicaland);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
 	return NULL;
 }
 Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseor);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
 	return NULL;
 }
 Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicalor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicalor);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll||_value2->value._integer->ll);
 	return NULL;
 }
 Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll<<_value2->value._integer->ll);
 	return NULL;
 }
 Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll>>_value2->value._integer->ll);
 	return NULL;
 }
 // comparison operators
 Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthan);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	return NULL;
 }
 Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthanorequalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	return NULL;
 }
 Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthan);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	return NULL;
 }
 Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthanorequalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	return NULL;
 }
 Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,unequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,unequalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	return NULL;
 }
 Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	return NULL;
@@ -1604,13 +1727,16 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 		while(expressionToken){
 
-			if(amVerbose())output("\nProcessing %s expression token '%s' of type %s.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			if(amVerbose())output("\ngetValueOfExpression() processing %s expression token '%s' of type %s.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			// does this token end the expression????
 			endTokenTypeIndex=endTokenTypeCount;
-			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]&&expressionToken->type>=8)endTokenTypeIndex--;
-			if(endTokenTypeIndex){if(amVerbose())output("\nEnd of %s expression.",info);break;}
+			// OOPS operators shouldn't break here (and end the expression)
+			while(endTokenTypeIndex>0&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1])endTokenTypeIndex--; // replacing: &&expressionToken->type>=8)endTokenTypeIndex--;
+			if(endTokenTypeIndex>0){if(amVerbose())output("\nEnd of %s expression.",info);break;}
 			
-			_formulaelement->_operand=getValueReference(endTokenTypes,endTokenTypeCount);
+			_formulaelement->_operand=getValueReference("operand",endTokenTypes,endTokenTypeCount);
+
+			if(amVerbose())outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.");
 
 			// the next token(s) should be a binary operator
 			// NOTE some binary operators are stored in a couple of tokens!!!
@@ -2167,7 +2293,7 @@ void setCommand(Mtoken* pNewCommand){
 
 // MDH@30APR2019: if the current token is a variable/function check whether it still is
 //                call whenever the current token changes (in removePreviousTokenCharacter() and commandCharacterAccepted())
-bool tokenCheckedForBeingAFunction(){
+bool tokenCheckedForBeingAFunction(bool endOfInput){
 	bool result=false;
 	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){
 		result=true;
@@ -2179,7 +2305,7 @@ bool tokenCheckedForBeingAFunction(){
 			pLastCommandToEvaluateToken->type=TT_FUNCTION;
 			reoutputToken(pLastCommandToEvaluateToken);
 			// insert an opening parenthesis for the function call
-			if(amMatchingparentheses())if(string_char(behindCursorText,0)!='(')string_insert_char(behindCursorText,0,'(');
+			if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='(')string_insert_char(behindCursorText,0,'(');
 		}
 	}else
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
@@ -2191,7 +2317,7 @@ bool tokenCheckedForBeingAFunction(){
 			reoutputToken(pLastCommandToEvaluateToken);
 			//////////outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
-			if(amMatchingparentheses())if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
+			if(endOfInput)if(amMatchingparentheses())if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
 		}
 	}
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
@@ -2201,14 +2327,14 @@ bool tokenCheckedForBeingAFunction(){
 			if(!containsVariable(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
-				if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
+				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else
 		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
 			if(containsVariable(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
-				if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			}
 		}
 	}
@@ -2226,7 +2352,7 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 		if(cursorPosition()){ // still something left of the command (that we might check for being a function or not)
 			// on screen as well please
 			// before writing the behind cursor text we're going to check whether the current token still is a function or variable
-			tokenCheckedForBeingAFunction();
+			tokenCheckedForBeingAFunction(true);
 			// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
 			writeBehindCursorText(false);
 			// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
@@ -2428,23 +2554,27 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	}
 
 	// MDH@24APR2019 obsolete: cursorPosition()++; // increment the current cursor position
+	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput); // MDH@28MAY2019: ALWAYS check for being a function!!!!
 
 	if(endOfInput){
 		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
-		if(!tokenCheckedForBeingAFunction()){
+		if(notCheckedForBeingAFunction){
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
-			if(pLastCommandToEvaluateToken->type==TT_BINARY_aErU){string_insert_char(behindCursorText,0,'=');/* MDH@24APR2019 obsolete: commandLength()++;*/}else
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
-				if(amMatchingparentheses()){
-					switch(inputCharacterType){
-						case '[':string_insert_char(behindCursorText,0,']');break;
-						case '{':string_insert_char(behindCursorText,0,'}');break;
-						case '(':string_insert_char(behindCursorText,0,')');break;
-						case '"':string_insert_char(behindCursorText,0,'"');break;
-						case '\'':string_insert_char(behindCursorText,0,'\'');break;
+				if(pLastCommandToEvaluateToken->type!=TT_BINARY_aErU){
+					if(amMatchingparentheses()){
+						if(!string_length(behindCursorText)) // MDH@28MAY2019: if there's nothing behind the cursor yes we do append closing stuff
+						switch(inputCharacterType){
+							case '[':string_insert_char(behindCursorText,0,']');break;
+							case '{':string_insert_char(behindCursorText,0,'}');break;
+							case '(':string_insert_char(behindCursorText,0,')');break;
+							case '"':string_insert_char(behindCursorText,0,'"');break;
+							case '\'':string_insert_char(behindCursorText,0,'\'');break;
+						}
 					}
-				}
+				}else
+					string_insert_char(behindCursorText,0,'=');
 			}
 		}
 		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)

@@ -118,10 +118,11 @@ typedef struct Mexpressionlist{
 
 // functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
 // all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
-struct Menvironment;
-typedef Mvalue* (*NoArgumentFunction)(struct Menvironment* _executionEnvironment);
-typedef Mvalue* (*OneArgumentFunction)(struct Menvironment* _executionEnvironment,Mvalue* _argumentValue);
-typedef Mvalue* (*TwoArgumentFunction)(struct Menvironment* _executionEnvironment,Mvalue* _argument1Value,Mvalue* _argument2Value);
+// MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
+/////////////struct Menvironment;
+typedef Mvalue* (*NoArgumentFunction)();
+typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
+typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
 
 typedef enum Mfunctiontype{FT_M,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
 
@@ -137,9 +138,11 @@ typedef union Mfunctionunion{
     Mfunctiondefinition* _functiondefinition; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
 }Mfunctionunion;
 
+struct Menvironment;
 typedef struct Mfunction{
     mstring* _name;
     Mmap* _parameterMap; // a map of values defines the parameters and their default values (implicitly defining the expected types)
+    struct Menvironment* _definitionEnvironment;
     Mfunctiontype type; // whether internal or external
     Mfunctionunion functionunion; // where either the internal function to call with the arguments is placed or 
 }Mfunction;
@@ -165,6 +168,11 @@ typedef struct Menvironment{
     Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
     struct Menvironment* _parent;
 }Menvironment;
+
+bool pushExecutionEnvironment(Menvironment* _environment);
+bool popExecutionEnvironment();
+
+////////Menvironment* getExecutionEnvironment();
 
 // MDH@20MAY2019: we need free_map to free the function argument maps!!
 void free_map(Mmap* _map);
@@ -226,6 +234,14 @@ Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
 
+Mvalue* _getValueOfList(Mlist* _list);
+Mvalue* _getValueOfInteger(Minteger* _integer);
+Mvalue* _getValueOfReal(Mreal* _real);
+Mvalue* _getValueOfMap(Mmap* _map);
+Mvalue* _getValueOfToken(Mtoken* _token);
+
+Mlist* _getListOfType(Mvaluetype valuetype);
+
 // MDH@02MAY2019: not allowed to call free_value from the outside
 bool decrementReferenceCount(Mvalue* _value);
 bool incrementReferenceCount(Mvalue* _value);
@@ -239,6 +255,7 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index); // helper function that c
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 
 long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);
+
 /*
 Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue);
 */
@@ -301,5 +318,11 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
 bool mapAppendedToList(Mlist* const _list,Mmap* const _map);
 bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map);
 
+// unary functions
+Mvalue* Mneg(Mvalue* _value); // negate a value
+Mvalue* Mbnot(Mvalue* _value); // binary not a value
+Mvalue* Mnot(Mvalue* _value); // not a value
+
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);
+
