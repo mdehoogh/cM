@@ -27,6 +27,7 @@
 
 // Token and Mexpression is provided in Mexpression.h
 #include "Mexpression.h"
+#include "zahl.h"
 
 bool initExecution();
 
@@ -236,7 +237,7 @@ bool createVariable(Menvironment* _environment,const char* name,Mvaluetype value
 // NOTE this doesn't mean that 
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
-Mvalue* _getBigIntegerValue(long long ll);
+Mvalue* _getBigIntegerValue(z_t zt);
 Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype

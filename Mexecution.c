@@ -1,13 +1,11 @@
-#include "Mexecution.h"
-
 #include <limits.h>
 #include <math.h>
 #include "Msettings.h"
 #include "Moutput.h"
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
 #include "Msession.h"
-// MDH@29MAY2019: for big integer arithmetic
 #include "zahl.h"
+#include "Mexecution.h"
 
 const char* MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
 const char* IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
@@ -72,6 +70,14 @@ void free_integer(Minteger* _integer){
     }else
         output("\nBUG: No integer to free!");
 }
+void free_biginteger(Mbiginteger* _biginteger){
+    if(_biginteger){
+        if(amVerbose())output("\nFreeing big integer."); // TODO can we display the value?
+        zfree(_biginteger->bi); // TODO guess we need to do this!!!!
+        free(_biginteger);
+    }else
+        output("\nBUG: No big integer to free!");
+}
 void free_real(Mreal* _real){
     if(_real){
         if(amVerbose())output("\nFreeing real %.*Lf.",23,_real->ld);
@@ -87,6 +93,7 @@ void free_value(Mvalue* _value){
             case VT_UNDEFINED:break;
             case VT_TOKEN:if(_value->value._token)free_token(_value->value._token);break;
             case VT_INTEGER:if(_value->value._integer)free_integer(_value->value._integer);break;
+            case VT_BIGINTEGER:if(_value->value._biginteger)free_biginteger(_value->value._biginteger);break;
             case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
             case VT_STRING:free_string(_value->value._string);break;
             case VT_LIST:free_list(_value->value._list);break;
@@ -214,11 +221,14 @@ Minteger* new_integer(long long ll){
     if(_integer)_integer->ll=ll;
     return _integer;
 }
-Mbiginteger* new_biginteger(long long ll){
+Mbiginteger* new_biginteger(z_t zt){
     Mbiginteger* _biginteger=malloc(sizeof(Mbiginteger));
     if(_biginteger){
+        zset(_biginteger->bi,zt);
+        /*
         zinit(_biginteger->bi);
         zseti(_biginteger->bi,ll); // TODO check if long long actually matches int64_t (as I expect it will on this machine!!)
+        */
     }
     return _biginteger;
 }
@@ -246,8 +256,8 @@ Mvalue* _getIntegerValue(long long ll){
     if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
     return _integervalue;
 }
-Mvalue* _getBigIntegerValue(long long ll){
-    Mbiginteger* _biginteger=new_biginteger(ll);
+Mvalue* _getBigIntegerValue(z_t zt){
+    Mbiginteger* _biginteger=new_biginteger(zt);
     Mvalue* _bigintegervalue=(_biginteger?_newValue():NULL);
     if(_bigintegervalue){_bigintegervalue->type=VT_BIGINTEGER;_bigintegervalue->value._biginteger=_biginteger;}
     return _bigintegervalue;
@@ -1615,22 +1625,20 @@ Mvalue* Mlen(Mvalue* _value){
 
 // MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
 long long bi2b(z_t bi){
-
+    return 0;
 }
 Mvalue* Mfac(Mvalue* _value){
     if(!_value)return NULL;
     if(_value->type!=VT_INTEGER||_value->type!=VT_BIGINTEGER)return NULL;
-    z_t* result=NULL;
+    z_t result;
+    zinit(result);
     if(_value->type==VT_INTEGER){
         if(_value->value._integer->ll==LLONG_MIN)return NULL; // TODO abstract checking for nai
-        result=new_biginteger(_value->value._integer->ll);
+        zseti(result,_value->value._integer->ll);
     }else
-        result=_value->value._biginteger->bi;
-    if(result){
-        while(!zcmpi(*result,2))zmul(result,result-1,result);
-
-    }
-    return NULL;
+        zset(result,_value->value._biginteger->bi);
+    // TODO perform the computation
+    return _getBigIntegerValue(result);
     /* replacing:
     // 39 is about the maximum that we can store in a long long
     if(n<40){
@@ -1646,7 +1654,10 @@ Mvalue* Mfac(Mvalue* _value){
 // big integer arithmetic
 Mvalue* Mbi(Mvalue* _value){
     if(_value&&_value->type==VT_INTEGER){
-        Mvalue* _biValue=getBigIntegerValue(_value->value._integer->ll);
+        z_t bi;
+        zinit(bi); // TODO do I need this??????
+        zseti(bi,_value->value._integer->ll);
+        Mvalue* _biValue=_getBigIntegerValue(bi);
     }
     return NULL;
 }

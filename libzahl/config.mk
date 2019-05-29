@@ -8,7 +8,7 @@ MANPREFIX = $(PREFIX)/share/man
 DOCPREFIX = $(PREFIX)/share/doc
 
 # MDH@29MAY2019: force using gcc instead (on my iMac)
-CC = gcc
+CC = cc
 AR = ar
 RANLIB = ranlib
 
