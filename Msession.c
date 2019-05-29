@@ -82,7 +82,7 @@ void initDisplay(){
 	outputControlText("?3l"); // switch to 132 column mode (if possible)
 	outputControlText("0m");
 	setColorscheme(getColorscheme()); // activate the current color scheme
-	setWrapping(amWrapping()); // activate the current wrap mode!!!
+	///////setWrapping(amWrapping()); // activate the current wrap mode!!!
 }
 
 void initSession(){ 

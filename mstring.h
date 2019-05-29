@@ -16,6 +16,8 @@ typedef struct{
 
 mstring* string_create();
 
+mstring* new_mstring(char* s); // convenient constructor
+
 void free_mstring(mstring* str); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
 
 bool string_empty(mstring* str);

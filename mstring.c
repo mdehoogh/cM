@@ -18,6 +18,19 @@ mstring* string_create(){
     return ans;
 }
 
+mstring* new_mstring(char* s){
+    mstring* ans=(s?calloc(1,sizeof *ans):NULL);
+    if(ans!=NULL){
+        // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
+        size_t l=strlen(s);    
+        ans->length=l;    
+        ans->blocks=1+(ans->length/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
+        ans->chars=malloc(BLOCK_SIZE*ans->blocks);
+        while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
+    }
+    return ans;
+}
+
 bool string_copy(mstring* src,mstring* dst){
     if(src!=NULL&&dst!=NULL){
         if(src->length){ // there needs to be something to copy (NOTE we're not allocating down ever!!!!)

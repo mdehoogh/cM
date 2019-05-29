@@ -543,7 +543,7 @@ bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetyp
 
 bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
-    if(!_environment||!name||!_value){output("\nERROR: Cannot set the value: no environment, name or value.");return false;}
+    if(!_environment||!name){output("\nERROR: Cannot set the value: no environment or name.");return false;}
     Mvariable* _variable=getVariable(_environment,name,false);
     if(_variable){
         if(!_variable->_value||!_variable->immutable){
@@ -551,14 +551,15 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
             if(!_value||_variable->valuetype==VT_UNDEFINED||_variable->valuetype==_value->type){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&_variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
+                if(amDebugging()){mstring* _valueText=_getValueText(_value,false);output("\nValue `%s` assigned to variable `%s`.",string(_valueText),name);free_mstring(_valueText);}
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }
-            output("\nERROR: Cannot set the value of variable '%s': the new value is of the wrong type.",name);
+            output("\nERROR: Cannot set the value of variable `%s`: the new value is of the wrong type.",name);
         }else
-            output("\nERROR: Cannot set the value of variable '%s': it is not mutable!",name);
+            output("\nERROR: Cannot set the value of variable `%s`: it is not mutable!",name);
     }else
-        output("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
+        output("\nERROR: Cannot set the value of variable `%s`:it is unknown.",name);
     return false;
 }
 
@@ -614,48 +615,41 @@ void checkList(Mlist* _list){
 }
 // instead of returning a boolean we could return the assigned index (0 on failure)
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index){
-    if(!_list||!_value||index<0){output("\nERROR: %s.","No list to append to or no value to append or negative index");return 0;}
-    Mlistelement* _listelement=NULL;
+    if(!_list||!_value){output("\nERROR: %s.","No list to append to or no value to append");return 0;}
     // check validity of index first
-    long long lastindex=(_list->_last?_list->_last->index:0);
+    long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
+    if(index<=0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
+    if(index<=0){output("\nERROR: Index %lld of (new) list element too small.",index);return 0;}
     // MDH@23MAY2019: let's allow inserting or replacing as well
-    if(index>0&&index<=lastindex){ // not appending, and index does not exceed the last index i.e. insert or replace
-        // NOTE this is only possible if the list has at least one element!!!
-        // find out where to insert/replace
-        // ASSERT we will always find a list element with index equal to or larger than index
-        Mlistelement* _prevlistelement=NULL;
-        _listelement=_list->_first;
-        while(index>_listelement->index){_prevlistelement=_listelement;_listelement=_listelement->_next;}
-        if(_listelement->index!=index){ // not present in list yet
-            _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));  // OOPS sizeof(Mlistelement) NOT sizeof(Mlistelement*) BAD BAD BOY!!!
-            if(!_listelement){output("\nERROR: Failed to create a list element to insert.");return 0;}
-            assignValue(&_listelement->_value,_value);
-            _listelement->index=index;
-            if(_prevlistelement){ // not in front of the first element (so first won't change)
-                _listelement->_next=_prevlistelement->_next; // successor of new list element is current successor of _prevlistelement
-                _prevlistelement->_next=_listelement; // successor of predecessor becomes _listelement
-            }else{ // in front of the first element (so first will change)
-                _listelement->_next=_list->_first; // _listelement successor will be the current _first
-                _list->_first=_listelement; // replace _first by _listelement
-            }
-            // one more element in list
-            (_list->numberOfElements)++;
-        }else // a replacement, so the only thing we need to do is replace the current value!!!
-            assignValue(&_listelement->_value,_value);
-    }else{ // append
-        if(index<=0)index=lastindex+1;
-        _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));  // OOPS sizeof(Mlistelement) NOT sizeof(Mlistelement*) BAD BAD BOY!!!
-        if(!_listelement){output("\nERROR: Failed to create a list element to append.");return 0;}
-        assignValue(&_listelement->_value,_value);
+    // determine _listelement as element to host the value, store the successor in _nextlistelement
+    Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index<=lastindex?_list->_first:NULL);
+    if(_listelement){ // we are not appending and we have a first element, so this might be an insert or replace
+        // NOTE testing _listelement is just a fail-safe as that should never happen
+        while(index>_listelement->index){
+            _prevListelement=_listelement;
+            if(!_listelement->_next){outputValue("\nBUG: Index of list element '",_listelement->_value,"' probably out of order.");return 0;}
+            _listelement=_listelement->_next;
+        }
+        // if we're going to insert we there will be a successor
+        if(_listelement->index!=index){_nextListelement=_prevListelement->_next;_listelement=NULL;} // so that we are forced to create one
+    }else // we'll be appending, so the current last is the predecessor (and no successor)
+        _prevListelement=_list->_last;
+    // if we do not have a list element ascertain to have one
+    if(!_listelement){ // not yet present in list, so we have to create a new element
+        _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));
+        if(!_listelement){output("\nERROR: Failed to create a list element to insert/append.");return 0;} // failure
+    }
+    assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
+    // if replacing i.e. the index of _listelement matches index, we're done
+    if(_listelement->index!=index){ // insert or append
         _listelement->index=index;
-        _listelement->_next=NULL; // should NOT be needed!!
-        if(_list->_last)_list->_last->_next=_listelement;else _list->_first=_listelement;
-        _list->_last=_listelement;
-        /////////////////incrementReferenceCount(_listelement->_value); // increment the reference count of the stored value once the list element is completely attached to the list
-        (_list->numberOfElements)++;
+        (_list->numberOfElements)++; // an additional element
+        // linking
+        if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
+        if(!_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
     }
     if(amVerbose())checkList(_list);
-    return (_listelement?_listelement->index:0);
+    return _listelement->index;
 }
 long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
     if(!_environment||!name||!_value){output("\nERROR: %s","No environment, variable name of value specified!");return 0;}
@@ -666,7 +660,7 @@ long long appendToListVariable(Menvironment* _environment,const char* name,Mvalu
             // we should prevent circular references
             if(_variableValue==_value)_value=NULL;
             Mlist* _list=_variableValue->value._list;
-            long long index=appendedToList(_list,_value,0); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
+            unsigned long long index=appendedToList(_list,_value,0); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
             if(index)return index;
             output("\nERROR: Didn't append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.",name,_value->type);
         }else
@@ -677,16 +671,20 @@ long long appendToListVariable(Menvironment* _environment,const char* name,Mvalu
 }
 
 Mvalue* getValueAtIndex(Mlist* _list,long long index){
-    if(_list&&index>0){
+    // NOTE if index is equal to zero definitely no value there!!!
+    if(_list&&index){
         if(_list->_last){
             long long maxindex=_list->_last->index;
-            if(index==maxindex)return _list->_last->_value;
-            if(index<maxindex){
-                Mlistelement* _listelement=_list->_first;
-                while(_listelement){
-                    if(_listelement->index==index)return _listelement->_value;
-                    if(_listelement->index>index)break; // couldn't find it!!!
-                    _listelement=_listelement->_next;
+            if(index<0)index+=(maxindex+1);
+            if(index>0){
+                if(index==maxindex)return _list->_last->_value;
+                if(index<maxindex){
+                    Mlistelement* _listelement=_list->_first;
+                    while(_listelement){
+                        if(_listelement->index==index)return _listelement->_value;
+                        if(_listelement->index>index)break; // couldn't find it!!!
+                        _listelement=_listelement->_next;
+                    }
                 }
             }
         }
@@ -1314,6 +1312,7 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
 			case VT_LIST:valueText=_getListText(_value->value._list);break;
+            case VT_TOKEN:valueText=string_create();string_copy(_value->value._token->text,valueText);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
 			default:break;
 		}
 	}
@@ -1328,7 +1327,12 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     */
 }
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
-    if(prefix)output("%s",prefix);if(_value){mstring* _valueText=_getValueText(_value,false);output("%s",string(_valueText));free_mstring(_valueText);}if(postfix)output("%s",postfix);
+    if(prefix)output("%s",prefix);
+    if(_value){
+        mstring* _valueText=_getValueText(_value,false);
+        output("%s",string(_valueText));free_mstring(_valueText);
+    }
+    if(postfix)output("%s",postfix);
 }
 long long getValueInteger(const Mvalue* const _value,long long invalid){
     // ASSERTION if _value can be converted to an integer,it should not equal invalid!!!!
@@ -1337,7 +1341,7 @@ long long getValueInteger(const Mvalue* const _value,long long invalid){
         if(_value->type==VT_STRING){
             // we should check for 0 explicitly, which should always be represented by a single '0' character i.e. without signs!!!
             // TODO are we allowing other zero representations as well???
-            if(!strcmp(_value->value._string->_c,"0"))return 0;
+            if(!strcmp(_value->value._string->_c,"0"))return 0LL;
             long long ll=atoll(_value->value._string->_c);
             if(ll)return ll; // valid if non-zero
         }
@@ -1549,6 +1553,52 @@ Mvalue* Mbnot(Mvalue* _value){ // not a value
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot));
     }
     return NULL;
+}
+
+// null test for the value to be considered NULL
+bool isNull(Mvalue* _value){
+    if(_value)
+    switch(_value->type){
+        case VT_INTEGER:return !_value->value._integer;
+        case VT_REAL:return !_value->value._real;
+        case VT_STRING:return !_value->value._string;
+        case VT_LIST:return !_value->value._list;
+        case VT_MAP:return !_value->value._map;
+        case VT_TOKEN:return !_value->value._token;
+        default:break;
+    }
+    return true;
+}
+Mvalue* Mnull(Mvalue* _value){
+    return _getIntegerValue(isNull(_value)?1:0);
+}
+Mvalue* Mundefined(Mvalue* _value){
+    return _getIntegerValue(!_value?1:0);
+}
+
+Mvalue* Mlen(Mvalue* _value){
+    long long result=0;
+    if(_value){
+        switch(_value->type){
+            case VT_INTEGER:case VT_REAL:case VT_STRING:result=1;break;
+            case VT_LIST:result=_value->value._list->numberOfElements;break;
+            case VT_MAP:result=_value->value._map->numberOfElements;break;
+            default:break;
+        }
+    }
+    return _getIntegerValue(result);
+}
+Mvalue* Mfac(Mvalue* _value){
+    long long n=(_value&&_value->type==VT_INTEGER?_value->value._integer->ll:LLONG_MIN);
+    if(n==LLONG_MIN)return NULL;
+    // 39 is about the maximum that we can store in a long long
+    if(n<40){
+        long long result=n;while(--n>1)result*=n; // TODO should we use multiply here NO I guess not, although we could get overflow at some point!!!
+        return _getIntegerValue(result);
+    }
+    long double result=n;
+    while(--n>1)result*=n;
+    return _getRealValue(result);
 }
 
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){

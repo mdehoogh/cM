@@ -233,6 +233,7 @@ Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
+//////Mvalue* _getTokenValue(char* text);
 
 Mvalue* _getValueOfList(Mlist* _list);
 Mvalue* _getValueOfInteger(Minteger* _integer);
@@ -326,7 +327,13 @@ Mvalue* Mneg(Mvalue* _value); // negate a value
 Mvalue* Mbnot(Mvalue* _value); // binary not a value
 Mvalue* Mnot(Mvalue* _value); // not a value
 
+bool isNull(Mvalue* _value); // expose as well
+Mvalue* Mnull(Mvalue* _value); // whether null!!!
+Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
+
 Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
+Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
+Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);

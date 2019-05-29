@@ -134,6 +134,8 @@ Mvalue* m2l(Mvalue* _value){
  // the value wrapper for not a real and not an integer...
 Mvalue* NAR_value=NULL;
 Mvalue* NAI_value=NULL;
+Mvalue* NULL_value=NULL; // the value containing the text to show when a value equals NULL
+
 long double getNAR(){return NAR_value->value._real->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
 
@@ -183,9 +185,13 @@ Mvalue* Msum(Mvalue* _value){
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
+Mtoken* newToken(Mtoken* prevToken);
 bool initEnvironment(){
+	
 	NAR_value=_getRealValue(strtold("nan",NULL)); // we'll be using the default NaN to represent Not A Real
 	NAI_value=_getIntegerValue(LLONG_MIN);
+	NULL_value=_getValueOfToken(newToken(NULL));NULL_value->value._token->text=new_mstring("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
+
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
@@ -195,11 +201,16 @@ bool initEnvironment(){
 		Mfunctionmap* environmentFunctionMap=calloc(1,sizeof(Mfunctionmap));
 		if(environmentVariableMap&&environmentFunctionMap){
 			_Menvironment->_variableMap=environmentVariableMap;
-			if(!NAR_value||!addVariable(_Menvironment,"NAR",VT_REAL,true)||setValue(_Menvironment,"NAR",NAR_value)){
+			// TODO should we allow assigning to NULL by defining NULL as a variable??????
+			// MDH@29MAY2019: we've got (symbol) NULL
+			if(!addVariable(_Menvironment,"NULL",VT_TOKEN,true)||!setValue(_Menvironment,"NULL",NULL_value)){
+				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
+			}
+			if(!NAR_value||!addVariable(_Menvironment,"NAR",VT_REAL,true)||!setValue(_Menvironment,"NAR",NAR_value)){
 				outputLine("WARNING: Failed to create, add or initialize Not-a-real constant NAR.");
 				////////return false;
 			}
-			if(!NAI_value||!addVariable(_Menvironment,"nai",VT_INTEGER,false)||setValue(_Menvironment,"nai",NAI_value)){
+			if(!NAI_value||!addVariable(_Menvironment,"nai",VT_INTEGER,false)||!setValue(_Menvironment,"nai",NAI_value)){
 				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default nai.");
 				////////return false;
 			}
@@ -271,20 +282,20 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"neg"),Mneg)){
-				outputLine("ERROR: Failed to register the negate function.");
+			if(!completedValueFunction(newFunction(_Menvironment,"neg"),Mneg)||!completedValueFunction(newFunction(_Menvironment,"bnot"),Mbnot)||!completedValueFunction(newFunction(_Menvironment,"not"),Mnot)){
+				outputLine("ERROR: Failed to register all unary functions.");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"bnot"),Mbnot)){
-				outputLine("ERROR: Failed to register the binary not function.");
+			if(!completedValueFunction(newFunction(_Menvironment,"null"),Mnull)||!completedValueFunction(newFunction(_Menvironment,"undefined"),Mundefined)){
+				outputLine("ERROR: Failed to register the null and undefined function.");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"not"),Mnot)){
-				outputLine("ERROR: Failed to register the binary not function.");
+			if(!completedValueFunction(newFunction(_Menvironment,"sum"),Msum)||!completedValueFunction(newFunction(_Menvironment,"len"),Mlen)){
+				outputLine("ERROR: Failed to register all list functions.");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"sum"),Msum)){
-				outputLine("ERROR: Failed to register the sum function.");
+			if(!completedValueFunction(newFunction(_Menvironment,"fac"),Mfac)){
+				outputLine("ERROR: Failed to register the fac functions.");
 				return false;
 			}
 			// register list conversions
@@ -982,9 +993,13 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(!maximumNumberOfElements||listElementIndex<=maximumNumberOfElements){
+			unsigned long long newListElementIndex=appendedToList(_list,_listElementValue,listElementIndex);
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
-			if(appendedToList(_list,_listElementValue,listElementIndex)!=listElementIndex){outputValue("\nERROR: Failed to append list element '",_listElementValue,"'.");break;}
-			if(amVerbose())output("\nList element #%lld appended to list!",listElementIndex);
+			if(newListElementIndex==0){
+				outputValue("\nERROR: Failed to append list element '",_listElementValue,"'.");
+				break;
+			}
+			if(amVerbose())output("\nList element #%lld appended to list with index %lld!",listElementIndex,newListElementIndex);
 		}else
 		if(amVerbose())output("\nMaximum number of elements reached.");
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
@@ -1120,12 +1135,15 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					}
 					if(_value->type==VT_LIST){
 						// try to convert the index value into a positive integer
-						long long index=getValueInteger(indexorattributenameListelementValue,0);
-						if(index>0){
+						long long index=getValueInteger(indexorattributenameListelementValue,LLONG_MIN);
+						if(index!=0&&index!=LLONG_MIN){
 							_value=getValueAtIndex(_value->value._list,index);
 							continue;
 						}
-						outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' not a (positive) integer.");
+						if(index)
+							outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.");
+						else
+							output("\nERROR: A zero index is not allowed.");
 					}
 					// neither a list nor a map, so nothing to return!!!
 					return NULL;
@@ -1151,6 +1169,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
 		if(_valuereference->_itemid){ // the hard part: index/attribute name list assignment!!
+			result=true;
 			Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
 			// let's get the first index/attribute name
 			Mlistelement* indexorattributenameListelement=_itemidlist->_first;
@@ -1187,18 +1206,30 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
 				if(_value->type==VT_MAP){
 					mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
-					if(appendedToMap(_value->value._map,string(_attributeName),_newValue))result=true;
+					if(!appendedToMap(_value->value._map,string(_attributeName),_newValue)){
+						result=false;
+					}
 					free_mstring(_attributeName);
+					if(!result)return false;
 				}else
 				if(_value->type==VT_LIST){
-					// NOTE allow appending using 0
-					long long index=getValueInteger(indexorattributenameListelement->_value,-1);
-					if(appendedToList(_value->value._list,_newValue,index))result=true;
+					// NOTE allow appending using 0 or inserting with negative values
+					long long index=getValueInteger(indexorattributenameListelement->_value,LLONG_MIN);
+					// replace the index to the actual index with the index of the element in the list (so getReferencedValue() will not complain!!!)
+					if(index!=LLONG_MIN){
+						index=appendedToList(_value->value._list,_newValue,index);
+						if(index>0){
+							assignValue(&indexorattributenameListelement->_value,_getIntegerValue(index));
+						}else{
+							result=false;
+						}				
+					}else{
+						result=false;
+					}
 				}
 			}
 		}else
 			setValue(_Menvironment,_valuereference->_name,_newValue);
-		return true;
 	}
 	return result;
 }
@@ -1291,7 +1322,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(!addVariable(_Menvironment,string(expressionToken->text),VT_UNDEFINED,false))break; // NO retrieves the undefined value subsequently!!
 			case TT_VARIABLE: // a value reference
 				_valueReference->_name=_strdup(string(expressionToken->text)); // store a copy of the name of the variable being referenced
-				assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
+				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
+				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				// a variable can be followed by an index that we should store in the value reference's itemid field
 				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
@@ -1299,7 +1331,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0); // typically allow for any number of indices (although perhaps we should check!!)
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
-					if(indexListValue&&indexListValue->type==VT_LIST){ // a list (possibly empty)
+					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->_first){ // a non-empty list
 						assignValue(&_valueReference->_itemid,indexListValue); // now storing the entire index/attribute name list
 						/* replacing (storing only the last index/attribute name):
 						Mlist* indexList=indexListValue->value._list;
@@ -1317,6 +1349,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						*/
 					}
 				}
+				// MDH@29MAY2019: if we do NOT have an indexed value, retrieve the value...
+				// TODO as a side-effect getReferencedValue() will bind the added value to the value reference (as result) BUT I don't think that is how it should be!!! no the assignment takes care of that
+				if(!_valueReference->_itemid)assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name));
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				{
@@ -1366,17 +1401,17 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 		}
 
-		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("\nValue: '",_valueReference->_value,"'.");else output("\nNo result!");}
+		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("\nValue: `",_valueReference->_value,"`.");else output("\nNo result!");}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
-			if(amVerbose())output("\nApplying unary operators: '%s'.",string(unaryOperators));
+			if(amVerbose())output("\nApplying unary operators: `%s`.",string(unaryOperators));
 			uint16_t l=string_length(unaryOperators);
 			while(l>0&&_valueReference->_value){
 				/////////////decrementReferenceCount(_valueReference->_value);
 				assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 			}
-			if(amVerbose())outputValue("\nResult after applying unary operators: '",_valueReference->_value,"'.");
+			if(amVerbose())outputValue("\nResult after applying unary operators: `",_valueReference->_value,"`.");
 		}else
 			if(amVerbose())output("\nNo unary operators to apply!");
 		
@@ -1385,7 +1420,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	}
 
-	if(amVerbose())outputValue("\nValue result: '",_valueReference->_value,"'.");
+	if(amVerbose())outputValue("\nValue result: `",_valueReference->_value,"`.");
 	
 	return _valueReference;
 
@@ -1963,7 +1998,9 @@ void clearCommand(){
 	if(pCommandToEvaluate){freeToken(pCommandToEvaluate);pCommandToEvaluate=NULL;}
 }
 void outputValueColored(Mvalue* _value){
+	if(_value)
 	switch(_value->type){
+		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output(string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
 		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
 		case VT_STRING:outputTokenTypeColor(_value->value._string->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
@@ -2063,13 +2100,12 @@ bool evaluateCommand(){
 	mstring* commandText=_getCommandText(true);
 	expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
-	if(_commandExpressionValue){
-		output("\n%s = ",string(commandText));
-		outputValueColored(_commandExpressionValue);
-		decrementReferenceCount(_commandExpressionValue); // TODO do we need to do this?????
-		if(amVerbose())outputLine("Result released!");
-	}else
-	if(amVerbose())output("\n'%s' is undefined!",string(commandText));
+	output("\n%s = ",string(commandText));
+	// if the result is a null value, show the NULL_value
+	outputValueColored(isNull(_commandExpressionValue)?NULL_value:_commandExpressionValue);
+	
+	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputLine("Result released!"); // TODO do we need to do this?????
+
 	if(amVerbose())outputLine("Command to release!");
 	free_mstring(commandText);
 	if(amVerbose())outputLine("Command released!");
@@ -2543,15 +2579,20 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							}
 							break;
 						case TT_LISTELEMENT:
+							if(pLastCommandToEvaluateToken->expr->type!=TT_LIST&&pLastCommandToEvaluateToken->expr->type!=TT_MAP){
+								inputError("First expression token '%s' of type '%s' does not start a list or map!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
+								newTokenType=TT_ERROR;
+							}
+							break;
 						case TT_END_OF_LIST:
-							if(pLastCommandToEvaluateToken->expr->type!=TT_LIST&&pLastCommandToEvaluateToken->expr->type!=TT_LISTELEMENT){
-								inputError("End of list character does not match '%s' of type '%s'!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
+							if(pLastCommandToEvaluateToken->expr->type!=TT_LIST){
+								inputError("First token '%s' of type '%s' does not start a list!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
 								newTokenType=TT_ERROR;
 							}
 							break;
 						case TT_END_OF_MAP:
 							if(pLastCommandToEvaluateToken->expr->type!=TT_MAP){
-								inputError("End of map character does not match '%s' of type '%s'!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
+								inputError("First expression token '%s' of type '%s' does not start a map!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
 								//inputError("No map to end here!");
 								newTokenType=TT_ERROR;
 							}
@@ -3143,6 +3184,8 @@ int main(int argc, char **argv){
 		if(inputCharType=='n'){
 			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
+				inputInfo(""); // so that line will be empty
+				clearScreenFromCursor(); // so we won't see the behind cursor text anymore
 				// if pCommandToEvaluate is set, we have a command to evaluate
 				/*
 				Mtoken* pCommandToEvaluateToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
