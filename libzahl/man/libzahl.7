@@ -1,0 +1,64 @@
+.TH LIBZAHL 7 libzahl
+.SH NAME
+libzahl - Big integer library
+.SH ETYMOLOGY
+The bold uppercase \(aqZ\(aq which represents the
+set of all integers is derived from the german word
+\(aqZahlen\(aq, whose singular is \(aqZahl\(aq.
+.SH DESCRIPTION
+.B libzahl
+is a C library for arbitrary size integers, that
+aims to be usable for robust programs, and be
+fast.
+.P
+.B libzahl
+will accomplish this by using long jumps when an
+error is detected, rather than letting the caller
+also perform a check. This shall make the code in
+the user program cleaner too.
+.B libzahl
+will use dedicated temporary bignum integers whether
+possible, and necessary, for its internal calculations.
+.B libzahl
+will not deallocate allocations, but rather cache
+them for reuse.
+.P
+With the exception of functions working with strings,
+all output parameters are before the input parameters.
+.P
+Like any self-respecting big number library, libzahl
+supports assign values to variables that are also
+input variables. However, keep in mind that commutative
+functions are optimised for the first operand to also
+be the output over the second operand to also be the
+input. For example, \fIzadd(a,a,b)\fP should be faster
+than \fIzadd(a,b,a)\fP, although both are supported.
+Whether or not the function believe that it is more
+likely to occur that the input variables are different
+that the output variable than the output variable
+being the first input variable depends on the function.
+Some functions are implemented to believe that the
+first is more likely, other fucntions are implemented
+to believe that the latter is more likely.
+.SH RATIONALE
+GMP MP cannot be used for robust programs. LibTomMath
+is too slow, probably because of all memory allocations,
+and has an nonintuitive API. Hebimath is promising, but
+I think it can be done better.
+.SH NOTES
+.B libzahl
+is currently not thread-safe.
+.P
+You are strongly discouraged from using
+.B libzahl
+for cryptographic applications. Instead, use a library
+specifically targeting cryptography, otherwise, your
+program may be subject to side-channel attacks such as
+timing attacks, power-monitoring attacks, electromagnetic
+attacks, acoustic cryptanalysis, and data remanence
+attacks.
+.B libzahl
+is known to be susceptible to timing attacks and data
+remanence attacks.
+.SH SEE ALSO
+.BR zsetup (3)

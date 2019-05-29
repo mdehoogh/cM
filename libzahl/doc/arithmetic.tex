@@ -1,0 +1,541 @@
+\chapter{Arithmetic}
+\label{chap:Arithmetic}
+
+In this chapter, we will learn how to perform basic
+arithmetic with libzahl: addition, subtraction,
+multiplication, division, modulus, exponentiation,
+and sign manipulation. \secref{sec:Division} is of
+special importance.
+
+\vspace{1cm}
+\minitoc
+
+
+\newpage
+\section{Addition}
+\label{sec:Addition}
+
+To calculate the sum of two terms, we perform
+addition using {\tt zadd}.
+
+\vspace{1em}
+$r \gets a + b$
+\vspace{1em}
+
+\noindent
+is written as
+
+\begin{alltt}
+   zadd(r, a, b);
+\end{alltt}
+
+libzahl also provides {\tt zadd\_unsigned} which
+has slightly lower overhead. The calculates the
+sum of the absolute values of two integers.
+
+\vspace{1em}
+$r \gets \lvert a \rvert + \lvert b \rvert$
+\vspace{1em}
+
+\noindent
+is written as
+
+\begin{alltt}
+   zadd_unsigned(r, a, b);
+\end{alltt}
+
+\noindent
+{\tt zadd\_unsigned} has lower overhead than
+{\tt zadd} because it does not need to inspect
+or change the sign of the input, the low-level
+function that performs the addition inherently
+calculates the sum of the absolute values of
+the input.
+
+In libzahl, addition is implemented using a
+technique called ripple-carry. It is derived
+from that observation that
+
+\vspace{1em}
+$f : \textbf{Z}_n, \textbf{Z}_n \rightarrow \textbf{Z}_n$
+\\ \indent
+$f : a, b \mapsto a + b + 1$
+\vspace{1em}
+
+\noindent
+only wraps at most once, that is, the
+carry cannot exceed 1. CPU:s provide an
+instruction specifically for performing
+addition with ripple-carry over multiple words,
+adds twos numbers plus the carry from the
+last addition. libzahl uses assembly to
+implement this efficiently. If, however, an
+assembly implementation is not available for
+the on which machine it is running, libzahl
+implements ripple-carry less efficiently
+using compiler extensions that check for
+overflow. In the event that neither an
+assembly implementation is available nor
+the compiler is known to support this
+extension, it is implemented using inefficient
+pure C code. This last resort manually
+predicts whether an addition will overflow;
+this could be made more efficient, by never
+using the highest bit in each character,
+except to detect overflow. This optimisation
+is however not implemented because it is
+not deemed important enough and would
+be detrimental to libzahl's simplicity.
+
+{\tt zadd} and {\tt zadd\_unsigned} support
+in-place operation:
+
+\begin{alltt}
+   zadd(a, a, b);
+   zadd(b, a, b);           \textcolor{c}{/* \textrm{should be avoided} */}
+   zadd_unsigned(a, a, b);
+   zadd_unsigned(b, a, b);  \textcolor{c}{/* \textrm{should be avoided} */}
+\end{alltt}
+
+\noindent
+Use this whenever possible, it will improve
+your performance, as it will involve less
+CPU instructions for each character addition
+and it may be possible to eliminate some
+character additions.
+
+
+\newpage
+\section{Subtraction}
+\label{sec:Subtraction}
+
+TODO % zsub zsub_unsigned
+
+
+\newpage
+\section{Multiplication}
+\label{sec:Multiplication}
+
+TODO % zmul zmodmul
+
+
+\newpage
+\section{Division}
+\label{sec:Division}
+
+To calculate the quotient or modulus of two integers,
+use either of
+
+\begin{alltt}
+   void zdiv(z_t quotient, z_t dividend, z_t divisor);
+   void zmod(z_t remainder, z_t dividend, z_t divisor);
+   void zdivmod(z_t quotient, z_t remainder,
+                z_t dividend, z_t divisor);
+\end{alltt}
+
+\noindent
+These function \emph{do not} allow {\tt NULL}
+for the output parameters: {\tt quotient} and
+{\tt remainder}. The quotient and remainder are
+calculated simultaneously and indivisibly, hence
+{\tt zdivmod} is provided to calculated both; if
+you are only interested in the quotient or only
+interested in the remainder, use {\tt zdiv} or
+{\tt zmod}, respectively.
+
+These functions calculate a truncated quotient.
+That is, the result is rounded towards zero. This
+means for example that if the quotient is in
+$(-1,~1)$, {\tt quotient} gets 0. That is, this % TODO try to clarify
+would not be the case for one of the sides of zero.
+For example, if the quotient would have been
+floored, negative quotients would have been rounded
+away from zero. libzahl only provides truncated
+division.
+
+The remainder is defined such that $n = qd + r$ after
+calling {\tt zdivmod(q, r, n, d)}. There is no
+difference in the remainer between {\tt zdivmod}
+and {\tt zmod}. The sign of {\tt d} has no affect
+on {\tt r}, {\tt r} will always, unless it is zero,
+have the same sign as {\tt n}.
+
+There are of course other ways to define integer
+division (that is, \textbf{Z} being the codomain)
+than as truncated division. For example integer
+divison in Python is floored — yes, you did just
+read `integer divison in Python is floored,' and
+you are correct, that is not the case in for
+example C. Users that want another definition
+for division than truncated division are required
+to implement that themselves. We will however
+lend you a hand.
+
+\begin{alltt}
+   #define isneg(x) (zsignum(x) < 0)
+   static z_t one;
+   \textcolor{c}{__attribute__((constructor)) static}
+   void init(void) \{ zinit(one), zseti(one, 1); \}
+
+   static int
+   cmpmag_2a_b(z_t a, z_b b)
+   \{
+       int r;
+       zadd(a, a, a), r = zcmpmag(a, b), zrsh(a, a, 1);
+       return r;
+   \}
+\end{alltt}
+
+% Floored division
+\begin{alltt}
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_floor(z_t q, z_t r, z_t n, z_t d)
+   \{
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && isneg(n) != isneg(d))
+           zsub(q, q, one), zadd(r, r, d);
+   \}
+\end{alltt}
+
+% Ceiled division
+\begin{alltt}
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_ceiling(z_t q, z_t r, z_t n, z_t d)
+   \{
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && isneg(n) == isneg(d))
+           zadd(q, q, one), zsub(r, r, d);
+   \}
+\end{alltt}
+
+% Division with round half aways from zero
+% This rounding method is also called:
+%    round half toward infinity
+%    commercial rounding
+\begin{alltt}
+   /* \textrm{This is how we normally round numbers.} */
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_half_from_zero(z_t q, z_t r, z_t n, z_t d)
+   \{
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && cmpmag_2a_b(r, d) >= 0) \{
+           if (isneg(n) == isneg(d))
+               zadd(q, q, one), zsub(r, r, d);
+           else
+               zsub(q, q, one), zadd(r, r, d);
+       \}
+   \}
+\end{alltt}
+
+\noindent
+Now to the weird ones that will more often than
+not award you a face-slap. % Had positive punishment
+% been legal or even mildly pedagogical. But I would
+% not put it past Coca-Cola.
+
+% Division with round half toward zero
+% This rounding method is also called:
+%     round half away from infinity
+\begin{alltt}
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_half_to_zero(z_t q, z_t r, z_t n, z_t d)
+   \{
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && cmpmag_2a_b(r, d) > 0) \{
+           if (isneg(n) == isneg(d))
+               zadd(q, q, one), zsub(r, r, d);
+           else
+               zsub(q, q, one), zadd(r, r, d);
+       \}
+   \}
+\end{alltt}
+
+% Division with round half up
+% This rounding method is also called:
+%     round half towards positive infinity
+\begin{alltt}
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_half_up(z_t q, z_t r, z_t n, z_t d)
+   \{
+       int cmp;
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && (cmp = cmpmag_2a_b(r, d)) >= 0) \{
+           if (isneg(n) == isneg(d))
+               zadd(q, q, one), zsub(r, r, d);
+           else if (cmp)
+               zsub(q, q, one), zadd(r, r, d);
+       \}
+   \}
+\end{alltt}
+
+% Division with round half down
+% This rounding method is also called:
+%     round half towards negative infinity
+\begin{alltt}
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_half_down(z_t q, z_t r, z_t n, z_t d)
+   \{
+       int cmp;
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && (cmp = cmpmag_2a_b(r, d)) >= 0) \{
+           if (isneg(n) != isneg(d))
+               zsub(q, q, one), zadd(r, r, d);
+           else if (cmp)
+               zadd(q, q, one), zsub(r, r, d);
+       \}
+   \}
+\end{alltt}
+
+% Division with round half to even
+% This rounding method is also called:
+%     unbiased rounding        (really stupid name)
+%     convergent rounding      (also quite stupid name)
+%     statistician's rounding
+%     Dutch rounding
+%     Gaussian rounding
+%     odd–even rounding
+%     bankers' rounding
+% It is the default rounding method used in IEEE 754.
+\begin{alltt}
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_half_to_even(z_t q, z_t r, z_t n, z_t d)
+   \{
+       int cmp;
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && (cmp = cmpmag_2a_b(r, d)) >= 0) \{
+           if (cmp || zodd(q)) \{
+               if (isneg(n) != isneg(d))
+                   zsub(q, q, one), zadd(r, r, d);
+               else
+                   zadd(q, q, one), zsub(r, r, d);
+           \}
+       \}
+   \}
+\end{alltt}
+
+% Division with round half to odd
+\newpage
+\begin{alltt}
+   void \textcolor{c}{/* \textrm{All arguments must be unique.} */}
+   divmod_half_to_odd(z_t q, z_t r, z_t n, z_t d)
+   \{
+       int cmp;
+       zdivmod(q, r, n, d);
+       if (!zzero(r) && (cmp = cmpmag_2a_b(r, d)) >= 0) \{
+           if (cmp || zeven(q)) \{
+               if (isneg(n) != isneg(d))
+                   zsub(q, q, one), zadd(r, r, d);
+               else
+                   zadd(q, q, one), zsub(r, r, d);
+           \}
+       \}
+   \}
+\end{alltt}
+
+% Other standard methods include stochastic rounding
+% and round half alternatingly, and what is is
+% New Zealand called “Swedish rounding”, which is
+% no longer used in Sweden, and is just normal round
+% half aways from zero but with 0.5 rather than
+% 1 as the integral unit, and is just a special case
+% of a more general rounding method.
+
+Currently, libzahl uses an almost trivial division
+algorithm. It operates on positive numbers. It begins
+by left-shifting the divisor as much as possible with
+letting it exceed the dividend. Then, it subtracts
+the shifted divisor from the dividend and add 1,
+left-shifted as much as the divisor, to the quotient.
+The quotient begins at 0. It then right-shifts
+the shifted divisor as little as possible until
+it no longer exceeds the diminished dividend and
+marks the shift in the quotient. This process is
+repeated until the unshifted divisor is greater
+than the diminished dividend. The final diminished
+dividend is the remainder.
+
+
+
+\newpage
+\section{Exponentiation}
+\label{sec:Exponentiation}
+
+Exponentiation refers to raising a number to
+a power. libzahl provides two functions for
+regular exponentiation, and two functions for
+modular exponentiation. libzahl also provides
+a function for raising a number to the second
+power, see \secref{sec:Multiplication} for
+more details on this. The functions for regular
+exponentiation are
+
+\begin{alltt}
+   void zpow(z_t power, z_t base, z_t exponent);
+   void zpowu(z_t, z_t, unsigned long long int);
+\end{alltt}
+
+\noindent
+They are identical, except {\tt zpowu} expects
+an intrinsic type as the exponent. Both functions
+calculate
+
+\vspace{1em}
+$power \gets base^{exponent}$
+\vspace{1em}
+
+\noindent
+The functions for modular exponentiation are
+\begin{alltt}
+   void zmodpow(z_t, z_t, z_t, z_t modulator);
+   void zmodpowu(z_t, z_t, unsigned long long int, z_t);
+\end{alltt}
+
+\noindent
+They are identical, except {\tt zmodpowu} expects
+and intrinsic type as the exponent. Both functions
+calculate
+
+\vspace{1em}
+$power \gets base^{exponent} \mod modulator$
+\vspace{1em}
+
+The sign of {\tt modulator} does not affect the
+result, {\tt power} will be negative if and only
+if {\tt base} is negative and {\tt exponent} is
+odd, that is, under the same circumstances as for
+{\tt zpow} and {\tt zpowu}.
+
+These four functions are implemented using
+exponentiation by squaring. {\tt zmodpow} and
+{\tt zmodpowu} are optimised, they modulate
+results for multiplication and squaring at
+every multiplication and squaring, rather than
+modulating the result at the end. Exponentiation
+by modulation is a very simple algorithm which
+can be expressed as a simple formula
+
+\vspace{-1em}
+\[ \hspace*{-0.4cm}
+    a^b =
+    \prod_{k \in \textbf{Z}_{+} ~:~ \left \lfloor \frac{b}{2^k} \hspace*{-1ex} \mod 2 \right \rfloor = 1}
+    a^{2^k}
+\]
+
+\noindent
+This is a natural extension to the
+observations\footnote{The first of course being
+that any non-negative number can be expressed
+with the binary positional system. The latter
+should be fairly self-explanatory.}
+
+\vspace{-1em}
+\[ \hspace*{-0.4cm}
+    \forall b \in \textbf{Z}_{+} \exists B \subset \textbf{Z}_{+} : b = \sum_{i \in B} 2^i
+    ~~~~ \textrm{and} ~~~~
+    a^{\sum x} = \prod a^x.
+\]
+
+\noindent
+The algorithm can be expressed in psuedocode as
+
+\vspace{1em}
+\hspace{-2.8ex}
+\begin{minipage}{\linewidth}
+\begin{algorithmic}
+    \STATE $r, f \gets 1, a$
+    \WHILE{$b \neq 0$}
+      \STATE $r \gets r \cdot f$ {\bf unless} $2 \vert b$
+      \STATE $f \gets f^2$ \textcolor{c}{\{$f \gets f \cdot f$\}}
+      \STATE $b \gets \lfloor b / 2 \rfloor$
+    \ENDWHILE
+    \RETURN $r$ 
+\end{algorithmic}
+\end{minipage}
+\vspace{1em}
+
+\noindent
+Modular exponentiation ($a^b \mod m$) by squaring can be
+expressed as
+
+\vspace{1em}
+\hspace{-2.8ex}
+\begin{minipage}{\linewidth}
+\begin{algorithmic}
+    \STATE $r, f \gets 1, a$
+    \WHILE{$b \neq 0$}
+      \STATE $r \gets r \cdot f \hspace*{-1ex}~ \mod m$ \textbf{unless} $2 \vert b$
+      \STATE $f \gets f^2 \hspace*{-1ex}~ \mod m$
+      \STATE $b \gets \lfloor b / 2 \rfloor$
+    \ENDWHILE
+    \RETURN $r$ 
+\end{algorithmic}
+\end{minipage}
+\vspace{1em}
+
+{\tt zmodpow} does \emph{not} calculate the
+modular inverse if the exponent is negative,
+rather, you should expect the result to be
+1 and 0 depending of whether the base is 1
+or not 1.
+
+
+\newpage
+\section{Sign manipulation}
+\label{sec:Sign manipulation}
+
+libzahl provides two functions for manipulating
+the sign of integers:
+
+\begin{alltt}
+   void zabs(z_t r, z_t a);
+   void zneg(z_t r, z_t a);
+\end{alltt}
+
+{\tt zabs} stores the absolute value of {\tt a}
+in {\tt r}, that is, it creates a copy of
+{\tt a} to {\tt r}, unless {\tt a} and {\tt r}
+are the same reference, and then removes its sign;
+if the value is negative, it becomes positive.
+
+\vspace{1em}
+\(
+    r \gets \lvert a \rvert =
+    \left \lbrace \begin{array}{rl}
+        -a & \quad \textrm{if}~a \le 0 \\
+        +a & \quad \textrm{if}~a \ge 0 \\
+    \end{array} \right .
+\)
+\vspace{1em}
+
+{\tt zneg} stores the negated of {\tt a}
+in {\tt r}, that is, it creates a copy of
+{\tt a} to {\tt r}, unless {\tt a} and {\tt r}
+are the same reference, and then flips sign;
+if the value is negative, it becomes positive,
+if the value is positive, it becomes negative.
+
+\vspace{1em}
+\(
+    r \gets -a
+\)
+\vspace{1em}
+
+Note that there is no function for
+
+\vspace{1em}
+\(
+    r \gets -\lvert a \rvert =
+    \left \lbrace \begin{array}{rl}
+         a & \quad \textrm{if}~a \le 0 \\
+        -a & \quad \textrm{if}~a \ge 0 \\
+    \end{array} \right .
+\)
+\vspace{1em}
+
+\noindent
+calling {\tt zabs} followed by {\tt zneg}
+should be sufficient for most users:
+
+\begin{alltt}
+   #define my_negabs(r, a)  (zabs(r, a), zneg(r, r))
+\end{alltt}

@@ -1,0 +1,93 @@
+.TH ZERROR 3 libzahl
+.SH NAME
+zerror - Get the error that caused a jump to the jmp_buf passed to zsetup
+.SH SYNOPSIS
+.nf
+#include <zahl.h>
+
+enum zerror zerror(const char **\fIdesc\fP);
+.fi
+.SH DESCRIPTION
+.B zerror
+shall return the error that caused a libzahl
+function to perform a long jump to the point
+specified to
+.BR zsetup (3).
+If
+.I desc
+is not
+.BR 0 ,
+a textual description is set stored in
+.IR *desc .
+This string may be changed by a subsequent
+call to
+.BR strerror (3),
+.BR perror (3),
+.BR zperror (3),
+and similar functions.
+.P
+Currently available
+.B "enum zerror"
+values are:
+.P
+.TP
+.B ZERROR_ERRNO_SET
+The error is stored in
+.IR errno .
+(The error may not be stored in
+.I errno
+until this function is called.)
+.TP
+.B ZERROR_0_POW_0
+An attempt to calculate the zeroth power of zero was made.
+This is on indeterminate form and cannot be calculated.
+The closest matching
+.I errno
+value is
+.BR EDOM .
+.TP
+.B ZERROR_0_DIV_0
+An attempt to divide zero by zero was made.
+This is on indeterminate form and cannot be calculated.
+The closest matching
+.I errno
+value is
+.BR EDOM .
+.TP
+.B ZERROR_DIV_0
+An attempt to divide a non-zero value by zero was made.
+This is undefined and cannot be calculated.
+This occurs if a divisor or a modulator is zero, or if
+zero is raised to a negative number.
+The closest matching
+.I errno
+value is
+.BR EDOM .
+.TP
+.B ZERROR_NEGATIVE
+A function argument that must not be negative was negative.
+The closest matching
+.I errno
+values is
+.B EDOM
+and
+.BR EINVAL .
+.TP
+.B ZERROR_INVALID_RADIX
+A radix less than 2 was selected, which is invalid because,
+radix 0 is impossible as there would be no digits, and radix
+1 is impossible because only the value 0 can be represented
+in radix 1. The closest matching
+.I errno
+values is
+.BR EINVAL .
+.SH RETURN VALUE
+.B zerror
+returns the error that caused libzahl a function to fail.
+.SH NOTES
+.I errno
+is only set if
+.B ZERROR_ERRNO_SET
+is returned.
+.SH SEE ALSO
+.BR zperror (3)

@@ -28,9 +28,11 @@
 // Token and Mexpression is provided in Mexpression.h
 #include "Mexpression.h"
 
+bool initExecution();
+
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
-typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -38,6 +40,10 @@ typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_REAL,VT_STRING,VT_L
 typedef struct Minteger{
     long long ll; // signed 64-bit integer (for now)
 }Minteger;
+
+typedef struct Mbiginteger{
+    z_t bi;
+}Mbiginteger;
 
 // TODO Mreal could become a union if we're storing multiple types of reals in it
 typedef struct Mreal{
@@ -54,6 +60,7 @@ struct Mmap;
 typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
+    Mbiginteger* _biginteger;
     Mreal* _real;
     Mstring* _string;
     struct Mlist* _list;
@@ -229,6 +236,7 @@ bool createVariable(Menvironment* _environment,const char* name,Mvaluetype value
 // NOTE this doesn't mean that 
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
+Mvalue* _getBigIntegerValue(long long ll);
 Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
@@ -334,6 +342,8 @@ Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
 Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
 Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
 Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)
+
+Mvalue* Mbi(Mvalue* _value); // convert to a big integer
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);

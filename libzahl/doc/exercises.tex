@@ -1,0 +1,931 @@
+\chapter{Exercises}
+\label{chap:Exercises}
+
+% TODO
+% 
+% All exercises should be group with a chapter
+% 
+% ▶   Recommended
+% M   Matematically oriented
+% HM  Higher matematical education required
+% MP  Matematical problem solving skills required,
+%     double the rating otherwise; difficult is
+%     very personal
+% 
+% 00  Immediate
+% 10  Simple
+% 20  Medium
+% 30  Moderately hard
+% 40  Term project
+% 50  Research project
+% 
+% ⁺   High risk of undershoot difficulty
+
+
+\begin{enumerate}[label=\textbf{\arabic*}.]
+
+
+
+\item {[$\RHD$\textit{02}]} \textbf{Saturated subtraction}
+
+Implement the function
+
+\vspace{-1em}
+\begin{alltt}
+   void monus(z_t r, z_t a, z_t b);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+which calculates $r = a \dotminus b = \max \{ 0,~ a - b \}$.
+
+
+
+\item {[$\RHD$\textit{10}]} \textbf{Modular powers of 2}
+
+What is the advantage of using \texttt{zmodpow}
+over \texttt{zbset} or \texttt{zlsh} in combination
+with \texttt{zmod}?
+
+
+
+\item {[\textit{M15}]} \textbf{Convergence of the Lucas Number ratios}
+
+Find an approximation for
+$\displaystyle{ \lim_{n \to \infty} \frac{L_{n + 1}}{L_n}}$,
+where $L_n$ is the $n^{\text{th}}$
+Lucas Number \psecref{sec:Lucas numbers}.
+
+\( \displaystyle{
+    L_n \stackrel{\text{\tiny{def}}}{\text{=}} \left \{ \begin{array}{ll}
+      2 & \text{if} ~ n = 0 \\
+      1 & \text{if} ~ n = 1 \\
+      L_{n - 1} + L_{n + 1} & \text{otherwise}
+    \end{array} \right .
+}\)
+
+
+
+\item {[\textit{MP12}]} \textbf{Factorisation of factorials}
+
+Implement the function
+
+\vspace{-1em}
+\begin{alltt}
+   void factor_fact(z_t n);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+which prints the prime factorisation of $n!$
+(the $n^{\text{th}}$ factorial). The function shall
+be efficient for all $n$ where all primes $p \le n$
+can be found efficiently. You can assume that
+$n \ge 2$. You should not evaluate $n!$.
+
+
+
+\item {[\textit{M20}]} \textbf{Reverse factorisation of factorials}
+
+{\small\textit{You should already have solved
+``Factorisation of factorials'' before you solve
+this problem.}}
+
+Implement the function
+
+\vspace{-1em}
+\begin{alltt}
+   void unfactor_fact(z_t x, z_t *P,
+        unsigned long long int *K, size_t n);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+which given the factorsation of $x!$ determines $x$.
+The factorisation of $x!$ is
+$\displaystyle{\prod_{i = 1}^{n} P_i^{K_i}}$, where
+$P_i$ is \texttt{P[i - 1]} and $K_i$ is \texttt{K[i - 1]}.
+
+
+
+\item {[$\RHD$\textit{MP17}]} \textbf{Factorials inverted}
+
+Implement the function
+
+\vspace{-1em}
+\begin{alltt}
+   void unfact(z_t x, z_t n);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+which given a factorial number $n$, i.e. on the form
+$x! = 1 \cdot 2 \cdot 3 \cdot \ldots \cdot x$,
+calculates $x = n!^{-1}$. You can assume that
+$n$ is a perfect factorial number and that $x \ge 1$.
+Extra credit if you can detect when the input, $n$,
+is not a factorial number. Such function would of
+course return an \texttt{int} 1 if the input is a
+factorial and 0 otherwise, or alternatively 0
+on success and $-1$ with \texttt{errno} set to
+\texttt{EDOM} if the input is not a factorial.
+
+
+
+\item {[\textit{05}]} \textbf{Fast primality test}
+
+$(x + y)^p \equiv x^p + y^p ~(\text{Mod}~p)$
+for all primes $p$ and for a few composites $p$,
+which are know as pseudoprimes. Use this to implement
+a fast primality tester.
+
+
+
+\item {[\textit{10}]} \textbf{Fermat primality test}
+
+$a^{p - 1} \equiv 1 ~(\text{Mod}~p) ~\forall~ 1 < a < p$
+for all primes $p$ and for a few composites $p$,
+which are know as pseudoprimes\footnote{If $p$ is composite
+but passes the test for all $a$, $p$ is a Carmichael
+number.}. Use this to implement a heuristic primality
+tester. Try to mimic \texttt{zptest} as much as possible.
+GNU~MP uses $a = 210$, but you don't have to. ($a$ is
+called a base.)
+
+
+
+\item {[\textit{11}]} \textbf{Lucas–Lehmer primality test}
+
+The Lucas–Lehmer primality test can be used to determine
+whether a Mersenne numbers $M_n = 2^n - 1$ is a prime (a
+Mersenne prime). $M_n$ is a prime if and only if
+$s_{n - 1} \equiv 0 ~(\text{Mod}~M_n)$, where
+
+\( \displaystyle{
+    s_i = \left \{ \begin{array}{ll}
+      4 & \text{if} ~ i = 0 \\
+      s_{i - 1}^2 - 2 & \text{otherwise}.
+    \end{array} \right .
+}\)
+
+\noindent
+The Lucas–Lehmer primality test requires that $n \ge 3$,
+however $M_2 = 2^2 - 1 = 3$ is a prime. Implement a version
+of the Lucas–Lehmer primality test that takes $n$ as the
+input. For some more fun, when you are done, you can
+implement a version that takes $M_n$ as the input.
+
+For improved performance, instead of using \texttt{zmod},
+you can use the recursive function
+%
+\( \displaystyle{
+    k \text{ mod } (2^n - 1) =
+    \left (
+      (k \text{ mod } 2^n) + \lfloor k \div 2^n \rfloor
+    \right ) \text{ mod } (2^n - 1),
+}\)
+%
+where $k \mod 2^n$ is efficiently calculated
+using \texttt{zand($k$, $2^n - 1$)}. (This optimisation
+is not part of the difficulty rating of this problem.)
+
+
+
+\item {[\textit{20}]} \textbf{Fast primality test with bounded perfection}
+
+Implement a primality test that is both very fast and
+never returns \texttt{PROBABLY\_PRIME} for input less
+than or equal to a preselected number.
+
+
+
+\item {[\textit{30}]} \textbf{Powers of the golden ratio}
+
+Implement function that returns $\varphi^n$ rounded
+to the nearest integer, where $n$ is the input and
+$\varphi$ is the golden ratio.
+
+
+
+\item {[\textit{$\RHD$05}]} \textbf{zlshu and zrshu}
+
+Why does libzahl have
+
+\vspace{-1em}
+\begin{alltt}
+   void zlsh(z_t, z_t, size_t);
+   void zrsh(z_t, z_t, size_t);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+rather than
+
+\vspace{-1em}
+\begin{alltt}
+   void zlsh(z_t, z_t, z_t);
+   void zrsh(z_t, z_t, z_t);
+   void zlshu(z_t, z_t, size_t);
+   void zrshu(z_t, z_t, size_t);
+\end{alltt}
+\vspace{-1em}
+
+
+
+\item {[\textit{$\RHD$M15}]} \textbf{Modular left-shift}
+
+Implement a function that calculates
+$2^a \text{ mod } b$, using \texttt{zmod} and
+only cheap functions. You can assume $a \ge 0$,
+ $b \ge 1$. You can also assume that all
+parameters are unique pointers.
+
+
+
+\item {[\textit{$\RHD$08}]} \textbf{Modular left-shift, extended}
+
+{\small\textit{You should already have solved
+``Modular left-shift'' before you solve this
+problem.}}
+
+Extend the function you wrote in ``Modular left-shift''
+to accept negative $b$ and non-unique pointers.
+
+
+
+\item {[\textit{13}]} \textbf{The totient}
+
+The totient of $n$ is the number of integer $a$,
+$0 < a < n$ that are relatively prime to $n$.
+Implement Euler's totient function $\varphi(n)$
+which calculates the totient of $n$. Its
+formula is
+
+\( \displaystyle{
+    \varphi(n) = |n| \prod_{p \in \textbf{P} : p | n}
+    \left ( 1 - \frac{1}{p} \right ).
+}\)
+
+Note that $\varphi(-n) = \varphi(n)$, $\varphi(0) = 0$,
+and $\varphi(1) = 1$.
+
+
+
+\item {[\textit{M13}]} \textbf{The totient from factorisation}
+
+Implement the function
+
+\vspace{-1em}
+\begin{alltt}
+   void totient_fact(z_t t, z_t *P,
+                     unsigned long long int *K, size_t n);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+which calculates the totient $t = \varphi(n)$, where
+$n = \displaystyle{\prod_{i = 1}^n P_i^{K_i}} > 0$,
+and $P_i = \texttt{P[i - 1]} \in \textbf{P}$,
+$K_i = \texttt{K[i - 1]} \ge 1$. All values \texttt{P}
+are mutually unique. \texttt{P} and \texttt{K} make up
+the prime factorisation of $n$.
+
+You can use the following rules:
+
+\( \displaystyle{
+  \begin{array}{ll}
+      \varphi(1) = 1                      & \\
+      \varphi(p) = p - 1                  & \text{if } p \in \textbf{P} \\
+      \varphi(nm) = \varphi(n)\varphi(m)  & \text{if } \gcd(n, m) = 1   \\
+      n^a\varphi(n) = \varphi(n^{a + 1})  &
+  \end{array}
+}\)
+
+
+
+\item {[\textit{HMP32}]} \textbf{Modular tetration}
+
+Implement the function
+
+\vspace{-1em}
+\begin{alltt}
+   void modtetra(z_t r, z_t b, unsigned long n, z_t m);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+which calculates $r = {}^n{}b \text{ mod } m$, where
+${}^0{}b = 1$, ${}^1{}b = b$, ${}^2{}b = b^b$,
+${}^3{}b = b^{b^b}$, ${}^4{}b = b^{b^{b^b}}$, and so on.
+You can assume $b > 0$ and $m > 0$. You can also assume
+\texttt{r}, \texttt{b}, and \texttt{m} are mutually
+unique pointers.
+
+
+
+\item {[\textit{13}]} \textbf{Modular generalised power towers}
+
+{\small\textit{This problem requires a working
+solution for ``Modular tetration''.}}
+
+Modify your solution for ``Modular tetration'' to
+evaluate any expression on the forms
+$a^b,~a^{b^c},~a^{b^{c^d}},~\ldots \text{ mod } m$.
+
+
+
+\end{enumerate}
+
+
+
+\chapter{Solutions}
+\label{chap:Solutions}
+
+
+\begin{enumerate}[label=\textbf{\arabic*}.]
+
+\item \textbf{Saturated subtraction}
+
+\vspace{-1em}
+\begin{alltt}
+void monus(z_t r, z_t a, z_t b)
+\{
+    zsub(r, a, b);
+    if (zsignum(r) < 0)
+        zsetu(r, 0);
+\}
+\end{alltt}
+\vspace{-1em}
+
+
+\item \textbf{Modular powers of 2}
+
+\texttt{zbset} and \texttt{zbit} requires $\Theta(n)$
+memory to calculate $2^n$. \texttt{zmodpow} only
+requires $\mathcal{O}(\min \{n, \log m\})$ memory
+to calculate $2^n \text{ mod } m$. $\Theta(n)$
+memory complexity becomes problematic for very
+large $n$.
+
+
+\item \textbf{Convergence of the Lucas Number ratios}
+
+It would be a mistake to use bignum, and bigint in particular,
+to solve this problem. Good old mathematics is a much better solution.
+
+$$ \lim_{n \to \infty} \frac{L_{n + 1}}{L_n} = \lim_{n \to \infty} \frac{L_{n}}{L_{n - 1}} = \lim_{n \to \infty} \frac{L_{n - 1}}{L_{n - 2}} $$
+
+$$ \frac{L_{n}}{L_{n - 1}} = \frac{L_{n - 1}}{L_{n - 2}} $$
+
+$$ \frac{L_{n - 1} + L_{n - 2}}{L_{n - 1}} = \frac{L_{n - 1}}{L_{n - 2}} $$
+
+$$ 1 + \frac{L_{n - 2}}{L_{n - 1}} = \frac{L_{n - 1}}{L_{n - 2}} $$
+
+$$ 1 + \varphi = \frac{1}{\varphi} $$
+
+So the ratio tends toward the golden ratio.
+
+
+
+\item \textbf{Factorisation of factorials}
+
+Base your implementation on
+
+\( \displaystyle{
+    n! = \prod_{p~\in~\textbf{P}}^{n} p^{k_p}, ~\text{where}~
+    k_p = \sum_{a = 1}^{\lfloor \log_p n \rfloor} \lfloor np^{-a} \rfloor.
+}\)
+
+There is no need to calculate $\lfloor \log_p n \rfloor$,
+you will see when $p^a > n$.
+
+
+
+\item \textbf{Reverse factorisation of factorials}
+
+$\displaystyle{x = \max_{p ~\in~ P} ~ p \cdot f(p, k_p)}$,
+where $k_p$ is the power of $p$ in the factorisation
+of $x!$. $f(p, k)$ is defined as:
+
+\vspace{1em}
+\hspace{-2.8ex}
+\begin{minipage}{\linewidth}
+\begin{algorithmic}
+    \STATE $k^\prime \gets 0$
+    \WHILE{$k > 0$}
+      \STATE $a \gets 0$
+      \WHILE{$p^a \le k$}
+        \STATE $k \gets k - p^a$
+        \STATE $a \gets a + 1$
+      \ENDWHILE
+      \STATE $k^\prime \gets k^\prime + p^{a - 1}$
+    \ENDWHILE
+    \RETURN $k^\prime$
+\end{algorithmic}
+\end{minipage}
+\vspace{1em}
+
+
+
+\item \textbf{Factorials inverted}
+
+Use \texttt{zlsb} to get the power of 2 in the
+prime factorisation of $n$, that is, the number
+of times $n$ is divisible by 2. If we write $n$ on
+the form $1 \cdot 2 \cdot 3 \cdot \ldots \cdot x$,
+every $2^\text{nd}$ factor is divisible by 2, every
+$4^\text{th}$ factor is divisible by $2^2$, and so on.
+From calling \texttt{zlsb} we know how many times,
+$n$ is divisible by 2, but know how many of the factors
+are divisible by 2, but this can be calculated with
+the following algorithm, where $k$ is the number
+times $n$ is divisible by 2:
+
+\vspace{1em}
+\hspace{-2.8ex}
+\begin{minipage}{\linewidth}
+\begin{algorithmic}
+    \STATE $k^\prime \gets 0$
+    \WHILE{$k > 0$}
+      \STATE $a \gets 0$
+      \WHILE{$2^a \le k$}
+        \STATE $k \gets k - 2^a$
+        \STATE $a \gets a + 1$
+      \ENDWHILE
+      \STATE $k^\prime \gets k^\prime + 2^{a - 1}$
+    \ENDWHILE
+    \RETURN $k^\prime$
+\end{algorithmic}
+\end{minipage}
+\vspace{1em}
+
+\noindent
+Note that $2^a$ is efficiently calculated with,
+\texttt{zlsh}, but it is more efficient to use
+\texttt{zbset}.
+
+Now that we know $k^\prime$, the number of
+factors ni $1 \cdot \ldots \cdot x$ that are
+divisible by 2, we have two choices for $x$:
+$k^\prime$ and $k^\prime + 1$. To check which, we
+calculate $(k^\prime - 1)!!$ (the semifactoral, i.e.
+$1 \cdot 3 \cdot 5 \cdot \ldots \cdot (k^\prime - 1)$)
+naïvely and shift the result $k$ steps to the left.
+This gives us $k^\prime!$. If $x! \neq k^\prime!$, then
+$x = k^\prime + 1$ unless $n$ is not factorial number.
+Of course, if $x! = k^\prime!$, then $x = k^\prime$.
+
+
+
+\item \textbf{Fast primality test}
+
+If we select $x = y = 1$ we get
+$2^p \equiv 2 ~(\text{Mod}~p)$. This gives us
+
+\vspace{-1em}
+\begin{alltt}
+enum zprimality
+ptest_fast(z_t p)
+\{
+    z_t a;
+    int c = zcmpu(p, 2);
+    if (c <= 0)
+        return c ? NONPRIME : PRIME;
+    zinit(a);
+    zsetu(a, 1);
+    zlsh(a, a, p);
+    zmod(a, a, p);
+    c = zcmpu(a, 2);
+    zfree(a);
+    return c ? NONPRIME : PROBABLY_PRIME;
+\}
+\end{alltt}
+\vspace{-1em}
+
+
+
+\item \textbf{Fermat primality test}
+
+Below is a simple implementation. It can be improved by
+just testing against a fix base, such as $a = 210$, it
+$t = 0$. It could also do an exhaustive test (all $a$
+such that $1 < a < p$) if $t < 0$.
+
+\vspace{-1em}
+\begin{alltt}
+enum zprimality
+ptest_fermat(z_t witness, z_t p, int t)
+\{
+    enum zprimality rc = PROBABLY_PRIME;
+    z_t a, p1, p3, temp;
+    int c;
+
+    if ((c = zcmpu(p, 2)) <= 0) \{
+        if (!c)
+            return PRIME;
+        if (witness && witness != p)
+            zset(witness, p);
+        return NONPRIME;
+    \}
+
+    zinit(a), zinit(p1), zinit(p3), zinit(temp);
+    zsetu(temp, 3), zsub(p3, p, temp);
+    zsetu(temp, 1), zsub(p1, p, temp);
+
+    zsetu(temp, 2);
+    while (t--) \{
+        zrand(a, DEFAULT_RANDOM, UNIFORM, p3);
+        zadd(a, a, temp);
+        zmodpow(a, a, p1, p);
+        if (zcmpu(a, 1)) \{
+            if (witness)
+                zswap(witness, a);
+            rc = NONPRIME;
+            break;
+        \}
+    \}
+
+    zfree(temp), zfree(p3), zfree(p1), zfree(a);
+    return rc;
+\}
+\end{alltt}
+\vspace{-1em}
+
+
+
+\item \textbf{Lucas–Lehmer primality test}
+
+\vspace{-1em}
+\begin{alltt}
+enum zprimality
+ptest_llt(z_t n)
+\{
+    z_t s, M;
+    int c;
+    size_t p;
+
+    if ((c = zcmpu(n, 2)) <= 0)
+        return c ? NONPRIME : PRIME;
+
+    if (n->used > 1) \{
+        \textcolor{c}{/* \textrm{An optimised implementation would not need this} */}
+        errno = ENOMEM;
+        return (enum zprimality)(-1);
+    \}
+
+    zinit(s), zinit(M), zinit(2);
+
+    p = (size_t)(n->chars[0]);
+    zsetu(s, 1), zsetu(M, 0);
+    zbset(M, M, p, 1), zsub(M, M, s);
+    zsetu(s, 4);
+    zsetu(two, 2);
+
+    p -= 2;
+    while (p--) \{
+        zsqr(s, s);
+        zsub(s, s, two);
+        zmod(s, s, M);
+    \}
+    c = zzero(s);
+
+    zfree(two), zfree(M), zfree(s);
+    return c ? PRIME : NONPRIME;
+\}
+\end{alltt}
+
+$M_n$ is composite if $n$ is composite, therefore,
+if you do not expect prime-only values on $n$, the
+performance can be improved by using some other
+primality test (or this same test if $n$ is a
+Mersenne number) to first check that $n$ is prime.
+
+
+
+\item \textbf{Fast primality test with bounded perfection}
+
+First we select a fast primality test. We can use
+$2^p \equiv 2 ~(\texttt{Mod}~ p) ~\forall~ p \in \textbf{P}$,
+as describe in the solution for the problem
+\textit{Fast primality test}.
+
+Next, we use this to generate a large list of primes and
+pseudoprimes. Use a perfect primality test, such as a
+naïve test or the AKS primality test, to filter out all
+primes and retain only the pseudoprimes. This is not in
+runtime so it does not matter that this is slow, but to
+speed it up, we can use a probabilistic test such the
+Miller–Rabin primality test (\texttt{zptest}) before we
+use the perfect test.
+
+Now that we have a quite large — but not humongous — list
+of pseudoprimes, we can incorporate it into our fast
+primality test. For any input that passes the test, and
+is less or equal to the largest pseudoprime we found,
+binary search our list of pseudoprime for the input.
+
+For input, larger than our limit, that passes the test,
+we can run it through \texttt{zptest} to reduce the
+number of false positives.
+
+As an alternative solution, instead of comparing against
+known pseudoprimes. Find a minimal set of primes that
+includes divisors for all known pseudoprimes, and do
+trail division with these primes when a number passes
+the test. No pseudoprime need to have more than one divisor
+included in the set, so this set cannot be larger than
+the set of pseudoprimes.
+
+
+
+\item \textbf{Powers of the golden ratio}
+
+This was an information gathering exercise.
+For $n \ge 2$, $L_n = [\varphi^n]$, where
+$L_n$ is the $n^\text{th}$ Lucas number.
+
+\( \displaystyle{
+    L_n \stackrel{\text{\tiny{def}}}{\text{=}} \left \{ \begin{array}{ll}
+      2 & \text{if} ~ n = 0 \\
+      1 & \text{if} ~ n = 1 \\
+      L_{n - 1} + L_{n + 1} & \text{otherwise}
+    \end{array} \right .
+}\)
+
+\noindent
+but for efficiency and briefness, we will use
+\texttt{lucas} from \secref{sec:Lucas numbers}.
+
+\vspace{-1em}
+\begin{alltt}
+void
+golden_pow(z_t r, z_t n)
+\{
+    if (zsignum(n) <= 0)
+        zsetu(r, zcmpi(n, -1) >= 0);
+    else if (!zcmpu(n, 1))
+        zsetu(r, 2);
+    else
+        lucas(r, n);
+\}
+\end{alltt}
+\vspace{-1em}
+
+
+
+\item \textbf{zlshu and zrshu}
+
+You are in big trouble, memorywise, of you
+need to evaluate $2^{2^{64}}$.
+
+
+
+\item \textbf{Modular left-shift}
+
+\vspace{-1em}
+\begin{alltt}
+void
+modlsh(z_t r, z_t a, z_t b)
+\{
+    z_t t, at;
+    size_t s = zbits(b);
+
+    zinit(t), zinit(at);
+    zset(at, a);
+    zsetu(r, 1);
+    zsetu(t, s);
+
+    while (zcmp(at, t) > 0) \{
+        zsub(at, at, t);
+        zlsh(r, r, t);
+        zmod(r, r, b);
+        if (zzero(r))
+            break;
+    \}
+    if (!zzero(a) && !zzero(b)) \{
+        zlsh(r, r, a);
+        zmod(r, r, b);
+    \}
+
+    zfree(at), zfree(t);
+\}
+\end{alltt}
+\vspace{-1em}
+
+It is worth noting that this function is
+not necessarily faster than \texttt{zmodpow}.
+
+
+
+\item \textbf{Modular left-shift, extended}
+
+The sign of \texttt{b} shall not effect the
+result. Use \texttt{zabs} to create a copy
+of \texttt{b} with its absolute value.
+
+
+
+\item \textbf{The totient}
+
+\( \displaystyle{
+    \varphi(n)
+    = n \prod_{p \in \textbf{P} : p | n} \left ( 1 - \frac{1}{p} \right )
+    = n \prod_{p \in \textbf{P} : p | n} \left ( \frac{p - 1}{p} \right )
+}\)
+
+\noindent
+So, if we set $a = n$ and $b = 1$, then we iterate
+of all integers $p$, $2 \le p \le n$. For which $p$
+that is prime, we set $a \gets a \cdot (p - 1)$ and
+$b \gets b \cdot p$. After the iteration, $b | a$,
+and $\varphi(n) = \frac{a}{b}$. However, if $n < 0$,
+then, $\varphi(n) = \varphi|n|$.
+
+
+
+\item \textbf{The totient from factorisation}
+
+\vspace{-1em}
+\begin{alltt}
+void
+totient_fact(z_t t, z_t *P,
+             unsigned long long *K, size_t n)
+\{
+    z_t a, one;
+    zinit(a), zinit(one);
+    zseti(t, 1);
+    zseti(one, 1);
+    while (n--) \{
+        zpowu(a, P[n], K[n] - 1);
+        zmul(t, t, a);
+        zsub(a, P[n], one);
+        zmul(t, t, a);
+    \}
+    zfree(a), zfree(one);
+\}
+\end{alltt}
+\vspace{-1em}
+
+
+
+\item \textbf{Modular tetration}
+
+Let \texttt{totient} be Euler's totient function.
+It is described in the problem ``The totient''.
+
+We need two help function: \texttt{tetra(r, b, n)}
+which calculated $r = {}^n{}b$, and \texttt{cmp\_tetra(a, b, n)}
+which is compares $a$ to ${}^n{}b$.
+
+\vspace{-1em}
+\begin{alltt}
+void
+tetra(z_t r, z_t b, unsigned long n)
+\{
+    zsetu(r, 1);
+    while (n--)
+        zpow(r, b, r);
+\}
+\end{alltt}
+\vspace{-1em}
+
+\vspace{-1em}
+\begin{alltt}
+int
+cmp_tetra(z_t a, z_t b, unsigned long n)
+\{
+    z_t B;
+    int cmp;
+
+    if (!n || !zcmpu(b, 1))
+        return zcmpu(a, 1);
+    if (n == 1)
+        return zcmp(a, b);
+    if (zcmp(a, b) >= 0)
+        return +1;
+
+    zinit(B);
+    zsetu(B, 1);
+    while (n) \{
+        zpow(B, b, B);
+        if (zcmp(a, B) < 0) \{
+            zfree(B);
+            return -1;
+        \}
+    \}
+    cmp = zcmp(a, B);
+    zfree(B);
+    return cmp;
+
+\}
+\end{alltt}
+\vspace{-1em}
+
+\texttt{tetra} can generate unmaintainably huge
+numbers. Will however only call \texttt{tetra}
+when this is not the case.
+
+\vspace{-1em}
+\begin{alltt}
+void
+modtetra(z_t r, z_t b, unsigned long n, z_t m)
+\{
+    z_t t, temp;
+
+    if (n <= 1) \{
+        if (!n)
+            zsetu(r, zcmpu(m, 1));
+        else
+            zmod(r, b, m);
+        return;
+    \}
+
+    zmod(r, b, m);
+    if (zcmpu(r, 1) <= 0)
+        return;
+
+    zinit(t);
+    zinit(temp);
+
+    t = totient(m);
+    zgcd(temp, b, m);
+
+    if (!zcmpu(temp, 1)) \{
+        modtetra(temp, b, n - 1, t);
+        zmodpow(r, r, temp, m);
+    \} else if (cmp_tetra(t, b, n - 1) > 0) \{
+        temp = tetra(b, n - 1);
+        zpowmod(r, r, temp, m);
+    \} else \{
+        modtetra(temp, b, n - 1, t);
+        zmodpow(temp, r, temp, m);
+        zmodpow(r, r, t, m);
+        zmodmul(r, r, temp, m);
+    \}
+
+    zfree(temp);
+    zfree(t);
+\}
+\end{alltt}
+\vspace{-1em}
+
+
+
+\item \textbf{Modular generalised power towers}
+
+Instead of the signature
+
+\vspace{-1em}
+\begin{alltt}
+   void modtetra(z_t r, z_t b, unsigned long n, z_t m);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+you want to use the signature
+
+\vspace{-1em}
+\begin{alltt}
+   void modtower_(z_t r, z_t *a, size_t n, z_t m);
+\end{alltt}
+\vspace{-1em}
+
+Instead of using, \texttt{b} (in \texttt{modtetra}),
+use \texttt{*a}. At every recursion, instead of
+passing on \texttt{a}, pass on \texttt{a + 1}.
+
+The function \texttt{tetra} is modified into
+
+\vspace{-1em}
+\begin{alltt}
+   void tower(z_t r, z_t *a, size_t n)
+   \{
+       zsetu(r, 1);
+       while (n--);
+           zpow(r, a[n], r);
+   \}
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+\texttt{cmp\_tetra} is changed analogously.
+
+To avoid problems in the evaluation, define
+
+\vspace{-1em}
+\begin{alltt}
+   void modtower(z_t r, z_t *a, size_t n, z_t m);
+\end{alltt}
+\vspace{-1em}
+
+\noindent
+which cuts the power short at the first element
+of of \texttt{a} that equals 1. For example, if
+$a = \{2, 3, 4, 5, 1, 2, 3\}$, and $n = 7$
+($n = |a|$), then \texttt{modtower}, sets $n = 4$,
+and effectively $a = \{2, 3, 4, 5\}$. After this
+\texttt{modtower} calls \texttt{modtower\_}.
+
+
+
+\end{enumerate}

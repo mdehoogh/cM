@@ -1,0 +1,49 @@
+GMP has mpz_divexact(q,n,d), we should have zdiv_exact(q,n,d).
+It uses optimised division algorithm that requires that d|n.
+
+Add zsets_radix
+Add zstr_radix
+
+Can zmodpowu and zmodpow be improved using some other algorithm?
+Is it worth implementing precomputed optimal
+  addition-chain exponentiation in zpowu?
+
+Test big endian
+Test always having .used > 0 for zero
+  Test negative/non-negative instead of sign
+Test long .sign
+Test always having .chars % 4 == 0
+Test reusing objects in the temp-stack
+
+Test optimisation of zmul:
+  bc = [(Hb * Hc) << (m2 << 1)]
+     + [(Hb * Hc) << m2]
+     - [(Hb - Lb)(Hc - Lc) << m2]
+     + [(Lb * Lc) << m2]
+     + (Lb * Lc)
+
+Would zmul be faster if we split only one of the
+factors until they are both approximately the same
+size?
+
+Add entropy test for zrand.
+
+Should zmodpowu, zmodpow, zmodmul, and zmodsqr be removed?
+  I need to research how important these are.
+  They are important for cryptography, but we do not care about that.
+  They are important for discrete/abstract mathematics, but bignum probably isn't in those cases?
+
+Add CPU-warmup loop to benchmarks.
+  If ondemand scaling is available but not set, set it.
+  If the current frequency is not the minimum, run a
+    catch-fire loop until the CPU is throttled to the
+    minimum frequency.
+  This loop shall be done after help variables have
+  been assigned values, as this can help the warmup.
+
+benchmark with worst case, average case, and best case input.
+
+zadd, zsub: benchmark both dense and sparse integers.
+
+Feedback on error handling:
+	 http://bbs.progrider.org/prog/read/1457215529/31,47

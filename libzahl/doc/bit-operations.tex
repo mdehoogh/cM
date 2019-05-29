@@ -1,0 +1,327 @@
+\chapter{Bit operations}
+\label{chap:Bit operations}
+
+libzahl provides a number of functions that operate on
+bits. These can sometimes be used instead of arithmetic
+functions for increased performance. You should read
+the sections in order.
+
+\vspace{1cm}
+\minitoc
+
+
+\newpage
+\section{Boundary}
+\label{sec:Boundary}
+
+To retrieve the index of the lowest set bit, use
+
+\begin{alltt}
+   size_t zlsb(z_t a);
+\end{alltt}
+
+\noindent
+It will return a zero-based index, that is, if the
+least significant bit is indeed set, it will return 0.
+
+If {\tt a} is a power of 2, it will return the power
+of which 2 is raised, effectively calculating the
+binary logarithm of {\tt a}. Note, this is only if
+{\tt a} is a power of two. More generally, it returns
+the number of trailing binary zeroes, if equivalently
+the number of times {\tt a} can evenly be divided by
+2. However, in the special case where $a = 0$,
+{\tt SIZE\_MAX} is returned.
+
+A similar function is
+
+\begin{alltt}
+   size_t zbit(z_t a);
+\end{alltt}
+
+\noindent
+It returns the minimal number of bits require to
+represent an integer. That is, $\lceil \log_2 a \rceil - 1$,
+or equivalently, the number of times {\tt a} can be
+divided by 2 before it gets the value 0. However, in
+the special case where $a = 0$, 1 is returned. 0 is
+never returned. If you want the value 0 to be returned
+if $a = 0$, write
+
+\begin{alltt}
+   zzero(a) ? 0 : zbits(a)
+\end{alltt}
+
+The definition ``it returns the minimal number
+of bits required to represent an integer,''
+holds true if $a = 0$, the other divisions
+do not hold true if $a = 0$.
+
+
+\newpage
+\section{Shift}
+\label{sec:Shift}
+
+There are two functions for shifting bits
+in integers:
+
+\begin{alltt}
+   void zlsh(z_t r, z_t a, size_t b);
+   void zrsh(z_t r, z_t a, size_t b);
+\end{alltt}
+
+\noindent
+{\tt zlsh} performs a left-shift, and {\tt zrsh}
+performs a right-shift. That is, {\tt zlsh} adds
+{\tt b} trailing binary zeroes, and {\tt zrsh}
+removes the lowest {\tt b} binary digits. So if
+
+$a = \phantom{00}10000101_2$ then
+
+$r = 1000010100_2$ after calling {\tt zlsh(r, a, 2)}, and
+
+$r = \phantom{0100}100001_2$ after calling {\tt zrsh(r, a, 2)}.
+\vspace{1em}
+
+{\tt zlsh(r, a, b)} is equivalent to $r \gets a \cdot 2^b$,
+and {\tt zrsh(r, a, b)} is equivalent to $r \gets a \div 2^b$,
+with truncated division, {\tt zlsh} and {\tt zrsh} are
+significantly faster than {\tt zpowu} and should be used
+whenever possible. {\tt zpowu} does not check if it is
+possible for it to use {\tt zlsh} instead, even if it
+would, {\tt zlsh} and {\tt zrsh} would still be preferable
+in most cases because it removes the need for {\tt zmul}
+and {\tt zdiv}, respectively.
+
+{\tt zlsh} and {\tt zrsh} are implemented in two steps:
+(1) shift whole characters, that is, groups of aligned
+64 bits, and (2) shift on a bit-level between characters.
+
+If you are implementing a calculator, you may want to
+create a wrapper for {\tt zpow} that uses {\tt zlsh}
+whenever possible. One such wrapper could be
+
+\begin{alltt}
+   void
+   pow(z_t r, z_t a, z_t b)
+   \{
+       size_t s1, s2;
+       if ((s1 = zlsb(a)) + 1 == zbits(a) &&
+                     zbits(b) <= 8 * sizeof(SIZE_MAX)) \{
+           s2 = zzero(b) ? 0 : b->chars[0];
+           if (s1 <= SIZE_MAX / s2) \{
+               zsetu(r, 1);
+               zlsh(r, r, s1 * s2);
+               return;
+           \}
+       \}
+       zpow(r, a, b);
+   \}
+\end{alltt}
+
+
+\newpage
+\section{Truncation}
+\label{sec:Truncation}
+
+In \secref{sec:Shift} we have seen how bit-shift
+operations can be used to multiply or divide by a
+power of two. There is also a bit-truncation
+operation: {\tt ztrunc}, which is used to keep
+only the lowest bits, or equivalently, calculate
+the remainder of a division by a power of two.
+
+\begin{alltt}
+   void ztrunc(z_t r, z_t a, size_t b);
+\end{alltt}
+
+\noindent
+is consistent with {\tt zmod}; like {\tt zlsh} and
+{\tt zrsh}, {\tt a}'s sign is preserved into {\tt r}
+assuming the result is non-zero.
+
+{\tt ztrunc(r, a, b)} stores only the lowest {\tt b}
+bits in {\tt a} into {\tt r}, or equivalently,
+calculates $r \gets a \mod 2^b$. For example, if
+
+$a = 100011000_2$ then
+
+$r = \phantom{10001}1000_2$ after calling
+{\tt ztrunc(r, a, 4)}.
+
+
+\newpage
+\section{Split}
+\label{sec:Split}
+
+In \secref{sec:Shift} and \secref{sec:Truncation}
+we have seen how bit operations can be used to
+calculate division by a power of two and
+modulus a power of two efficiently using
+bit-shift and bit-truncation operations. libzahl
+also has a bit-split operation that can be used
+to efficiently calculate both division and
+modulus a power of two efficiently in the same
+operation, or equivalently, storing low bits
+in one integer and high bits in another integer.
+This function is
+
+\begin{alltt}
+   void zsplit(z_t high, z_t low, z_t a, size_t b);
+\end{alltt}
+
+\noindent
+Unlike {\tt zdivmod}, it is not more efficient
+than calling {\tt zrsh} and {\tt ztrunc}, but
+it is more convenient. {\tt zsplit} requires
+that {\tt high} and {\tt low} are from each
+other distinct references.
+
+Calling {\tt zsplit(high, low, a, b)} is
+equivalent to
+
+\begin{alltt}
+   ztrunc(low, a, delim);
+   zrsh(high, a, delim);
+\end{alltt}
+
+\noindent
+assuming {\tt a} and {\tt low} are not the
+same reference (reverse the order of the
+functions if they are the same reference.)
+
+{\tt zsplit} copies the lowest {\tt b} bits
+of {\tt a} to {\tt low}, and the rest of the
+bits to {\tt high}, with the lowest {\tt b}
+removesd. For example, if $a = 1010101111_2$,
+then $high = 101010_2$ and $low = 1111_2$
+after calling {\tt zsplit(high, low, a, 4)}.
+
+{\tt zsplit} is especially useful in
+divide-and-conquer algorithms.
+
+
+\newpage
+\section{Bit manipulation}
+\label{sec:Bit manipulation}
+
+
+The function
+
+\begin{alltt}
+   void zbset(z_t r, z_t a, size_t bit, int mode);
+\end{alltt}
+
+\noindent
+is used to manipulate single bits in {\tt a}. It will
+copy {\tt a} into {\tt r} and then, in {\tt r}, either
+set, clear, or flip, the bit with the index {\tt bit}
+— the least significant bit has the index 0. The
+action depend on the value of {\tt mode}:
+
+\begin{itemize}
+\item
+$mode > 0$ ($+1$): set
+\item
+$mode = 0$ ($0$): clear
+\item
+$mode < 0$ ($-1$): flip
+\end{itemize}
+
+
+\newpage
+\section{Bit test}
+\label{sec:Bit test}
+
+libzahl provides a function for testing whether a bit
+in a big integer is set:
+
+\begin{alltt}
+   int zbtest(z_t a, size_t bit);
+\end{alltt}
+
+\noindent
+it will return 1 if the bit with the index {\tt bit}
+is set in {\tt a}, counting from the least significant
+bit, starting at zero. 0 is returned otherwise. The
+sign of {\tt a} is ignored.
+
+We can think of this like so: consider
+
+$$ \lvert a \rvert = \sum_{i = 0}^\infty k_i 2^i,~ k_i \in \{0, 1\}, $$
+
+\noindent
+{\tt zbtest(a, b)} returns $k_b$. Equivalently, we can
+think that {\tt zbtest(a, b)} return whether $b \in B$
+where $B$ is defined by
+
+$$ \lvert a \rvert = \sum_{b \in B} 2^b,~ B \subset \textbf{Z}_+, $$
+
+\noindent
+or as right-shifting $a$ by $b$ bits and returning
+whether the least significant bit is set.
+
+{\tt zbtest} always returns 1 or 0, but for good
+code quality, you should avoid testing against 1,
+rather you should test whether the value is a
+truth-value or a falsehood-value. However, there
+is nothing wrong with depending on the value being
+restricted to being either 1 or 0 if you want to
+sum up returned values or otherwise use them in
+new values.
+
+
+\newpage
+\section{Connectives}
+\label{sec:Connectives}
+
+libzahl implements the four basic logical
+connectives: and, or, exclusive or, and not.
+The functions for these are named {\tt zand},
+{\tt zor}, {\tt zxor}, and {\tt znot},
+respectively.
+
+The connectives apply to each bit in the
+integers, as well as the sign. The sign is
+treated as a bit that is set if the integer
+is negative, and as cleared otherwise. For
+example (integers are in binary):
+
+\begin{alltt}
+   zand(r, a, b)              zor(r, a, b)
+   a = +1010  (input)         a = +1010  (input)
+   b = -1100  (input)         b = -1100  (input)
+   r = +1000  (output)        r = -1110  (output)
+
+   zxor(r, a, b)              znot(r, a)
+   a = +1010  (input)         a = +1010  (input)
+   b = -1100  (input)         r = -0101  (output)
+   r = -0110  (output)
+\end{alltt}
+
+Remember, in libzahl, integers are represented
+with sign and magnitude, not two's complement,
+even when using these connectives. Therefore,
+more work than just changing the name of the
+called function may be required when moving
+between big integer libraries. Consequently,
+{\tt znot} does not flip bits that are higher
+than the highest set bit, which means that
+{\tt znot} is nilpotent rather than self dual.
+
+Below is a list of the value of {\tt a} when
+{\tt znot(a, a)} is called repeatedly.
+
+\begin{alltt}
+   10101010
+   -1010101
+     101010
+     -10101
+       1010
+       -101
+         10
+         -1
+          0
+          0
+          0
+\end{alltt}

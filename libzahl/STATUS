@@ -1,0 +1,174 @@
+Optimisation progress for libzahl. Benchmarks are done in the
+range 1 to 4097 bits. So far all benchmarks on libzahl are
+done with the following combinations of cc and libc:
+
+    gcc + glibc
+    gcc + musl
+    clang + glibc
+
+Benchmarks on the other libraries are done with gcc and glibc.
+
+All benchmarks are done on an x86-64 (specifically an Intel
+Core 2 Quad CPU Q9300), without any extensions turned on
+during compilation, and without any use of extensions in
+assembly code. The benchmarks are performed with Linux as
+the OS's kernel with 50 µs timer slack, and the benchmarking
+processes are fixed to one CPU.
+
+
+  The following functions are probably implemented optimally:
+
+zset .................... always fastest
+zseti(a, +) ............. tomsfastmath is faster
+zseti(a, -) ............. tomsfastmath is faster
+zsetu ................... tomsfastmath is faster
+zswap ................... always fastest
+zzero ................... always fastest (shared with gmp)
+zsignum ................. always fastest (shared with gmp)
+zeven ................... always fastest (shared with gmp)
+zodd .................... always fastest (shared with gmp)
+zeven_nonzero ........... always fastest (shared with gmp)
+zodd_nonzero ............ always fastest (shared with gmp)
+zbtest .................. always fastest
+zsave ................... always fastest
+zload ................... always fastest
+
+
+  The following functions are probably implemented optimally, but
+  depends on other functions or call-cases for better performance:
+
+zneg(a, b) .............. always fastest
+zabs(a, b) .............. always fastest
+ztrunc(a, b, c) ......... always fastest
+zbset(a, b, 1) .......... always fastest
+zbset(a, b, 0) .......... always fastest
+zbset(a, b, -1) ......... always fastest
+zsplit .................. alternating with gmp for fastest, but gmp is a bit faster on average
+
+
+  The following functions are probably implemented close to
+  optimally, further optimisation should not be a priority:
+
+zadd_unsigned ........... fastest after ~140 (depends on cc and libc) compared against zadd too
+ztrunc(a, a, b) ......... fastest until ~100, then 77 % (gcc) or 68 % (clang) of tomsfastmath
+zbset(a, a, 1) .......... always fastest
+zbset(a, a, 0) .......... always fastest
+zbset(a, a, -1) ......... always fastest (only marginally faster than gmp with clang)
+zlsb .................... always fastest <<suspicious>>
+zlsh .................... not too fast anymore
+zand .................... fastest after ~400, tomsfastmath before
+zor ..................... fastest after ~1150, tomsfastmath before
+zxor .................... alternative with gmp after ~700, tomsfastmath before (musl), a bit slow with glibc
+znot .................... always fastest
+
+
+  The following functions require structural changes for
+  further optimisations:
+
+zneg(a, a) .............. always fastest (shared with gmp (gcc))
+zabs(a, a) .............. 34 % (clang) or 8 % (gcc) of tomsfastmath
+
+
+  The following functions are probably implemented optimally
+  or close to optimally, except they contain some code that
+  should not be necessary after some bugs have been fixed:
+
+zbits ................... always fastest
+zcmpi(a, +) ............. always fastest
+zcmpi(a, -) ............. always fastest
+zcmpu ................... always fastest
+
+
+  It may be possible optimise the following functions
+  further:
+
+zadd .................... fastest after ~90 (clang), ~260 (gcc+musl), or ~840 (gcc+glibc) (gcc+glibc is slow)
+zcmp .................... almost always fastest (musl), almost always slowest (glibc) <<suspicious (clang)>>
+zcmpmag ................. always fastest <<suspicious, see zcmp>>
+
+
+  The following functions could be optimised further:
+
+zrsh .................... gmp is almost always faster; also tomsfastmath after ~3000 (gcc+glibc) or ~2800 (clang)
+zsub_unsigned ........... always fastest (compared against zsub too)
+zsub .................... always fastest (slower with gcc+glibc than gcc+musl or clang)
+
+
+  The following functions could probably be optimised further,
+  but their performance can be significantly improved by
+  optimising their dependencies:
+
+zmul .................... slowest
+zsqr .................... slowest
+zstr_length(a, 10) ...... gmp is faster (clang is faster than gcc, musl is faster than glibc)
+zstr(a, b, n) ........... slowest
+
+
+musl has more stable performance than glibc. clang is better at
+inlining than gcc. (Which is better at optimising must be judged
+on a per-function basis.)
+
+
+
+{{{ [out of date legacy area, this being phased out]
+Optimisation progress for libzahl, compared to other big integer
+libraries. These comparisons are for 152-bit integers. Functions
+in parenthesis the right column are functions that needs
+optimisation to improve the peformance of the function in the
+left column. Double-parenthesis means there may be a better way
+to do it. Inside square-brackets, there are some comments on
+multi-bit comparisons.
+
+zgcd .................... 21 % of gmp (zcmpmag)
+zmodmul(big mod) ........ slowest ((zmul, zmod))
+zmodsqr(big mod) ........ slowest ((zmul, zmod))
+zmodmul(tiny mod) ....... slowest ((zmul))
+zmodsqr(tiny mod) ....... slowest ((zmul))
+zpow .................... slowest (zmul, zsqr)
+zpowu ................... slowest (zmul, zsqr)
+zmodpow ................. slowest (zmul, zsqr. zmod)
+zmodpowu ................ slowest (zmul, zsqr, zmod)
+zsets ................... 13 % of gmp
+zrand(default uniform) .. 51 % of gmp
+zptest .................. slowest (zrand, zmodpow, zsqr, zmod)
+zdiv(big denum) ......... tomsfastmath is faster (zdivmod)
+zmod(big denum) ......... fastest (zdivmod)
+zdivmod(big denum) ...... fastest
+zdiv(tiny denum) ........ slowest
+zmod(tiny denum) ........ slowest
+zdivmod(tiny denum) ..... slowest
+}}}
+
+
+
+Note, some corresponding functions are not implemented in
+some other libraries. In such cases, they have been implemented
+in the translation layers (found under bench/). Those
+implementations are often suboptimal, but probably in style
+with what you would write if you need that functionality.
+Note further, if for example, you want do perform addition
+and you know that your operands are non-negative, you would
+choose zadd_unsigned in libzahl, but if you are using a
+library that does not have the corrsponding function, you are
+better of with the regular addition (zadd). This is however
+reflected in the comment column.
+
+Also note, TomsFastMath does not support arbitrarily large
+integers, the limit is set at compile-time, which gives is
+a significant performance advantage. Furthermore, no failure
+check is done with GMP. Additionally, hebimath has been
+excluded from these comparison because it is not fully
+operational.
+
+Also note, NOT does not mean the same thing in all libraries,
+for example in GMP it means (-x - 1), thus, znot does not
+use GMP's NOT in the translations layer.
+
+
+The following optimisation flags have been tested:
+
+-O0 ...................... Bad
+-O1 ...................... Bad
+-O2 ...................... Not so good
+-O3 ...................... Good
+-fno-builtin ............. Bad

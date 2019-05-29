@@ -1,0 +1,154 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, mathtools}
+\usepackage{microtype}
+\DeclarePairedDelimiter\ab{\lvert}{\rvert}
+
+\newcommand{\size}{{\tt size\_t}}
+\newcommand{\ullong}{{\tt unsigned long long int}}
+
+\newcommand{\entry}[3]{ #2 & {\tt #1} & #3 \\ }
+\newcommand{\cont}[1]{ & & #1 \\ }
+
+\begin{document}
+
+
+
+{\Huge libzahl}
+\vspace{1ex}
+
+Unless specified otherwise, returns are {\tt void} and all parameters are of type {\tt z\_t}.
+\vspace{1.5em}
+
+
+
+\hspace{-2ex}
+\begin{tabular}{lll}
+
+
+
+\textbf{Initialisation} \\
+\entry{zsetup(env)} {Initialise libzahl}   {must be called before any other function is}
+\cont                                      {used, {\tt env} is a {\tt jmp\_buf} all functions will}
+\cont                                      {{\tt longjmp} to --- with value 1 --- on error}
+\entry{zunsetup()}  {Deinitialise libzahl} {will free any pooled memory}
+\entry{zinit(a)}    {Initialise $a$}       {call once before use in any other function}
+\entry{zfree(a)}    {Deinitialise $a$}     {must not be used again before reinitialisation}
+\\
+
+\textbf{Error handling} \\
+\entry{zerror(a)}  {Get error code}          {returns {\tt enum zerror}, and stores}
+\cont                                        {description in {\tt const char **a}}
+\entry{zperror(a)} {Print error description} {behaves like {\tt perror(a)}, {\tt a} is a,}
+\cont                                        {possibly {\tt NULL} or $\varepsilon$, {\tt const char *}}
+%\\
+
+\textbf{Arithmetic} \\
+\entry{zadd(a, b, c)}        {$a \gets b + c$}            {}
+\entry{zsub(a, b, c)}        {$a \gets b - c$}            {}
+\entry{zmul(a, b, c)}        {$a \gets b \cdot c$}        {}
+\entry{zmodmul(a, b, c, d)}  {$a \gets b \cdot c \mod d$} {$0 \le a~\mbox{sgn}~bc < \ab{d}$}
+\entry{zdiv(a, b, c)}        {$a \gets b / c$}            {rounded towards zero}
+\entry{zdivmod(a, b, c, d)}  {$a \gets c / d$}            {rounded towards zero}
+\entry{zdivmod(a, b, c, d)}  {$b \gets c \mod d$}         {$0 \le b~\mbox{sgn}~c < \ab{d}$}
+\entry{zmod(a, b, c)}        {$a \gets b \mod c$}         {$0 \le a~\mbox{sgn}~b < \ab{c}$}
+%\entry{zdiv\_exact(a, b, c)} {$a \gets b / c$}            {assumes $c \vert d$}
+\entry{zsqr(a, b)}           {$a \gets b^2$}              {}
+\entry{zmodsqr(a, b, c)}     {$a \gets b^2 \mod c$}       {$0 \le a < \ab{c}$}
+\entry{zsqr(a, b)}           {$a \gets b^2$}              {}
+\entry{zpow(a, b, c)}        {$a \gets b^c$}              {}
+\entry{zpowu(a, b, c)}       {$a \gets b^c$}              {{\tt c} is an \ullong{}}
+\entry{zmodpow(a, b, c, d)}  {$a \gets b^c \mod d$}       {$0 \le a~\mbox{sgn}~b^c < \ab{d}$}
+\entry{zmodpowu(a, b, c, d)} {$a \gets b^c \mod d$}       {ditto, {\tt c} is an \ullong{}}
+\entry{zabs(a, b)}           {$a \gets \ab{b}$}           {}
+\entry{zneg(a, b)}           {$a \gets -b$}               {}
+\\
+
+\textbf{Assignment} \\
+\entry{zset(a, b)}            {$a \gets b$}           {}
+\entry{zseti(a, b)}           {$a \gets b$}           {{\tt b} is an {\tt int64\_t}}
+\entry{zsetu(a, b)}           {$a \gets b$}           {{\tt b} is a {\tt uint64\_t}}
+\entry{zsets(a, b)}           {$a \gets b$}           {{\tt b} is a decimal {\tt const char *}}
+%\entry{zsets\_radix(a, b, c)} {$a \gets b$}           {{\tt b} is a radix $c$ {\tt const char *},}
+%\cont                                                 {{\tt c} is an \ullong{}}
+\entry{zswap(a, b)}           {$a \leftrightarrow b$} {}
+\\
+
+\textbf{Comparison} \\
+\entry{zcmp(a, b)}    {Compare $a$ and $b$}           {returns {\tt int} $\mbox{sgn}(a - b)$}
+\entry{zcmpi(a, b)}   {Compare $a$ and $b$}           {ditto, {\tt b} is an {\tt int64\_t}}
+\entry{zcmpu(a, b)}   {Compare $a$ and $b$}           {ditto, {\tt b} is a {\tt uint64\_t}}
+\entry{zcmpmag(a, b)} {Compare $\ab{a}$ and $\ab{b}$} {returns {\tt int} $\mbox{sgn}(\ab{a} - \ab{b})$}
+\\
+
+
+
+\end{tabular}
+\newpage
+\hspace{-2ex}
+\begin{tabular}{lll}
+
+
+
+\textbf{Bit operation} \\
+\entry{zand(a, b, c)}      {$a \gets b \wedge c$}         {bitwise}
+\entry{zor(a, b, c)}       {$a \gets b \vee c$}           {bitwise}
+\entry{zxor(a, b, c)}      {$a \gets b \oplus c$}         {bitwise}
+\entry{znot(a, b, c)}      {$a \gets \lnot b$}            {bitwise, cut at highest set bit}
+\entry{zlsh(a, b, c)}      {$a \gets b \cdot 2^c$}        {{\tt c} is a \size{}}
+\entry{zrsh(a, b, c)}      {$a \gets b / 2^c$}            {ditto, rounded towards zero}
+\entry{ztrunc(a, b, c)}    {$a \gets b \mod 2^c$}         {ditto, $a$ shares signum with $b$}
+\entry{zbits(a)}           {Get number of used bits}      {returns \size{}, 1 if $a = 0$}
+\entry{zlsb(a)}            {Get index of lowest set bit}  {returns \size{}, {\tt SIZE\_MAX} if $a = 0$}
+\entry{zbtest(a, b)}       {Is bit $b$ in $a$ set?}       {{\tt b} is a \size{}, returns {\tt int}}
+\entry{zbset(a, b, c, 1)}  {$a \gets b$, set bit $c$}     {{\tt c} is a \size{}}
+\entry{zbset(a, b, c, 0)}  {$a \gets b$, clear bit $c$}   {ditto}
+\entry{zbset(a, b, c, -1)} {$a \gets b$, flip bit $c$}    {ditto}
+\entry{zsplit(a, b, c, d)} {$a \gets c / 2^d$}            {{\tt d} is a \size{}, rounded towards zero}
+\entry{zsplit(a, b, c, d)} {$b \gets c \mod 2^d$}         {ditto, $b$ shares signum with $c$}
+\\
+
+\textbf{Conversion to string} \\
+\entry{zstr(a, b, c)}           {Convert $a$ to decimal}   {returns the resulting {\tt const char *}}
+\cont                                                      {--- {\tt b} unless {\tt b} is
+                                                                {\tt NULL}, --- $c$ must be}
+\cont                                                      {either 0 or at least the length of the}
+\cont                                                      {resulting string but at most the}
+\cont                                                      {allocation size of {\tt b} minus 1}
+%\entry{zstr\_radix(a, b, c, d)} {Convert $a$ to radix $d$} {ditto, {\tt d} is an \ullong{}}
+\entry{zstr\_length(a, b)}      {Get string length of $a$} {returns \size{} length of $a$ in radix $b$}
+\\
+
+\textbf{Marshallisation} \\
+\entry{zsave(a, b)}    {Marshal $a$ into $b$}    {returns \size{} number of saved bytes,}
+\cont                                            {{\tt b} is a {\tt void *}}
+\entry{zsave(a, NULL)} {Get marshal-size of $a$} {returns \size{}}
+\entry{zload(a, b)}    {Unmarshal $a$ from $b$}  {returns \size{} number of read bytes,}
+\cont                                            {{\tt b} is a {\tt const void *}}
+%\\
+
+\textbf{Number theory} \\
+\entry{zsignum(a, b)}     {$a \gets \mbox{sgn}~b$} {}
+\entry{zeven(a)}          {Is $a$ even?}           {returns {\tt int} 1 (true) or 0 (false)}
+\entry{zeven\_nonzero(a)} {Is $a$ even?}           {ditto, assumes $a \neq 0$}
+\entry{zodd(a)}           {Is $a$ odd?}            {returns {\tt int} 1 (true) or 0 (false)}
+\entry{zodd\_nonzero(a)}  {Is $a$ odd?}            {ditto, assumes $a \neq 0$}
+\entry{zzero(a)}          {Is $a$ zero?}           {returns {\tt int} 1 (true) or 0 (false)}
+\entry{zgcd(a, b, c)}     {$a \gets \gcd(c, b)$}   {$a < 0$ if $b < 0 \wedge c < 0$}
+\entry{zptest(a, b, c)}   {Is $b$ a prime?}        {$c$ runs of Miller--Rabin, returns}
+\cont                                              {{\tt enum zprimality} {\tt NONPRIME} (0)}
+\cont                                              {(and stores the witness in {\tt a} unless}
+\cont                                              {{\tt a} is {\tt NULL}), {\tt PROBABLY\_PRIME} (1), or}
+\cont                                              {{\tt PRIME} (2)}
+%\\
+
+\textbf{Randomness} \\
+\entry{zrand(a, b, UNIFORM, d)} {$a \xleftarrow{\$} \textbf{Z}_d$}
+      {{\tt b} is a {\tt enum zranddev}, e.g.}
+\cont {{\tt DEFAULT\_RANDOM}, {\tt FASTEST\_RANDOM}}
+\\
+
+
+
+\end{tabular}
+\end{document}

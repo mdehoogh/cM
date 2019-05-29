@@ -6,9 +6,19 @@
 #include "Moutput.h"
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
 #include "Msession.h"
+// MDH@29MAY2019: for big integer arithmetic
+#include "zahl.h"
 
 const char* MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
 const char* IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
+
+// initialization for big integer arithmetic
+jmp_buf env;
+bool initExecution(){
+    if(setjmp(env))return false;
+    zsetup(env);
+    return true;
+}
 
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
@@ -204,6 +214,14 @@ Minteger* new_integer(long long ll){
     if(_integer)_integer->ll=ll;
     return _integer;
 }
+Mbiginteger* new_biginteger(long long ll){
+    Mbiginteger* _biginteger=malloc(sizeof(Mbiginteger));
+    if(_biginteger){
+        zinit(_biginteger->bi);
+        zseti(_biginteger->bi,ll); // TODO check if long long actually matches int64_t (as I expect it will on this machine!!)
+    }
+    return _biginteger;
+}
 Mreal* new_real(long double ld){
     Mreal* _real=malloc(sizeof(Mreal));
     if(_real)_real->ld=ld;
@@ -227,6 +245,12 @@ Mvalue* _getIntegerValue(long long ll){
     Mvalue* _integervalue=(_integer?_newValue():NULL);
     if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
     return _integervalue;
+}
+Mvalue* _getBigIntegerValue(long long ll){
+    Mbiginteger* _biginteger=new_biginteger(ll);
+    Mvalue* _bigintegervalue=(_biginteger?_newValue():NULL);
+    if(_bigintegervalue){_bigintegervalue->type=VT_BIGINTEGER;_bigintegervalue->value._biginteger=_biginteger;}
+    return _bigintegervalue;
 }
 Mvalue* _getRealValue(long double ld){
     Mreal* _real=new_real(ld);
@@ -1588,9 +1612,26 @@ Mvalue* Mlen(Mvalue* _value){
     }
     return _getIntegerValue(result);
 }
+
+// MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
+long long bi2b(z_t bi){
+
+}
 Mvalue* Mfac(Mvalue* _value){
-    long long n=(_value&&_value->type==VT_INTEGER?_value->value._integer->ll:LLONG_MIN);
-    if(n==LLONG_MIN)return NULL;
+    if(!_value)return NULL;
+    if(_value->type!=VT_INTEGER||_value->type!=VT_BIGINTEGER)return NULL;
+    z_t* result=NULL;
+    if(_value->type==VT_INTEGER){
+        if(_value->value._integer->ll==LLONG_MIN)return NULL; // TODO abstract checking for nai
+        result=new_biginteger(_value->value._integer->ll);
+    }else
+        result=_value->value._biginteger->bi;
+    if(result){
+        while(!zcmpi(*result,2))zmul(result,result-1,result);
+
+    }
+    return NULL;
+    /* replacing:
     // 39 is about the maximum that we can store in a long long
     if(n<40){
         long long result=n;while(--n>1)result*=n; // TODO should we use multiply here NO I guess not, although we could get overflow at some point!!!
@@ -1599,6 +1640,15 @@ Mvalue* Mfac(Mvalue* _value){
     long double result=n;
     while(--n>1)result*=n;
     return _getRealValue(result);
+    */
+}
+
+// big integer arithmetic
+Mvalue* Mbi(Mvalue* _value){
+    if(_value&&_value->type==VT_INTEGER){
+        Mvalue* _biValue=getBigIntegerValue(_value->value._integer->ll);
+    }
+    return NULL;
 }
 
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){
