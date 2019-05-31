@@ -4,19 +4,46 @@
 #include "Moutput.h"
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
 #include "Msession.h"
-#include "zahl.h"
+// MDH@31MAY2019 (married for 8 year now): switched from libzahl to tommath
+#include "tommath.h"
 #include "Mexecution.h"
 
 const char* MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
 const char* IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
 
-// initialization for big integer arithmetic
+/* initialization for big integer arithmetic
 jmp_buf env;
 bool initExecution(){
     if(setjmp(env))return false;
     zsetup(env);
     return true;
 }
+*/
+// new_mp_int returns an initialized big integer on success, or NULL when failing
+mp_int* new_mp_int(){
+    mp_int* result=(mp_int*)malloc(sizeof(mp_int));
+    if(!result)return NULL;
+    if(mp_init(result)!=MP_OKAY){mp_clear(result);return NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
+    return result;
+}
+mp_int* _getBigInteger(int64_t l){
+    mp_int* bi=new_mp_int();
+    if(l)mp_set_i64(bi,l); // TODO mp_set_i64 can fail can't it? then why is it of type void???
+    return bi;
+}
+// pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
+mp_int* _getBigIntegerCopy(mp_int* bi){
+    mp_int* result=new_mp_int();
+    if(bi&&mp_copy(result,bi)!=MP_OKAY){mp_clear(result);return NULL;}
+    return result;
+}
+
+// using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
+static mp_int *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
+mp_int* getBigIntegerZero(){if(!bi0)bi0=_getBigInteger(0);return bi0;}
+mp_int* getBigIntegerOne(){if(!bi1)bi1=_getBigInteger(1);return bi1;}
+mp_int* getBigIntegerTwo(){if(!bi2)bi2=_getBigInteger(2);return bi2;}
+mp_int* getBigIntegerThree(){if(!bi3)bi3=_getBigInteger(3);return bi3;}
 
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
@@ -70,11 +97,10 @@ void free_integer(Minteger* _integer){
     }else
         output("\nBUG: No integer to free!");
 }
-void free_biginteger(Mbiginteger* _biginteger){
-    if(_biginteger){
+void free_biginteger(mp_int* bi){
+    if(bi){
         if(amVerbose())output("\nFreeing big integer."); // TODO can we display the value?
-        zfree(_biginteger->bi); // TODO guess we need to do this!!!!
-        free(_biginteger);
+        mp_clear(bi); // directly call mp_clear on the mp_int pointer!!!
     }else
         output("\nBUG: No big integer to free!");
 }
@@ -221,17 +247,15 @@ Minteger* new_integer(long long ll){
     if(_integer)_integer->ll=ll;
     return _integer;
 }
+/*
 Mbiginteger* new_biginteger(z_t zt){
     Mbiginteger* _biginteger=malloc(sizeof(Mbiginteger));
     if(_biginteger){
         zset(_biginteger->bi,zt);
-        /*
-        zinit(_biginteger->bi);
-        zseti(_biginteger->bi,ll); // TODO check if long long actually matches int64_t (as I expect it will on this machine!!)
-        */
     }
     return _biginteger;
 }
+*/
 Mreal* new_real(long double ld){
     Mreal* _real=malloc(sizeof(Mreal));
     if(_real)_real->ld=ld;
@@ -256,11 +280,10 @@ Mvalue* _getIntegerValue(long long ll){
     if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
     return _integervalue;
 }
-Mvalue* _getBigIntegerValue(z_t zt){
-    Mbiginteger* _biginteger=new_biginteger(zt);
-    Mvalue* _bigintegervalue=(_biginteger?_newValue():NULL);
-    if(_bigintegervalue){_bigintegervalue->type=VT_BIGINTEGER;_bigintegervalue->value._biginteger=_biginteger;}
-    return _bigintegervalue;
+Mvalue* _getBigintegerValue(mp_int* _biginteger){
+    Mvalue* _bigintegerValue=(_biginteger?_newValue():NULL);
+    if(_bigintegerValue){_bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;}
+    return _bigintegerValue;
 }
 Mvalue* _getRealValue(long double ld){
     Mreal* _real=new_real(ld);
@@ -1342,6 +1365,15 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 		////////printf("\nTYPE: %d",_value->type);
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
+            case VT_BIGINTEGER: // how many characters do we need????
+                {
+                    char buffer[1024];
+                    if(mp_toradix_n(_value->value._biginteger,buffer,10,1024)!=MP_OKAY)
+                        output("\nERROR: 1024 characters can't hold the big integer decimal representation.");
+                    else
+                        valueText=new_mstring(buffer);
+                }
+                break;
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
 			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
@@ -1359,6 +1391,16 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
     return _UNDEFINED_VALUETEXT;
     */
+}
+void outputBigInteger(const char* const prefix,const mp_int* const _bigInteger,const char* const postfix){
+    if(prefix)output("%s",prefix);
+    mstring* _bigIntegerText=string_create();
+    char buffer[1024];
+    if(mp_toradix_n(_bigInteger,buffer,10,1024)!=MP_OKAY)
+        output("too large for buffer");
+    else
+        output("%s",buffer);
+    if(postfix)output("%s",postfix);
 }
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
     if(prefix)output("%s",prefix);
@@ -1594,6 +1636,7 @@ bool isNull(Mvalue* _value){
     if(_value)
     switch(_value->type){
         case VT_INTEGER:return !_value->value._integer;
+        case VT_BIGINTEGER:return !_value->value._biginteger;
         case VT_REAL:return !_value->value._real;
         case VT_STRING:return !_value->value._string;
         case VT_LIST:return !_value->value._list;
@@ -1624,21 +1667,42 @@ Mvalue* Mlen(Mvalue* _value){
 }
 
 // MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
-long long bi2b(z_t bi){
-    return 0;
-}
 Mvalue* Mfac(Mvalue* _value){
-    if(!_value)return NULL;
-    if(_value->type!=VT_INTEGER||_value->type!=VT_BIGINTEGER)return NULL;
-    z_t result;
-    zinit(result);
+    if(!_value){if(amVerbose())output("\nNo value!");return NULL;}
+    if(amVerbose())outputValue("\nArgument of fac() function: '",_value,"'.");
+    if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){outputValue("\nERROR: Non-integer argument '",_value,"' to fac() function!");return NULL;}
+    // some special cases (i.e. the input number is smaller than 2)
+    mp_int* finalmultiplier=NULL;
     if(_value->type==VT_INTEGER){
-        if(_value->value._integer->ll==LLONG_MIN)return NULL; // TODO abstract checking for nai
-        zseti(result,_value->value._integer->ll);
+        if(_value->value._integer->ll<0){output("\nERROR: Invalid (negative integer) argument to fac() function.");return NULL;}
+        if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
+        finalmultiplier=_getBigInteger(_value->value._integer->ll);
+    }else{
+        if(_value->value._biginteger->sign==MP_NEG){output("\nERROR: Invalid (negative integer) argument to fac() function!");return NULL;}
+        if(mp_cmp(_value->value._biginteger,getBigIntegerThree())==MP_LT)return _getBigintegerValue(_getBigIntegerCopy(_value->value._biginteger));
+        finalmultiplier=_value->value._biginteger;
+    }
+    if(!finalmultiplier){outputValue("\nERROR: Failed to convert '",_value,"' to a big integer!");return NULL;}
+    if(amVerbose()&&amDebugging())outputBigInteger("\nFinal multiplier: '",finalmultiplier,"'.");
+    mp_int* result=_getBigInteger(6); // the smallest value to return
+    if(result){
+        // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
+        // we could start at some intermediate value????
+        mp_int *multiplier=_getBigInteger(3);
+        if(multiplier){
+            while(mp_cmp(multiplier,finalmultiplier)==MP_LT){
+                if(mp_incr(multiplier)!=MP_OKAY){if(amVerbose())output("\nERROR: Failed to increment big integer!");result=NULL;break;} // if we fail to increment break
+                if(mp_mul(result,multiplier,result)!=MP_OKAY){if(amVerbose())output("\nERROR: Failed to multiply big integer!");result=NULL;break;}
+                //////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
+            }
+            // get rid of intermediate big integers
+            mp_clear(multiplier);
+        }
     }else
-        zset(result,_value->value._biginteger->bi);
-    // TODO perform the computation
-    return _getBigIntegerValue(result);
+        if(amVerbose())output("\nERROR: No initial big integer 6.");
+    if(_value->type==VT_INTEGER)mp_clear(finalmultiplier);
+    if(amVerbose())outputBigInteger("\nResult of applying the fac() function: '",result,"'.");
+    return (result?_getBigintegerValue(result):NULL);
     /* replacing:
     // 39 is about the maximum that we can store in a long long
     if(n<40){
@@ -1650,7 +1714,7 @@ Mvalue* Mfac(Mvalue* _value){
     return _getRealValue(result);
     */
 }
-
+/*
 // big integer arithmetic
 Mvalue* Mbi(Mvalue* _value){
     if(_value&&_value->type==VT_INTEGER){
@@ -1661,7 +1725,7 @@ Mvalue* Mbi(Mvalue* _value){
     }
     return NULL;
 }
-
+*/
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
     *_valueholder=_value; // replace what's being pointed to

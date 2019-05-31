@@ -2002,6 +2002,7 @@ void outputValueColored(Mvalue* _value){
 	switch(_value->type){
 		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output(string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
+		case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBigInteger(NULL,_value->value._biginteger,NULL);break;
 		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
 		case VT_STRING:outputTokenTypeColor(_value->value._string->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
 		case VT_LIST:

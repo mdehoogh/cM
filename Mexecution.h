@@ -27,7 +27,8 @@
 
 // Token and Mexpression is provided in Mexpression.h
 #include "Mexpression.h"
-#include "zahl.h"
+// MDH@31MAY2019: switched from libzahl to libtommatch
+#include "tommath.h"
 
 bool initExecution();
 
@@ -41,11 +42,11 @@ typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_REAL,
 typedef struct Minteger{
     long long ll; // signed 64-bit integer (for now)
 }Minteger;
-
+/*
 typedef struct Mbiginteger{
-    z_t bi;
+    mp_int* _mi;
 }Mbiginteger;
-
+*/
 // TODO Mreal could become a union if we're storing multiple types of reals in it
 typedef struct Mreal{
     long double ld; // double precision floating point binary number (for now)
@@ -61,7 +62,7 @@ struct Mmap;
 typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
-    Mbiginteger* _biginteger;
+    mp_int* _biginteger; // most convenient to immediately point to the mp_int structure
     Mreal* _real;
     Mstring* _string;
     struct Mlist* _list;
@@ -237,7 +238,7 @@ bool createVariable(Menvironment* _environment,const char* name,Mvaluetype value
 // NOTE this doesn't mean that 
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
-Mvalue* _getBigIntegerValue(z_t zt);
+Mvalue* _getBigintegerValue(mp_int* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
 Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
@@ -317,6 +318,7 @@ mstring* _getMapText(Mmap* _map);
 mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value,long long invalid);
+void outputBigInteger(const char* const prefix,const mp_int* const _value,const char* const postfix);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
 // list to map (list) conversions
