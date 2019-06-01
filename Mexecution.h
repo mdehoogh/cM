@@ -236,6 +236,22 @@ bool createVariable(Menvironment* _environment,const char* name,Mvaluetype value
 
 // anybody can ask for a specific type of value (wrapping certain contents) and the pointer in it should be considered immutable i.e. Mvalue itself should be considered immutable
 // NOTE this doesn't mean that 
+/*
+const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
+// it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
+const long long M_LL_MIN=LLONG_MIN+1;
+const long long M_LL_MAX=LLONG_MAX;
+*/
+long long double2long(long double ld); // convert long double to long long
+
+mp_err mp_set_long_double(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
+
+mp_int* _getBiginteger(int64_t l);
+
+// in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
+mp_int* getBigintegerLLMin();
+mp_int* getBigintegerLLMax();
+
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
 Mvalue* _getBigintegerValue(mp_int* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here

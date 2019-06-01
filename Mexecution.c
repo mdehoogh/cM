@@ -26,24 +26,25 @@ mp_int* new_mp_int(){
     if(mp_init(result)!=MP_OKAY){mp_clear(result);return NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
     return result;
 }
-mp_int* _getBigInteger(int64_t l){
-    mp_int* bi=new_mp_int();
-    if(l)mp_set_i64(bi,l); // TODO mp_set_i64 can fail can't it? then why is it of type void???
-    return bi;
+mp_int* _getBiginteger(int64_t l){
+    mp_int* _biginteger=new_mp_int();
+    if(l)mp_set_i64(_biginteger,l); // TODO mp_set_i64 can fail can't it? then why is it of type void???
+    return _biginteger;
 }
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
-mp_int* _getBigIntegerCopy(mp_int* bi){
-    mp_int* result=new_mp_int();
-    if(bi&&mp_copy(result,bi)!=MP_OKAY){mp_clear(result);return NULL;}
-    return result;
+mp_int* _getBigintegerCopy(mp_int* _biginteger){
+    if(!_biginteger)return NULL;
+    mp_int* _result=new_mp_int();
+    if(mp_copy(_result,_biginteger)!=MP_OKAY){mp_clear(_result);return NULL;}
+    return _result;
 }
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static mp_int *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-mp_int* getBigIntegerZero(){if(!bi0)bi0=_getBigInteger(0);return bi0;}
-mp_int* getBigIntegerOne(){if(!bi1)bi1=_getBigInteger(1);return bi1;}
-mp_int* getBigIntegerTwo(){if(!bi2)bi2=_getBigInteger(2);return bi2;}
-mp_int* getBigIntegerThree(){if(!bi3)bi3=_getBigInteger(3);return bi3;}
+mp_int* getBigIntegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}
+mp_int* getBigIntegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
+mp_int* getBigIntegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
+mp_int* getBigIntegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
 
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
@@ -1241,12 +1242,109 @@ mstring* _getIntegerText(Minteger* _integer){
 	return s;
 }
 
+const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
+// it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
+const long long M_LL_MIN=LLONG_MIN+1;
+const long long M_LL_MAX=LLONG_MAX;
+
+mp_int *_biLLMin=NULL,*_biLLMax=NULL;
+
+mp_int* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);return _biLLMin;}
+mp_int* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}
+
+// MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
+typedef struct ldintparts{
+    uint16_t signandexponent;
+    uint64_t mantisse;
+} ldintparts;
+
+#  define MP_ZERO_DIGITS(mem, digits)                   \
+do {                                                    \
+   int zd_ = (digits);                                  \
+   mp_digit* zm_ = (mem);                               \
+   while (zd_-- > 0) {                                  \
+      *zm_++ = 0;                                       \
+   }                                                    \
+} while (0)
+typedef unsigned __int128 uint128_t;
+const uint128_t ONE128=1;
+void mp_set_u128(mp_int* a,uint128_t b){
+    int i=0;
+    while(b!=0u){
+        a->dp[i++]=((mp_digit)b&MP_MASK);
+        if(128<=MP_DIGIT_BIT)break;
+        b>>=((128<=MP_DIGIT_BIT)?0:MP_DIGIT_BIT);
+    }
+    a->used=i;
+    a->sign=MP_ZPOS;
+    MP_ZERO_DIGITS(a->dp+a->used,a->alloc-a->used);
+}
+mp_err mp_set_long_double(mp_int *a, long double b){
+    if(sizeof(long double)==16){
+        int exp;
+        mp_err err;
+        union {
+            long double dbl;
+            uint128_t bits;
+        } cast;
+        cast.dbl=b;
+        exp=(int)((unsigned)(cast.bits>>112)&0x7FFFu); // get rid of mantisse and sign
+        uint128_t frac=(cast.bits&((ONE128<<112)-1uLL))|(ONE128<<112);
+        if(exp==0x7FFF)return MP_VAL; /* +-inf, NaN */
+        exp-=16383+112;
+        mp_set_u128(a,frac);
+        err=(exp<0)?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a);
+        if(err!=MP_OKAY)return err;
+        if(((cast.bits>>127)!=0uLL)&&!mp_iszero(a))a->sign=MP_NEG;
+        return MP_OKAY;
+    }
+    if(sizeof(long double)==10){
+        uint64_t frac;
+        int exp;
+        mp_err err;
+        union {
+            long double dbl;
+            ldintparts ldints;
+        } cast;
+        cast.dbl=b;
+        if((cast.ldints.mantisse>>63)==0){ // a normalized number
+            exp=(int)((unsigned)(cast.ldints.signandexponent)&0x7FFFu);
+            if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; /* +-inf, NaN */
+            exp-=16383+63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers    
+            frac=(cast.ldints.mantisse<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
+            mp_set_u64(a,frac);
+            if(amVerbose())output("\nFraction part %16x used to initialize the big integer.",frac);
+            err=(exp<0?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a));
+            if(err!=MP_OKAY){output("ERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
+            // take over the sign from the long double (bit 15 in the signandexponent part)
+            if(((cast.ldints.signandexponent>>15)!=0uLL)&&!mp_iszero(a))a->sign=MP_NEG;
+            if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
+        }else // a denormalized number, which all map to zero!!
+            mp_zero(a); // NOTE it probably is already zero!!
+        return MP_OKAY;
+    }else
+    if(sizeof(long double)==8){
+        if(amVerbose())output("\nNOTE: Long double has same size as a double!");
+        return mp_set_double(a,(double)b);
+    }
+    if(amVerbose())output("\nThe size of a long double is %u.",sizeof(long double));
+    return MP_VAL;
+}
+
 // part of implementing _getRealText (so not present in the header)
 const char* M_NAN="NaN";
 const char* M_INF="Inf";
 bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}
 bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}
 bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}
+long long double2long(long double ld){
+    if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
+    // TODO perhaps there are some other 
+    if(ldIsZero(ld))return 0;
+    long double tld=truncl(ld); // extract the integer part i.e. floor towards zero (which is called truncate)
+    if(tld<M_LL_MIN||tld>M_LL_MAX)return M_LL_INVALID; // out of range
+    return(long long)tld;
+}
 mstring* _getRealText(Mreal* _real){
 	mstring* s=string_create();
     mstring* p=s;
@@ -1676,19 +1774,19 @@ Mvalue* Mfac(Mvalue* _value){
     if(_value->type==VT_INTEGER){
         if(_value->value._integer->ll<0){output("\nERROR: Invalid (negative integer) argument to fac() function.");return NULL;}
         if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
-        finalmultiplier=_getBigInteger(_value->value._integer->ll);
+        finalmultiplier=_getBiginteger(_value->value._integer->ll);
     }else{
         if(_value->value._biginteger->sign==MP_NEG){output("\nERROR: Invalid (negative integer) argument to fac() function!");return NULL;}
-        if(mp_cmp(_value->value._biginteger,getBigIntegerThree())==MP_LT)return _getBigintegerValue(_getBigIntegerCopy(_value->value._biginteger));
+        if(mp_cmp(_value->value._biginteger,getBigIntegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger));
         finalmultiplier=_value->value._biginteger;
     }
     if(!finalmultiplier){outputValue("\nERROR: Failed to convert '",_value,"' to a big integer!");return NULL;}
     if(amVerbose()&&amDebugging())outputBigInteger("\nFinal multiplier: '",finalmultiplier,"'.");
-    mp_int* result=_getBigInteger(6); // the smallest value to return
+    mp_int* result=_getBiginteger(6); // the smallest value to return
     if(result){
         // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
         // we could start at some intermediate value????
-        mp_int *multiplier=_getBigInteger(3);
+        mp_int *multiplier=_getBiginteger(3);
         if(multiplier){
             while(mp_cmp(multiplier,finalmultiplier)==MP_LT){
                 if(mp_incr(multiplier)!=MP_OKAY){if(amVerbose())output("\nERROR: Failed to increment big integer!");result=NULL;break;} // if we fail to increment break

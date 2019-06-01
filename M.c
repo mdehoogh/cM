@@ -139,16 +139,82 @@ Mvalue* NULL_value=NULL; // the value containing the text to show when a value e
 long double getNAR(){return NAR_value->value._real->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
 
-Mvalue* i(Mvalue* _value){
-	if(amVerbose())outputValue("Converting '",_value,"' to an integer.");
-	Mvalue* _integerValue=NAI_value;
+typedef union {
+	long long ll;
+	char octets[sizeof(long long)];
+} longlongunion;
+typedef union {
+	long double ld;
+	char octets[sizeof(long double)];
+} longdoubleunion;
+Mvalue* d(Mvalue* _value){
+	Mlist* _dlist=NULL;
 	if(_value){
-		if(_value->type==VT_INTEGER)_integerValue=_value;else
-		if(_value->type==VT_REAL)_integerValue=_getIntegerValue((long long)_value->value._real->ld);else // TODO casting to a long long is a bit crude!!
-		if(_value->type==VT_STRING)_integerValue=_getIntegerValue(_strtoll(_value->value._string->_c,getNAI()));
+		if(_value->type==VT_INTEGER){
+			_dlist=_getListOfType(VT_INTEGER);
+			longlongunion llu;
+			llu.ll=_value->value._integer->ll;
+			int l=sizeof(long long);
+			while(--l>=0&&appendedToList(_dlist,_getIntegerValue((uint8_t)llu.octets[l]),0));
+		}else
+		if(_value->type==VT_REAL){
+			_dlist=_getListOfType(VT_INTEGER);
+			longdoubleunion lld;
+			lld.ld=_value->value._real->ld;
+			int l=sizeof(long double);
+			while(--l>=0&&appendedToList(_dlist,_getIntegerValue((uint8_t)lld.octets[l]),0));
+		}
 	}
-	if(amVerbose())outputValue("Converted to '",_integerValue,"'.");
-	return _integerValue;
+	return (_dlist?_getValueOfList(_dlist):NULL);
+} 
+
+Mvalue* i(Mvalue* _value){
+	if(amVerbose())outputValue("\nConverting '",_value,"' to an integer.");
+	Mvalue* _integerValue=NAI_value;
+	
+	if(_value)
+	switch(_value->type){
+		case VT_INTEGER:return _value;
+		case VT_BIGINTEGER:
+				// this will not be possible when the big integer is out of range
+			{
+				mp_int* biLLMin=getBigintegerLLMin();
+				mp_int* biLLMax=getBigintegerLLMax();
+				if(mp_cmp(_value->value._biginteger,biLLMin)!=MP_LT&&mp_cmp(_value->value._biginteger,biLLMax)!=MP_GT)
+					return _getIntegerValue(mp_get_i64(_value->value._biginteger));
+			}
+			break;
+		case VT_REAL:return _getIntegerValue(double2long(_value->value._real->ld));
+		case VT_STRING:return _getIntegerValue(_strtoll(_value->value._string->_c,getNAI()));
+		default:break;
+	}
+	return NULL;
+}
+// convert to a big integer
+Mvalue* I(Mvalue* _value){
+	if(amVerbose())outputValue("\nConverting '",_value,"' to a big integer.");
+	if(_value){
+		switch(_value->type){
+			case VT_BIGINTEGER:return _value;
+			case VT_INTEGER:return _getBigintegerValue(_getBiginteger(_value->value._integer->ll));
+			case VT_REAL:
+				{
+					// this is a bit of a nuisance when the double is out of the VT_INTEGER range
+					mp_int* _bigInteger=_getBiginteger(0);
+					if(mp_set_long_double(_bigInteger,_value->value._real->ld)==MP_OKAY)return _getBigintegerValue(_bigInteger);
+					mp_clear(_bigInteger);
+				}
+				break;
+			case VT_STRING:
+				{
+					mp_int* _bigInteger=_getBiginteger(0);
+					if(mp_read_radix(_bigInteger,_value->value._string->_c,10)==MP_OKAY)return _getBigintegerValue(_bigInteger);
+					mp_clear(_bigInteger); // not used so free immediately
+				}
+			default:break;
+		}
+	}
+	return NULL;
 }
 Mvalue* r(Mvalue* _value){
 	if(amVerbose())outputValue("Converting '",_value,"' to a real.");
@@ -210,8 +276,8 @@ bool initEnvironment(){
 				outputLine("WARNING: Failed to create, add or initialize Not-a-real constant NAR.");
 				////////return false;
 			}
-			if(!NAI_value||!addVariable(_Menvironment,"nai",VT_INTEGER,false)||!setValue(_Menvironment,"nai",NAI_value)){
-				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default nai.");
+			if(!NAI_value||!addVariable(_Menvironment,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
+				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
 			// create and add PI and E constants!!!
@@ -278,7 +344,8 @@ bool initEnvironment(){
 			}
 			*/
 			// conversions
-			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"r"),r)){
+			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"I"),I)
+					||!completedValueFunction(newFunction(_Menvironment,"r"),r)||!completedValueFunction(newFunction(_Menvironment,"d"),d)){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
 			}
