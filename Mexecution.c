@@ -672,12 +672,14 @@ void checkList(Mlist* _list){
     }
 }
 // instead of returning a boolean we could return the assigned index (0 on failure)
+// MDH@02JUN2019: check (and correct) prepending
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index){
     if(!_list||!_value){output("\nERROR: %s.","No list to append to or no value to append");return 0;}
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     if(index<=0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
     if(index<=0){output("\nERROR: Index %lld of (new) list element too small.",index);return 0;}
+    if(amVerbose())outputValue("Appending '",_value,"' to list.");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
     Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index<=lastindex?_list->_first:NULL);
@@ -688,8 +690,8 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long l
             if(!_listelement->_next){outputValue("\nBUG: Index of list element '",_listelement->_value,"' probably out of order.");return 0;}
             _listelement=_listelement->_next;
         }
-        // if we're going to insert we there will be a successor
-        if(_listelement->index!=index){_nextListelement=_prevListelement->_next;_listelement=NULL;} // so that we are forced to create one
+        // if we're going to insert there will be a successor
+        if(_listelement->index!=index){_nextListelement=(_prevListelement?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
     }else // we'll be appending, so the current last is the predecessor (and no successor)
         _prevListelement=_list->_last;
     // if we do not have a list element ascertain to have one
@@ -1247,17 +1249,42 @@ const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLO
 const long long M_LL_MIN=LLONG_MIN+1;
 const long long M_LL_MAX=LLONG_MAX;
 
+// BigInteger stuff
+mstring* _getBigIntegerText(const mp_int* const a){
+    // determine the required size
+    int arepsize;
+    if(mp_radix_size(a,10,&arepsize)!=MP_OKAY){if(amVerbose())output("\nCan't get the size of big integer.");return NULL;}
+    if(arepsize>0xFFFFFFFF){output("\nCan't store more than %u characters in a string.",0xFFFFFFFF);return NULL;}
+    mstring* _rep=string_setlength(string_create(),arepsize);
+    if(!_rep){output("\nERROR: Failed to create a string to hold %d characters.",arepsize);return NULL;}
+    if(mp_toradix(a,_rep->chars,10)==MP_OKAY){string_synclength(_rep);return _rep;} // return _rep if we succeed in storing the text representation of a
+    free_mstring(_rep); // get rid of the mstring that we would have returned on success
+    output("\nERROR: Failed to big integer decimal representation.");
+    return NULL;
+}
+
 mp_int *_biLLMin=NULL,*_biLLMax=NULL;
 
 mp_int* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);return _biLLMin;}
 mp_int* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
-typedef struct ldintparts{
-    uint16_t signandexponent;
+typedef struct {
     uint64_t mantisse;
-} ldintparts;
-
+    int16_t exponent;
+} littleEndianLongDouble;
+typedef struct {
+    int16_t exponent;
+    uint64_t mantisse;
+} bigEndianLongDouble;
+typedef union {
+    long double ld;
+    littleEndianLongDouble lELD;
+} littleEndianLongDoubleUnion;
+typedef union {
+    long double ld;
+    bigEndianLongDouble bELD;
+} bigEndianLongDoubleUnion;
 #  define MP_ZERO_DIGITS(mem, digits)                   \
 do {                                                    \
    int zd_ = (digits);                                  \
@@ -1279,7 +1306,42 @@ void mp_set_u128(mp_int* a,uint128_t b){
     a->sign=MP_ZPOS;
     MP_ZERO_DIGITS(a->dp+a->used,a->alloc-a->used);
 }
-mp_err mp_set_long_double(mp_int *a, long double b){
+mp_err mp_set_long_double(mp_int *a, long double b,bool littleEndian){
+    // always assume 10-byte long double (extended precision)
+    bool negative=false;
+    int16_t exp;
+    uint64_t frac;
+    if(littleEndian){
+        littleEndianLongDoubleUnion lELDU;
+        lELDU.ld=b;
+        frac=lELDU.lELD.mantisse;
+        exp=lELDU.lELD.exponent;
+    }else{
+        bigEndianLongDoubleUnion bELDU;
+        bELDU.ld=b;
+        frac=bELDU.bELD.mantisse;
+        exp=bELDU.bELD.exponent;
+    }
+    if(exp){
+        if(exp<0){negative=true;exp=-exp;}
+        if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
+        exp-=16383; // the actual exponent
+        exp-=63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers  
+        //////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
+        if(amVerbose())output("\nExponent: %d - fraction: %llu.",exp,frac);  
+        mp_set_u64(a,frac);
+        if(amVerbose())output("\nVaue after setting the fraction: %s.",_getBigIntegerText(a)); /////outputValue("\nFraction part %16x used to initialize the big integer.",frac);
+        if(exp){
+            mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
+            if(err!=MP_OKAY){output("ERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
+        }
+        // take over the sign from the long double (bit 15 in the signandexponent part)
+        if(negative&&!mp_iszero(a))a->sign=MP_NEG;
+        if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
+    }else // all zeros stored exponent
+        mp_zero(a);
+    return MP_OKAY;
+    /*
     if(sizeof(long double)==16){
         int exp;
         mp_err err;
@@ -1290,7 +1352,7 @@ mp_err mp_set_long_double(mp_int *a, long double b){
         cast.dbl=b;
         exp=(int)((unsigned)(cast.bits>>112)&0x7FFFu); // get rid of mantisse and sign
         uint128_t frac=(cast.bits&((ONE128<<112)-1uLL))|(ONE128<<112);
-        if(exp==0x7FFF)return MP_VAL; /* +-inf, NaN */
+        if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
         exp-=16383+112;
         mp_set_u128(a,frac);
         err=(exp<0)?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a);
@@ -1309,7 +1371,7 @@ mp_err mp_set_long_double(mp_int *a, long double b){
         cast.dbl=b;
         if((cast.ldints.mantisse>>63)==0){ // a normalized number
             exp=(int)((unsigned)(cast.ldints.signandexponent)&0x7FFFu);
-            if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; /* +-inf, NaN */
+            if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
             exp-=16383+63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers    
             frac=(cast.ldints.mantisse<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
             mp_set_u64(a,frac);
@@ -1327,8 +1389,9 @@ mp_err mp_set_long_double(mp_int *a, long double b){
         if(amVerbose())output("\nNOTE: Long double has same size as a double!");
         return mp_set_double(a,(double)b);
     }
-    if(amVerbose())output("\nThe size of a long double is %u.",sizeof(long double));
+     if(amVerbose())output("\nThe size of a long double is %u.",sizeof(long double));
     return MP_VAL;
+   */
 }
 
 // part of implementing _getRealText (so not present in the header)
@@ -1463,15 +1526,7 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 		////////printf("\nTYPE: %d",_value->type);
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
-            case VT_BIGINTEGER: // how many characters do we need????
-                {
-                    char buffer[1024];
-                    if(mp_toradix_n(_value->value._biginteger,buffer,10,1024)!=MP_OKAY)
-                        output("\nERROR: 1024 characters can't hold the big integer decimal representation.");
-                    else
-                        valueText=new_mstring(buffer);
-                }
-                break;
+            case VT_BIGINTEGER:valueText=_getBigIntegerText(_value->value._biginteger);break; // how many characters do we need????
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
 			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
@@ -1492,12 +1547,12 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 }
 void outputBigInteger(const char* const prefix,const mp_int* const _bigInteger,const char* const postfix){
     if(prefix)output("%s",prefix);
-    mstring* _bigIntegerText=string_create();
-    char buffer[1024];
-    if(mp_toradix_n(_bigInteger,buffer,10,1024)!=MP_OKAY)
+    mstring* _bigIntegerText=_getBigIntegerText(_bigInteger);
+    if(_bigIntegerText){
+        output("%s",string(_bigIntegerText));
+        free_mstring(_bigIntegerText);
+    }else
         output("too large for buffer");
-    else
-        output("%s",buffer);
     if(postfix)output("%s",postfix);
 }
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
@@ -1764,6 +1819,10 @@ Mvalue* Mlen(Mvalue* _value){
     return _getIntegerValue(result);
 }
 
+Mvalue* Mfacd(Mvalue* _value){
+    // Stirling formula to compute the number of factorial digits in n!: return floor( ((n+0.5)*log(n) - n + 0.5*log(2*pi))/log(10) ) + 1
+    return NULL;
+}
 // MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
 Mvalue* Mfac(Mvalue* _value){
     if(!_value){if(amVerbose())output("\nNo value!");return NULL;}

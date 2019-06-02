@@ -139,39 +139,69 @@ Mvalue* NULL_value=NULL; // the value containing the text to show when a value e
 long double getNAR(){return NAR_value->value._real->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
 
+// conversion to decimal,  hex and binary
+// the 'real' number of octets used by a long double
+#define M_LONG_DOUBLE_OCTETS 10
+bool littleEndian;
+void initConversions(){
+	int i=1;
+	char* c=(char*)&i;
+	littleEndian=*c;
+	if(amVerbose())output(littleEndian?"\nLittle endian.":"Big endian.");
+}
 typedef union {
 	long long ll;
-	char octets[sizeof(long long)];
+	uint8_t octets[sizeof(long long)];
 } longlongunion;
+// a long double itself is 10 octets but sizeof(long double) might be 12 or 16
 typedef union {
 	long double ld;
-	char octets[sizeof(long double)];
+	uint8_t octets[sizeof(long double)];
 } longdoubleunion;
-Mvalue* d(Mvalue* _value){
-	Mlist* _dlist=NULL;
+// return the value decimals in little endian order
+Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){
+	Mlist* _dlist=_getListOfType(VT_INTEGER);
+	if(!_dlist)return NULL;
+	longlongunion llu;
+	llu.ll=ll;
+	int l=sizeof(long long);
+	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(littleEndian&&littleEndianOrder?l+1:0))>0);
+	return _getValueOfList(_dlist);
+}
+Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
+	Mlist* _dlist=_getListOfType(VT_INTEGER);
+	if(!_dlist)return NULL;
+	longdoubleunion lld;
+	lld.ld=ld;
+	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
+	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(littleEndian&&littleEndianOrder?l+1:0))>0);
+	return _getValueOfList(_dlist);
+}
+Mvalue* d(Mvalue* _value){ // little-endian representation list to return
 	if(_value){
-		if(_value->type==VT_INTEGER){
-			_dlist=_getListOfType(VT_INTEGER);
-			longlongunion llu;
-			llu.ll=_value->value._integer->ll;
-			int l=sizeof(long long);
-			while(--l>=0&&appendedToList(_dlist,_getIntegerValue((uint8_t)llu.octets[l]),0));
-		}else
-		if(_value->type==VT_REAL){
-			_dlist=_getListOfType(VT_INTEGER);
-			longdoubleunion lld;
-			lld.ld=_value->value._real->ld;
-			int l=sizeof(long double);
-			while(--l>=0&&appendedToList(_dlist,_getIntegerValue((uint8_t)lld.octets[l]),0));
+		switch(_value->type){
+			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,true);
+			case VT_REAL:return getRealDecimalListValue(_value->value._real->ld,true);
+			default:break;
 		}
 	}
-	return (_dlist?_getValueOfList(_dlist):NULL);
+	return NULL;
 } 
+Mvalue* D(Mvalue* _value){ // big endian decimal representation list to return
+	if(_value){
+		switch(_value->type){
+			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,false);
+			case VT_REAL:return getRealDecimalListValue(_value->value._real->ld,false);
+			default:break;
+		}
+	}
+	return NULL;
+}
+// TODO to add h/H and b/B functions
 
 Mvalue* i(Mvalue* _value){
 	if(amVerbose())outputValue("\nConverting '",_value,"' to an integer.");
 	Mvalue* _integerValue=NAI_value;
-	
 	if(_value)
 	switch(_value->type){
 		case VT_INTEGER:return _value;
@@ -201,7 +231,7 @@ Mvalue* I(Mvalue* _value){
 				{
 					// this is a bit of a nuisance when the double is out of the VT_INTEGER range
 					mp_int* _bigInteger=_getBiginteger(0);
-					if(mp_set_long_double(_bigInteger,_value->value._real->ld)==MP_OKAY)return _getBigintegerValue(_bigInteger);
+					if(mp_set_long_double(_bigInteger,_value->value._real->ld,littleEndian)==MP_OKAY)return _getBigintegerValue(_bigInteger);
 					mp_clear(_bigInteger);
 				}
 				break;
@@ -254,6 +284,8 @@ Menvironment* _Menvironment; // this is the root (M) environment
 Mtoken* newToken(Mtoken* prevToken);
 bool initEnvironment(){
 	
+	initConversions(); // determining little endianness
+
 	NAR_value=_getRealValue(strtold("nan",NULL)); // we'll be using the default NaN to represent Not A Real
 	NAI_value=_getIntegerValue(LLONG_MIN);
 	NULL_value=_getValueOfToken(newToken(NULL));NULL_value->value._token->text=new_mstring("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
@@ -345,7 +377,8 @@ bool initEnvironment(){
 			*/
 			// conversions
 			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"I"),I)
-					||!completedValueFunction(newFunction(_Menvironment,"r"),r)||!completedValueFunction(newFunction(_Menvironment,"d"),d)){
+					||!completedValueFunction(newFunction(_Menvironment,"r"),r)
+					||!completedValueFunction(newFunction(_Menvironment,"d"),d)||!completedValueFunction(newFunction(_Menvironment,"D"),D)){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
 			}

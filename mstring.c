@@ -65,20 +65,40 @@ bool string_empty(mstring *str){
     */
 }
 
-uint16_t string_length(mstring* str){
+uint32_t string_length(mstring* str){
     return(str==NULL?0:str->length);
 }
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
-bool string_setlength(mstring* str,uint16_t length){
-    if(!str)return false;
-    if(length>str->length)return false; // not allowing to make longer
+mstring* string_setlength(mstring* str,uint32_t length){
+    if(!str)return NULL;
+    if(length>str->length){ // we're supposed to increment the length
+        // how many blocks do we need
+        uint32_t blocks=(length/BLOCK_SIZE)+1;
+        // if we do not have enough blocks ascertain to have enough...
+        if(blocks>str->blocks){
+            char* new_str=realloc(str->chars,BLOCK_SIZE*blocks*sizeof *(str->chars));
+            if (!new_str)return NULL; // failure!!
+            str->chars=new_str;
+            str->blocks=blocks;
+        }
+        // fill with blanks??? for now that's OK
+        while(str->length<length){str->chars[str->length]=' ';str->length++;}
+        str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
+    }else
     if(length<str->length){
         str->length=length;
         str->chars[str->length]='\0';
     }
-    return true;
+    return str;
 }
-bool string_shorten(mstring* str,uint16_t length){
+void string_synclength(mstring* str){
+    if(!str)return;
+    uint32_t l=str->length;
+    while(l>0)if(str->chars[--l]=='\0')break;
+    str->length=l;
+}
+
+bool string_shorten(mstring* str,uint32_t length){
     if(!str)return false;
     if(length>str->length)return false;
     str->length-=length;
@@ -86,7 +106,7 @@ bool string_shorten(mstring* str,uint16_t length){
     return true;
 }
 
-char string_char(mstring* str,uint16_t pos){
+char string_char(mstring* str,uint32_t pos){
     return(str!=NULL?(pos<str->length?str->chars[pos]:'\0'):'\0');
 }
 
@@ -94,10 +114,10 @@ char string_last_char(mstring *str){
     return(str!=NULL?(str->length>0?str->chars[str->length-1]:'\0'):'\0');
 }
 
-char string_removed_char(mstring* str,uint16_t pos){
+char string_removed_char(mstring* str,uint32_t pos){
     char rc='\0';
     if(str!=NULL){
-        uint16_t l=str->length;
+        uint32_t l=str->length;
         if(pos<l){
             --(str->length); // one less long
             rc=str->chars[pos]; // remember the character that is being removed!!
@@ -114,9 +134,9 @@ char string_removed_char(mstring* str,uint16_t pos){
  * insert char c at position pos in the given string 
  * NOTE: returns NULL on failure, @str otherwise 
  */
-mstring* string_insert_char(mstring* str,uint16_t pos,char c){
+mstring* string_insert_char(mstring* str,uint32_t pos,char c){
     if(str!=NULL){
-        uint16_t l=str->length+1; // the 'length' of the text plus 1
+        uint32_t l=str->length+1; // the 'length' of the text plus 1
         // pos should never be larger than l
         if(pos<l){
             if(pos<l-1){ // a true insert, i.e. NOT replacing the last character!!
@@ -149,7 +169,7 @@ mstring* string_insert_char(mstring* str,uint16_t pos,char c){
  */
 mstring* string_append_char(mstring* str,char c){
     if(str!=NULL){
-        uint16_t l=str->length+1;
+        uint32_t l=str->length+1;
         /////printf("{%hu-%d}",l,str->blocks);
         if(l==str->blocks*BLOCK_SIZE){
             char *new_str=realloc(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars));
@@ -170,14 +190,14 @@ mstring* string_append_char(mstring* str,char c){
 mstring* string_append(mstring* str,const char* pc){
     if(str!=NULL&&pc!=NULL){ // something to append
         char c;
-        uint16_t index=0;
+        uint32_t index=0;
         while((c=pc[index++]))if(string_append_char(str,c)==NULL)return NULL;
         /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
     }
     return str;
 }
 
-char* string_remainder(mstring* str,uint16_t firstpos){
+char* string_remainder(mstring* str,uint32_t firstpos){
     if(!str)return NULL;
     if(!firstpos)return string(str);
     if(firstpos>str->length)return NULL;
@@ -191,10 +211,10 @@ char* string_remainder(mstring* str,uint16_t firstpos){
 char* string(mstring* str){return (str?str->chars:NULL);}
 
 /** Get where the first occurrence of a character in the String is */
-int16_t string_find(mstring *str,char c){
+int32_t string_find(mstring *str,char c){
     if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
-        int16_t pos=0; // first character to check
+        int32_t pos=0; // first character to check
         while(pos<str->length){ // still within the text
             if(str->chars[pos]==c)return pos; // if a match return pos
             pos++; // keep looking

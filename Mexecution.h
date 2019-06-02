@@ -244,7 +244,7 @@ const long long M_LL_MAX=LLONG_MAX;
 */
 long long double2long(long double ld); // convert long double to long long
 
-mp_err mp_set_long_double(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
+mp_err mp_set_long_double(mp_int *a, long double b, bool littleEndian); // MDH@01MAY2019: which I made myself
 
 mp_int* _getBiginteger(int64_t l);
 
