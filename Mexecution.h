@@ -30,11 +30,9 @@
 // MDH@31MAY2019: switched from libzahl to libtommatch
 #include "tommath.h"
 
-bool initExecution();
-
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
-typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_RATIONAL,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -52,6 +50,11 @@ typedef struct Mreal{
     long double ld; // double precision floating point binary number (for now)
 }Mreal;
 
+typedef struct Mrational{
+    mp_int* num;
+    mp_int* den;
+}Mrational;
+
 typedef struct Mstring{
     char presuffix;
     char _c[]; // by using an array and not a pointer, it's easy to make one out of an mstring* by strcpy from string(mstring)
@@ -63,6 +66,7 @@ typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
     mp_int* _biginteger; // most convenient to immediately point to the mp_int structure
+    Mrational* _rational;
     Mreal* _real;
     Mstring* _string;
     struct Mlist* _list;
@@ -244,17 +248,30 @@ const long long M_LL_MAX=LLONG_MAX;
 */
 long long double2long(long double ld); // convert long double to long long
 
-mp_err mp_set_long_double(mp_int *a, long double b, bool littleEndian); // MDH@01MAY2019: which I made myself
+mp_err mp_set_long_double(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
 
 mp_int* _getBiginteger(int64_t l);
 
-// in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
+#define M_LL_INVALID LLONG_MIN // the invalid long long defaults to LLONG_MIN
+// it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
+#define M_LL_MIN LLONG_MIN+1
+#define M_LL_MAX LLONG_MAX
+
 mp_int* getBigintegerLLMin();
 mp_int* getBigintegerLLMax();
+
+bool isLittleEndian();
+
+long long getInteger(Mvalue* _value); // TODO check how this differs from getValueInteger()!!!
+mp_int* _getValueBiginteger(Mvalue* _value); // converts a value to a big integer (if possible)
+
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator);
+// in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
 Mvalue* _getBigintegerValue(mp_int* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getRationalValue(Mrational* _rational);
 Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
@@ -334,7 +351,7 @@ mstring* _getMapText(Mmap* _map);
 mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value,long long invalid);
-void outputBigInteger(const char* const prefix,const mp_int* const _value,const char* const postfix);
+void outputBiginteger(const char* const prefix,const mp_int* const _value,const char* const postfix);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
 // list to map (list) conversions

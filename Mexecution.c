@@ -8,6 +8,19 @@
 #include "tommath.h"
 #include "Mexecution.h"
 
+static int8_t littleEndian=-1;
+void initExecution(){
+    int i=1;
+	char* c=(char*)&i;
+	littleEndian=*c;
+	if(amVerbose())output(littleEndian?"\nLittle endian.":"\nBig endian.");
+}
+
+bool isLittleEndian(){
+    if(littleEndian<0)initExecution();
+    return(littleEndian>0);
+}
+
 const char* MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
 const char* IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
 
@@ -112,6 +125,13 @@ void free_real(Mreal* _real){
     }else
         output("\nBUG: No real to free!");
 }
+void free_rational(Mrational* _rational){
+    if(_rational){
+        if(_rational->num)free_biginteger(_rational->num);
+        if(_rational->den)free_biginteger(_rational->den);
+    }else
+        output("\nNo rational to free!");
+}
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
@@ -121,6 +141,7 @@ void free_value(Mvalue* _value){
             case VT_TOKEN:if(_value->value._token)free_token(_value->value._token);break;
             case VT_INTEGER:if(_value->value._integer)free_integer(_value->value._integer);break;
             case VT_BIGINTEGER:if(_value->value._biginteger)free_biginteger(_value->value._biginteger);break;
+            case VT_RATIONAL:if(_value->value._rational)free_rational(_value->value._rational);break;
             case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
             case VT_STRING:free_string(_value->value._string);break;
             case VT_LIST:free_list(_value->value._list);break;
@@ -679,7 +700,7 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long l
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     if(index<=0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
     if(index<=0){output("\nERROR: Index %lld of (new) list element too small.",index);return 0;}
-    if(amVerbose())outputValue("Appending '",_value,"' to list.");
+    if(amVerbose())outputValue("\nAppending '",_value,"' to list.");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
     Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index<=lastindex?_list->_first:NULL);
@@ -1244,13 +1265,22 @@ mstring* _getIntegerText(Minteger* _integer){
 	return s;
 }
 
-const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
-// it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
-const long long M_LL_MIN=LLONG_MIN+1;
-const long long M_LL_MAX=LLONG_MAX;
-
+long long getInteger(Mvalue* _value){
+    if(_value)
+    switch(_value->type){
+        case VT_INTEGER:return _value->value._integer->ll;
+        case VT_BIGINTEGER:
+			if(mp_cmp(_value->value._biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_value->value._biginteger,getBigintegerLLMax())!=MP_GT)
+                return mp_get_i64(_value->value._biginteger);
+            break;
+		case VT_REAL:return double2long(_value->value._real->ld);
+		case VT_STRING:return _strtoll(_value->value._string->_c,M_LL_INVALID);
+		default:break;
+    }
+    return M_LL_INVALID;
+}
 // BigInteger stuff
-mstring* _getBigIntegerText(const mp_int* const a){
+mstring* _getBigintegerText(const mp_int* const a){
     // determine the required size
     int arepsize;
     if(mp_radix_size(a,10,&arepsize)!=MP_OKAY){if(amVerbose())output("\nCan't get the size of big integer.");return NULL;}
@@ -1271,10 +1301,10 @@ mp_int* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);retu
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
 typedef struct {
     uint64_t mantisse;
-    int16_t exponent;
+    uint16_t exponent;
 } littleEndianLongDouble;
 typedef struct {
-    int16_t exponent;
+    uint16_t exponent;
     uint64_t mantisse;
 } bigEndianLongDouble;
 typedef union {
@@ -1285,6 +1315,7 @@ typedef union {
     long double ld;
     bigEndianLongDouble bELD;
 } bigEndianLongDoubleUnion;
+/*
 #  define MP_ZERO_DIGITS(mem, digits)                   \
 do {                                                    \
    int zd_ = (digits);                                  \
@@ -1306,38 +1337,69 @@ void mp_set_u128(mp_int* a,uint128_t b){
     a->sign=MP_ZPOS;
     MP_ZERO_DIGITS(a->dp+a->used,a->alloc-a->used);
 }
-mp_err mp_set_long_double(mp_int *a, long double b,bool littleEndian){
+*/
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator){
+    if(!_numerator||mp_iszero(_numerator)==MP_YES)return NULL; // numerator needs to be non-zero
+    Mrational* _rational=(Mrational*)calloc(1,sizeof(Mrational));
+    _rational->num=_numerator;
+    _rational->den=_denominator;
+    return _rational;
+}
+Mvalue* _getRationalValue(Mrational* _rational){
+    if(!_rational)return NULL;
+    Mvalue* _value=_newValue();
+    _value->type=VT_RATIONAL;
+    _value->value._rational=_rational;
+    return _value;
+}
+mp_err mp_set_long_double(mp_int *a, long double b){
     // always assume 10-byte long double (extended precision)
-    bool negative=false;
-    int16_t exp;
-    uint64_t frac;
-    if(littleEndian){
+    uint64_t mantisse;
+    uint16_t exponent; // including bit 63
+    if(isLittleEndian()){
         littleEndianLongDoubleUnion lELDU;
         lELDU.ld=b;
-        frac=lELDU.lELD.mantisse;
-        exp=lELDU.lELD.exponent;
+        mantisse=lELDU.lELD.mantisse;
+        exponent=lELDU.lELD.exponent;
     }else{
         bigEndianLongDoubleUnion bELDU;
         bELDU.ld=b;
-        frac=bELDU.bELD.mantisse;
-        exp=bELDU.bELD.exponent;
+        mantisse=bELDU.bELD.mantisse;
+        exponent=bELDU.bELD.exponent;
     }
-    if(exp){
-        if(exp<0){negative=true;exp=-exp;}
+    // determine the sign, and the 15-bit power of two exponent
+    int negative=(exponent>>15); // determine the sign
+    int64_t exp=(exponent&0x7FFF); // cut off the sign
+    if(exp!=0){ // always positive at this moment 0-16383
+        mp_set_u64(a,mantisse);
+        if(amVerbose()){
+            mstring* _mantisseBigIntegerText=_getBigintegerText(a);
+            output("\nValue after setting the fraction: %s.",string(_mantisseBigIntegerText));
+            free_mstring(_mantisseBigIntegerText);
+        }
+        if(amVerbose())output("\nLong double exponent part: %d - mantisse: %llu.",exp,mantisse);
         if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
         exp-=16383; // the actual exponent
         exp-=63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers  
         //////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
-        if(amVerbose())output("\nExponent: %d - fraction: %llu.",exp,frac);  
-        mp_set_u64(a,frac);
-        if(amVerbose())output("\nVaue after setting the fraction: %s.",_getBigIntegerText(a)); /////outputValue("\nFraction part %16x used to initialize the big integer.",frac);
-        if(exp){
+        if(amVerbose())output("\nPower of two exponent: %d.",exp);  
+        if(exp!=0){
             mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
             if(err!=MP_OKAY){output("ERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
         }
+        if(amVerbose()){
+            mstring* _bigIntegerText=_getBigintegerText(a);
+            output("\nValue after applying the exponent: %s.",string(_bigIntegerText));
+            free_mstring(_bigIntegerText);
+        }
         // take over the sign from the long double (bit 15 in the signandexponent part)
-        if(negative&&!mp_iszero(a))a->sign=MP_NEG;
-        if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
+        if(negative){
+            if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
+                a->sign=MP_NEG;
+                if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
+            }else
+                if(amVerbose())output("\nNo need to set the sign on a big integer equal to zero.");           
+        }
     }else // all zeros stored exponent
         mp_zero(a);
     return MP_OKAY;
@@ -1526,7 +1588,22 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 		////////printf("\nTYPE: %d",_value->type);
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
-            case VT_BIGINTEGER:valueText=_getBigIntegerText(_value->value._biginteger);break; // how many characters do we need????
+            case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????
+            case VT_RATIONAL:
+                {
+                    Mrational* _rational=_value->value._rational;
+                    if(_rational){
+                        valueText=string_create();
+                        valueText=string_append_char(valueText,'(');
+                        mstring* _numeratorBigintegerText=_getBigintegerText(_rational->num);
+                        if(_numeratorBigintegerText){valueText=string_append(valueText,string(_numeratorBigintegerText));free_mstring(_numeratorBigintegerText);}
+                        valueText=string_append_char(valueText,'/');
+                        mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
+                        if(_denominatorBigintegerText){valueText=string_append(valueText,string(_denominatorBigintegerText));free_mstring(_denominatorBigintegerText);}
+                        valueText=string_append_char(valueText,')');
+                    }
+                }
+                break;
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
 			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
@@ -1545,9 +1622,9 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     return _UNDEFINED_VALUETEXT;
     */
 }
-void outputBigInteger(const char* const prefix,const mp_int* const _bigInteger,const char* const postfix){
+void outputBiginteger(const char* const prefix,const mp_int* const _bigInteger,const char* const postfix){
     if(prefix)output("%s",prefix);
-    mstring* _bigIntegerText=_getBigIntegerText(_bigInteger);
+    mstring* _bigIntegerText=_getBigintegerText(_bigInteger);
     if(_bigIntegerText){
         output("%s",string(_bigIntegerText));
         free_mstring(_bigIntegerText);
@@ -1578,7 +1655,29 @@ long long getValueInteger(const Mvalue* const _value,long long invalid){
     }
     return invalid;
 }
-
+mp_int* _getValueBiginteger(Mvalue* _value){
+    if(_value)
+        switch(_value->type){
+        case VT_BIGINTEGER:return _value->value._biginteger;
+        case VT_INTEGER:return _getBiginteger(_value->value._integer->ll);
+        case VT_REAL:
+            {
+                // this is a bit of a nuisance when the double is out of the VT_INTEGER range
+                mp_int* _bigInteger=_getBiginteger(0);
+                if(mp_set_long_double(_bigInteger,_value->value._real->ld)==MP_OKAY)return _bigInteger;
+                mp_clear(_bigInteger);
+            }
+            break;
+        case VT_STRING:
+            {
+                mp_int* _bigInteger=_getBiginteger(0);
+                if(mp_read_radix(_bigInteger,_value->value._string->_c,10)==MP_OKAY)return _bigInteger;
+                mp_clear(_bigInteger); // not used so free immediately
+            }
+        default:break;
+    }
+    return NULL;
+}
 // (map) list conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a list to a (possibly empty) map using the indices as attribute name
     bool result=(_map!=NULL); // no map, no result!
@@ -1790,6 +1889,7 @@ bool isNull(Mvalue* _value){
     switch(_value->type){
         case VT_INTEGER:return !_value->value._integer;
         case VT_BIGINTEGER:return !_value->value._biginteger;
+        case VT_RATIONAL:return !_value->value._rational;
         case VT_REAL:return !_value->value._real;
         case VT_STRING:return !_value->value._string;
         case VT_LIST:return !_value->value._list;
@@ -1810,7 +1910,7 @@ Mvalue* Mlen(Mvalue* _value){
     long long result=0;
     if(_value){
         switch(_value->type){
-            case VT_INTEGER:case VT_REAL:case VT_STRING:result=1;break;
+            case VT_INTEGER:case VT_BIGINTEGER:case VT_REAL:case VT_STRING:result=1;break;
             case VT_LIST:result=_value->value._list->numberOfElements;break;
             case VT_MAP:result=_value->value._map->numberOfElements;break;
             default:break;
@@ -1819,10 +1919,6 @@ Mvalue* Mlen(Mvalue* _value){
     return _getIntegerValue(result);
 }
 
-Mvalue* Mfacd(Mvalue* _value){
-    // Stirling formula to compute the number of factorial digits in n!: return floor( ((n+0.5)*log(n) - n + 0.5*log(2*pi))/log(10) ) + 1
-    return NULL;
-}
 // MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
 Mvalue* Mfac(Mvalue* _value){
     if(!_value){if(amVerbose())output("\nNo value!");return NULL;}
@@ -1840,7 +1936,7 @@ Mvalue* Mfac(Mvalue* _value){
         finalmultiplier=_value->value._biginteger;
     }
     if(!finalmultiplier){outputValue("\nERROR: Failed to convert '",_value,"' to a big integer!");return NULL;}
-    if(amVerbose()&&amDebugging())outputBigInteger("\nFinal multiplier: '",finalmultiplier,"'.");
+    if(amVerbose()&&amDebugging())outputBiginteger("\nFinal multiplier: '",finalmultiplier,"'.");
     mp_int* result=_getBiginteger(6); // the smallest value to return
     if(result){
         // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
@@ -1858,7 +1954,7 @@ Mvalue* Mfac(Mvalue* _value){
     }else
         if(amVerbose())output("\nERROR: No initial big integer 6.");
     if(_value->type==VT_INTEGER)mp_clear(finalmultiplier);
-    if(amVerbose())outputBigInteger("\nResult of applying the fac() function: '",result,"'.");
+    if(amVerbose())outputBiginteger("\nResult of applying the fac() function: '",result,"'.");
     return (result?_getBigintegerValue(result):NULL);
     /* replacing:
     // 39 is about the maximum that we can store in a long long

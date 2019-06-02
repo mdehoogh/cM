@@ -64,6 +64,16 @@ bool initVariable(Menvironment* _Menvironment,char* name,double d){
 const long double LD_PI=3.141592653589793238462643383279L; // 30 decimal digits of PI
 const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
+Mvalue* Mfacd(Mvalue* _value){
+    // Stirling formula to compute the number of factorial digits in n!: return 
+    if(_value){
+        // get the integer out of the value
+        long long ll=getInteger(_value);
+        if(ll>0)return _getIntegerValue(floor( ((ll+0.5)*log(ll) - ll + 0.5*log(2*LD_PI))/log(10) ) + 1);
+    }
+    return NULL;
+}
+
 // how about storing all results here?????? instead of in the root environment????
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
@@ -142,13 +152,6 @@ long long getNAI(){return NAI_value->value._integer->ll;}
 // conversion to decimal,  hex and binary
 // the 'real' number of octets used by a long double
 #define M_LONG_DOUBLE_OCTETS 10
-bool littleEndian;
-void initConversions(){
-	int i=1;
-	char* c=(char*)&i;
-	littleEndian=*c;
-	if(amVerbose())output(littleEndian?"\nLittle endian.":"Big endian.");
-}
 typedef union {
 	long long ll;
 	uint8_t octets[sizeof(long long)];
@@ -165,7 +168,7 @@ Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){
 	longlongunion llu;
 	llu.ll=ll;
 	int l=sizeof(long long);
-	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(littleEndian&&littleEndianOrder?l+1:0))>0);
+	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:0))>0);
 	return _getValueOfList(_dlist);
 }
 Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
@@ -174,7 +177,7 @@ Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
 	longdoubleunion lld;
 	lld.ld=ld;
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
-	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(littleEndian&&littleEndianOrder?l+1:0))>0);
+	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:0))>0);
 	return _getValueOfList(_dlist);
 }
 Mvalue* d(Mvalue* _value){ // little-endian representation list to return
@@ -201,50 +204,31 @@ Mvalue* D(Mvalue* _value){ // big endian decimal representation list to return
 
 Mvalue* i(Mvalue* _value){
 	if(amVerbose())outputValue("\nConverting '",_value,"' to an integer.");
-	Mvalue* _integerValue=NAI_value;
-	if(_value)
-	switch(_value->type){
-		case VT_INTEGER:return _value;
-		case VT_BIGINTEGER:
-				// this will not be possible when the big integer is out of range
-			{
-				mp_int* biLLMin=getBigintegerLLMin();
-				mp_int* biLLMax=getBigintegerLLMax();
-				if(mp_cmp(_value->value._biginteger,biLLMin)!=MP_LT&&mp_cmp(_value->value._biginteger,biLLMax)!=MP_GT)
-					return _getIntegerValue(mp_get_i64(_value->value._biginteger));
-			}
-			break;
-		case VT_REAL:return _getIntegerValue(double2long(_value->value._real->ld));
-		case VT_STRING:return _getIntegerValue(_strtoll(_value->value._string->_c,getNAI()));
-		default:break;
-	}
-	return NULL;
+	long long ll=getInteger(_value);
+	return(ll!=M_LL_INVALID?_getIntegerValue(ll):NULL);
 }
 // convert to a big integer
 Mvalue* I(Mvalue* _value){
-	if(amVerbose())outputValue("\nConverting '",_value,"' to a big integer.");
 	if(_value){
-		switch(_value->type){
-			case VT_BIGINTEGER:return _value;
-			case VT_INTEGER:return _getBigintegerValue(_getBiginteger(_value->value._integer->ll));
-			case VT_REAL:
-				{
-					// this is a bit of a nuisance when the double is out of the VT_INTEGER range
-					mp_int* _bigInteger=_getBiginteger(0);
-					if(mp_set_long_double(_bigInteger,_value->value._real->ld,littleEndian)==MP_OKAY)return _getBigintegerValue(_bigInteger);
-					mp_clear(_bigInteger);
-				}
-				break;
-			case VT_STRING:
-				{
-					mp_int* _bigInteger=_getBiginteger(0);
-					if(mp_read_radix(_bigInteger,_value->value._string->_c,10)==MP_OKAY)return _getBigintegerValue(_bigInteger);
-					mp_clear(_bigInteger); // not used so free immediately
-				}
-			default:break;
-		}
+		if(_value->type==VT_BIGINTEGER)return _value; // already a big integer
+		mp_int* _bigInteger=_getValueBiginteger(_value);
+		if(_bigInteger)return _getBigintegerValue(_bigInteger);
 	}
 	return NULL;
+}
+// TODO complete the q function
+Mvalue* q(Mvalue* _value){
+	if(amVerbose())outputValue("\nConverting '",_value,"' to a rational.");
+	Mvalue* _rationalValue=NULL;
+	if(_value){
+		// when a list easiest to apply the I function to get the associated big integer!!!!
+		if(_value->type==VT_RATIONAL)_rationalValue=_value;else
+		if(_value->type==VT_BIGINTEGER||_value->type==VT_INTEGER||_value->type==VT_REAL)_rationalValue=_getRationalValue(_getRational(_getValueBiginteger(_value),NULL));else
+		if(_value->type==VT_LIST)if(_value->value._list->numberOfElements>1)
+		_rationalValue=_getRationalValue(_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value)));
+	}
+	if(amVerbose())outputValue("Converted to '",_rationalValue,"'.");
+	return _rationalValue;
 }
 Mvalue* r(Mvalue* _value){
 	if(amVerbose())outputValue("Converting '",_value,"' to a real.");
@@ -284,8 +268,6 @@ Menvironment* _Menvironment; // this is the root (M) environment
 Mtoken* newToken(Mtoken* prevToken);
 bool initEnvironment(){
 	
-	initConversions(); // determining little endianness
-
 	NAR_value=_getRealValue(strtold("nan",NULL)); // we'll be using the default NaN to represent Not A Real
 	NAI_value=_getIntegerValue(LLONG_MIN);
 	NULL_value=_getValueOfToken(newToken(NULL));NULL_value->value._token->text=new_mstring("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
@@ -377,7 +359,7 @@ bool initEnvironment(){
 			*/
 			// conversions
 			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"I"),I)
-					||!completedValueFunction(newFunction(_Menvironment,"r"),r)
+					||!completedValueFunction(newFunction(_Menvironment,"r"),r)||!completedValueFunction(newFunction(_Menvironment,"q"),q)
 					||!completedValueFunction(newFunction(_Menvironment,"d"),d)||!completedValueFunction(newFunction(_Menvironment,"D"),D)){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
@@ -394,7 +376,7 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to register all list functions.");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"fac"),Mfac)){
+			if(!completedValueFunction(newFunction(_Menvironment,"fac"),Mfac)||!completedValueFunction(newFunction(_Menvironment,"facd"),Mfacd)){
 				outputLine("ERROR: Failed to register the fac functions.");
 				return false;
 			}
@@ -2102,7 +2084,16 @@ void outputValueColored(Mvalue* _value){
 	switch(_value->type){
 		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output(string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
-		case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBigInteger(NULL,_value->value._biginteger,NULL);break;
+		case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
+		case VT_RATIONAL:
+			if(_value->value._rational){
+				output("(");
+				outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
+				output("/");
+				outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._rational->den,NULL);resetOutputColor();
+				output(")");
+			}
+			break;
 		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
 		case VT_STRING:outputTokenTypeColor(_value->value._string->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
 		case VT_LIST:
