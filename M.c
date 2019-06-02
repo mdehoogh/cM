@@ -241,6 +241,22 @@ Mvalue* r(Mvalue* _value){
 	if(amVerbose())outputValue("Converted to '",_realValue,"'.");
 	return _realValue;
 }
+// the type of a value
+Mvalue* t(Mvalue* _value){
+	if(_value)
+	switch(_value->type){
+		case VT_TOKEN:return _getStringValue("'t");
+		case VT_INTEGER:return _getStringValue("'i");
+		case VT_BIGINTEGER:return _getStringValue("'I");
+		case VT_RATIONAL:return _getStringValue("'q");
+		case VT_REAL:return _getStringValue("'r");
+		case VT_STRING:return _getStringValue("'s");
+		case VT_LIST:return _getStringValue("'l");
+		case VT_MAP:return _getStringValue("'m");
+		case VT_UNDEFINED:return _getStringValue("'u");
+	}
+	return NULL;
+}
 
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
@@ -359,6 +375,7 @@ bool initEnvironment(){
 			*/
 			// conversions
 			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"I"),I)
+					||!completedValueFunction(newFunction(_Menvironment,"t"),t)
 					||!completedValueFunction(newFunction(_Menvironment,"r"),r)||!completedValueFunction(newFunction(_Menvironment,"q"),q)
 					||!completedValueFunction(newFunction(_Menvironment,"d"),d)||!completedValueFunction(newFunction(_Menvironment,"D"),D)){
 				outputLine("ERROR: Failed to register value type conversion functions.");
@@ -1436,15 +1453,27 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(!_valueReference->_itemid)assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name));
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
-				{
-					long long ll=_strtoll(string(expressionToken->text),NAI_value->value._integer->ll);
-					if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
-						expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
-						if(string_length(expressionToken->text)==1)string_append_char(expressionToken->text,'0'); // a single period is NOT considered equal to zero apparently!!!!
-						assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text),getNAR())+ll));
-					}else // just an integer
-						assignValue(&_valueReference->_value,_getIntegerValue(ll));
-					/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
+				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
+					// first compose the full real text (with the integer text prepended to it)
+					mstring* _realText=new_mstring(string(expressionToken->text));
+					expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
+					if(string_length(expressionToken->text)==1)string_append_char(expressionToken->text,'0'); // a single period is NOT considered equal to zero apparently!!!!
+					_realText=string_append(_realText,string(expressionToken->text));
+					assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text),getNAR())));
+					free_mstring(_realText);
+				}else{ // just an integer
+					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
+					mp_int* _biginteger=new_mp_int();
+					if(mp_read_radix(_biginteger,string(expressionToken->text),10)==MP_OKAY){
+						if(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT){
+              assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
+							free_biginteger(_biginteger);
+						}else
+							assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger));
+					}else{
+						free_biginteger(_biginteger);
+						output("\nERROR: Failed to create the big integer to store integer '%s'.",string(expressionToken->text));
+					}
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though

@@ -189,6 +189,7 @@ bool popExecutionEnvironment();
 
 // MDH@20MAY2019: we need free_map to free the function argument maps!!
 void free_map(Mmap* _map);
+void free_biginteger(mp_int* _biginteger);
 /* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside
 // pointer to these structs releasers
 void free_string(Mstring* _string);
@@ -264,7 +265,7 @@ bool isLittleEndian();
 
 long long getInteger(Mvalue* _value); // TODO check how this differs from getValueInteger()!!!
 mp_int* _getValueBiginteger(Mvalue* _value); // converts a value to a big integer (if possible)
-
+mp_int* new_mp_int();
 Mrational* _getRational(mp_int* _numerator,mp_int* _denominator);
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 

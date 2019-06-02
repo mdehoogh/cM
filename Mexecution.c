@@ -111,10 +111,10 @@ void free_integer(Minteger* _integer){
     }else
         output("\nBUG: No integer to free!");
 }
-void free_biginteger(mp_int* bi){
-    if(bi){
+void free_biginteger(mp_int* _biginteger){
+    if(_biginteger){
         if(amVerbose())output("\nFreeing big integer."); // TODO can we display the value?
-        mp_clear(bi); // directly call mp_clear on the mp_int pointer!!!
+        mp_clear(_biginteger); // directly call mp_clear on the mp_int pointer!!!
     }else
         output("\nBUG: No big integer to free!");
 }
