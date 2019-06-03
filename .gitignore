@@ -1,3 +1,4 @@
+libtommath-1.1.0/*
 libtommath.a
 libtommath/*.a
 libtommath/*.o
