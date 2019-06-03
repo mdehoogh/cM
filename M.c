@@ -80,8 +80,8 @@ Mvalue* _resultListValue=NULL; // were the results are being kept
 Mvalue* getResult(Mvalue* _indexValue){
 	if(amVerbose())output("\nResult requested!");
 	if(!_indexValue)return _resultListValue;
-	long long indexValueInteger=getValueInteger(_indexValue,0); // NOTE all index values should be positive!!!
-	return getValueAtIndex(_resultListValue->value._list,indexValueInteger); // TODO are we calling getResult anywhere????
+	long long indexValueInteger=getValueInteger(_indexValue); // NOTE all index values should be positive!!!
+	return (indexValueInteger>0?getValueAtIndex(_resultListValue->value._list,indexValueInteger):NULL); // TODO are we calling getResult anywhere????
 }
 
 // LIST CONVERSIONS
@@ -285,7 +285,7 @@ Mtoken* newToken(Mtoken* prevToken);
 bool initEnvironment(){
 	
 	NAR_value=_getRealValue(strtold("nan",NULL)); // we'll be using the default NaN to represent Not A Real
-	NAI_value=_getIntegerValue(LLONG_MIN);
+	NAI_value=_getIntegerValue(M_LL_INVALID);
 	NULL_value=_getValueOfToken(newToken(NULL));NULL_value->value._token->text=new_mstring("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
 
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
@@ -1234,8 +1234,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					}
 					if(_value->type==VT_LIST){
 						// try to convert the index value into a positive integer
-						long long index=getValueInteger(indexorattributenameListelementValue,LLONG_MIN);
-						if(index!=0&&index!=LLONG_MIN){
+						long long index=getValueInteger(indexorattributenameListelementValue);
+						if(index!=0&&index!=M_LL_INVALID){
 							_value=getValueAtIndex(_value->value._list,index);
 							continue;
 						}
@@ -1313,7 +1313,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				}else
 				if(_value->type==VT_LIST){
 					// NOTE allow appending using 0 or inserting with negative values
-					long long index=getValueInteger(indexorattributenameListelement->_value,LLONG_MIN);
+					long long index=getValueInteger(indexorattributenameListelement->_value);
 					// replace the index to the actual index with the index of the element in the list (so getReferencedValue() will not complain!!!)
 					if(index!=LLONG_MIN){
 						index=appendedToList(_value->value._list,_newValue,index);

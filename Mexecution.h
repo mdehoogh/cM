@@ -350,8 +350,11 @@ mstring* _getListText(Mlist* _list);
 mstring* _getMapText(Mmap* _map);
 
 mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
+
+mp_int* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
+
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
-long long getValueInteger(const Mvalue* const _value,long long invalid);
+long long getValueInteger(const Mvalue* const _value);
 void outputBiginteger(const char* const prefix,const mp_int* const _value,const char* const postfix);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 

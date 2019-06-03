@@ -1264,7 +1264,7 @@ mstring* _getIntegerText(Minteger* _integer){
 	////////if(amVerbose())output("\nInteger '%s'.",string(s));
 	return s;
 }
-
+/* replaced by getValueInteger()
 long long getInteger(Mvalue* _value){
     if(_value)
     switch(_value->type){
@@ -1279,6 +1279,8 @@ long long getInteger(Mvalue* _value){
     }
     return M_LL_INVALID;
 }
+*/
+
 // BigInteger stuff
 mstring* _getBigintegerText(const mp_int* const a){
     // determine the required size
@@ -1640,39 +1642,87 @@ void outputValue(const char* const prefix,const Mvalue* _value,const char* const
     }
     if(postfix)output("%s",postfix);
 }
-long long getValueInteger(const Mvalue* const _value,long long invalid){
+
+// conversion from big integer to the long long it contains (when in range)
+long long biginteger2long(mp_int* _biginteger){
+	return(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT?mp_get_i64(_biginteger):M_LL_INVALID);
+}
+bool strIsZero(char* str){
+    size_t l=strlen(str);
+    //// NOTE do not accept integer literal postfixes when checking for 1: if(l>0&&str[l-1]=='i'||str[l-1]=='I'||str[l-1]=='q'||str[l-1]=='r')l-=1; // skip any accepted integer postfix!!
+    // if l already is zero str[0] will equal '\0' which (see below) is not considered a zero integer!!!!
+    while(l>0){l--;if(str[l]!='0')break;} // stop as soon as the character does not match '0' (any sign is only allowed at position 0)
+    return(!l?false:str[l]=='-'||str[l]=='+'||str[l]=='0');
+}
+
+// NOTE the _ indicates that what is returned has to be freed after being used
+mp_int* _rational2biginteger(Mrational* _rational){
+    if(!_rational)return NULL;
+    mp_int* _biginteger=new_mp_int();
+    if(!_biginteger){output("\nERROR: Failed to create a big integer.");return NULL;}
+    if(_rational->den){
+        if(mp_div(_rational->num,_rational->den,_biginteger,NULL)!=MP_OKAY){
+            output("\nERROR: Failed to divide the rational numerator and denominator.");
+            free_biginteger(_biginteger);
+            return NULL;
+        }
+    }else // copy the numerator
+        if(mp_copy(_rational->num,_biginteger)!=MP_OKAY){output("\nERROR: Failed to copy the rational numerator.");free_biginteger(_biginteger);return NULL;}
+    return _biginteger;
+}
+long long getValueInteger(const Mvalue* const _value){
     // ASSERTION if _value can be converted to an integer,it should not equal invalid!!!!
     if(_value){
-        if(_value->type==VT_INTEGER)return _value->value._integer->ll;
-        if(_value->type==VT_STRING){
-            // we should check for 0 explicitly, which should always be represented by a single '0' character i.e. without signs!!!
-            // TODO are we allowing other zero representations as well???
-            if(!strcmp(_value->value._string->_c,"0"))return 0LL;
-            long long ll=atoll(_value->value._string->_c);
-            if(ll)return ll; // valid if non-zero
+        switch(_value->type){
+            case VT_INTEGER:return _value->value._integer->ll;
+		    case VT_REAL:return double2long(_value->value._real->ld);
+            case VT_BIGINTEGER:return biginteger2long(_value->value._biginteger);
+            case VT_STRING:
+                {
+                    // alternative which doesn't check for 0 explicitly I think: _strtoll(_value->value._string->_c,M_LL_INVALID);
+                    // we should check for 0 explicitly, which should always be represented by a single '0' character i.e. without signs!!!
+                    // TODO are we allowing other zero representations as well???
+                    if(strIsZero(_value->value._string->_c))return 0;
+                    long long ll=atoll(_value->value._string->_c); // invalid if zero
+                    if(ll)return ll; // valid if non-zero
+                }
+                break;
+            case VT_RATIONAL:
+                {
+                    mp_int* _biginteger=_rational2biginteger(_value->value._rational);
+                    if(_biginteger){
+                        long long ll=biginteger2long(_biginteger);
+                        free_biginteger(_biginteger);
+                        return ll;
+                    }
+                }
+   		    default:break;
         }
         // TODO sometimes reals can also represent integers!!!
     }
-    return invalid;
+    return M_LL_INVALID;
 }
 mp_int* _getValueBiginteger(Mvalue* _value){
     if(_value)
         switch(_value->type){
         case VT_BIGINTEGER:return _value->value._biginteger;
         case VT_INTEGER:return _getBiginteger(_value->value._integer->ll);
+        case VT_RATIONAL:return _rational2biginteger(_value->value._rational); // TODO how can we be certain that the returned big integer is actually used? well, it should as this is _getValueBiginteger meaning you have to free it if you don't use it!!!
         case VT_REAL:
             {
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
-                mp_int* _bigInteger=_getBiginteger(0);
-                if(mp_set_long_double(_bigInteger,_value->value._real->ld)==MP_OKAY)return _bigInteger;
-                mp_clear(_bigInteger);
+                mp_int* _biginteger=new_mp_int();
+                if(mp_set_long_double(_biginteger,_value->value._real->ld)==MP_OKAY)return _biginteger;
+                outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
+                mp_clear(_biginteger);
             }
             break;
         case VT_STRING:
             {
-                mp_int* _bigInteger=_getBiginteger(0);
-                if(mp_read_radix(_bigInteger,_value->value._string->_c,10)==MP_OKAY)return _bigInteger;
-                mp_clear(_bigInteger); // not used so free immediately
+                mp_int* _biginteger=new_mp_int();
+                if(mp_read_radix(_biginteger,_value->value._string->_c,10)==MP_OKAY)return _biginteger;
+                outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
+                mp_clear(_biginteger); // not used so free immediately
             }
         default:break;
     }
@@ -1730,7 +1780,7 @@ bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist){
                 // each map list element should be a list with at least two elements
                 if(_maplistelementValue&&_maplistelementValue->type==VT_LIST&&_maplistelementValue->value._list->numberOfElements>1){
                     // the first element in the map list element should be a positive integer that we can use as index
-                    long long index=getValueInteger(_maplistelementValue->value._list->_first->_value,0);
+                    long long index=getValueInteger(_maplistelementValue->value._list->_first->_value);
                     // if the index is positive AND we fail to copy the second list element over, we failed!!!
                     if(index>0&&!appendedToList(_list,_maplistelementValue->value._list->_first->_next->_value,index))
                         result=false;
