@@ -68,7 +68,7 @@ Mvalue* Mfacd(Mvalue* _value){
     // Stirling formula to compute the number of factorial digits in n!: return 
     if(_value){
         // get the integer out of the value
-        long long ll=getInteger(_value);
+        long long ll=getValueInteger(_value);
         if(ll>0)return _getIntegerValue(floor( ((ll+0.5)*log(ll) - ll + 0.5*log(2*LD_PI))/log(10) ) + 1);
     }
     return NULL;
@@ -171,12 +171,28 @@ Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){
 	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:0))>0);
 	return _getValueOfList(_dlist);
 }
+const char* const REAL_OCTET_INDEX_IDS[]={"1","2","3","4","5","6","7","8","9","10"};
+Mvalue* getRealDecimalMapValue(long double ld,bool littleEndianOrder){
+	Mmap* _dmap=_getMapOfType(VT_INTEGER);
+	if(!_dmap)return NULL;
+	longdoubleunion lld;
+	lld.ld=ld;
+	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
+	// if we make a map with m0 through m7 for the mantisse, and e0 and e1 for the exponent
+	if(littleEndianOrder^isLittleEndian()){ // user wants to see them in little endian order i.e. m0 first
+		while(--l>=0)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[l],_getIntegerValue(lld.octets[l])))break;
+	}else{
+		for(int i=0;i<l;i++)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[i],_getIntegerValue(lld.octets[i])))break;
+	}
+	return _getValueOfMap(_dmap);
+}
 Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
 	Mlist* _dlist=_getListOfType(VT_INTEGER);
 	if(!_dlist)return NULL;
 	longdoubleunion lld;
 	lld.ld=ld;
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
+	// how about adding a two-element list with the first equal to the field name?????
 	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:0))>0);
 	return _getValueOfList(_dlist);
 }
@@ -184,7 +200,7 @@ Mvalue* d(Mvalue* _value){ // little-endian representation list to return
 	if(_value){
 		switch(_value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,true);
-			case VT_REAL:return getRealDecimalListValue(_value->value._real->ld,true);
+			case VT_REAL:return getRealDecimalMapValue(_value->value._real->ld,true);
 			default:break;
 		}
 	}
@@ -194,7 +210,7 @@ Mvalue* D(Mvalue* _value){ // big endian decimal representation list to return
 	if(_value){
 		switch(_value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,false);
-			case VT_REAL:return getRealDecimalListValue(_value->value._real->ld,false);
+			case VT_REAL:return getRealDecimalMapValue(_value->value._real->ld,false);
 			default:break;
 		}
 	}
@@ -204,9 +220,10 @@ Mvalue* D(Mvalue* _value){ // big endian decimal representation list to return
 
 Mvalue* i(Mvalue* _value){
 	if(amVerbose())outputValue("\nConverting '",_value,"' to an integer.");
-	long long ll=getInteger(_value);
+	long long ll=getValueInteger(_value);
 	return(ll!=M_LL_INVALID?_getIntegerValue(ll):NULL);
 }
+
 // convert to a big integer
 Mvalue* I(Mvalue* _value){
 	if(_value){
@@ -216,20 +233,85 @@ Mvalue* I(Mvalue* _value){
 	}
 	return NULL;
 }
+
 // TODO complete the q function
-Mvalue* q(Mvalue* _value){
-	if(amVerbose())outputValue("\nConverting '",_value,"' to a rational.");
-	Mvalue* _rationalValue=NULL;
-	if(_value){
-		// when a list easiest to apply the I function to get the associated big integer!!!!
-		if(_value->type==VT_RATIONAL)_rationalValue=_value;else
-		if(_value->type==VT_BIGINTEGER||_value->type==VT_INTEGER||_value->type==VT_REAL)_rationalValue=_getRationalValue(_getRational(_getValueBiginteger(_value),NULL));else
-		if(_value->type==VT_LIST)if(_value->value._list->numberOfElements>1)
-		_rationalValue=_getRationalValue(_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value)));
+
+// double to rational conversion (called rat_approx which computes int64_t* num and denom parameters)
+// now returning an Mrational*, the larger md is choosen so we might stick to using LLONG_MAX as largest possible denominator
+// source: https://rosettacode.org/wiki/Convert_decimal_number_to_rational#C
+/* f : number to convert.
+ * num, denom: returned parts of the rational.
+ * md: max denominator value.  Note that machine floating point number
+ *     has a finite resolution (10e-16 ish for 64 bit double), so specifying
+ *     a "best match with minimal error" is often wrong, because one can
+ *     always just retrieve the significand and return that divided by 
+ *     2**52, which is in a sense accurate, but generally not very useful:
+ *     1.0/7.0 would be "2573485501354569/18014398509481984", for example.
+ */
+Mrational* _getLongDoubleRational(long double f){ // taking out: int64_t md, int64_t *num, int64_t *denom){
+	/*  a: continued fraction coefficients. */
+	long long a, h[3] = { 0, 1, 0 }, k[3] = { 1, 0, 0 };
+	long long x, d, n = 1;
+	int i, neg = 0;
+ 
+	long long md=1000000; //////LLONG_MAX; // the largest possible long long
+
+	// MDH@03JUN2019: with md equal to LLONG_MAX no need for: if (md <= 1) { *denom = 1; *num = (int64_t) f; return; }
+ 
+	if (f < 0) { neg = 1; f = -f; }
+ 
+	while (f != floor(f)) { n <<= 1; f *= 2; }
+	d = f;
+  
+	output("\n%llu.",d);
+
+	/* continued fraction and check denominator each step */
+	for (i = 0; i < 64; i++) {
+		a = n ? d / n : 0;
+		if (i && !a) break;
+ 
+		x = d; d = n; n = x % n;
+ 
+		x = a;
+		if (k[1] * a + k[0] >= md) {
+			x = (md - k[0]) / k[1];
+			if (x * 2 >= a || k[1] >= md)
+				i = 65;
+			else
+				break;
+		}
+ 
+		h[2] = x * h[1] + h[0]; h[0] = h[1]; h[1] = h[2];
+		k[2] = x * k[1] + k[0]; k[0] = k[1]; k[1] = k[2];
 	}
-	if(amVerbose())outputValue("Converted to '",_rationalValue,"'.");
+	return _getRational(_getBiginteger(neg?-h[1]:h[1]),_getBiginteger(k[1]),true);
+	/* replacing:
+	*denom = k[1];
+	*num = neg ? -h[1] : h[1];
+	*/
+}
+Mrational* _getValueRational(Mvalue* _value){
+	Mrational* _rational=NULL;
+	if(_value){
+		if(amVerbose())outputValue("\nExtracting the rational from '",_value,"'.");
+		// when a list easiest to apply the I function to get the associated big integer!!!!
+		if(_value->type==VT_RATIONAL)_rational=_value->value._rational;else
+		if(_value->type==VT_REAL)_rational=_getLongDoubleRational(_value->value._real->ld);else
+		if(_value->type==VT_BIGINTEGER||_value->type==VT_INTEGER)_rational=_getRational(_getValueBiginteger(_value),NULL,false);else
+		if(_value->type==VT_LIST)if(_value->value._list->numberOfElements>1)_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),true);
+	}
+	return _rational;
+}
+Mvalue* q(Mvalue* _value){
+	if(_value&&_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
+	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value)); // make a rational from it and wrap it again
+	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
 }
+
+// convert to a real
+
+// TODO complete with conversion from big integer and rational
 Mvalue* r(Mvalue* _value){
 	if(amVerbose())outputValue("Converting '",_value,"' to a real.");
 	Mvalue* _realValue=NAR_value;
@@ -1454,13 +1536,18 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
+					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
-					mstring* _realText=new_mstring(string(expressionToken->text));
+					mstring* _realText=new_mstring(string(expressionToken->text)); // the integer part
 					expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
-					if(string_length(expressionToken->text)==1)string_append_char(expressionToken->text,'0'); // a single period is NOT considered equal to zero apparently!!!!
-					_realText=string_append(_realText,string(expressionToken->text));
-					assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text),getNAR())));
-					free_mstring(_realText);
+					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
+					mstring* pRealText=_realText;
+					if(pRealText){
+						pRealText=string_append(pRealText,string(expressionToken->text));
+						if(string_length(expressionToken->text)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
+						assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
+						free_mstring(_realText);
+					}
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					mp_int* _biginteger=new_mp_int();
@@ -1632,13 +1719,29 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
 	return _getValueOfList(_result);
 }
+
 // two-argument arithmetic
+mp_int* Iadd(mp_int* a,mp_int *b){if(mp_iszero(a))return b;if(mp_iszero(b))return a;mp_int* sum=new_mp_int();if(mp_add(a,b,sum)!=MP_OKAY)return NULL;return sum;} // adding two big integers
+mp_int* Imul(mp_int* a,mp_int *b){if(!a&&!b)return NULL;if(!a)return b;if(!b)return a;mp_int* product=new_mp_int();if(mp_mul(a,b,product)!=MP_OKAY)return NULL;return product;} // multiplying two big integers, if both are NULL return NULL
+Mrational* qadd(Mrational* _rational1,Mrational* _rational2){
+	// ASSERT _rational1 and _rational2 should not be zero!!!
+	mp_int *_den1=_rational1->den,*_den2=_rational2->den; // get the denominators
+	mp_int *_num1=_rational1->num,*_num2=_rational2->num; // get the denominators
+	if(!_den1&&!_den2)return _getRational(Iadd(_num1,_num2),NULL,false); // if both denominators are undefined (i.e. 1), return the sum of the numerators
+	mp_int* _den=Imul(_den1,_den2);if(!_den){output("\nERROR: Failed to compute the product of two rational denominators.");return NULL;}
+	mp_int* _mul1=Imul(_num1,_den2);if(!_mul1){output("\nERROR: Failed to compute the product of the first numerator and second denominator of two rational numbers.");return NULL;}
+	mp_int* _mul2=Imul(_num2,_den1);if(!_mul2){output("\nERROR: Failed to compute the product of the second numerator and first denominator of two rational numbers.");return NULL;}
+	mp_int* _num=Iadd(_mul1,_mul2);if(!_num){output("ERROR: Failed to compute the new numerator of the sum of two rational numbers.");return NULL;}
+	return _getRational(_num,_den,true);
+}
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	// if either is NULL return the other
 	if(!_value1||isZero(_value1))return _value2;if(!_value2||isZero(_value2))return _value1;
 	// ASSERT neither are NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
+	// if either is a rational, compute the sum rational
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL)return _getRationalValue(qadd(_getValueRational(_value1),_getValueRational(_value2)));
 	if(_value1->type==VT_STRING){ // force string concatenation using the quote character in the Mvalue in the resulting text
 		mstring* _valueText=string_create();
 		mstring* p=_valueText;
@@ -1715,14 +1818,17 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	}
 	return NULL;
 }
+
+
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isZero(_value1)||isOne(_value2))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
+	// if either is a big integer
 	// always real divide
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
-		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld); // TODO casting to a long double is perhaps not the best way?
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld); // TODO casting to a long double is perhaps not the best way?
 		return _getRealValue(ld1/ld2);
 	}
 	return NULL;

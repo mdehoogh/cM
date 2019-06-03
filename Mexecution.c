@@ -54,10 +54,10 @@ mp_int* _getBigintegerCopy(mp_int* _biginteger){
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static mp_int *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-mp_int* getBigIntegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}
-mp_int* getBigIntegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
-mp_int* getBigIntegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
-mp_int* getBigIntegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
+const mp_int* getBigintegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}
+const mp_int* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
+const mp_int* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
+const mp_int* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
 
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
@@ -1301,22 +1301,6 @@ mp_int* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);retu
 mp_int* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
-typedef struct {
-    uint64_t mantisse;
-    uint16_t exponent;
-} littleEndianLongDouble;
-typedef struct {
-    uint16_t exponent;
-    uint64_t mantisse;
-} bigEndianLongDouble;
-typedef union {
-    long double ld;
-    littleEndianLongDouble lELD;
-} littleEndianLongDoubleUnion;
-typedef union {
-    long double ld;
-    bigEndianLongDouble bELD;
-} bigEndianLongDoubleUnion;
 /*
 #  define MP_ZERO_DIGITS(mem, digits)                   \
 do {                                                    \
@@ -1340,11 +1324,33 @@ void mp_set_u128(mp_int* a,uint128_t b){
     MP_ZERO_DIGITS(a->dp+a->used,a->alloc-a->used);
 }
 */
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator){
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,bool normalize){
     if(!_numerator||mp_iszero(_numerator)==MP_YES)return NULL; // numerator needs to be non-zero
     Mrational* _rational=(Mrational*)calloc(1,sizeof(Mrational));
-    _rational->num=_numerator;
-    _rational->den=_denominator;
+    mp_int* _gcd=NULL; // either not requested or failing
+    if(normalize){
+        if(_denominator){
+            _gcd=new_mp_int();
+            // if we fail to compute the GCD or it equals 1 get rid of it
+            if(_gcd&&(mp_gcd(_numerator,_denominator,_gcd)!=MP_OKAY||mp_cmp(_gcd,getBigintegerOne())==MP_EQ)){free_biginteger(_gcd);_gcd=NULL;}
+        }
+    }
+    if(_gcd){ // some correction to apply
+        // if the correction fails, make _gcd NULL
+        _rational->num=new_mp_int();
+        _rational->den=new_mp_int();
+        if(mp_div(_numerator,_gcd,_rational->num,NULL)!=MP_OKAY||mp_div(_denominator,_gcd,_rational->den,NULL)!=MP_OKAY){
+            free_biginteger(_gcd);
+            _gcd=NULL; // assume failure
+            free_biginteger(_rational->num);
+            free_biginteger(_rational->den);
+        }
+    }
+    if(!_gcd){
+        _rational->num=_numerator;
+        _rational->den=_denominator;
+    }else // no need for the _gcd anymore!!!!
+        free_biginteger(_gcd);
     return _rational;
 }
 Mvalue* _getRationalValue(Mrational* _rational){
@@ -1354,7 +1360,75 @@ Mvalue* _getRationalValue(Mrational* _rational){
     _value->value._rational=_rational;
     return _value;
 }
-mp_err mp_set_long_double(mp_int *a, long double b){
+
+// for dealing with long double to big integer conversion
+mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
+    int32_t exp=(exponent&0x7FFF); // cut off the sign
+    if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
+    if(exp!=0){
+        mp_set_u64(a,mantisse);
+        exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
+        if(exp!=0){
+            mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
+            if(err!=MP_OKAY)return err;
+        }
+        if(exponent>>15&&mp_iszero(a)==MP_NO)a->sign=MP_NEG;
+    }else // all zeros in exponent
+        mp_zero(a);
+    return MP_OKAY;
+}
+mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
+    int32_t exp=(exponent&0x7FFF); // cut off the sign
+    if(exp!=0){
+        mp_set_u64(a,mantisse);
+        if(amVerbose()){
+            mstring* _mantisseBigIntegerText=_getBigintegerText(a);
+            output("\nValue after setting the fraction: %s.",string(_mantisseBigIntegerText));
+            free_mstring(_mantisseBigIntegerText);
+        }
+        if(amVerbose())output("\nLong double exponent part: %d - mantisse: %llu.",exp,mantisse);
+        if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
+        exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
+        //////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
+        if(amVerbose())output("\nPower of two exponent: %d.",exp);  
+        if(exp!=0){
+            mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
+            if(err!=MP_OKAY){output("\nERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
+        }
+        if(amVerbose()){
+            mstring* _bigIntegerText=_getBigintegerText(a);
+            output("\nValue after applying the exponent: %s.",string(_bigIntegerText));
+            free_mstring(_bigIntegerText);
+        }
+        if(exponent>>15){ // negative
+            // take over the sign from the long double (bit 15 in the signandexponent part)
+            if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
+                a->sign=MP_NEG;
+                if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
+            }else
+                if(amVerbose())output("\nNo need to set the sign on a big integer equal to zero.");           
+        }
+    }else // all zeros in exponent
+        mp_zero(a);
+    return MP_OKAY;
+}
+typedef struct {
+    uint64_t mantisse;
+    uint16_t exponent;
+} littleEndianLongDouble;
+typedef struct {
+    uint16_t exponent;
+    uint64_t mantisse;
+} bigEndianLongDouble;
+typedef union {
+    long double ld;
+    littleEndianLongDouble lELD;
+} littleEndianLongDoubleUnion;
+typedef union {
+    long double ld;
+    bigEndianLongDouble bELD;
+} bigEndianLongDoubleUnion;
+mp_err mp_set_longdouble(mp_int *a, long double b){
     // always assume 10-byte long double (extended precision)
     uint64_t mantisse;
     uint16_t exponent; // including bit 63
@@ -1370,41 +1444,7 @@ mp_err mp_set_long_double(mp_int *a, long double b){
         exponent=bELDU.bELD.exponent;
     }
     // determine the sign, and the 15-bit power of two exponent
-    int negative=(exponent>>15); // determine the sign
-    int64_t exp=(exponent&0x7FFF); // cut off the sign
-    if(exp!=0){ // always positive at this moment 0-16383
-        mp_set_u64(a,mantisse);
-        if(amVerbose()){
-            mstring* _mantisseBigIntegerText=_getBigintegerText(a);
-            output("\nValue after setting the fraction: %s.",string(_mantisseBigIntegerText));
-            free_mstring(_mantisseBigIntegerText);
-        }
-        if(amVerbose())output("\nLong double exponent part: %d - mantisse: %llu.",exp,mantisse);
-        if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
-        exp-=16383; // the actual exponent
-        exp-=63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers  
-        //////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
-        if(amVerbose())output("\nPower of two exponent: %d.",exp);  
-        if(exp!=0){
-            mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
-            if(err!=MP_OKAY){output("ERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
-        }
-        if(amVerbose()){
-            mstring* _bigIntegerText=_getBigintegerText(a);
-            output("\nValue after applying the exponent: %s.",string(_bigIntegerText));
-            free_mstring(_bigIntegerText);
-        }
-        // take over the sign from the long double (bit 15 in the signandexponent part)
-        if(negative){
-            if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
-                a->sign=MP_NEG;
-                if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
-            }else
-                if(amVerbose())output("\nNo need to set the sign on a big integer equal to zero.");           
-        }
-    }else // all zeros stored exponent
-        mp_zero(a);
-    return MP_OKAY;
+    return mp_set_me_verbose(a,mantisse,exponent); ///////////return (amVerbose()?mp_set_me_verbose(a,mantisse,exponent):mp_set_me(a,mantisse,exponent));
     /*
     if(sizeof(long double)==16){
         int exp;
@@ -1712,7 +1752,7 @@ mp_int* _getValueBiginteger(Mvalue* _value){
             {
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
                 mp_int* _biginteger=new_mp_int();
-                if(mp_set_long_double(_biginteger,_value->value._real->ld)==MP_OKAY)return _biginteger;
+                if(mp_set_longdouble(_biginteger,_value->value._real->ld)==MP_OKAY)return _biginteger;
                 outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
                 mp_clear(_biginteger);
             }
@@ -1982,7 +2022,7 @@ Mvalue* Mfac(Mvalue* _value){
         finalmultiplier=_getBiginteger(_value->value._integer->ll);
     }else{
         if(_value->value._biginteger->sign==MP_NEG){output("\nERROR: Invalid (negative integer) argument to fac() function!");return NULL;}
-        if(mp_cmp(_value->value._biginteger,getBigIntegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger));
+        if(mp_cmp(_value->value._biginteger,getBigintegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger));
         finalmultiplier=_value->value._biginteger;
     }
     if(!finalmultiplier){outputValue("\nERROR: Failed to convert '",_value,"' to a big integer!");return NULL;}

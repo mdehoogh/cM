@@ -249,7 +249,7 @@ const long long M_LL_MAX=LLONG_MAX;
 */
 long long double2long(long double ld); // convert long double to long long
 
-mp_err mp_set_long_double(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
+mp_err mp_set_longdouble(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
 
 mp_int* _getBiginteger(int64_t l);
 
@@ -266,7 +266,7 @@ bool isLittleEndian();
 long long getInteger(Mvalue* _value); // TODO check how this differs from getValueInteger()!!!
 mp_int* _getValueBiginteger(Mvalue* _value); // converts a value to a big integer (if possible)
 mp_int* new_mp_int();
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator);
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,bool normalize);
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
@@ -286,6 +286,7 @@ Mvalue* _getValueOfMap(Mmap* _map);
 Mvalue* _getValueOfToken(Mtoken* _token);
 
 Mlist* _getListOfType(Mvaluetype valuetype);
+Mmap* _getMapOfType(Mvaluetype valuetype);
 
 // MDH@02MAY2019: not allowed to call free_value from the outside
 bool decrementReferenceCount(Mvalue* _value);
