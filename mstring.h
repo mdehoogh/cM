@@ -43,6 +43,8 @@ mstring* string_append_char(mstring* str,char c);
 // MDH@26FEB2019: can we append a text as a whole???
 mstring* string_append(mstring* str,const char* pc);
 
+void string_reverse(mstring* str);
+
 // copying 
 bool string_copy(mstring* src,mstring* dst);
 

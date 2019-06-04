@@ -21,6 +21,29 @@ bool isLittleEndian(){
     return(littleEndian>0);
 }
 
+mstring* _getUint64BinaryText(uint64_t ul,char presuffix){
+    mstring* _binaryText=string_create();
+    if(_binaryText){
+        mstring* _p=_binaryText;
+        int l=64;
+        while(--l>=0&&_p){_p=string_append_char(_p,ul&1?'1':'0');ul>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
+        if(presuffix)_p=string_append_char(_p,presuffix);
+        if(!_p){free_mstring(_binaryText);_binaryText=NULL;}else string_reverse(_p);
+    }
+    return _binaryText;
+}
+mstring* _getUint16BinaryText(uint16_t us,char presuffix){
+    mstring* _binaryText=string_create();
+    if(_binaryText){
+        mstring* _p=_binaryText;
+        int l=16;
+        while(--l>=0&&_p){_p=string_append_char(_p,us&1?'1':'0');us>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
+        if(presuffix)_p=string_append_char(_p,presuffix);
+        if(!_p){free_mstring(_binaryText);_binaryText=NULL;}else string_reverse(_p);
+    }
+    return _binaryText;
+}
+
 const char* MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
 const char* IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
 
@@ -59,6 +82,105 @@ const mp_int* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
 const mp_int* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
 const mp_int* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
 
+typedef struct {
+    uint64_t mantisse;
+    uint16_t exponent;
+} littleEndianLongDouble;
+typedef struct {
+    uint16_t exponent;
+    uint64_t mantisse;
+} bigEndianLongDouble;
+typedef union {
+    long double ld;
+    littleEndianLongDouble lELD;
+} littleEndianLongDoubleUnion;
+typedef union {
+    long double ld;
+    bigEndianLongDouble bELD;
+} bigEndianLongDoubleUnion;
+void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent){
+    if(isLittleEndian()){
+        littleEndianLongDoubleUnion lELDU;
+        lELDU.ld=ld;
+        *mantisse=lELDU.lELD.mantisse;
+        *exponent=lELDU.lELD.exponent;
+    }else{
+        bigEndianLongDoubleUnion bELDU;
+        bELDU.ld=ld;
+        *mantisse=bELDU.bELD.mantisse;
+        *exponent=bELDU.bELD.exponent;
+    }
+}
+mstring* _getBigintegerText(const mp_int* const _biginteger); // prototype declaration
+// MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
+Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter,long double eps){
+    if(!ldIsNaN(ld)&&!ldIsInf(ld)){ // neither a NaN nor Inf      
+        if(ldIsZero(ld))return _getRational(new_mp_int(),NULL,false); // zero is easy
+        bool neg=(ld<0);if(neg)ld=-ld; // remember if negative
+        // ASSERT ld is positive 
+        long long pmin1=1,pmin2=0,qmin1=0,qmin2=1;
+        long long a,p,q;
+        long double delta,rem=ld;
+        for(int i=1;i<=maxiter;i++){
+            a=lrint(floorl(rem));
+            p=a*pmin1+pmin2;
+            q=a*qmin1+qmin2;
+            ////////printf("\nIteration #%u: %lld:  %lld/%lld", i, a, p, q);
+            rem-=a;
+            ///////printf(" - delta: %.*Lf, rem: %.*Lf",LDBL_DIG,delta,LDBL_DIG,rem);
+            ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
+            delta=(ld*q)-p;
+            if(fabsl(delta)<eps)break;
+            rem=1/rem;
+            // shift the lot
+            pmin2=pmin1;qmin2=qmin1;
+            pmin1=p;qmin1=q;
+        }
+        mp_int* _num=_getBiginteger(p);if(neg&&mp_neg(_num,_num)!=MP_OKAY){output("\nERROR: Failed to negate the numerator of the rational of a real.");free_biginteger(_num);return NULL;}
+        return _getRational(_num,_getBiginteger(q),true);
+    }
+    return NULL;
+}
+/* replacing:
+Mrational* _getLongDoubleRational(long double ld){
+    // a non zero long double
+    uint16_t exponent;
+    uint64_t mantisse;
+    extractMantisseAndExponent(ld,&mantisse,&exponent);
+    int32_t exp=(exponent&0x7FFF);
+    // if exponent is all ones, the long double represents a NaN or Inf
+    if(exp==0x7FFF){if(amVerbose())output("\nCan't convert an invalid or infinite real to a rational!");return NULL;}
+    // if exponent is all zeroes, the long double represents zero
+    mp_int* _numerator=new_mp_int();
+    if(exp==0)return _getRational(_numerator,NULL,false);
+    // set the numerator to the mantisse (which luckily is uint64_t)
+    mp_set_u64(_numerator,mantisse);
+    exp-=0x403E; // determine the 'true' exponent
+    // if the true exponent is negative, the multiplier is below 1 and cannot be used as denominator, instead the numerator should be multiplied by 2 to the power -exp
+    if(exp<0){
+        mp_int* _shiftedout=new_mp_int();
+        mp_err err=mp_div_2d(_numerator,-exp,_numerator,_shiftedout);
+        if(err!=MP_OKAY){
+            free_biginteger(_shiftedout);
+            output("\nERROR: Failed to adjust the numerator of the rational by the negative exponent of the real.");
+            free_biginteger(_numerator);
+            return NULL;
+        }
+        // we may assume that what got shifted out fits in an uint64_t
+        uint64_t shiftedout=mp_get_u64(_shiftedout);mstring* _shiftedoutText=_getUint64BinaryText(shiftedout,'\0');output("\nShifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
+        // replacing: mstring* _shiftedoutText=_getBigintegerText(_shiftedout);output("\nShifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
+        free_biginteger(_shiftedout);
+    }
+    // make the numerator negative if the long double is negative (this is when bit 15 of the exponent equals 1)
+    if(exponent>>15)if(mp_neg(_numerator,_numerator)!=MP_OKAY){output("\nERROR: Failed to negate the rational of the real.");free_biginteger(_numerator);return NULL;}
+    // if the exponent is non-positive (zero or negative) there's no denominator (i.e. denominator remains 1)
+    if(exp<=0)return _getRational(_numerator,NULL,false);
+    // ASSERT a positive exponent that we can use for the denominator
+    mp_int* _denominator=_getBiginteger(1);
+    if(!_denominator||mp_mul_2d(_denominator,exp,_denominator)!=MP_OKAY){output("\nERROR: Failed to compute the denominator of the rational of a real.");free_biginteger(_denominator);return NULL;}
+    return _getRational(_numerator,_denominator,true);
+}
+*/
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
@@ -1361,6 +1483,7 @@ Mvalue* _getRationalValue(Mrational* _rational){
     return _value;
 }
 
+// we can use the method below to come up with the numerator and denominator of a given double that matches the double exactly
 // for dealing with long double to big integer conversion
 mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
     int32_t exp=(exponent&0x7FFF); // cut off the sign
@@ -1377,6 +1500,7 @@ mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
         mp_zero(a);
     return MP_OKAY;
 }
+
 mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
     int32_t exp=(exponent&0x7FFF); // cut off the sign
     if(exp!=0){
@@ -1412,37 +1536,11 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
         mp_zero(a);
     return MP_OKAY;
 }
-typedef struct {
-    uint64_t mantisse;
-    uint16_t exponent;
-} littleEndianLongDouble;
-typedef struct {
-    uint16_t exponent;
-    uint64_t mantisse;
-} bigEndianLongDouble;
-typedef union {
-    long double ld;
-    littleEndianLongDouble lELD;
-} littleEndianLongDoubleUnion;
-typedef union {
-    long double ld;
-    bigEndianLongDouble bELD;
-} bigEndianLongDoubleUnion;
 mp_err mp_set_longdouble(mp_int *a, long double b){
     // always assume 10-byte long double (extended precision)
     uint64_t mantisse;
     uint16_t exponent; // including bit 63
-    if(isLittleEndian()){
-        littleEndianLongDoubleUnion lELDU;
-        lELDU.ld=b;
-        mantisse=lELDU.lELD.mantisse;
-        exponent=lELDU.lELD.exponent;
-    }else{
-        bigEndianLongDoubleUnion bELDU;
-        bELDU.ld=b;
-        mantisse=bELDU.bELD.mantisse;
-        exponent=bELDU.bELD.exponent;
-    }
+    extractMantisseAndExponent(b,&mantisse,&exponent);
     // determine the sign, and the 15-bit power of two exponent
     return mp_set_me_verbose(a,mantisse,exponent); ///////////return (amVerbose()?mp_set_me_verbose(a,mantisse,exponent):mp_set_me(a,mantisse,exponent));
     /*
@@ -1639,9 +1737,11 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                         valueText=string_append_char(valueText,'(');
                         mstring* _numeratorBigintegerText=_getBigintegerText(_rational->num);
                         if(_numeratorBigintegerText){valueText=string_append(valueText,string(_numeratorBigintegerText));free_mstring(_numeratorBigintegerText);}
-                        valueText=string_append_char(valueText,'/');
-                        mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
-                        if(_denominatorBigintegerText){valueText=string_append(valueText,string(_denominatorBigintegerText));free_mstring(_denominatorBigintegerText);}
+                        if(_rational->den){
+                            valueText=string_append_char(valueText,'/');
+                            mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
+                            if(_denominatorBigintegerText){valueText=string_append(valueText,string(_denominatorBigintegerText));free_mstring(_denominatorBigintegerText);}
+                        }
                         valueText=string_append_char(valueText,')');
                     }
                 }

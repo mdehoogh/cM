@@ -223,3 +223,16 @@ int32_t string_find(mstring *str,char c){
     // not found!!!
     return -1;
 }
+
+void string_reverse(mstring* str){
+    if(!str)return;
+    uint32_t l=str->length;
+    if(!l)return;
+    l--;
+    int32_t halfway=(l>>1);
+    if(!halfway)return;
+    ///////////printf("\nReversing: '%s'.",string(str));
+    char c;
+    while(halfway>=0){c=str->chars[halfway];str->chars[halfway]=str->chars[l-halfway];str->chars[l-halfway]=c;halfway--;}   
+    //////////////printf("\nReversed: '%s'.",string(str));
+}

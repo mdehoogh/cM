@@ -184,6 +184,15 @@ Mvalue* getRealDecimalMapValue(long double ld,bool littleEndianOrder){
 	}else{
 		for(int i=0;i<l;i++)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[i],_getIntegerValue(lld.octets[i])))break;
 	}
+	// how about extracting the mantisse and the exponent as well
+	uint64_t mantisse;uint16_t exponent;extractMantisseAndExponent(ld,&mantisse,&exponent);
+	// let's return the binary representation of exponent and mantisse with single quotes around it!!
+	mstring* _mantisseText=_getUint64BinaryText(mantisse,'\'');if(_mantisseText){appendedToMap(_dmap,"m",_getStringValue(string(_mantisseText)));free_mstring(_mantisseText);}
+	mstring* _exponentText=_getUint16BinaryText(exponent,'\'');if(_exponentText){appendedToMap(_dmap,"e",_getStringValue(string(_exponentText)));free_mstring(_exponentText);}
+	/* replacing:
+	mp_int* _mantisse=new_mp_int();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
+	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
+	*/
 	return _getValueOfMap(_dmap);
 }
 Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
@@ -248,8 +257,9 @@ Mvalue* I(Mvalue* _value){
  *     2**52, which is in a sense accurate, but generally not very useful:
  *     1.0/7.0 would be "2573485501354569/18014398509481984", for example.
  */
+/*
 Mrational* _getLongDoubleRational(long double f){ // taking out: int64_t md, int64_t *num, int64_t *denom){
-	/*  a: continued fraction coefficients. */
+	//  a: continued fraction coefficients.
 	long long a, h[3] = { 0, 1, 0 }, k[3] = { 1, 0, 0 };
 	long long x, d, n = 1;
 	int i, neg = 0;
@@ -265,7 +275,7 @@ Mrational* _getLongDoubleRational(long double f){ // taking out: int64_t md, int
   
 	output("\n%llu.",d);
 
-	/* continued fraction and check denominator each step */
+	// continued fraction and check denominator each step
 	for (i = 0; i < 64; i++) {
 		a = n ? d / n : 0;
 		if (i && !a) break;
@@ -285,18 +295,55 @@ Mrational* _getLongDoubleRational(long double f){ // taking out: int64_t md, int
 		k[2] = x * k[1] + k[0]; k[0] = k[1]; k[1] = k[2];
 	}
 	return _getRational(_getBiginteger(neg?-h[1]:h[1]),_getBiginteger(k[1]),true);
-	/* replacing:
-	*denom = k[1];
-	*num = neg ? -h[1] : h[1];
-	*/
+	// replacing:*denom = k[1];*num = neg ? -h[1] : h[1];
 }
+*/
+/* a Java version
+public Rational limitDenominator(long maximumDenominator) {
+    if (maximumDenominator < 1) {
+        throw new IllegalArgumentException("Denominator cannot be less than 1.");
+    }
+    if(this.den <= maximumDenominator)
+        // we can't get closer than the current value
+        return this;
+    long p0 = 0;
+    long q0 = 1;
+    long p1 = 1;
+    long q1 = 0;
+    long n = this.num;
+    long d = this.den;
+    while(true) {
+        long a = n / d;
+        long q2 = q0 + a * q1;
+        if(q2 > maximumDenominator)
+            break;
+        long oldP0 = p0;
+        p0 = p1;
+        q0 = q1;
+        p1 = oldP0 + a * p1;
+        q1 = q2;
+        long oldN = n;
+        n = d;
+        d = oldN - a * d;
+    }
+    long k = (maximumDenominator - q0) / q1;
+    Rational bound1 = new Rational(p0 + k * p1, q0 + k * q1);
+    Rational bound2 = new Rational(p1, q1);
+    if(bound2.minus(this).abs().compareTo(bound1.minus(this).abs()) <= 0){
+        return bound2;
+    } else {
+        return bound1;
+    }
+}
+*/
+
 Mrational* _getValueRational(Mvalue* _value){
 	Mrational* _rational=NULL;
 	if(_value){
 		if(amVerbose())outputValue("\nExtracting the rational from '",_value,"'.");
 		// when a list easiest to apply the I function to get the associated big integer!!!!
 		if(_value->type==VT_RATIONAL)_rational=_value->value._rational;else
-		if(_value->type==VT_REAL)_rational=_getLongDoubleRational(_value->value._real->ld);else
+		if(_value->type==VT_REAL)_rational=_getLongDoubleRational(_value->value._real->ld,100,1e-20);else
 		if(_value->type==VT_BIGINTEGER||_value->type==VT_INTEGER)_rational=_getRational(_getValueBiginteger(_value),NULL,false);else
 		if(_value->type==VT_LIST)if(_value->value._list->numberOfElements>1)_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),true);
 	}
@@ -2224,8 +2271,9 @@ void outputValueColored(Mvalue* _value){
 			if(_value->value._rational){
 				output("(");
 				outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
-				output("/");
-				outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._rational->den,NULL);resetOutputColor();
+				output("/");outputTokenTypeColor(TT_INTEGER);
+				if(_value->value._rational->den)outputBiginteger(NULL,_value->value._rational->den,NULL);else outputChar('1'); // a missing denominator means it's equal to 1
+				resetOutputColor();
 				output(")");
 			}
 			break;

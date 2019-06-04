@@ -263,6 +263,12 @@ mp_int* getBigintegerLLMax();
 
 bool isLittleEndian();
 
+mstring* _getUint64BinaryText(uint64_t l,char presuffix);
+mstring* _getUint16BinaryText(uint16_t s,char presuffix);
+
+void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent); // so we can also put these into the decimal representation of a double!!!
+Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter,long double eps); // convert a long double to its rational equivalent
+
 long long getInteger(Mvalue* _value); // TODO check how this differs from getValueInteger()!!!
 mp_int* _getValueBiginteger(Mvalue* _value); // converts a value to a big integer (if possible)
 mp_int* new_mp_int();
