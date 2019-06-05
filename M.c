@@ -924,7 +924,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
      E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
-char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","!","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","q","q","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -1002,13 +1002,17 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
 // if we put the error info in the error token
 
-uint8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
+// MDH@05JUN2019: it's prudent to return the negative value of the input token type if the given input character type ends the token 
+//                i.e. when NO_TRANSITIONS is a match, so that the caller can set the significantCharacterCount
+int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
 	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
 		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
 		char* noTransition=NO_TRANSITIONS[inputTokenType];
 #ifdef __DEBUG__
 		printf("'%s'",noTransition);
 #endif
+		// TODO we can improve on the following
+		///////////if(noTransition[0]!='`'&&!strchr(noTransition,inputCharacterType))return -inputTokenType;
 		if(strlen(noTransition)==0||(noTransition[0]=='`'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
 			int8_t tokenType=NUMBER_OF_TOKEN_TYPES; // MDH@10APR2019: BUG FIX uint8_t changed to int8_t otherwise would circle around
 			while(--tokenType>=0)if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)return tokenType;
@@ -1794,7 +1798,12 @@ Mrational* qadd(Mrational* _rational1,Mrational* _rational2){
 	mp_int *_den1=_rational1->den,*_den2=_rational2->den; // get the denominators
 	mp_int *_num1=_rational1->num,*_num2=_rational2->num; // get the numerators
 	long double deltasum=(_rational1->delta&&_rational2->delta?_rational1->delta->ld+_rational2->delta->ld:(_rational1->delta?_rational1->delta->ld:(_rational2->delta?_rational2->delta->ld:M_LD_NAN))); // MDH@05JUN2019: compute the sum of the deltas
+	// we can speed it up if certain elements are integer (because the denominator is NULL)
 	if(!_den1&&!_den2)return _getRational(Iadd(_num1,_num2),NULL,deltasum,false); // if both denominators are undefined (i.e. 1), return the sum of the numerators
+	if(!_den1)return _getRational(Iadd(_num2,Imul(_num1,_den2)),_den2,deltasum,true);
+	if(!_den2)return _getRational(Iadd(_num1,Imul(_num2,_den1)),_den1,deltasum,true);
+	// if the denominators are equal it's also easier
+	if(mp_cmp(_den1,_den2)==MP_EQ)return _getRational(Iadd(_num1,_num2),_den1,deltasum,true);
 	mp_int* _den=Imul(_den1,_den2);if(!_den){output("\nERROR: Failed to compute the product of two rational denominators.");return NULL;}
 	mp_int* _mul1=Imul(_num1,_den2);if(!_mul1){output("\nERROR: Failed to compute the product of the first numerator and second denominator of two rational numbers.");return NULL;}
 	mp_int* _mul2=Imul(_num2,_den1);if(!_mul2){output("\nERROR: Failed to compute the product of the second numerator and first denominator of two rational numbers.");return NULL;}
@@ -2806,8 +2815,9 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	if((TOKENTYPE_IDS[pLastCommandToEvaluateToken->type]&0x62)==0x62)if(inputChar==string_char(pLastCommandToEvaluateToken->text,0))inputCharacterType='R';
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 	if(inputCharacterType=='W')if(pLastCommandToEvaluateToken->type==TT_ERROR||pLastCommandToEvaluateToken->type==TT_COMMENT||pLastCommandToEvaluateToken->type==TT_DQSTRING||pLastCommandToEvaluateToken->type==TT_SQSTRING)inputCharacterType='w';
+	int16_t newTokenType=0; // MDH@05JUN2019: we need newTokenType AFTER appending the last character allowed in a token (like q behind a integer or real)
 	if(inputCharacterType!='W'){ // only characters that are not whitespace can start a new token
-		int16_t newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 	resetOutputColor();
 	printf("[%d+%c->%d]",pLastCommandToEvaluateToken->type,inputCharacterType,newTokenType);
@@ -2815,7 +2825,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 #endif
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
-		if(newTokenType==pLastCommandToEvaluateToken->type){
+		if(newTokenType<0||newTokenType==pLastCommandToEvaluateToken->type){
 			/* MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
 			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->significantCharacterCount>0){
@@ -2833,6 +2843,9 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
 		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
 		//                this way it will always be there!!
+		if(newTokenType<0){
+
+		}else
 		if(newTokenType!=pLastCommandToEvaluateToken->type||pLastCommandToEvaluateToken->type==TT_EXPRESSION||pLastCommandToEvaluateToken->significantCharacterCount>0){
 
 			// MDH@10APR2019: NOT every new token type starts a new token:
@@ -2938,6 +2951,9 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 
 	// append the typed character at cursorPosition() minus current token offset in pLastCommandToEvaluateToken->text
 	string_append_char(pLastCommandToEvaluateToken->text,inputChar);
+
+	if(newTokenType<0)pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
+
 #ifdef __DEBUG__
 	printf("[%s]",string(pLastCommandToEvaluateToken->text));
 #endif
