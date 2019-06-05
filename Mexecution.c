@@ -8,6 +8,10 @@
 #include "tommath.h"
 #include "Mexecution.h"
 
+extern long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
+
+extern long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
+
 static int8_t littleEndian=-1;
 void initExecution(){
     int i=1;
@@ -111,36 +115,9 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
         *exponent=bELDU.bELD.exponent;
     }
 }
-mstring* _getBigintegerText(const mp_int* const _biginteger); // prototype declaration
-// MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
-Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter,long double eps){
-    if(!ldIsNaN(ld)&&!ldIsInf(ld)){ // neither a NaN nor Inf      
-        if(ldIsZero(ld))return _getRational(new_mp_int(),NULL,false); // zero is easy
-        bool neg=(ld<0);if(neg)ld=-ld; // remember if negative
-        // ASSERT ld is positive 
-        long long pmin1=1,pmin2=0,qmin1=0,qmin2=1;
-        long long a,p,q;
-        long double delta,rem=ld;
-        for(int i=1;i<=maxiter;i++){
-            a=lrint(floorl(rem));
-            p=a*pmin1+pmin2;
-            q=a*qmin1+qmin2;
-            ////////printf("\nIteration #%u: %lld:  %lld/%lld", i, a, p, q);
-            rem-=a;
-            ///////printf(" - delta: %.*Lf, rem: %.*Lf",LDBL_DIG,delta,LDBL_DIG,rem);
-            ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
-            delta=(ld*q)-p;
-            if(fabsl(delta)<eps)break;
-            rem=1/rem;
-            // shift the lot
-            pmin2=pmin1;qmin2=qmin1;
-            pmin1=p;qmin1=q;
-        }
-        mp_int* _num=_getBiginteger(p);if(neg&&mp_neg(_num,_num)!=MP_OKAY){output("\nERROR: Failed to negate the numerator of the rational of a real.");free_biginteger(_num);return NULL;}
-        return _getRational(_num,_getBiginteger(q),true);
-    }
-    return NULL;
-}
+
+///////mstring* _getBigintegerText(const mp_int* const _biginteger); // prototype declaration
+
 /* replacing:
 Mrational* _getLongDoubleRational(long double ld){
     // a non zero long double
@@ -251,6 +228,8 @@ void free_rational(Mrational* _rational){
     if(_rational){
         if(_rational->num)free_biginteger(_rational->num);
         if(_rational->den)free_biginteger(_rational->den);
+        if(_rational->delta)free_real(_rational->delta);
+        free(_rational);
     }else
         output("\nNo rational to free!");
 }
@@ -1372,9 +1351,53 @@ mstring* appendll(mstring* const ms,long long ll){
 }
 mstring* appendld(mstring* const ms,long double ld){
 	char ldText[80];
-	snprintf(ldText,80,"%.*Lf",LDBL_DIG,ld);
-	return string_append(ms,ldText);
+    // how about using scientific notation here?????
+	snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); //////snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); // replaced f with e to get scientific notation!!
+    // alternatively we could shift
+    char* exp=strchr(ldText,'e');
+    int l=strlen(ldText); // where we will be searching for decimal zeroes
+    int exponent=0;
+    if(exp){
+        int e=(int)(exp-ldText);
+        l=e++;
+        ldText[l]='\0'; // cut off the exponent (we can still extract the exponent though)
+        //////output("With exponent: '%s'",ldText);
+        // extract the exponent
+        bool neg=(ldText[e]=='-');if(neg||ldText[e]=='+')e++;
+        while(ldText[e]!='\0'){exponent=10*exponent+(ldText[e]-'0');e++;}
+        if(neg)exponent=-exponent;
+        //////output("Exponent: %u.",exponent);
+        /* replacing:
+        while(--l>0&&ldText[l]=='0');
+        if(ldText[l]=='-'||ldText[l]=='+')l--;
+        if(ldText[l]=='e'){ // the e-part is zero
+            ///output("Zero exponent!");
+            exp=NULL;
+        }else{
+            while(--l>0&&ldText[l]!='e'); // move to the 'e'
+        }
+        */
+    }///////else output("Without exponent: '%s'",ldText);
+
+    // ASSERT l is now on the 'e' of the exponent (if any)
+    
+    char* period=strchr(ldText,'.');
+    if(period){ // there's a decimal period
+        int p=(int)(period-ldText); // p is the position of the decimal point
+        // l-p-1 is the number of decimals if the exponent is smaller than that
+        if(exponent>0&&exponent<l-p){
+            // move the period up as far as necessary
+            while(exponent>0){ldText[p]=ldText[p+1];ldText[++p]='.';exponent--;}
+        }
+        // ASSERT p is the index of the period
+        while(ldText[--l]=='0'); // a bit naughty to simply replacing '0' with '\0' to pretend to end the text!!!
+        ldText[l+1]='\0';
+    }
+	if(!string_append(ms,ldText))return NULL;
+    if(exponent!=0)if(!string_append_char(ms,'e')||!appendll(ms,exponent))return NULL; // append the exponent
+    return ms;
 }
+
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer){
@@ -1446,34 +1469,58 @@ void mp_set_u128(mp_int* a,uint128_t b){
     MP_ZERO_DIGITS(a->dp+a->used,a->alloc-a->used);
 }
 */
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,bool normalize){
-    if(!_numerator||mp_iszero(_numerator)==MP_YES)return NULL; // numerator needs to be non-zero
-    Mrational* _rational=(Mrational*)calloc(1,sizeof(Mrational));
-    mp_int* _gcd=NULL; // either not requested or failing
-    if(normalize){
-        if(_denominator){
-            _gcd=new_mp_int();
-            // if we fail to compute the GCD or it equals 1 get rid of it
-            if(_gcd&&(mp_gcd(_numerator,_denominator,_gcd)!=MP_OKAY||mp_cmp(_gcd,getBigintegerOne())==MP_EQ)){free_biginteger(_gcd);_gcd=NULL;}
+// TODO should we free the given big integers when they are NOT bound to the rational that is being returned????
+void normalizeRational(Mrational* _rational){
+    if(!_rational)return;
+    // checking on the validity of the flag (which would actually be a bug)
+    if(!_rational->normalized&&!_rational->den){output("\nBUG: Normalized flag of rational not set although the denominator equals 1; flag set.");_rational->normalized=true;}
+    if(_rational->normalized)return; // apparently already normalized
+    // normalization means dividing by the gcd unless the gcd is one
+    mp_int* _gcd=new_mp_int();
+    if(!_gcd){output("\nERROR: Can't normalize a rational: failed to create the big integer to store the GCD.");return;}
+    // ASSERT at the end of the following block always free _gcd
+    if(mp_gcd(_rational->num,_rational->den,_gcd)==MP_OKAY){
+        if(mp_cmp(_gcd,getBigintegerOne())!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
+            // won't do an in-place division as we need both to succeed, if only one does we would be in trouble
+            mp_int *new_num=new_mp_int(),*new_den=new_mp_int();
+            if(mp_div(_rational->num,_gcd,new_num,NULL)==MP_OKAY&&mp_div(_rational->den,_gcd,new_den,NULL)==MP_OKAY){
+                free_biginteger(_rational->num);_rational->num=new_num;
+                free_biginteger(_rational->den);_rational->den=new_den;
+                _rational->normalized=true;
+            }else{
+                free_biginteger(new_num);
+                free_biginteger(new_den);
+                output("\nERROR: Normalization of rational failed.");
+            }
+        }else // the GCD equals 1 which means that the thing is normalized!!!
+            _rational->normalized=true;
+    }else
+        output("\nERROR: Can't normalize a rational: failed to compute the GCD.");
+}
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize){
+    if(_numerator&&(!_denominator||mp_iszero(_denominator)==MP_NO)){ // we have a numerator (any would do), and either NO denominator or a non-zero denominator
+        Mrational* _rational=(Mrational*)calloc(1,sizeof(Mrational));
+        if(_rational){
+            // TODO what if a delta is defined and the denominator is undefined (i.e. 1)
+            if(!ldIsNaN(delta)&&!ldIsInf(delta)&&!ldIsZero(delta))_rational->delta=new_real(delta); // store the delta if a valid value
+            _rational->num=_numerator;
+            if(_denominator&&mp_cmp(_denominator,getBigintegerOne())==MP_EQ){
+                free_biginteger(_denominator); // won't store denominator equal to 1
+                _rational->den=NULL; // probably already is though
+            }else // either NULL or not equal to 1
+                _rational->den=_denominator;
+            _rational->normalized=(!_rational->den);
+            if(normalize&&!_rational->normalized){
+                normalizeRational(_rational); // normalize the rational if we are supposed to
+                if(_denominator&&!_rational->normalized)output("\nWARNING: Failed to normalize a rational number.");
+            }
+            return _rational; // return whether normalized or not
         }
     }
-    if(_gcd){ // some correction to apply
-        // if the correction fails, make _gcd NULL
-        _rational->num=new_mp_int();
-        _rational->den=new_mp_int();
-        if(mp_div(_numerator,_gcd,_rational->num,NULL)!=MP_OKAY||mp_div(_denominator,_gcd,_rational->den,NULL)!=MP_OKAY){
-            free_biginteger(_gcd);
-            _gcd=NULL; // assume failure
-            free_biginteger(_rational->num);
-            free_biginteger(_rational->den);
-        }
-    }
-    if(!_gcd){
-        _rational->num=_numerator;
-        _rational->den=_denominator;
-    }else // no need for the _gcd anymore!!!!
-        free_biginteger(_gcd);
-    return _rational;
+    // if we get here we failed storing _numerator and _denominator, so we free them
+    if(_numerator)free_biginteger(_numerator);
+    if(_denominator)free_biginteger(_denominator);
+    return NULL;
 }
 Mvalue* _getRationalValue(Mrational* _rational){
     if(!_rational)return NULL;
@@ -1719,6 +1766,32 @@ mstring* getUndefinedValueText(){
     if(!string_copy(_UNDEFINED_VALUETEXT,_undefinedValueText)){if(_undefinedValueText)free_mstring(_undefinedValueText);return NULL;}
     return _undefinedValueText;
 }
+mstring* _getRationalText(Mrational* _rational){
+    if(_rational){
+        mstring* _rationalText=string_create();
+        if(_rationalText){
+            mstring* _p=_rationalText;
+            _p=string_append_char(_p,'(');
+            mstring* _numeratorBigintegerText=_getBigintegerText(_rational->num);
+            if(_numeratorBigintegerText){_p=string_append(_p,string(_numeratorBigintegerText));free_mstring(_numeratorBigintegerText);}
+            if(_rational->den){
+                _p=string_append_char(_p,'/');
+                mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
+                if(_denominatorBigintegerText){_p=string_append(_p,string(_denominatorBigintegerText));free_mstring(_denominatorBigintegerText);}
+            }
+            _p=string_append_char(_p,')');
+            // if a delta is known, append that as well!!!
+            if(_rational->delta){
+                // always show a sign
+                if(_rational->delta>=0)string_append_char(_p,'+');
+                _p=appendld(_p,_rational->delta->ld);
+            }
+            if(_p)return _rationalText;
+            free_mstring(_rationalText);
+        }
+    }
+    return NULL;
+}
 mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
 	mstring* valueText=NULL;
@@ -1729,23 +1802,7 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
             case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????
-            case VT_RATIONAL:
-                {
-                    Mrational* _rational=_value->value._rational;
-                    if(_rational){
-                        valueText=string_create();
-                        valueText=string_append_char(valueText,'(');
-                        mstring* _numeratorBigintegerText=_getBigintegerText(_rational->num);
-                        if(_numeratorBigintegerText){valueText=string_append(valueText,string(_numeratorBigintegerText));free_mstring(_numeratorBigintegerText);}
-                        if(_rational->den){
-                            valueText=string_append_char(valueText,'/');
-                            mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
-                            if(_denominatorBigintegerText){valueText=string_append(valueText,string(_denominatorBigintegerText));free_mstring(_denominatorBigintegerText);}
-                        }
-                        valueText=string_append_char(valueText,')');
-                    }
-                }
-                break;
+            case VT_RATIONAL:valueText=_getRationalText(_value->value._rational);break;
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
 			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
@@ -2169,6 +2226,108 @@ Mvalue* Mbi(Mvalue* _value){
     return NULL;
 }
 */
+
+// when only interested in the end result, calling _getLongDoubleRational is the way to go
+Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
+    // if iterations, you're supposed to return all iteration results
+    Mrational* _rational=NULL; // the last (computed) rational
+    if(!ldIsNaN(ld)&&!ldIsInf(ld)){ // neither a NaN nor Inf      
+        if(!ldIsZero(ld)){
+            bool neg=(ld<0);if(neg)ld=-ld; // remember if negative
+            // ASSERT ld is positive 
+            // if we use p for pmin1 and q for qmin1 we do not need pmin1 and qmin1
+            long long pmin1=1,qmin1=0,pmin2=0,qmin2=1;
+            long long a,p,q; // p and q now store the initial values of pmin1 and qmin1
+            long double delta,rem=ld;
+            // ascertain to execute the following at least once (so when maxiter<=1 we at least get the integer part of the rational)
+            for(int i=1;i<=MAX(1,maxiter);i++){
+                a=lrint(floorl(rem));
+                p=a*pmin1+pmin2;
+                q=a*qmin1+qmin2;
+                ////////printf("\nIteration #%u: %lld:  %lld/%lld", i, a, p, q);
+                ///////printf(" - delta: %.*Lf, rem: %.*Lf",LDBL_DIG,delta,LDBL_DIG,rem);
+                ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
+                delta=(ld*q)-p;
+                if(fabsl(delta)<=M_LD_Q_EPS)break;
+                rem-=a;
+                rem=1/rem;
+                // shift the lot
+                pmin2=pmin1;qmin2=qmin1;
+                pmin1=p;qmin1=q;
+            }
+            // construct the last rational (i.e. the result) from p and q
+            mp_int* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
+            if(_numerator&&_denominator){ // we've got both of them
+                if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY){
+                    _rational=_getRational(_numerator,_denominator,delta,true); // NOTE there should always be a delta!!!!
+                }
+            }
+            if(!_rational){if(_numerator)free_biginteger(_numerator);if(_denominator)free_biginteger(_denominator);}
+        }else // long double is zero
+            _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false);
+    }
+    // _rational should contain the 'last' computed rational
+    return _rational;
+}
+// MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
+Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
+    // if iterations, you're supposed to return all iteration results
+    Mlist* _iterationsList=_getListOfType(VT_UNDEFINED);
+    if(_iterationsList){
+        Mrational* _rational=NULL; // the last (computed) rational
+        if(!ldIsNaN(ld)&&!ldIsInf(ld)){ // neither a NaN nor Inf      
+            if(!ldIsZero(ld)){
+                bool neg=(ld<0);if(neg)ld=-ld; // remember if negative
+                // ASSERT ld is positive 
+                long long pmin1=1,pmin2=0,qmin1=0,qmin2=1;
+                long long a,p,q;
+                long double delta,rem=ld;
+                // ascertain to execute the following at least once (so when maxiter<=1 we at least get the integer part of the rational)
+                for(int i=1;i<=MAX(maxiter,1);i++){
+                    a=lrint(floorl(rem));
+                    p=a*pmin1+pmin2;
+                    q=a*qmin1+qmin2;
+                    ////////printf("\nIteration #%u: %lld:  %lld/%lld", i, a, p, q);
+                    ///////printf(" - delta: %.*Lf, rem: %.*Lf",LDBL_DIG,delta,LDBL_DIG,rem);
+                    ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
+                    delta=(ld*q)-p;
+                    if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
+                    _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false); // construct the intermediate result without normalizing
+                    if(!_rational){output("\nERROR: Failed to construct the intermediate rational %lld/%lld",p,q);break;}
+                    // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
+                    if(!appendedToList(_iterationsList,_getRationalValue(_rational),i)){free_rational(_rational);output("\nERROR: Failed to register a intermediate rational approximation.");/*break;*/}
+                    rem-=a;
+                    rem=1/rem;
+                    // shift the lot
+                    pmin2=pmin1;qmin2=qmin1;
+                    pmin1=p;qmin1=q;
+                }
+                // construct the last rational (i.e. the result) from p and q
+                mp_int* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
+                if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true);
+                if(!_rational){if(_numerator)free_biginteger(_numerator);if(_denominator)free_biginteger(_denominator);}
+            }else // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
+                _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false);
+        }
+        // _rational should contain the 'last' computed rational
+        if(_rational){
+            Mvalue* _rationalValue=_getRationalValue(_rational);
+            if(_rationalValue){
+                // how about reporting backwards????
+                if(appendedToList(_iterationsList,_rationalValue,0))return _iterationsList;
+                // ASSERT failed to append the rational approximation to the iterations list
+                // free whatever's NOT being returned NOTE the list itself will be freed below
+                free_value(_rationalValue);
+                output("\nERROR: Failed to append the rational of a real to the result list.");
+            }else{ // failed to wrap the rational
+                free_rational(_rational);output("\nERROR: Failed to store the rational approximation.");
+            }
+        }
+        if(_iterationsList)free_list(_iterationsList);
+    }
+    return NULL;
+}
+
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
     *_valueholder=_value; // replace what's being pointed to

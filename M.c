@@ -14,6 +14,12 @@
 #include "Moutput.h"
 #include "Msession.h"
 
+long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
+
+// I guess we could allow the user to specify another eps value through the QEPS command line argument!!!
+
+long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
+
 void writeTimestamp(FILE* _file){
 	if(_file){
     time_t now=time(NULL);
@@ -343,14 +349,25 @@ Mrational* _getValueRational(Mvalue* _value){
 		if(amVerbose())outputValue("\nExtracting the rational from '",_value,"'.");
 		// when a list easiest to apply the I function to get the associated big integer!!!!
 		if(_value->type==VT_RATIONAL)_rational=_value->value._rational;else
-		if(_value->type==VT_REAL)_rational=_getLongDoubleRational(_value->value._real->ld,100,1e-20);else
-		if(_value->type==VT_BIGINTEGER||_value->type==VT_INTEGER)_rational=_getRational(_getValueBiginteger(_value),NULL,false);else
-		if(_value->type==VT_LIST)if(_value->value._list->numberOfElements>1)_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),true);
+		if(_value->type==VT_REAL)_rational=_getLongDoubleRational(_value->value._real->ld,250);else
+		if(_value->type==VT_BIGINTEGER||_value->type==VT_INTEGER)_rational=_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false);else
+		if(_value->type==VT_LIST)if(_value->value._list->numberOfElements>1)_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),M_LD_NAN,true);
 	}
 	return _rational;
 }
+// TODO how many iterations would we accept at most?????
+Mvalue* Q(Mvalue* _value){
+	if(!_value)return NULL;
+	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
+	if(_value->type==VT_REAL)return _getValueOfList(_getLongDoubleRationalList(_value->value._real->ld,250)); // the intermediate results are stored in a list, and the last element will be the final result!!!
+	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value)); // make a rational from it and wrap it again
+	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
+	return _rationalValue;
+}
 Mvalue* q(Mvalue* _value){
-	if(_value&&_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
+	if(!_value)return NULL;
+	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
+	if(_value->type==VT_REAL)return _getRationalValue(_getLongDoubleRational(_value->value._real->ld,250));
 	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value)); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
@@ -411,10 +428,11 @@ Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
 Mtoken* newToken(Mtoken* prevToken);
+
 bool initEnvironment(){
-	
-	NAR_value=_getRealValue(strtold("nan",NULL)); // we'll be using the default NaN to represent Not A Real
-	NAI_value=_getIntegerValue(M_LL_INVALID);
+
+	NAR_value=_getRealValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
+
 	NULL_value=_getValueOfToken(newToken(NULL));NULL_value->value._token->text=new_mstring("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
 
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
@@ -505,7 +523,8 @@ bool initEnvironment(){
 			// conversions
 			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"I"),I)
 					||!completedValueFunction(newFunction(_Menvironment,"t"),t)
-					||!completedValueFunction(newFunction(_Menvironment,"r"),r)||!completedValueFunction(newFunction(_Menvironment,"q"),q)
+					||!completedValueFunction(newFunction(_Menvironment,"r"),r)
+					||!completedValueFunction(newFunction(_Menvironment,"q"),q)||!completedValueFunction(newFunction(_Menvironment,"Q"),Q)
 					||!completedValueFunction(newFunction(_Menvironment,"d"),d)||!completedValueFunction(newFunction(_Menvironment,"D"),D)){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
@@ -1773,20 +1792,23 @@ mp_int* Imul(mp_int* a,mp_int *b){if(!a&&!b)return NULL;if(!a)return b;if(!b)ret
 Mrational* qadd(Mrational* _rational1,Mrational* _rational2){
 	// ASSERT _rational1 and _rational2 should not be zero!!!
 	mp_int *_den1=_rational1->den,*_den2=_rational2->den; // get the denominators
-	mp_int *_num1=_rational1->num,*_num2=_rational2->num; // get the denominators
-	if(!_den1&&!_den2)return _getRational(Iadd(_num1,_num2),NULL,false); // if both denominators are undefined (i.e. 1), return the sum of the numerators
+	mp_int *_num1=_rational1->num,*_num2=_rational2->num; // get the numerators
+	long double deltasum=(_rational1->delta&&_rational2->delta?_rational1->delta->ld+_rational2->delta->ld:(_rational1->delta?_rational1->delta->ld:(_rational2->delta?_rational2->delta->ld:M_LD_NAN))); // MDH@05JUN2019: compute the sum of the deltas
+	if(!_den1&&!_den2)return _getRational(Iadd(_num1,_num2),NULL,deltasum,false); // if both denominators are undefined (i.e. 1), return the sum of the numerators
 	mp_int* _den=Imul(_den1,_den2);if(!_den){output("\nERROR: Failed to compute the product of two rational denominators.");return NULL;}
 	mp_int* _mul1=Imul(_num1,_den2);if(!_mul1){output("\nERROR: Failed to compute the product of the first numerator and second denominator of two rational numbers.");return NULL;}
 	mp_int* _mul2=Imul(_num2,_den1);if(!_mul2){output("\nERROR: Failed to compute the product of the second numerator and first denominator of two rational numbers.");return NULL;}
 	mp_int* _num=Iadd(_mul1,_mul2);if(!_num){output("ERROR: Failed to compute the new numerator of the sum of two rational numbers.");return NULL;}
-	return _getRational(_num,_den,true);
+	return _getRational(_num,_den,deltasum,true);
 }
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	// if either is NULL return the other
-	if(!_value1||isZero(_value1))return _value2;if(!_value2||isZero(_value2))return _value1;
+	if(!_value1||isZero(_value1))return _value2;
+	if(!_value2||isZero(_value2))return _value1;
 	// ASSERT neither are NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);
+	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
 	// if either is a rational, compute the sum rational
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL)return _getRationalValue(qadd(_getValueRational(_value1),_getValueRational(_value2)));
 	if(_value1->type==VT_STRING){ // force string concatenation using the quote character in the Mvalue in the resulting text
@@ -2275,6 +2297,18 @@ void outputValueColored(Mvalue* _value){
 				if(_value->value._rational->den)outputBiginteger(NULL,_value->value._rational->den,NULL);else outputChar('1'); // a missing denominator means it's equal to 1
 				resetOutputColor();
 				output(")");
+				if(_value->value._rational->delta){
+					outputTokenTypeColor(TT_REAL);
+					if(_value->value._rational->delta->ld>=0)output("+");
+					mstring* _realValueText=string_create();
+					if(_realValueText){
+						appendld(_realValueText,_value->value._rational->delta->ld);
+						output("%s",string(_realValueText));
+						free_mstring(_realValueText);
+					}
+					// replacing:	output("%.*Lf",LDBL_DIG,_value->value._rational->delta->ld);
+					resetOutputColor();
+				}
 			}
 			break;
 		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;

@@ -19,6 +19,7 @@
  *   Functions have an associated identifier (different from the names of variables) that can be executed on a list of argument values
  *   The pointer to the name of the variable/function does not need to be 
  */
+
 #include <math.h>
 #include <float.h>
 
@@ -29,6 +30,9 @@
 #include "Mexpression.h"
 // MDH@31MAY2019: switched from libzahl to libtommatch
 #include "tommath.h"
+
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
@@ -53,6 +57,8 @@ typedef struct Mreal{
 typedef struct Mrational{
     mp_int* num;
     mp_int* den;
+    Mreal* delta; // any deviation from the original long double
+    bool normalized; // MDH@05JUN2019: remember whether or not normalized...
 }Mrational;
 
 typedef struct Mstring{
@@ -247,6 +253,7 @@ const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLO
 const long long M_LL_MIN=LLONG_MIN+1;
 const long long M_LL_MAX=LLONG_MAX;
 */
+
 long long double2long(long double ld); // convert long double to long long
 
 mp_err mp_set_longdouble(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
@@ -267,12 +274,16 @@ mstring* _getUint64BinaryText(uint64_t l,char presuffix);
 mstring* _getUint16BinaryText(uint16_t s,char presuffix);
 
 void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent); // so we can also put these into the decimal representation of a double!!!
-Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter,long double eps); // convert a long double to its rational equivalent
+
+// the following two methods will use M_LD_Q_EPS as default cut-off value
+Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
+Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 
 long long getInteger(Mvalue* _value); // TODO check how this differs from getValueInteger()!!!
 mp_int* _getValueBiginteger(Mvalue* _value); // converts a value to a big integer (if possible)
 mp_int* new_mp_int();
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,bool normalize);
+
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize);
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
@@ -299,6 +310,7 @@ bool decrementReferenceCount(Mvalue* _value);
 bool incrementReferenceCount(Mvalue* _value);
 
 //////void free_value(Mvalue* _value);
+mstring* appendld(mstring* mstr,long double ld);
 
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue);
