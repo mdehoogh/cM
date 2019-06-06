@@ -75,7 +75,7 @@ mp_int* _getBiginteger(int64_t l){
 mp_int* _getBigintegerCopy(mp_int* _biginteger){
     if(!_biginteger)return NULL;
     mp_int* _result=new_mp_int();
-    if(mp_copy(_result,_biginteger)!=MP_OKAY){mp_clear(_result);return NULL;}
+    if(mp_copy(_biginteger,_result)!=MP_OKAY){free_biginteger(_result);return NULL;}
     return _result;
 }
 
@@ -86,6 +86,10 @@ const mp_int* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
 const mp_int* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
 const mp_int* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
 
+bool isBigintegerZero(mp_int* _biginteger){return(_biginteger?mp_iszero(_biginteger)==MP_YES:false);}
+bool isBigintegerOne(mp_int* _biginteger){return(_biginteger?mp_cmp(_biginteger,getBigintegerOne())==MP_EQ:false);}
+
+// long double to rational or representation
 typedef struct {
     uint64_t mantisse;
     uint16_t exponent;
@@ -1385,9 +1389,11 @@ mstring* appendld(mstring* const ms,long double ld){
     if(period){ // there's a decimal period
         int p=(int)(period-ldText); // p is the position of the decimal point
         // l-p-1 is the number of decimals if the exponent is smaller than that
-        if(exponent>0&&exponent<l-p){
-            // move the period up as far as necessary
-            while(exponent>0){ldText[p]=ldText[p+1];ldText[++p]='.';exponent--;}
+        if(exponent>0){ // move the period up as far as necessary
+            if(exponent<l-p)while(exponent>0){ldText[p]=ldText[p+1];ldText[++p]='.';exponent--;}
+        }else
+        if(exponent<0){ // move the period back as far as possible
+            if(exponent+p>=0)while(exponent<0){ldText[p]=ldText[p-1];ldText[--p]='.';exponent++;}
         }
         // ASSERT p is the index of the period
         while(ldText[--l]=='0'); // a bit naughty to simply replacing '0' with '\0' to pretend to end the text!!!
@@ -1528,6 +1534,13 @@ Mvalue* _getRationalValue(Mrational* _rational){
     _value->type=VT_RATIONAL;
     _value->value._rational=_rational;
     return _value;
+}
+// rationals can equal zero or one but only when the delta value equals 0 (or is not defined which is the same)
+bool isRationalZero(Mrational* _rational){
+    return(_rational?isBigintegerZero(_rational->num)&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false); // the delta needs to be undefined (i.e. zero)
+}
+bool isRationalOne(Mrational* _rational){
+    return(_rational?isBigintegerOne(_rational->num)&&(!_rational->den||isBigintegerOne(_rational->den))&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false);
 }
 
 // we can use the method below to come up with the numerator and denominator of a given double that matches the double exactly
@@ -1867,6 +1880,7 @@ mp_int* _rational2biginteger(Mrational* _rational){
         if(mp_copy(_rational->num,_biginteger)!=MP_OKAY){output("\nERROR: Failed to copy the rational numerator.");free_biginteger(_biginteger);return NULL;}
     return _biginteger;
 }
+
 long long getValueInteger(const Mvalue* const _value){
     // ASSERTION if _value can be converted to an integer,it should not equal invalid!!!!
     if(_value){
@@ -1899,7 +1913,10 @@ long long getValueInteger(const Mvalue* const _value){
     }
     return M_LL_INVALID;
 }
-mp_int* _getValueBiginteger(Mvalue* _value){
+long double getValueReal(const Mvalue* const _value){
+    return(_value&&_value->type==VT_REAL?_value->value._real->ld:M_LD_NAN);
+}
+mp_int* _getValueBiginteger(const Mvalue* const _value){
     if(_value)
         switch(_value->type){
         case VT_BIGINTEGER:return _value->value._biginteger;
@@ -2089,14 +2106,14 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
     }
     return _result;
 }
-bool isZero(Mvalue* _value){
+bool isValueZero(Mvalue* _value){
     if(_value){
         if(_value->type==VT_INTEGER)return _value->value._integer->ll==0;
         if(_value->type==VT_REAL)return ldIsZero(_value->value._real->ld);
     }
     return false;
 }
-bool isOne(Mvalue* _value){
+bool isValueOne(Mvalue* _value){
     if(_value){
         if(_value->type==VT_INTEGER)return _value->value._integer->ll==1;
         if(_value->type==VT_REAL)return _value->value._real->ld==1;

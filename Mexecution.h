@@ -279,11 +279,19 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 
-long long getInteger(Mvalue* _value); // TODO check how this differs from getValueInteger()!!!
-mp_int* _getValueBiginteger(Mvalue* _value); // converts a value to a big integer (if possible)
+long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
+long double getValueReal(const Mvalue* const _value);
+mp_int* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
+
 mp_int* new_mp_int();
 
+bool isBigintegerZero(mp_int* _biginteger);
+bool isBigintegerOne(mp_int* _biginteger);
+mp_int* _getBigintegerCopy(mp_int* _biginteger);
+
 Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize);
+void free_rational(Mrational* _rational);
+
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
@@ -386,8 +394,8 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
 bool mapAppendedToList(Mlist* const _list,Mmap* const _map);
 bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map);
 
-bool isZero(Mvalue* _value);
-bool isOne(Mvalue* _value);
+bool isValueZero(Mvalue* _value);
+bool isValueOne(Mvalue* _value);
 
 // unary functions
 Mvalue* Mneg(Mvalue* _value); // negate a value
