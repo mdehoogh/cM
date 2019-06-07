@@ -68,6 +68,13 @@ bool initVariable(Menvironment* _Menvironment,char* name,double d){
 // there will be a root (M) environment
 
 const long double LD_PI=3.141592653589793238462643383279L; // 30 decimal digits of PI
+
+// PI all little more accurate (we could make a PI100 from these numbers)
+// source: https://blog.wolfram.com/2011/06/30/all-rational-approximations-of-pi-are-useless/
+// wolfram has a Rationalize function to compute rational approximations to a certain accuracy (see https://reference.wolfram.com/language/ref/Rationalize.html)
+const char* M_QNUM_PI100="394372834342725903069943709807632345074473102456264";
+const char* M_QDEN_PI100="125532772013612015195543173729505082616186012726141";
+
 const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
 Mvalue* Mfacd(Mvalue* _value){
@@ -78,6 +85,81 @@ Mvalue* Mfacd(Mvalue* _value){
         if(ll>0)return _getIntegerValue(floor( ((ll+0.5)*log(ll) - ll + 0.5*log(2*LD_PI))/log(10) ) + 1);
     }
     return NULL;
+}
+
+mp_int* _Iadd(mp_int* a,mp_int *b){
+	// ASSERT do NOT call with either a or b NULL
+	if(!a||!b)return NULL;
+	if(isBigintegerZero(a))return _getBigintegerCopy(b);
+	if(isBigintegerZero(b))return _getBigintegerCopy(a);
+	mp_int* sum=new_mp_int();if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);return NULL;} // if the addition fails return 0
+	return sum;
+} // adding two big integers
+mp_int* _Imultiply(mp_int* a,mp_int *b){
+	if(!a&&!b)return NULL;
+	if(isBigintegerOne(a))return _getBigintegerCopy(b);
+	if(isBigintegerOne(b))return _getBigintegerCopy(a);
+	mp_int* product=new_mp_int(); // defaults to zero, which would be the result as well if either big integer is zero!!!
+	if(!isBigintegerZero(a)&&!isBigintegerZero(b)&&mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);return NULL;}
+	return product;
+} // multiplying two big integers, if both are NULL return NULL
+Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
+	// ASSERT _rational1 and _rational2 should not be NULL
+	mp_int *_den1=_rational1->den,*_den2=_rational2->den; // get the denominators
+	mp_int *_num1=_rational1->num,*_num2=_rational2->num; // get the numerators
+	long double deltasum=(_rational1->delta&&_rational2->delta?_rational1->delta->ld+_rational2->delta->ld:(_rational1->delta?_rational1->delta->ld:(_rational2->delta?_rational2->delta->ld:M_LD_NAN))); // MDH@05JUN2019: compute the sum of the deltas
+	// we can speed it up if certain elements are integer (because the denominator is NULL)
+	if(!_den1&&!_den2)return _getRational(_Iadd(_num1,_num2),NULL,deltasum,false); // if both denominators are undefined (i.e. 1), return the sum of the numerators
+	if(!_den1)return _getRational(_Iadd(_num2,_Imultiply(_num1,_den2)),_den2,deltasum,true);
+	if(!_den2)return _getRational(_Iadd(_num1,_Imultiply(_num2,_den1)),_den1,deltasum,true);
+	// if the denominators are equal it's also easier
+	if(mp_cmp(_den1,_den2)==MP_EQ)return _getRational(_Iadd(_num1,_num2),_den1,deltasum,true);
+	mp_int* _den=_Imultiply(_den1,_den2);if(!_den){output("\nERROR: Failed to compute the product of two rational denominators.");return NULL;}
+	mp_int* _mul1=_Imultiply(_num1,_den2);if(!_mul1){output("\nERROR: Failed to compute the product of the first numerator and second denominator of two rational numbers.");return NULL;}
+	mp_int* _mul2=_Imultiply(_num2,_den1);if(!_mul2){output("\nERROR: Failed to compute the product of the second numerator and first denominator of two rational numbers.");return NULL;}
+	mp_int* _num=_Iadd(_mul1,_mul2);if(!_num){output("ERROR: Failed to compute the new numerator of the sum of two rational numbers.");return NULL;}
+	return _getRational(_num,_den,deltasum,true);
+}
+
+// wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
+// and the following is an implementation that can approximate pi using this formula
+Mvalue* pi(Mvalue* _value){
+	if(_value&&_value->type==VT_INTEGER){
+		long long iter=_value->value._integer->ll;
+		if(iter>=0){
+			if(amVerbose())output("\nComputing %llu continued fractions of pi.",iter);
+			mp_int* _biginteger3=_getBiginteger(3);
+			Mrational* _rational=_getRational(_biginteger3,NULL,M_LD_NAN,false);
+			if(_rational){
+				if(iter>0){
+					// working backwards starting with the last denominator quotient seems to be best
+					// in every step you have to compute i**2/6 the second term of the denominator
+					mp_int* _biginteger6=_getBiginteger(6);
+					Mrational* _denominatorRational=_getRational(_biginteger6,NULL,M_LD_NAN,false); // the final denominator equals 6
+					if(_denominatorRational){
+						while(--iter>=0){
+							if(amVerbose())output("\n%llu fractions yet to compute.",iter);
+							mp_int* _bigintegerSquare=_getBiginteger(4*iter*(iter-1)+1);
+							// the new denominator becomes 6+square/prev denominator=
+							_denominatorRational=_getRational(_Iadd(_Imultiply(_denominatorRational->num,_getBiginteger(6)),(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare)),_denominatorRational->num,M_LD_NAN,true);
+							if(!_denominatorRational){free_biginteger(_bigintegerSquare);break;} // let's keep it normalized???? TODO is that necessary
+							if(!amVerbose())continue;
+							Mvalue* _denominatorRationalValue=_getRationalValue(_denominatorRational);
+							outputValue("\nDenominator: ",_denominatorRationalValue,"'.");
+							/////////free_value(_denominatorRationalValue);
+						}
+					}else
+						free_biginteger(_biginteger6);
+					Mrational* _result=(_denominatorRational?_qadd(_rational,_getRational(_denominatorRational->den,_denominatorRational->num,M_LD_NAN,true)):NULL);
+					if(!_result)free_rational(_rational);else _rational=_result;
+					free_rational(_denominatorRational);
+				}
+				return _getRationalValue(_rational);
+			}else
+				free_biginteger(_biginteger3);
+		}
+	}
+	return NULL;
 }
 
 // how about storing all results here?????? instead of in the root environment????
@@ -342,61 +424,84 @@ public Rational limitDenominator(long maximumDenominator) {
     }
 }
 */
-
+// MDH@07JUN2019: we are going to store real text representations (like 100.1) as rationals from now on with delta equal to 0 (so we know where they came from, and that the denominator is a power of 10)
+//                because if we convert them to a long double we might loose precision in converting the decimal representation to the binary (internal) representation
+Mrational* _getDecimalTextRational(char* rationalText){
+	// the text should represent an integer or a real
+	Mrational* _rational=NULL;
+	if(rationalText){
+		int l=strlen(rationalText);
+		if(l){
+			bool neg=(*rationalText=='-');if(neg)rationalText++; // get the sign
+			// TODO if we would just have an eval to get the value out of the token text
+			char* decimalPartText=strchr(rationalText,'.');
+			int decimalPartIndex=0;
+			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
+			// now ready to check the integer part 
+			mp_int* _numerator=new_mp_int();
+			if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
+				mp_int* _decimalPartBiginteger=NULL;
+				mp_int* _denominator=NULL;
+				if(decimalPartText){
+					int decimalPartIndex=(int)(decimalPartText-rationalText);
+					decimalPartText++; // point to the first character of the decimal part
+					_decimalPartBiginteger=new_mp_int();
+					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY&&isBigintegerZero(_decimalPartBiginteger)==MP_NO){
+						// compute the power of ten denominator
+						_denominator=_getBiginteger(1);
+						mp_int* _tenBiginteger=_getBiginteger(10);
+						while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
+						free_biginteger(_tenBiginteger);
+					}
+				}
+				// if we have a decimalPartText we need a denominator
+				if(!decimalPartText||_denominator){
+					// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
+					if(_denominator&&(mp_mul(_numerator,_denominator,_numerator)!=MP_OKAY||mp_add(_numerator,_decimalPartBiginteger,_numerator)!=MP_OKAY)){
+						free_biginteger(_numerator);
+						free_biginteger(_denominator);
+					}else
+						_rational=_getRational(_numerator,_denominator,0,true); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
+				}
+				if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
+			}else{
+				output("\nERROR: Integer part of rational text '%s' invalid.",rationalText);
+				free_biginteger(_numerator);
+			}				
+		}
+	}
+	return _rational;
+}
+Mrational* _getRationalCopy(Mrational* _rational){
+	if(!_rational)return NULL;
+	mp_int *_numeratorBiginteger=_getBigintegerCopy(_rational->num),*_denominatorBiginteger=(_rational->den?_getBigintegerCopy(_rational->den):NULL);
+	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){free_biginteger(_numeratorBiginteger);free_biginteger(_denominatorBiginteger);return NULL;} // some error
+	Mrational* _copyRational=_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false);
+	if(_copyRational)_copyRational->normalized=_rational->normalized; // copy the rational flag
+	return _copyRational;
+}
 Mrational* _getValueRational(Mvalue* _value){
 	Mrational* _rational=NULL;
 	if(_value){
 		if(amVerbose())outputValue("\nExtracting the rational from '",_value,"'.");
-		// when a list easiest to apply the I function to get the associated big integer!!!!
-		if(_value->type==VT_RATIONAL)_rational=_value->value._rational;else
-		if(_value->type==VT_REAL)_rational=_getLongDoubleRational(_value->value._real->ld,250);else
-		if(_value->type==VT_BIGINTEGER||_value->type==VT_INTEGER)_rational=_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false);else
-		if(_value->type==VT_STRING){
-			// the text should represent an integer or a real
-			char* rationalText=_value->value._string->_c;
-			int l=strlen(rationalText);
-			if(l){
-				bool neg=(*rationalText=='-');if(neg)rationalText++; // get the sign
-				// TODO if we would just have an eval to get the value out of the token text
-				char* decimalPartText=strchr(rationalText,'.');
-				int decimalPartIndex=0;
-				if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
-				// now ready to check the integer part 
-				mp_int* _numerator=new_mp_int();
-				if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
-					mp_int* _decimalPartBiginteger=NULL;
-					mp_int* _denominator=NULL;
-					if(decimalPartText){
-						int decimalPartIndex=(int)(decimalPartText-rationalText);
-						decimalPartText++; // point to the first character of the decimal part
-						_decimalPartBiginteger=new_mp_int();
-						if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY&&isBigintegerZero(_decimalPartBiginteger)==MP_NO){
-							// compute the power of ten denominator
-							_denominator=_getBiginteger(1);
-							mp_int* _tenBiginteger=_getBiginteger(10);
-							while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
-							free_biginteger(_tenBiginteger);
-						}
-					}
-					// if we have a decimalPartText we need a denominator
-					if(!decimalPartText||_denominator){
-						// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
-						if(_denominator&&(mp_mul(_numerator,_denominator,_numerator)!=MP_OKAY||mp_add(_numerator,_decimalPartBiginteger,_numerator)!=MP_OKAY)){
-							free_biginteger(_numerator);
-							free_biginteger(_denominator);
-						}else
-							_rational=_getRational(_numerator,_denominator,0,true);
-					}
-					if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
-				}else{
-					output("\nERROR: Integer part of rational text '%s' invalid.",rationalText);
-					free_biginteger(_numerator);
-				}				
-			}
-		}else
-		if(_value->type==VT_LIST)if(_value->value._list->numberOfElements>1)
-			_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),
-															(_value->value._list->numberOfElements>2?getValueReal(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true);
+		switch(_value->type){
+			case VT_INTEGER:
+			case VT_BIGINTEGER:
+				_rational=_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false);
+				break;
+			case VT_RATIONAL:
+				_rational=_getRationalCopy(_value->value._rational); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
+				break;
+			case VT_REAL:
+				_rational=_getLongDoubleRational(_value->value._real->ld,250); // TODO how many iterations at most???
+				break;
+			case VT_LIST:
+				if(_value->value._list->numberOfElements>1)
+					_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),
+											(_value->value._list->numberOfElements>2?getValueReal(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true);
+				break;
+			default:break;
+		}
 	}
 	return _rational;
 }
@@ -422,14 +527,19 @@ Mvalue* q(Mvalue* _value){
 
 // TODO complete with conversion from big integer and rational
 Mvalue* r(Mvalue* _value){
-	if(amVerbose())outputValue("Converting '",_value,"' to a real.");
+	if(amVerbose())outputValue("\nConverting '",_value,"' to a real.");
 	Mvalue* _realValue=NAR_value;
 	if(_value){
-		if(_value->type==VT_REAL)_realValue=_value;else
-		if(_value->type==VT_INTEGER)_realValue=_getRealValue((long double)_value->value._integer->ll);else // TODO casting to a long long is a bit crude!!
-		if(_value->type==VT_STRING)_realValue=_getRealValue(_strtold(_value->value._string->_c,getNAR()));
+		switch(_value->type){
+			case VT_INTEGER:_realValue=_getRealValue((long double)_value->value._integer->ll);break;
+			case VT_BIGINTEGER:_realValue=_getRealValue(mp_get_long_double(_value->value._biginteger));break;
+			case VT_RATIONAL:_realValue=_getRealValue(getRationalLongDouble(_value->value._rational));break;
+			case VT_REAL:_realValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
+			case VT_STRING:_realValue=_getRealValue(_strtold(_value->value._string->_c,getNAR()));break;
+			default:break;
+		}
 	}
-	if(amVerbose())outputValue("Converted to '",_realValue,"'.");
+	if(amVerbose())outputValue("\nConverted to '",_realValue,"'.");
 	return _realValue;
 }
 // the type of a value
@@ -565,6 +675,11 @@ bool initEnvironment(){
 				return false;
 			}
 			*/
+			// pi() function
+			if(!completedIntegerFunction(newFunction(_Menvironment,"pi"),pi)){
+				outputLine("ERROR: Failed to register the pi() function.");
+				return false;
+			}
 			// conversions
 			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"I"),I)
 					||!completedValueFunction(newFunction(_Menvironment,"t"),t)
@@ -1660,7 +1775,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(pRealText){
 						pRealText=string_append(pRealText,string(expressionToken->text));
 						if(string_length(expressionToken->text)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
-						assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
+						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
+						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getRationalValue(_rational));
+						// replacing: assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
 						free_mstring(_realText);
 					}
 				}else{ // just an integer
@@ -1843,48 +1960,7 @@ mp_int* _getBigintegerCopy(mp_int* _biginteger){
 	mp_int* _bigintegerCopy=new_mp_int();if(mp_copy(_biginteger,_bigintegerCopy)!=MP_OKAY){free_biginteger(_bigintegerCopy);return NULL;}return _bigintegerCopy;
 }
 */
-mp_int* _Iadd(mp_int* a,mp_int *b){
-	// ASSERT do NOT call with either a or b NULL
-	if(!a||!b)return NULL;
-	if(isBigintegerZero(a))return _getBigintegerCopy(b);
-	if(isBigintegerZero(b))return _getBigintegerCopy(a);
-	mp_int* sum=new_mp_int();if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);return NULL;} // if the addition fails return 0
-	return sum;
-} // adding two big integers
-mp_int* _Imultiply(mp_int* a,mp_int *b){
-	if(!a&&!b)return NULL;
-	if(isBigintegerOne(a))return _getBigintegerCopy(b);
-	if(isBigintegerOne(b))return _getBigintegerCopy(a);
-	mp_int* product=new_mp_int(); // defaults to zero, which would be the result as well if either big integer is zero!!!
-	if(!isBigintegerZero(a)&&!isBigintegerZero(b)&&mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);return NULL;}
-	return product;
-} // multiplying two big integers, if both are NULL return NULL
-Mrational* _getRationalCopy(Mrational* _rational){
-	if(!_rational)return NULL;
-	mp_int *_numeratorBiginteger=_getBigintegerCopy(_rational->num),*_denominatorBiginteger=(_rational->den?_getBigintegerCopy(_rational->den):NULL);
-	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){free_biginteger(_numeratorBiginteger);free_biginteger(_denominatorBiginteger);return NULL;} // some error
-	Mrational* _copyRational=_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false);
-	if(_copyRational)_copyRational->normalized=_rational->normalized; // copy the rational flag
-	return _copyRational;
-}
 // rational number addition
-Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
-	// ASSERT _rational1 and _rational2 should not be NULL
-	mp_int *_den1=_rational1->den,*_den2=_rational2->den; // get the denominators
-	mp_int *_num1=_rational1->num,*_num2=_rational2->num; // get the numerators
-	long double deltasum=(_rational1->delta&&_rational2->delta?_rational1->delta->ld+_rational2->delta->ld:(_rational1->delta?_rational1->delta->ld:(_rational2->delta?_rational2->delta->ld:M_LD_NAN))); // MDH@05JUN2019: compute the sum of the deltas
-	// we can speed it up if certain elements are integer (because the denominator is NULL)
-	if(!_den1&&!_den2)return _getRational(_Iadd(_num1,_num2),NULL,deltasum,false); // if both denominators are undefined (i.e. 1), return the sum of the numerators
-	if(!_den1)return _getRational(_Iadd(_num2,_Imultiply(_num1,_den2)),_den2,deltasum,true);
-	if(!_den2)return _getRational(_Iadd(_num1,_Imultiply(_num2,_den1)),_den1,deltasum,true);
-	// if the denominators are equal it's also easier
-	if(mp_cmp(_den1,_den2)==MP_EQ)return _getRational(_Iadd(_num1,_num2),_den1,deltasum,true);
-	mp_int* _den=_Imultiply(_den1,_den2);if(!_den){output("\nERROR: Failed to compute the product of two rational denominators.");return NULL;}
-	mp_int* _mul1=_Imultiply(_num1,_den2);if(!_mul1){output("\nERROR: Failed to compute the product of the first numerator and second denominator of two rational numbers.");return NULL;}
-	mp_int* _mul2=_Imultiply(_num2,_den1);if(!_mul2){output("\nERROR: Failed to compute the product of the second numerator and first denominator of two rational numbers.");return NULL;}
-	mp_int* _num=_Iadd(_mul1,_mul2);if(!_num){output("ERROR: Failed to compute the new numerator of the sum of two rational numbers.");return NULL;}
-	return _getRational(_num,_den,deltasum,true);
-}
 // generic addition
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	// if either is NULL return the other
@@ -1980,25 +2056,36 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 
-Mrational* qmultiply(Mrational* _rational1,Mrational* _rational2){
-	Mrational* _result=NULL;
+Mrational* _qmultiply(Mrational* _rational1,Mrational* _rational2){
+	Mrational* _rational=NULL;
 	if(_rational1&&_rational2){
 		// worst case we have a total of four parts, three rational parts (ac/bd, cd1/d, ad2/b) and one real part (d1d2) where d1 and d2 are the real error parts of either
 		// so it's a good idea to speed things up if possible
 		
 	}
-	return _result;
+	return _rational;
 }
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueOne(_value2))return _value1;if(isValueZero(_value2)||isValueOne(_value1))return _value2;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
+	// if either is rational do a rational multiplication
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		Mrational *_rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2);
+		Mrational* _multiplicationRational=_qmultiply(_rational1,_rational2);
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
+		if(!_multiplicationRational)return NULL; // failed to create the sum for whatever reason
+		Mvalue* _rationalValue=_getRationalValue(_multiplicationRational);
+		if(!_rationalValue)free_rational(_multiplicationRational);
+		return _rationalValue;
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)*(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
 	}
 	return NULL;
 }
+
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1))return _value1;if(isValueZero(_value2))return(_value2->type==VT_INTEGER?_getIntegerValue(1):_getRealValue(1)); // if the power is zero, we return 1 or 1.0
@@ -2020,12 +2107,53 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 
+// MDH@07JUN2019: when two integers are presented to divide instead of actually computing the division we can store the division as a rational (so we kind of have a slow evaluation of the division, and we maintain accuracy as long as possible)
+Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
+	// if either of them has a delta (i.e. is not pure), convert to double reals first
+	Mrational* _rational=NULL;
+	if(rational1&&rational2){
+		long double delta1=getRealLongDouble(rational1->delta),delta2=getRealLongDouble(rational2->delta);
+		if((ldIsNaN(delta1)||ldIsZero(delta1))&&(ldIsNaN(delta2)||ldIsZero(delta2))){ // both are 'pure' rationals
+			if(amVerbose())output("\nPure rational division.");
+			// compute the new numerator and denominator, both should not be NULL as the numerators are not NULL, so should be freed if we can't drop them
+			mp_int* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den):_getBigintegerCopy(rational1->num));
+			mp_int* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den):_getBigintegerCopy(rational2->num));
+			if(!_numerator||!_denominator){ // failed to compute either, so somewhere it went wrong
+				free_biginteger(_numerator);free_biginteger(_denominator);
+			}else{
+				if(isBigintegerOne(_denominator)){free_biginteger(_denominator);_denominator=NULL;} // prevent storing 1 explicitly...
+				_rational=_getRational(_numerator,_denominator,M_LD_NAN,true);
+			}
+		}else{ // either one or both are unpure i.e. 'reals' approximated by rationals 
+			if(amVerbose())output("\nApproximate rational division.");
 
+		}
+	}
+	return _rational;
+}
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueOne(_value2))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
-	// if either is a big integer
+	// integer divisions are not computed but stored in rational format (without a delta to not suggest that the division is decimal)
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
+		mp_int* _numerator=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		mp_int* _denominator=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		Mrational* _rational=_getRational(_numerator,_denominator,M_LD_NAN,true);
+		// free the big integer copies if we failed to compose the rational
+		if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);return NULL;}
+		return _getRationalValue(_rational);
+	}
+	// if one of them is a rational do a rational division
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		Mrational *_rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2);
+		Mrational* _divisionRational=_qdivide(_rational1,_rational2);
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
+		if(!_divisionRational)return NULL; // failed to create the sum for whatever reason
+		Mvalue* _rationalValue=_getRationalValue(_divisionRational);
+		if(!_rationalValue)free_rational(_divisionRational);
+		return _rationalValue;
+	}
 	// always real divide
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld); // TODO casting to a long double is perhaps not the best way?

@@ -413,6 +413,7 @@ Mvalue* _getBigintegerValue(mp_int* _biginteger){
     return _bigintegerValue;
 }
 Mvalue* _getRealValue(long double ld){
+    if(amVerbose())output("\nWrapping long double '%.*Lf'.",ld);
     Mreal* _real=new_real(ld);
     Mvalue* _realvalue=(_real?_newValue():NULL);
     if(_realvalue){_realvalue->type=VT_REAL;_realvalue->value._real=_real;}
@@ -1655,6 +1656,46 @@ mp_err mp_set_longdouble(mp_int *a, long double b){
     return MP_VAL;
    */
 }
+// MDH@07JUN2019: based on mp_get_double in libtommath:
+/*
+double mp_get_double(const mp_int *a)
+{
+   int i;
+   double d = 0.0, fac = 1.0;
+   for (i = 0; i < MP_DIGIT_BIT; ++i) {
+      fac *= 2.0;
+   }
+   for (i = a->used; i --> 0;) {
+      d = (d * fac) + (double)a->dp[i];
+   }
+   return (a->sign == MP_NEG) ? -d : d;
+}
+*/
+long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
+long double mp_get_long_double(const mp_int* const a){
+    if(!a)return M_LD_NAN; // if a undefined, return NaN
+    int i=a->used;
+    if(i==0)return 0.0; // if a zero, return 0
+    --i; // 0 if only one big integer digit, otherwise positive
+    if(i&&!M_LD_DIGIT_MULTIPLIER){ // if we need the digit multiplier, get it
+        M_LD_DIGIT_MULTIPLIER=1.0;
+        int j=MP_DIGIT_BIT;
+        while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
+    }
+    long double d=(long double)a->dp[i]; // initialize d to the most significant big integer digit
+    if(amVerbose())output("\nReal of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.",a->dp[i],LDBL_DIG,d,i);
+    while(--i>=0){
+        if(amVerbose())output("\nMultiplying '%.*Lf' by %Lf.",d,M_LD_DIGIT_MULTIPLIER);
+        d*=M_LD_DIGIT_MULTIPLIER;
+        if(amVerbose())output("\nResult of multiplying by '%Lf': '%.*Lf'.",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
+        d+=(long double)a->dp[i];
+        if(amVerbose())output("\nResult of adding '%lld': '%.*Lf'.",a->dp[i],LDBL_DIG,d);
+    }
+    if(a->sign==MP_NEG&&!ldIsNaN(d))return -d;
+    if(amVerbose())output("\nConversion of big integer to long double '%.*Lf' done!",LDBL_DIG,d);
+    return d;
+    // replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
+}
 
 // part of implementing _getRealText (so not present in the header)
 const char* M_NAN="NaN";
@@ -1913,9 +1954,9 @@ long long getValueInteger(const Mvalue* const _value){
     }
     return M_LL_INVALID;
 }
-long double getValueReal(const Mvalue* const _value){
-    return(_value&&_value->type==VT_REAL?_value->value._real->ld:M_LD_NAN);
-}
+long double getValueReal(const Mvalue* const _value){return(_value&&_value->type==VT_REAL?_value->value._real->ld:M_LD_NAN);}
+long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}
+
 mp_int* _getValueBiginteger(const Mvalue* const _value){
     if(_value)
         switch(_value->type){
@@ -2286,6 +2327,30 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
     // _rational should contain the 'last' computed rational
     return _rational;
 }
+// MDH@07JUN2019: converting a rational to a double
+long double getRationalLongDouble(const Mrational* const _rational){
+    if(_rational){
+        // as you can see up we're storing the delta in our rationals as well, so if we want to get ld back out of it the formula is: (numerator+delta)/denominator
+        // but with the numerator and denominator possibly big integers adding delta to the numerator means adding a double to a big integer (of course delta typically is very small)
+        // it's easiest to turn the numerator big integer into a long double and add delta to it, and divide by the long double stored in the denominator
+        // TODO find a better way to do this
+        long double ldNumerator=mp_get_long_double(_rational->num); // NOTE also shortcuts when _rational->num equals 0 but we have to add the delta, so we have to do it this way
+        if(amVerbose())output("\nRational numerator converted to real '%.*Lf'.",LDBL_DIG,ldNumerator);
+        if(!ldIsNaN(ldNumerator)&&!ldIsInf(ldNumerator)){ // TODO checking with ldIsInf probably NOT needed although the big integer might be too big!!!
+            // add delta (which could be zero though) NOTE ld should not be NaN or Infinity though
+            if(_rational->delta)ldNumerator+=_rational->delta->ld;
+            if(!_rational->den)return ldNumerator; // if no denominator (i.e. 1) nothing to divide by!!
+            // a denominator which is not equal to 1
+            long double ldDenominator=mp_get_long_double(_rational->den);
+            if(amVerbose())output("\nRational denominator converted to real '%.*Lf'.",LDBL_DIG,ldDenominator);
+            if(!ldIsNaN(ldDenominator)&&!ldIsInf(ldDenominator))return ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok
+            if(amVerbose())output("\nERROR: Failed to convert a rational denominator to a real.");
+        }
+        if(amVerbose())output("\nERROR: Failed to convert a rational numerator to a real.");
+    }
+    return M_LD_NAN; // if something went wrong
+}
+
 // MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
     // if iterations, you're supposed to return all iteration results
@@ -2308,7 +2373,8 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     ///////printf(" - delta: %.*Lf, rem: %.*Lf",LDBL_DIG,delta,LDBL_DIG,rem);
                     ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
                     delta=(ld*q)-p;
-                    if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
+                    if(ldIsZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
+                    ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
                     _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false); // construct the intermediate result without normalizing
                     if(!_rational){output("\nERROR: Failed to construct the intermediate rational %lld/%lld",p,q);break;}
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result

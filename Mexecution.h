@@ -256,7 +256,8 @@ const long long M_LL_MAX=LLONG_MAX;
 
 long long double2long(long double ld); // convert long double to long long
 
-mp_err mp_set_longdouble(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
+mp_err mp_set_long_double(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
+long double mp_get_long_double(const mp_int* const a); // MDH@07JUN2019: same here
 
 mp_int* _getBiginteger(int64_t l);
 
@@ -278,6 +279,8 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
 // the following two methods will use M_LD_Q_EPS as default cut-off value
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
+long double getRationalLongDouble(const Mrational* const _rational);
+long double getRealLongDouble(const Mreal* const _real);
 
 long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
 long double getValueReal(const Mvalue* const _value);
@@ -291,6 +294,8 @@ mp_int* _getBigintegerCopy(mp_int* _biginteger);
 
 Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize);
 void free_rational(Mrational* _rational);
+bool isRationalZero(Mrational* _rational);
+bool isRationalOne(Mrational* _rational);
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 
