@@ -292,10 +292,13 @@ bool isBigintegerZero(mp_int* _biginteger);
 bool isBigintegerOne(mp_int* _biginteger);
 mp_int* _getBigintegerCopy(mp_int* _biginteger);
 
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize);
 void free_rational(Mrational* _rational);
 bool isRationalZero(Mrational* _rational);
 bool isRationalOne(Mrational* _rational);
+void normalizeRational(Mrational* _rational);
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize);
+Mrational* _getInverseRational(const Mrational* const _rational);
+
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 
@@ -376,6 +379,8 @@ bool ldIsInf(long double ld);
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer);
+mstring* _getBigintegerText(const mp_int* const _biginteger);
+mstring* _getRationalText(const Mrational* const _rational);
 mstring* _getRealText(Mreal* _real);
 mstring* _getStringText(Mstring* _string,bool dequoted);
 mstring* _getListText(Mlist* _list);
@@ -387,7 +392,8 @@ mp_int* _rational2biginteger(Mrational* _rational); // computes the integer part
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value);
-void outputBiginteger(const char* const prefix,const mp_int* const _value,const char* const postfix);
+void outputBiginteger(const char* const prefix,const mp_int* const _biginteger,const char* const postfix);
+void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
 // list to map (list) conversions

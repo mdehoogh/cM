@@ -67,13 +67,13 @@ bool initVariable(Menvironment* _Menvironment,char* name,double d){
 */
 // there will be a root (M) environment
 
-const long double LD_PI=3.141592653589793238462643383279L; // 30 decimal digits of PI
+const long double LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
 
 // PI all little more accurate (we could make a PI100 from these numbers)
 // source: https://blog.wolfram.com/2011/06/30/all-rational-approximations-of-pi-are-useless/
 // wolfram has a Rationalize function to compute rational approximations to a certain accuracy (see https://reference.wolfram.com/language/ref/Rationalize.html)
-const char* M_QNUM_PI100="394372834342725903069943709807632345074473102456264";
-const char* M_QDEN_PI100="125532772013612015195543173729505082616186012726141";
+/////const char* M_QNUM_PI100="394372834342725903069943709807632345074473102456264";
+/////const char* M_QDEN_PI100="125532772013612015195543173729505082616186012726141";
 
 const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
@@ -87,41 +87,212 @@ Mvalue* Mfacd(Mvalue* _value){
     return NULL;
 }
 
-mp_int* _Iadd(mp_int* a,mp_int *b){
+mp_int* _Iadd(mp_int* a,mp_int* b){
 	// ASSERT do NOT call with either a or b NULL
 	if(!a||!b)return NULL;
 	if(isBigintegerZero(a))return _getBigintegerCopy(b);
 	if(isBigintegerZero(b))return _getBigintegerCopy(a);
 	mp_int* sum=new_mp_int();if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);return NULL;} // if the addition fails return 0
+	outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
 	return sum;
 } // adding two big integers
-mp_int* _Imultiply(mp_int* a,mp_int *b){
+mp_int* _Imultiply(mp_int* a,mp_int* b){
 	if(!a&&!b)return NULL;
 	if(isBigintegerOne(a))return _getBigintegerCopy(b);
 	if(isBigintegerOne(b))return _getBigintegerCopy(a);
 	mp_int* product=new_mp_int(); // defaults to zero, which would be the result as well if either big integer is zero!!!
 	if(!isBigintegerZero(a)&&!isBigintegerZero(b)&&mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);return NULL;}
+	outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
 	return product;
 } // multiplying two big integers, if both are NULL return NULL
 Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
+
+	// OOPS here we have a problem, we should not use big integers contained in the given rationals itself
+	//      but then these new big integer should be freed if we can't bind them
+
 	// ASSERT _rational1 and _rational2 should not be NULL
-	mp_int *_den1=_rational1->den,*_den2=_rational2->den; // get the denominators
-	mp_int *_num1=_rational1->num,*_num2=_rational2->num; // get the numerators
+	mp_int *_den1=_getBigintegerCopy(_rational1->den),*_den2=_getBigintegerCopy(_rational2->den); // get the denominators
+	mp_int *_num1=_getBigintegerCopy(_rational1->num),*_num2=_getBigintegerCopy(_rational2->num); // get the numerators
+	
 	long double deltasum=(_rational1->delta&&_rational2->delta?_rational1->delta->ld+_rational2->delta->ld:(_rational1->delta?_rational1->delta->ld:(_rational2->delta?_rational2->delta->ld:M_LD_NAN))); // MDH@05JUN2019: compute the sum of the deltas
+	
 	// we can speed it up if certain elements are integer (because the denominator is NULL)
-	if(!_den1&&!_den2)return _getRational(_Iadd(_num1,_num2),NULL,deltasum,false); // if both denominators are undefined (i.e. 1), return the sum of the numerators
-	if(!_den1)return _getRational(_Iadd(_num2,_Imultiply(_num1,_den2)),_den2,deltasum,true);
-	if(!_den2)return _getRational(_Iadd(_num1,_Imultiply(_num2,_den1)),_den1,deltasum,true);
+	// DONE problem to solve: the intermediate results should be freed if the rational could not be created!!
+	// TODO we can speed up these shortcuts (see how we handled creation errors at the bottom!!!)
+	if(!_den1&&!_den2){
+		output("\nBoth denominators in adding two rationals undefined!");
+		mp_int* _num=_Iadd(_num1,_num2);
+		free_biginteger(_num1);free_biginteger(_num2); // don't need these anymore
+		Mrational* _rational=_getRational(_num,NULL,deltasum,false);
+		if(!_rational)free_biginteger(_num);
+		return _rational; // if both denominators are undefined (i.e. 1), return the sum of the numerators
+	}
+	if(!_den1){
+		output("\nFirst denominator in adding two rationals undefined!");
+		mp_int* _mult=(_num1?_Imultiply(_num1,_den2):_den2);
+		mp_int* _num=(_mult?_Iadd(_num2,_mult):NULL);
+		outputBiginteger("\nNew numerator: ",_num,".");
+		Mrational* _rational=(_num?_getRational(_num,_den2,deltasum,true):NULL);
+		if(!_rational){free_biginteger(_num);free_biginteger(_mult);free_biginteger(_den2);}
+		outputRational("\nSum rational: ",_rational,".");
+		free_biginteger(_num1);free_biginteger(_num2);
+		return _rational;
+	}
+	if(!_den2){
+		output("\nSecond denominator in adding two rationals undefined!");
+		mp_int* _mult=(_num1?_Imultiply(_num2,_den1):_getBigintegerCopy(_den1));
+		mp_int* _num=(_mult?_Iadd(_num1,_mult):NULL);
+		Mrational* _rational=(_num?_getRational(_num,_den1,deltasum,true):NULL);
+		if(!_rational){free_biginteger(_num);free_biginteger(_mult);free_biginteger(_den1);}
+		outputRational("\nSum rational: ",_rational,".");
+		free_biginteger(_num1);free_biginteger(_num2);
+		return _rational;
+	}
 	// if the denominators are equal it's also easier
-	if(mp_cmp(_den1,_den2)==MP_EQ)return _getRational(_Iadd(_num1,_num2),_den1,deltasum,true);
-	mp_int* _den=_Imultiply(_den1,_den2);if(!_den){output("\nERROR: Failed to compute the product of two rational denominators.");return NULL;}
-	mp_int* _mul1=_Imultiply(_num1,_den2);if(!_mul1){output("\nERROR: Failed to compute the product of the first numerator and second denominator of two rational numbers.");return NULL;}
-	mp_int* _mul2=_Imultiply(_num2,_den1);if(!_mul2){output("\nERROR: Failed to compute the product of the second numerator and first denominator of two rational numbers.");return NULL;}
-	mp_int* _num=_Iadd(_mul1,_mul2);if(!_num){output("ERROR: Failed to compute the new numerator of the sum of two rational numbers.");return NULL;}
-	return _getRational(_num,_den,deltasum,true);
+	if(mp_cmp(_den1,_den2)==MP_EQ){
+		mp_int* _num=_Iadd(_num1,_num2);
+		Mrational* _rational=(_num?_getRational(_num,_den1,deltasum,true):NULL);
+		if(!_rational){free_biginteger(_num);free_biginteger(_den1);}
+		outputRational("\nSum rational: ",_rational,".");
+		free_biginteger(_num1);free_biginteger(_num2);free_biginteger(_den2);
+		return _rational;
+	}
+
+	outputRational("\nAdding true rationals ",_rational1,NULL);outputRational(" and ",_rational2,".");
+
+	// true rational addition (as _den1 and _den2 are defined, i.e. unequal to 1)
+	// TODO we can speed this up as well using ternary operators
+	mp_int* _den=_Imultiply(_den1,_den2);
+	mp_int* _mul1=(_den?_Imultiply(_num1,_den2):NULL);
+	mp_int* _mul2=(_den&&_mul1?_Imultiply(_num2,_den1):NULL);
+	free_biginteger(_den1);free_biginteger(_den2);
+	
+	outputBiginteger("\n\tNumerator part 1: ",_mul1,NULL);outputBiginteger(" - part 2: ",_mul2,".");
+	mp_int* _num=(_mul1&&_mul2?_Iadd(_mul1,_mul2):NULL);
+	free_biginteger(_mul1);free_biginteger(_mul2); // always free the intermediate results (even if we failed to add them)
+
+	outputBiginteger("\n\tSum numerator: ",_num,NULL);outputBiginteger(" - denominator: ",_den,".");
+	Mrational* _rational=(_num?_getRational(_num,_den,deltasum,true):NULL);
+	// if we do NOT have a rational at this point, free the numerator and the denominator that we failed to bind
+	if(!_rational){free_biginteger(_num);free_biginteger(_den);output("\nERROR: Failed to create the rational sum.");}
+	
+	outputRational("\n\tSum rational: ",_rational,".");
+	free_biginteger(_num1);free_biginteger(_num2);free_biginteger(_den1);free_biginteger(_den2);
+	
+	return _rational;
+
 }
 
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
+
+/*
+the following very fast approximation (which computes decimal digits), wich I guess we should use to compute pi with a sufficient number of decimal digits
+source: https://en.wikipedia.org/wiki/Chudnovsky_algorithm
+from decimal import Decimal as Dec, getcontext as gc
+
+def PI(maxK=70, prec=1008, disp=1007): # parameter defaults chosen to gain 1000+ digits within a few seconds
+    gc().prec = prec
+    K, M, L, X, S = 6, 1, 13591409, 1, 13591409
+    for k in range(1, maxK+1):
+        M = (K**3 - 16*K) * M // k**3 
+        L += 545140134
+        X *= -262537412640768000
+        S += Dec(M * L) / X
+        K += 12
+    pi = 426880 * Dec(10005).sqrt() / S
+    pi = Dec(str(pi)[:disp]) # drop few digits of precision for accuracy
+    print("PI(maxK={} iterations, gc().prec={}, disp={} digits) =\n{}".format(maxK, prec, disp, pi))
+    return pi
+
+Pi = PI()
+print("\nFor greater precision and more digits (takes a few extra seconds) - Try")
+print("Pi = PI(317,4501,4500)") 
+print("Pi = PI(353,5022,5020)")
+ */
+// but the primary formula is pretty simple: 4*sum((-1)k/(2k+1)): this is the very slow Gregory-Leibniz series approximation
+Mvalue* piL(Mvalue* _value){
+	if(_value&&_value->type==VT_INTEGER){
+		long long maxiter=_value->value._integer->ll;
+		if(maxiter>=0){
+			if(amVerbose())output("\nApproximating pi/4 by a sum of %llu rational fractions.",maxiter);
+			// the first approximation (when iter=0) equals 4
+			mp_int* _biginteger1=_getBiginteger(1);
+			Mrational* _rational=_getRational(_biginteger1,NULL,M_LD_NAN,false);
+			if(_rational){
+				// obviously we can add 2 to the big integer storing the numerator
+				if(maxiter>0){
+					mp_int* _addendumDenominator=_getBiginteger(3);
+					mp_int* _denominatorIncrement=_getBiginteger(2);
+					if(_addendumDenominator&&_denominatorIncrement){
+						for(int iter=1;iter<=maxiter;iter++){
+							// compute the numerator and (new) denominator of the addendum rational
+							mp_int* _addendumNumerator=_getBiginteger(iter%2?-1:1); // the numerator is either 1 or -1
+							if(!_addendumNumerator){
+								free_biginteger(_addendumDenominator);
+								output("\nERROR: Failed to set the addendum numerator at iteration %u.",iter);
+								break;
+							}
+							// both _addendumNumerator and _addendumDenominator are now available to be bound in the rational
+							Mrational* _addendumRational=_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false);
+							if(!_addendumRational){ // failed to bind in the rational
+								free_biginteger(_addendumDenominator);
+								free_biginteger(_addendumNumerator);
+								output("ERROR: Failed to compute the rational to add to the approximation of pi in step %u.",iter);
+								break;
+							}
+							// add the addendum to the current rational
+							//if(amVerbose()){
+								outputRational("\nSum so far: ",_rational,NULL);
+								outputRational(", addendum: ",_addendumRational,".");
+							//}
+							Mrational* _newRational=_qadd(_rational,_addendumRational);
+							if(!_newRational){
+								// we have to free the addendum numerator and denominator
+								output("\nERROR: Failed to add this addendum at step %u in approximating pi.",iter);
+								free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
+								break;
+							}
+							// increment the denominator BEFORE we loose the addendum denominator we have now (as part of _rational)
+							outputBiginteger("\nIncrementing the addendum denominator by ",_denominatorIncrement,".");		
+							mp_int* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement);
+							if(!_newAddendumDenominator){
+								free_biginteger(_addendumDenominator); // won't be using this in the addendum rational
+								output("\nERROR: Failed to increment the addendum denominator.");
+								break;
+							}
+							outputBiginteger("\nNew addendum denominator: ",_newAddendumDenominator,".");
+							outputRational("\nNew approximation to pi/4: ",_newRational,".");
+							free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
+							// replace _rational by _newRational
+							free_rational(_rational);
+							_rational=_newRational;
+							//if(amVerbose())
+							outputRational("\nSum approximation of pi/4 so far: ",_rational,".");
+							// no need to normalize as the addendum is always normalized by itself
+							// replace the addendum denominator with the new one)
+							_addendumDenominator=_newAddendumDenominator;
+							outputBiginteger("\nNew addendum denominator: ",_addendumDenominator,".");
+						}
+					}else{
+						output("\nERROR: Failed to initialize the addendum numerator and its increment value (2).");
+						free_biginteger(_addendumDenominator);
+					}
+				}
+				if(mp_mul_2d(_rational->num,2,_rational->num)!=MP_OKAY){
+					outputRational("\nERROR: Failed to multiply the approximation of pi/4 (",_rational," by 4.");
+					free_rational(_rational);
+					return NULL;
+				} // multiply the numerator by 4 i.e. 2**2
+				normalizeRational(_rational);
+				if(amVerbose())outputRational("\nNormalized approximation of pi: ",_rational,".");
+				return _getRationalValue(_rational);
+			}
+			free_biginteger(_biginteger1);
+		}
+	}
+	return NULL;
+}
+
 // and the following is an implementation that can approximate pi using this formula
 Mvalue* pi(Mvalue* _value){
 	if(_value&&_value->type==VT_INTEGER){
@@ -134,25 +305,54 @@ Mvalue* pi(Mvalue* _value){
 				if(iter>0){
 					// working backwards starting with the last denominator quotient seems to be best
 					// in every step you have to compute i**2/6 the second term of the denominator
-					mp_int* _biginteger6=_getBiginteger(6);
+					mp_int* _biginteger6=_getBiginteger(6); // should be freed when failing to bind (perhaps we should add a flag to a big integer that indicates whether it's bound)
 					Mrational* _denominatorRational=_getRational(_biginteger6,NULL,M_LD_NAN,false); // the final denominator equals 6
 					if(_denominatorRational){
-						while(--iter>=0){
-							if(amVerbose())output("\n%llu fractions yet to compute.",iter);
-							mp_int* _bigintegerSquare=_getBiginteger(4*iter*(iter-1)+1);
+						if(amVerbose())output("\nFirst denominator rational computed.");
+						long long square;
+						mp_int* _bi6=_getBiginteger(6); // the one we want to reuse in the computation (that we need to free when done)
+						if(!_bi6){free_rational(_denominatorRational);return NULL;} // what a nuisance
+						while(--iter>0){
+							square=4*(iter+1)*iter+1;
+							////////////if(amVerbose())output("\nSquare numerator: %llu.",square);
+							mp_int* _bigintegerSquare=_getBiginteger(square);
+							if(!_bigintegerSquare){output("\nERROR: Failed to compute the big integer of square %llu.",square);break;}
+							if(amVerbose())output("\n%llu fractions yet to compute using numerator square '%llu'.",iter,square);
 							// the new denominator becomes 6+square/prev denominator=
-							_denominatorRational=_getRational(_Iadd(_Imultiply(_denominatorRational->num,_getBiginteger(6)),(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare)),_denominatorRational->num,M_LD_NAN,true);
+							_denominatorRational=_getRational(
+								_Iadd(_Imultiply(_denominatorRational->num,_bi6),
+										(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare)),
+								_denominatorRational->num,M_LD_NAN,false);
 							if(!_denominatorRational){free_biginteger(_bigintegerSquare);break;} // let's keep it normalized???? TODO is that necessary
-							if(!amVerbose())continue;
-							Mvalue* _denominatorRationalValue=_getRationalValue(_denominatorRational);
-							outputValue("\nDenominator: ",_denominatorRationalValue,"'.");
+							if(amVerbose()){
+								outputRational("\nDenominator (unnormalized): ",_rational,".");
+								/* DO NOT DO THIS as it will free the rational which will be bound inside another value elsewwhere!!
+								Mvalue* _denominatorRationalValue=_getRationalValue(_denominatorRational);
+								outputValue("\nDenominator (unnormalized): ",_denominatorRationalValue,"'.");
+								*/
+							}
 							/////////free_value(_denominatorRationalValue);
 						}
-					}else
+						free_biginteger(_bi6);
+					}else // not bound, so release
 						free_biginteger(_biginteger6);
-					Mrational* _result=(_denominatorRational?_qadd(_rational,_getRational(_denominatorRational->den,_denominatorRational->num,M_LD_NAN,true)):NULL);
-					if(!_result)free_rational(_rational);else _rational=_result;
+					if(!_denominatorRational){output("\nERROR: Final denominator could not be computed!");return NULL;}
+					// NOTE: do NOT use the originals in inverting the denominator because those will be freed below so we need to pass in copies
+					Mrational* _inverseDenominatorRational=_getInverseRational(_denominatorRational);
+					Mrational* _result=NULL;
+					if(!_inverseDenominatorRational){
+						outputRational("\nERROR: Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,".");
+						free_rational(_rational);_rational=NULL;
+					}else
+						_result=_qadd(_rational,_inverseDenominatorRational);
 					free_rational(_denominatorRational);
+					if(_result){
+						_rational=_result;
+						if(amVerbose())outputRational("\nApproximation of pi: ",_rational,".");
+					}else{
+						free_rational(_rational);
+						_rational=NULL;
+					}
 				}
 				return _getRationalValue(_rational);
 			}else

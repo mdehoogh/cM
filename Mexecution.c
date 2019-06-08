@@ -1434,14 +1434,14 @@ long long getInteger(Mvalue* _value){
 */
 
 // BigInteger stuff
-mstring* _getBigintegerText(const mp_int* const a){
+mstring* _getBigintegerText(const mp_int* const _biginteger){
     // determine the required size
     int arepsize;
-    if(mp_radix_size(a,10,&arepsize)!=MP_OKAY){if(amVerbose())output("\nCan't get the size of big integer.");return NULL;}
+    if(mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())output("\nCan't get the size of big integer.");return NULL;}
     if(arepsize>0xFFFFFFFF){output("\nCan't store more than %u characters in a string.",0xFFFFFFFF);return NULL;}
     mstring* _rep=string_setlength(string_create(),arepsize);
     if(!_rep){output("\nERROR: Failed to create a string to hold %d characters.",arepsize);return NULL;}
-    if(mp_toradix(a,_rep->chars,10)==MP_OKAY){string_synclength(_rep);return _rep;} // return _rep if we succeed in storing the text representation of a
+    if(mp_toradix(_biginteger,_rep->chars,10)==MP_OKAY){string_synclength(_rep);return _rep;} // return _rep if we succeed in storing the text representation of a
     free_mstring(_rep); // get rid of the mstring that we would have returned on success
     output("\nERROR: Failed to big integer decimal representation.");
     return NULL;
@@ -1504,31 +1504,86 @@ void normalizeRational(Mrational* _rational){
     }else
         output("\nERROR: Can't normalize a rational: failed to compute the GCD.");
 }
+
+// MDH@07JUN2019: _getRational does NOT free the numerator and denominator supplied!!!
+//                as it does not know whether _numerator or _denominator should be released on failure
 Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize){
-    if(_numerator&&(!_denominator||mp_iszero(_denominator)==MP_NO)){ // we have a numerator (any would do), and either NO denominator or a non-zero denominator
-        Mrational* _rational=(Mrational*)calloc(1,sizeof(Mrational));
+    // if the given numerator is NULL assume 1
+    Mrational* _rational=NULL;
+    //if(amVerbose()){
+        outputBiginteger("\nDetermining the rational with numerator ",_numerator,NULL);outputBiginteger(" and denominator ",_denominator,".");
+    //}
+    if(!_denominator||mp_iszero(_denominator)!=MP_YES){ // we have a numerator (any would do), and either NO denominator or a non-zero denominator
+        _rational=(Mrational*)calloc(1,sizeof(Mrational));
         if(_rational){
             // TODO what if a delta is defined and the denominator is undefined (i.e. 1)
             if(!ldIsNaN(delta)&&!ldIsInf(delta)&&!ldIsZero(delta))_rational->delta=new_real(delta); // store the delta if a valid value
-            _rational->num=_numerator;
-            if(_denominator&&mp_cmp(_denominator,getBigintegerOne())==MP_EQ){
-                free_biginteger(_denominator); // won't store denominator equal to 1
-                _rational->den=NULL; // probably already is though
-            }else // either NULL or not equal to 1
+            // force using a nonnullnumerator, if NULL was provided (typically when inverting a rational)
+            mp_int* _nonnullnumerator=(_numerator?_numerator:_getBiginteger(1));
+            if(_nonnullnumerator){
+                _rational->num=_nonnullnumerator; // could be NULL now when it's the inverse of another rational
                 _rational->den=_denominator;
-            _rational->normalized=(!_rational->den);
-            if(normalize&&!_rational->normalized){
-                normalizeRational(_rational); // normalize the rational if we are supposed to
-                if(_denominator&&!_rational->normalized)output("\nWARNING: Failed to normalize a rational number.");
+                if(amVerbose())outputRational("\nRational created: ",_rational,".");
+                /* STORING 1 AS DENOMINATOR ISN'T WRONG per se 
+                if(_denominator&&mp_cmp(_denominator,getBigintegerOne())==MP_EQ){
+                    free_biginteger(_denominator); // won't store denominator equal to 1
+                    _rational->den=NULL; // probably already is though
+                }else // either NULL or not equal to 1
+                    _rational->den=_denominator;
+                */
+                _rational->normalized=(!_rational->den||!_rational->num); // if either numerator or denominator is NULL assume normalized!!!
+                //if(amVerbose())
+                outputRational("\nRational before normalization: ",_rational,".");
+                if(normalize&&!_rational->normalized){
+                    normalizeRational(_rational); // normalize the rational if we are supposed to
+                    if(_denominator&&!_rational->normalized)output("\nWARNING: Failed to normalize a rational number.");
+                    //if(amVerbose())
+                    outputRational("\nRational after normalization: ",_rational,".");
+                }
+                return _rational; // return whether normalized or not
+            }else{
+                if(amVerbose())output("WARNING: Undefined rational numerator.");
             }
-            return _rational; // return whether normalized or not
+            // NOTE if we get here we failed to create the big integer 1 to use as numerator!!!
         }
     }
+    /* NOT OUR RESPONSIBILITY unless we decide to do that
     // if we get here we failed storing _numerator and _denominator, so we free them
     if(_numerator)free_biginteger(_numerator);
     if(_denominator)free_biginteger(_denominator);
+    */
+    if(_rational)free_rational(_rational);
     return NULL;
 }
+// _getInverseRational() will take care of releasing the newly created rational parts when failing to wrap them in a rational
+Mrational* _getInverseRational(const Mrational* const _rational){
+    if(_rational){
+        // for now only allow inverting pure rationals!!!
+        if(!_rational->delta||ldIsZero(_rational->delta->ld)){
+            mp_int* _inverseRationalNumerator=NULL;
+            if(_rational->den){
+                _inverseRationalNumerator=_getBigintegerCopy(_rational->den);
+                if(!_inverseRationalNumerator){output("\nERROR: Failed to copy the rational denominator.");return NULL;}
+            }
+            mp_int* _inverseRationalDenominator=NULL;
+            if(_rational->num){
+                _inverseRationalDenominator=_getBigintegerCopy(_rational->num);
+                if(!_inverseRationalDenominator){output("\nERROR: Failed to copy the rational numerator.");return NULL;}
+            }
+            // if the original is not normalized normalize, otherwise just copy the normalized flag!!
+            Mrational* _inverseRational=_getRational(_inverseRationalNumerator,_inverseRationalDenominator,M_LD_NAN,!_rational->normalized);
+            if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
+            if(_inverseRational)return _inverseRational;
+            output("\nERROR: Failed to create the inverse rational.");
+            free_biginteger(_inverseRationalNumerator);
+            free_biginteger(_inverseRationalDenominator);
+        }else
+            output("ERROR: Can't invert an unpure rational.");
+    }else
+    if(amVerbose())output("WARNING: No rational to invert!");
+    return NULL;
+}
+
 Mvalue* _getRationalValue(Mrational* _rational){
     if(!_rational)return NULL;
     Mvalue* _value=_newValue();
@@ -1536,12 +1591,16 @@ Mvalue* _getRationalValue(Mrational* _rational){
     _value->value._rational=_rational;
     return _value;
 }
+// MDH@08JUN2019 NOTE: adapted so that if the numerator is NULL will assume the numerator to equal 1
+// BUT _getRational has been adapted to NOT allow a NULL numerator, i.e. replacing NULL with big integer 1, so actually a NULL numerator is unlikely to occur!!!
 // rationals can equal zero or one but only when the delta value equals 0 (or is not defined which is the same)
 bool isRationalZero(Mrational* _rational){
-    return(_rational?isBigintegerZero(_rational->num)&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false); // the delta needs to be undefined (i.e. zero)
+    // if the rational does not have a num, the numerator equals 1, and obviously is NOT zero
+    return(_rational&&_rational->num?isBigintegerZero(_rational->num)&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false); // the delta needs to be undefined (i.e. zero)
 }
 bool isRationalOne(Mrational* _rational){
-    return(_rational?isBigintegerOne(_rational->num)&&(!_rational->den||isBigintegerOne(_rational->den))&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false);
+    // when the numerator is NULL, it is considered to be equal to 1
+    return(_rational?!(_rational->num||isBigintegerOne(_rational->num))&&(!_rational->den||isBigintegerOne(_rational->den))&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false);
 }
 
 // we can use the method below to come up with the numerator and denominator of a given double that matches the double exactly
@@ -1820,7 +1879,7 @@ mstring* getUndefinedValueText(){
     if(!string_copy(_UNDEFINED_VALUETEXT,_undefinedValueText)){if(_undefinedValueText)free_mstring(_undefinedValueText);return NULL;}
     return _undefinedValueText;
 }
-mstring* _getRationalText(Mrational* _rational){
+mstring* _getRationalText(const Mrational* const _rational){
     if(_rational){
         mstring* _rationalText=string_create();
         if(_rationalText){
@@ -1875,14 +1934,30 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     return _UNDEFINED_VALUETEXT;
     */
 }
-void outputBiginteger(const char* const prefix,const mp_int* const _bigInteger,const char* const postfix){
+void outputBiginteger(const char* const prefix,const mp_int* const _biginteger,const char* const postfix){
     if(prefix)output("%s",prefix);
-    mstring* _bigIntegerText=_getBigintegerText(_bigInteger);
-    if(_bigIntegerText){
-        output("%s",string(_bigIntegerText));
-        free_mstring(_bigIntegerText);
+    if(_biginteger){
+        mstring* _bigintegerText=_getBigintegerText(_biginteger);
+        if(_bigintegerText){
+            output("%s",string(_bigintegerText));
+            free_mstring(_bigintegerText);
+        }else
+            output("too large for buffer");
     }else
-        output("too large for buffer");
+        outputChar('?');
+    if(postfix)output("%s",postfix);
+}
+void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix){
+    if(prefix)output("%s",prefix);
+    if(_rational){
+        mstring* _rationalText=_getRationalText(_rational);
+        if(_rationalText){
+            output("%s",string(_rationalText));
+            free_mstring(_rationalText);
+        }else
+            output("no rational text representation");
+    }else
+        outputChar('?');
     if(postfix)output("%s",postfix);
 }
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
@@ -1890,7 +1965,8 @@ void outputValue(const char* const prefix,const Mvalue* _value,const char* const
     if(_value){
         mstring* _valueText=_getValueText(_value,false);
         output("%s",string(_valueText));free_mstring(_valueText);
-    }
+    }else
+        outputChar('?');
     if(postfix)output("%s",postfix);
 }
 
