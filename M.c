@@ -749,6 +749,7 @@ Mvalue* t(Mvalue* _value){
 		case VT_TOKEN:return _getStringValue("'t");
 		case VT_INTEGER:return _getStringValue("'i");
 		case VT_BIGINTEGER:return _getStringValue("'I");
+		case VT_DECIMAL:return _getStringValue("d");
 		case VT_RATIONAL:return _getStringValue("'q");
 		case VT_REAL:return _getStringValue("'r");
 		case VT_STRING:return _getStringValue("'s");

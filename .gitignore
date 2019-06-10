@@ -1,3 +1,10 @@
+cdecimal-2.3/literature/*
+cdecimal-2.3/*.py
+cdecimal-2.3/python/*
+cdecimal-2.3/*.a
+cdecimal-2.3/*.o
+cdecimal-2.3/*.so.2.3
+libmpdec.a
 libtommath-1.1.0/*
 libtommath.a
 libtommath/*.a

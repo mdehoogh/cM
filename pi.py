@@ -14,7 +14,7 @@ def PI(maxK=70, prec=1008, disp=1007): # parameter defaults chosen to gain 1000+
     print("PI(maxK={} iterations, gc().prec={}, disp={} digits) =\n{}".format(maxK, prec, disp, pi))
     return pi
 
-Pi = PI()
+Pi = PI(1,1008,1007)
 print("\nFor greater precision and more digits (takes a few extra seconds) - Try")
 print("Pi = PI(317,4501,4500)") 
 print("Pi = PI(353,5022,5020)")

@@ -28,15 +28,19 @@
 
 // Token and Mexpression is provided in Mexpression.h
 #include "Mexpression.h"
-// MDH@31MAY2019: switched from libzahl to libtommatch
+
+// MDH@31MAY2019: big integer support switched from libzahl to libtommatch
 #include "tommath.h"
+
+// MDH@10JUN2019: decimal support by libmpdec
+#include "mpdecimal.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
-typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_RATIONAL,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -72,6 +76,7 @@ typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
     mp_int* _biginteger; // most convenient to immediately point to the mp_int structure
+    mpd_t* _decimal; // most convenient to immediately point to the mpd_t structure
     Mrational* _rational;
     Mreal* _real;
     Mstring* _string;

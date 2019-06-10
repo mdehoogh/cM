@@ -59,6 +59,36 @@ bool initExecution(){
     return true;
 }
 */
+
+// are we keeping a map of mpd contexts????
+size_t mpd_context_count=0;
+mpd_context_t** mpd_contexts; // keep track of all decimal contexts
+mpd_context_t* get_mpd_context(mpd_size_t decimal_precision){
+    int mpd_context_index=mpd_context_count;
+    while(--mpd_context_index>=0){
+        mpd_context_index--;
+        if(mpd_contexts[mpd_context_index]->prec==decimal_precision)break;
+    }
+    if(mpd_context_index<0){
+        mpd_context_t** new_mpd_contexts=realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t));
+        if(new_mpd_contexts){
+            output("\nERROR: Failed to return a decimal context with precision %u.",decimal_precision);
+            return NULL;
+        }
+        mpd_contexts=new_mpd_contexts;
+        mpd_context_index=mpd_context_count;
+        mpd_context_count++;
+        mpd_init(mpd_contexts[mpd_context_index],decimal_precision);
+    }
+    return mpd_contexts[mpd_context_index];
+}
+
+mpd_t* new_decimal(mpd_context_t* _mpd_context){
+    mpd_t* result=mpd_new(_mpd_context);
+    if(!result)return NULL;
+    return result;
+}
+
 // new_mp_int returns an initialized big integer on success, or NULL when failing
 mp_int* new_mp_int(){
     mp_int* result=(mp_int*)malloc(sizeof(mp_int));
@@ -221,6 +251,13 @@ void free_biginteger(mp_int* _biginteger){
     }else
         output("\nBUG: No big integer to free!");
 }
+void free_decimal(mpd_t* _decimal){
+    if(_decimal){
+        if(amVerbose())output("\nFreeing decimal.");
+        mpd_del(_decimal);
+    }else
+        output("\nBUG: No decimal to free.");
+}
 void free_real(Mreal* _real){
     if(_real){
         if(amVerbose())output("\nFreeing real %.*Lf.",23,_real->ld);
@@ -246,6 +283,7 @@ void free_value(Mvalue* _value){
             case VT_TOKEN:if(_value->value._token)free_token(_value->value._token);break;
             case VT_INTEGER:if(_value->value._integer)free_integer(_value->value._integer);break;
             case VT_BIGINTEGER:if(_value->value._biginteger)free_biginteger(_value->value._biginteger);break;
+            case VT_DECIMAL:if(_value->value._decimal)free_decimal(_value->value._decimal);break;
             case VT_RATIONAL:if(_value->value._rational)free_rational(_value->value._rational);break;
             case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
             case VT_STRING:free_string(_value->value._string);break;
