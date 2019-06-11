@@ -61,32 +61,55 @@ bool initExecution(){
 */
 
 // are we keeping a map of mpd contexts????
+// trap handler (how to set it????)
+void Mmpd_traphandler(mpd_context_t* mpd_context){
+}
 size_t mpd_context_count=0;
-mpd_context_t** mpd_contexts; // keep track of all decimal contexts
-mpd_context_t* get_mpd_context(mpd_size_t decimal_precision){
+
+const size_t MAXIMUM_NUMBER_OF_CONTEXTS=2; // quick fix to ascertain to use the same context over and over again
+
+mpd_context_t** mpd_contexts=NULL; // keep track of all decimal contexts
+mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision){
+    output("\nRetrieving the decimal context with precision %lld.",decimal_precision);
     int mpd_context_index=mpd_context_count;
-    while(--mpd_context_index>=0){
-        mpd_context_index--;
-        if(mpd_contexts[mpd_context_index]->prec==decimal_precision)break;
-    }
+    while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimal_precision)break;
     if(mpd_context_index<0){
-        mpd_context_t** new_mpd_contexts=realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t));
-        if(new_mpd_contexts){
-            output("\nERROR: Failed to return a decimal context with precision %u.",decimal_precision);
-            return NULL;
+        if(mpd_context_count<MAXIMUM_NUMBER_OF_CONTEXTS){
+            if(amVerbose())output("\nAbout to create the decimal context with precision %lld.",decimal_precision);
+            mpd_context_t** new_mpd_contexts=(mpd_context_count>0?realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t*)):(mpd_context_t**)malloc(sizeof(mpd_context_t*)));
+            if(!new_mpd_contexts){
+                output("\nERROR: Failed to return a decimal context with precision %u.",decimal_precision);
+                return NULL;
+            }
+            mpd_contexts=new_mpd_contexts;
+            mpd_context_index=mpd_context_count;
+            mpd_context_count++;
+            mpd_contexts[mpd_context_index]=(mpd_context_t*)malloc(sizeof(mpd_context_t)); // TODO do we need to do this???
+            if(amVerbose())output("\nNew decimal context with precision %lld created.",decimal_precision);
+            // initialize the new context to the default context
+            mpd_init(mpd_contexts[mpd_context_index],decimal_precision);
+            if(amVerbose())output("\nDecimal context with precision %u initialized.",mpd_getprec(mpd_contexts[mpd_context_index]));
+        }else{ // re-use the last context
+            mpd_context_index=mpd_context_count-1;
+            output("\nChanging the decimal precision to %llu.",decimal_precision);
+            mpd_qsetprec(mpd_contexts[mpd_context_index],decimal_precision);
         }
-        mpd_contexts=new_mpd_contexts;
-        mpd_context_index=mpd_context_count;
-        mpd_context_count++;
-        mpd_init(mpd_contexts[mpd_context_index],decimal_precision);
+        ////mpd_traphandler=Mmpd_traphandler;
     }
+    // reset the status
+    mpd_qsetstatus(mpd_contexts[mpd_context_index],0); // using the setter is preferred over ->status=0 assignment
     return mpd_contexts[mpd_context_index];
 }
 
-mpd_t* new_decimal(mpd_context_t* _mpd_context){
-    mpd_t* result=mpd_new(_mpd_context);
+mpd_t* new_decimal(mpd_context_t* mpd_context){
+    mpd_t* result=mpd_new(mpd_context);
     if(!result)return NULL;
     return result;
+}
+mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value){
+    mpd_t* _decimal=new_decimal(mpd_context);
+    if(_decimal)mpd_set_i64(_decimal,value,mpd_context);
+    return _decimal;
 }
 
 // new_mp_int returns an initialized big integer on success, or NULL when failing
@@ -277,6 +300,7 @@ void free_rational(Mrational* _rational){
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
+        if(amVerbose())output("\nValue of type %u to free.",_value->type);
         // I do not need to free the value itself, only the pointers inside it
         switch(_value->type){
             case VT_UNDEFINED:break;
@@ -290,6 +314,7 @@ void free_value(Mvalue* _value){
             case VT_LIST:free_list(_value->value._list);break;
             case VT_MAP:free_map(_value->value._map);break;
         }
+        if(amVerbose())output("\nType-specific value freed.");
         free(_value);
     }else
         output("\nBUG: No value to free!");
@@ -322,23 +347,29 @@ const char* VALUETYPENAMES[]={"unknown","integer","real","string","list","map"};
 
 // can be asked to remove unused values
 size_t getNumberOfRemovedValues(){
-    size_t removed=0;
-    size_t tofree=0; // how many value elements we should free
+    unsigned long long removed=0;
+    unsigned long long tofree=0; // how many value elements we should free
     if(_valueList){
-        if(amVerbose())output("\nNumber of values to check: %u.",_valueList->numberOfElements);
         Mlistelement* _valueListelement=_valueList->_first;
-        size_t checked=0;
+        if(amVerbose())output("\nNumber of values to check: %llu.",_valueList->numberOfElements);
+        unsigned long long checked=0;
         while(_valueListelement){
             checked++;
-            if(_valueListelement->_value&&!_valueListelement->_value->count){ // unused
-                if(amVerbose())output("\nAbout to free unused value #%u of type '%s'.",checked,VALUETYPENAMES[_valueListelement->_value->type]);
-                free_value(_valueListelement->_value);
-                _valueListelement->_value=NULL; // just in case
-                tofree++;
-            }
-            _valueListelement=_valueListelement->_next;
+            if(amVerbose())output("\nChecking value #%llu.",checked);
+            if(_valueListelement->_value){
+                if(amVerbose())output("\nChecking the count!");
+                if(_valueListelement->_value->count==0){ // unused
+                    if(amVerbose())output("\nAbout to free unused value #%llu of type '%s'.",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+                    free_value(_valueListelement->_value);
+                    _valueListelement->_value=NULL; // just in case
+                    tofree++;
+                }else
+                if(amVerbose())output("\nStill in use!");
+           }else
+                output("\nERROR: No value stored in value #%llu.",checked);
+             _valueListelement=_valueListelement->_next;
         }
-        if(amVerbose())output("\nNumber of values checked: %lu.\nNumber of value list elements to free: %lu.",checked,tofree);
+        if(amVerbose())output("\nNumber of values checked: %llu.\nNumber of value list elements to free: %llu.",checked,tofree);
         // the list is now intact, are we going to correct the links??????
         if(tofree){ // some values were freed
             Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
@@ -367,7 +398,7 @@ size_t getNumberOfRemovedValues(){
         }
     }
     if(tofree){
-        if(tofree>removed)output("\nWARNING: Failed to free %lu unused value list elements.",(tofree-removed));else if(amVerbose())output("\nAll unused value list elements freed!");
+        if(tofree>removed)output("\nWARNING: Failed to free %llu unused value list elements.",(tofree-removed));else if(amVerbose())output("\nAll unused value list elements freed!");
     }
     return removed;
 }
@@ -439,6 +470,12 @@ Mstring* new_charstring(char _char){ // _text assumed to be string(mstring*), so
 // interface functions that use the above functions
 // wrapping the different value type instances
 Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
+
+Mvalue* _getDecimalValue(mpd_t* _decimal){
+    Mvalue* _decimalValue=(_decimal?_newValue():NULL);
+    if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}
+    return _decimalValue;
+}
 Mvalue* _getIntegerValue(long long ll){
     Minteger* _integer=new_integer(ll);
     Mvalue* _integervalue=(_integer?_newValue():NULL);
@@ -1943,6 +1980,16 @@ mstring* _getRationalText(const Mrational* const _rational){
     }
     return NULL;
 }
+mstring* _getDecimalText(const mpd_t* const _decimal){
+    if(_decimal){
+        mstring* _decimalText=string_create();
+        if(_decimalText){
+            if(string_append(_decimalText,mpd_to_sci(_decimal,0)))return _decimalText;
+            free_mstring(_decimalText);
+        }
+    }
+    return NULL;
+}
 mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
 	mstring* valueText=NULL;
@@ -1953,6 +2000,7 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
             case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????
+            case VT_DECIMAL:valueText=_getDecimalText(_value->value._decimal);break;
             case VT_RATIONAL:valueText=_getRationalText(_value->value._rational);break;
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
 			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
@@ -1981,6 +2029,19 @@ void outputBiginteger(const char* const prefix,const mp_int* const _biginteger,c
             free_mstring(_bigintegerText);
         }else
             output("too large for buffer");
+    }else
+        outputChar('?');
+    if(postfix)output("%s",postfix);
+}
+void outputDecimal(const char* const prefix,const mpd_t* const _decimal,const char* const postfix){
+    if(prefix)output("%s",prefix);
+    if(_decimal){
+        mstring* _decimalText=_getDecimalText(_decimal);
+        if(_decimalText){
+            output("%s",string(_decimalText));
+            free_mstring(_decimalText);
+        }else
+            output("no decimal text representation");
     }else
         outputChar('?');
     if(postfix)output("%s",postfix);
@@ -2308,6 +2369,7 @@ bool isNull(Mvalue* _value){
     switch(_value->type){
         case VT_INTEGER:return !_value->value._integer;
         case VT_BIGINTEGER:return !_value->value._biginteger;
+        case VT_DECIMAL:return !_value->value._decimal;
         case VT_RATIONAL:return !_value->value._rational;
         case VT_REAL:return !_value->value._real;
         case VT_STRING:return !_value->value._string;

@@ -183,6 +183,23 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 
 }
 
+void report_mpd_status(mpd_context_t* mpd_context){
+	uint32_t mpd_status=mpd_getstatus(mpd_context);
+	if(mpd_status>0){
+		output("\nDecimal computations error report.");
+		if(mpd_status&MPD_IEEE_Invalid_operation)output("\n\tIEEE Invalid operation error.");
+		if(mpd_status&MPD_Clamped)output("\n\tClamped error.");
+		if(mpd_status&MPD_Division_by_zero)output("\n\tDivision by zero error.");
+		if(mpd_status&MPD_Fpu_error)output("\n\tFPU error.");
+		if(mpd_status&MPD_Inexact)output("\n\tInexact error.");
+		if(mpd_status&MPD_Not_implemented)output("\n\tNot implemented error.");
+		if(mpd_status&MPD_Overflow)output("\n\tOverflow error.");
+		if(mpd_status&MPD_Rounded)output("\n\tRounding error.");
+		if(mpd_status&MPD_Subnormal)output("\n\tSubnormal error.");
+		if(mpd_status&MPD_Underflow)output("\n\tUnderflow error.");
+	}else
+		output("\nNo decimal context errors.");
+}
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
 
 /*
@@ -210,7 +227,8 @@ print("Pi = PI(317,4501,4500)")
 print("Pi = PI(353,5022,5020)")
  */
 // but the primary formula is pretty simple: 4*sum((-1)k/(2k+1)): this is the very slow Gregory-Leibniz series approximation
-Mvalue* piL(Mvalue* _value){
+// this is a very slow algorithm
+Mvalue* pi_ql(Mvalue* _value){
 	if(_value&&_value->type==VT_INTEGER){
 		long long maxiter=_value->value._integer->ll;
 		if(maxiter>=0){
@@ -294,7 +312,7 @@ Mvalue* piL(Mvalue* _value){
 }
 
 // and the following is an implementation that can approximate pi using this formula
-Mvalue* pi(Mvalue* _value){
+Mvalue* pi_q(Mvalue* _value){
 	if(_value&&_value->type==VT_INTEGER){
 		long long iter=_value->value._integer->ll;
 		if(iter>=0){
@@ -359,6 +377,110 @@ Mvalue* pi(Mvalue* _value){
 				free_biginteger(_biginteger3);
 		}
 	}
+	return NULL;
+}
+
+// decimalerrorstatus() filter out the rounding and inexact 'errors'
+bool mpd_error(mpd_context_t* mpd_context){return(mpd_getstatus(mpd_context)&0xEFBF)!=0;}
+
+// we can also use decimals to approximate pi to a certain precision (=decimal digits)
+/* Python test program for approximating pi!!!!
+import cdecimal
+import decimal
+
+def pi(module, prec):
+    """From the decimal.py documentation"""
+    module.getcontext().prec = prec + 2
+    D = module.Decimal
+    lasts, t, s, n, na, d, da = D(0), D(3), D(3), D(1), D(0), D(0), D(24)
+    while s != lasts:
+        lasts = s
+        n, na = n+na, na+8
+        d, da = d+da, da+32
+        t = (t * n) / d
+        s += t
+    module.getcontext().prec -= 2
+    return +s
+
+for i in range(10000):
+    x = pi(cdecimal, 28)
+
+for i in range(10000):
+    y = pi(decimal, 28)
+ */
+Mvalue* pi_d(Mvalue* _value){
+	// _value should be a positive integer defining the required precision
+	if(amVerbose())output("\nComputing pi using decimals.");
+	if(_value&&_value->type==VT_INTEGER){
+		long long decimalprecision=_value->value._integer->ll;
+		if(decimalprecision>0){
+			if(amVerbose())output("\nComputing pi to %lld decimals.",decimalprecision);
+			mpd_context_t* mpd_context=get_mpd_context(decimalprecision);
+			if(mpd_context){ // success
+				if(amVerbose())output("\nDecimal context created!");
+				// initialize the variables we need for the iterations
+				mpd_t *lasts=_getDecimal(mpd_context,0),*t=_getDecimal(mpd_context,3),*s=_getDecimal(mpd_context,3),*n=_getDecimal(mpd_context,1),*na=_getDecimal(mpd_context,0),*d=_getDecimal(mpd_context,0),*da=_getDecimal(mpd_context,24);
+				if(amVerbose())output("\nInitial decimals created!");
+				// some constant decimals we need
+				mpd_t *d8=_getDecimal(mpd_context,8),*d32=_getDecimal(mpd_context,32);
+				unsigned long long iter=0;
+				if(amVerbose())output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,
+										mpd_to_sci(lasts,0),mpd_to_sci(t,0),
+										mpd_to_sci(s,0),mpd_to_sci(n,0),
+										mpd_to_sci(na,0),mpd_to_sci(d,0),
+										mpd_to_sci(da,0)
+										);
+				int cmp;
+				mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
+				while(!mpd_error(mpd_context)){
+					iter++;
+					//if(amVerbose())output("\nIteration: %lld: ",iter);
+					cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
+					//if(amVerbose()){output("\na\t");if(mpd_error(mpd_context))break;}
+					if(!cmp){if(amVerbose())output("\nDone!");break;}
+					//if(amVerbose()){output("\nb\t");if(mpd_error(mpd_context))break;}
+					if(cmp==INT_MAX){output("\nSomething went wrong!");break;}
+					//if(amVerbose()){output("\nc\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",mpd_to_sci(s,0));}
+					mpd_copy(lasts,s,mpd_context); // lasts = s
+					//if(amVerbose()){output("\nd\t",mpd_to_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",mpd_to_sci(n,0),mpd_to_sci(na,0));}
+					mpd_add(n,n,na,mpd_context);
+					//if(amVerbose()){output(" = %s\ne\t",mpd_to_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",mpd_to_sci(na,0));}
+					mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
+					//if(amVerbose()){output(" = %s\nf\t",mpd_to_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",mpd_to_sci(d,0),mpd_to_sci(da,0));}
+					mpd_add(d,d,da,mpd_context);
+					//if(amVerbose()){output(" = %s\ng\t",mpd_to_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",mpd_to_sci(da,0));}
+					mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
+					//if(amVerbose()){output(" = %s\nh\t",mpd_to_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",mpd_to_sci(t,0),mpd_to_sci(n,0));}
+					mpd_mul(t,t,n,mpd_context);
+					//if(amVerbose()){output(" = %s\ni\t",mpd_to_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",mpd_to_sci(t,0),mpd_to_sci(d,0));}
+					mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
+					//if(amVerbose()){output(" = %s\nj\t",mpd_to_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",mpd_to_sci(s,0),mpd_to_sci(t,0));}
+					mpd_add(s,s,t,mpd_context); // add t to s
+					//if(amVerbose()){output(" = %s\nk\t",mpd_to_sci(s,0));if(mpd_error(mpd_context))break;}
+					if(amVerbose())output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,
+											mpd_to_sci(lasts,0),mpd_to_sci(t,0),
+											mpd_to_sci(s,0),mpd_to_sci(n,0),
+											mpd_to_sci(na,0),mpd_to_sci(d,0),
+											mpd_to_sci(da,0)
+											);
+				}
+				mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+				// get rid of all the decimals we used
+				free_decimal(lasts);free_decimal(t);free_decimal(n);free_decimal(na);free_decimal(d);free_decimal(da);free_decimal(d8);free_decimal(d32);
+				if(mpd_error(mpd_context)){ // something went wrong
+					if(amVerbose())output("\nERROR: Computation of pi with precision %lld error status: %u.",decimalprecision,mpd_getstatus(mpd_context));
+					report_mpd_status(mpd_context);
+					return NULL;
+				}
+				// success
+				mpd_finalize(s,mpd_context); // to round to the requested precision
+				if(amVerbose())output("\nFinal approximation of pi (rounded to %llu decimals): %s.",decimalprecision,mpd_to_sci(s,0));
+				return _getDecimalValue(s);
+			}else
+				output("\nERROR: Failed to set the decimal precision to %lld.",decimalprecision);
+		}
+	}else
+		output("\nERROR: Decimal precision not an integer.");
 	return NULL;
 }
 
@@ -876,9 +998,9 @@ bool initEnvironment(){
 				return false;
 			}
 			*/
-			// pi() function
-			if(!completedIntegerFunction(newFunction(_Menvironment,"pi"),pi)){
-				outputLine("ERROR: Failed to register the pi() function.");
+			// pi() functions (decimal and rational)
+			if(!completedIntegerFunction(newFunction(_Menvironment,"pi$q"),pi_q)||!completedIntegerFunction(newFunction(_Menvironment,"pi$ql"),pi_ql)||!completedIntegerFunction(newFunction(_Menvironment,"pi$d"),pi_d)){
+				outputLine("ERROR: Failed to register the pi$d, pi$q and pi$ql functions.");
 				return false;
 			}
 			// conversions
@@ -2681,6 +2803,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		}else
 		if(amVerbose())output("\nNo result to store.");
 	}
+	if(amVerbose())outputValue("\nExpression value: '",_expressionValue,"'.");
 	return _expressionValue;
 }
 /**
@@ -2750,6 +2873,7 @@ void outputValueColored(Mvalue* _value){
 		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output(string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
 		case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
+		case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
 		case VT_RATIONAL:
 			if(_value->value._rational){
 				output("(");
@@ -2813,6 +2937,7 @@ void outputValueColored(Mvalue* _value){
 	}
 	resetOutputColor();
 }
+
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
 	
@@ -2869,16 +2994,18 @@ bool evaluateCommand(){
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	mstring* commandText=_getCommandText(true);
 	expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
+	clock_t then=clock();
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
-	output("\n%s = ",string(commandText));
+	long long elapsed=clock()-then;
+	output("\nDuration of evaluation: %d ms.\n%s = ",(elapsed/1000),string(commandText));
 	// if the result is a null value, show the NULL_value
 	outputValueColored(isNull(_commandExpressionValue)?NULL_value:_commandExpressionValue);
 	
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputLine("Result released!"); // TODO do we need to do this?????
 
-	if(amVerbose())outputLine("Command to release!");
+	///////if(amVerbose())outputLine("Command to release!");
 	free_mstring(commandText);
-	if(amVerbose())outputLine("Command released!");
+	////////if(amVerbose())outputLine("Command released!");
 	return true;
 }
 

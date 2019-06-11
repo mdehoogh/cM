@@ -281,21 +281,27 @@ mstring* _getUint16BinaryText(uint16_t s,char presuffix);
 
 void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent); // so we can also put these into the decimal representation of a double!!!
 
+///////////long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
+long double getValueReal(const Mvalue* const _value);
+
+// decimal support
+mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
+mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value);
+void free_decimal(mpd_t* _decimal);
+
+// big integer support
+mp_int* new_mp_int();
+bool isBigintegerZero(mp_int* _biginteger);
+bool isBigintegerOne(mp_int* _biginteger);
+mp_int* _getBigintegerCopy(mp_int* _biginteger);
+mp_int* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
+
+// rational support
 // the following two methods will use M_LD_Q_EPS as default cut-off value
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 long double getRationalLongDouble(const Mrational* const _rational);
 long double getRealLongDouble(const Mreal* const _real);
-
-long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
-long double getValueReal(const Mvalue* const _value);
-mp_int* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
-
-mp_int* new_mp_int();
-
-bool isBigintegerZero(mp_int* _biginteger);
-bool isBigintegerOne(mp_int* _biginteger);
-mp_int* _getBigintegerCopy(mp_int* _biginteger);
 
 void free_rational(Mrational* _rational);
 bool isRationalZero(Mrational* _rational);
@@ -306,11 +312,12 @@ Mrational* _getInverseRational(const Mrational* const _rational);
 
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
-
+// data wrappers
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
 Mvalue* _getBigintegerValue(mp_int* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
 Mvalue* _getRationalValue(Mrational* _rational);
+Mvalue* _getDecimalValue(mpd_t* _decimal);
 Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
@@ -385,6 +392,7 @@ bool ldIsInf(long double ld);
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer);
 mstring* _getBigintegerText(const mp_int* const _biginteger);
+mstring* _getDecimalText(const mpd_t* const _decimal);
 mstring* _getRationalText(const Mrational* const _rational);
 mstring* _getRealText(Mreal* _real);
 mstring* _getStringText(Mstring* _string,bool dequoted);
@@ -398,6 +406,7 @@ mp_int* _rational2biginteger(Mrational* _rational); // computes the integer part
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value);
 void outputBiginteger(const char* const prefix,const mp_int* const _biginteger,const char* const postfix);
+void outputDecimal(const char* const prefix,const mpd_t* const _decimal,const char* const postfix);
 void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
