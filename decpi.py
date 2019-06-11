@@ -1,5 +1,6 @@
 import decimal
 import sys
+import time
 
 def pi(module, prec):
 	"""From the decimal.py documentation"""
@@ -7,7 +8,7 @@ def pi(module, prec):
 	D = module.Decimal
 	lasts, t, s, n, na, d, da = D(0), D(3), D(3), D(1), D(0), D(0), D(24)
 	iter=0
-	print("Iteration "+str(iter)+": lasts="+str(lasts)+", t="+str(t)+", s="+str(s)+", n="+str(n)+", na="+str(na)+", d="+str(d)+", da="+str(da)+".")
+	#print("Iteration "+str(iter)+": lasts="+str(lasts)+", t="+str(t)+", s="+str(s)+", n="+str(n)+", na="+str(na)+", d="+str(d)+", da="+str(da)+".")
 	while s != lasts:
 		#print("\tlasts="+str(lasts)+", t="+str(t)+", s="+str(s)+", n="+str(n)+", na="+str(na)+", d="+str(d)+", da="+str(da)+".")
 		#print("Iteration "+str(iter)+":")
@@ -22,7 +23,7 @@ def pi(module, prec):
 		s += t
 		#print("\ts="+str(s)+"(s)+"+str(t)+"(t)")
 		iter+=1
-		print("Iteration "+str(iter)+": lasts="+str(lasts)+", t="+str(t)+", s="+str(s)+", n="+str(n)+", na="+str(na)+", d="+str(d)+", da="+str(da)+".")
+		#print("Iteration "+str(iter)+": lasts="+str(lasts)+", t="+str(t)+", s="+str(s)+", n="+str(n)+", na="+str(na)+", d="+str(d)+", da="+str(da)+".")
 	module.getcontext().prec -= 2
 	return +s
 
@@ -31,8 +32,11 @@ def main(args):
 		precision=int(args[0])
 	else:
 		precision=28
+	x=time.time()
 	y = pi(decimal, precision)
+	elapsed=time.time()-x
 	print("Pi in "+str(precision)+" decimals: "+str(y)+".")
-
+	print("Duration of computation: "+str(elapsed)+".")
+	
 if __name__=="__main__":
 	main(sys.argv[1:])
