@@ -471,9 +471,10 @@ Mstring* new_charstring(char _char){ // _text assumed to be string(mstring*), so
 // wrapping the different value type instances
 Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
 
-Mvalue* _getDecimalValue(mpd_t* _decimal){
-    Mvalue* _decimalValue=(_decimal?_newValue():NULL);
-    if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}
+Mvalue* _getDecimalValue(mpd_t* _decimal,bool freeonfailure){
+    if(!_decimal)return NULL;
+    Mvalue* _decimalValue=_newValue();
+    if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
     return _decimalValue;
 }
 Mvalue* _getIntegerValue(long long ll){
@@ -482,9 +483,10 @@ Mvalue* _getIntegerValue(long long ll){
     if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
     return _integervalue;
 }
-Mvalue* _getBigintegerValue(mp_int* _biginteger){
-    Mvalue* _bigintegerValue=(_biginteger?_newValue():NULL);
-    if(_bigintegerValue){_bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;}
+Mvalue* _getBigintegerValue(mp_int* _biginteger,bool freeonfailure){
+    if(!_biginteger)return NULL;
+    Mvalue* _bigintegerValue=_newValue();
+    if(_bigintegerValue){_bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;}else if(freeonfailure)free_biginteger(_biginteger);
     return _bigintegerValue;
 }
 Mvalue* _getRealValue(long double ld){
@@ -494,11 +496,16 @@ Mvalue* _getRealValue(long double ld){
     if(_realvalue){_realvalue->type=VT_REAL;_realvalue->value._real=_real;}
     return _realvalue;
 }
-Mvalue* _getStringValue(char* _s){
-    Mstring* _string=(_s?new_string(_s):NULL); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
-    Mvalue* _stringvalue=(_string?_newValue():NULL);
-    if(_stringvalue){_stringvalue->type=VT_STRING;_stringvalue->value._string=_string;}
-    return _stringvalue;
+Mvalue* _getStringValue(char* _s,bool freeonfailure){
+    if(!_s)return NULL; // when no input, no go
+    Mvalue* _stringValue=NULL; // the result, when NULL check freeonfailure
+    Mstring* _string=new_string(_s); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
+    if(_string){
+        _stringValue=_newValue();
+        if(_stringValue){_stringValue->type=VT_STRING;_stringValue->value._string=_string;}else free_string(_string); // always free the Mstring if it is not bound!!!
+    }
+    if(!_stringValue)if(freeonfailure)free(_s);
+    return _stringValue;
 }
 Mvalue* _getCharStringValue(char _c){
     Mstring* _string=(_c?new_charstring(_c):NULL); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
@@ -523,11 +530,11 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype){
 }
 
 // some other wrappers
-Mvalue* _getValueOfList(Mlist* _list){Mvalue* _value=_newValue();_value->type=VT_LIST;_value->value._list=_list;return _value;}
-Mvalue* _getValueOfInteger(Minteger* _integer){Mvalue* _value=_newValue();_value->type=VT_INTEGER;_value->value._integer=_integer;return _value;}
-Mvalue* _getValueOfReal(Mreal* _real){Mvalue* _value=_newValue();_value->type=VT_REAL;_value->value._real=_real;return _value;}
-Mvalue* _getValueOfMap(Mmap* _map){Mvalue* _value=_newValue();_value->type=VT_MAP;_value->value._map=_map;return _value;}
-Mvalue* _getValueOfToken(Mtoken* _token){Mvalue* _value=_newValue();_value->type=VT_TOKEN;_value->value._token=_token;return _value;}
+Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure){if(!_list)return NULL;Mvalue* _value=_newValue();if(_value){_value->type=VT_LIST;_value->value._list=_list;}else if(freeonfailure)free_list(_list);return _value;}
+Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure){if(!_integer)return NULL;Mvalue* _value=_newValue();if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);return _value;}
+Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure){if(!_real)return NULL;Mvalue* _value=_newValue();if(_value){_value->type=VT_REAL;_value->value._real=_real;}else if(freeonfailure)free_real(_real);return _value;}
+Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){if(!_map)return NULL;Mvalue* _value=_newValue();if(_value){_value->type=VT_MAP;_value->value._map=_map;}else if(freeonfailure)free_map(_map);return _value;}
+Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){if(!_token)return NULL;Mvalue* _value=_newValue();if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);return _value;}
 
 /*
 void free_list(Mlist* _list);
@@ -1136,17 +1143,17 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
                             _functionmap->_last=_functionmapelement;
                             _functionmap->numberOfFunctions++;
                              _function->_name=_functionName; // success!!!!!
-                            printf("\nFunction '%s' registered as function #%d.",string(_function->_name),_functionmap->numberOfFunctions);
+                            output("\nFunction '%s' registered as function #%d.",string(_function->_name),_functionmap->numberOfFunctions);
                         }
                     }
                 }else
-                    printf("\nERROR: Failed to store function name '%s'.",name);
+                    output("\nERROR: Failed to store function name '%s'.",name);
                 // if we fail to register the name and/or the function with the environment free the function!!
                 if(!_function->_name){free_function(_function);_function=NULL;}   
             }
-            if(!_function)printf("\nERROR: Failed to create function '%s'.",name);
+            if(!_function)output("\nERROR: Failed to create function '%s'.",name);
         }else
-            printf("\nFunction '%s' already exists.",name);
+            output("\nFunction '%s' already exists.",name);
     }
     return _function;
 }
@@ -1582,7 +1589,7 @@ void normalizeRational(Mrational* _rational){
 
 // MDH@07JUN2019: _getRational does NOT free the numerator and denominator supplied!!!
 //                as it does not know whether _numerator or _denominator should be released on failure
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize){
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize,bool freeonfailure){
     // if the given numerator is NULL assume 1
     Mrational* _rational=NULL;
     //if(amVerbose()){
@@ -1615,8 +1622,9 @@ Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delt
                     //if(amVerbose())
                     outputRational("\nRational after normalization: ",_rational,".");
                 }
-                return _rational; // return whether normalized or not
+                ///////// AS LONG AS WE FREE THE RATIONAL IN THE ELSE PART NO NEED TO DO: return _rational; // return whether normalized or not
             }else{
+                free_rational(_rational);_rational=NULL;
                 if(amVerbose())output("WARNING: Undefined rational numerator.");
             }
             // NOTE if we get here we failed to create the big integer 1 to use as numerator!!!
@@ -1627,11 +1635,12 @@ Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delt
     if(_numerator)free_biginteger(_numerator);
     if(_denominator)free_biginteger(_denominator);
     */
-    if(_rational)free_rational(_rational);
-    return NULL;
+    if(!_rational)if(freeonfailure){free_biginteger(_numerator);free_biginteger(_denominator);}
+    return _rational;
 }
 // _getInverseRational() will take care of releasing the newly created rational parts when failing to wrap them in a rational
 Mrational* _getInverseRational(const Mrational* const _rational){
+    Mrational* _inverseRational=NULL;
     if(_rational){
         // for now only allow inverting pure rationals!!!
         if(!_rational->delta||ldIsZero(_rational->delta->ld)){
@@ -1646,12 +1655,11 @@ Mrational* _getInverseRational(const Mrational* const _rational){
                 if(!_inverseRationalDenominator){output("\nERROR: Failed to copy the rational numerator.");return NULL;}
             }
             // if the original is not normalized normalize, otherwise just copy the normalized flag!!
-            Mrational* _inverseRational=_getRational(_inverseRationalNumerator,_inverseRationalDenominator,M_LD_NAN,!_rational->normalized);
+            _inverseRational=_getRational(_inverseRationalNumerator,_inverseRationalDenominator,M_LD_NAN,!_rational->normalized,true);
+            if(!_inverseRational)
+                output("\nERROR: Failed to create the inverse rational.");
+            else
             if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
-            if(_inverseRational)return _inverseRational;
-            output("\nERROR: Failed to create the inverse rational.");
-            free_biginteger(_inverseRationalNumerator);
-            free_biginteger(_inverseRationalDenominator);
         }else
             output("ERROR: Can't invert an unpure rational.");
     }else
@@ -1659,13 +1667,8 @@ Mrational* _getInverseRational(const Mrational* const _rational){
     return NULL;
 }
 
-Mvalue* _getRationalValue(Mrational* _rational){
-    if(!_rational)return NULL;
-    Mvalue* _value=_newValue();
-    _value->type=VT_RATIONAL;
-    _value->value._rational=_rational;
-    return _value;
-}
+Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){if(!_rational)return NULL;Mvalue* _value=_newValue();if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);return _value;}
+
 // MDH@08JUN2019 NOTE: adapted so that if the numerator is NULL will assume the numerator to equal 1
 // BUT _getRational has been adapted to NOT allow a NULL numerator, i.e. replacing NULL with big integer 1, so actually a NULL numerator is unlikely to occur!!!
 // rationals can equal zero or one but only when the delta value equals 0 (or is not defined which is the same)
@@ -2283,7 +2286,7 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map){
                     if(_attributeName){
                         string_append_char(_attributeName,'\'');
                         string_append(_attributeName,_mapelement->_variable->_name);
-                        Mvalue* _attributeNameValue=_getStringValue(string(_attributeName));
+                        Mvalue* _attributeNameValue=_getStringValue(string(_attributeName),false);
                         if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,0)){
                             if(!appendedToList(_maplistelement,_mapelement->_variable->_value,0)||!appendedToList(_maplist,_maplistelementValue,0))result=false;
                         }else
@@ -2340,16 +2343,16 @@ Mvalue* Mneg(Mvalue* _value){ // negate a value
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
         if(_value->type==VT_REAL)return _getRealValue(-_value->value._real->ld);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg));
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg));
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg),true);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg),true);
     }
     return NULL;
 }
 Mvalue* Mnot(Mvalue* _value){ // not a value
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(!_value->value._integer->ll);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot));
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot));
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot),true);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot),true);
     }
     return NULL;
 }
@@ -2357,8 +2360,8 @@ Mvalue* Mnot(Mvalue* _value){ // not a value
 Mvalue* Mbnot(Mvalue* _value){ // not a value
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot));
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot));
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot),true);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot),true);
     }
     return NULL;
 }
@@ -2413,7 +2416,7 @@ Mvalue* Mfac(Mvalue* _value){
         finalmultiplier=_getBiginteger(_value->value._integer->ll);
     }else{
         if(_value->value._biginteger->sign==MP_NEG){output("\nERROR: Invalid (negative integer) argument to fac() function!");return NULL;}
-        if(mp_cmp(_value->value._biginteger,getBigintegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger));
+        if(mp_cmp(_value->value._biginteger,getBigintegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         finalmultiplier=_value->value._biginteger;
     }
     if(!finalmultiplier){outputValue("\nERROR: Failed to convert '",_value,"' to a big integer!");return NULL;}
@@ -2436,7 +2439,7 @@ Mvalue* Mfac(Mvalue* _value){
         if(amVerbose())output("\nERROR: No initial big integer 6.");
     if(_value->type==VT_INTEGER)mp_clear(finalmultiplier);
     if(amVerbose())outputBiginteger("\nResult of applying the fac() function: '",result,"'.");
-    return (result?_getBigintegerValue(result):NULL);
+    return (result?_getBigintegerValue(result,true):NULL);
     /* replacing:
     // 39 is about the maximum that we can store in a long long
     if(n<40){
@@ -2493,12 +2496,12 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
             mp_int* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
             if(_numerator&&_denominator){ // we've got both of them
                 if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY){
-                    _rational=_getRational(_numerator,_denominator,delta,true); // NOTE there should always be a delta!!!!
+                    _rational=_getRational(_numerator,_denominator,delta,true,false); // NOTE there should always be a delta!!!!
                 }
             }
-            if(!_rational){if(_numerator)free_biginteger(_numerator);if(_denominator)free_biginteger(_denominator);}
+            if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);}
         }else // long double is zero
-            _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false);
+            _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false,true);
     }
     // _rational should contain the 'last' computed rational
     return _rational;
@@ -2551,10 +2554,12 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     delta=(ld*q)-p;
                     if(ldIsZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
                     ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
-                    _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false); // construct the intermediate result without normalizing
+                    _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false,true); // construct the intermediate result without normalizing
                     if(!_rational){output("\nERROR: Failed to construct the intermediate rational %lld/%lld",p,q);break;}
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
-                    if(!appendedToList(_iterationsList,_getRationalValue(_rational),i)){free_rational(_rational);output("\nERROR: Failed to register a intermediate rational approximation.");/*break;*/}
+                    Mvalue* _rationalValue=_getRationalValue(_rational,true);
+                    if(!_rationalValue){output("\nERROR: Failed to value wrap the intermediate rational approximation to a real.");break;}
+                    if(!appendedToList(_iterationsList,_rationalValue,i)){free_rational(_rational);output("\nERROR: Failed to register a intermediate rational approximation.");/*break;*/}
                     rem-=a;
                     rem=1/rem;
                     // shift the lot
@@ -2563,14 +2568,13 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                 }
                 // construct the last rational (i.e. the result) from p and q
                 mp_int* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
-                if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true);
-                if(!_rational){if(_numerator)free_biginteger(_numerator);if(_denominator)free_biginteger(_denominator);}
+                if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true,true);
             }else // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
-                _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false);
+                _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false,true);
         }
         // _rational should contain the 'last' computed rational
         if(_rational){
-            Mvalue* _rationalValue=_getRationalValue(_rational);
+            Mvalue* _rationalValue=_getRationalValue(_rational,true);
             if(_rationalValue){
                 // how about reporting backwards????
                 if(appendedToList(_iterationsList,_rationalValue,0))return _iterationsList;
@@ -2578,9 +2582,8 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                 // free whatever's NOT being returned NOTE the list itself will be freed below
                 free_value(_rationalValue);
                 output("\nERROR: Failed to append the rational of a real to the result list.");
-            }else{ // failed to wrap the rational
-                free_rational(_rational);output("\nERROR: Failed to store the rational approximation.");
-            }
+            }else // failed to wrap the rational
+                output("\nERROR: Failed to store the rational approximation.");
         }
         if(_iterationsList)free_list(_iterationsList);
     }

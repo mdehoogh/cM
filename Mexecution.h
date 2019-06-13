@@ -286,6 +286,7 @@ long double getValueReal(const Mvalue* const _value);
 
 // decimal support
 mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
+mpd_t* new_decimal(mpd_context_t* mpd_context);
 mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value);
 void free_decimal(mpd_t* _decimal);
 
@@ -307,7 +308,7 @@ void free_rational(Mrational* _rational);
 bool isRationalZero(Mrational* _rational);
 bool isRationalOne(Mrational* _rational);
 void normalizeRational(Mrational* _rational);
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize);
+Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize,bool freeonfailure);
 Mrational* _getInverseRational(const Mrational* const _rational);
 
 
@@ -315,20 +316,21 @@ Mrational* _getInverseRational(const Mrational* const _rational);
 // data wrappers
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
-Mvalue* _getBigintegerValue(mp_int* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
-Mvalue* _getRationalValue(Mrational* _rational);
-Mvalue* _getDecimalValue(mpd_t* _decimal);
+// MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
+Mvalue* _getBigintegerValue(mp_int* _biginteger,bool freeonfailure); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
+Mvalue* _getDecimalValue(mpd_t* _decimal,bool freeonfailure);
 Mvalue* _getRealValue(long double ld);
-Mvalue* _getStringValue(char* text);
+Mvalue* _getStringValue(char* text,bool freeonfailure);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getTokenValue(char* text);
 
-Mvalue* _getValueOfList(Mlist* _list);
-Mvalue* _getValueOfInteger(Minteger* _integer);
-Mvalue* _getValueOfReal(Mreal* _real);
-Mvalue* _getValueOfMap(Mmap* _map);
-Mvalue* _getValueOfToken(Mtoken* _token);
+Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure);
+Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure);
+Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure);
+Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure);
+Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure);
 
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mmap* _getMapOfType(Mvaluetype valuetype);
