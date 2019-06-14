@@ -454,12 +454,11 @@ Mvalue* pi_d(Mvalue* _value){
 				// some constant decimals we need
 				mpd_t *d8=_getDecimal(mpd_context,8),*d32=_getDecimal(mpd_context,32);
 				unsigned long long iter=0;
-				if(amVerbose())output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,
-										mpd_to_sci(lasts,0),mpd_to_sci(t,0),
-										mpd_to_sci(s,0),mpd_to_sci(n,0),
-										mpd_to_sci(na,0),mpd_to_sci(d,0),
-										mpd_to_sci(da,0)
-										);
+				if(amVerbose()){
+					char *_lasts=mpd_to_sci(lasts,0),*_t=mpd_to_sci(t,0),*_s=mpd_to_sci(s,0),*_n=mpd_to_sci(n,0),*_na=mpd_to_sci(na,0),*_d=mpd_to_sci(d,0),*_da=mpd_to_sci(da,0);
+					output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,_lasts,_t,_s,_n,_na,_d,_da);
+					free(_lasts);free(_t);free(_s);free(_n);free(_na);free(_d);free(_da); // yes, we do have to free them all!!!
+				}
 				int cmp;
 				mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
 				while(!mpd_error(mpd_context)){
@@ -487,12 +486,11 @@ Mvalue* pi_d(Mvalue* _value){
 					//if(amVerbose()){output(" = %s\nj\t",mpd_to_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",mpd_to_sci(s,0),mpd_to_sci(t,0));}
 					mpd_add(s,s,t,mpd_context); // add t to s
 					//if(amVerbose()){output(" = %s\nk\t",mpd_to_sci(s,0));if(mpd_error(mpd_context))break;}
-					if(amVerbose())output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,
-											mpd_to_sci(lasts,0),mpd_to_sci(t,0),
-											mpd_to_sci(s,0),mpd_to_sci(n,0),
-											mpd_to_sci(na,0),mpd_to_sci(d,0),
-											mpd_to_sci(da,0)
-											);
+					if(amVerbose()){
+						char *_lasts=mpd_to_sci(lasts,0),*_t=mpd_to_sci(t,0),*_s=mpd_to_sci(s,0),*_n=mpd_to_sci(n,0),*_na=mpd_to_sci(na,0),*_d=mpd_to_sci(d,0),*_da=mpd_to_sci(da,0);
+						output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,_lasts,_t,_s,_n,_na,_d,_da);
+						free(_lasts);free(_t);free(_s);free(_n);free(_na);free(_d);free(_da); // yes, we do have to free them all!!!
+					}
 				}
 				mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
 				// get rid of all the decimals we used
@@ -504,7 +502,9 @@ Mvalue* pi_d(Mvalue* _value){
 				}
 				// success
 				mpd_finalize(s,mpd_context); // to round to the requested precision
-				if(amVerbose())output("\nFinal approximation of pi (rounded to %llu decimals): %s.",decimalprecision,mpd_to_sci(s,0));
+				if(amVerbose()){
+					char* _s=mpd_to_sci(s,0);if(_s){output("\nFinal approximation of pi (rounded to %llu decimals): %s.",decimalprecision,_s);free(_s);}
+				}
 				return _getDecimalValue(s,true);
 			}else
 				output("\nERROR: Failed to set the decimal precision to %lld.",decimalprecision);
@@ -778,6 +778,7 @@ public Rational limitDenominator(long maximumDenominator) {
 */
 // MDH@07JUN2019: we are going to store real text representations (like 100.1) as rationals from now on with delta equal to 0 (so we know where they came from, and that the denominator is a power of 10)
 //                because if we convert them to a long double we might loose precision in converting the decimal representation to the binary (internal) representation
+// MDH@14JUN2019: now also possible that the text has an e-part (which will change the denominator!!!!)
 Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 	// the text should represent an integer or a real
 	if(!rationalText)return NULL;
@@ -785,41 +786,87 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 	int l=strlen(rationalText);
 	if(l){
 		bool neg=(*rationalText=='-');if(neg)rationalText++; // get the sign
-		// TODO if we would just have an eval to get the value out of the token text
-		char* decimalPartText=strchr(rationalText,'.');
-		int decimalPartIndex=0;
-		if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
-		// now ready to check the integer part 
-		mp_int* _numerator=new_mp_int();
-		mp_int* _denominator=NULL;
-		if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
-			mp_int* _decimalPartBiginteger=NULL;
-			if(decimalPartText){
-				int decimalPartIndex=(int)(decimalPartText-rationalText);
-				decimalPartText++; // point to the first character of the decimal part
-				_decimalPartBiginteger=new_mp_int();
-				if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY&&isBigintegerZero(_decimalPartBiginteger)==MP_NO){
-					// compute the power of ten denominator
-					_denominator=_getBiginteger(1);
-					mp_int* _tenBiginteger=_getBiginteger(10);
-					while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
-					free_biginteger(_tenBiginteger);
+		// get the e-part (if any)
+		char* exponentText=strchr(rationalText,'e'); // assume lowercase e
+		mp_int* _exponent=new_mp_int();
+		if(exponentText){
+			*exponentText='\0'; // 'cuf off' the e-part!!!!
+			l=(int)(exponentText-rationalText); // this will be the new l we need below!!!
+			output("\nWith exponent removed: '%s'.",rationalText);
+			exponentText++; // point to the first character of the exponent
+			if(mp_read_radix(_exponent,exponentText,10)!=MP_OKAY){
+				output("\nERROR: Failed to extract the exponent its text representation '%s'.",exponentText);
+				free_biginteger(_exponent);
+				_exponent=NULL;
+			}else
+			//if(amVerbose())
+				outputBiginteger("\nExponent '",_exponent,"'.");
+		}
+		if(!exponentText||_exponent){ // either we do not have an exponentText or we have an exponent big integer (to apply later on)
+			// TODO if we would just have an eval to get the value out of the token text
+			char* decimalPartText=strchr(rationalText,'.');
+			int decimalPartIndex=0;
+			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
+			output("\nWith decimal part removed: '%s'.",rationalText);
+			// now ready to check the integer part 
+			mp_int* _numerator=new_mp_int();
+			mp_int* _denominator=NULL;
+			if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
+				mp_int* _decimalPartBiginteger=NULL;
+				if(decimalPartText){
+					int decimalPartIndex=(int)(decimalPartText-rationalText);
+					decimalPartText++; // point to the first character of the decimal part
+					_decimalPartBiginteger=new_mp_int();
+					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY&&!isBigintegerZero(_decimalPartBiginteger)){
+						// compute the power of ten denominator
+						_denominator=_getBiginteger(1);
+						mp_int* _tenBiginteger=_getBiginteger(10);
+						while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
+						free_biginteger(_tenBiginteger);
+					}
+					outputBiginteger("\nDecimal part integer: '",_decimalPartBiginteger,"'.");
+					if(_denominator)outputBiginteger("\nDenominator: '",_denominator,"'.");
 				}
-			}
-			// if we have a decimalPartText we need a denominator
-			if(!decimalPartText||_denominator){
-				// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
-				// NOTE do NOT free the numerator and denominator in the call to _getRational, as we free them if _rational ends of being NULL afterwards
-				if(!_denominator||(mp_mul(_numerator,_denominator,_numerator)==MP_OKAY&&mp_add(_numerator,_decimalPartBiginteger,_numerator)==MP_OKAY))
-					_rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
-			}
-			if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
-		}else
-			output("\nERROR: Integer part of rational text '%s' invalid.",rationalText);
-		// if we haven't got a rational that binded _numerator and _denominator free both of them
-		if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);}
+				// if we have a decimalPartText we need a denominator
+				if(!decimalPartText||_denominator){
+					// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
+					// NOTE do NOT free the numerator and denominator in the call to _getRational, as we free them if _rational ends of being NULL afterwards
+					if(!_denominator||(mp_mul(_numerator,_denominator,_numerator)==MP_OKAY&&mp_add(_numerator,_decimalPartBiginteger,_numerator)==MP_OKAY)){
+						outputBiginteger("\nNumerator before applying the exponent: '",_numerator,"'.");
+						outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
+						// if we have an non-zero exponent, we have to adjust the numerator or denominator BEFORE trying to create the rational!!!
+						if(exponentText&&mp_iszero(_exponent)==MP_NO){
+							mp_int* _tenBiginteger=_getBiginteger(10);
+							if(_tenBiginteger){
+								if(mp_isneg(_exponent)==MP_YES){ // a negative exponent goes into the denominator
+									if(!_denominator)_denominator=_getBiginteger(1);
+									if(_denominator){
+										while(mp_iszero(_exponent)==MP_NO){
+											if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+											if(mp_incr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+										}
+									}else{free_biginteger(_exponent);_exponent=NULL;}
+								}else{ // a positive exponent goes into the numerator
+									while(mp_iszero(_exponent)==MP_NO){
+										if(mp_mul(_numerator,_tenBiginteger,_numerator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+										if(mp_decr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+									}
+								}
+								free_biginteger(_tenBiginteger);
+							}else{free_biginteger(_exponent);_exponent=NULL;}
+						}
+						// check again whether we still have an exponent (when we should)
+						if(!exponentText||_exponent)
+							_rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
+					}
+				}
+				if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
+			}else
+				output("\nERROR: Integer part of rational text '%s' invalid.",rationalText);
+			// if we haven't got a rational that binded _numerator and _denominator free both of them
+			if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);if(freeonfailure)free(rationalText);}
+		}
 	}
-	if(!_rational)if(freeonfailure)free(rationalText);
 	return _rational;
 }
 Mrational* _getRationalCopy(Mrational* _rational){
@@ -831,6 +878,7 @@ Mrational* _getRationalCopy(Mrational* _rational){
 	if(_copyRational)_copyRational->normalized=_rational->normalized; // copy the rational flag
 	return _copyRational;
 }
+// _getValueRational() returns a (new) rational from the value stored in _value
 Mrational* _getValueRational(Mvalue* _value){
 	Mrational* _rational=NULL;
 	if(_value){
@@ -839,6 +887,15 @@ Mrational* _getValueRational(Mvalue* _value){
 			case VT_INTEGER:
 			case VT_BIGINTEGER:
 				_rational=_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false,false); // not to free what's wrapped in _value
+				break;
+			case VT_DECIMAL:
+				{ // until we find a way to get the associated rational using the internal representation we stick to extracting the rational from the text representation of the decimal (which should be exact)
+					char* _decimalText=mpd_to_sci(_value->value._decimal,0);
+					if(_decimalText){_rational=_getDecimalTextRational(_decimalText,false);free(_decimalText);}else output("\nERROR: Failed to obtain the text representation of a decimal.");
+				}
+				break;
+			case VT_STRING:
+				_rational=_getDecimalTextRational(_value->value._string->_c,false);
 				break;
 			case VT_RATIONAL:
 				_rational=_getRationalCopy(_value->value._rational); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
@@ -856,25 +913,26 @@ Mrational* _getValueRational(Mvalue* _value){
 	}
 	return _rational;
 }
-mpd_t* _getDecimalCopy(mpd_t* _decimal){
-	if(!_decimal)return NULL;
-	mpd_t* _copyDecimal=new_decimal(_decimalContext);
-	mpd_copy(_copyDecimal,_decimal,_decimalContext);
-	return _copyDecimal;
-}
+
 mpd_t* _getValueDecimal(Mvalue* _value){
 	mpd_t* _decimal=NULL;
 	if(_value){
-		if(_value->type==VT_LIST||_value->type==VT_MAP)return NULL; 
-		switch(_value->type){
-			case VT_DECIMAL:_decimal=_getDecimalCopy(_value->value._decimal);break;
-			case VT_INTEGER:_decimal=_getDecimal(_decimalContext,_value->value._integer->ll);break;
-			default:
-				{
-					mstring* _valueText=_getValueText(_value,true);
-					if(_valueText){mpd_set_string(_decimal,string(_valueText),_decimalContext);free_mstring(_valueText);}
-				}
-				break;
+		if(_value->type!=VT_LIST&&_value->type!=VT_MAP){
+			switch(_value->type){
+				case VT_DECIMAL:_decimal=_getDecimalCopy(_value->value._decimal);break;
+				case VT_INTEGER:_decimal=_getDecimal(_decimalContext,_value->value._integer->ll);break;
+				case VT_RATIONAL:
+					{ // a rational text representation still contains the numerator/denominator pair, so can't be parsed into a decimal
+						// TODO we need to find the decimal approximation with precision equal to the default decimal precision
+					}
+					break;
+				default:
+					{
+						mstring* _valueText=_getValueText(_value,true);
+						if(_valueText){mpd_set_string(_decimal,string(_valueText),_decimalContext);free_mstring(_valueText);}
+					}
+					break;
+			}
 		}
 	}
 	return _decimal;
@@ -900,6 +958,15 @@ Mvalue* q(Mvalue* _value){
 
 // convert to a real
 
+long double getDecimalLongDouble(mpd_t* _decimal){
+	// easiest way is to transform to text first, and take if from there...
+	long double ldDecimal=M_LD_NAN;
+	if(_decimal){
+		char* _decimalText=mpd_to_sci(_decimal,0);
+		if(_decimalText){ldDecimal=_strtold(_decimalText,ldDecimal);free(_decimalText);} // no need for this anymore
+	}
+	return ldDecimal;
+}
 // TODO complete with conversion from big integer and rational
 Mvalue* r(Mvalue* _value){
 	if(amVerbose())outputValue("\nConverting '",_value,"' to a real.");
@@ -908,6 +975,7 @@ Mvalue* r(Mvalue* _value){
 		switch(_value->type){
 			case VT_INTEGER:_realValue=_getRealValue((long double)_value->value._integer->ll);break;
 			case VT_BIGINTEGER:_realValue=_getRealValue(mp_get_long_double(_value->value._biginteger));break;
+			case VT_DECIMAL:_realValue=_getRealValue(getDecimalLongDouble(_value->value._decimal));break;
 			case VT_RATIONAL:_realValue=_getRealValue(getRationalLongDouble(_value->value._rational));break;
 			case VT_REAL:_realValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
 			case VT_STRING:_realValue=_getRealValue(_strtold(_value->value._string->_c,getNAR()));break;
@@ -924,7 +992,7 @@ Mvalue* t(Mvalue* _value){
 		case VT_TOKEN:return _getStringValue("'t",false);
 		case VT_INTEGER:return _getStringValue("'i",false);
 		case VT_BIGINTEGER:return _getStringValue("'I",false);
-		case VT_DECIMAL:return _getStringValue("d",false);
+		case VT_DECIMAL:return _getStringValue("'d",false);
 		case VT_RATIONAL:return _getStringValue("'q",false);
 		case VT_REAL:return _getStringValue("'r",false);
 		case VT_STRING:return _getStringValue("'s",false);
@@ -1065,8 +1133,8 @@ bool initEnvironment(){
 				return false;
 			}
 			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(newFunction(_Menvironment,"pi$q"),pi_q)||!completedIntegerFunction(newFunction(_Menvironment,"pi$ql"),pi_ql)||!completedIntegerFunction(newFunction(_Menvironment,"pi$d"),pi_d)){
-				outputLine("ERROR: Failed to register the pi$d, pi$q and pi$ql functions.");
+			if(!completedIntegerFunction(newFunction(_Menvironment,"pi$q"),pi_q)||!completedIntegerFunction(newFunction(_Menvironment,"pi$ql"),pi_ql)||!completedIntegerFunction(newFunction(_Menvironment,"pi"),pi_d)){
+				outputLine("ERROR: Failed to register the pi, pi$q and pi$ql functions.");
 				return false;
 			}
 			// conversions
@@ -1457,7 +1525,7 @@ bool registerCommand(){
 //                in certain languages it means evaluate this (or the result of a system command??????)
 //                furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
@@ -1545,7 +1613,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
 {""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *   .>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   LEN  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
@@ -2489,23 +2557,140 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 
-Mvalue* power(Mvalue* _value1,Mvalue* _value2){
-	if(!_value1||!_value2)return NULL;
-	if(isValueZero(_value1))return _value1;if(isValueZero(_value2))return(_value2->type==VT_INTEGER?_getIntegerValue(1):_getRealValue(1)); // if the power is zero, we return 1 or 1.0
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(pow(_value1->value._integer->ll,_value2->value._integer->ll));
-		return _getRealValue(pow(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld,_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+Mvalue* _getValueOneOfType(Mvaluetype valuetype){
+	switch(valuetype){
+		case VT_INTEGER: return _getIntegerValue(1);
+		case VT_BIGINTEGER: return _getBigintegerValue(_getBiginteger(1),true);
+		case VT_REAL: return _getRealValue(1.0);
+		case VT_RATIONAL: return _getRationalValue(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),true);
+		case VT_DECIMAL: return _getDecimalValue(_getDecimal(_decimalContext,1),true);
+		default:break;
 	}
 	return NULL;
 }
+
+long double getRealPowerValue(long double base,Mvalue* _powerValue){
+	// ASSERT assuming power does not equal 0
+	if(!ldIsNaN(base)&&!ldIsInf(base)){
+		if(_powerValue)
+		switch(_powerValue->type){
+			case VT_INTEGER:return powl(base,_powerValue->value._integer->ll); // very easy, as we can expext to be able to convert the integer to a long double
+			case VT_BIGINTEGER:return powl(base,mp_get_long_double(_powerValue->value._biginteger));
+			case VT_DECIMAL:return powl(base,getDecimalLongDouble(_powerValue->value._decimal));
+			case VT_RATIONAL:
+				{
+					long double power=powl(mp_get_long_double(_powerValue->value._rational->num),power);
+					if(_powerValue->value._rational->den)power/=powl(mp_get_long_double(_powerValue->value._rational->den),power);
+					return powl(base,power);
+				}
+			case VT_REAL:return powl(base,_powerValue->value._real->ld);
+			default:break;
+		}
+	}
+	return M_LD_NAN; // uncomputable
+}
+long double getRealValuePower(Mvalue* _baseValue,long double power){
+	// ASSERT assuming power does not equal 0
+	if(!ldIsNaN(power)&&!ldIsInf(power)){
+		if(_baseValue)
+		switch(_baseValue->type){
+			case VT_INTEGER:return powl(_baseValue->value._integer->ll,power); // very easy, as we can expext to be able to convert the integer to a long double
+			case VT_BIGINTEGER:return powl(mp_get_long_double(_baseValue->value._biginteger),power);
+			case VT_DECIMAL:return powl(getDecimalLongDouble(_baseValue->value._decimal),power);
+			case VT_RATIONAL:
+				{ // transform the base value rational to a long double
+					long double base=powl(mp_get_long_double(_baseValue->value._rational->num),power);
+					if(_baseValue->value._rational->den)base/=powl(mp_get_long_double(_baseValue->value._rational->den),power);
+					return powl(base,power);
+				}
+			case VT_REAL:return powl(_baseValue->value._real->ld,power);
+			default:break;
+		}
+	}
+	return M_LD_NAN; // uncomputable
+}
+
+mpd_t* getValueDecimal(Mvalue* _value){
+	// ASSERT typically _value should contain a numeric (non-real) value
+	if(_value&&_value->type==VT_DECIMAL)return _value->value._decimal;
+	return _getValueDecimal(_value); // will always create a new one...
+}
+Mvalue* power(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(isValueZero(_value1))return _value1;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
+	if(isValueZero(_value2))return _getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
+		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
+		// computing the power is not so easy for certain value type combinations
+		// I suppose if the base or exponent is real, the result should also be real (because it will be approximate)
+		if(_value2->type==VT_REAL)return _getRealValue(getRealValuePower(_value1,_value2->value._real->ld));
+		// ASSERT exponent is NOT a real
+		if(_value1->type==VT_REAL)return _getRealValue(getRealPowerValue(_value1->value._real->ld,_value2));
+		// ASSERT base and exponent are not reals
+		// therefore exact computations should be possible
+		// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
+		// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
+		mpd_t* _baseDecimal=getValueDecimal(_value1);
+		mpd_t* _exponentDecimal=getValueDecimal(_value2);
+		mpd_t* _powerDecimal=new_decimal(_decimalContext);
+		if(_powerDecimal){
+			mpd_pow(_powerDecimal,_baseDecimal,_exponentDecimal,_decimalContext);
+			// TODO are we converting back?
+		}
+		if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal);if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal);
+		return _getDecimalValue(_powerDecimal,true);
+	}
+	return NULL;
+}
+
+long double getReal(Mreal* _real){return(_real?_real->ld:M_LD_NAN);}
 Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueZero(_value2))return _value1; // NOTE if the power is zero, the multiplication factor will be 1
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*pow(10.,_value2->value._integer->ll));
-		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld))));
+	// if both values are numeric (somehow) we can do the computation
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
+		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
+		// if the epower exponent is zero _value1 is the result
+		if(isValueZero(_value2))return _value1;
+		if(_value2->type==VT_INTEGER){ // an integer exponent
+			long long exponentOf10=_value2->value._integer->ll;
+			// if the power value is 0, _value1 is the result
+			// multiplication or division by an integer power of 10 which is an integer therefore
+			if(_value1->type==VT_DECIMAL){
+				mpd_t* _decimal=_getDecimalCopy(_value1->value._decimal);
+				_decimal->exp+=exponentOf10; // TODO theoretically we can get overflow here!! the exponent is an int64_t (alternative is using mpd_scaleb)
+				return _getDecimalValue(_decimal,true);
+			}
+			if(_value1->type==VT_RATIONAL){
+				// either to multiply the numerator or the denominator with the exponent
+				// TODO deal appropriately with any delta!!!
+				mp_int* _biginteger10=_getBiginteger(10);
+				Mrational* _rational=NULL;
+				if(_biginteger10){
+					if(exponentOf10>0){
+						mp_int* _numerator=_getBigintegerCopy(_value1->value._rational->num);
+						while(exponentOf10>0)if(mp_mul(_numerator,_biginteger10,_numerator)==MP_OKAY)exponentOf10--;else break;
+						if(exponentOf10==0)
+							_rational=_getRational(_numerator,_getBigintegerCopy(_value1->value._rational->den),getReal(_value1->value._rational->delta),true,true);
+						else
+							output("\nERROR: Failed to multiply the numerator of the rational by an integer power of 10.");
+					}else{
+						mp_int* _denominator=(!_value1->value._rational->den?_getBiginteger(1):_getBigintegerCopy(_value1->value._rational->den));
+						while(exponentOf10<0)if(mp_mul(_denominator,_biginteger10,_denominator)==MP_OKAY)exponentOf10++;else break;
+						if(exponentOf10==0)
+							_rational=_getRational(_getBigintegerCopy(_value1->value._rational->num),_denominator,getReal(_value1->value._rational->delta),true,true);
+						else
+							output("\nERROR: Failed to multiply the denominator of the rational by an integer power of 10.");
+					}
+					free_biginteger(_biginteger10);
+				}
+				return _getRationalValue(_rational,true);
+			}
+		}
+		return multiply(_value1,power(_getIntegerValue(10),_value2)); // temp. value like the power result and _getIntegerValue(10) will be garbage collected if not bound somewhere!!!
+		// replacing: return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld))));
 	}
 	return NULL;
 }

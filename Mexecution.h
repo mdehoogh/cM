@@ -288,6 +288,7 @@ long double getValueReal(const Mvalue* const _value);
 mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
 mpd_t* new_decimal(mpd_context_t* mpd_context);
 mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value);
+mpd_t* _getDecimalCopy(mpd_t* _decimal);
 void free_decimal(mpd_t* _decimal);
 
 // big integer support

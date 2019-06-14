@@ -101,17 +101,6 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision){
     return mpd_contexts[mpd_context_index];
 }
 
-mpd_t* new_decimal(mpd_context_t* mpd_context){
-    mpd_t* result=mpd_new(mpd_context);
-    if(!result)return NULL;
-    return result;
-}
-mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value){
-    mpd_t* _decimal=new_decimal(mpd_context);
-    if(_decimal)mpd_set_i64(_decimal,value,mpd_context);
-    return _decimal;
-}
-
 // new_mp_int returns an initialized big integer on success, or NULL when failing
 mp_int* new_mp_int(){
     mp_int* result=(mp_int*)malloc(sizeof(mp_int));
@@ -141,6 +130,29 @@ const mp_int* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
 
 bool isBigintegerZero(mp_int* _biginteger){return(_biginteger?mp_iszero(_biginteger)==MP_YES:false);}
 bool isBigintegerOne(mp_int* _biginteger){return(_biginteger?mp_cmp(_biginteger,getBigintegerOne())==MP_EQ:false);}
+
+extern mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
+mpd_t* new_decimal(mpd_context_t* mpd_context){
+    mpd_t* result=mpd_new(mpd_context?mpd_context:_decimalContext);
+    if(!result)return NULL;
+    return result;
+}
+mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value){
+    mpd_t* _decimal=new_decimal(mpd_context);
+    if(_decimal)mpd_set_i64(_decimal,value,mpd_context);
+    return _decimal;
+}
+
+static mpd_t* d1=NULL;
+const mpd_t* getDecimalOne(){if(!d1)d1=_getDecimal(NULL,1);return d1;}
+bool isDecimalOne(mpd_t* _decimal){return (mpd_cmp(_decimal,getDecimalOne(),_decimalContext)==0);}
+
+mpd_t* _getDecimalCopy(mpd_t* _decimal){
+    if(!_decimal)return NULL;
+    mpd_t* _decimalCopy=new_decimal(_decimalContext);
+    mpd_copy(_decimalCopy,_decimal,_decimalContext);
+    return _decimalCopy;
+}
 
 // long double to rational or representation
 typedef struct {
@@ -1678,7 +1690,11 @@ bool isRationalZero(Mrational* _rational){
 }
 bool isRationalOne(Mrational* _rational){
     // when the numerator is NULL, it is considered to be equal to 1
-    return(_rational?!(_rational->num||isBigintegerOne(_rational->num))&&(!_rational->den||isBigintegerOne(_rational->den))&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false);
+    if(!_rational)return false;
+    // basically a rational equals 1 if the numerator and denominator are the same
+    if(_rational->delta&&!ldIsZero(_rational->delta->ld))return false; // TODO if the rational delta is not zero, do not consider to be equal to 1 (although theoretically it could be)
+    return (_rational->den?mp_cmp(_rational->num,_rational->den)==MP_EQ:isBigintegerOne(_rational->num));
+    // replacing: return(_rational?!(_rational->num||isBigintegerOne(_rational->num))&&(!_rational->den||isBigintegerOne(_rational->den))&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false);
 }
 
 // we can use the method below to come up with the numerator and denominator of a given double that matches the double exactly
@@ -1985,11 +2001,10 @@ mstring* _getRationalText(const Mrational* const _rational){
 }
 mstring* _getDecimalText(const mpd_t* const _decimal){
     if(_decimal){
-        mstring* _decimalText=string_create();
-        if(_decimalText){
-            if(string_append(_decimalText,mpd_to_sci(_decimal,0)))return _decimalText;
-            free_mstring(_decimalText);
-        }
+        mstring* _decimalText=NULL;
+        char* _decimalRep=mpd_to_sci(_decimal,0);
+        if(_decimalRep){_decimalText=new_mstring(_decimalRep);free(_decimalRep);}
+        return _decimalText;
     }
     return NULL;
 }
@@ -2328,13 +2343,19 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
 bool isValueZero(Mvalue* _value){
     if(_value){
         if(_value->type==VT_INTEGER)return _value->value._integer->ll==0;
+        if(_value->type==VT_BIGINTEGER)return isBigintegerZero(_value->value._biginteger);
         if(_value->type==VT_REAL)return ldIsZero(_value->value._real->ld);
+        if(_value->type==VT_DECIMAL)return mpd_iszero(_value->value._decimal);
+        if(_value->type==VT_RATIONAL)return isBigintegerZero(_value->value._rational->num);
     }
     return false;
 }
 bool isValueOne(Mvalue* _value){
     if(_value){
         if(_value->type==VT_INTEGER)return _value->value._integer->ll==1;
+        if(_value->type==VT_BIGINTEGER)return isBigintegerOne(_value->value._biginteger);
+        if(_value->type==VT_DECIMAL)return isDecimalOne(_value->value._decimal);
+        if(_value->type==VT_RATIONAL)return isRationalOne(_value->value._rational);
         if(_value->type==VT_REAL)return _value->value._real->ld==1;
     }
     return false;
