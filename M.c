@@ -645,7 +645,19 @@ Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
 	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:0))>0);
 	return _getValueOfList(_dlist,true);
 }
-Mvalue* d(Mvalue* _value){ // little-endian representation list to return
+
+// we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
+Mvalue* d(Mvalue* _value){
+	if(_value){
+		switch(_value->type){
+			// TODO all other types
+			case VT_RATIONAL:return _getDecimalValue(_getRationalDecimal(_value->value._rational),true);
+			default:break;
+		}
+	}
+	return NULL;
+}
+Mvalue* b(Mvalue* _value){ // little-endian representation list to return
 	if(_value){
 		switch(_value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,true);
@@ -655,7 +667,8 @@ Mvalue* d(Mvalue* _value){ // little-endian representation list to return
 	}
 	return NULL;
 } 
-Mvalue* D(Mvalue* _value){ // big endian decimal representation list to return
+
+Mvalue* B(Mvalue* _value){ // big endian decimal representation list to return
 	if(_value){
 		switch(_value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,false);
@@ -682,6 +695,7 @@ Mvalue* I(Mvalue* _value){
 	}
 	return NULL;
 }
+
 
 // TODO complete the q function
 
@@ -1006,7 +1020,7 @@ Mvalue* t(Mvalue* _value){
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
     if(_value){
-				if(amVerbose())outputValue("\nComputing the sum of '",_value,"'.");
+		if(amVerbose())outputValue("\nComputing the sum of '",_value,"'.");
         if(_value->type!=VT_LIST)return _value;
 				// all the values in the list could be integer
 				Mlist* _list=_value->value._list;
@@ -1142,7 +1156,8 @@ bool initEnvironment(){
 					||!completedValueFunction(newFunction(_Menvironment,"t"),t)
 					||!completedValueFunction(newFunction(_Menvironment,"r"),r)
 					||!completedValueFunction(newFunction(_Menvironment,"q"),q)||!completedValueFunction(newFunction(_Menvironment,"Q"),Q)
-					||!completedValueFunction(newFunction(_Menvironment,"d"),d)||!completedValueFunction(newFunction(_Menvironment,"D"),D)){
+					||!completedValueFunction(newFunction(_Menvironment,"d"),d)
+					||!completedValueFunction(newFunction(_Menvironment,"b"),b)||!completedValueFunction(newFunction(_Menvironment,"B"),B)){
 				outputLine("ERROR: Failed to register value type conversion functions.");
 				return false;
 			}

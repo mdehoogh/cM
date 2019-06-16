@@ -143,6 +143,43 @@ mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value){
     return _decimal;
 }
 
+mpd_t* _getRationalDecimal(const Mrational* const _rational){
+    if(!_rational)return NULL;
+    mp_int *_numerator=_rational->num,*_denominator=_rational->den;
+    mstring* _decimalText;
+    if(_denominator){
+        mp_int *_dividend=new_mp_int(),*_remainder=new_mp_int();
+        if(_dividend&&_remainder&&mp_div(_numerator,_denominator,_dividend,_remainder)==MP_OKAY){
+            // the integer part is _dividend
+            _decimalText=_getBigintegerText(_dividend);
+            if(_decimalText&&mp_iszero(_remainder)==MP_NO){ // we've got a fraction to add!!!
+                string_append_char(_decimalText,'.'); // the decimal period
+                mp_int* _bi10=_getBiginteger(10);
+                long long decimalsLeft=_decimalContext->prec+2; // stop as soon as we have sufficient decimals
+                mstring* _dividendText; // for storing the dividend digit character
+                while(--decimalsLeft>=0){
+                    if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY)break;
+                    if(mp_div(_remainder,_denominator,_dividend,_remainder)!=MP_OKAY)break;
+                    _dividendText=_getBigintegerText(_dividend);
+                    if(!_dividendText){output("\nERROR: Failed to store the next decimal character.");break;}
+                    string_append(_decimalText,string(_dividendText));
+                    free_mstring(_dividendText);
+                    if(mp_iszero(_remainder)==MP_YES)break;
+                }
+                free_biginteger(_bi10);
+            }
+        }
+        free_biginteger(_dividend);free_biginteger(_remainder);
+    }else
+        _decimalText=_getBigintegerText(_numerator);
+    // parse _decimalText to a decimal
+    if(!_decimalText)return NULL;
+    mpd_t* _decimal=new_decimal(_decimalContext);
+    if(_decimal)mpd_set_string(_decimal,string(_decimalText),_decimalContext);
+    free_mstring(_decimalText);
+    return _decimal;
+}
+
 static mpd_t* d1=NULL;
 const mpd_t* getDecimalOne(){if(!d1)d1=_getDecimal(NULL,1);return d1;}
 bool isDecimalOne(mpd_t* _decimal){return (mpd_cmp(_decimal,getDecimalOne(),_decimalContext)==0);}

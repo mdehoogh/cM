@@ -312,6 +312,7 @@ void normalizeRational(Mrational* _rational);
 Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize,bool freeonfailure);
 Mrational* _getInverseRational(const Mrational* const _rational);
 
+mpd_t* _getRationalDecimal(const Mrational* const _rational); // converts a rational to a decimal
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 // data wrappers
