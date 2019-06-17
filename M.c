@@ -89,20 +89,20 @@ Mvalue* Mfacd(Mvalue* _value){
     return NULL;
 }
 
-mp_int* _Iadd(mp_int* a,mp_int* b){
+Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b){
 	// ASSERT do NOT call with either a or b NULL
 	if(!a||!b)return NULL;
 	if(isBigintegerZero(a))return _getBigintegerCopy(b);
 	if(isBigintegerZero(b))return _getBigintegerCopy(a);
-	mp_int* sum=new_mp_int();if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);return NULL;} // if the addition fails return 0
+	Mbiginteger* sum=new_biginteger();if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);return NULL;} // if the addition fails return 0
 	outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
 	return sum;
 } // adding two big integers
-mp_int* _Imultiply(mp_int* a,mp_int* b){
+Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b){
 	if(!a&&!b)return NULL;
 	if(isBigintegerOne(a))return _getBigintegerCopy(b);
 	if(isBigintegerOne(b))return _getBigintegerCopy(a);
-	mp_int* product=new_mp_int(); // defaults to zero, which would be the result as well if either big integer is zero!!!
+	Mbiginteger* product=new_biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
 	if(!isBigintegerZero(a)&&!isBigintegerZero(b)&&mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);return NULL;}
 	outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
 	return product;
@@ -113,8 +113,8 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	//      but then these new big integer should be freed if we can't bind them
 
 	// ASSERT _rational1 and _rational2 should not be NULL
-	mp_int *_den1=_getBigintegerCopy(_rational1->den),*_den2=_getBigintegerCopy(_rational2->den); // get the denominators
-	mp_int *_num1=_getBigintegerCopy(_rational1->num),*_num2=_getBigintegerCopy(_rational2->num); // get the numerators
+	Mbiginteger *_den1=_getBigintegerCopy(_rational1->den),*_den2=_getBigintegerCopy(_rational2->den); // get the denominators
+	Mbiginteger *_num1=_getBigintegerCopy(_rational1->num),*_num2=_getBigintegerCopy(_rational2->num); // get the numerators
 	
 	long double deltasum=(_rational1->delta&&_rational2->delta?_rational1->delta->ld+_rational2->delta->ld:(_rational1->delta?_rational1->delta->ld:(_rational2->delta?_rational2->delta->ld:M_LD_NAN))); // MDH@05JUN2019: compute the sum of the deltas
 	
@@ -123,14 +123,14 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	// TODO we can speed up these shortcuts (see how we handled creation errors at the bottom!!!)
 	if(!_den1&&!_den2){
 		output("\nBoth denominators in adding two rationals undefined!");
-		mp_int* _num=_Iadd(_num1,_num2);free_biginteger(_num1);free_biginteger(_num2); // don't need these anymore
+		Mbiginteger* _num=_Iadd(_num1,_num2);free_biginteger(_num1);free_biginteger(_num2); // don't need these anymore
 		Mrational* _rational=_getRational(_num,NULL,deltasum,false,true);
 		return _rational; // if both denominators are undefined (i.e. 1), return the sum of the numerators
 	}
 	if(!_den1){
 		output("\nFirst denominator in adding two rationals undefined!");
-		mp_int* _mult=(_num1?_Imultiply(_num1,_den2):_den2);free_biginteger(_num1); // _num1 no longer needed
-		mp_int* _num=(_mult?_Iadd(_num2,_mult):NULL);free_biginteger(_num2); // _num2 no longer needed
+		Mbiginteger* _mult=(_num1?_Imultiply(_num1,_den2):_den2);free_biginteger(_num1); // _num1 no longer needed
+		Mbiginteger* _num=(_mult?_Iadd(_num2,_mult):NULL);free_biginteger(_num2); // _num2 no longer needed
 		if(_num1)free_biginteger(_mult); // _mult no longer needed i.e. when it is not equal to _den2
 		Mrational* _rational=NULL;
 		if(_num){
@@ -143,8 +143,8 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	}
 	if(!_den2){
 		output("\nSecond denominator in adding two rationals undefined!");
-		mp_int* _mult=(_num1?_Imultiply(_num2,_den1):_den1);free_biginteger(_num2);
-		mp_int* _num=(_mult?_Iadd(_num1,_mult):NULL);free_biginteger(_num1);
+		Mbiginteger* _mult=(_num1?_Imultiply(_num2,_den1):_den1);free_biginteger(_num2);
+		Mbiginteger* _num=(_mult?_Iadd(_num1,_mult):NULL);free_biginteger(_num1);
 		if(_num1)free_biginteger(_mult);
 		Mrational* _rational=NULL;
 		if(_num){
@@ -158,7 +158,7 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	// if the denominators are equal it's also easier
 	if(mp_cmp(_den1,_den2)==MP_EQ){
 		free_biginteger(_den2); // won't need it anymore
-		mp_int* _num=_Iadd(_num1,_num2);free_biginteger(_num1);free_biginteger(_num2);
+		Mbiginteger* _num=_Iadd(_num1,_num2);free_biginteger(_num1);free_biginteger(_num2);
 		Mrational* _rational=NULL;
 		if(_num){
 			outputBiginteger("\nNew numerator: ",_num,".");
@@ -173,15 +173,15 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 
 	// true rational addition (as _den1 and _den2 are defined, i.e. unequal to 1)
 	// TODO we can speed this up as well using ternary operators
-	mp_int* _den=_Imultiply(_den1,_den2);
-	mp_int* _mul1=(_den?_Imultiply(_num1,_den2):NULL);
-	mp_int* _mul2=(_den&&_mul1?_Imultiply(_num2,_den1):NULL);
+	Mbiginteger* _den=_Imultiply(_den1,_den2);
+	Mbiginteger* _mul1=(_den?_Imultiply(_num1,_den2):NULL);
+	Mbiginteger* _mul2=(_den&&_mul1?_Imultiply(_num2,_den1):NULL);
 	// free the original copies
 	free_biginteger(_num1);free_biginteger(_num2);
 	free_biginteger(_den1);free_biginteger(_den2);
 	
 	outputBiginteger("\n\tNumerator part 1: ",_mul1,NULL);outputBiginteger(" - part 2: ",_mul2,".");
-	mp_int* _num=(_mul1&&_mul2?_Iadd(_mul1,_mul2):NULL);
+	Mbiginteger* _num=(_mul1&&_mul2?_Iadd(_mul1,_mul2):NULL);
 	free_biginteger(_mul1);free_biginteger(_mul2); // always free the intermediate results (even if we failed to add them)
 
 	outputBiginteger("\nSum denominator: ",_den,".");
@@ -216,9 +216,9 @@ Mvalue* setdp(Mvalue* _value){
 }
 ///////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
 
-mpd_t* _dadd(mpd_t* _decimal1,mpd_t* _decimal2){
-	mpd_t* _result=new_decimal(_decimalContext);
-	mpd_add(_result,_decimal1,_decimal2,_decimalContext);
+Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
+	Mdecimal* _result=new_decimal(_decimalContext,0);
+	mpd_add(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext);
 	return _result;
 }
 
@@ -277,12 +277,12 @@ Mvalue* pi_ql(Mvalue* _value){
 			if(_rational){
 				// obviously we can add 2 to the big integer storing the numerator
 				if(maxiter>0){
-					mp_int* _addendumDenominator=_getBiginteger(3);
-					mp_int* _denominatorIncrement=_getBiginteger(2);
+					Mbiginteger* _addendumDenominator=_getBiginteger(3);
+					Mbiginteger* _denominatorIncrement=_getBiginteger(2);
 					if(_addendumDenominator&&_denominatorIncrement){
 						for(int iter=1;iter<=maxiter;iter++){
 							// compute the numerator and (new) denominator of the addendum rational
-							mp_int* _addendumNumerator=_getBiginteger(iter%2?-1:1); // the numerator is either 1 or -1
+							Mbiginteger* _addendumNumerator=_getBiginteger(iter%2?-1:1); // the numerator is either 1 or -1
 							if(!_addendumNumerator){
 								free_biginteger(_addendumDenominator);
 								output("\nERROR: Failed to set the addendum numerator at iteration %u.",iter);
@@ -308,7 +308,7 @@ Mvalue* pi_ql(Mvalue* _value){
 							}
 							// increment the denominator BEFORE we loose the addendum denominator we have now (as part of _rational)
 							outputBiginteger("\nIncrementing the addendum denominator by ",_denominatorIncrement,".");		
-							mp_int* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement);
+							Mbiginteger* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement);
 							if(!_newAddendumDenominator){
 								free_biginteger(_addendumDenominator); // won't be using this in the addendum rational
 								output("\nERROR: Failed to increment the addendum denominator.");
@@ -361,23 +361,23 @@ Mvalue* pi_q(Mvalue* _value){
 					if(_denominatorRational){
 						if(amVerbose())output("\nFirst denominator rational computed.");
 						long long square;
-						mp_int* _bi6=_getBiginteger(6); // the one we want to reuse in the computation (that we need to free when done)
+						Mbiginteger* _bi6=_getBiginteger(6); // the one we want to reuse in the computation (that we need to free when done)
 						if(!_bi6){free_rational(_denominatorRational);return NULL;} // what a nuisance
 						while(--iter>0){
 							square=4*(iter+1)*iter+1;
 							////////////if(amVerbose())output("\nSquare numerator: %llu.",square);
-							mp_int* _bigintegerSquare=_getBiginteger(square);
+							Mbiginteger* _bigintegerSquare=_getBiginteger(square);
 							if(!_bigintegerSquare){output("\nERROR: Failed to compute the big integer of square %llu.",square);break;}
 							if(amVerbose())output("\n%llu fractions yet to compute using numerator square '%llu'.",iter,square);
 							// the new denominator becomes 6+square/prev denominator=
-							mp_int* _mult=_Imultiply(_denominatorRational->num,_bi6);
-							mp_int* _add=(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare);
-							mp_int* _denominatorNumerator=(_mult?_Iadd(_mult,_add):NULL);
+							Mbiginteger* _mult=_Imultiply(_denominatorRational->num,_bi6);
+							Mbiginteger* _add=(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare);
+							Mbiginteger* _denominatorNumerator=(_mult?_Iadd(_mult,_add):NULL);
 							// free all intermediate big integers
 							free_biginteger(_mult);free_biginteger(_bigintegerSquare);if(_denominatorRational->den)free_biginteger(_add);
 							// update the denominator rational, free the numerator if we fail to bind it to _denominatorRational
 							// what's dangerous in the following is that _denominatorRational->num is not freed!!!!
-							mp_int* _previousDenominatorNumerator=_getBigintegerCopy(_denominatorRational->num);
+							Mbiginteger* _previousDenominatorNumerator=_getBigintegerCopy(_denominatorRational->num);
 							free_rational(_denominatorRational); // get the 'previous' numerator and denominator released!!!!!!
 							_denominatorRational=_getRational(_denominatorNumerator,_previousDenominatorNumerator,M_LD_NAN,false,true);
 							if(!_denominatorRational)break; // let's keep it normalized???? TODO is that necessary
@@ -449,10 +449,10 @@ Mvalue* pi_d(Mvalue* _value){
 			if(mpd_context){ // success
 				if(amVerbose())output("\nDecimal context created!");
 				// initialize the variables we need for the iterations
-				mpd_t *lasts=_getDecimal(mpd_context,0),*t=_getDecimal(mpd_context,3),*s=_getDecimal(mpd_context,3),*n=_getDecimal(mpd_context,1),*na=_getDecimal(mpd_context,0),*d=_getDecimal(mpd_context,0),*da=_getDecimal(mpd_context,24);
+				mpd_t *lasts=new_mpd(mpd_context,0),*t=new_mpd(mpd_context,3),*s=new_mpd(mpd_context,3),*n=new_mpd(mpd_context,1),*na=new_mpd(mpd_context,0),*d=new_mpd(mpd_context,0),*da=new_mpd(mpd_context,24);
 				if(amVerbose())output("\nInitial decimals created!");
 				// some constant decimals we need
-				mpd_t *d8=_getDecimal(mpd_context,8),*d32=_getDecimal(mpd_context,32);
+				mpd_t *d8=new_mpd(mpd_context,8),*d32=new_mpd(mpd_context,32);
 				unsigned long long iter=0;
 				if(amVerbose()){
 					char *_lasts=mpd_to_sci(lasts,0),*_t=mpd_to_sci(t,0),*_s=mpd_to_sci(s,0),*_n=mpd_to_sci(n,0),*_na=mpd_to_sci(na,0),*_d=mpd_to_sci(d,0),*_da=mpd_to_sci(da,0);
@@ -469,23 +469,23 @@ Mvalue* pi_d(Mvalue* _value){
 					if(!cmp){if(amVerbose())output("\nDone!");break;}
 					//if(amVerbose()){output("\nb\t");if(mpd_error(mpd_context))break;}
 					if(cmp==INT_MAX){output("\nSomething went wrong!");break;}
-					//if(amVerbose()){output("\nc\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",mpd_to_sci(s,0));}
+					//if(amVerbose()){output("\nc\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
 					mpd_copy(lasts,s,mpd_context); // lasts = s
-					//if(amVerbose()){output("\nd\t",mpd_to_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",mpd_to_sci(n,0),mpd_to_sci(na,0));}
+					//if(amVerbose()){output("\nd\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
 					mpd_add(n,n,na,mpd_context);
-					//if(amVerbose()){output(" = %s\ne\t",mpd_to_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",mpd_to_sci(na,0));}
+					//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
 					mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
-					//if(amVerbose()){output(" = %s\nf\t",mpd_to_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",mpd_to_sci(d,0),mpd_to_sci(da,0));}
+					//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
 					mpd_add(d,d,da,mpd_context);
-					//if(amVerbose()){output(" = %s\ng\t",mpd_to_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",mpd_to_sci(da,0));}
+					//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
 					mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
-					//if(amVerbose()){output(" = %s\nh\t",mpd_to_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",mpd_to_sci(t,0),mpd_to_sci(n,0));}
+					//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
 					mpd_mul(t,t,n,mpd_context);
-					//if(amVerbose()){output(" = %s\ni\t",mpd_to_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",mpd_to_sci(t,0),mpd_to_sci(d,0));}
+					//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
 					mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
-					//if(amVerbose()){output(" = %s\nj\t",mpd_to_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",mpd_to_sci(s,0),mpd_to_sci(t,0));}
+					//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
 					mpd_add(s,s,t,mpd_context); // add t to s
-					//if(amVerbose()){output(" = %s\nk\t",mpd_to_sci(s,0));if(mpd_error(mpd_context))break;}
+					//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
 					if(amVerbose()){
 						char *_lasts=mpd_to_sci(lasts,0),*_t=mpd_to_sci(t,0),*_s=mpd_to_sci(s,0),*_n=mpd_to_sci(n,0),*_na=mpd_to_sci(na,0),*_d=mpd_to_sci(d,0),*_da=mpd_to_sci(da,0);
 						output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,_lasts,_t,_s,_n,_na,_d,_da);
@@ -494,7 +494,8 @@ Mvalue* pi_d(Mvalue* _value){
 				}
 				mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
 				// get rid of all the decimals we used
-				free_decimal(lasts);free_decimal(t);free_decimal(n);free_decimal(na);free_decimal(d);free_decimal(da);free_decimal(d8);free_decimal(d32);
+				mpd_del(lasts);mpd_del(t);mpd_del(n);mpd_del(na);mpd_del(d);mpd_del(da);
+				mpd_del(d8);mpd_del(d32);
 				if(mpd_error(mpd_context)){ // something went wrong
 					if(amVerbose())output("\nERROR: Computation of pi with precision %lld error status: %u.",decimalprecision,mpd_getstatus(mpd_context));
 					report_mpd_status(mpd_context);
@@ -505,7 +506,8 @@ Mvalue* pi_d(Mvalue* _value){
 				if(amVerbose()){
 					char* _s=mpd_to_sci(s,0);if(_s){output("\nFinal approximation of pi (rounded to %llu decimals): %s.",decimalprecision,_s);free(_s);}
 				}
-				return _getDecimalValue(s,true);
+				// wrap the mpd_t in a decimal, and subsequently in an Mvalue!!!
+				return _getDecimalValue(_getDecimal(s,0,true),true);
 			}else
 				output("\nERROR: Failed to set the decimal precision to %lld.",decimalprecision);
 		}
@@ -630,7 +632,7 @@ Mvalue* getRealDecimalMapValue(long double ld,bool littleEndianOrder){
 	mstring* _mantisseText=_getUint64BinaryText(mantisse,'\'');if(_mantisseText){appendedToMap(_dmap,"m",_getStringValue(string(_mantisseText),false));free_mstring(_mantisseText);}
 	mstring* _exponentText=_getUint16BinaryText(exponent,'\'');if(_exponentText){appendedToMap(_dmap,"e",_getStringValue(string(_exponentText),false));free_mstring(_exponentText);}
 	/* replacing:
-	mp_int* _mantisse=new_mp_int();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
+	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
 	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
 	*/
 	return _getValueOfMap(_dmap,true);
@@ -690,7 +692,7 @@ Mvalue* i(Mvalue* _value){
 Mvalue* I(Mvalue* _value){
 	if(_value){
 		if(_value->type==VT_BIGINTEGER)return _value; // already a big integer
-		mp_int* _bigInteger=_getValueBiginteger(_value);
+		Mbiginteger* _bigInteger=_getValueBiginteger(_value);
 		if(_bigInteger)return _getBigintegerValue(_bigInteger,true);
 	}
 	return NULL;
@@ -802,7 +804,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 		bool neg=(*rationalText=='-');if(neg)rationalText++; // get the sign
 		// get the e-part (if any)
 		char* exponentText=strchr(rationalText,'e'); // assume lowercase e
-		mp_int* _exponent=new_mp_int();
+		Mbiginteger* _exponent=new_biginteger();
 		if(exponentText){
 			*exponentText='\0'; // 'cuf off' the e-part!!!!
 			l=(int)(exponentText-rationalText); // this will be the new l we need below!!!
@@ -823,18 +825,18 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
 			output("\nWith decimal part removed: '%s'.",rationalText);
 			// now ready to check the integer part 
-			mp_int* _numerator=new_mp_int();
-			mp_int* _denominator=NULL;
+			Mbiginteger* _numerator=new_biginteger();
+			Mbiginteger* _denominator=NULL;
 			if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
-				mp_int* _decimalPartBiginteger=NULL;
+				Mbiginteger* _decimalPartBiginteger=NULL;
 				if(decimalPartText){
 					int decimalPartIndex=(int)(decimalPartText-rationalText);
 					decimalPartText++; // point to the first character of the decimal part
-					_decimalPartBiginteger=new_mp_int();
+					_decimalPartBiginteger=new_biginteger();
 					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY&&!isBigintegerZero(_decimalPartBiginteger)){
 						// compute the power of ten denominator
 						_denominator=_getBiginteger(1);
-						mp_int* _tenBiginteger=_getBiginteger(10);
+						Mbiginteger* _tenBiginteger=_getBiginteger(10);
 						while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
 						free_biginteger(_tenBiginteger);
 					}
@@ -850,7 +852,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 						outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
 						// if we have an non-zero exponent, we have to adjust the numerator or denominator BEFORE trying to create the rational!!!
 						if(exponentText&&mp_iszero(_exponent)==MP_NO){
-							mp_int* _tenBiginteger=_getBiginteger(10);
+							Mbiginteger* _tenBiginteger=_getBiginteger(10);
 							if(_tenBiginteger){
 								if(mp_isneg(_exponent)==MP_YES){ // a negative exponent goes into the denominator
 									if(!_denominator)_denominator=_getBiginteger(1);
@@ -885,7 +887,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 }
 Mrational* _getRationalCopy(Mrational* _rational){
 	if(!_rational)return NULL;
-	mp_int *_numeratorBiginteger=_getBigintegerCopy(_rational->num),*_denominatorBiginteger=(_rational->den?_getBigintegerCopy(_rational->den):NULL);
+	Mbiginteger *_numeratorBiginteger=_getBigintegerCopy(_rational->num),*_denominatorBiginteger=(_rational->den?_getBigintegerCopy(_rational->den):NULL);
 	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){free_biginteger(_numeratorBiginteger);free_biginteger(_denominatorBiginteger);return NULL;} // some error
 	// MDH@13JUN2019: if we can't get a rational, free the numerator and denominator
 	Mrational* _copyRational=_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false,true);
@@ -904,7 +906,7 @@ Mrational* _getValueRational(Mvalue* _value){
 				break;
 			case VT_DECIMAL:
 				{ // until we find a way to get the associated rational using the internal representation we stick to extracting the rational from the text representation of the decimal (which should be exact)
-					char* _decimalText=mpd_to_sci(_value->value._decimal,0);
+					char* _decimalText=mpd_to_sci(_value->value._decimal->mpd,0);
 					if(_decimalText){_rational=_getDecimalTextRational(_decimalText,false);free(_decimalText);}else output("\nERROR: Failed to obtain the text representation of a decimal.");
 				}
 				break;
@@ -928,13 +930,13 @@ Mrational* _getValueRational(Mvalue* _value){
 	return _rational;
 }
 
-mpd_t* _getValueDecimal(Mvalue* _value){
-	mpd_t* _decimal=NULL;
+Mdecimal* _getValueDecimal(Mvalue* _value){
+	Mdecimal* _decimal=NULL;
 	if(_value){
 		if(_value->type!=VT_LIST&&_value->type!=VT_MAP){
 			switch(_value->type){
 				case VT_DECIMAL:_decimal=_getDecimalCopy(_value->value._decimal);break;
-				case VT_INTEGER:_decimal=_getDecimal(_decimalContext,_value->value._integer->ll);break;
+				case VT_INTEGER:_decimal=_getDecimal(new_mpd(_decimalContext,_value->value._integer->ll),0,true);break;
 				case VT_RATIONAL:
 					{ // a rational text representation still contains the numerator/denominator pair, so can't be parsed into a decimal
 						// TODO we need to find the decimal approximation with precision equal to the default decimal precision
@@ -943,7 +945,7 @@ mpd_t* _getValueDecimal(Mvalue* _value){
 				default:
 					{
 						mstring* _valueText=_getValueText(_value,true);
-						if(_valueText){mpd_set_string(_decimal,string(_valueText),_decimalContext);free_mstring(_valueText);}
+						if(_valueText){mpd_set_string(_decimal->mpd,string(_valueText),_decimalContext);free_mstring(_valueText);}
 					}
 					break;
 			}
@@ -972,11 +974,11 @@ Mvalue* q(Mvalue* _value){
 
 // convert to a real
 
-long double getDecimalLongDouble(mpd_t* _decimal){
+long double getDecimalLongDouble(Mdecimal* _decimal){
 	// easiest way is to transform to text first, and take if from there...
 	long double ldDecimal=M_LD_NAN;
 	if(_decimal){
-		char* _decimalText=mpd_to_sci(_decimal,0);
+		char* _decimalText=mpd_to_sci(_decimal->mpd,0); // NOTE do NOT use _getDecimalText here!!!
 		if(_decimalText){ldDecimal=_strtold(_decimalText,ldDecimal);free(_decimalText);} // no need for this anymore
 	}
 	return ldDecimal;
@@ -2251,9 +2253,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						//                the problem is that we need a context, and therefore a decimal precision 
 						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
 						if(getDP()<string_length(expressionToken->text))output("\nWARNING: More decimals present in literal than expected. Rounding may occur.");
-						mpd_t* _decimal=new_decimal(_decimalContext);
-						mpd_set_string(_decimal,string(pRealText),_decimalContext);
-						if(!mpd_isnan(_decimal)){
+						Mdecimal* _decimal=new_decimal(_decimalContext,0);
+						mpd_set_string(_decimal->mpd,string(pRealText),_decimalContext);
+						if(!mpd_isnan(_decimal->mpd)){
 							assignValue(&_valueReference->_value,_getDecimalValue(_decimal,true));
 						}else
 							output("\nERROR: The decimal value of %s is undefined.",string(pRealText));
@@ -2266,7 +2268,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					}
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
-					mp_int* _biginteger=new_mp_int();
+					Mbiginteger* _biginteger=new_biginteger();
 					if(mp_read_radix(_biginteger,string(expressionToken->text),10)==MP_OKAY){
 						if(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT){
               				assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
@@ -2440,8 +2442,8 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 // helper functions
 // NOTE the following takes a lot of precision because we should never return the originals always copies which should be freed if they are not used anymore
 /* see Mexecution.c
-mp_int* _getBigintegerCopy(mp_int* _biginteger){
-	mp_int* _bigintegerCopy=new_mp_int();if(mp_copy(_biginteger,_bigintegerCopy)!=MP_OKAY){free_biginteger(_bigintegerCopy);return NULL;}return _bigintegerCopy;
+Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
+	Mbiginteger* _bigintegerCopy=new_Mbiginteger();if(mp_copy(_biginteger,_bigintegerCopy)!=MP_OKAY){free_biginteger(_bigintegerCopy);return NULL;}return _bigintegerCopy;
 }
 */
 // rational number addition
@@ -2464,8 +2466,8 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	}
 	// if either is a decimal, compute the sum decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		mpd_t *_decimal1=_getValueDecimal(_value1),*_decimal2=_getValueDecimal(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
-		mpd_t* _sumDecimal=_dadd(_decimal1,_decimal2);
+		Mdecimal *_decimal1=_getValueDecimal(_value1),*_decimal2=_getValueDecimal(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
+		Mdecimal* _sumDecimal=_dadd(_decimal1,_decimal2);
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_sumDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_sumDecimal,true);
@@ -2578,7 +2580,7 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){
 		case VT_BIGINTEGER: return _getBigintegerValue(_getBiginteger(1),true);
 		case VT_REAL: return _getRealValue(1.0);
 		case VT_RATIONAL: return _getRationalValue(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),true);
-		case VT_DECIMAL: return _getDecimalValue(_getDecimal(_decimalContext,1),true);
+		case VT_DECIMAL: return _getDecimalValue(_getDecimal(new_mpd(_decimalContext,1),0,true),true);
 		default:break;
 	}
 	return NULL;
@@ -2625,7 +2627,7 @@ long double getRealValuePower(Mvalue* _baseValue,long double power){
 	return M_LD_NAN; // uncomputable
 }
 
-mpd_t* getValueDecimal(Mvalue* _value){
+Mdecimal* getValueDecimal(Mvalue* _value){
 	// ASSERT typically _value should contain a numeric (non-real) value
 	if(_value&&_value->type==VT_DECIMAL)return _value->value._decimal;
 	return _getValueDecimal(_value); // will always create a new one...
@@ -2646,11 +2648,11 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		// therefore exact computations should be possible
 		// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
 		// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
-		mpd_t* _baseDecimal=getValueDecimal(_value1);
-		mpd_t* _exponentDecimal=getValueDecimal(_value2);
-		mpd_t* _powerDecimal=new_decimal(_decimalContext);
+		Mdecimal* _baseDecimal=getValueDecimal(_value1);
+		Mdecimal* _exponentDecimal=getValueDecimal(_value2);
+		Mdecimal* _powerDecimal=new_decimal(_decimalContext,0);
 		if(_powerDecimal){
-			mpd_pow(_powerDecimal,_baseDecimal,_exponentDecimal,_decimalContext);
+			mpd_pow(_powerDecimal->mpd,_baseDecimal->mpd,_exponentDecimal->mpd,_decimalContext);
 			// TODO are we converting back?
 		}
 		if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal);if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal);
@@ -2674,25 +2676,25 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 			// if the power value is 0, _value1 is the result
 			// multiplication or division by an integer power of 10 which is an integer therefore
 			if(_value1->type==VT_DECIMAL){
-				mpd_t* _decimal=_getDecimalCopy(_value1->value._decimal);
-				_decimal->exp+=exponentOf10; // TODO theoretically we can get overflow here!! the exponent is an int64_t (alternative is using mpd_scaleb)
+				Mdecimal* _decimal=_getDecimalCopy(_value1->value._decimal);
+				_decimal->mpd->exp+=exponentOf10; // TODO theoretically we can get overflow here!! the exponent is an int64_t (alternative is using mpd_scaleb)
 				return _getDecimalValue(_decimal,true);
 			}
 			if(_value1->type==VT_RATIONAL){
 				// either to multiply the numerator or the denominator with the exponent
 				// TODO deal appropriately with any delta!!!
-				mp_int* _biginteger10=_getBiginteger(10);
+				Mbiginteger* _biginteger10=_getBiginteger(10);
 				Mrational* _rational=NULL;
 				if(_biginteger10){
 					if(exponentOf10>0){
-						mp_int* _numerator=_getBigintegerCopy(_value1->value._rational->num);
+						Mbiginteger* _numerator=_getBigintegerCopy(_value1->value._rational->num);
 						while(exponentOf10>0)if(mp_mul(_numerator,_biginteger10,_numerator)==MP_OKAY)exponentOf10--;else break;
 						if(exponentOf10==0)
 							_rational=_getRational(_numerator,_getBigintegerCopy(_value1->value._rational->den),getReal(_value1->value._rational->delta),true,true);
 						else
 							output("\nERROR: Failed to multiply the numerator of the rational by an integer power of 10.");
 					}else{
-						mp_int* _denominator=(!_value1->value._rational->den?_getBiginteger(1):_getBigintegerCopy(_value1->value._rational->den));
+						Mbiginteger* _denominator=(!_value1->value._rational->den?_getBiginteger(1):_getBigintegerCopy(_value1->value._rational->den));
 						while(exponentOf10<0)if(mp_mul(_denominator,_biginteger10,_denominator)==MP_OKAY)exponentOf10++;else break;
 						if(exponentOf10==0)
 							_rational=_getRational(_getBigintegerCopy(_value1->value._rational->num),_denominator,getReal(_value1->value._rational->delta),true,true);
@@ -2719,8 +2721,8 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 		if((ldIsNaN(delta1)||ldIsZero(delta1))&&(ldIsNaN(delta2)||ldIsZero(delta2))){ // both are 'pure' rationals
 			if(amVerbose())output("\nPure rational division.");
 			// compute the new numerator and denominator, both should not be NULL as the numerators are not NULL, so should be freed if we can't drop them
-			mp_int* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den):_getBigintegerCopy(rational1->num));
-			mp_int* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den):_getBigintegerCopy(rational2->num));
+			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den):_getBigintegerCopy(rational1->num));
+			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den):_getBigintegerCopy(rational2->num));
 			if(!_numerator||!_denominator){ // failed to compute either, so somewhere it went wrong
 				free_biginteger(_numerator);free_biginteger(_denominator);
 			}else{
@@ -2739,8 +2741,8 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
 	// integer divisions are not computed but stored in rational format (without a delta to not suggest that the division is decimal)
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
-		mp_int* _numerator=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
-		mp_int* _denominator=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		Mbiginteger* _numerator=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _denominator=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		Mrational* _rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind
 		return _getRationalValue(_rational,true); // when failing to bind _rational to a value, free it as well
 	}

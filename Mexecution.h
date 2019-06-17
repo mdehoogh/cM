@@ -50,7 +50,7 @@ typedef struct Minteger{
 }Minteger;
 /*
 typedef struct Mbiginteger{
-    mp_int* _mi;
+    Mbiginteger* _mi;
 }Mbiginteger;
 */
 // TODO Mreal could become a union if we're storing multiple types of reals in it
@@ -58,9 +58,11 @@ typedef struct Mreal{
     long double ld; // double precision floating point binary number (for now)
 }Mreal;
 
+typedef mp_int Mbiginteger; // MDH@17JUN2019: use Mbiginteger the same as we would Mbiginteger, one-to-one correspondence with the structure used in libtommath 
+
 typedef struct Mrational{
-    mp_int* num;
-    mp_int* den;
+    Mbiginteger* num;
+    Mbiginteger* den;
     Mreal* delta; // any deviation from the original long double
     bool normalized; // MDH@05JUN2019: remember whether or not normalized...
 }Mrational;
@@ -70,13 +72,19 @@ typedef struct Mstring{
     char _c[]; // by using an array and not a pointer, it's easy to make one out of an mstring* by strcpy from string(mstring)
 }Mstring;
 
+// MDH@17JUN2019: if we want to know when a decimal contains repeating fractions we should be able to remember how many decimals repeat themselves
+typedef struct Mdecimal{
+    mpd_t* mpd; // ok, for now use a pointer
+    uint64_t repeating; // the number of decimals that repeat themselves at the end
+}Mdecimal;
+
 struct Mlist;
 struct Mmap;
 typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
-    mp_int* _biginteger; // most convenient to immediately point to the mp_int structure
-    mpd_t* _decimal; // most convenient to immediately point to the mpd_t structure
+    Mbiginteger* _biginteger; // most convenient to immediately point to the Mbiginteger structure
+    Mdecimal* _decimal; // no longer pointing to the mpd_t structure, as we're going to store the number of repeating decimals as well!!!
     Mrational* _rational;
     Mreal* _real;
     Mstring* _string;
@@ -200,7 +208,7 @@ bool popExecutionEnvironment();
 
 // MDH@20MAY2019: we need free_map to free the function argument maps!!
 void free_map(Mmap* _map);
-void free_biginteger(mp_int* _biginteger);
+void free_biginteger(Mbiginteger* _biginteger);
 /* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside
 // pointer to these structs releasers
 void free_string(Mstring* _string);
@@ -261,18 +269,18 @@ const long long M_LL_MAX=LLONG_MAX;
 
 long long double2long(long double ld); // convert long double to long long
 
-mp_err mp_set_long_double(mp_int *a, long double b); // MDH@01MAY2019: which I made myself
-long double mp_get_long_double(const mp_int* const a); // MDH@07JUN2019: same here
+mp_err mp_set_long_double(Mbiginteger *a, long double b); // MDH@01MAY2019: which I made myself
+long double mp_get_long_double(const Mbiginteger* const a); // MDH@07JUN2019: same here
 
-mp_int* _getBiginteger(int64_t l);
+Mbiginteger* _getBiginteger(int64_t l);
 
 #define M_LL_INVALID LLONG_MIN // the invalid long long defaults to LLONG_MIN
 // it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
 #define M_LL_MIN LLONG_MIN+1
 #define M_LL_MAX LLONG_MAX
 
-mp_int* getBigintegerLLMin();
-mp_int* getBigintegerLLMax();
+Mbiginteger* getBigintegerLLMin();
+Mbiginteger* getBigintegerLLMax();
 
 bool isLittleEndian();
 
@@ -286,17 +294,20 @@ long double getValueReal(const Mvalue* const _value);
 
 // decimal support
 mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
-mpd_t* new_decimal(mpd_context_t* mpd_context);
-mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value);
-mpd_t* _getDecimalCopy(mpd_t* _decimal);
-void free_decimal(mpd_t* _decimal);
+mpd_t* new_mpd(mpd_context_t* mpd_context,int64_t value);
+Mdecimal* new_decimal(mpd_context_t* mpd_context,uint64_t repeating);
+Mdecimal* _getDecimal(mpd_t* _mpd,uint64_t repeating,bool freeonfailure);
+Mdecimal* _getDecimalCopy(Mdecimal* _decimal);
+void free_decimal(Mdecimal* _decimal);
+bool isDecimalZero(Mdecimal* _decimal);
 
 // big integer support
-mp_int* new_mp_int();
-bool isBigintegerZero(mp_int* _biginteger);
-bool isBigintegerOne(mp_int* _biginteger);
-mp_int* _getBigintegerCopy(mp_int* _biginteger);
-mp_int* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
+Mbiginteger* new_biginteger();
+
+bool isBigintegerZero(Mbiginteger* _biginteger);
+bool isBigintegerOne(Mbiginteger* _biginteger);
+Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger);
+Mbiginteger* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
 
 // rational support
 // the following two methods will use M_LD_Q_EPS as default cut-off value
@@ -309,19 +320,19 @@ void free_rational(Mrational* _rational);
 bool isRationalZero(Mrational* _rational);
 bool isRationalOne(Mrational* _rational);
 void normalizeRational(Mrational* _rational);
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize,bool freeonfailure);
+Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure);
 Mrational* _getInverseRational(const Mrational* const _rational);
 
-mpd_t* _getRationalDecimal(const Mrational* const _rational); // converts a rational to a decimal
+Mdecimal* _getRationalDecimal(const Mrational* const _rational); // converts a rational to a decimal
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 // data wrappers
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 Mvalue* _getIntegerValue(long long ll);
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
-Mvalue* _getBigintegerValue(mp_int* _biginteger,bool freeonfailure); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure); // MDH@31MAY2019: we cannot use a big integer long here
 Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
-Mvalue* _getDecimalValue(mpd_t* _decimal,bool freeonfailure);
+Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure);
 Mvalue* _getRealValue(long double ld);
 Mvalue* _getStringValue(char* text,bool freeonfailure);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
@@ -345,6 +356,8 @@ bool incrementReferenceCount(Mvalue* _value);
 mstring* appendld(mstring* mstr,long double ld);
 
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+void free_list(Mlist* _list);
+
 bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue);
 
 Mvalue* getValueAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
@@ -395,8 +408,8 @@ bool ldIsInf(long double ld);
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer);
-mstring* _getBigintegerText(const mp_int* const _biginteger);
-mstring* _getDecimalText(const mpd_t* const _decimal);
+mstring* _getBigintegerText(const Mbiginteger* const _biginteger);
+mstring* _getDecimalText(const Mdecimal* const _decimal);
 mstring* _getRationalText(const Mrational* const _rational);
 mstring* _getRealText(Mreal* _real);
 mstring* _getStringText(Mstring* _string,bool dequoted);
@@ -405,12 +418,12 @@ mstring* _getMapText(Mmap* _map);
 
 mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
 
-mp_int* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
+Mbiginteger* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value);
-void outputBiginteger(const char* const prefix,const mp_int* const _biginteger,const char* const postfix);
-void outputDecimal(const char* const prefix,const mpd_t* const _decimal,const char* const postfix);
+void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
+void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);
 void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 

@@ -62,7 +62,7 @@ bool initExecution(){
 
 // are we keeping a map of mpd contexts????
 // trap handler (how to set it????)
-void Mmpd_traphandler(mpd_context_t* mpd_context){
+void MMdecimalraphandler(mpd_context_t* mpd_context){
 }
 size_t mpd_context_count=0;
 
@@ -94,100 +94,163 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision){
             output("\nChanging the decimal precision to %llu.",decimal_precision);
             mpd_qsetprec(mpd_contexts[mpd_context_index],decimal_precision);
         }
-        ////mpd_traphandler=Mmpd_traphandler;
+        ////Mdecimalraphandler=MMdecimalraphandler;
     }
     // reset the status
     mpd_qsetstatus(mpd_contexts[mpd_context_index],0); // using the setter is preferred over ->status=0 assignment
     return mpd_contexts[mpd_context_index];
 }
 
-// new_mp_int returns an initialized big integer on success, or NULL when failing
-mp_int* new_mp_int(){
-    mp_int* result=(mp_int*)malloc(sizeof(mp_int));
+// new_biginteger returns an initialized big integer on success, or NULL when failing
+Mbiginteger* new_biginteger(){
+    Mbiginteger* result=(Mbiginteger*)malloc(sizeof(mp_int));
     if(!result)return NULL;
-    if(mp_init(result)!=MP_OKAY){mp_clear(result);return NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
+    if(mp_init(result)!=MP_OKAY){mp_clear((mp_int*)result);return NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
     return result;
 }
-mp_int* _getBiginteger(int64_t l){
-    mp_int* _biginteger=new_mp_int();
-    if(l)mp_set_i64(_biginteger,l); // TODO mp_set_i64 can fail can't it? then why is it of type void???
+Mbiginteger* _getBiginteger(int64_t l){
+    Mbiginteger* _biginteger=new_biginteger();
+    if(l)mp_set_i64((mp_int*)_biginteger,l); // TODO mp_set_i64 can fail can't it? then why is it of type void???
     return _biginteger;
 }
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
-mp_int* _getBigintegerCopy(mp_int* _biginteger){
+Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
     if(!_biginteger)return NULL;
-    mp_int* _result=new_mp_int();
+    Mbiginteger* _result=new_biginteger();
     if(mp_copy(_biginteger,_result)!=MP_OKAY){free_biginteger(_result);return NULL;}
     return _result;
 }
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
-static mp_int *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-const mp_int* getBigintegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}
-const mp_int* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
-const mp_int* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
-const mp_int* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
+static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
+const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}
+const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
+const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
+const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
 
-bool isBigintegerZero(mp_int* _biginteger){return(_biginteger?mp_iszero(_biginteger)==MP_YES:false);}
-bool isBigintegerOne(mp_int* _biginteger){return(_biginteger?mp_cmp(_biginteger,getBigintegerOne())==MP_EQ:false);}
+bool isBigintegerZero(Mbiginteger* _biginteger){return(_biginteger?mp_iszero((mp_int*)_biginteger)==MP_YES:false);}
+bool isBigintegerOne(Mbiginteger* _biginteger){return(_biginteger?mp_cmp((mp_int*)_biginteger,getBigintegerOne())==MP_EQ:false);}
 
 extern mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
-mpd_t* new_decimal(mpd_context_t* mpd_context){
-    mpd_t* result=mpd_new(mpd_context?mpd_context:_decimalContext);
-    if(!result)return NULL;
-    return result;
+// MDH@17JUN2019: convenient to expose _get_mpd (e.g. for use in approximating pi with a decimal)
+mpd_t* new_mpd(mpd_context_t* mpd_context,int64_t value){
+    mpd_t* _mpd=mpd_new(mpd_context?mpd_context:_decimalContext);
+    if(_mpd&&value)mpd_set_i64(_mpd,value,(mpd_context?mpd_context:_decimalContext));
+    return _mpd;
 }
-mpd_t* _getDecimal(mpd_context_t* mpd_context,int64_t value){
-    mpd_t* _decimal=new_decimal(mpd_context);
-    if(_decimal)mpd_set_i64(_decimal,value,mpd_context);
+Mdecimal* new_decimal(mpd_context_t* mpd_context,uint64_t repeating){
+    Mdecimal* _decimal=(Mdecimal*)malloc(sizeof(Mdecimal));
+    if(_decimal){
+        _decimal->mpd=mpd_new(mpd_context?mpd_context:_decimalContext);
+        if(!_decimal->mpd){output("\nERROR: Failed to create a decimal.");free(_decimal);_decimal=NULL;}else _decimal->repeating=repeating;
+    }
+    return _decimal;
+}
+Mdecimal* _getDecimal(mpd_t* _mpd,uint64_t repeating,bool freeonfailure){
+    Mdecimal* _decimal=NULL;
+    if(_mpd){
+        _decimal=new_decimal(NULL,repeating); // always using the default decimal context
+        if(_decimal)_decimal->mpd=_mpd;else if(freeonfailure)mpd_del(_mpd);
+    }
+    return _decimal;
+}
+Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
+    Mdecimal* _decimal=NULL;
+    if(decimalText&&strlen(decimalText)){
+        if(amVerbose())output("\nParsing decimal text '%s'.",decimalText);
+        // can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
+        // the rounding at the end of course could prove to be problematic
+        _decimal=new_decimal(_decimalContext,repeating);
+        if(_decimal)mpd_set_string(_decimal->mpd,decimalText,_decimalContext);
+    }else
+        output("\nERROR: No decimal text to parse.");
+    if(!_decimal)output("\nERROR: Failed to create a decimal.");
     return _decimal;
 }
 
-mpd_t* _getRationalDecimal(const Mrational* const _rational){
-    if(!_rational)return NULL;
-    mp_int *_numerator=_rational->num,*_denominator=_rational->den;
-    mstring* _decimalText;
+void free_value(Mvalue* _value); // TODO perhaps we should prevent _getRationalDecimal to have to call free_value()????
+Mdecimal* _getRationalDecimal(const Mrational* const _rational){
+    if(!_rational){output("\nERROR: No rational to convert to a decimal!");return NULL;}
+    Mbiginteger *_numerator=_rational->num,*_denominator=_rational->den;
+    mstring* _decimalText=NULL;
+    uint64_t repeating=0;
     if(_denominator){
-        mp_int *_dividend=new_mp_int(),*_remainder=new_mp_int();
-        if(_dividend&&_remainder&&mp_div(_numerator,_denominator,_dividend,_remainder)==MP_OKAY){
+        Mbiginteger *_digit=new_biginteger(),*_remainder=new_biginteger();
+        if(_digit&&_remainder&&mp_div(_numerator,_denominator,_digit,_remainder)==MP_OKAY){
             // the integer part is _dividend
-            _decimalText=_getBigintegerText(_dividend);
-            if(_decimalText&&mp_iszero(_remainder)==MP_NO){ // we've got a fraction to add!!!
+            _decimalText=_getBigintegerText(_digit);
+            free_biginteger(_digit);
+            if(_decimalText&&isBigintegerZero(_remainder)==MP_NO){ // we've got a fraction to add!!!
                 string_append_char(_decimalText,'.'); // the decimal period
-                mp_int* _bi10=_getBiginteger(10);
+                Mbiginteger* _bi10=_getBiginteger(10);
+                // in order to find the repeating fraction we have to continue computing the remainders
+                // and we have to register the remainders and compare the one we find with all remembered remainders, so far
+                Mlist* _remainderList=_getListOfType(VT_BIGINTEGER);
+                Mlistelement* _remainderListelement=NULL;
+                uint64_t remainderIndex; // where we found a match
                 long long decimalsLeft=_decimalContext->prec+2; // stop as soon as we have sufficient decimals
-                mstring* _dividendText; // for storing the dividend digit character
+                if(amVerbose())output("\nNumber of decimals to determine: %llu.",decimalsLeft);
+                mstring* _digitText; // for storing the dividend digit character
                 while(--decimalsLeft>=0){
-                    if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY)break;
-                    if(mp_div(_remainder,_denominator,_dividend,_remainder)!=MP_OKAY)break;
-                    _dividendText=_getBigintegerText(_dividend);
-                    if(!_dividendText){output("\nERROR: Failed to store the next decimal character.");break;}
-                    string_append(_decimalText,string(_dividendText));
-                    free_mstring(_dividendText);
-                    if(mp_iszero(_remainder)==MP_YES)break;
+                    // ASSERT the current remainder is nonzero, therefore we have to store it (if different from any we have so far)
+                    // compare first, if not present store and continue
+                    // if the new remainder is not-zero and present in the list, we will know how many repeating fractions we have
+                    _remainderListelement=_remainderList->_first;
+                    remainderIndex=0;
+                    while(_remainderListelement){
+                        if(amVerbose()){outputBiginteger("\nComparing '",_remainderListelement->_value->value._biginteger,"'");outputBiginteger(" with remainder '",_remainder,"'.");}
+                        if(mp_cmp(_remainderListelement->_value->value._biginteger,_remainder)==MP_EQ)break;
+                        remainderIndex++;
+                        _remainderListelement=_remainderListelement->_next;
+                    }
+                    if(_remainderListelement){ // we know the repeating part, so no need to add the remainder anymore!!!
+                        repeating=(_remainderList->numberOfElements-remainderIndex);
+                        if(amVerbose())output("\nNumber of repeating decimals: %llu.",repeating);
+                        break;
+                    }
+                    // remainder hasn't appeared before so store it in the list of remainders
+                    Mvalue* remainderValue=_getBigintegerValue(_getBigintegerCopy(_remainder),true);
+                    if(!remainderValue){output("\nERROR: Failed to store the remainder.");break;}
+                    if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);output("\nERROR: Failed to remember the remainder in order to recognized the repeating fraction.");break;}
+                    if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY){output("\nERROR: Failed to multiply the remainder by 10.");break;}
+                    if(mp_div(_remainder,_denominator,_digit,_remainder)!=MP_OKAY){output("\nERROR: Failed to perform a long division to obtain the next decimal digit.");break;}
+                    if(amVerbose()){outputBiginteger("\nDigit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.");}
+                    // append the dividend to the decimal text
+                    _digitText=_getBigintegerText(_digit);
+                    if(!_digitText){output("\nERROR: Failed to store the next decimal character.");break;}
+                    string_append(_decimalText,string(_digitText));
+                    if(amVerbose())output("\nDecimal text so far: '%s'.",string(_decimalText));
+                    free_mstring(_digitText);
+                    free_biginteger(_digit);
+                    // if the remainder is zero, we're done (it's a finite decimal fraction)
+                    if(isBigintegerZero(_remainder)){if(amVerbose())output("\nRemainder is zero, so the decimal is finished.");break;}
                 }
+                free_list(_remainderList);
                 free_biginteger(_bi10);
             }
         }
-        free_biginteger(_dividend);free_biginteger(_remainder);
+        free_biginteger(_digit);free_biginteger(_remainder);
     }else
         _decimalText=_getBigintegerText(_numerator);
     // parse _decimalText to a decimal
-    if(!_decimalText)return NULL;
-    mpd_t* _decimal=new_decimal(_decimalContext);
-    if(_decimal)mpd_set_string(_decimal,string(_decimalText),_decimalContext);
+    if(!_decimalText){output("\nERROR: No text to parse into a decimal.");return NULL;}
+    Mdecimal* _decimal=_getTextDecimal(string(_decimalText),repeating);
+    if(!_decimal)output("\nERROR: No decimal produced!");
     free_mstring(_decimalText);
     return _decimal;
 }
 
 static mpd_t* d1=NULL;
-const mpd_t* getDecimalOne(){if(!d1)d1=_getDecimal(NULL,1);return d1;}
-bool isDecimalOne(mpd_t* _decimal){return (mpd_cmp(_decimal,getDecimalOne(),_decimalContext)==0);}
+const mpd_t* get_mpdOne(){if(!d1)d1=new_mpd(NULL,1);return d1;}
+bool isDecimalOne(Mdecimal* _decimal){
+    // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
+    return (_decimal->repeating&&mpd_cmp(_decimal->mpd,get_mpdOne(),_decimalContext)==MP_EQ);
+}
 
-mpd_t* _getDecimalCopy(mpd_t* _decimal){
+Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
     if(!_decimal)return NULL;
-    mpd_t* _decimalCopy=new_decimal(_decimalContext);
-    mpd_copy(_decimalCopy,_decimal,_decimalContext);
+    Mdecimal* _decimalCopy=new_decimal(_decimalContext,_decimal->repeating);
+    if(_decimalCopy)mpd_copy(_decimalCopy->mpd,_decimal->mpd,_decimalContext);
     return _decimalCopy;
 }
 
@@ -222,7 +285,7 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
     }
 }
 
-///////mstring* _getBigintegerText(const mp_int* const _biginteger); // prototype declaration
+///////mstring* _getBigintegerText(const Mbiginteger* const _biginteger); // prototype declaration
 
 /* replacing:
 Mrational* _getLongDoubleRational(long double ld){
@@ -234,14 +297,14 @@ Mrational* _getLongDoubleRational(long double ld){
     // if exponent is all ones, the long double represents a NaN or Inf
     if(exp==0x7FFF){if(amVerbose())output("\nCan't convert an invalid or infinite real to a rational!");return NULL;}
     // if exponent is all zeroes, the long double represents zero
-    mp_int* _numerator=new_mp_int();
+    Mbiginteger* _numerator=new_biginteger();
     if(exp==0)return _getRational(_numerator,NULL,false);
     // set the numerator to the mantisse (which luckily is uint64_t)
     mp_set_u64(_numerator,mantisse);
     exp-=0x403E; // determine the 'true' exponent
     // if the true exponent is negative, the multiplier is below 1 and cannot be used as denominator, instead the numerator should be multiplied by 2 to the power -exp
     if(exp<0){
-        mp_int* _shiftedout=new_mp_int();
+        Mbiginteger* _shiftedout=new_biginteger();
         mp_err err=mp_div_2d(_numerator,-exp,_numerator,_shiftedout);
         if(err!=MP_OKAY){
             free_biginteger(_shiftedout);
@@ -259,7 +322,7 @@ Mrational* _getLongDoubleRational(long double ld){
     // if the exponent is non-positive (zero or negative) there's no denominator (i.e. denominator remains 1)
     if(exp<=0)return _getRational(_numerator,NULL,false);
     // ASSERT a positive exponent that we can use for the denominator
-    mp_int* _denominator=_getBiginteger(1);
+    Mbiginteger* _denominator=_getBiginteger(1);
     if(!_denominator||mp_mul_2d(_denominator,exp,_denominator)!=MP_OKAY){output("\nERROR: Failed to compute the denominator of the rational of a real.");free_biginteger(_denominator);return NULL;}
     return _getRational(_numerator,_denominator,true);
 }
@@ -316,17 +379,18 @@ void free_integer(Minteger* _integer){
     }else
         output("\nBUG: No integer to free!");
 }
-void free_biginteger(mp_int* _biginteger){
+void free_biginteger(Mbiginteger* _biginteger){
     if(_biginteger){
         if(amVerbose())output("\nFreeing big integer."); // TODO can we display the value?
-        mp_clear(_biginteger); // directly call mp_clear on the mp_int pointer!!!
+        mp_clear(_biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
     }else
         output("\nBUG: No big integer to free!");
 }
-void free_decimal(mpd_t* _decimal){
+void free_decimal(Mdecimal* _decimal){
     if(_decimal){
         if(amVerbose())output("\nFreeing decimal.");
-        mpd_del(_decimal);
+        mpd_del(_decimal->mpd); // assuming -> precedes the address of operator
+        free(_decimal);
     }else
         output("\nBUG: No decimal to free.");
 }
@@ -520,7 +584,7 @@ Mstring* new_charstring(char _char){ // _text assumed to be string(mstring*), so
 // wrapping the different value type instances
 Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
 
-Mvalue* _getDecimalValue(mpd_t* _decimal,bool freeonfailure){
+Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     if(!_decimal)return NULL;
     Mvalue* _decimalValue=_newValue();
     if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
@@ -532,7 +596,7 @@ Mvalue* _getIntegerValue(long long ll){
     if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
     return _integervalue;
 }
-Mvalue* _getBigintegerValue(mp_int* _biginteger,bool freeonfailure){
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     if(!_biginteger)return NULL;
     Mvalue* _bigintegerValue=_newValue();
     if(_bigintegerValue){_bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;}else if(freeonfailure)free_biginteger(_biginteger);
@@ -1565,7 +1629,7 @@ long long getInteger(Mvalue* _value){
 */
 
 // BigInteger stuff
-mstring* _getBigintegerText(const mp_int* const _biginteger){
+mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
     // determine the required size
     int arepsize;
     if(mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())output("\nCan't get the size of big integer.");return NULL;}
@@ -1578,10 +1642,10 @@ mstring* _getBigintegerText(const mp_int* const _biginteger){
     return NULL;
 }
 
-mp_int *_biLLMin=NULL,*_biLLMax=NULL;
+Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
 
-mp_int* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);return _biLLMin;}
-mp_int* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}
+Mbiginteger* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);return _biLLMin;}
+Mbiginteger* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
 /*
@@ -1595,7 +1659,7 @@ do {                                                    \
 } while (0)
 typedef unsigned __int128 uint128_t;
 const uint128_t ONE128=1;
-void mp_set_u128(mp_int* a,uint128_t b){
+void mp_set_u128(Mbiginteger* a,uint128_t b){
     int i=0;
     while(b!=0u){
         a->dp[i++]=((mp_digit)b&MP_MASK);
@@ -1614,13 +1678,13 @@ void normalizeRational(Mrational* _rational){
     if(!_rational->normalized&&!_rational->den){output("\nBUG: Normalized flag of rational not set although the denominator equals 1; flag set.");_rational->normalized=true;}
     if(_rational->normalized)return; // apparently already normalized
     // normalization means dividing by the gcd unless the gcd is one
-    mp_int* _gcd=new_mp_int();
+    Mbiginteger* _gcd=new_biginteger();
     if(!_gcd){output("\nERROR: Can't normalize a rational: failed to create the big integer to store the GCD.");return;}
     // ASSERT at the end of the following block always free _gcd
     if(mp_gcd(_rational->num,_rational->den,_gcd)==MP_OKAY){
         if(mp_cmp(_gcd,getBigintegerOne())!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
             // won't do an in-place division as we need both to succeed, if only one does we would be in trouble
-            mp_int *new_num=new_mp_int(),*new_den=new_mp_int();
+            Mbiginteger *new_num=new_biginteger(),*new_den=new_biginteger();
             if(mp_div(_rational->num,_gcd,new_num,NULL)==MP_OKAY&&mp_div(_rational->den,_gcd,new_den,NULL)==MP_OKAY){
                 free_biginteger(_rational->num);_rational->num=new_num;
                 free_biginteger(_rational->den);_rational->den=new_den;
@@ -1638,19 +1702,19 @@ void normalizeRational(Mrational* _rational){
 
 // MDH@07JUN2019: _getRational does NOT free the numerator and denominator supplied!!!
 //                as it does not know whether _numerator or _denominator should be released on failure
-Mrational* _getRational(mp_int* _numerator,mp_int* _denominator,long double delta,bool normalize,bool freeonfailure){
+Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure){
     // if the given numerator is NULL assume 1
     Mrational* _rational=NULL;
     //if(amVerbose()){
         outputBiginteger("\nDetermining the rational with numerator ",_numerator,NULL);outputBiginteger(" and denominator ",_denominator,".");
     //}
-    if(!_denominator||mp_iszero(_denominator)!=MP_YES){ // we have a numerator (any would do), and either NO denominator or a non-zero denominator
+    if(!_denominator||!isBigintegerZero(_denominator)){ // we have a numerator (any would do), and either NO denominator or a non-zero denominator
         _rational=(Mrational*)calloc(1,sizeof(Mrational));
         if(_rational){
             // TODO what if a delta is defined and the denominator is undefined (i.e. 1)
             if(!ldIsNaN(delta)&&!ldIsInf(delta)&&!ldIsZero(delta))_rational->delta=new_real(delta); // store the delta if a valid value
             // force using a nonnullnumerator, if NULL was provided (typically when inverting a rational)
-            mp_int* _nonnullnumerator=(_numerator?_numerator:_getBiginteger(1));
+            Mbiginteger* _nonnullnumerator=(_numerator?_numerator:_getBiginteger(1));
             if(_nonnullnumerator){
                 _rational->num=_nonnullnumerator; // could be NULL now when it's the inverse of another rational
                 _rational->den=_denominator;
@@ -1693,12 +1757,12 @@ Mrational* _getInverseRational(const Mrational* const _rational){
     if(_rational){
         // for now only allow inverting pure rationals!!!
         if(!_rational->delta||ldIsZero(_rational->delta->ld)){
-            mp_int* _inverseRationalNumerator=NULL;
+            Mbiginteger* _inverseRationalNumerator=NULL;
             if(_rational->den){
                 _inverseRationalNumerator=_getBigintegerCopy(_rational->den);
                 if(!_inverseRationalNumerator){output("\nERROR: Failed to copy the rational denominator.");return NULL;}
             }
-            mp_int* _inverseRationalDenominator=NULL;
+            Mbiginteger* _inverseRationalDenominator=NULL;
             if(_rational->num){
                 _inverseRationalDenominator=_getBigintegerCopy(_rational->num);
                 if(!_inverseRationalDenominator){output("\nERROR: Failed to copy the rational numerator.");return NULL;}
@@ -1736,6 +1800,7 @@ bool isRationalOne(Mrational* _rational){
 
 // we can use the method below to come up with the numerator and denominator of a given double that matches the double exactly
 // for dealing with long double to big integer conversion
+// MDH@17JUN2019: although a typically is of type Mbiginteger, for a function that starts with mp_ we can use the primitive type mp_int instead of the alias Mbiginteger
 mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
     int32_t exp=(exponent&0x7FFF); // cut off the sign
     if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
@@ -1751,7 +1816,6 @@ mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
         mp_zero(a);
     return MP_OKAY;
 }
-
 mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
     int32_t exp=(exponent&0x7FFF); // cut off the sign
     if(exp!=0){
@@ -1787,7 +1851,7 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
         mp_zero(a);
     return MP_OKAY;
 }
-mp_err mp_set_longdouble(mp_int *a, long double b){
+mp_err mp_set_longdouble(Mbiginteger *a, long double b){
     // always assume 10-byte long double (extended precision)
     uint64_t mantisse;
     uint16_t exponent; // including bit 63
@@ -1810,7 +1874,7 @@ mp_err mp_set_longdouble(mp_int *a, long double b){
         mp_set_u128(a,frac);
         err=(exp<0)?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a);
         if(err!=MP_OKAY)return err;
-        if(((cast.bits>>127)!=0uLL)&&!mp_iszero(a))a->sign=MP_NEG;
+        if(((cast.bits>>127)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
         return MP_OKAY;
     }
     if(sizeof(long double)==10){
@@ -1832,7 +1896,7 @@ mp_err mp_set_longdouble(mp_int *a, long double b){
             err=(exp<0?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a));
             if(err!=MP_OKAY){output("ERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
             // take over the sign from the long double (bit 15 in the signandexponent part)
-            if(((cast.ldints.signandexponent>>15)!=0uLL)&&!mp_iszero(a))a->sign=MP_NEG;
+            if(((cast.ldints.signandexponent>>15)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
             if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
         }else // a denormalized number, which all map to zero!!
             mp_zero(a); // NOTE it probably is already zero!!
@@ -1848,7 +1912,7 @@ mp_err mp_set_longdouble(mp_int *a, long double b){
 }
 // MDH@07JUN2019: based on mp_get_double in libtommath:
 /*
-double mp_get_double(const mp_int *a)
+double mp_get_double(const Mbiginteger *a)
 {
    int i;
    double d = 0.0, fac = 1.0;
@@ -1862,7 +1926,7 @@ double mp_get_double(const mp_int *a)
 }
 */
 long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
-long double mp_get_long_double(const mp_int* const a){
+long double mp_get_long_double(const Mbiginteger* const a){
     if(!a)return M_LD_NAN; // if a undefined, return NaN
     int i=a->used;
     if(i==0)return 0.0; // if a zero, return 0
@@ -2036,11 +2100,17 @@ mstring* _getRationalText(const Mrational* const _rational){
     }
     return NULL;
 }
-mstring* _getDecimalText(const mpd_t* const _decimal){
+mstring* _getDecimalText(const Mdecimal* const _decimal){
+    mstring* _decimalText=NULL;
     if(_decimal){
-        mstring* _decimalText=NULL;
-        char* _decimalRep=mpd_to_sci(_decimal,0);
-        if(_decimalRep){_decimalText=new_mstring(_decimalRep);free(_decimalRep);}
+        char* _decimalRep=mpd_to_sci(_decimal->mpd,0);
+        if(_decimalRep){
+            _decimalText=new_mstring(_decimalRep);
+            free(_decimalRep);
+            // TODO what if the decimal text representation has an e-part?????
+            // bracket the repeating part
+            if(_decimal->repeating){string_insert_char(_decimalText,string_length(_decimalText)-_decimal->repeating,'[');string_append_char(_decimalText,']');}
+        }
         return _decimalText;
     }
     return NULL;
@@ -2075,7 +2145,7 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     return _UNDEFINED_VALUETEXT;
     */
 }
-void outputBiginteger(const char* const prefix,const mp_int* const _biginteger,const char* const postfix){
+void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_biginteger){
         mstring* _bigintegerText=_getBigintegerText(_biginteger);
@@ -2088,7 +2158,7 @@ void outputBiginteger(const char* const prefix,const mp_int* const _biginteger,c
         outputChar('?');
     if(postfix)output("%s",postfix);
 }
-void outputDecimal(const char* const prefix,const mpd_t* const _decimal,const char* const postfix){
+void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_decimal){
         mstring* _decimalText=_getDecimalText(_decimal);
@@ -2125,7 +2195,7 @@ void outputValue(const char* const prefix,const Mvalue* _value,const char* const
 }
 
 // conversion from big integer to the long long it contains (when in range)
-long long biginteger2long(mp_int* _biginteger){
+long long biginteger2long(Mbiginteger* _biginteger){
 	return(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT?mp_get_i64(_biginteger):M_LL_INVALID);
 }
 bool strIsZero(char* str){
@@ -2137,9 +2207,9 @@ bool strIsZero(char* str){
 }
 
 // NOTE the _ indicates that what is returned has to be freed after being used
-mp_int* _rational2biginteger(Mrational* _rational){
+Mbiginteger* _rational2biginteger(Mrational* _rational){
     if(!_rational)return NULL;
-    mp_int* _biginteger=new_mp_int();
+    Mbiginteger* _biginteger=new_biginteger();
     if(!_biginteger){output("\nERROR: Failed to create a big integer.");return NULL;}
     if(_rational->den){
         if(mp_div(_rational->num,_rational->den,_biginteger,NULL)!=MP_OKAY){
@@ -2171,7 +2241,7 @@ long long getValueInteger(const Mvalue* const _value){
                 break;
             case VT_RATIONAL:
                 {
-                    mp_int* _biginteger=_rational2biginteger(_value->value._rational);
+                    Mbiginteger* _biginteger=_rational2biginteger(_value->value._rational);
                     if(_biginteger){
                         long long ll=biginteger2long(_biginteger);
                         free_biginteger(_biginteger);
@@ -2187,7 +2257,7 @@ long long getValueInteger(const Mvalue* const _value){
 long double getValueReal(const Mvalue* const _value){return(_value&&_value->type==VT_REAL?_value->value._real->ld:M_LD_NAN);}
 long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}
 
-mp_int* _getValueBiginteger(const Mvalue* const _value){
+Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
     if(_value)
         switch(_value->type){
         case VT_BIGINTEGER:return _value->value._biginteger;
@@ -2196,7 +2266,7 @@ mp_int* _getValueBiginteger(const Mvalue* const _value){
         case VT_REAL:
             {
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
-                mp_int* _biginteger=new_mp_int();
+                Mbiginteger* _biginteger=new_biginteger();
                 if(mp_set_longdouble(_biginteger,_value->value._real->ld)==MP_OKAY)return _biginteger;
                 outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
                 mp_clear(_biginteger);
@@ -2204,7 +2274,7 @@ mp_int* _getValueBiginteger(const Mvalue* const _value){
             break;
         case VT_STRING:
             {
-                mp_int* _biginteger=new_mp_int();
+                Mbiginteger* _biginteger=new_biginteger();
                 if(mp_read_radix(_biginteger,_value->value._string->_c,10)==MP_OKAY)return _biginteger;
                 outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
                 mp_clear(_biginteger); // not used so free immediately
@@ -2377,12 +2447,15 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
     }
     return _result;
 }
+bool isDecimalZero(Mdecimal* _decimal){
+    return(_decimal&&mpd_iszero((mpd_t*)_decimal)==0); // TODO apparently 0 means true, something else means false
+}
 bool isValueZero(Mvalue* _value){
     if(_value){
         if(_value->type==VT_INTEGER)return _value->value._integer->ll==0;
         if(_value->type==VT_BIGINTEGER)return isBigintegerZero(_value->value._biginteger);
         if(_value->type==VT_REAL)return ldIsZero(_value->value._real->ld);
-        if(_value->type==VT_DECIMAL)return mpd_iszero(_value->value._decimal);
+        if(_value->type==VT_DECIMAL)return isDecimalZero(_value->value._decimal);
         if(_value->type==VT_RATIONAL)return isBigintegerZero(_value->value._rational->num);
     }
     return false;
@@ -2467,23 +2540,23 @@ Mvalue* Mfac(Mvalue* _value){
     if(amVerbose())outputValue("\nArgument of fac() function: '",_value,"'.");
     if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){outputValue("\nERROR: Non-integer argument '",_value,"' to fac() function!");return NULL;}
     // some special cases (i.e. the input number is smaller than 2)
-    mp_int* finalmultiplier=NULL;
+    Mbiginteger* finalmultiplier=NULL;
     if(_value->type==VT_INTEGER){
         if(_value->value._integer->ll<0){output("\nERROR: Invalid (negative integer) argument to fac() function.");return NULL;}
         if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
         finalmultiplier=_getBiginteger(_value->value._integer->ll);
     }else{
-        if(_value->value._biginteger->sign==MP_NEG){output("\nERROR: Invalid (negative integer) argument to fac() function!");return NULL;}
+        if(mp_isneg(_value->value._biginteger)){output("\nERROR: Invalid (negative integer) argument to fac() function!");return NULL;}
         if(mp_cmp(_value->value._biginteger,getBigintegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         finalmultiplier=_value->value._biginteger;
     }
     if(!finalmultiplier){outputValue("\nERROR: Failed to convert '",_value,"' to a big integer!");return NULL;}
     if(amVerbose()&&amDebugging())outputBiginteger("\nFinal multiplier: '",finalmultiplier,"'.");
-    mp_int* result=_getBiginteger(6); // the smallest value to return
+    Mbiginteger* result=_getBiginteger(6); // the smallest value to return
     if(result){
         // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
         // we could start at some intermediate value????
-        mp_int *multiplier=_getBiginteger(3);
+        Mbiginteger *multiplier=_getBiginteger(3);
         if(multiplier){
             while(mp_cmp(multiplier,finalmultiplier)==MP_LT){
                 if(mp_incr(multiplier)!=MP_OKAY){if(amVerbose())output("\nERROR: Failed to increment big integer!");result=NULL;break;} // if we fail to increment break
@@ -2551,7 +2624,7 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
                 pmin1=p;qmin1=q;
             }
             // construct the last rational (i.e. the result) from p and q
-            mp_int* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
+            Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
             if(_numerator&&_denominator){ // we've got both of them
                 if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY){
                     _rational=_getRational(_numerator,_denominator,delta,true,false); // NOTE there should always be a delta!!!!
@@ -2559,7 +2632,7 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
             }
             if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);}
         }else // long double is zero
-            _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false,true);
+            _rational=_getRational(new_biginteger(),NULL,M_LD_NAN,false,true);
     }
     // _rational should contain the 'last' computed rational
     return _rational;
@@ -2625,10 +2698,10 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     pmin1=p;qmin1=q;
                 }
                 // construct the last rational (i.e. the result) from p and q
-                mp_int* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
+                Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
                 if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true,true);
             }else // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
-                _rational=_getRational(new_mp_int(),NULL,M_LD_NAN,false,true);
+                _rational=_getRational(new_biginteger(),NULL,M_LD_NAN,false,true);
         }
         // _rational should contain the 'last' computed rational
         if(_rational){
