@@ -180,7 +180,7 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
             // the integer part is _dividend
             _decimalText=_getBigintegerText(_digit);
             free_biginteger(_digit);
-            if(_decimalText&&isBigintegerZero(_remainder)==MP_NO){ // we've got a fraction to add!!!
+            if(_decimalText&&!isBigintegerZero(_remainder)){ // we've got a fraction to add!!!
                 string_append_char(_decimalText,'.'); // the decimal period
                 Mbiginteger* _bi10=_getBiginteger(10);
                 // in order to find the repeating fraction we have to continue computing the remainders
@@ -212,7 +212,9 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
                     Mvalue* remainderValue=_getBigintegerValue(_getBigintegerCopy(_remainder),true);
                     if(!remainderValue){output("\nERROR: Failed to store the remainder.");break;}
                     if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);output("\nERROR: Failed to remember the remainder in order to recognized the repeating fraction.");break;}
+                    
                     if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY){output("\nERROR: Failed to multiply the remainder by 10.");break;}
+                    if(amVerbose()){outputBiginteger("\nDividing '",_remainder,"'");outputBiginteger(" by '",_denominator,"'.");}
                     if(mp_div(_remainder,_denominator,_digit,_remainder)!=MP_OKAY){output("\nERROR: Failed to perform a long division to obtain the next decimal digit.");break;}
                     if(amVerbose()){outputBiginteger("\nDigit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.");}
                     // append the dividend to the decimal text
@@ -252,6 +254,116 @@ Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
     Mdecimal* _decimalCopy=new_decimal(_decimalContext,_decimal->repeating);
     if(_decimalCopy)mpd_copy(_decimalCopy->mpd,_decimal->mpd,_decimalContext);
     return _decimalCopy;
+}
+
+// MDH@07JUN2019: we are going to store real text representations (like 100.1) as rationals from now on with delta equal to 0 (so we know where they came from, and that the denominator is a power of 10)
+//                because if we convert them to a long double we might loose precision in converting the decimal representation to the binary (internal) representation
+// MDH@14JUN2019: now also possible that the text has an e-part (which will change the denominator!!!!)
+Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
+	// the text should represent an integer or a real
+	if(!rationalText)return NULL;
+	Mrational* _rational=NULL;
+	int l=strlen(rationalText);
+	if(l){
+		bool neg=(*rationalText=='-');if(neg)rationalText++; // get the sign
+		// get the e-part (if any)
+		char* exponentText=strchr(rationalText,'e'); // assume lowercase e
+		Mbiginteger* _exponent=new_biginteger();
+		if(exponentText){
+			*exponentText='\0'; // 'cuf off' the e-part!!!!
+			l=(int)(exponentText-rationalText); // this will be the new l we need below!!!
+			output("\nWith exponent removed: '%s'.",rationalText);
+			exponentText++; // point to the first character of the exponent
+			if(mp_read_radix(_exponent,exponentText,10)!=MP_OKAY){
+				output("\nERROR: Failed to extract the exponent its text representation '%s'.",exponentText);
+				free_biginteger(_exponent);
+				_exponent=NULL;
+			}else
+			//if(amVerbose())
+				outputBiginteger("\nExponent '",_exponent,"'.");
+		}
+		if(!exponentText||_exponent){ // either we do not have an exponentText or we have an exponent big integer (to apply later on)
+			// TODO if we would just have an eval to get the value out of the token text
+			char* decimalPartText=strchr(rationalText,'.');
+			int decimalPartIndex=0;
+			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
+			output("\nWith decimal part removed: '%s'.",rationalText);
+			// now ready to check the integer part 
+			Mbiginteger* _numerator=new_biginteger();
+			Mbiginteger* _denominator=NULL;
+			if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
+				Mbiginteger* _decimalPartBiginteger=NULL;
+				if(decimalPartText){
+					int decimalPartIndex=(int)(decimalPartText-rationalText);
+					decimalPartText++; // point to the first character of the decimal part
+					_decimalPartBiginteger=new_biginteger();
+					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY&&!isBigintegerZero(_decimalPartBiginteger)){
+						// compute the power of ten denominator
+						_denominator=_getBiginteger(1);
+						Mbiginteger* _tenBiginteger=_getBiginteger(10);
+						while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
+						free_biginteger(_tenBiginteger);
+					}
+					outputBiginteger("\nDecimal part integer: '",_decimalPartBiginteger,"'.");
+					if(_denominator)outputBiginteger("\nDenominator: '",_denominator,"'.");
+				}
+				// if we have a decimalPartText we need a denominator
+				if(!decimalPartText||_denominator){
+					// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
+					// NOTE do NOT free the numerator and denominator in the call to _getRational, as we free them if _rational ends of being NULL afterwards
+					if(!_denominator||(mp_mul(_numerator,_denominator,_numerator)==MP_OKAY&&mp_add(_numerator,_decimalPartBiginteger,_numerator)==MP_OKAY)){
+						outputBiginteger("\nNumerator before applying the exponent: '",_numerator,"'.");
+						outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
+						// if we have an non-zero exponent, we have to adjust the numerator or denominator BEFORE trying to create the rational!!!
+						if(exponentText&&mp_iszero(_exponent)==MP_NO){
+							Mbiginteger* _tenBiginteger=_getBiginteger(10);
+							if(_tenBiginteger){
+								if(mp_isneg(_exponent)==MP_YES){ // a negative exponent goes into the denominator
+									if(!_denominator)_denominator=_getBiginteger(1);
+									if(_denominator){
+										while(mp_iszero(_exponent)==MP_NO){
+											if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+											if(mp_incr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+										}
+									}else{free_biginteger(_exponent);_exponent=NULL;}
+								}else{ // a positive exponent goes into the numerator
+									while(mp_iszero(_exponent)==MP_NO){
+										if(mp_mul(_numerator,_tenBiginteger,_numerator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+										if(mp_decr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+									}
+								}
+								free_biginteger(_tenBiginteger);
+							}else{free_biginteger(_exponent);_exponent=NULL;}
+						}
+						// check again whether we still have an exponent (when we should)
+						if(!exponentText||_exponent)
+							_rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
+					}
+				}
+				if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
+			}else
+				output("\nERROR: Integer part of rational text '%s' invalid.",rationalText);
+			// if we haven't got a rational that binded _numerator and _denominator free both of them
+			if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);if(freeonfailure)free(rationalText);}
+		}
+	}
+	return _rational;
+}
+// MDH@17JUN2019: convert a decimal (back) to a rational
+Mrational* _getDecimalRational(Mdecimal* _decimal){
+    if(!_decimal)return NULL;
+    Mrational* _rational=NULL;
+    char* _decimalText=mpd_to_sci(_decimal->mpd,0);
+    if(_decimalText){
+        if(_decimal->repeating){
+            // we have _decimal->repeating characters at the end of _decimalText that are repeated
+            // 1. determine the decimal without the repeating part
+
+        }else // we can go through the text????
+            _rational=_getDecimalTextRational(_decimalText,false);
+        free(_decimalText);
+    }
+    return _rational;
 }
 
 // long double to rational or representation

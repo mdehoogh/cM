@@ -291,6 +291,7 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
 
 ///////////long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
 long double getValueReal(const Mvalue* const _value);
+long double getRealLongDouble(const Mreal* const _real);
 
 // decimal support
 mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
@@ -314,7 +315,10 @@ Mbiginteger* _getValueBiginteger(const Mvalue* const _value); // converts a valu
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 long double getRationalLongDouble(const Mrational* const _rational);
-long double getRealLongDouble(const Mreal* const _real);
+
+Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure); 
+// used by:
+Mrational* _getDecimalRational(Mdecimal* _decimal);
 
 void free_rational(Mrational* _rational);
 bool isRationalZero(Mrational* _rational);
