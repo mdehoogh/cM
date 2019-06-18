@@ -413,7 +413,7 @@ bool ldIsInf(long double ld);
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 mstring* _getIntegerText(Minteger* _integer);
 mstring* _getBigintegerText(const Mbiginteger* const _biginteger);
-mstring* _getDecimalText(const Mdecimal* const _decimal);
+mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
 mstring* _getRationalText(const Mrational* const _rational);
 mstring* _getRealText(Mreal* _real);
 mstring* _getStringText(Mstring* _string,bool dequoted);

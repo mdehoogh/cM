@@ -103,7 +103,7 @@ else
 fi
 
 echo "Compiling M..."
-/usr/bin/cc  -L . -ltommath -lmpdec mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c M.c -o M -Wincompatible-pointer-types
+/usr/bin/cc  -L . -ltommath -lmpdec mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c M.c -o M -Wincompatible-pointer-types -Wdangling-else
 
 # don't run M here, instead check whether it is there!!!
 if [ -f M ]; then

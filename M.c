@@ -441,79 +441,84 @@ for i in range(10000):
 Mvalue* pi_d(Mvalue* _value){
 	// _value should be a positive integer defining the required precision
 	if(amVerbose())output("\nComputing pi using decimals.");
-	if(_value&&_value->type==VT_INTEGER){
-		long long decimalprecision=_value->value._integer->ll;
-		if(decimalprecision>0){
-			if(amVerbose())output("\nComputing pi to %lld decimals.",decimalprecision);
-			mpd_context_t* mpd_context=get_mpd_context(decimalprecision);
-			if(mpd_context){ // success
-				if(amVerbose())output("\nDecimal context created!");
-				// initialize the variables we need for the iterations
-				mpd_t *lasts=new_mpd(mpd_context,0),*t=new_mpd(mpd_context,3),*s=new_mpd(mpd_context,3),*n=new_mpd(mpd_context,1),*na=new_mpd(mpd_context,0),*d=new_mpd(mpd_context,0),*da=new_mpd(mpd_context,24);
-				if(amVerbose())output("\nInitial decimals created!");
-				// some constant decimals we need
-				mpd_t *d8=new_mpd(mpd_context,8),*d32=new_mpd(mpd_context,32);
-				unsigned long long iter=0;
-				if(amVerbose()){
-					char *_lasts=mpd_to_sci(lasts,0),*_t=mpd_to_sci(t,0),*_s=mpd_to_sci(s,0),*_n=mpd_to_sci(n,0),*_na=mpd_to_sci(na,0),*_d=mpd_to_sci(d,0),*_da=mpd_to_sci(da,0);
-					output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,_lasts,_t,_s,_n,_na,_d,_da);
-					free(_lasts);free(_t);free(_s);free(_n);free(_na);free(_d);free(_da); // yes, we do have to free them all!!!
-				}
-				int cmp;
-				mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
-				while(!mpd_error(mpd_context)){
-					iter++;
-					//if(amVerbose())output("\nIteration: %lld: ",iter);
-					cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
-					//if(amVerbose()){output("\na\t");if(mpd_error(mpd_context))break;}
-					if(!cmp){if(amVerbose())output("\nDone!");break;}
-					//if(amVerbose()){output("\nb\t");if(mpd_error(mpd_context))break;}
-					if(cmp==INT_MAX){output("\nSomething went wrong!");break;}
-					//if(amVerbose()){output("\nc\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
-					mpd_copy(lasts,s,mpd_context); // lasts = s
-					//if(amVerbose()){output("\nd\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
-					mpd_add(n,n,na,mpd_context);
-					//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
-					mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
-					//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
-					mpd_add(d,d,da,mpd_context);
-					//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
-					mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
-					//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
-					mpd_mul(t,t,n,mpd_context);
-					//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
-					mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
-					//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
-					mpd_add(s,s,t,mpd_context); // add t to s
-					//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
-					if(amVerbose()){
-						char *_lasts=mpd_to_sci(lasts,0),*_t=mpd_to_sci(t,0),*_s=mpd_to_sci(s,0),*_n=mpd_to_sci(n,0),*_na=mpd_to_sci(na,0),*_d=mpd_to_sci(d,0),*_da=mpd_to_sci(da,0);
-						output("\nIteration %u: lasts=%s, t=%s, s=%s, n=%s, na=%s, d=%s, da=%s",iter,_lasts,_t,_s,_n,_na,_d,_da);
-						free(_lasts);free(_t);free(_s);free(_n);free(_na);free(_d);free(_da); // yes, we do have to free them all!!!
-					}
-				}
-				mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
-				// get rid of all the decimals we used
-				mpd_del(lasts);mpd_del(t);mpd_del(n);mpd_del(na);mpd_del(d);mpd_del(da);
-				mpd_del(d8);mpd_del(d32);
-				if(mpd_error(mpd_context)){ // something went wrong
-					if(amVerbose())output("\nERROR: Computation of pi with precision %lld error status: %u.",decimalprecision,mpd_getstatus(mpd_context));
-					report_mpd_status(mpd_context);
-					return NULL;
-				}
-				// success
-				mpd_finalize(s,mpd_context); // to round to the requested precision
-				if(amVerbose()){
-					char* _s=mpd_to_sci(s,0);if(_s){output("\nFinal approximation of pi (rounded to %llu decimals): %s.",decimalprecision,_s);free(_s);}
-				}
-				// wrap the mpd_t in a decimal, and subsequently in an Mvalue!!!
-				return _getDecimalValue(_getDecimal(s,0,true),true);
-			}else
-				output("\nERROR: Failed to set the decimal precision to %lld.",decimalprecision);
+	long long decimalprecision=0;if(_value&&_value->type==VT_INTEGER)decimalprecision=_value->value._integer->ll;
+	mpd_context_t* mpd_context=(decimalprecision>0?get_mpd_context(decimalprecision):_decimalContext);
+	if(!mpd_context){if(decimalprecision>0)output("\nERROR: Failed to obtain the requested decimal context.");else output("\nERROR: No (default) decimal context available!");return NULL;}
+	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
+	if(amVerbose())output("\nComputing pi to %lld decimals.",decimalprecision);
+	// initialize the variables we need for the iterations
+	mpd_t *lasts=new_mpd(mpd_context,0),*t=new_mpd(mpd_context,3),*s=new_mpd(mpd_context,3),*n=new_mpd(mpd_context,1),*na=new_mpd(mpd_context,0),*d=new_mpd(mpd_context,0),*da=new_mpd(mpd_context,24);
+	// some constant decimals we need
+	mpd_t *d8=new_mpd(mpd_context,8),*d32=new_mpd(mpd_context,32);
+	if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){output("\nERROR: Failed to create all helper decimals.");return NULL;}
+	if(amVerbose())output("\nInitial decimals created!");
+	unsigned long long iter=0;
+	if(amVerbose()){
+		output("\nIteration %u:",iter);
+		char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
+		char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
+		char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
+		char* _n=mpd_to_sci(n,0);output(" n=%s",_n);free(_n);
+		char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
+		char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
+		char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
+	}
+	int cmp;
+	mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
+	while(!mpd_error(mpd_context)){
+		iter++;
+		//if(amVerbose())output("\nIteration: %lld: ",iter);
+		cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
+		//if(amVerbose()){output("\na\t");if(mpd_error(mpd_context))break;}
+		if(!cmp){if(amVerbose())output("\nDone!");break;}
+		//if(amVerbose()){output("\nb\t");if(mpd_error(mpd_context))break;}
+		if(cmp==INT_MAX){output("\nSomething went wrong!");break;}
+		//if(amVerbose()){output("\nc\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
+		mpd_copy(lasts,s,mpd_context); // lasts = s
+		//if(amVerbose()){output("\nd\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
+		mpd_add(n,n,na,mpd_context);
+		//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
+		mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
+		//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
+		mpd_add(d,d,da,mpd_context);
+		//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
+		mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
+		//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
+		mpd_mul(t,t,n,mpd_context);
+		//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
+		mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
+		//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
+		mpd_add(s,s,t,mpd_context); // add t to s
+		//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+		if(amVerbose()){
+			output("\nIteration %u:",iter);
+			char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
+			char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
+			char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
+			char* _n=mpd_to_sci(n,0);output(" n=%s",_n);free(_n);
+			char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
+			char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
+			char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
 		}
-	}else
-		output("\nERROR: Decimal precision not an integer.");
-	return NULL;
+	}
+	if(mpd_context)mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+	// get rid of all the decimals we used
+	mpd_del(lasts);mpd_del(t);mpd_del(n);mpd_del(na);mpd_del(d);mpd_del(da);
+	mpd_del(d8);mpd_del(d32);
+	if(mpd_context){
+		if(mpd_error(mpd_context)){ // something went wrong
+			if(amVerbose())output("\nERROR: Computation of pi with precision %lld error status: %u.",decimalprecision,mpd_getstatus(mpd_context));
+			report_mpd_status(mpd_context);
+			return NULL;
+		}
+	}
+	// success
+	mpd_finalize(s,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
+	if(amVerbose()){
+		char* _s=mpd_to_sci(s,0);if(_s){output("\nFinal approximation of pi (rounded to %llu decimals): %s.",decimalprecision,_s);free(_s);}
+	}
+	// wrap the mpd_t in a decimal, and subsequently in an Mvalue!!!
+	return _getDecimalValue(_getDecimal(s,0,true),true);
 }
 
 // how about storing all results here?????? instead of in the root environment????
