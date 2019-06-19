@@ -29,7 +29,7 @@ if [[ ! -f ./libmpdec.a && ! -d ./libmpdec.a ]]; then
             fi
         fi
         echo "Will attempt to create 'libmpdec.a'..."
-        cd mpdecimal-2.4.2
+        cd mpdecimal-2.4.2/libmpdec
         echo "Ready for compile the mpdecimal static library..."
         # we want make to actually create the .o files now
         sudo make
