@@ -117,8 +117,25 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	return product;
 } // multiplying two big integers, if either is NULL return NULL
 
+Mbiginteger* _Imult(Mbiginteger* a,Mbiginteger* b){
+	if(!a&&!b)return NULL;
+	if(!a)return _getBigintegerCopy(b);
+	if(!b)return _getBigintegerCopy(a);
+	Mbiginteger* product=new_biginteger();
+	if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
+	return product;
+}
 Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
+	
+	Mrational* _rational=NULL;
 
+	// we can speed things up by using a special multiplication method
+	Mbiginteger *_num1=_Imult(_rational1->num,_rational2->den),*_num2=_Imult(_rational2->num,_rational1->den);
+	if(_num1&&_num2) // we got (and need) both
+		_rational=_getRational(_Iadd(_num1,_num2,false),_Imult(_rational1->den,_rational2->den),M_LD_NAN,true,true); // free the numerator and denominator
+	if(_num1)free_biginteger(_num1);if(_num2)free_biginteger(_num2);
+	/* replacing:
+	
 	// OOPS here we have a problem, we should not use big integers contained in the given rationals itself
 	//      but then these new big integer should be freed if we can't bind them
 
@@ -195,7 +212,6 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	free_biginteger(_mul1);free_biginteger(_mul2); // always free the intermediate results (even if we failed to add them)
 
 	//////outputBiginteger("\nSum denominator: ",_den,".");
-	Mrational* _rational=NULL;
 	if(_num){
 		/////outputBiginteger("\nSum numerator: ",_num,".");
 		_rational=_getRational(_num,_den,deltasum,true,true);
@@ -203,6 +219,7 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	}else{
 		free_biginteger(_num);free_biginteger(_den);
 	}
+	*/
 	return _rational;
 
 }
