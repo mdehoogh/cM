@@ -117,7 +117,7 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	return product;
 } // multiplying two big integers, if either is NULL return NULL
 
-Mbiginteger* _Imult(Mbiginteger* a,Mbiginteger* b){
+Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 	if(!a&&!b)return NULL;
 	if(!a)return _getBigintegerCopy(b);
 	if(!b)return _getBigintegerCopy(a);
@@ -125,14 +125,20 @@ Mbiginteger* _Imult(Mbiginteger* a,Mbiginteger* b){
 	if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
 	return product;
 }
+long double realsum(Mreal* _real1,Mreal* _real2){
+	if(!_real1&&!_real2)return M_LD_NAN; // both undefined
+	if(!_real1||ldIsZero(_real1->ld)||ldIsNaN(_real1->ld))return _real2->ld;
+	if(!_real2||ldIsZero(_real1->ld)||ldIsNaN(_real1->ld))return _real1->ld;
+	return _real1->ld+_real2->ld;
+}
 Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	
 	Mrational* _rational=NULL;
 
 	// we can speed things up by using a special multiplication method
-	Mbiginteger *_num1=_Imult(_rational1->num,_rational2->den),*_num2=_Imult(_rational2->num,_rational1->den);
+	Mbiginteger *_num1=_Imul(_rational1->num,_rational2->den),*_num2=_Imul(_rational2->num,_rational1->den);
 	if(_num1&&_num2) // we got (and need) both
-		_rational=_getRational(_Iadd(_num1,_num2,false),_Imult(_rational1->den,_rational2->den),M_LD_NAN,true,true); // free the numerator and denominator
+		_rational=_getRational(_Iadd(_num1,_num2,false),_Imul(_rational1->den,_rational2->den),realsum(_rational1->delta,_rational2->delta),true,true); // free the numerator and denominator
 	if(_num1)free_biginteger(_num1);if(_num2)free_biginteger(_num2);
 	/* replacing:
 	
@@ -2489,13 +2495,8 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 }
 
 Mrational* _qmultiply(Mrational* _rational1,Mrational* _rational2){
-	Mrational* _rational=NULL;
-	if(_rational1&&_rational2){
-		// worst case we have a total of four parts, three rational parts (ac/bd, cd1/d, ad2/b) and one real part (d1d2) where d1 and d2 are the real error parts of either
-		// so it's a good idea to speed things up if possible
-		
-	}
-	return _rational;
+	// TODO take the delta's into account!!!
+	return(_rational1&&_rational2?_getRational(_Imul(_rational1->num,_rational2->num),_Imul(_rational1->den,_rational2->den),M_LD_NAN,true,true):NULL);
 }
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
