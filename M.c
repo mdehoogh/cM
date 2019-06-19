@@ -89,24 +89,34 @@ Mvalue* Mfacd(Mvalue* _value){
     return NULL;
 }
 
-Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b){
+Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	// ASSERT do NOT call with either a or b NULL
-	if(!a||!b)return NULL;
-	if(isBigintegerZero(a))return _getBigintegerCopy(b);
-	if(isBigintegerZero(b))return _getBigintegerCopy(a);
-	Mbiginteger* sum=new_biginteger();if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);return NULL;} // if the addition fails return 0
-	outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
+	Mbiginteger* sum=NULL;
+	if(a&&b){
+		if(!isBigintegerZero(a)&&!isBigintegerZero(b)){
+			sum=new_biginteger();
+			if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);sum=NULL;} // if the addition fails return 0
+		}else
+			sum=_getBigintegerCopy(isBigintegerZero(a)?b:a);
+	}
+	///////outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
+	if(!sum)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
 	return sum;
-} // adding two big integers
-Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b){
-	if(!a&&!b)return NULL;
-	if(isBigintegerOne(a))return _getBigintegerCopy(b);
-	if(isBigintegerOne(b))return _getBigintegerCopy(a);
-	Mbiginteger* product=new_biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
-	if(!isBigintegerZero(a)&&!isBigintegerZero(b)&&mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);return NULL;}
-	outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
+} // adding two big integers, if either is NULL return NULL
+Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
+	Mbiginteger* product=NULL;
+	if(a&&b){
+		if(!isBigintegerOne(a)&&!isBigintegerOne(b)){
+			product=new_biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
+			if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
+		}else
+			product=_getBigintegerCopy(isBigintegerOne(a)?b:a);
+	}
+	//////////outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
+	if(!product)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
 	return product;
-} // multiplying two big integers, if both are NULL return NULL
+} // multiplying two big integers, if either is NULL return NULL
+
 Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 
 	// OOPS here we have a problem, we should not use big integers contained in the given rationals itself
@@ -122,35 +132,35 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	// DONE problem to solve: the intermediate results should be freed if the rational could not be created!!
 	// TODO we can speed up these shortcuts (see how we handled creation errors at the bottom!!!)
 	if(!_den1&&!_den2){
-		output("\nBoth denominators in adding two rationals undefined!");
-		Mbiginteger* _num=_Iadd(_num1,_num2);free_biginteger(_num1);free_biginteger(_num2); // don't need these anymore
+		if(amVerbose())output("\nBoth denominators in adding two rationals undefined!");
+		Mbiginteger* _num=_Iadd(_num1,_num2,false);free_biginteger(_num1);free_biginteger(_num2); // don't need these anymore
 		Mrational* _rational=_getRational(_num,NULL,deltasum,false,true);
 		return _rational; // if both denominators are undefined (i.e. 1), return the sum of the numerators
 	}
 	if(!_den1){
-		output("\nFirst denominator in adding two rationals undefined!");
-		Mbiginteger* _mult=(_num1?_Imultiply(_num1,_den2):_den2);free_biginteger(_num1); // _num1 no longer needed
-		Mbiginteger* _num=(_mult?_Iadd(_num2,_mult):NULL);free_biginteger(_num2); // _num2 no longer needed
+		if(amVerbose())output("\nFirst denominator in adding two rationals undefined!");
+		Mbiginteger* _mult=(_num1?_Imultiply(_num1,_den2,false):_den2);free_biginteger(_num1); // _num1 no longer needed
+		Mbiginteger* _num=(_mult?_Iadd(_num2,_mult,false):NULL);free_biginteger(_num2); // _num2 no longer needed
 		if(_num1)free_biginteger(_mult); // _mult no longer needed i.e. when it is not equal to _den2
 		Mrational* _rational=NULL;
 		if(_num){
-			outputBiginteger("\nNew numerator: ",_num,".");
+			//////outputBiginteger("\nNew numerator: ",_num,".");
 			_rational=_getRational(_num,_den2,deltasum,true,true); // free _num and _den2 if not bound to _rational
-			outputRational("\nSum rational: ",_rational,".");
+			//////outputRational("\nSum rational: ",_rational,".");
 		}else
 			free_biginteger(_den2);
 		return _rational;
 	}
 	if(!_den2){
-		output("\nSecond denominator in adding two rationals undefined!");
-		Mbiginteger* _mult=(_num1?_Imultiply(_num2,_den1):_den1);free_biginteger(_num2);
-		Mbiginteger* _num=(_mult?_Iadd(_num1,_mult):NULL);free_biginteger(_num1);
+		if(amVerbose())output("\nSecond denominator in adding two rationals undefined!");
+		Mbiginteger* _mult=(_num1?_Imultiply(_num2,_den1,false):_den1);free_biginteger(_num2);
+		Mbiginteger* _num=(_mult?_Iadd(_num1,_mult,false):NULL);free_biginteger(_num1);
 		if(_num1)free_biginteger(_mult);
 		Mrational* _rational=NULL;
 		if(_num){
-			outputBiginteger("\nNew numerator: ",_num,".");
+			//////outputBiginteger("\nNew numerator: ",_num,".");
 			_rational=_getRational(_num,_den1,deltasum,true,true);
-			outputRational("\nSum rational: ",_rational,".");
+			/////outputRational("\nSum rational: ",_rational,".");
 		}else 
 			free_biginteger(_den1);
 		return _rational;
@@ -158,38 +168,38 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	// if the denominators are equal it's also easier
 	if(mp_cmp(_den1,_den2)==MP_EQ){
 		free_biginteger(_den2); // won't need it anymore
-		Mbiginteger* _num=_Iadd(_num1,_num2);free_biginteger(_num1);free_biginteger(_num2);
+		Mbiginteger* _num=_Iadd(_num1,_num2,false);free_biginteger(_num1);free_biginteger(_num2);
 		Mrational* _rational=NULL;
 		if(_num){
-			outputBiginteger("\nNew numerator: ",_num,".");
+			//////outputBiginteger("\nNew numerator: ",_num,".");
 			_rational=_getRational(_num,_den1,deltasum,true,true);
-			outputRational("\nSum rational: ",_rational,".");
+			//////outputRational("\nSum rational: ",_rational,".");
 		}else
 			free_biginteger(_den1);
 		return _rational;
 	}
 
-	outputRational("\nAdding true rationals ",_rational1,NULL);outputRational(" and ",_rational2,".");
+	if(amVerbose()){outputRational("\nAdding true rationals ",_rational1,NULL);outputRational(" and ",_rational2,".");}
 
 	// true rational addition (as _den1 and _den2 are defined, i.e. unequal to 1)
 	// TODO we can speed this up as well using ternary operators
-	Mbiginteger* _den=_Imultiply(_den1,_den2);
-	Mbiginteger* _mul1=(_den?_Imultiply(_num1,_den2):NULL);
-	Mbiginteger* _mul2=(_den&&_mul1?_Imultiply(_num2,_den1):NULL);
+	Mbiginteger* _den=_Imultiply(_den1,_den2,false);
+	Mbiginteger* _mul1=(_den?_Imultiply(_num1,_den2,false):NULL);
+	Mbiginteger* _mul2=(_den&&_mul1?_Imultiply(_num2,_den1,false):NULL);
 	// free the original copies
 	free_biginteger(_num1);free_biginteger(_num2);
 	free_biginteger(_den1);free_biginteger(_den2);
 	
-	outputBiginteger("\n\tNumerator part 1: ",_mul1,NULL);outputBiginteger(" - part 2: ",_mul2,".");
-	Mbiginteger* _num=(_mul1&&_mul2?_Iadd(_mul1,_mul2):NULL);
+	if(amVerbose()){outputBiginteger("\n\tNumerator part 1: ",_mul1,NULL);outputBiginteger(" - part 2: ",_mul2,".");}
+	Mbiginteger* _num=(_mul1&&_mul2?_Iadd(_mul1,_mul2,false):NULL);
 	free_biginteger(_mul1);free_biginteger(_mul2); // always free the intermediate results (even if we failed to add them)
 
-	outputBiginteger("\nSum denominator: ",_den,".");
+	//////outputBiginteger("\nSum denominator: ",_den,".");
 	Mrational* _rational=NULL;
 	if(_num){
-		outputBiginteger("\nSum numerator: ",_num,".");
+		/////outputBiginteger("\nSum numerator: ",_num,".");
 		_rational=_getRational(_num,_den,deltasum,true,true);
-		outputRational("\n\tSum rational: ",_rational,".");
+		/////outputRational("\n\tSum rational: ",_rational,".");
 	}else{
 		free_biginteger(_num);free_biginteger(_den);
 	}
@@ -295,10 +305,10 @@ Mvalue* pi_ql(Mvalue* _value){
 								break;
 							}
 							// add the addendum to the current rational
-							//if(amVerbose()){
+							if(amVerbose()){
 								outputRational("\nSum so far: ",_rational,NULL);
 								outputRational(", addendum: ",_addendumRational,".");
-							//}
+							}
 							Mrational* _newRational=_qadd(_rational,_addendumRational);
 							if(!_newRational){
 								// we have to free the addendum numerator and denominator
@@ -307,25 +317,25 @@ Mvalue* pi_ql(Mvalue* _value){
 								break;
 							}
 							// increment the denominator BEFORE we loose the addendum denominator we have now (as part of _rational)
-							outputBiginteger("\nIncrementing the addendum denominator by ",_denominatorIncrement,".");		
-							Mbiginteger* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement);
+							if(amVerbose())outputBiginteger("\nIncrementing the addendum denominator by ",_denominatorIncrement,".");		
+							Mbiginteger* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement,false);
 							if(!_newAddendumDenominator){
 								free_biginteger(_addendumDenominator); // won't be using this in the addendum rational
 								output("\nERROR: Failed to increment the addendum denominator.");
 								break;
 							}
-							outputBiginteger("\nNew addendum denominator: ",_newAddendumDenominator,".");
-							outputRational("\nNew approximation to pi/4: ",_newRational,".");
+							if(amVerbose())outputBiginteger("\nNew addendum denominator: ",_newAddendumDenominator,".");
+							if(amVerbose())outputRational("\nNew approximation to pi/4: ",_newRational,".");
 							free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
 							// replace _rational by _newRational
 							free_rational(_rational);
 							_rational=_newRational;
 							//if(amVerbose())
-							outputRational("\nSum approximation of pi/4 so far: ",_rational,".");
+							if(amVerbose())outputRational("\nSum approximation of pi/4 so far: ",_rational,".");
 							// no need to normalize as the addendum is always normalized by itself
 							// replace the addendum denominator with the new one)
 							_addendumDenominator=_newAddendumDenominator;
-							outputBiginteger("\nNew addendum denominator: ",_addendumDenominator,".");
+							if(amVerbose())outputBiginteger("\nNew addendum denominator: ",_addendumDenominator,".");
 						}
 					}else{
 						output("\nERROR: Failed to initialize the addendum numerator and its increment value (2).");
@@ -333,7 +343,7 @@ Mvalue* pi_ql(Mvalue* _value){
 					}
 				}
 				if(mp_mul_2d(_rational->num,2,_rational->num)!=MP_OKAY){
-					outputRational("\nERROR: Failed to multiply the approximation of pi/4 (",_rational," by 4.");
+					if(amVerbose())outputRational("\nERROR: Failed to multiply the approximation of pi/4 (",_rational," by 4.");
 					free_rational(_rational);
 					return NULL;
 				} // multiply the numerator by 4 i.e. 2**2
@@ -370,9 +380,9 @@ Mvalue* pi_q(Mvalue* _value){
 							if(!_bigintegerSquare){output("\nERROR: Failed to compute the big integer of square %llu.",square);break;}
 							if(amVerbose())output("\n%llu fractions yet to compute using numerator square '%llu'.",iter,square);
 							// the new denominator becomes 6+square/prev denominator=
-							Mbiginteger* _mult=_Imultiply(_denominatorRational->num,_bi6);
-							Mbiginteger* _add=(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare);
-							Mbiginteger* _denominatorNumerator=(_mult?_Iadd(_mult,_add):NULL);
+							Mbiginteger* _mult=_Imultiply(_denominatorRational->num,_bi6,false);
+							Mbiginteger* _add=(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare,false):_bigintegerSquare);
+							Mbiginteger* _denominatorNumerator=(_mult?_Iadd(_mult,_add,false):NULL);
 							// free all intermediate big integers
 							free_biginteger(_mult);free_biginteger(_bigintegerSquare);if(_denominatorRational->den)free_biginteger(_add);
 							// update the denominator rational, free the numerator if we fail to bind it to _denominatorRational
@@ -390,7 +400,7 @@ Mvalue* pi_q(Mvalue* _value){
 					Mrational* _inverseDenominatorRational=_getInverseRational(_denominatorRational);
 					Mrational* _result=NULL;
 					if(!_inverseDenominatorRational){
-						outputRational("\nERROR: Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,".");
+						outputRational("\nERROR: Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").");
 						free_rational(_rational);_rational=NULL;
 					}else
 						_result=_qadd(_rational,_inverseDenominatorRational);
@@ -1351,7 +1361,7 @@ void toCursorPosition(){
 // MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
 // MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
 
-void outputError(const char* const error){if(error&&!strlen(error))output("\nERROR: %s",error);}
+void outputError(const char* const error){if(error&&!strlen(error))output("ERROR: %s",error);} // NO newline at the beginning!!!!!
 
 void inputInfo(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
@@ -2636,8 +2646,8 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 		if((ldIsNaN(delta1)||ldIsZero(delta1))&&(ldIsNaN(delta2)||ldIsZero(delta2))){ // both are 'pure' rationals
 			if(amVerbose())output("\nPure rational division.");
 			// compute the new numerator and denominator, both should not be NULL as the numerators are not NULL, so should be freed if we can't drop them
-			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den):_getBigintegerCopy(rational1->num));
-			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den):_getBigintegerCopy(rational2->num));
+			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den,false):_getBigintegerCopy(rational1->num));
+			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den,false):_getBigintegerCopy(rational2->num));
 			if(!_numerator||!_denominator){ // failed to compute either, so somewhere it went wrong
 				free_biginteger(_numerator);free_biginteger(_denominator);
 			}else{
@@ -3132,6 +3142,8 @@ void outputValueColored(Mvalue* _value){
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
 	
+	outputChar('\n'); // indicating that the command is being evaluated!!!
+
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
 	if(!pCommandToEvaluate){outputError("Nothing to evaluate!");return false;}
 	
@@ -3187,8 +3199,9 @@ bool evaluateCommand(){
 	expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
 	clock_t then=clock();
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
-	long long elapsed=clock()-then;
-	output("\nDuration of evaluation: %d ms.\n%s = ",(elapsed/1000),string(commandText));
+	long long elapsed=(clock()-then)/1000;if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
+	// output the commandText
+	output("%s = ",string(commandText));
 	// if the result is a null value, show the NULL_value
 	outputValueColored(isNull(_commandExpressionValue)?NULL_value:_commandExpressionValue);
 	

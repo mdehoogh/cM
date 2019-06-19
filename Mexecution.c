@@ -268,6 +268,7 @@ Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
 Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 	// the text should represent an integer or a real
 	if(!rationalText)return NULL;
+    output("\nConverting '%s' to a rational.",rationalText);
 	Mrational* _rational=NULL;
 	int l=strlen(rationalText);
 	if(l){
@@ -303,12 +304,15 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 					int decimalPartIndex=(int)(decimalPartText-rationalText);
 					decimalPartText++; // point to the first character of the decimal part
 					_decimalPartBiginteger=new_biginteger();
-					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY&&!isBigintegerZero(_decimalPartBiginteger)){
-						// compute the power of ten denominator
-						_denominator=_getBiginteger(1);
-						Mbiginteger* _tenBiginteger=_getBiginteger(10);
-						while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
-						free_biginteger(_tenBiginteger);
+					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY){
+                        if(!isBigintegerZero(_decimalPartBiginteger)){
+						    // compute the power of ten denominator
+						    _denominator=_getBiginteger(1);
+						    Mbiginteger* _tenBiginteger=_getBiginteger(10);
+						    while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
+						    free_biginteger(_tenBiginteger);
+                        }else // the decimal part is zero therefore we do not officially have a decimal part (but we do want the associated rational even with _denominator NULL)
+                            decimalPartText=NULL;
 					}
 					outputBiginteger("\nDecimal part integer: '",_decimalPartBiginteger,"'.");
 					if(_denominator)outputBiginteger("\nDenominator: '",_denominator,"'.");
@@ -319,7 +323,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 					// NOTE do NOT free the numerator and denominator in the call to _getRational, as we free them if _rational ends of being NULL afterwards
 					if(!_denominator||(mp_mul(_numerator,_denominator,_numerator)==MP_OKAY&&mp_add(_numerator,_decimalPartBiginteger,_numerator)==MP_OKAY)){
 						outputBiginteger("\nNumerator before applying the exponent: '",_numerator,"'.");
-						outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
+						if(_denominator)outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
 						// if we have an non-zero exponent, we have to adjust the numerator or denominator BEFORE trying to create the rational!!!
 						if(exponentText&&mp_iszero(_exponent)==MP_NO){
 							Mbiginteger* _tenBiginteger=_getBiginteger(10);
@@ -343,16 +347,21 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 						}
 						// check again whether we still have an exponent (when we should)
 						if(!exponentText||_exponent)
-                            if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
+                            if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)
+                                _rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
 					}
 				}
-				if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
+                if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
 			}else
 				output("\nERROR: Integer part of rational text '%s' invalid.",rationalText);
 			// if we haven't got a rational that binded _numerator and _denominator free both of them
-			if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);if(freeonfailure)free(rationalText);}
+			if(!_rational){
+                free_biginteger(_numerator);
+                if(_denominator)free_biginteger(_denominator);
+             }
 		}
 	}
+    if(!_rational)if(freeonfailure)free(rationalText);
 	return _rational;
 }
 // MDH@17JUN2019: convert a decimal (back) to a rational
@@ -1949,31 +1958,29 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
 }
 // _getInverseRational() will take care of releasing the newly created rational parts when failing to wrap them in a rational
 Mrational* _getInverseRational(const Mrational* const _rational){
+    if(!_rational){output("\nWARNING: No rational to invert.");return NULL;}
     Mrational* _inverseRational=NULL;
-    if(_rational){
-        // for now only allow inverting pure rationals!!!
-        if(!_rational->delta||ldIsZero(_rational->delta->ld)){
-            Mbiginteger* _inverseRationalNumerator=NULL;
-            if(_rational->den){
-                _inverseRationalNumerator=_getBigintegerCopy(_rational->den);
-                if(!_inverseRationalNumerator){output("\nERROR: Failed to copy the rational denominator.");return NULL;}
-            }
-            Mbiginteger* _inverseRationalDenominator=NULL;
-            if(_rational->num){
-                _inverseRationalDenominator=_getBigintegerCopy(_rational->num);
-                if(!_inverseRationalDenominator){output("\nERROR: Failed to copy the rational numerator.");return NULL;}
-            }
-            // if the original is not normalized normalize, otherwise just copy the normalized flag!!
-            _inverseRational=_getRational(_inverseRationalNumerator,_inverseRationalDenominator,M_LD_NAN,!_rational->normalized,true);
-            if(!_inverseRational)
-                output("\nERROR: Failed to create the inverse rational.");
-            else
-            if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
-        }else
-            output("ERROR: Can't invert an unpure rational.");
+    // for now only allow inverting pure rationals!!!
+    if(!_rational->delta||ldIsZero(_rational->delta->ld)){
+        Mbiginteger* _inverseRationalNumerator=NULL;
+        if(_rational->den){
+            _inverseRationalNumerator=_getBigintegerCopy(_rational->den);
+            if(!_inverseRationalNumerator){output("\nERROR: Failed to copy the rational denominator.");return NULL;}
+        }
+        Mbiginteger* _inverseRationalDenominator=NULL;
+        if(_rational->num){
+            _inverseRationalDenominator=_getBigintegerCopy(_rational->num);
+            if(!_inverseRationalDenominator){output("\nERROR: Failed to copy the rational numerator.");return NULL;}
+        }
+        // if the original is not normalized normalize, otherwise just copy the normalized flag!!
+        _inverseRational=_getRational(_inverseRationalNumerator,_inverseRationalDenominator,M_LD_NAN,!_rational->normalized,true);
+        if(!_inverseRational)
+            output("\nERROR: Failed to create the inverse rational.");
+        else
+        if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
     }else
-    if(amVerbose())output("WARNING: No rational to invert!");
-    return NULL;
+        output("ERROR: Can't invert an unpure rational.");
+    return _inverseRational;
 }
 
 Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){if(!_rational)return NULL;Mvalue* _value=_newValue();if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);return _value;}
