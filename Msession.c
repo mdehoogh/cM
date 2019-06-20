@@ -28,9 +28,6 @@ void disableRawmode(){
 }
 
 void endOfUserInput(){
-#ifdef __DEBUG__
-	printf("\nEnd of user input.");
-#endif
 	// return to the 'right' colors
 	resetOutputColor();
 	output("\n\n%s\n\n","Thanks for using M.");

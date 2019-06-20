@@ -45,7 +45,7 @@ mstring* string_append(mstring* str,const char* pc);
 
 void string_reverse(mstring* str);
 
-// copying 
-bool string_copy(mstring* src,mstring* dst);
+// copying
+mstring* string_copy(mstring* src);
 
 #endif /* __MSTRING_H__ */

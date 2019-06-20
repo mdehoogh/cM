@@ -269,18 +269,19 @@ const long long M_LL_MAX=LLONG_MAX;
 
 long long double2long(long double ld); // convert long double to long long
 
-mp_err mp_set_long_double(Mbiginteger *a, long double b); // MDH@01MAY2019: which I made myself
-long double mp_get_long_double(const Mbiginteger* const a); // MDH@07JUN2019: same here
-
-Mbiginteger* _getBiginteger(int64_t l);
-
 #define M_LL_INVALID LLONG_MIN // the invalid long long defaults to LLONG_MIN
 // it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
 #define M_LL_MIN LLONG_MIN+1
 #define M_LL_MAX LLONG_MAX
 
+// big integer stuff
+Mbiginteger* _getBiginteger(int64_t l);
+Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger);
 Mbiginteger* getBigintegerLLMin();
 Mbiginteger* getBigintegerLLMax();
+// big integer conversions
+mp_err mp_set_long_double(Mbiginteger *a, long double b); // MDH@01MAY2019: which I made myself
+long double mp_get_long_double(const Mbiginteger* const a); // MDH@07JUN2019: same here
 
 bool isLittleEndian();
 

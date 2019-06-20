@@ -10,29 +10,45 @@
 /** Create a String */
 mstring* string_create(){
     mstring* ans=calloc(1,sizeof *ans);
-    if(ans!=NULL){
+    if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         ans->chars=malloc(BLOCK_SIZE*sizeof *(ans->chars));
         if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
+#ifdef __DEBUGGING__
+    if(!ans)printf("\nFailed to create a string.");
+#endif
     return ans;
 }
 
 mstring* new_mstring(char* s){
-    mstring* ans=(s?calloc(1,sizeof *ans):NULL);
-    if(ans!=NULL){
+    if(!s)return NULL;
+    mstring* ans=calloc(1,sizeof *ans);
+    if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
-        size_t l=strlen(s);    
-        ans->length=l;    
-        ans->blocks=1+(ans->length/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
-        ans->chars=malloc(BLOCK_SIZE*ans->blocks);
-        while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
+        size_t l=strlen(s);
+        ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
+        ans->chars=malloc((++ans->blocks)*BLOCK_SIZE); // here we increment ans->blocks (as we must)
+        if(ans->chars){
+            //////////////strcpy(ans->chars,s);ans->length=l; // also copies the ending '\0' over but memcpy() does not have to check for '\0' so we use memcpy()
+            ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
+            memcpy(ans->chars,s,l); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
+        }else{
+            free(ans);ans=NULL;
+        } // failure
     }
+#ifdef __DEBUGGING__
+    if(!ans)printf("\nFailed to create a string.");
+#endif
     return ans;
 }
 
-bool string_copy(mstring* src,mstring* dst){
-    if(src!=NULL&&dst!=NULL){
+// MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
+mstring* string_copy(mstring* src){
+    return (src?new_mstring(src->chars):NULL);
+    /* replacing:
+    mstring* dst=string_create();
+    if(dst){
         if(src->length){ // there needs to be something to copy (NOTE we're not allocating down ever!!!!)
             // if we have more blocks for chars in src we have to realloc
             if(src->blocks>dst->blocks){
@@ -45,9 +61,9 @@ bool string_copy(mstring* src,mstring* dst){
             dst->length=src->length;
             strcpy(dst->chars,src->chars); // probably better than using memcpy as we do NOT have to tell where src->chars ends!!
         }
-        return true;
     }
-    return false;
+    return dst;
+    */
 }
 
 /** 

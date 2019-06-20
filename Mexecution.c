@@ -113,6 +113,11 @@ Mbiginteger* _getBiginteger(int64_t l){
     if(l)mp_set_i64((mp_int*)_biginteger,l); // TODO mp_set_i64 can fail can't it? then why is it of type void???
     return _biginteger;
 }
+Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger){
+    Mbiginteger* _bigintegerNeg=new_biginteger();
+    if(mp_neg(_biginteger,_bigintegerNeg)!=MP_OKAY){free_biginteger(_bigintegerNeg);_bigintegerNeg=NULL;}
+    return _bigintegerNeg;
+}
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
 Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
     if(!_biginteger)return NULL;
@@ -268,7 +273,7 @@ Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
 Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 	// the text should represent an integer or a real
 	if(!rationalText)return NULL;
-    output("\nConverting '%s' to a rational.",rationalText);
+    if(amVerbose())output("\nConverting '%s' to a rational.",rationalText);
 	Mrational* _rational=NULL;
 	int l=strlen(rationalText);
 	if(l){
@@ -279,10 +284,10 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 		if(exponentText){
 			*exponentText='\0'; // 'cuf off' the e-part!!!!
 			l=(int)(exponentText-rationalText); // this will be the new l we need below!!!
-			output("\nWith exponent removed: '%s'.",rationalText);
+			if(amVerbose())output("\nWith exponent removed: '%s'.",rationalText);
 			exponentText++; // point to the first character of the exponent
 			if(mp_read_radix(_exponent,exponentText,10)!=MP_OKAY){
-				output("\nERROR: Failed to extract the exponent its text representation '%s'.",exponentText);
+				if(amVerbose())output("\nERROR: Failed to extract the exponent its text representation '%s'.",exponentText);
 				free_biginteger(_exponent);
 				_exponent=NULL;
 			}else
@@ -294,7 +299,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 			char* decimalPartText=strchr(rationalText,'.');
 			int decimalPartIndex=0;
 			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
-			output("\nWith decimal part removed: '%s'.",rationalText);
+			if(amVerbose())output("\nWith decimal part removed: '%s'.",rationalText);
 			// now ready to check the integer part 
 			Mbiginteger* _numerator=new_biginteger();
 			Mbiginteger* _denominator=NULL;
@@ -314,16 +319,16 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
                         }else // the decimal part is zero therefore we do not officially have a decimal part (but we do want the associated rational even with _denominator NULL)
                             decimalPartText=NULL;
 					}
-					outputBiginteger("\nDecimal part integer: '",_decimalPartBiginteger,"'.");
-					if(_denominator)outputBiginteger("\nDenominator: '",_denominator,"'.");
+					if(amVerbose())outputBiginteger("\nDecimal part integer: '",_decimalPartBiginteger,"'.");
+					if(amVerbose())if(_denominator)outputBiginteger("\nDenominator: '",_denominator,"'.");
 				}
 				// if we have a decimalPartText we need a denominator
 				if(!decimalPartText||_denominator){
 					// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
 					// NOTE do NOT free the numerator and denominator in the call to _getRational, as we free them if _rational ends of being NULL afterwards
 					if(!_denominator||(mp_mul(_numerator,_denominator,_numerator)==MP_OKAY&&mp_add(_numerator,_decimalPartBiginteger,_numerator)==MP_OKAY)){
-						outputBiginteger("\nNumerator before applying the exponent: '",_numerator,"'.");
-						if(_denominator)outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
+						if(amVerbose())outputBiginteger("\nNumerator before applying the exponent: '",_numerator,"'.");
+						if(amVerbose())if(_denominator)outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
 						// if we have an non-zero exponent, we have to adjust the numerator or denominator BEFORE trying to create the rational!!!
 						if(exponentText&&mp_iszero(_exponent)==MP_NO){
 							Mbiginteger* _tenBiginteger=_getBiginteger(10);
@@ -2267,16 +2272,6 @@ mstring* _getMapText(Mmap* _map){
 	return s;
 }
 
-mstring* _UNDEFINED_VALUETEXT=NULL;
-// the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
-// we can solve that by returning a new undefined value text instance every time
-mstring* getUndefinedValueText(){
-    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
-    mstring* _undefinedValueText=string_create();
-    // if copying fails (however unlikely), we ourselves need to free _undefinedValueText, and return NULL (unfortunately), which indicates memory problems!!!
-    if(!string_copy(_UNDEFINED_VALUETEXT,_undefinedValueText)){if(_undefinedValueText)free_mstring(_undefinedValueText);return NULL;}
-    return _undefinedValueText;
-}
 mstring* _getRationalText(const Mrational* const _rational){
     if(_rational){
         mstring* _rationalText=string_create();
@@ -2321,6 +2316,16 @@ mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
     }
     return NULL;
 }
+mstring* _UNDEFINED_VALUETEXT=NULL;
+// the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
+// we can solve that by returning a new undefined value text instance every time
+mstring* getUndefinedValueText(){
+    return new_mstring(UNDEFINED_VALUETEXT); // just wrapping UNDEFINED_VALUETEXT again...
+    /* replacing:
+    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
+    return string_copy(_UNDEFINED_VALUETEXT);
+    */
+}
 mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
 	mstring* valueText=NULL;
@@ -2337,7 +2342,7 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
 			case VT_LIST:valueText=_getListText(_value->value._list);break;
-            case VT_TOKEN:valueText=string_create();string_copy(_value->value._token->text,valueText);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
+            case VT_TOKEN:valueText=string_copy(_value->value._token->text);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
 			default:break;
 		}
 	}

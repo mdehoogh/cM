@@ -117,6 +117,7 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	return product;
 } // multiplying two big integers, if either is NULL return NULL
 
+// _Imul is special big integer multiplier that assumes a NULL big integer equals 1
 Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 	if(!a&&!b)return NULL;
 	if(!a)return _getBigintegerCopy(b);
@@ -125,21 +126,79 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 	if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
 	return product;
 }
+
+// RATIONAL STUFF
+// long double helper functions for use with the delta of rationals
 long double realsum(Mreal* _real1,Mreal* _real2){
 	if(!_real1&&!_real2)return M_LD_NAN; // both undefined
 	if(!_real1||ldIsZero(_real1->ld)||ldIsNaN(_real1->ld))return _real2->ld;
 	if(!_real2||ldIsZero(_real1->ld)||ldIsNaN(_real1->ld))return _real1->ld;
 	return _real1->ld+_real2->ld;
 }
-Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
-	
-	Mrational* _rational=NULL;
+bool realIsUndefined(Mreal* _real){return(!_real||ldIsNaN(_real->ld));}
+long double realneg(Mreal* _real){return (realIsUndefined(_real)?M_LD_NAN:-_real->ld);}
 
-	// we can speed things up by using a special multiplication method
-	Mbiginteger *_num1=_Imul(_rational1->num,_rational2->den),*_num2=_Imul(_rational2->num,_rational1->den);
-	if(_num1&&_num2) // we got (and need) both
-		_rational=_getRational(_Iadd(_num1,_num2,false),_Imul(_rational1->den,_rational2->den),realsum(_rational1->delta,_rational2->delta),true,true); // free the numerator and denominator
-	if(_num1)free_biginteger(_num1);if(_num2)free_biginteger(_num2);
+// operators applied to rationals
+Mrational* _qmultiply(Mrational* _rational1,Mrational* _rational2){
+	if(!_rational1||!_rational2)return NULL;
+	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
+	Mbiginteger *_num=_Imul(_rational1->num,_rational2->num),*_den=_Imul(_rational1->den,_rational2->den);
+	// pure rationals are easy
+	if(delta1undefined&&delta2undefined)return _getRational(_num,_den,M_LD_NAN,true,true);
+	// TODO take the delta's into account!!!
+	return NULL;
+}
+Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
+	if(!_rational1||!_rational2)return NULL;
+	// even if we have delta's we will always need these products
+	Mbiginteger *_num=_Imul(_rational1->num,_rational2->den),*_den=_Imul(_rational2->num,_rational1->den);
+	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
+	// pure rationals are easy
+	if(delta1undefined&&delta2undefined)return _getRational(_num,_den,M_LD_NAN,true,true);
+	// if we assume the delta's to be very small (as they will be), the parts containing squares to be too small to care about 
+	if(delta1undefined){
+		// second denominator term is -(b*d*delta2)**2 which for reasonably small b and d (both denominators) will be negligable
+
+	}
+	if(delta2undefined){
+
+	}
+	// neither undefined
+	return NULL;
+}
+/* replacing:
+Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
+	// if either of them has a delta (i.e. is not pure), convert to double reals first
+	Mrational* _rational=NULL;
+	if(rational1&&rational2){
+		long double delta1=getRealLongDouble(rational1->delta),delta2=getRealLongDouble(rational2->delta);
+		if((ldIsNaN(delta1)||ldIsZero(delta1))&&(ldIsNaN(delta2)||ldIsZero(delta2))){ // both are 'pure' rationals
+			if(amVerbose())output("\nPure rational division.");
+			// compute the nsew numerator and denominator, both should not be NULL as the numerators are not NULL, so should be freed if we can't drop them
+			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den,false):_getBigintegerCopy(rational1->num));
+			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den,false):_getBigintegerCopy(rational2->num));
+			if(!_numerator||!_denominator){ // failed to compute either, so somewhere it went wrong
+				free_biginteger(_numerator);free_biginteger(_denominator);
+			}else{
+				if(isBigintegerOne(_denominator)){free_biginteger(_denominator);_denominator=NULL;} // prevent storing 1 explicitly...
+				_rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind them
+			}
+		}else{ // either one or both are unpure i.e. 'reals' approximated by rationals 
+			if(amVerbose())output("\nApproximate rational division.");
+		}
+	}
+	return _rational;
+}
+*/
+Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
+	Mrational* _rational=NULL;
+	if(_rational1&&_rational2){
+		// we can speed things up by using a special multiplication method
+		Mbiginteger *_num1=_Imul(_rational1->num,_rational2->den),*_num2=_Imul(_rational2->num,_rational1->den);
+		if(_num1&&_num2) // we got (and need) both
+			_rational=_getRational(_Iadd(_num1,_num2,false),_Imul(_rational1->den,_rational2->den),realsum(_rational1->delta,_rational2->delta),true,true); // free the numerator and denominator
+		if(_num1)free_biginteger(_num1);if(_num2)free_biginteger(_num2);
+	}
 	/* replacing:
 	
 	// OOPS here we have a problem, we should not use big integers contained in the given rationals itself
@@ -228,6 +287,19 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	*/
 	return _rational;
 
+}
+Mrational* _qneg(Mrational* _rational){
+	// normalizes the negated rational if not currently normalized, otherwise it will not normalize it
+	Mrational* _rationalNeg=(_rational?_getRational(_getBigintegerNeg(_rational->num),_getBigintegerCopy(_rational->den),realneg(_rational->delta),!_rational->normalized,true):NULL);
+	if(_rationalNeg)if(_rational->normalized)_rationalNeg->normalized=true; // if original assumed normalized, so is the negated value
+	return _rationalNeg;
+}
+Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
+	if(!_rational1||!_rational2)return NULL;
+	Mrational* _rational2Neg=_qneg(_rational2); // get the negated rational2
+	Mrational* _rational=_qadd(_rational1,_rational2Neg);
+	free_rational(_rational2Neg); // free the negated rational2
+	return _rational;
 }
 // end rational stuff
 
@@ -2187,6 +2259,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(!_valueReference->_itemid)assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name));
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
+				// MDH@20JUN2019: some error in the following part because every now and then we get a segmentation fault!!!!
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
@@ -2202,18 +2275,22 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
 						if(getDP()<string_length(expressionToken->text))output("\nWARNING: More decimals present in literal than expected. Rounding may occur.");
 						Mdecimal* _decimal=new_decimal(_decimalContext,0);
-						mpd_set_string(_decimal->mpd,string(pRealText),_decimalContext);
-						if(!mpd_isnan(_decimal->mpd)){
-							assignValue(&_valueReference->_value,_getDecimalValue(_decimal,true));
+						if(_decimal){
+							mpd_set_string(_decimal->mpd,string(pRealText),_decimalContext);
+							if(!mpd_isnan(_decimal->mpd))
+								assignValue(&_valueReference->_value,_getDecimalValue(_decimal,true));
+							else
+								output("\nERROR: The decimal value of %s is undefined.",string(pRealText));
 						}else
-							output("\nERROR: The decimal value of %s is undefined.",string(pRealText));
+							output("\nERROR: Failed to create a decimal.");
 						/* replacing:
 						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getRationalValue(_rational));
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
 						free_mstring(_realText);
-					}
+					}else
+						output("\nERROR: Failed to initialize the text representation of a decimal.");
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=new_biginteger();
@@ -2457,26 +2534,6 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	}
 	return NULL;
 }
-
-Mrational* _qneg(Mrational* _rational){
-	// ASSERT _rational is not NULL
-	// the issue here is that we also should negate the delta so we have to create a new temporary rational
-	if(!_rational)return NULL;
-	Mrational* _negrational=_getRational(_rational->num,_rational->den,(_rational->delta?-_rational->delta->ld:M_LD_NAN),false,false); // do NOT normalize i.e. it's an exact copy, do NOT free bound num/den
-	if(_negrational){
-		_negrational->normalized=_rational->normalized; // take over the flag
-		if(isBigintegerZero(_rational->num)==MP_NO&&mp_neg(_rational->num,_rational->num)!=MP_OKAY){free_rational(_negrational);_negrational=NULL;} // negate the numerator
-	}
-	return _negrational;
-}
-Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
-	Mrational* _result=NULL;
-	if(_rational1&&_rational2){ // both defined
-		Mrational* _negrational2=_qneg(_rational2);
-		if(_negrational2){_result=_qadd(_rational1,_negrational2);free_rational(_negrational2);} // if negation succeeded add
-	}
-	return _result;
-}
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||isValueZero(_value1))return Mneg(_value2);if(!_value2||isValueZero(_value1))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
@@ -2494,10 +2551,6 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 
-Mrational* _qmultiply(Mrational* _rational1,Mrational* _rational2){
-	// TODO take the delta's into account!!!
-	return(_rational1&&_rational2?_getRational(_Imul(_rational1->num,_rational2->num),_Imul(_rational1->den,_rational2->den),M_LD_NAN,true,true):NULL);
-}
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueOne(_value2))return _value1;if(isValueZero(_value2)||isValueOne(_value1))return _value2;
@@ -2656,28 +2709,6 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 }
 
 // MDH@07JUN2019: when two integers are presented to divide instead of actually computing the division we can store the division as a rational (so we kind of have a slow evaluation of the division, and we maintain accuracy as long as possible)
-Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
-	// if either of them has a delta (i.e. is not pure), convert to double reals first
-	Mrational* _rational=NULL;
-	if(rational1&&rational2){
-		long double delta1=getRealLongDouble(rational1->delta),delta2=getRealLongDouble(rational2->delta);
-		if((ldIsNaN(delta1)||ldIsZero(delta1))&&(ldIsNaN(delta2)||ldIsZero(delta2))){ // both are 'pure' rationals
-			if(amVerbose())output("\nPure rational division.");
-			// compute the new numerator and denominator, both should not be NULL as the numerators are not NULL, so should be freed if we can't drop them
-			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den,false):_getBigintegerCopy(rational1->num));
-			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den,false):_getBigintegerCopy(rational2->num));
-			if(!_numerator||!_denominator){ // failed to compute either, so somewhere it went wrong
-				free_biginteger(_numerator);free_biginteger(_denominator);
-			}else{
-				if(isBigintegerOne(_denominator)){free_biginteger(_denominator);_denominator=NULL;} // prevent storing 1 explicitly...
-				_rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind them
-			}
-		}else{ // either one or both are unpure i.e. 'reals' approximated by rationals 
-			if(amVerbose())output("\nApproximate rational division.");
-		}
-	}
-	return _rational;
-}
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueOne(_value2))return _value1;
@@ -2916,8 +2947,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			if(expressionToken){
 				if(amVerbose())output("\nInterpreting operator token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-				_formulaelement->_operator=string_create();
-				if(!string_copy(expressionToken->text,_formulaelement->_operator)){output("\nERROR: Failed to copy the operator!");break;}
+				_formulaelement->_operator=string_copy(expressionToken->text);
+				if(!_formulaelement->_operator){output("\nERROR: Failed to copy the operator!");break;}
 				string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
 				while(expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
@@ -3431,7 +3462,8 @@ void copyCommand(){
 		pLastCommandToEvaluateToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
 		pLastCommandToEvaluateToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
 		// if failing to copy the text over get rid of the command constructed so far, and break
-		if(!string_copy(_tokenToCopy->text,pLastCommandToEvaluateToken->text)){pLastCommandToEvaluateToken=NULL;break;}
+		pLastCommandToEvaluateToken->text=string_copy(_tokenToCopy->text);
+		if(!pLastCommandToEvaluateToken->text){pLastCommandToEvaluateToken=NULL;break;}
 		// MDH@24APR2019 obsolete: commandLength()+=string_length(pLastCommandToEvaluateToken->text);
 		// some additional fields to copy over (NOT the offset is that is set automatically)
 #ifdef __DEBUG__
