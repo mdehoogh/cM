@@ -1,3 +1,5 @@
+mpdecimal-2.4.2/config.status
+mpdecimal-2.4.2/config.log
 mpdecimal-2.4.2/libmpdec/*.o
 mpdecimal-2.4.2/libmpdec/*.a
 mpdecimal-2.4.2/libmpdec/.objs/*
