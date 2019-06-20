@@ -14,6 +14,8 @@
 #include "Moutput.h"
 #include "Msession.h"
 
+const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
+
 const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
 
 const long long M_DP=20; // the default decimal precision
@@ -173,7 +175,7 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 	if(rational1&&rational2){
 		long double delta1=getRealLongDouble(rational1->delta),delta2=getRealLongDouble(rational2->delta);
 		if((ldIsNaN(delta1)||ldIsZero(delta1))&&(ldIsNaN(delta2)||ldIsZero(delta2))){ // both are 'pure' rationals
-			if(amVerbose())output("\nPure rational division.");
+			if(amVerbose())output("Pure rational division.");
 			// compute the nsew numerator and denominator, both should not be NULL as the numerators are not NULL, so should be freed if we can't drop them
 			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den,false):_getBigintegerCopy(rational1->num));
 			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den,false):_getBigintegerCopy(rational2->num));
@@ -184,7 +186,7 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 				_rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind them
 			}
 		}else{ // either one or both are unpure i.e. 'reals' approximated by rationals 
-			if(amVerbose())output("\nApproximate rational division.");
+			if(amVerbose())output("Approximate rational division.");
 		}
 	}
 	return _rational;
@@ -214,13 +216,13 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	// DONE problem to solve: the intermediate results should be freed if the rational could not be created!!
 	// TODO we can speed up these shortcuts (see how we handled creation errors at the bottom!!!)
 	if(!_den1&&!_den2){
-		if(amVerbose())output("\nBoth denominators in adding two rationals undefined!");
+		if(amVerbose())output("Both denominators in adding two rationals undefined!");
 		Mbiginteger* _num=_Iadd(_num1,_num2,false);free_biginteger(_num1);free_biginteger(_num2); // don't need these anymore
 		Mrational* _rational=_getRational(_num,NULL,deltasum,false,true);
 		return _rational; // if both denominators are undefined (i.e. 1), return the sum of the numerators
 	}
 	if(!_den1){
-		if(amVerbose())output("\nFirst denominator in adding two rationals undefined!");
+		if(amVerbose())output("First denominator in adding two rationals undefined!");
 		Mbiginteger* _mult=(_num1?_Imultiply(_num1,_den2,false):_den2);free_biginteger(_num1); // _num1 no longer needed
 		Mbiginteger* _num=(_mult?_Iadd(_num2,_mult,false):NULL);free_biginteger(_num2); // _num2 no longer needed
 		if(_num1)free_biginteger(_mult); // _mult no longer needed i.e. when it is not equal to _den2
@@ -234,7 +236,7 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 		return _rational;
 	}
 	if(!_den2){
-		if(amVerbose())output("\nSecond denominator in adding two rationals undefined!");
+		if(amVerbose())output("Second denominator in adding two rationals undefined!");
 		Mbiginteger* _mult=(_num1?_Imultiply(_num2,_den1,false):_den1);free_biginteger(_num2);
 		Mbiginteger* _num=(_mult?_Iadd(_num1,_mult,false):NULL);free_biginteger(_num1);
 		if(_num1)free_biginteger(_mult);
@@ -304,20 +306,39 @@ Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
 // end rational stuff
 
 // decimal stuff
-Mvalue* DP_value=NULL;
+/* MDH@20JUN2019: by not using DP_value anymore, we solved the problem of DP_value holding a reference to the decimal precision value which apparently was released at some point
+                  so as soon as the value pointer is released by the value list, a reference is still kept by DP_value but the memory will be reused and _integer might point into uncharted territory at some point in the future
+				  if we were to keep using DP_value we should have called assignValue() to assign the value and not DP_value=_getIntegerValue() (see initEnvironment())
+Mvalue* DP_value=NULL; 
+*/
 mpd_context_t* _decimalContext=NULL; // the application-wide decimal context
-long long getDP(){return DP_value->value._integer->ll;}
+long long getDP(){
+	if(!_decimalContext)_decimalContext=get_mpd_context(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
+	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
+	long long dp=(_decimalContext?_decimalContext->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
+	if(dp==M_LL_INVALID)output("BUG: No default decimal context active!\n");
+	return dp;
+}
 Mvalue* setdp(Mvalue* _value){
 	// how about returning the current value, no matter what the argument is????
-	long long decimalprecision=getDP();
+	long long olddecimalprecision=getDP();
+	// ignore if NO value specified...
 	if(_value&&_value->type==VT_INTEGER){
 		long long decimalprecision=_value->value._integer->ll;
-		if(decimalprecision>0){
-			DP_value->value._integer->ll=decimalprecision;
-			_decimalContext=get_mpd_context(getDP()); // update the application-wide decimal context
+		if(decimalprecision!=M_LL_INVALID){ // if not the default!!!
+			if(decimalprecision>=6){
+				// if I fail to create the associated decimal context, no go
+				mpd_context_t* _newDecimalContext=get_mpd_context(decimalprecision);
+				if(_newDecimalContext)
+					_decimalContext=_newDecimalContext;
+					////DP_value->value._integer->ll=_decimalContext->prec;
+				else
+					output("%sActive decimal context not replaced: failed to create a decimal context with precision %llu.\n",ERROR_PREFIX,decimalprecision);
+			}else
+				output("%sRequested decimal precision (%llu) not activated: it should at least be 6.\n",ERROR_PREFIX,decimalprecision);
 		}
 	}
-	return _getIntegerValue(decimalprecision);
+	return _getIntegerValue(olddecimalprecision);
 }
 ///////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
 
@@ -330,19 +351,19 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 void report_mpd_status(mpd_context_t* mpd_context){
 	uint32_t mpd_status=mpd_getstatus(mpd_context);
 	if(mpd_status>0){
-		output("\nDecimal computations error report.");
-		if(mpd_status&MPD_IEEE_Invalid_operation)output("\n\tIEEE Invalid operation error.");
-		if(mpd_status&MPD_Clamped)output("\n\tClamped error.");
-		if(mpd_status&MPD_Division_by_zero)output("\n\tDivision by zero error.");
-		if(mpd_status&MPD_Fpu_error)output("\n\tFPU error.");
-		if(mpd_status&MPD_Inexact)output("\n\tInexact error.");
-		if(mpd_status&MPD_Not_implemented)output("\n\tNot implemented error.");
-		if(mpd_status&MPD_Overflow)output("\n\tOverflow error.");
-		if(mpd_status&MPD_Rounded)output("\n\tRounding error.");
-		if(mpd_status&MPD_Subnormal)output("\n\tSubnormal error.");
-		if(mpd_status&MPD_Underflow)output("\n\tUnderflow error.");
+		outputLine("Decimal computations error report.");
+		if(mpd_status&MPD_IEEE_Invalid_operation)outputLine("\tIEEE Invalid operation error.");
+		if(mpd_status&MPD_Clamped)outputLine("\tClamped error.");
+		if(mpd_status&MPD_Division_by_zero)outputLine("\tDivision by zero error.");
+		if(mpd_status&MPD_Fpu_error)outputLine("\tFPU error.");
+		if(mpd_status&MPD_Inexact)outputLine("\tInexact error.");
+		if(mpd_status&MPD_Not_implemented)outputLine("\tNot implemented error.");
+		if(mpd_status&MPD_Overflow)outputLine("\tOverflow error.");
+		if(mpd_status&MPD_Rounded)outputLine("\tRounding error.");
+		if(mpd_status&MPD_Subnormal)outputLine("\tSubnormal error.");
+		if(mpd_status&MPD_Underflow)outputLine("\tUnderflow error.");
 	}else
-		output("\nNo decimal context errors.");
+		outputLine("No decimal context errors.");
 }
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
 
@@ -376,7 +397,7 @@ Mvalue* pi_ql(Mvalue* _value){
 	if(_value&&_value->type==VT_INTEGER){
 		long long maxiter=_value->value._integer->ll;
 		if(maxiter>=0){
-			if(amVerbose())output("\nApproximating pi/4 by a sum of %llu rational fractions.",maxiter);
+			if(amVerbose())output("Approximating pi/4 by a sum of %llu rational fractions.\n",maxiter);
 			// the first approximation (when iter=0) equals 4
 			Mrational* _rational=_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true);
 			if(_rational){
@@ -390,60 +411,60 @@ Mvalue* pi_ql(Mvalue* _value){
 							Mbiginteger* _addendumNumerator=_getBiginteger(iter%2?-1:1); // the numerator is either 1 or -1
 							if(!_addendumNumerator){
 								free_biginteger(_addendumDenominator);
-								output("\nERROR: Failed to set the addendum numerator at iteration %u.",iter);
+								output("%sFailed to set the addendum numerator at iteration %u.\n",ERROR_PREFIX,iter);
 								break;
 							}
 							// both _addendumNumerator and _addendumDenominator are now available to be bound in the rational
 							Mrational* _addendumRational=_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false,true);
 							if(!_addendumRational){ // failed to bind in the rational
-								output("ERROR: Failed to compute the rational to add to the approximation of pi in step %u.",iter);
+								output("%sFailed to compute the rational to add to the approximation of pi in step %u.",ERROR_PREFIX,iter);
 								break;
 							}
 							// add the addendum to the current rational
 							if(amVerbose()){
-								outputRational("\nSum so far: ",_rational,NULL);
-								outputRational(", addendum: ",_addendumRational,".");
+								outputRational("Sum so far: ",_rational,NULL);
+								outputRational(", addendum: ",_addendumRational,".\n");
 							}
 							Mrational* _newRational=_qadd(_rational,_addendumRational);
 							if(!_newRational){
 								// we have to free the addendum numerator and denominator
-								output("\nERROR: Failed to add this addendum at step %u in approximating pi.",iter);
+								output("%sFailed to add this addendum at step %u in approximating pi.\n",ERROR_PREFIX,iter);
 								free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
 								break;
 							}
 							// increment the denominator BEFORE we loose the addendum denominator we have now (as part of _rational)
-							if(amVerbose())outputBiginteger("\nIncrementing the addendum denominator by ",_denominatorIncrement,".");		
+							if(amVerbose())outputBiginteger("Incrementing the addendum denominator by ",_denominatorIncrement,".\n");		
 							Mbiginteger* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement,false);
 							if(!_newAddendumDenominator){
 								free_biginteger(_addendumDenominator); // won't be using this in the addendum rational
-								output("\nERROR: Failed to increment the addendum denominator.");
+								outputError("Failed to increment the addendum denominator");
 								break;
 							}
-							if(amVerbose())outputBiginteger("\nNew addendum denominator: ",_newAddendumDenominator,".");
-							if(amVerbose())outputRational("\nNew approximation to pi/4: ",_newRational,".");
+							if(amVerbose())outputBiginteger("New addendum denominator: ",_newAddendumDenominator,".\n");
+							if(amVerbose())outputRational("New approximation to pi/4: ",_newRational,".\n");
 							free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
 							// replace _rational by _newRational
 							free_rational(_rational);
 							_rational=_newRational;
 							//if(amVerbose())
-							if(amVerbose())outputRational("\nSum approximation of pi/4 so far: ",_rational,".");
+							if(amVerbose())outputRational("Sum approximation of pi/4 so far: ",_rational,".\n");
 							// no need to normalize as the addendum is always normalized by itself
 							// replace the addendum denominator with the new one)
 							_addendumDenominator=_newAddendumDenominator;
-							if(amVerbose())outputBiginteger("\nNew addendum denominator: ",_addendumDenominator,".");
+							if(amVerbose())outputBiginteger("New addendum denominator: ",_addendumDenominator,".\n");
 						}
 					}else{
-						output("\nERROR: Failed to initialize the addendum numerator and its increment value (2).");
+						outputError("Failed to initialize the addendum numerator and its increment value (2)");
 						free_biginteger(_addendumDenominator);
 					}
 				}
 				if(mp_mul_2d(_rational->num,2,_rational->num)!=MP_OKAY){
-					if(amVerbose())outputRational("\nERROR: Failed to multiply the approximation of pi/4 (",_rational," by 4.");
+					if(amVerbose()){output("%s",ERROR_PREFIX);outputRational("Failed to multiply the approximation of pi/4 (",_rational," by 4.\n");}
 					free_rational(_rational);
 					return NULL;
 				} // multiply the numerator by 4 i.e. 2**2
 				normalizeRational(_rational);
-				if(amVerbose())outputRational("\nNormalized approximation of pi: ",_rational,".");
+				if(amVerbose())outputRational("Normalized approximation of pi: ",_rational,".\n");
 				return _getRationalValue(_rational,true);
 			}
 		}
@@ -456,7 +477,7 @@ Mvalue* pi_q(Mvalue* _value){
 	if(_value&&_value->type==VT_INTEGER){
 		long long iter=_value->value._integer->ll;
 		if(iter>=0){
-			if(amVerbose())output("\nComputing %llu continued fractions of pi.",iter);
+			if(amVerbose())output("Computing %llu continued fractions of pi.\n",iter);
 			Mrational* _rational=_getRational(_getBiginteger(3),NULL,M_LD_NAN,false,true);
 			if(_rational){
 				if(iter>0){
@@ -464,16 +485,16 @@ Mvalue* pi_q(Mvalue* _value){
 					// in every step you have to compute i**2/6 the second term of the denominator
 					Mrational* _denominatorRational=_getRational(_getBiginteger(6),NULL,M_LD_NAN,false,true); // the final denominator equals 6
 					if(_denominatorRational){
-						if(amVerbose())output("\nFirst denominator rational computed.");
+						if(amVerbose())output("First denominator rational computed.\n");
 						long long square;
 						Mbiginteger* _bi6=_getBiginteger(6); // the one we want to reuse in the computation (that we need to free when done)
 						if(!_bi6){free_rational(_denominatorRational);return NULL;} // what a nuisance
 						while(--iter>0){
 							square=4*(iter+1)*iter+1;
-							////////////if(amVerbose())output("\nSquare numerator: %llu.",square);
+							////////////if(amVerbose())output("Square numerator: %llu.",square);
 							Mbiginteger* _bigintegerSquare=_getBiginteger(square);
-							if(!_bigintegerSquare){output("\nERROR: Failed to compute the big integer of square %llu.",square);break;}
-							if(amVerbose())output("\n%llu fractions yet to compute using numerator square '%llu'.",iter,square);
+							if(!_bigintegerSquare){output("%sFailed to compute the big integer of square %llu.\n",ERROR_PREFIX,square);break;}
+							if(amVerbose())output("%llu fractions yet to compute using numerator square '%llu'.\n",iter,square);
 							// the new denominator becomes 6+square/prev denominator=
 							Mbiginteger* _mult=_Imultiply(_denominatorRational->num,_bi6,false);
 							Mbiginteger* _add=(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare,false):_bigintegerSquare);
@@ -486,23 +507,23 @@ Mvalue* pi_q(Mvalue* _value){
 							free_rational(_denominatorRational); // get the 'previous' numerator and denominator released!!!!!!
 							_denominatorRational=_getRational(_denominatorNumerator,_previousDenominatorNumerator,M_LD_NAN,false,true);
 							if(!_denominatorRational)break; // let's keep it normalized???? TODO is that necessary
-							if(amVerbose())outputRational("\nDenominator (unnormalized): ",_rational,".");
+							if(amVerbose())outputRational("Denominator (unnormalized): ",_rational,".\n");
 						}
 						free_biginteger(_bi6);
 					}
-					if(!_denominatorRational){output("\nERROR: Final denominator could not be computed!");return NULL;}
+					if(!_denominatorRational){outputError("Final denominator could not be computed");return NULL;}
 					// NOTE: do NOT use the originals in inverting the denominator because those will be freed below so we need to pass in copies
 					Mrational* _inverseDenominatorRational=_getInverseRational(_denominatorRational);
 					Mrational* _result=NULL;
 					if(!_inverseDenominatorRational){
-						outputRational("\nERROR: Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").");
+						output("%s",ERROR_PREFIX);outputRational("Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").\n");
 						free_rational(_rational);_rational=NULL;
 					}else
 						_result=_qadd(_rational,_inverseDenominatorRational);
 					free_rational(_denominatorRational);
 					if(_result){
 						_rational=_result;
-						if(amVerbose())outputRational("\nApproximation of pi: ",_rational,".");
+						if(amVerbose())outputRational("Approximation of pi: ",_rational,".\n");
 					}else{
 						free_rational(_rational);
 						_rational=NULL;
@@ -545,21 +566,21 @@ for i in range(10000):
  */
 Mvalue* pi_d(Mvalue* _value){
 	// _value should be a positive integer defining the required precision
-	if(amVerbose())output("\nComputing pi using decimals.");
+	if(amVerbose())output("Computing pi using decimals.\n");
 	long long decimalprecision=0;if(_value&&_value->type==VT_INTEGER)decimalprecision=_value->value._integer->ll;
 	mpd_context_t* mpd_context=(decimalprecision>0?get_mpd_context(decimalprecision):_decimalContext);
-	if(!mpd_context){if(decimalprecision>0)output("\nERROR: Failed to obtain the requested decimal context.");else output("\nERROR: No (default) decimal context available!");return NULL;}
+	if(!mpd_context){if(decimalprecision>0)outputError("Failed to obtain the requested decimal context");else outputError("No (default) decimal context available");return NULL;}
 	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
-	if(amVerbose())output("\nComputing pi to %lld decimals.",decimalprecision);
+	if(amVerbose())output("Computing pi to %lld decimals.\n",decimalprecision);
 	// initialize the variables we need for the iterations
 	mpd_t *lasts=new_mpd(mpd_context,0),*t=new_mpd(mpd_context,3),*s=new_mpd(mpd_context,3),*n=new_mpd(mpd_context,1),*na=new_mpd(mpd_context,0),*d=new_mpd(mpd_context,0),*da=new_mpd(mpd_context,24);
 	// some constant decimals we need
 	mpd_t *d8=new_mpd(mpd_context,8),*d32=new_mpd(mpd_context,32);
-	if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){output("\nERROR: Failed to create all helper decimals.");return NULL;}
-	if(amVerbose())output("\nInitial decimals created!");
+	if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
+	if(amVerbose())output("Initial decimals created!\n");
 	unsigned long long iter=0;
 	if(amVerbose()){
-		output("\nIteration %u:",iter);
+		output("Iteration %u:",iter);
 		char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
 		char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
 		char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
@@ -567,20 +588,21 @@ Mvalue* pi_d(Mvalue* _value){
 		char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
 		char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
 		char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
+		outputChar('\n');
 	}
 	int cmp;
 	mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
 	while(!mpd_error(mpd_context)){
 		iter++;
-		//if(amVerbose())output("\nIteration: %lld: ",iter);
+		//if(amVerbose())output("Iteration: %lld: ",iter);
 		cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
-		//if(amVerbose()){output("\na\t");if(mpd_error(mpd_context))break;}
-		if(!cmp){if(amVerbose())output("\nDone!");break;}
-		//if(amVerbose()){output("\nb\t");if(mpd_error(mpd_context))break;}
-		if(cmp==INT_MAX){output("\nSomething went wrong!");break;}
-		//if(amVerbose()){output("\nc\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
+		//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
+		if(!cmp){if(amVerbose())output("Done!\n");break;}
+		//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
+		if(cmp==INT_MAX){output("Something went wrong!\n");break;}
+		//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
 		mpd_copy(lasts,s,mpd_context); // lasts = s
-		//if(amVerbose()){output("\nd\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
+		//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
 		mpd_add(n,n,na,mpd_context);
 		//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
 		mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
@@ -596,7 +618,7 @@ Mvalue* pi_d(Mvalue* _value){
 		mpd_add(s,s,t,mpd_context); // add t to s
 		//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
 		if(amVerbose()){
-			output("\nIteration %u:",iter);
+			output("Iteration %u:",iter);
 			char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
 			char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
 			char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
@@ -604,6 +626,7 @@ Mvalue* pi_d(Mvalue* _value){
 			char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
 			char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
 			char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
+			outputChar('\n');
 		}
 	}
 	if(mpd_context)mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
@@ -612,7 +635,7 @@ Mvalue* pi_d(Mvalue* _value){
 	mpd_del(d8);mpd_del(d32);
 	if(mpd_context){
 		if(mpd_error(mpd_context)){ // something went wrong
-			if(amVerbose())output("\nERROR: Computation of pi with precision %lld error status: %u.",decimalprecision,mpd_getstatus(mpd_context));
+			if(amVerbose())output("%sComputation of pi with precision %lld error status: %u.\n",ERROR_PREFIX,decimalprecision,mpd_getstatus(mpd_context));
 			report_mpd_status(mpd_context);
 			return NULL;
 		}
@@ -620,7 +643,7 @@ Mvalue* pi_d(Mvalue* _value){
 	// success
 	mpd_finalize(s,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
 	if(amVerbose()){
-		char* _s=mpd_to_sci(s,0);if(_s){output("\nFinal approximation of pi (rounded to %llu decimals): %s.",decimalprecision,_s);free(_s);}
+		char* _s=mpd_to_sci(s,0);if(_s){output("Final approximation of pi (rounded to %llu decimals): %s.\n",decimalprecision,_s);free(_s);}
 	}
 	// wrap the mpd_t in a decimal, and subsequently in an Mvalue!!!
 	return _getDecimalValue(_getDecimal(s,0,true),true);
@@ -630,7 +653,7 @@ Mvalue* pi_d(Mvalue* _value){
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
 Mvalue* getResult(Mvalue* _indexValue){
-	if(amVerbose())output("\nResult requested!");
+	if(amVerbose())outputLine("Result requested!");
 	if(!_indexValue)return _resultListValue;
 	long long indexValueInteger=getValueInteger(_indexValue); // NOTE all index values should be positive!!!
 	return (indexValueInteger>0?getValueAtIndex(_resultListValue->value._list,indexValueInteger):NULL); // TODO are we calling getResult anywhere????
@@ -839,7 +862,7 @@ Mrational* _getLongDoubleRational(long double f){ // taking out: int64_t md, int
 	while (f != floor(f)) { n <<= 1; f *= 2; }
 	d = f;
   
-	output("\n%llu.",d);
+	output("%llu.",d);
 
 	// continued fraction and check denominator each step
 	for (i = 0; i < 64; i++) {
@@ -926,7 +949,7 @@ Mrational* _getValueRational(Mvalue* _value){
 				/* replacing (and augmenting in case of a repeating fractional part):
 				{ // until we find a way to get the associated rational using the internal representation we stick to extracting the rational from the text representation of the decimal (which should be exact)
 					char* _decimalText=mpd_to_sci(_value->value._decimal->mpd,0);
-					if(_decimalText){_rational=_getDecimalTextRational(_decimalText,false);free(_decimalText);}else output("\nERROR: Failed to obtain the text representation of a decimal.");
+					if(_decimalText){_rational=_getDecimalTextRational(_decimalText,false);free(_decimalText);}else output("ERROR: Failed to obtain the text representation of a decimal.");
 				}
 				*/
 				break;
@@ -1070,9 +1093,12 @@ bool initEnvironment(){
 	NAI_value=_getIntegerValue(M_LL_INVALID);
 	NULL_value=_getValueOfToken(newToken(NULL),true);NULL_value->value._token->text=new_mstring("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
 
-	_decimalContext=get_mpd_context(M_DP); // initialize the application-wide decimal context with precision M_DP
 	// either set the DP_value to 0 (failed to get a decimal context somehow)
-	DP_value=_getIntegerValue(_decimalContext?_decimalContext->prec:0L);
+	/* MDH@20JUN2019: no need for DP_value anymore (as setdp() return _decimalContext->prec now): 
+	_decimalContext=get_mpd_context(M_DP); // initialize the application-wide decimal context with precision M_DP
+	assignValue(DP_value,_getIntegerValue(_decimalContext?_decimalContext->prec:0L));
+	if(!DP_value)output("WARNING: Failed to initialize the decimal precision.");
+	*/
 
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
@@ -1150,12 +1176,12 @@ bool initEnvironment(){
 			*/
 			_Menvironment->_functionMap=environmentFunctionMap;
 			if(!registerInternalFunctions(_Menvironment)){
-				outputLine("ERROR: Failed to register all internal functions.");
+				outputError("Failed to register all internal functions");
 				return false;
 			}
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
 			if(_resultListValue&&!completedIntegerFunction(newFunction(_Menvironment,"M"),getResult)){
-				outputLine("ERROR: Failed to register function M (for requesting previous results).");
+				outputError("Failed to register function M (for requesting previous results)");
 				return false;
 			}
 			/*
@@ -1165,12 +1191,12 @@ bool initEnvironment(){
 			}
 			*/
 			if(!completedIntegerFunction(newFunction(_Menvironment,"setdp"),setdp)){
-				outputLine("ERROR: Failed to register the setdp function.");
+				outputError("Failed to register the setdp function");
 				return false;
 			}
 			// pi() functions (decimal and rational)
 			if(!completedIntegerFunction(newFunction(_Menvironment,"pi$q"),pi_q)||!completedIntegerFunction(newFunction(_Menvironment,"pi$ql"),pi_ql)||!completedIntegerFunction(newFunction(_Menvironment,"pi"),pi_d)){
-				outputLine("ERROR: Failed to register the pi, pi$q and pi$ql functions.");
+				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return false;
 			}
 			// conversions
@@ -1180,40 +1206,40 @@ bool initEnvironment(){
 					||!completedValueFunction(newFunction(_Menvironment,"q"),q)||!completedValueFunction(newFunction(_Menvironment,"Q"),Q)
 					||!completedValueFunction(newFunction(_Menvironment,"d"),d)
 					||!completedValueFunction(newFunction(_Menvironment,"b"),b)||!completedValueFunction(newFunction(_Menvironment,"B"),B)){
-				outputLine("ERROR: Failed to register value type conversion functions.");
+				outputError("Failed to register value type conversion functions");
 				return false;
 			}
 			if(!completedValueFunction(newFunction(_Menvironment,"neg"),Mneg)||!completedValueFunction(newFunction(_Menvironment,"bnot"),Mbnot)||!completedValueFunction(newFunction(_Menvironment,"not"),Mnot)){
-				outputLine("ERROR: Failed to register all unary functions.");
+				outputError("Failed to register all unary functions");
 				return false;
 			}
 			if(!completedValueFunction(newFunction(_Menvironment,"null"),Mnull)||!completedValueFunction(newFunction(_Menvironment,"undefined"),Mundefined)){
-				outputLine("ERROR: Failed to register the null and undefined function.");
+				outputError("Failed to register the null and undefined function");
 				return false;
 			}
 			if(!completedValueFunction(newFunction(_Menvironment,"sum"),Msum)||!completedValueFunction(newFunction(_Menvironment,"len"),Mlen)){
-				outputLine("ERROR: Failed to register all list functions.");
+				outputError("Failed to register all list functions");
 				return false;
 			}
 			if(!completedValueFunction(newFunction(_Menvironment,"fac"),Mfac)||!completedValueFunction(newFunction(_Menvironment,"facd"),Mfacd)){
-				outputLine("ERROR: Failed to register the fac functions.");
+				outputError("Failed to register the fac and facd function");
 				return false;
 			}
 			// register list conversions
 			if(!completedListFunction(newFunction(_Menvironment,"l2m"),l2m)||!completedListFunction(newFunction(_Menvironment,"l2ml"),l2ml)||!completedListFunction(newFunction(_Menvironment,"ml2l"),ml2l)||!completedListFunction(newFunction(_Menvironment,"ml2m"),ml2m)){
-				outputLine("ERROR: Failed to register list conversion functions.");
+				outputError("Failed to register list conversion functions");
 				return false;
 			}
 			// register map conversions
 			if(!completedListFunction(newFunction(_Menvironment,"m2ml"),m2ml)||!completedListFunction(newFunction(_Menvironment,"m2l"),m2l)){
-				outputLine("ERROR: Failed to register map conversion functions.");
+				outputError("Failed to register map conversion functions");
 				return false;
 			}
 
 		}
 	}
 	if(!pushExecutionEnvironment(_Menvironment)){
-		outputLine("ERROR: Failed to register the M environment as execution environment!");
+		outputError("Failed to register the M environment as execution environment");
 		return false;
 	}
 	return true;
@@ -1283,13 +1309,13 @@ mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 }
 void outputFunctions(){
 	mstring* functionsText=_getFunctionMapText(_Menvironment->_functionMap);
-	output("\nFunctions: %s.",string(functionsText));
+	output("Functions: %s.\n",string(functionsText));
 	free_mstring(functionsText);
 }
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
 	mstring* variablesText=_getMapText(_Menvironment->_variableMap);
-	output("\nVariables: %s.",string(variablesText));
+	output("Variables: %s.\n",string(variablesText));
 	free_mstring(variablesText);
 }
 
@@ -1312,7 +1338,7 @@ void restoreCursor(){printf("\0338");}
 */
 
 void displayFlags(){
-	output("\nEdit flags: %c%c%c%c%c - Display flags: %c%c.",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'s':'S',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
+	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'s':'S',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
 }
 
 void outputFlags(){
@@ -1366,7 +1392,7 @@ void prompt(){
 void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
-	output("\n\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
+	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
 	prompt();
 }
 
@@ -1455,8 +1481,6 @@ void toCursorPosition(){
 
 // MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
 // MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
-
-void outputError(const char* const error){if(error&&!strlen(error))output("ERROR: %s",error);} // NO newline at the beginning!!!!!
 
 void inputInfo(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
@@ -1808,7 +1832,7 @@ void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_valuereference->_variable->_value,commandCount+1))outputLine("ERROR: Failed to save the result.");else if(amVerbose())outputLine("Result saved.");}
 		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))outputLine("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputLine("Result appended to the M list.");
 		//// NEVER free what does not have an underscore at the start!!!! free_token(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
-		////////output("\nFreeing expression!");
+		////////output("Freeing expression!");
 		decrementReferenceCount(_expressionvalue->_valuereference->_variable->_value); // as where freeing _expressionvalue!!!!
 		free(_expressionvalue);
 	}else
@@ -1873,14 +1897,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
-	if(amVerbose())output("\nComposing a list starting with '%s'.",string(expressionToken->text));
+	if(amVerbose())output("Composing a list starting with '%s'.",string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mvalue* _listValue=_getListValue(VT_UNDEFINED); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
-	if(!_list){output("\nFailed to create a list to return.");return NULL;}
-	if(_list->_first||_list->_last){output("\nSupposedly empty list not initialized correctly.");return NULL;}
-	if(amVerbose())output("\nComposing a list starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(!_list){output("Failed to create a list to return.");return NULL;}
+	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.");return NULL;}
+	if(amVerbose())output("Composing a list starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	unsigned long long listElementIndex=0;
@@ -1889,11 +1913,11 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 		if(!expressionToken)break;
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
-		if(amVerbose())output("\nProcessing list element #%llu starting with token '%s' of type '%s'.",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerbose())output("Processing list element #%llu starting with token '%s' of type '%s'.",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 		Mvalue* _listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
-		if(!_listElementValue){if(amVerbose())output("\nList element missing!");continue;} // undefined list elements should NEVER be added to the list
-		if(amVerbose())output("\nList element ending token: %s.",TOKENTYPE_STRING[expressionToken->type]);
+		if(!_listElementValue){if(amVerbose())output("List element missing!");continue;} // undefined list elements should NEVER be added to the list
+		if(amVerbose())output("List element ending token: %s.",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
@@ -1904,12 +1928,12 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 				outputValue("\nERROR: Failed to append list element '",_listElementValue,"'.");
 				break;
 			}
-			if(amVerbose())output("\nList element #%lld appended to list with index %lld!",listElementIndex,newListElementIndex);
+			if(amVerbose())output("List element #%lld appended to list with index %lld!",listElementIndex,newListElementIndex);
 		}else
-		if(amVerbose())output("\nMaximum number of elements reached.");
+		if(amVerbose())output("Maximum number of elements reached.");
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
-	if(amVerbose())output("\nList extracted!");
+	if(amVerbose())output("List extracted!");
 	return _listValue;
 }
 
@@ -1952,13 +1976,13 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
 				break;
 			}
 		case FT_INTERNAL_NO_ARGUMENTS:
-			if(amVerbose())output("\nCalling no-argument function %s.",string(_function->_name));
+			if(amVerbose())output("Calling no-argument function %s.",string(_function->_name));
 			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
-			if(amVerbose())output("\nCalling one-argument function %s.",string(_function->_name));
+			if(amVerbose())output("Calling one-argument function %s.",string(_function->_name));
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:{
-			if(amVerbose())output("\nCalling two-argument function %s.",string(_function->_name));
+			if(amVerbose())output("Calling two-argument function %s.",string(_function->_name));
 			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 			Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 			return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
@@ -2048,7 +2072,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 						if(index)
 							outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.");
 						else
-							output("\nERROR: A zero index is not allowed.");
+							output("ERROR: A zero index is not allowed.");
 					}
 					// neither a list nor a map, so nothing to return!!!
 					return NULL;
@@ -2141,7 +2165,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	if(amVerbose()){
-		output("\nApplying unary operator '%c'",operator);
+		output("Applying unary operator '%c'",operator);
 		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.",_value->type);}
 	}
 	// delegating to the one argument functions that we have is best!!!
@@ -2161,7 +2185,7 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 */
 Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
 
-	if(amVerbose())output("\ngetValueReference() extracting a(n) %s value that starts with token '%s' of type '%s'.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(amVerbose())output("getValueReference() extracting a(n) %s value that starts with token '%s' of type '%s'.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
 	Mvaluereference* _valueReference=NULL;
 
@@ -2175,11 +2199,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		}
 		expressionToken=expressionToken->next;
 	}
-	if(amVerbose()){if(unaryOperators)output("\nUnary operators: '%s'.",string(unaryOperators));else output("\nNo unary operators!");}
+	if(amVerbose()){if(unaryOperators)output("Unary operators: '%s'.",string(unaryOperators));else output("No unary operators!");}
 	// ASSERT unary operators extracted
 
 	if(expressionToken){
-		if(amVerbose())output("\ngetValueReference() interpreting first value token '%s' of type %s.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		_valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
@@ -2194,32 +2218,32 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		switch(expressionToken->type){
 			case TT_FUNCTION:
 				{
-					if(amVerbose())output("\nCall of function '%s'.",string(expressionToken->text));
+					if(amVerbose())output("Call of function '%s'.",string(expressionToken->text));
 					Mfunction* function=getFunction(_Menvironment,string(expressionToken->text)); // get the function associated with the name of the function
 					if(function){					
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=expressionToken->next;
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
 						if(_functionArgumentsValue){
-							if(amVerbose())output("\nConstructing the function call argument map!");
+							if(amVerbose())output("Constructing the function call argument map!");
 							// 2. get the arguments map
 							Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
 							/*
-							if(amVerbose())output("\nDecrementing the reference count of the function arguments value!");
+							if(amVerbose())output("Decrementing the reference count of the function arguments value!");
 							decrementReferenceCount(_functionArgumentsValue); // TODO is this correct?????
-							if(amVerbose())output("\nReference count of the function arguments value decremented!");
+							if(amVerbose())output("Reference count of the function arguments value decremented!");
 							*/
 							// 3. the result of applying the function to the arguments is the end result
 							assignValue(&_valueReference->_value,getValueOfFunctionCall(function,_functionArgumentMap));
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
-							if(amVerbose())output("\nFreeing the function argument map!");
+							if(amVerbose())output("Freeing the function argument map!");
 							free_map(_functionArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
-							if(amVerbose())output("\nFunction argument map freed!");
+							if(amVerbose())output("Function argument map freed!");
 						}else
-							output("\nERROR: No function arguments!");
+							output("ERROR: No function arguments!");
 					}else
-						output("\nERROR: Function '%s' unknown!",string(expressionToken->text));
+						output("ERROR: Function '%s' unknown!",string(expressionToken->text));
 				}
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
@@ -2269,28 +2293,37 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					mstring* pRealText=_realText;
 					if(pRealText){
 						pRealText=string_append(pRealText,string(expressionToken->text));
+						if(amDebugging())outputLine("Fractional part appended!");
 						if(string_length(expressionToken->text)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
+						if(amDebugging())outputLine("Fractional part corrected!");
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
 						//                the problem is that we need a context, and therefore a decimal precision 
 						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
-						if(getDP()<string_length(expressionToken->text))output("\nWARNING: More decimals present in literal than expected. Rounding may occur.");
+						uint32_t l=string_length(expressionToken->text);
+						if(amDebugging())output("Real part string length: %u.\n",l);
+						if(getDP()<l)output("WARNING: More decimals present in literal than expected. Rounding may occur.\n");
+						if(amDebugging())outputLine("Decimal precision checked!");
 						Mdecimal* _decimal=new_decimal(_decimalContext,0);
+						if(amDebugging())outputLine("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),_decimalContext);
+							if(amDebugging())outputLine("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
 								assignValue(&_valueReference->_value,_getDecimalValue(_decimal,true));
 							else
-								output("\nERROR: The decimal value of %s is undefined.",string(pRealText));
+								outputErrorAndText("The decimal value of %s is undefined",string(pRealText));
 						}else
-							output("\nERROR: Failed to create a decimal.");
+							outputError("Failed to create a decimal");
 						/* replacing:
 						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getRationalValue(_rational));
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
+						if(amDebugging())outputLine("Releasing decimal text.");
 						free_mstring(_realText);
+						if(amDebugging())outputLine("Decimal text released.");
 					}else
-						output("\nERROR: Failed to initialize the text representation of a decimal.");
+						outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=new_biginteger();
@@ -2302,7 +2335,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
 					}else{
 						free_biginteger(_biginteger);
-						output("\nERROR: Failed to create the big integer to store integer '%s'.",string(expressionToken->text));
+						outputErrorAndText("Failed to create the big integer to store integer ",string(expressionToken->text));
 					}
 				}
 				break;
@@ -2321,31 +2354,31 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			case TT_MAP: // a map literal
 			{	
 				Mvalue* _mapValue=getValueOfMap();
-				if(amVerbose())outputValue("\nMap extracted: '",_mapValue,"'.");
+				if(amVerbose())outputValue("Map extracted: '",_mapValue,"'.\n");
 				_valueReference=get_valuereference(_mapValue);
 				break;
 			}
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
 			{
 				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1);
-				if(amVerbose())output("\nGoing to wrap the list extracted!");
+				if(amVerbose())outputLine("Going to wrap the list extracted!");
 				// well, actually, we need the first element of the list that is returned!!!
 				// use only the first element if the list only has one element, otherwise use the list itself
 				if(_expressionListValue->value._list->numberOfElements==1){
 					_valueReference=get_valuereference(_expressionListValue->value._list->_first->_value);
 				}else
 					_valueReference=get_valuereference(_expressionListValue);
-				if(amVerbose())output("\nExtracted list wrapped!");
+				if(amVerbose())outputLine("Extracted list wrapped!");
 				break;
 			}
 			default:
 				break;
 		}
 
-		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("\nValue: `",_valueReference->_value,"`.");else output("\nNo result!");}
+		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("Value: `",_valueReference->_value,"`.\n");else output("No result!");}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
-			if(amVerbose())output("\nApplying unary operators: `%s`.",string(unaryOperators));
+			if(amVerbose())output("Applying unary operators: `%s`.",string(unaryOperators));
 			uint16_t l=string_length(unaryOperators);
 			while(l>0&&_valueReference->_value){
 				/////////////decrementReferenceCount(_valueReference->_value);
@@ -2354,7 +2387,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}
 			if(amVerbose())outputValue("\nResult after applying unary operators: `",_valueReference->_value,"`.");
 		}else
-			if(amVerbose())output("\nNo unary operators to apply!");
+			if(amVerbose())output("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=expressionToken->next;
@@ -2386,15 +2419,15 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						// TODO apply the shortcut binary operator to the current value of the assignee before assigning
 					}
 					// if we failed to create the variable (see above), the following obviously will fail!!! (or of course when the type of the value is wrong)
-					//if(amVerbose())output("\nStoring value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
+					//if(amVerbose())output("Storing value '%s' in variable '%s'.",string(_getValueText(_expressionvalue->_value)),firstTokenText);
 					if(!setValue(_Menvironment,firstTokenText,_valuereference->_variable->_value)){
-						//output("\nERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
+						//output("ERROR: Value '%s' not stored.",string(_getValueText(_expressionvalue->_value)));
 						// no need to ever free a value ourselves, the 'garbage collection' takes care of that (see removedValues())
 						///free_value(_expressionvalue->_value);
 						///_expressionvalue->_value=NULL;
 					}else
 					if(amVerbose())
-						output("\nVariable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(_Menvironment,firstTokenText))));
+						output("Variable '%s' set to '%s'.",firstTokenText,string(_getValueText(getValue(_Menvironment,firstTokenText))));
 				}
 			}
 		}
@@ -2516,7 +2549,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 			char* valueText=_value2->value._string->_c;
 			if(strchr(valueText,'.')!=NULL){ // a period 
 				////////if(strlen(_valueText)==1)return _value1; // if a single period no need to actually add it unless someone want to change an integer in a real????
-				////// we can use _strtold!!! long double ld=0;if(strlen(valueText)>1){char *endPtr=NULL;ld=strtold(valueText,&endPtr);if(endPtr==valueText){output("\nERROR: Can't add '%s'.",valueText);return NULL;}} // failure
+				////// we can use _strtold!!! long double ld=0;if(strlen(valueText)>1){char *endPtr=NULL;ld=strtold(valueText,&endPtr);if(endPtr==valueText){output("ERROR: Can't add '%s'.",valueText);return NULL;}} // failure
 				_value2=_getRealValue(_strtold(valueText,getNAR()));
 			}else{ // no period
 				_value2=_getIntegerValue(_strtoll(valueText,getNAI()));
@@ -2524,7 +2557,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 				int l=strlen(valueText)-1; // the last character
 				if(l<0||(l==((valueText[0]=='-'||valueText[0]=='+'))&&valueText[l]=='0'))return _value1; // if adding zero just return _value1 (and therefore something of the same type)
 				long long ll=atoll(valueText);
-				if(!ll){output("\nERROR: Can't add '%s'!",valueText);return NULL;}; // if zero the text does not represent a valid integer!!!
+				if(!ll){output("ERROR: Can't add '%s'!",valueText);return NULL;}; // if zero the text does not represent a valid integer!!!
 				_value2=_getIntegerValue(ll); //re-use the _value2 pointer so we can perform the requested addition
 				*/
 			}
@@ -2688,14 +2721,14 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 						if(exponentOf10==0)
 							_rational=_getRational(_numerator,_getBigintegerCopy(_value1->value._rational->den),getReal(_value1->value._rational->delta),true,true);
 						else
-							output("\nERROR: Failed to multiply the numerator of the rational by an integer power of 10.");
+							output("ERROR: Failed to multiply the numerator of the rational by an integer power of 10.");
 					}else{
 						Mbiginteger* _denominator=(!_value1->value._rational->den?_getBiginteger(1):_getBigintegerCopy(_value1->value._rational->den));
 						while(exponentOf10<0)if(mp_mul(_denominator,_biginteger10,_denominator)==MP_OKAY)exponentOf10++;else break;
 						if(exponentOf10==0)
 							_rational=_getRational(_getBigintegerCopy(_value1->value._rational->num),_denominator,getReal(_value1->value._rational->delta),true,true);
 						else
-							output("\nERROR: Failed to multiply the denominator of the rational by an integer power of 10.");
+							output("ERROR: Failed to multiply the denominator of the rational by an integer power of 10.");
 					}
 					free_biginteger(_biginteger10);
 				}
@@ -2905,7 +2938,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 	if(expressionToken){
 
 		if(amVerbose()){
-			output("\ngetValueOfExpression() interpreting %s expression starting with token '%s' of type '%s'",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			output("getValueOfExpression() interpreting %s expression starting with token '%s' of type '%s'",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			if(endTokenTypeCount){
 				output(" that ends");
 				uint8_t endTokenTypeIndex=0;
@@ -2923,32 +2956,32 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 		while(expressionToken){
 
-			if(amVerbose())output("\ngetValueOfExpression() processing %s expression token '%s' of type %s.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			if(amVerbose())output("getValueOfExpression() processing %s expression token '%s' of type %s.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			// does this token end the expression????
 			endTokenTypeIndex=endTokenTypeCount;
 			// OOPS operators shouldn't break here (and end the expression)
 			while(endTokenTypeIndex>0&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1])endTokenTypeIndex--; // replacing: &&expressionToken->type>=8)endTokenTypeIndex--;
-			if(endTokenTypeIndex>0){if(amVerbose())output("\nEnd of %s expression.",info);break;}
+			if(endTokenTypeIndex>0){if(amVerbose())output("End of %s expression.\n",info);break;}
 			
 			_formulaelement->_operand=getValueReference("operand",endTokenTypes,endTokenTypeCount);
 
-			if(amVerbose())outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.");
+			if(amVerbose())outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.\n");
 
 			// the next token(s) should be a binary operator
 			// NOTE some binary operators are stored in a couple of tokens!!!
 			if(expressionToken)if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)expressionToken=expressionToken->next;
 
 			// MDH@16MAY2019: can't end an expression with an operator BRO'
-			if(amVerbose())if(expressionToken)output("\nDoes '%s' of type '%s' end the expression?",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			if(amVerbose())if(expressionToken)output("Does '%s' of type '%s' end the expression?",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			endTokenTypeIndex=endTokenTypeCount;
 			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
-			if(endTokenTypeIndex){if(amVerbose())output("\nToken '%s' of type %s ends the %s expression.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);break;}
-			if(amVerbose())if(expressionToken)output(" NO");
+			if(endTokenTypeIndex){if(amVerbose())output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);break;}
+			if(amVerbose())if(expressionToken)outputLine(" NO");
 
 			if(expressionToken){
-				if(amVerbose())output("\nInterpreting operator token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+				if(amVerbose())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				_formulaelement->_operator=string_copy(expressionToken->text);
-				if(!_formulaelement->_operator){output("\nERROR: Failed to copy the operator!");break;}
+				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
 				string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
 				while(expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
@@ -2959,7 +2992,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					expressionToken=expressionToken->next;
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
-				if(amVerbose())output("\nFormula element operator: '%s'.",string(_formulaelement->_operator));
+				if(amVerbose())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
 				_formulaelement->_next=(Mformulaelement*)calloc(1,sizeof(Mformulaelement));
 				_formulaelement=_formulaelement->_next;
 				expressionToken=expressionToken->next;
@@ -2973,7 +3006,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		// evaluate the formula
 		if(formula){
 
-			if(amVerbose())outputValue("\nFirst formula value: '",formula->_operand->_value,"'.");
+			if(amVerbose())outputValue("First formula value: '",formula->_operand->_value,"'.\n");
 
 			// skip all assignments
 			uint16_t numberOfAssignments=0;
@@ -2988,28 +3021,28 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				numberOfAssignments++;
 				_formulaelement=_formulaelement->_next;
 			}
-			if(amVerbose())output("\nNumber of assignments: %u.",numberOfAssignments);
+			if(amVerbose())output("Number of assignments: %u.\n",numberOfAssignments);
 
 			Mvalue* _result=getReferencedValue(_formulaelement->_operand); // the first result computed
 
-			if(amVerbose())outputValue("\nFirst result: '",_result,"'.");
+			if(amVerbose())outputValue("First result: '",_result,"'.\n");
 			// 'applying' the binary operators left-to-right remembering the intermediate result in _result
 			// NOTE because all formula-elements are freed afterwards (see below) there's no need to so while applying the binary operators
 			while(_formulaelement->_next){ // a binary operator to apply
 				_result=applyBinaryOperator(string(_formulaelement->_operator),_result,getReferencedValue(_formulaelement->_next->_operand));
 				_formulaelement=_formulaelement->_next;
 			}
-			if(amVerbose())outputValue("\nResult: '",_result,"'.");
+			if(amVerbose())outputValue("Result: '",_result,"'.\n");
 			
 			// perform assignments right-to-left (which is a little problematic though)
 			if(numberOfAssignments){
-				if(amVerbose())output("\nPerforming %u assignments.",numberOfAssignments);
+				if(amVerbose())output("Performing %u assignments.",numberOfAssignments);
 				_formulaelement=_lastAssignmentFormulaelement;
 				while(_formulaelement){
 					_valuereference=_formulaelement->_operand;
 					if(amVerbose()){
 						mstring* _indexidText=_getValueText(_valuereference->_itemid,false);
-						output("\nAssignment to %s%s using operator %s!",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
+						output("Assignment to %s%s using operator %s!",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
 						if(_indexidText)free_mstring(_indexidText);
 					}
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
@@ -3051,9 +3084,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_nextformulaelement;
 			}
 		}else
-		if(amVerbose())output("\nNo result to store.");
+		if(amVerbose())outputLine("No result to store.");
 	}
-	if(amVerbose())outputValue("\nExpression value: '",_expressionValue,"'.");
+	if(amVerbose())outputValue("Expression value: '",_expressionValue,"'.\n");
 	return _expressionValue;
 }
 /**
@@ -3279,25 +3312,25 @@ void setCommandPage(uint32_t newCommandPage){
 	int32_t commandToShowIndex=10,lastCommandToShowIndex=commandCount-(commandPage*10);
 	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
 		resetOutputColor();
-		output("\n%d. ",lastCommandToShowIndex+commandToShowIndex+1);
+		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
 		Mtoken* token=commands[lastCommandToShowIndex+commandToShowIndex];
 		while(token){outputToken(token);token=token->next;}
 	}
 	resetOutputColor();
-	output("\n%s","Select the last digit of the command to use, or the up/down key to show the next/previous page.");
-	output("\n%s",">> "); // TODO what kind of prompting do we want to do???
+	output("%s","Select the last digit of the command to use, or the up/down key to show the next/previous page.");
+	output("%s",">> "); // TODO what kind of prompting do we want to do???
 }
 void showNextCommandPage(){
 	if(commandPage<commandPages)
 		setCommandPage(commandPage+1);
 	else
-		output("\n%s","No further commands to show.");
+		output("%s","No further commands to show.");
 }
 void showPreviousCommandPage(){
 	if(commandPage>1)
 		setCommandPage(commandPage-1);
 	else
-		output("\n%s","No further commands to show.");
+		output("%s","No further commands to show.");
 }
 /*
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
@@ -3346,7 +3379,7 @@ char switchToControlMode(char* message){
 	}
 	///////////outputFlags(); // show the user the current flags!!
 	return 'o'; // to make the loop know to quit
-	//output("\n%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History Shell");
+	//output("%s\n >> ","Control mode: Flags: Assist Debug - Options: eXit History Shell");
 }
 
 void writeBehindCursorText(bool clearAfterBehindCursorText){
@@ -3598,11 +3631,11 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 void outputTokenInfo(){
 	Mtoken* token=pCommandToEvaluate;
 	uint16_t tokenIndex=0;
-	output("\n%s:","Tokens");
-	output("\n%s\t%s\t%s\t%s\t%s\t\t\t%s","#","OFFSET","USED","LENGTH","TYPE","TEXT");
+	output("%s:","Tokens");
+	output("%s\t%s\t%s\t%s\t%s\t\t\t%s","#","OFFSET","USED","LENGTH","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("\n%u\t%u\t%u\t%u\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),TOKENTYPE_STRING[token->type],string(token->text));
 		token=token->next;
 	}
 }
@@ -3838,7 +3871,7 @@ void clearShellCommand(){
 }
 void executeShellCommand(){
 	// ASSERTION string_length(shellCommand) should be positive
-	output("\n"); // get a new line before we see the result of executing this command!!
+	output(""); // get a new line before we see the result of executing this command!!
 	int result=system(string(shellCommand));
 	if(result)output("Result: %d.\n",result); // non-zero result
 	clearShellCommand(); // ready for the next execution
@@ -3846,11 +3879,11 @@ void executeShellCommand(){
 char switchToShellMode(char* message){
 	clearCommand();
 	resetOutputColor();
-	if(message!=NULL)output("\n%s",message);
+	if(message!=NULL)output("%s",message);
 	inputMode=IM_SHELL;
 	clearShellCommand();
 	return 's';
-	//output("\n%s\n $ ","Enter your shell command, and press the Return button to execute.");
+	//output("%s\n $ ","Enter your shell command, and press the Return button to execute.");
 }
 void switchToCommandMode(){
 	if(inputMode==IM_COMMAND)return;
@@ -3919,15 +3952,15 @@ int main(int argc, char **argv){
 		resetOutputColor();
 		exit(1);
 	}
-	if(amVerbose())output("\nM environment initialized with %llu predefined values.",getNumberOfValues());
+	if(amVerbose())output("M environment initialized with %llu predefined values.",getNumberOfValues());
 
 	mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
 	if(predefinedVariableNames){
-		output("\nPredefined variables: %s.",string(predefinedVariableNames));
+		output("Predefined variables: %s.",string(predefinedVariableNames));
 		free_mstring(predefinedVariableNames); // no get rid of it!!!
 	}else
 		outputLine("No predefined variables!");
-	//////////output("\nNumber of predefined variables: %d.",getNumberOfVariables(mEnvironment));
+	//////////output("Number of predefined variables: %d.",getNumberOfVariables(mEnvironment));
 	
 	// initialize commands and input mode
 	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
@@ -4221,7 +4254,7 @@ int main(int argc, char **argv){
 							commandPages=1+(commandCount-1)/10;
 							showNextCommandPage(); // as soon as commandPage>0 we are paging...
 						}else
-							output("\n%s\n","No previous commands to show.");
+							output("%s\n","No previous commands to show.");
 					}
 				}else
 					// user might have selected one of the commands (letter a through j)
@@ -4366,9 +4399,9 @@ int main(int argc, char **argv){
 						mstring* commandText=_getCommandText(false);
 						if(!string_length(commandText)){
 							clearCommand();
-							output("Nothing to evaluate!");
+							outputLine("Nothing to evaluate!");
 						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
-							output("\nPlease complete, correct or cancel the command.",string(commandText));
+							outputLine("Please complete, correct or cancel the command.");
 						free_mstring(commandText);
 						continue;
 					}
@@ -4380,16 +4413,16 @@ int main(int argc, char **argv){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(!commandIndex){ // a new command being registered!!!
 							freeToken(pCommandToEvaluate);
-							outputLine("ERROR: Failed to register the command! Out of memory?");
+							outputError("Failed to register the command! Probable cause: out of memory");
 						}else
-							outputLine("ERROR: Failed to register the command again! Out of memory?");
+							outputError("Failed to register the command again! Probable cause: out of memory");
 					}
 					// start anew (without a current command to evaluate!!!!)
 					pLastCommandToEvaluateToken=pCommandToEvaluate=NULL; // remove reference to current command
 
 					// remove any values not used anymore...
 					size_t removedValueCount=getNumberOfRemovedValues();
-					if(amVerbose())output("\nNumber of removed values: %lu.",removedValueCount);
+					if(amVerbose())output("Number of removed values: %lu.",removedValueCount);
 
 				}else
 				if(behindCursor()==0)

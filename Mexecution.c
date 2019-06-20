@@ -8,9 +8,13 @@
 #include "tommath.h"
 #include "Mexecution.h"
 
-extern long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
+// externally (in M.c) defined constants
+extern const char* const ERROR_PREFIX;
+extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
+extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 
-extern long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
+void outputError(const char* const error){if(error)output("%s%s.\n",ERROR_PREFIX,error);}
+void outputErrorAndText(const char* const error,const char* const text){if(error)output("%s%s",ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
 static int8_t littleEndian=-1;
 void initExecution(){
@@ -69,30 +73,30 @@ size_t mpd_context_count=0;
 const size_t MAXIMUM_NUMBER_OF_CONTEXTS=2; // quick fix to ascertain to use the same context over and over again
 
 mpd_context_t** mpd_contexts=NULL; // keep track of all decimal contexts
-mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision){
-    output("\nRetrieving the decimal context with precision %lld.",decimal_precision);
+mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
+    if(amVerbose())output("Retrieving the decimal context with precision %lld.\n",decimalprecision);
     int mpd_context_index=mpd_context_count;
-    while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimal_precision)break;
+    while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimalprecision)break;
     if(mpd_context_index<0){
         if(mpd_context_count<MAXIMUM_NUMBER_OF_CONTEXTS){
-            if(amVerbose())output("\nAbout to create the decimal context with precision %lld.",decimal_precision);
+            if(amVerbose())output("About to create the decimal context with precision %lld.\n",decimalprecision);
             mpd_context_t** new_mpd_contexts=(mpd_context_count>0?realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t*)):(mpd_context_t**)malloc(sizeof(mpd_context_t*)));
             if(!new_mpd_contexts){
-                output("\nERROR: Failed to return a decimal context with precision %u.",decimal_precision);
+                output("%sFailed to return a decimal context with precision %u.\n",ERROR_PREFIX,decimalprecision);
                 return NULL;
             }
             mpd_contexts=new_mpd_contexts;
             mpd_context_index=mpd_context_count;
             mpd_context_count++;
             mpd_contexts[mpd_context_index]=(mpd_context_t*)malloc(sizeof(mpd_context_t)); // TODO do we need to do this???
-            if(amVerbose())output("\nNew decimal context with precision %lld created.",decimal_precision);
+            if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
             // initialize the new context to the default context
-            mpd_init(mpd_contexts[mpd_context_index],decimal_precision);
-            if(amVerbose())output("\nDecimal context with precision %u initialized.",mpd_getprec(mpd_contexts[mpd_context_index]));
+            mpd_init(mpd_contexts[mpd_context_index],decimalprecision);
+            if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_contexts[mpd_context_index]));
         }else{ // re-use the last context
             mpd_context_index=mpd_context_count-1;
-            output("\nChanging the decimal precision to %llu.",decimal_precision);
-            mpd_qsetprec(mpd_contexts[mpd_context_index],decimal_precision);
+            output("Changing the decimal precision to %llu.\n",decimalprecision);
+            mpd_qsetprec(mpd_contexts[mpd_context_index],decimalprecision);
         }
         ////Mdecimalraphandler=MMdecimalraphandler;
     }
@@ -145,7 +149,7 @@ mpd_t* new_mpd(mpd_context_t* mpd_context,int64_t value){
     if(_mpd)
         mpd_set_i64(_mpd,value,(mpd_context?mpd_context:_decimalContext));
     else
-        output("\nERROR: Failed to allocate a decimal.");
+        outputError("Failed to allocate a decimal");
     /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
     return _mpd;
 }
@@ -153,7 +157,7 @@ Mdecimal* new_decimal(mpd_context_t* mpd_context,uint64_t repeating){
     Mdecimal* _decimal=(Mdecimal*)malloc(sizeof(Mdecimal));
     if(_decimal){
         _decimal->mpd=new_mpd(mpd_context,0); // initialize to zero by default
-        if(!_decimal->mpd){output("\nERROR: Failed to create a decimal.");free(_decimal);_decimal=NULL;}else _decimal->repeating=repeating;
+        if(!_decimal->mpd){outputError("Failed to create a decimal");free(_decimal);_decimal=NULL;}else _decimal->repeating=repeating;
     }
     return _decimal;
 }
@@ -168,20 +172,20 @@ Mdecimal* _getDecimal(mpd_t* _mpd,uint64_t repeating,bool freeonfailure){
 Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
     Mdecimal* _decimal=NULL;
     if(decimalText&&strlen(decimalText)){
-        if(amVerbose())output("\nParsing decimal text '%s'.",decimalText);
+        if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
         // can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
         // the rounding at the end of course could prove to be problematic
         _decimal=new_decimal(_decimalContext,repeating);
         if(_decimal)mpd_set_string(_decimal->mpd,decimalText,_decimalContext);
     }else
-        output("\nERROR: No decimal text to parse.");
-    if(!_decimal)output("\nERROR: Failed to create a decimal.");
+        outputError("No decimal text to parse");
+    if(!_decimal)outputError("Failed to create a decimal");
     return _decimal;
 }
 
 void free_value(Mvalue* _value); // TODO perhaps we should prevent _getRationalDecimal to have to call free_value()????
 Mdecimal* _getRationalDecimal(const Mrational* const _rational){
-    if(!_rational){output("\nERROR: No rational to convert to a decimal!");return NULL;}
+    if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     Mbiginteger *_numerator=_rational->num,*_denominator=_rational->den;
     mstring* _decimalText=NULL;
     uint64_t repeating=0;
@@ -200,7 +204,7 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
                 Mlistelement* _remainderListelement=NULL;
                 uint64_t remainderIndex; // where we found a match
                 long long decimalsLeft=_decimalContext->prec+2; // stop as soon as we have sufficient decimals
-                if(amVerbose())output("\nNumber of decimals to determine: %llu.",decimalsLeft);
+                if(amVerbose())output("Number of decimals to determine: %llu.\n",decimalsLeft);
                 mstring* _digitText; // for storing the dividend digit character
                 while(--decimalsLeft>=0){
                     // ASSERT the current remainder is nonzero, therefore we have to store it (if different from any we have so far)
@@ -209,34 +213,34 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
                     _remainderListelement=_remainderList->_first;
                     remainderIndex=0;
                     while(_remainderListelement){
-                        if(amVerbose()){outputBiginteger("\nComparing '",_remainderListelement->_value->value._biginteger,"'");outputBiginteger(" with remainder '",_remainder,"'.");}
+                        if(amVerbose()){outputBiginteger("Comparing '",_remainderListelement->_value->value._biginteger,"'");outputBiginteger(" with remainder '",_remainder,"'.\n");}
                         if(mp_cmp(_remainderListelement->_value->value._biginteger,_remainder)==MP_EQ)break;
                         remainderIndex++;
                         _remainderListelement=_remainderListelement->_next;
                     }
                     if(_remainderListelement){ // we know the repeating part, so no need to add the remainder anymore!!!
                         repeating=(_remainderList->numberOfElements-remainderIndex);
-                        if(amVerbose())output("\nNumber of repeating decimals: %llu.",repeating);
+                        if(amVerbose())output("Number of repeating decimals: %llu.\n",repeating);
                         break;
                     }
                     // remainder hasn't appeared before so store it in the list of remainders
                     Mvalue* remainderValue=_getBigintegerValue(_getBigintegerCopy(_remainder),true);
-                    if(!remainderValue){output("\nERROR: Failed to store the remainder.");break;}
-                    if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);output("\nERROR: Failed to remember the remainder in order to recognized the repeating fraction.");break;}
+                    if(!remainderValue){outputError("Failed to store the remainder");break;}
+                    if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);outputError("Failed to remember the remainder in order to recognized the repeating fraction");break;}
                     
-                    if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY){output("\nERROR: Failed to multiply the remainder by 10.");break;}
-                    if(amVerbose()){outputBiginteger("\nDividing '",_remainder,"'");outputBiginteger(" by '",_denominator,"'.");}
-                    if(mp_div(_remainder,_denominator,_digit,_remainder)!=MP_OKAY){output("\nERROR: Failed to perform a long division to obtain the next decimal digit.");break;}
-                    if(amVerbose()){outputBiginteger("\nDigit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.");}
+                    if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY){outputError("Failed to multiply the remainder by 10");break;}
+                    if(amVerbose()){outputBiginteger("Dividing '",_remainder,"'");outputBiginteger(" by '",_denominator,"'.\n");}
+                    if(mp_div(_remainder,_denominator,_digit,_remainder)!=MP_OKAY){outputError("Failed to perform a long division to obtain the next decimal digit");break;}
+                    if(amVerbose()){outputBiginteger("Digit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.\n");}
                     // append the dividend to the decimal text
                     _digitText=_getBigintegerText(_digit);
-                    if(!_digitText){output("\nERROR: Failed to store the next decimal character.");break;}
+                    if(!_digitText){outputError("Failed to store the next decimal character");break;}
                     string_append(_decimalText,string(_digitText));
-                    if(amVerbose())output("\nDecimal text so far: '%s'.",string(_decimalText));
+                    if(amVerbose())output("Decimal text so far: '%s'.\n",string(_decimalText));
                     free_mstring(_digitText);
                     free_biginteger(_digit);
                     // if the remainder is zero, we're done (it's a finite decimal fraction)
-                    if(isBigintegerZero(_remainder)){if(amVerbose())output("\nRemainder is zero, so the decimal is finished.");break;}
+                    if(isBigintegerZero(_remainder)){if(amVerbose())outputLine("Remainder is zero, so the decimal is finished.");break;}
                 }
                 free_list(_remainderList);
                 free_biginteger(_bi10);
@@ -246,9 +250,9 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
     }else
         _decimalText=_getBigintegerText(_numerator);
     // parse _decimalText to a decimal
-    if(!_decimalText){output("\nERROR: No text to parse into a decimal.");return NULL;}
+    if(!_decimalText){outputError("No text to parse into a decimal");return NULL;}
     Mdecimal* _decimal=_getTextDecimal(string(_decimalText),repeating);
-    if(!_decimal)output("\nERROR: No decimal produced!");
+    if(!_decimal)outputError("No decimal produced");
     free_mstring(_decimalText);
     return _decimal;
 }
@@ -273,7 +277,7 @@ Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
 Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 	// the text should represent an integer or a real
 	if(!rationalText)return NULL;
-    if(amVerbose())output("\nConverting '%s' to a rational.",rationalText);
+    if(amVerbose())output("Converting '%s' to a rational.",rationalText);
 	Mrational* _rational=NULL;
 	int l=strlen(rationalText);
 	if(l){
@@ -284,10 +288,10 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 		if(exponentText){
 			*exponentText='\0'; // 'cuf off' the e-part!!!!
 			l=(int)(exponentText-rationalText); // this will be the new l we need below!!!
-			if(amVerbose())output("\nWith exponent removed: '%s'.",rationalText);
+			if(amVerbose())output("With exponent removed: '%s'.",rationalText);
 			exponentText++; // point to the first character of the exponent
 			if(mp_read_radix(_exponent,exponentText,10)!=MP_OKAY){
-				if(amVerbose())output("\nERROR: Failed to extract the exponent its text representation '%s'.",exponentText);
+				output("%sFailed to extract the exponent its text representation '%s'.\n",ERROR_PREFIX,exponentText);
 				free_biginteger(_exponent);
 				_exponent=NULL;
 			}else
@@ -299,7 +303,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 			char* decimalPartText=strchr(rationalText,'.');
 			int decimalPartIndex=0;
 			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
-			if(amVerbose())output("\nWith decimal part removed: '%s'.",rationalText);
+			if(amVerbose())output("With decimal part removed: '%s'.",rationalText);
 			// now ready to check the integer part 
 			Mbiginteger* _numerator=new_biginteger();
 			Mbiginteger* _denominator=NULL;
@@ -358,7 +362,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 				}
                 if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
 			}else
-				output("\nERROR: Integer part of rational text '%s' invalid.",rationalText);
+				output("%sInteger part of rational text '%s' invalid.\n",ERROR_PREFIX,rationalText);
 			// if we haven't got a rational that binded _numerator and _denominator free both of them
 			if(!_rational){
                 free_biginteger(_numerator);
@@ -394,14 +398,14 @@ Mrational* _getDecimalRational(Mdecimal* _decimal){
                     // now ready to compute _den1 and _den2
                     mp_int* _bi10=_getBiginteger(10);
                     mp_int* _den2=_getBiginteger(10);
-                    for(int i=_decimal->repeating;i>1;i--)if(mp_mul(_den2,_bi10,_den2)!=MP_OKAY){output("\nERROR: Failed to multiply the second rational denominator part by 10.");free_biginteger(_den2);_den2=NULL;break;}
+                    for(int i=_decimal->repeating;i>1;i--)if(mp_mul(_den2,_bi10,_den2)!=MP_OKAY){outputError("Failed to multiply the second rational denominator part by 10");free_biginteger(_den2);_den2=NULL;break;}
                     if(_den2&&mp_decr(_den2)==MP_OKAY){ // _den2 computed (as 9999....9)
                         // let's determine the denominator
                         mp_int* _den=NULL;
                         int numberOfNonRepeatingDecimalDigits=(int)(repeatingText-periodText-2); // compute the number of non repeating decimals
                         mp_int* _den1=_getBiginteger(1);
                         if(numberOfNonRepeatingDecimalDigits>0){
-                            while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(_den1,_bi10,_den1)!=MP_OKAY){output("\nWERROR: Failed to multiply the first rational denominator part by 10.");free_biginteger(_den1);_den1=NULL;}
+                            while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(_den1,_bi10,_den1)!=MP_OKAY){output("WERROR: Failed to multiply the first rational denominator part by 10.");free_biginteger(_den1);_den1=NULL;}
                             if(_den1){
                                 _den=new_mp_int();
                                 if(mp_mul(_den1,_den2,_den)!=MP_OKAY){free_biginteger(_den);_den=NULL;}else if(amVerbose())outputBiginteger("\nFirst denominator multiplier: '",_den1,"'.");
@@ -412,7 +416,7 @@ Mrational* _getDecimalRational(Mdecimal* _decimal){
                         if(_den){ // denominator computed successfully
                             *periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
                             periodText++; // point periodText to the first digit behind the decimal period
-                            if(amVerbose())output("\nBehind period text: '%s'.",periodText);
+                            if(amVerbose())output("Behind period text: '%s'.",periodText);
                             // the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
                             mp_int* _num=_getBigintegerCopy(_num3); // initialize _num to the repeating digits integer
                             // add the fixed part of the decimal digits (treated as integer)
@@ -443,11 +447,11 @@ Mrational* _getDecimalRational(Mdecimal* _decimal){
                         }
                         free_biginteger(_den1);
                     }else
-                        output("\nERROR: Failed to compute the second denominator multiplier.");
+                        outputError("Failed to compute the second denominator multiplier");
                     free_biginteger(_bi10);
                     free_biginteger(_den2);
                 }else
-                    output("\nERROR: Failed to construct the integer containing the repeating digits.");
+                    outputError("Failed to construct the integer containing the repeating digits");
                 free_biginteger(_num3);
             }else{
                 if(amVerbose())outputDecimal("\nNo decimal digits in decimal '",_decimal,"'.");
@@ -505,7 +509,7 @@ Mrational* _getLongDoubleRational(long double ld){
     extractMantisseAndExponent(ld,&mantisse,&exponent);
     int32_t exp=(exponent&0x7FFF);
     // if exponent is all ones, the long double represents a NaN or Inf
-    if(exp==0x7FFF){if(amVerbose())output("\nCan't convert an invalid or infinite real to a rational!");return NULL;}
+    if(exp==0x7FFF){if(amVerbose())output("Can't convert an invalid or infinite real to a rational!");return NULL;}
     // if exponent is all zeroes, the long double represents zero
     Mbiginteger* _numerator=new_biginteger();
     if(exp==0)return _getRational(_numerator,NULL,false);
@@ -518,22 +522,22 @@ Mrational* _getLongDoubleRational(long double ld){
         mp_err err=mp_div_2d(_numerator,-exp,_numerator,_shiftedout);
         if(err!=MP_OKAY){
             free_biginteger(_shiftedout);
-            output("\nERROR: Failed to adjust the numerator of the rational by the negative exponent of the real.");
+            outputError("Failed to adjust the numerator of the rational by the negative exponent of the real.");
             free_biginteger(_numerator);
             return NULL;
         }
         // we may assume that what got shifted out fits in an uint64_t
-        uint64_t shiftedout=mp_get_u64(_shiftedout);mstring* _shiftedoutText=_getUint64BinaryText(shiftedout,'\0');output("\nShifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
-        // replacing: mstring* _shiftedoutText=_getBigintegerText(_shiftedout);output("\nShifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
+        uint64_t shiftedout=mp_get_u64(_shiftedout);mstring* _shiftedoutText=_getUint64BinaryText(shiftedout,'\0');output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
+        // replacing: mstring* _shiftedoutText=_getBigintegerText(_shiftedout);output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
         free_biginteger(_shiftedout);
     }
     // make the numerator negative if the long double is negative (this is when bit 15 of the exponent equals 1)
-    if(exponent>>15)if(mp_neg(_numerator,_numerator)!=MP_OKAY){output("\nERROR: Failed to negate the rational of the real.");free_biginteger(_numerator);return NULL;}
+    if(exponent>>15)if(mp_neg(_numerator,_numerator)!=MP_OKAY){outputError("Failed to negate the rational of the real.");free_biginteger(_numerator);return NULL;}
     // if the exponent is non-positive (zero or negative) there's no denominator (i.e. denominator remains 1)
     if(exp<=0)return _getRational(_numerator,NULL,false);
     // ASSERT a positive exponent that we can use for the denominator
     Mbiginteger* _denominator=_getBiginteger(1);
-    if(!_denominator||mp_mul_2d(_denominator,exp,_denominator)!=MP_OKAY){output("\nERROR: Failed to compute the denominator of the rational of a real.");free_biginteger(_denominator);return NULL;}
+    if(!_denominator||mp_mul_2d(_denominator,exp,_denominator)!=MP_OKAY){outputError("Failed to compute the denominator of the rational of a real.");free_biginteger(_denominator);return NULL;}
     return _getRational(_numerator,_denominator,true);
 }
 */
@@ -584,32 +588,32 @@ void free_map(Mmap* _map){
 }
 void free_integer(Minteger* _integer){
     if(_integer){
-        if(amVerbose())output("\nFreeing integer %llu.",_integer->ll);
+        if(amVerbose())output("Freeing integer %llu.",_integer->ll);
         free(_integer);
     }else
-        output("\nBUG: No integer to free!");
+        output("BUG: No integer to free!");
 }
 void free_biginteger(Mbiginteger* _biginteger){
     if(_biginteger){
-        if(amVerbose())output("\nFreeing big integer."); // TODO can we display the value?
+        if(amVerbose())output("Freeing big integer."); // TODO can we display the value?
         mp_clear(_biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
     }else
-        output("\nBUG: No big integer to free!");
+        output("BUG: No big integer to free!");
 }
 void free_decimal(Mdecimal* _decimal){
     if(_decimal){
-        if(amVerbose())output("\nFreeing decimal.");
+        if(amVerbose())output("Freeing decimal.");
         mpd_del(_decimal->mpd); // assuming -> precedes the address of operator
         free(_decimal);
     }else
-        output("\nBUG: No decimal to free.");
+        output("BUG: No decimal to free.");
 }
 void free_real(Mreal* _real){
     if(_real){
-        if(amVerbose())output("\nFreeing real %.*Lf.",23,_real->ld);
+        if(amVerbose())output("Freeing real %.*Lf.",23,_real->ld);
         free(_real);
     }else
-        output("\nBUG: No real to free!");
+        output("BUG: No real to free!");
 }
 void free_rational(Mrational* _rational){
     if(_rational){
@@ -618,12 +622,12 @@ void free_rational(Mrational* _rational){
         if(_rational->delta)free_real(_rational->delta);
         free(_rational);
     }else
-        output("\nNo rational to free!");
+        output("No rational to free!");
 }
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
-        if(amVerbose())output("\nValue of type %u to free.",_value->type);
+        if(amVerbose())output("Value of type %u to free.",_value->type);
         // I do not need to free the value itself, only the pointers inside it
         switch(_value->type){
             case VT_UNDEFINED:break;
@@ -637,10 +641,10 @@ void free_value(Mvalue* _value){
             case VT_LIST:free_list(_value->value._list);break;
             case VT_MAP:free_map(_value->value._map);break;
         }
-        if(amVerbose())output("\nType-specific value freed.");
+        if(amVerbose())output("Type-specific value freed.");
         free(_value);
     }else
-        output("\nBUG: No value to free!");
+        output("BUG: No value to free!");
 }
 
 // keep a list of allocated values
@@ -674,25 +678,25 @@ size_t getNumberOfRemovedValues(){
     unsigned long long tofree=0; // how many value elements we should free
     if(_valueList){
         Mlistelement* _valueListelement=_valueList->_first;
-        if(amVerbose())output("\nNumber of values to check: %llu.",_valueList->numberOfElements);
+        if(amVerbose())output("Number of values to check: %llu.\n",_valueList->numberOfElements);
         unsigned long long checked=0;
         while(_valueListelement){
             checked++;
-            if(amVerbose())output("\nChecking value #%llu.",checked);
+            if(amVerbose())output("Checking value #%llu.",checked);
             if(_valueListelement->_value){
-                if(amVerbose())output("\nChecking the count!");
+                if(amVerbose())output("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
-                    if(amVerbose())output("\nAbout to free unused value #%llu of type '%s'.",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+                    if(amVerbose())output("About to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                     free_value(_valueListelement->_value);
                     _valueListelement->_value=NULL; // just in case
                     tofree++;
                 }else
-                if(amVerbose())output("\nStill in use!");
-           }else
-                output("\nERROR: No value stored in value #%llu.",checked);
-             _valueListelement=_valueListelement->_next;
+                if(amVerbose())outputLine("\tStill in use!");
+            }else
+                output("%sNo value stored in value #%llu.\n",ERROR_PREFIX,checked);
+            _valueListelement=_valueListelement->_next;
         }
-        if(amVerbose())output("\nNumber of values checked: %llu.\nNumber of value list elements to free: %llu.",checked,tofree);
+        if(amVerbose())output("Number of values checked: %llu.\nNumber of value list elements to free: %llu.\n",checked,tofree);
         // the list is now intact, are we going to correct the links??????
         if(tofree){ // some values were freed
             Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
@@ -709,7 +713,7 @@ size_t getNumberOfRemovedValues(){
                 }else{ // this one is to be removed
                     removed++;
                     // let's be careful here!!!
-                    if(_valueList->numberOfElements)_valueList->numberOfElements--;else output("\nBUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
+                    if(_valueList->numberOfElements)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
                     free(_valueListelement);
                 }
                 // next to check!!!
@@ -721,7 +725,7 @@ size_t getNumberOfRemovedValues(){
         }
     }
     if(tofree){
-        if(tofree>removed)output("\nWARNING: Failed to free %llu unused value list elements.",(tofree-removed));else if(amVerbose())output("\nAll unused value list elements freed!");
+        if(tofree>removed)output("WARNING: Failed to free %llu unused value list elements.\n",(tofree-removed));else if(amVerbose())outputLine("All unused value list elements freed!");
     }
     return removed;
 }
@@ -743,7 +747,7 @@ bool decrementReferenceCount(Mvalue* _value){
             return true;
         }
         mstring* _valueText=_getValueText(_value,false);
-        output("\nBUG: Reference count of '%s' of type '%c' already zero.",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
+        output("BUG: Reference count of '%s' of type '%c' already zero.",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
         free_mstring(_valueText);
     }else
         if(amVerbose())outputLine("No value to decrement the reference count of.");
@@ -813,7 +817,7 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     return _bigintegerValue;
 }
 Mvalue* _getRealValue(long double ld){
-    if(amVerbose())output("\nWrapping long double '%.*Lf'.",ld);
+    if(amVerbose())output("Wrapping long double '%.*Lf'.",ld);
     Mreal* _real=new_real(ld);
     Mvalue* _realvalue=(_real?_newValue():NULL);
     if(_realvalue){_realvalue->type=VT_REAL;_realvalue->value._real=_real;}
@@ -1040,10 +1044,10 @@ mstring* _getVariableNames(const Menvironment* _environment,char* sep){
 }
 
 Mvariable* getVariable(Menvironment* _environment,const char* name, bool verbose){
-    if(!_environment||!name){output("\nERROR: %s","No environment or name specified.");return NULL;}
+    if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     // input valid        
-    if(!_environment->_variableMap){output("\nERROR: %s","No variables in environment.");return NULL;}
-    if(verbose)output("\nLooking for variable '%s'.",name);
+    if(!_environment->_variableMap){outputError("No variables in environment");return NULL;}
+    if(verbose)output("Looking for variable '%s'.",name);
     Mmapelement*_variableMapelement=_environment->_variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
     while(_variableMapelement&&(!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))_variableMapelement=_variableMapelement->_next;
@@ -1059,19 +1063,19 @@ bool containsVariable(Menvironment* _environment,const char* name){return(getVar
 // helper function to create a new variable with a given name and of a given type
 Mvariable* _createVariable(const char* name,Mvaluetype valuetype,bool immutable){
     if(!name||!strlen(name)){
-        printf("\nERROR: No variable name defined.");
+        outputError("No variable name defined");
         return NULL;
     }
     Mvariable* _variable=(Mvariable*)calloc(1,sizeof(Mvariable)); // all pointers will be NULL!!
     if(!_variable){
-        printf("\nERROR: Failed to allocate memory to store variable '%s'.",name);
+        outputErrorAndText("Failed to allocate memory to store variable ",name);
         return NULL;
     }
     _variable->immutable=immutable;
     _variable->_name=_strdup(name); // create a dynamic pointer on the heap
     if(!_variable->_name){
         free_variable(_variable);
-        printf("\nERROR: Failed to allocate memory to store name '%s' of the new variable.",name);
+        output("%sFailed to allocate memory to store name '%s' of the new variable.\n",ERROR_PREFIX,name);
         return NULL;
     }
     _variable->valuetype=valuetype;
@@ -1123,9 +1127,9 @@ bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetyp
                 }
                 // ASSERT failed to link the variable to the variable map!!
                 free_variable(_variable);
-                output("\nERROR: Failed to link variable '%s'.",name);
+                outputErrorAndText("Failed to link variable ",name);
             }else
-                output("\nERROR: Failed to create variable '%s'.",name);
+                outputErrorAndText("%sFailed to create variable ",name);
         }
     }
     return false;
@@ -1133,7 +1137,7 @@ bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetyp
 
 bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
-    if(!_environment||!name){output("\nERROR: Cannot set the value: no environment or name.");return false;}
+    if(!_environment||!name){outputError("Cannot set the value: no environment or name");return false;}
     Mvariable* _variable=getVariable(_environment,name,false);
     if(_variable){
         if(!_variable->_value||!_variable->immutable){
@@ -1141,22 +1145,22 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
             if(!_value||_variable->valuetype==VT_UNDEFINED||_variable->valuetype==_value->type){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&_variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
-                if(amDebugging()){mstring* _valueText=_getValueText(_value,false);output("\nValue `%s` assigned to variable `%s`.",string(_valueText),name);free_mstring(_valueText);}
+                if(amDebugging()){mstring* _valueText=_getValueText(_value,false);output("Value `%s` assigned to variable `%s`.",string(_valueText),name);free_mstring(_valueText);}
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }
-            output("\nERROR: Cannot set the value of variable `%s`: the new value is of the wrong type.",name);
+            output("%sCannot set the value of variable `%s`: the new value is of the wrong type.\n",ERROR_PREFIX,name);
         }else
-            output("\nERROR: Cannot set the value of variable `%s`: it is not mutable!",name);
+            output("%sCannot set the value of variable `%s`: it is not mutable!\n",ERROR_PREFIX,name);
     }else
-        output("\nERROR: Cannot set the value of variable `%s`:it is unknown.",name);
+        output("%sCannot set the value of variable `%s`:it is unknown.\n",ERROR_PREFIX,name);
     return false;
 }
 
 // MDH@24MAY2019: if already in the map should replace the current value
 bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue){
     if(!_map||!attributeName)return false;
-    if(amVerbose()){output("\nSetting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.");}
+    if(amVerbose()){output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.");}
     Mmapelement* _mapelement=_map->_first;
     while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
     if(!_mapelement){ // not found
@@ -1182,35 +1186,35 @@ void checkList(Mlist* _list){
                 // the number of elements in the list should match the number of counted elements
                 long long listelementindex=0;
                 while(true){
-                    if(l==0)output("\nERROR: More elements in list than accounted for.");
+                    if(l==0)outputError("More elements in list than accounted for");
                     l--;
-                    if(_listelement->index<=listelementindex)output("\nERROR: List element index (%lld) below the expected list element index (%lld).",_listelement->index,listelementindex);
+                    if(_listelement->index<=listelementindex)output("%sList element index (%lld) below the expected list element index (%lld).",ERROR_PREFIX,_listelement->index,listelementindex);
                     listelementindex=_listelement->index;
                     if(!_listelement->_next){
-                        if(_list->_last!=_listelement)output("\nERROR: Registered last list element not equal to the actual last list element.");
+                        if(_list->_last!=_listelement)outputError("Registered last list element not equal to the actual last list element");
                         break;                        
                     }
-                    output("\nList element with index %llu OK.",_listelement->index);
+                    output("List element with index %llu OK.",_listelement->index);
                     _listelement=_listelement->_next;
                 }
-                if(l>0)output("\nERROR: Less elements in list than accounted for.");else 
-                if(l<0)output("\nERROR: %lld more elements in list than counted.",(-l));
+                if(l>0)outputError("Less elements in list than accounted for");else 
+                if(l<0)output("%s%lld more elements in list than counted.",ERROR_PREFIX,(-l));
             }else
-                output("\nERROR: List with %lld elements does not have a first element!",l);
+                output("%sList with %lld elements does not have a first element!",ERROR_PREFIX,l);
         }else{
-            if(_list->_first)output("\nERROR: Empty list with first element!");
-            if(_list->_last)output("\nERROR: Empty list with last element.");
+            if(_list->_first)outputError("Empty list with first element");
+            if(_list->_last)outputError("Empty list with last element");
         }
     }
 }
 // instead of returning a boolean we could return the assigned index (0 on failure)
 // MDH@02JUN2019: check (and correct) prepending
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index){
-    if(!_list||!_value){output("\nERROR: %s.","No list to append to or no value to append");return 0;}
+    if(!_list||!_value){outputError("No list to append to or no value to append");return 0;}
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     if(index<=0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
-    if(index<=0){output("\nERROR: Index %lld of (new) list element too small.",index);return 0;}
+    if(index<=0){output("%sIndex %lld of (new) list element too small.\n",index);return 0;}
     if(amVerbose())outputValue("\nAppending '",_value,"' to list.");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
@@ -1229,7 +1233,7 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long l
     // if we do not have a list element ascertain to have one
     if(!_listelement){ // not yet present in list, so we have to create a new element
         _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));
-        if(!_listelement){output("\nERROR: Failed to create a list element to insert/append.");return 0;} // failure
+        if(!_listelement){outputError("Failed to create a list element to insert/append");return 0;} // failure
     }
     assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
     // if replacing i.e. the index of _listelement matches index, we're done
@@ -1244,7 +1248,7 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long l
     return _listelement->index;
 }
 long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
-    if(!_environment||!name||!_value){output("\nERROR: %s","No environment, variable name of value specified!");return 0;}
+    if(!_environment||!name||!_value){outputError("No environment, variable name of value specified");return 0;}
     Mvariable* _variable=getVariable(_environment,name,amVerbose());
     if(_variable){
         Mvalue* _variableValue=_variable->_value; // OOPS shouldn't assign to _value (that's the parameter name DUMMY)
@@ -1254,11 +1258,11 @@ long long appendToListVariable(Menvironment* _environment,const char* name,Mvalu
             Mlist* _list=_variableValue->value._list;
             unsigned long long index=appendedToList(_list,_value,0); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
             if(index)return index;
-            output("\nERROR: Didn't append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.",name,_value->type);
+            output("%sDidn't append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",ERROR_PREFIX,name,_value->type);
         }else
-            output("\nERROR: Cannot append the value to variable '%s': it does not contain a list!",name);
+            output("%sCannot append the value to variable '%s': it does not contain a list!\n",name);
     }else
-        output("\nERROR: Cannot set the value of variable '%s':it is unknown.",name);
+        output("%sCannot set the value of variable '%s':it is unknown.\n",ERROR_PREFIX,name);
     return 0;
 }
 
@@ -1317,7 +1321,7 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 }
 */
 Mvalue* getValue(Menvironment* _environment,const char* name){
-    if(!_environment||!name){output("\nERROR: %s.","No environment or name specified.");return NULL;}
+    if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     Mvariable* _variable=getVariable(_environment,name,false);
     return(_variable?_variable->_value:NULL);
 }
@@ -1413,7 +1417,7 @@ Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
         Mmap* _argumentMap=(Mmap*)calloc(1,sizeof(Mmap));
         Mmap* _functionParameterMap=_function->_parameterMap;
         if(_functionParameterMap){
-            if(amVerbose())output("\nMatching the function parameters!");
+            if(amVerbose())output("Matching the function parameters!");
             Mmapelement* _functionParameterMapelement=_functionParameterMap->_first;
             Mlistelement* _argumentListelement=_argumentList->_first;
             while(_functionParameterMapelement){
@@ -1435,7 +1439,7 @@ Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
                 _functionParameterMapelement=_functionParameterMapelement->_next;
             }
         }
-        if(amVerbose())output("\nArgument map created.");
+        if(amVerbose())output("Argument map created.");
         return _argumentMap;
     }
     return NULL;
@@ -1466,17 +1470,17 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
                             _functionmap->_last=_functionmapelement;
                             _functionmap->numberOfFunctions++;
                              _function->_name=_functionName; // success!!!!!
-                            output("\nFunction '%s' registered as function #%d.",string(_function->_name),_functionmap->numberOfFunctions);
+                            output("Function '%s' registered as function #%d.\n",string(_function->_name),_functionmap->numberOfFunctions);
                         }
                     }
                 }else
-                    output("\nERROR: Failed to store function name '%s'.",name);
+                    output("%sFailed to store function name '%s'.\n",ERROR_PREFIX,name);
                 // if we fail to register the name and/or the function with the environment free the function!!
                 if(!_function->_name){free_function(_function);_function=NULL;}   
             }
-            if(!_function)output("\nERROR: Failed to create function '%s'.",name);
+            if(!_function)output("%sFailed to create function '%s'.\n",ERROR_PREFIX,name);
         }else
-            output("\nFunction '%s' already exists.",name);
+            output("NOTE: Function '%s' already exists.\n",name);
     }
     return _function;
 }
@@ -1495,17 +1499,17 @@ Mmap* _getRealMap(char* name,Mvalue* _realValue){
                 if(_map){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    output("\n%s","Returning the single real map!");
+                    if(amDebugging())outputLine("Returning the single real map!");
                     return _map;
                 }
-                output("\nERROR: %s.","Failed to create the real variable map!");
+                outputError("Failed to create the real variable map");
                free_mapelement(_mapelement);
             }else{
-                output("\nERROR: %s.","Failed to create the real variable map element!");
+                outputError("Failed to create the real variable map element");
                 free_variable(_realVariable);
             }
         }else
-            output("\nERROR: %s.","Failed to create the real variable!");
+            outputError("Failed to create the real variable");
     }
     return NULL;
 }
@@ -1534,17 +1538,17 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
                 if(_map){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    output("\n%s","Returning the single integer map!");
+                    outputLine("Returning the single integer map!");
                     return _map;
                 }
-                printf("\nERROR: %s.","Failed to create the integer variable map!");
+                outputError("Failed to create the integer variable map");
                free_mapelement(_mapelement);
             }else{
-                printf("\nERROR: %s.","Failed to create the integer variable map element!");
+                outputError("Failed to create the integer variable map element");
                 free_variable(_integerVariable);
             }
         }else
-            printf("\nERROR: %s.","Failed to create the integer variable!");
+            outputError("Failed to create the integer variable");
     }
     return NULL;
 }
@@ -1583,17 +1587,17 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
                 if(_map){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    output("\n%s","Returning the single list map!");
+                    if(amDebugging())outputLine("Returning the single list map");
                     return _map;
                 }
-                output("\nERROR: %s.","Failed to create the list variable map!");
+                outputError("Failed to create the list variable map");
                free_mapelement(_mapelement);
             }else{
-                output("\nERROR: %s.","Failed to create the list variable map element!");
+                outputError("Failed to create the list variable map element");
                 free_variable(_listVariable);
             }
         }else
-            output("\nERROR: %s.","Failed to create the list variable!");
+            outputError("Failed to create the list variable");
     }
     return NULL;
 }
@@ -1678,7 +1682,7 @@ bool completedFunction(Mfunction* _function,NoArgumentFunction noArgumentFunctio
         _function->type=FT_INTERNAL_NO_ARGUMENTS;
         _function->functionunion.noArgumentFunction=noArgumentFunction;
         _function->_parameterMap=NULL;
-        output("\nRegistered function '%s' completed.",string(_function->_name));
+        output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1689,7 +1693,7 @@ bool completedValueFunction(Mfunction* _function,OneArgumentFunction oneArgument
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getMap("v");
         // no defaults here!!!
-        output("\nRegistered function '%s' completed.",string(_function->_name));
+        output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1698,8 +1702,8 @@ bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentF
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
-        _function->_parameterMap=_getRealMap("x",_getRealValue(0.0));
-        output("\nRegistered function '%s' completed.",string(_function->_name));
+        _function->_parameterMap=_getRealMap("x",_getRealValue(M_LD_NAN)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
+        output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1709,8 +1713,8 @@ bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgume
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=_getIntegerMap("i",_getIntegerValue(0));
-        output("\nRegistered function '%s' completed.",string(_function->_name));
+        _function->_parameterMap=_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
+        output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1721,7 +1725,7 @@ bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentF
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED));
-        output("\nRegistered list function '%s' completed.",string(_function->_name));
+        output("Registered list function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1731,7 +1735,7 @@ bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoA
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=_getStringStringMap("variable","type");
-        output("\nRegistered function '%s' completed.",string(_function->_name));
+        output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1818,7 +1822,7 @@ mstring* _getIntegerText(Minteger* _integer){
     if(amDebugging())p=string_append_char(p,'i');
 	if(p&&_integer)p=appendll(p,_integer->ll);
     if(!p){free_mstring(s);s=NULL;}
-	////////if(amVerbose())output("\nInteger '%s'.",string(s));
+	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return s;
 }
 /* replaced by getValueInteger()
@@ -1842,13 +1846,13 @@ long long getInteger(Mvalue* _value){
 mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
     // determine the required size
     int arepsize;
-    if(mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())output("\nCan't get the size of big integer.");return NULL;}
-    if(arepsize>0xFFFFFFFF){output("\nCan't store more than %u characters in a string.",0xFFFFFFFF);return NULL;}
+    if(mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())outputError("Can't determine the size of a big integer");return NULL;}
+    if(arepsize>0xFFFFFFFF){output("%sCan't store more than %u characters in a string.",ERROR_PREFIX,0xFFFFFFFF);return NULL;}
     mstring* _rep=string_setlength(string_create(),arepsize);
-    if(!_rep){output("\nERROR: Failed to create a string to hold %d characters.",arepsize);return NULL;}
+    if(!_rep){output("%sFailed to create a string to hold %d characters.\n",ERROR_PREFIX,arepsize);return NULL;}
     if(mp_toradix(_biginteger,_rep->chars,10)==MP_OKAY){string_synclength(_rep);return _rep;} // return _rep if we succeed in storing the text representation of a
     free_mstring(_rep); // get rid of the mstring that we would have returned on success
-    output("\nERROR: Failed to big integer decimal representation.");
+    outputError("Failed to create the text representation of a big integer");
     return NULL;
 }
 
@@ -1885,11 +1889,11 @@ void mp_set_u128(Mbiginteger* a,uint128_t b){
 void normalizeRational(Mrational* _rational){
     if(!_rational)return;
     // checking on the validity of the flag (which would actually be a bug)
-    if(!_rational->normalized&&!_rational->den){output("\nBUG: Normalized flag of rational not set although the denominator equals 1; flag set.");_rational->normalized=true;}
+    if(!_rational->normalized&&!_rational->den){output("BUG: Normalized flag of rational not set although the denominator equals 1; flag set.");_rational->normalized=true;}
     if(_rational->normalized)return; // apparently already normalized
     // normalization means dividing by the gcd unless the gcd is one
     Mbiginteger* _gcd=new_biginteger();
-    if(!_gcd){output("\nERROR: Can't normalize a rational: failed to create the big integer to store the GCD.");return;}
+    if(!_gcd){outputError("Can't normalize a rational: failed to create the big integer to store the GCD");return;}
     // ASSERT at the end of the following block always free _gcd
     if(mp_gcd(_rational->num,_rational->den,_gcd)==MP_OKAY){
         if(mp_cmp(_gcd,getBigintegerOne())!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
@@ -1902,12 +1906,12 @@ void normalizeRational(Mrational* _rational){
             }else{
                 free_biginteger(new_num);
                 free_biginteger(new_den);
-                output("\nERROR: Normalization of rational failed.");
+                outputError("Normalization of rational failed");
             }
         }else // the GCD equals 1 which means that the thing is normalized!!!
             _rational->normalized=true;
     }else
-        output("\nERROR: Can't normalize a rational: failed to compute the GCD.");
+        outputError("Can't normalize a rational: failed to compute the GCD");
 }
 
 // MDH@07JUN2019: _getRational does NOT free the numerator and denominator supplied!!!
@@ -1941,7 +1945,7 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
                 outputRational("\nRational before normalization: ",_rational,".");
                 if(normalize&&!_rational->normalized){
                     normalizeRational(_rational); // normalize the rational if we are supposed to
-                    if(_denominator&&!_rational->normalized)output("\nWARNING: Failed to normalize a rational number.");
+                    if(_denominator&&!_rational->normalized)output("WARNING: Failed to normalize a rational number.");
                     if(amVerbose())
                     outputRational("\nRational after normalization: ",_rational,".");
                 }
@@ -1963,28 +1967,28 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
 }
 // _getInverseRational() will take care of releasing the newly created rational parts when failing to wrap them in a rational
 Mrational* _getInverseRational(const Mrational* const _rational){
-    if(!_rational){output("\nWARNING: No rational to invert.");return NULL;}
+    if(!_rational){output("WARNING: No rational to invert.");return NULL;}
     Mrational* _inverseRational=NULL;
     // for now only allow inverting pure rationals!!!
     if(!_rational->delta||ldIsZero(_rational->delta->ld)){
         Mbiginteger* _inverseRationalNumerator=NULL;
         if(_rational->den){
             _inverseRationalNumerator=_getBigintegerCopy(_rational->den);
-            if(!_inverseRationalNumerator){output("\nERROR: Failed to copy the rational denominator.");return NULL;}
+            if(!_inverseRationalNumerator){outputError("Failed to copy the rational denominator");return NULL;}
         }
         Mbiginteger* _inverseRationalDenominator=NULL;
         if(_rational->num){
             _inverseRationalDenominator=_getBigintegerCopy(_rational->num);
-            if(!_inverseRationalDenominator){output("\nERROR: Failed to copy the rational numerator.");return NULL;}
+            if(!_inverseRationalDenominator){outputError("Failed to copy the rational numerator");return NULL;}
         }
         // if the original is not normalized normalize, otherwise just copy the normalized flag!!
         _inverseRational=_getRational(_inverseRationalNumerator,_inverseRationalDenominator,M_LD_NAN,!_rational->normalized,true);
         if(!_inverseRational)
-            output("\nERROR: Failed to create the inverse rational.");
+            outputError("Failed to create the inverse rational");
         else
         if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
     }else
-        output("ERROR: Can't invert an unpure rational.");
+        outputError("Can't invert an unpure rational");
     return _inverseRational;
 }
 
@@ -2030,30 +2034,30 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
         mp_set_u64(a,mantisse);
         if(amVerbose()){
             mstring* _mantisseBigIntegerText=_getBigintegerText(a);
-            output("\nValue after setting the fraction: %s.",string(_mantisseBigIntegerText));
+            output("Value after setting the fraction: %s.",string(_mantisseBigIntegerText));
             free_mstring(_mantisseBigIntegerText);
         }
-        if(amVerbose())output("\nLong double exponent part: %d - mantisse: %llu.",exp,mantisse);
-        if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
+        if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.",exp,mantisse);
+        if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
         exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
         //////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
-        if(amVerbose())output("\nPower of two exponent: %d.",exp);  
+        if(amVerbose())output("Power of two exponent: %d.",exp);  
         if(exp!=0){
             mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
-            if(err!=MP_OKAY){output("\nERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
+            if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
         }
         if(amVerbose()){
             mstring* _bigIntegerText=_getBigintegerText(a);
-            output("\nValue after applying the exponent: %s.",string(_bigIntegerText));
+            output("Value after applying the exponent: %s.",string(_bigIntegerText));
             free_mstring(_bigIntegerText);
         }
         if(exponent>>15){ // negative
             // take over the sign from the long double (bit 15 in the signandexponent part)
             if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
                 a->sign=MP_NEG;
-                if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
+                if(amVerbose())output("Sign part of real used to set the sign of the big integer.");
             }else
-                if(amVerbose())output("\nNo need to set the sign on a big integer equal to zero.");           
+                if(amVerbose())output("No need to set the sign on a big integer equal to zero.");           
         }
     }else // all zeros in exponent
         mp_zero(a);
@@ -2096,25 +2100,25 @@ mp_err mp_set_longdouble(Mbiginteger *a, long double b){
         cast.dbl=b;
         if((cast.ldints.mantisse>>63)==0){ // a normalized number
             exp=(int)((unsigned)(cast.ldints.signandexponent)&0x7FFFu);
-            if(exp==0x7FFF){if(amVerbose())output("\nNOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
+            if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;}; // +-inf, NaN
             exp-=16383+63; // 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers    
             frac=(cast.ldints.mantisse<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
             mp_set_u64(a,frac);
-            if(amVerbose())output("\nFraction part %16x used to initialize the big integer.",frac);
+            if(amVerbose())output("Fraction part %16x used to initialize the big integer.",frac);
             err=(exp<0?mp_div_2d(a,-exp,a,NULL):mp_mul_2d(a,exp,a));
-            if(err!=MP_OKAY){output("ERROR: Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
+            if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer.");return err;}
             // take over the sign from the long double (bit 15 in the signandexponent part)
             if(((cast.ldints.signandexponent>>15)!=0uLL)&&!isBigintegerZero(a))a->sign=MP_NEG;
-            if(amVerbose())output("\nSign part of real used to set the sign of the big integer.");
+            if(amVerbose())output("Sign part of real used to set the sign of the big integer.");
         }else // a denormalized number, which all map to zero!!
             mp_zero(a); // NOTE it probably is already zero!!
         return MP_OKAY;
     }else
     if(sizeof(long double)==8){
-        if(amVerbose())output("\nNOTE: Long double has same size as a double!");
+        if(amVerbose())output("NOTE: Long double has same size as a double!");
         return mp_set_double(a,(double)b);
     }
-     if(amVerbose())output("\nThe size of a long double is %u.",sizeof(long double));
+     if(amVerbose())output("The size of a long double is %u.",sizeof(long double));
     return MP_VAL;
    */
 }
@@ -2145,16 +2149,16 @@ long double mp_get_long_double(const Mbiginteger* const a){
         while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
     }
     long double d=(long double)a->dp[i]; // initialize d to the most significant big integer digit
-    if(amVerbose())output("\nReal of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.",a->dp[i],LDBL_DIG,d,i);
+    if(amVerbose())output("Real of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.",a->dp[i],LDBL_DIG,d,i);
     while(--i>=0){
-        if(amVerbose())output("\nMultiplying '%.*Lf' by %Lf.",d,M_LD_DIGIT_MULTIPLIER);
+        if(amVerbose())output("Multiplying '%.*Lf' by %Lf.",d,M_LD_DIGIT_MULTIPLIER);
         d*=M_LD_DIGIT_MULTIPLIER;
-        if(amVerbose())output("\nResult of multiplying by '%Lf': '%.*Lf'.",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
+        if(amVerbose())output("Result of multiplying by '%Lf': '%.*Lf'.",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
         d+=(long double)a->dp[i];
-        if(amVerbose())output("\nResult of adding '%lld': '%.*Lf'.",a->dp[i],LDBL_DIG,d);
+        if(amVerbose())output("Result of adding '%lld': '%.*Lf'.",a->dp[i],LDBL_DIG,d);
     }
     if(a->sign==MP_NEG&&!ldIsNaN(d))return -d;
-    if(amVerbose())output("\nConversion of big integer to long double '%.*Lf' done!",LDBL_DIG,d);
+    if(amVerbose())output("Conversion of big integer to long double '%.*Lf' done!",LDBL_DIG,d);
     return d;
     // replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
 }
@@ -2201,7 +2205,7 @@ mstring* _getStringText(Mstring* _string,bool dequoted){
 }
 //////////mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
 mstring* _getListText(Mlist* _list){
-    ///////output("\nList to output.");char c;inputCharRead(&c);
+    ///////output("List to output.");char c;inputCharRead(&c);
 	mstring* s=string_create();
     mstring* p=s;
     if(amDebugging())p=string_append_char(p,'l');
@@ -2229,7 +2233,7 @@ mstring* _getListText(Mlist* _list){
 			_listelement=_listelement->_next;
 		}
 		p=string_append_char(p,']');
-		/////output("\nList=%s",string(p));
+		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
 		if(!p){free_mstring(s);s=NULL;}
 	}
@@ -2241,31 +2245,31 @@ mstring* _getMapText(Mmap* _map){
     if(amDebugging())p=string_append_char(p,'m');
 	if(p){
         p=string_append_char(p,'{');
-		//////output("\n%s",string(p));
+		//////output("%s",string(p));
 		Mmapelement* _mapelement=_map->_first;
 		while(p&&_mapelement){
-			//////output("\n%s","start");
+			//////output("%s","start");
 			Mvariable* _variable=_mapelement->_variable;
 			if(!_variable)continue;
             // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
             p=string_append_char(p,'\'');
 			p=string_append(p,_variable->_name);
             p=string_append_char(p,'\'');
-			/////output("\n%s",string(p));
+			/////output("%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
-			/////output("\n%s",string(p));
+			/////output("%s",string(p));
 			mstring* mapelementValueText=_getValueText(_variable->_value,false);
-			/////output("\nMap element: %s",string(p));
+			/////output("Map element: %s",string(p));
 			if(!mapelementValueText)continue;
 			p=string_append(p,string(mapelementValueText)); // append 
 			free_mstring(mapelementValueText); // release AFTER copying over
 			_mapelement=_mapelement->_next;
 			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
-			////output("\n%s","next");
+			////output("%s","next");
 		}
-		//////output("\n%s(%d)",string(p),string_length(p));
+		//////output("%s(%d)",string(p),string_length(p));
 		p=string_append_char(p,'}');
-		//////output("\n%s",string(p));
+		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
 		if(!p){free_mstring(s);s=NULL;}
 	}
@@ -2351,7 +2355,7 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     return(valueText?valueText:getUndefinedValueText());
     /* replacing:
     if(valueText)return valueText;
-	////////if(amVerbose())if(valueText)output("\nValue text: '%s'.",string(valueText));else output("\nValue not represented.");
+	////////if(amVerbose())if(valueText)output("Value text: '%s'.",string(valueText));else output("Value not represented.");
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
     return _UNDEFINED_VALUETEXT;
     */
@@ -2421,15 +2425,15 @@ bool strIsZero(char* str){
 Mbiginteger* _rational2biginteger(Mrational* _rational){
     if(!_rational)return NULL;
     Mbiginteger* _biginteger=new_biginteger();
-    if(!_biginteger){output("\nERROR: Failed to create a big integer.");return NULL;}
+    if(!_biginteger){outputError("Failed to create a big integer");return NULL;}
     if(_rational->den){
         if(mp_div(_rational->num,_rational->den,_biginteger,NULL)!=MP_OKAY){
-            output("\nERROR: Failed to divide the rational numerator and denominator.");
+            outputError("Failed to divide the rational numerator and denominator");
             free_biginteger(_biginteger);
             return NULL;
         }
     }else // copy the numerator
-        if(mp_copy(_rational->num,_biginteger)!=MP_OKAY){output("\nERROR: Failed to copy the rational numerator.");free_biginteger(_biginteger);return NULL;}
+        if(mp_copy(_rational->num,_biginteger)!=MP_OKAY){outputError("Failed to copy the rational numerator");free_biginteger(_biginteger);return NULL;}
     return _biginteger;
 }
 
@@ -2507,7 +2511,7 @@ bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a 
                     free_mstring(_indexValueText);
                 }else{
                     result=false;
-                    output("\nFailed to convert index %llu to attribute name.",_listelement->index);
+                    output("Failed to convert index %llu to attribute name.",_listelement->index);
                 }
                 if(!result)break;
                 _listelement=_listelement->_next;
@@ -2747,21 +2751,21 @@ Mvalue* Mlen(Mvalue* _value){
 
 // MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
 Mvalue* Mfac(Mvalue* _value){
-    if(!_value){if(amVerbose())output("\nNo value!");return NULL;}
+    if(!_value){if(amVerbose())output("No value!");return NULL;}
     if(amVerbose())outputValue("\nArgument of fac() function: '",_value,"'.");
     if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){outputValue("\nERROR: Non-integer argument '",_value,"' to fac() function!");return NULL;}
     // some special cases (i.e. the input number is smaller than 2)
     Mbiginteger* finalmultiplier=NULL;
     if(_value->type==VT_INTEGER){
-        if(_value->value._integer->ll<0){output("\nERROR: Invalid (negative integer) argument to fac() function.");return NULL;}
+        if(_value->value._integer->ll<0){outputError("Invalid (negative integer) argument to fac() function");return NULL;}
         if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
         finalmultiplier=_getBiginteger(_value->value._integer->ll);
     }else{
-        if(mp_isneg(_value->value._biginteger)){output("\nERROR: Invalid (negative integer) argument to fac() function!");return NULL;}
+        if(mp_isneg(_value->value._biginteger)){outputError("Invalid (negative integer) argument to fac() function");return NULL;}
         if(mp_cmp(_value->value._biginteger,getBigintegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         finalmultiplier=_value->value._biginteger;
     }
-    if(!finalmultiplier){outputValue("\nERROR: Failed to convert '",_value,"' to a big integer!");return NULL;}
+    if(!finalmultiplier){output("%s",ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");return NULL;}
     if(amVerbose()&&amDebugging())outputBiginteger("\nFinal multiplier: '",finalmultiplier,"'.");
     Mbiginteger* result=_getBiginteger(6); // the smallest value to return
     if(result){
@@ -2770,17 +2774,17 @@ Mvalue* Mfac(Mvalue* _value){
         Mbiginteger *multiplier=_getBiginteger(3);
         if(multiplier){
             while(mp_cmp(multiplier,finalmultiplier)==MP_LT){
-                if(mp_incr(multiplier)!=MP_OKAY){if(amVerbose())output("\nERROR: Failed to increment big integer!");result=NULL;break;} // if we fail to increment break
-                if(mp_mul(result,multiplier,result)!=MP_OKAY){if(amVerbose())output("\nERROR: Failed to multiply big integer!");result=NULL;break;}
+                if(mp_incr(multiplier)!=MP_OKAY){if(amVerbose())outputError("Failed to increment big integer");result=NULL;break;} // if we fail to increment break
+                if(mp_mul(result,multiplier,result)!=MP_OKAY){if(amVerbose())outputError("Failed to multiply a big integer by 6");result=NULL;break;}
                 //////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
             }
             // get rid of intermediate big integers
             mp_clear(multiplier);
         }
     }else
-        if(amVerbose())output("\nERROR: No initial big integer 6.");
+        if(amVerbose())outputError("Failed to create a big integer representing 6");
     if(_value->type==VT_INTEGER)mp_clear(finalmultiplier);
-    if(amVerbose())outputBiginteger("\nResult of applying the fac() function: '",result,"'.");
+    if(amVerbose())outputBiginteger("Result of applying the fac() function: '",result,"'.\n");
     return (result?_getBigintegerValue(result,true):NULL);
     /* replacing:
     // 39 is about the maximum that we can store in a long long
@@ -2856,18 +2860,18 @@ long double getRationalLongDouble(const Mrational* const _rational){
         // it's easiest to turn the numerator big integer into a long double and add delta to it, and divide by the long double stored in the denominator
         // TODO find a better way to do this
         long double ldNumerator=mp_get_long_double(_rational->num); // NOTE also shortcuts when _rational->num equals 0 but we have to add the delta, so we have to do it this way
-        if(amVerbose())output("\nRational numerator converted to real '%.*Lf'.",LDBL_DIG,ldNumerator);
+        if(amVerbose())output("Rational numerator converted to real '%.*Lf'.",LDBL_DIG,ldNumerator);
         if(!ldIsNaN(ldNumerator)&&!ldIsInf(ldNumerator)){ // TODO checking with ldIsInf probably NOT needed although the big integer might be too big!!!
             // add delta (which could be zero though) NOTE ld should not be NaN or Infinity though
             if(_rational->delta)ldNumerator+=_rational->delta->ld;
             if(!_rational->den)return ldNumerator; // if no denominator (i.e. 1) nothing to divide by!!
             // a denominator which is not equal to 1
             long double ldDenominator=mp_get_long_double(_rational->den);
-            if(amVerbose())output("\nRational denominator converted to real '%.*Lf'.",LDBL_DIG,ldDenominator);
+            if(amVerbose())output("Rational denominator converted to real '%.*Lf'.",LDBL_DIG,ldDenominator);
             if(!ldIsNaN(ldDenominator)&&!ldIsInf(ldDenominator))return ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok
-            if(amVerbose())output("\nERROR: Failed to convert a rational denominator to a real.");
+            if(amVerbose())outputError("Failed to convert a rational denominator to a real");
         }
-        if(amVerbose())output("\nERROR: Failed to convert a rational numerator to a real.");
+        if(amVerbose())outputError("Failed to convert a rational numerator to a real");
     }
     return M_LD_NAN; // if something went wrong
 }
@@ -2897,11 +2901,11 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     if(ldIsZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
                     ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
                     _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false,true); // construct the intermediate result without normalizing
-                    if(!_rational){output("\nERROR: Failed to construct the intermediate rational %lld/%lld",p,q);break;}
+                    if(!_rational){output("%sFailed to construct the intermediate rational %lld/%lld",ERROR_PREFIX,p,q);break;}
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
                     Mvalue* _rationalValue=_getRationalValue(_rational,true);
-                    if(!_rationalValue){output("\nERROR: Failed to value wrap the intermediate rational approximation to a real.");break;}
-                    if(!appendedToList(_iterationsList,_rationalValue,i)){free_rational(_rational);output("\nERROR: Failed to register a intermediate rational approximation.");/*break;*/}
+                    if(!_rationalValue){outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
+                    if(!appendedToList(_iterationsList,_rationalValue,i)){free_rational(_rational);outputError("Failed to register a intermediate rational approximation");/*break;*/}
                     rem-=a;
                     rem=1/rem;
                     // shift the lot
@@ -2923,9 +2927,9 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                 // ASSERT failed to append the rational approximation to the iterations list
                 // free whatever's NOT being returned NOTE the list itself will be freed below
                 free_value(_rationalValue);
-                output("\nERROR: Failed to append the rational of a real to the result list.");
+                outputError("Failed to append the rational of a real to the result list");
             }else // failed to wrap the rational
-                output("\nERROR: Failed to store the rational approximation.");
+                outputError("Failed to store the rational approximation");
         }
         if(_iterationsList)free_list(_iterationsList);
     }

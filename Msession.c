@@ -72,7 +72,7 @@ void setBackColor(const char* colortext){output(ES"48;5%sm",colortext);}
 
 void resetOutputColor(){setColor(getInfoColor());setBackColor(getBackgroundColor());}
 
-void outputLine(char* s){resetOutputColor();output("\n%s",s);} // for writing a single line of output text in the info color
+void outputLine(char* s){resetOutputColor();output("%s\n",s);} // for writing a single line of output text in the info color
 
 void initDisplay(){
 	outputControlText("=3h"); // 80x25 color mode
