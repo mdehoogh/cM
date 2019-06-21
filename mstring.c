@@ -1,4 +1,5 @@
 #include "mstring.h"
+#include "Malloc.h"
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //                TODO if blocks is zero failed to 
@@ -12,11 +13,11 @@
 
 /** Create a String */
 mstring* string_create(){
-    mstring* ans=calloc(1,sizeof *ans);
+    mstring* ans=CALLOC(1,sizeof *ans,'s');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
-        ans->chars=malloc(BLOCK_SIZE*sizeof *(ans->chars));
-        if(!ans->chars){free(ans);ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
+        ans->chars=MALLOC(BLOCK_SIZE*sizeof *(ans->chars),'c');
+        if(!ans->chars){FREE(ans,'s');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
         // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
 #ifdef __DEBUGGING__
@@ -27,18 +28,18 @@ mstring* string_create(){
 
 mstring* new_mstring(char* s){
     if(!s)return NULL;
-    mstring* ans=calloc(1,sizeof *ans);
+    mstring* ans=CALLOC(1,sizeof *ans,'s');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
-        ans->chars=malloc((++ans->blocks)*BLOCK_SIZE); // here we increment ans->blocks (as we must)
+        ans->chars=MALLOC((++ans->blocks)*BLOCK_SIZE,'c'); // here we increment ans->blocks (as we must)
         if(ans->chars){
             //////////////strcpy(ans->chars,s);ans->length=l; // also copies the ending '\0' over but memcpy() does not have to check for '\0' so we use memcpy()
             ans->length=l; // MDH@21JUN2019: no need to copy '\0' at the end!!! replacing: ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
             memcpy(ans->chars,s,l); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
         }else{
-            free(ans);ans=NULL;
+            FREE(ans,'s');ans=NULL;
         } // failure
     }
 #ifdef __DEBUGGING__
@@ -75,7 +76,7 @@ mstring* string_copy(mstring* src){
 /** 
  * Free the memory associated with a String
  */
-void free_mstring(mstring* str){if(str){if(str->chars)free(str->chars);free(str);}}
+void free_mstring(mstring* str){if(str){if(str->chars)FREE(str->chars,'c');FREE(str,'s');}}
 
 /** Is the String empty? */
 bool string_empty(mstring *str){

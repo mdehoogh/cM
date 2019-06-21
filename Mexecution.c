@@ -1,5 +1,7 @@
 #include <limits.h>
 #include <math.h>
+
+#include "Malloc.h"
 #include "Msettings.h"
 #include "Moutput.h"
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
@@ -153,18 +155,18 @@ mpd_t* new_mpd(mpd_context_t* mpd_context,int64_t value){
     /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
     return _mpd;
 }
-Mdecimal* new_decimal(mpd_context_t* mpd_context,uint64_t repeating){
-    Mdecimal* _decimal=(Mdecimal*)malloc(sizeof(Mdecimal));
+Mdecimal* new_decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating){
+    Mdecimal* _decimal=(Mdecimal*)MALLOC(sizeof(Mdecimal),'D');
     if(_decimal){
-        _decimal->mpd=new_mpd(mpd_context,0); // initialize to zero by default
-        if(!_decimal->mpd){outputError("Failed to create a decimal");free(_decimal);_decimal=NULL;}else _decimal->repeating=repeating;
+        _decimal->mpd=new_mpd(mpd_context,value); // initialize to zero by default
+        if(!_decimal->mpd){outputError("Failed to create a decimal");FREE(_decimal,'D');_decimal=NULL;}else _decimal->repeating=repeating;
     }
     return _decimal;
 }
 Mdecimal* _getDecimal(mpd_t* _mpd,uint64_t repeating,bool freeonfailure){
     Mdecimal* _decimal=NULL;
     if(_mpd){
-        _decimal=new_decimal(NULL,repeating); // always using the default decimal context
+        _decimal=new_decimal(NULL,0,repeating); // always using the default decimal context
         if(_decimal)_decimal->mpd=_mpd;else if(freeonfailure)mpd_del(_mpd);
     }
     return _decimal;
@@ -175,7 +177,7 @@ Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
         if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
         // can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
         // the rounding at the end of course could prove to be problematic
-        _decimal=new_decimal(_decimalContext,repeating);
+        _decimal=new_decimal(_decimalContext,0,repeating);
         if(_decimal)mpd_set_string(_decimal->mpd,decimalText,_decimalContext);
     }else
         outputError("No decimal text to parse");
@@ -266,7 +268,7 @@ bool isDecimalOne(Mdecimal* _decimal){
 
 Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
     if(!_decimal)return NULL;
-    Mdecimal* _decimalCopy=new_decimal(_decimalContext,_decimal->repeating);
+    Mdecimal* _decimalCopy=new_decimal(_decimalContext,0,_decimal->repeating);
     if(_decimalCopy)mpd_copy(_decimalCopy->mpd,_decimal->mpd,_decimalContext);
     return _decimalCopy;
 }
@@ -604,7 +606,7 @@ void free_decimal(Mdecimal* _decimal){
     if(_decimal){
         if(amVerbose())output("Freeing decimal.");
         mpd_del(_decimal->mpd); // assuming -> precedes the address of operator
-        free(_decimal);
+        FREE(_decimal,'D');
     }else
         output("BUG: No decimal to free.");
 }

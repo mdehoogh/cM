@@ -300,7 +300,8 @@ long double getRealLongDouble(const Mreal* const _real);
 // decimal support
 mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
 mpd_t* new_mpd(mpd_context_t* mpd_context,int64_t value);
-Mdecimal* new_decimal(mpd_context_t* mpd_context,uint64_t repeating);
+/////void free_mpd(mpd_t* _mpd);
+Mdecimal* new_decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating);
 Mdecimal* _getDecimal(mpd_t* _mpd,uint64_t repeating,bool freeonfailure);
 Mdecimal* _getDecimalCopy(Mdecimal* _decimal);
 void free_decimal(Mdecimal* _decimal);

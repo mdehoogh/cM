@@ -10,6 +10,7 @@
 #include <time.h>
 #include <limits.h>
 
+#include "Malloc.h"
 #include "Msettings.h"
 #include "Moutput.h"
 #include "Msession.h"
@@ -26,10 +27,11 @@ const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for app
 
 void writeTimestamp(FILE* _file){
 	if(_file){
-    time_t now=time(NULL);
+    	time_t now=time(NULL);
 		struct tm * nowlocal=localtime(&now);
-    char buffer[50];strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",nowlocal);
-    fprintf(_file,"%s\t",buffer);
+    	char buffer[50];
+		strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",nowlocal);
+    	fprintf(_file,"%s\t",buffer);
 	}
 }
 
@@ -343,7 +345,7 @@ Mvalue* setdp(Mvalue* _value){
 ////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
 
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
-	Mdecimal* _result=new_decimal(_decimalContext,0);
+	Mdecimal* _result=new_decimal(_decimalContext,0,0);
 	mpd_add(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext);
 	return _result;
 }
@@ -578,15 +580,31 @@ Mvalue* pi_d(Mvalue* _value){
 	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
 	*/
 	if(amVerbose())output("Computing pi to %lld decimals.\n",mpd_context->prec);
+
 	// initialize the variables we need for the iterations
+#ifdef __ADEBUG__
+	Mdecimal *lasts=new_decimal(mpd_context,0,0),*t=new_decimal(mpd_context,3,0),*s=new_decimal(mpd_context,3,0),*n=new_decimal(mpd_context,1,0),*na=new_decimal(mpd_context,0,0),*d=new_decimal(mpd_context,0,0),*da=new_decimal(mpd_context,24,0);
+	// some constant decimals we need
+	Mdecimal *d8=new_decimal(mpd_context,8,0),*d32=new_decimal(mpd_context,32,0);
+#else
 	mpd_t *lasts=new_mpd(mpd_context,0),*t=new_mpd(mpd_context,3),*s=new_mpd(mpd_context,3),*n=new_mpd(mpd_context,1),*na=new_mpd(mpd_context,0),*d=new_mpd(mpd_context,0),*da=new_mpd(mpd_context,24);
 	// some constant decimals we need
 	mpd_t *d8=new_mpd(mpd_context,8),*d32=new_mpd(mpd_context,32);
+#endif
 	if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
 	if(amVerbose())output("Initial decimals created!\n");
 	unsigned long long iter=0;
 	if(amVerbose()){
 		output("Iteration %u:",iter);
+#ifdef __ADEBUG__
+		char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
+		char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
+		char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
+		char* _n=mpd_to_sci(n->mpd,0);output(" n=%s",_n);free(_n);
+		char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
+		char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
+		char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
+#else
 		char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
 		char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
 		char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
@@ -594,12 +612,49 @@ Mvalue* pi_d(Mvalue* _value){
 		char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
 		char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
 		char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
+#endif
 		outputChar('\n');
 	}
 	int cmp;
 	mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
 	while(!mpd_error(mpd_context)){
 		iter++;
+#ifdef __ADEBUG__
+		//if(amVerbose())output("Iteration: %lld: ",iter);
+		cmp=mpd_cmp(lasts->mpd,s->mpd,mpd_context); // lasts == s ?
+		//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
+		if(!cmp){if(amVerbose())output("Done!\n");break;}
+		//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
+		if(cmp==INT_MAX){output("Something went wrong!\n");break;}
+		//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
+		mpd_copy(lasts->mpd,s->mpd,mpd_context); // lasts = s
+		//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
+		mpd_add(n->mpd,n->mpd,na->mpd,mpd_context);
+		//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
+		mpd_add(na->mpd,na->mpd,d8->mpd,mpd_context); // increment n by na and na by 8
+		//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
+		mpd_add(d->mpd,d->mpd,da->mpd,mpd_context);
+		//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
+		mpd_add(da->mpd,da->mpd,d32->mpd,mpd_context); // increment d by da and da by 32
+		//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
+		mpd_mul(t->mpd,t->mpd,n->mpd,mpd_context);
+		//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
+		mpd_div(t->mpd,t->mpd,d->mpd,mpd_context); // multiply t by n and divide t by d
+		//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
+		mpd_add(s->mpd,s->mpd,t->mpd,mpd_context); // add t to s
+		//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+		if(amVerbose()){
+			output("Iteration %u:",iter);
+			char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
+			char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
+			char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
+			char* _n=mpd_to_sci(n->mpd,0);output(" n=%s",_n);free(_n);
+			char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
+			char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
+			char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
+			outputChar('\n');
+		}
+#else
 		//if(amVerbose())output("Iteration: %lld: ",iter);
 		cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
 		//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
@@ -634,11 +689,17 @@ Mvalue* pi_d(Mvalue* _value){
 			char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
 			outputChar('\n');
 		}
+#endif
 	}
 	if(mpd_context)mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
 	// get rid of all the decimals we used
+#ifdef __ADEBUG__
+	free_decimal(lasts);free_decimal(t);free_decimal(n);free_decimal(na);free_decimal(d);free_decimal(da);
+	free_decimal(d8);free_decimal(d32);
+#else
 	mpd_del(lasts);mpd_del(t);mpd_del(n);mpd_del(na);mpd_del(d);mpd_del(da);
 	mpd_del(d8);mpd_del(d32);
+#endif
 	if(mpd_context){
 		if(mpd_error(mpd_context)){ // something went wrong
 			if(amVerbose())output("%sComputation of pi with precision %lld error status: %u.\n",ERROR_PREFIX,decimalprecision,mpd_getstatus(mpd_context));
@@ -647,12 +708,25 @@ Mvalue* pi_d(Mvalue* _value){
 		}
 	}
 	// success
+#ifdef __ADEBUG__
+	mpd_finalize(s->mpd,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
+#else
 	mpd_finalize(s,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
+#endif
 	if(amVerbose()){
-		char* _s=mpd_to_sci(s,0);if(_s){output("Final approximation of pi (rounded to %llu decimals): %s.\n",decimalprecision,_s);free(_s);}
+#ifdef __ADEBUG__
+		char* _s=mpd_to_sci(s->mpd,0);
+#else
+		char* _s=mpd_to_sci(s,0);
+#endif
+		if(_s){output("Final approximation of pi (rounded to %llu decimals): %s.\n",decimalprecision,_s);free(_s);}
 	}
 	// wrap the mpd_t in a decimal, and subsequently in an Mvalue!!!
+#ifdef __ADEBUG__
+	return _getDecimalValue(s,true);
+#else
 	return _getDecimalValue(_getDecimal(s,0,true),true);
+#endif
 }
 
 // how about storing all results here?????? instead of in the root environment????
@@ -1333,7 +1407,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap|Use history command - Options: eXit|Functions|History|Shell|Variables.","Shell mode: enter a system command to execute."};
+char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap|Use history command - Options: Reset|eXit|Functions|History|Shell|Variables.","Shell mode: enter a system command to execute."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -1402,7 +1476,7 @@ void prompt(){
 void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
-	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
+	output("\n\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
 	prompt();
 }
 
@@ -1480,7 +1554,6 @@ Mtoken* freeToken(Mtoken* _token){
 	// MDH@30APR2019: let's delegate to free_token()
 	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token);}return _prevToken;
 }
-
 // output functions that require access to the current token
 void toStartOfPreviousLine(){oneLineUp();toStartOfLine();clearLine();toStartOfLine();}
 void toStartOfNextLine(){oneLineDown();toStartOfLine();}
@@ -1516,7 +1589,7 @@ void outputStatus(char inputChar,char inputCharType){
 }
 
 Mtoken* newToken(Mtoken* prevToken){
-	Mtoken* pNewToken=(Mtoken*)calloc(1,sizeof(Mtoken));
+	Mtoken* pNewToken=new_token();
 	if(pNewToken){
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
 		if(prevToken){
@@ -1573,6 +1646,16 @@ bool registerCommand(){
 	}
 	commands[commandCount++]=pCommandToEvaluate;
 	return true;
+}
+// MDH@21JUN2019: reset() takes care of removing all stored commands
+void reset(){
+	while(commandCount>0){
+		freeToken(commands[--commandCount]);
+	}
+#ifdef __ADEBUG__
+	outputChar('\n');
+	syncallocations();
+#endif
 }
 
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
@@ -2313,7 +2396,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						if(amDebugging())output("Real part string length: %u.\n",l);
 						if(getDP()<l)output("WARNING: More decimals present in literal than expected. Rounding may occur.\n");
 						if(amDebugging())outputLine("Decimal precision checked!");
-						Mdecimal* _decimal=new_decimal(_decimalContext,0);
+						Mdecimal* _decimal=new_decimal(_decimalContext,0,0);
 						if(amDebugging())outputLine("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),_decimalContext);
@@ -2689,7 +2772,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
 		Mdecimal* _baseDecimal=getValueDecimal(_value1);
 		Mdecimal* _exponentDecimal=getValueDecimal(_value2);
-		Mdecimal* _powerDecimal=new_decimal(_decimalContext,0);
+		Mdecimal* _powerDecimal=new_decimal(_decimalContext,0,0);
 		if(_powerDecimal){
 			mpd_pow(_powerDecimal->mpd,_baseDecimal->mpd,_exponentDecimal->mpd,_decimalContext);
 			// TODO are we converting back?
@@ -3234,7 +3317,7 @@ void outputValueColored(Mvalue* _value){
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
 	
-	outputChar('\n'); // indicating that the command is being evaluated!!!
+	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
 	if(!pCommandToEvaluate){outputError("Nothing to evaluate!");return false;}
@@ -3956,6 +4039,9 @@ int main(int argc, char **argv){
 	displayFlags();
 	outputLine("");
 	
+	// tell user whether allocation recording is active!!!
+	outputLine(allocationrecordinginitialized()?"Allocation recording ready!":"No allocation recording!");
+
 	if(!initEnvironment()){ // ascertain to have an execution environment!!!
 		setColor(getErrorColor());setBackColor(getBackgroundColor());
 		outputLine("Exiting: due to failing to initialize the M execution environment!");
@@ -3984,7 +4070,10 @@ int main(int argc, char **argv){
 
 	outputLine("");
 	outputLine("Use Ctrl-Z to exit M immediately at any time.");
-	outputLine("In any mode press the Enter key on an empty line to switch modes.");
+	output("In any mode press the Enter key on an empty line to switch modes.");
+
+	// let's mark the allocations BEFORE we start looping
+	addallocationtype('!');
 
 	while(1){
 
@@ -4254,6 +4343,7 @@ int main(int argc, char **argv){
 					if(inputChar=='w'||inputChar=='W'){setWrapping(inputChar=='W');inputCharType='n';break;}
 					if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
 					if(inputChar=='f'||inputChar=='F'){outputFunctions();inputCharType='n';break;}
+					if(inputChar=='r'||inputChar=='R'){reset();inputCharType='n';break;}
 					// options
 					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
 					if(inputChar=='s'||inputChar=='S')inputCharType=switchToShellMode(NULL);
@@ -4383,10 +4473,13 @@ int main(int argc, char **argv){
 
 		// MDH@16APR2019: now if we use n to switch modes as well, we can do that if there's no command
 		if(inputCharType=='n'){
-			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
+			if(inputMode==IM_COMMAND){
+				inputInfo("%s",""); // so that line will be empty
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
-				inputInfo(""); // so that line will be empty
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore
+			}
+			outputChar('\n');
+			if(inputMode==IM_COMMAND){ // the newline character ends the command to be evaluated!!
 				// if pCommandToEvaluate is set, we have a command to evaluate
 				/*
 				Mtoken* pCommandToEvaluateToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
@@ -4405,7 +4498,16 @@ int main(int argc, char **argv){
 
 				// if we succeeded in evaluating a command we should register it
 				if(pCommandToEvaluate){ // technically something to evaluate
-					if(!evaluateCommand()){
+					size_t mark=allocationmark();
+					output("Mark: %zu.\n",mark);
+					bool commandEvaluated=evaluateCommand();
+					outputChar('\n');
+					if(mark>0){
+						output("Left after unmarking: %zu.\n",unmarkallocation(mark));
+						allocationreport(1); //syncallocations(); // will also do allocationreport(1)
+					}else
+						outputLine("No allocations to unmark.");
+					if(!commandEvaluated){
 						mstring* commandText=_getCommandText(false);
 						if(!string_length(commandText)){
 							clearCommand();
