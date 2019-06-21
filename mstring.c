@@ -1,5 +1,8 @@
 #include "mstring.h"
 
+// MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
+//                TODO if blocks is zero failed to 
+
 /** MDH@25DEC2018: 
  *  this code is from the Internet to implement a mutable string
  *  however, letting string_get_all() return a string allocated on the heap which means it needs to be freed is 
@@ -13,7 +16,8 @@ mstring* string_create(){
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         ans->chars=malloc(BLOCK_SIZE*sizeof *(ans->chars));
-        if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
+        if(!ans->chars){free(ans);ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
+        // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
 #ifdef __DEBUGGING__
     if(!ans)printf("\nFailed to create a string.");
@@ -31,7 +35,7 @@ mstring* new_mstring(char* s){
         ans->chars=malloc((++ans->blocks)*BLOCK_SIZE); // here we increment ans->blocks (as we must)
         if(ans->chars){
             //////////////strcpy(ans->chars,s);ans->length=l; // also copies the ending '\0' over but memcpy() does not have to check for '\0' so we use memcpy()
-            ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
+            ans->length=l; // MDH@21JUN2019: no need to copy '\0' at the end!!! replacing: ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
             memcpy(ans->chars,s,l); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
         }else{
             free(ans);ans=NULL;
@@ -73,7 +77,7 @@ void free_mstring(mstring* str){if(str){if(str->chars)free(str->chars);free(str)
 
 /** Is the String empty? */
 bool string_empty(mstring *str){
-    return(str==NULL||str->chars[0]=='\0'); // MDH@25APR2019: checking the first character probably is easiest
+    return(!str||!str->length); // MDH@21JUN2019 replacing: chars[0]=='\0'); // MDH@25APR2019: checking the first character probably is easiest
     /* replacing:
     if(str==NULL)return true;
     if(str->length==0)return true;
@@ -99,11 +103,11 @@ mstring* string_setlength(mstring* str,uint32_t length){
         }
         // fill with blanks??? for now that's OK
         while(str->length<length){str->chars[str->length]=' ';str->length++;}
-        str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
+        // MDH@21JUN2019 removing: str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
     }else
     if(length<str->length){
         str->length=length;
-        str->chars[str->length]='\0';
+        // MDH@21JUN2019 removing: str->chars[str->length]='\0';
     }
     return str;
 }
@@ -118,7 +122,7 @@ bool string_shorten(mstring* str,uint32_t length){
     if(!str)return false;
     if(length>str->length)return false;
     str->length-=length;
-    str->chars[str->length]='\0';
+    // MDH@21JUN2019 removing: str->chars[str->length]='\0';
     return true;
 }
 
@@ -197,7 +201,7 @@ mstring* string_append_char(mstring* str,char c){
         if(l>=str->blocks*BLOCK_SIZE)return NULL;
         str->chars[str->length]=c;
         ++(str->length);
-        str->chars[str->length]='\0';
+        // MDH@21JUN2019 removing: str->chars[str->length]='\0';
     }
     return str;
 }
@@ -217,6 +221,7 @@ char* string_remainder(mstring* str,uint32_t firstpos){
     if(!str)return NULL;
     if(!firstpos)return string(str);
     if(firstpos>str->length)return NULL;
+    str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
     return str->chars+firstpos;
 }
 
@@ -224,14 +229,20 @@ char* string_remainder(mstring* str,uint32_t firstpos){
  * Get a C-String with the proper null-terminator 
  * NOTE: returning the pointer to the characters stored in the mstring (which is str->chars)
 */
-char* string(mstring* str){return (str?str->chars:NULL);}
+char* string(mstring* str){
+    if(!str)return NULL;
+    str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
+    return str->chars;
+    // MDH@21JUN2019: replacing: return (str?str->chars:NULL);
+}
 
 /** Get where the first occurrence of a character in the String is */
 int32_t string_find(mstring *str,char c){
     if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
-        int32_t pos=0; // first character to check
-        while(pos<str->length){ // still within the text
+        int32_t pos=0;
+        uint32_t l=str->length; // first character to check
+        while(pos<l){ // still within the text
             if(str->chars[pos]==c)return pos; // if a match return pos
             pos++; // keep looking
         }
