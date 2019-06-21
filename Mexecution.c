@@ -1470,7 +1470,7 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
                             _functionmap->_last=_functionmapelement;
                             _functionmap->numberOfFunctions++;
                              _function->_name=_functionName; // success!!!!!
-                            output("Function '%s' registered as function #%d.\n",string(_function->_name),_functionmap->numberOfFunctions);
+                            if(amVerbose())output("Function '%s' registered as function #%d.\n",string(_function->_name),_functionmap->numberOfFunctions);
                         }
                     }
                 }else
@@ -1538,7 +1538,7 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
                 if(_map){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    outputLine("Returning the single integer map!");
+                    if(amVerbose())outputLine("Returning the single integer map!");
                     return _map;
                 }
                 outputError("Failed to create the integer variable map");
@@ -1682,7 +1682,7 @@ bool completedFunction(Mfunction* _function,NoArgumentFunction noArgumentFunctio
         _function->type=FT_INTERNAL_NO_ARGUMENTS;
         _function->functionunion.noArgumentFunction=noArgumentFunction;
         _function->_parameterMap=NULL;
-        output("Registered function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1693,7 +1693,7 @@ bool completedValueFunction(Mfunction* _function,OneArgumentFunction oneArgument
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getMap("v");
         // no defaults here!!!
-        output("Registered function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1703,7 +1703,7 @@ bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentF
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getRealMap("x",_getRealValue(M_LD_NAN)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
-        output("Registered function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1714,7 +1714,7 @@ bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgume
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
-        output("Registered function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1725,7 +1725,7 @@ bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentF
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED));
-        output("Registered list function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered list function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
@@ -1735,7 +1735,7 @@ bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoA
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=_getStringStringMap("variable","type");
-        output("Registered function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;

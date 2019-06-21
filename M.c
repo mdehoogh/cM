@@ -316,7 +316,7 @@ long long getDP(){
 	if(!_decimalContext)_decimalContext=get_mpd_context(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
 	long long dp=(_decimalContext?_decimalContext->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
-	if(dp==M_LL_INVALID)output("BUG: No default decimal context active!\n");
+	if(dp==M_LL_INVALID)outputLine("BUG: No default decimal context active!");
 	return dp;
 }
 Mvalue* setdp(Mvalue* _value){
@@ -340,7 +340,7 @@ Mvalue* setdp(Mvalue* _value){
 	}
 	return _getIntegerValue(olddecimalprecision);
 }
-///////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
+////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
 
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	Mdecimal* _result=new_decimal(_decimalContext,0);
@@ -567,11 +567,17 @@ for i in range(10000):
 Mvalue* pi_d(Mvalue* _value){
 	// _value should be a positive integer defining the required precision
 	if(amVerbose())output("Computing pi using decimals.\n");
-	long long decimalprecision=0;if(_value&&_value->type==VT_INTEGER)decimalprecision=_value->value._integer->ll;
-	mpd_context_t* mpd_context=(decimalprecision>0?get_mpd_context(decimalprecision):_decimalContext);
+	long long decimalprecision=M_LL_INVALID;if(_value&&_value->type==VT_INTEGER)decimalprecision=_value->value._integer->ll;
+	mpd_context_t* mpd_context=(decimalprecision>0?get_mpd_context(decimalprecision):NULL);
+	if(!mpd_context){
+		if(decimalprecision>0)outputLine("Failed to create the requested decimal context. Will use the default instead.");
+		mpd_context=_decimalContext;
+	}
+	/* replacing:
 	if(!mpd_context){if(decimalprecision>0)outputError("Failed to obtain the requested decimal context");else outputError("No (default) decimal context available");return NULL;}
 	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
-	if(amVerbose())output("Computing pi to %lld decimals.\n",decimalprecision);
+	*/
+	if(amVerbose())output("Computing pi to %lld decimals.\n",mpd_context->prec);
 	// initialize the variables we need for the iterations
 	mpd_t *lasts=new_mpd(mpd_context,0),*t=new_mpd(mpd_context,3),*s=new_mpd(mpd_context,3),*n=new_mpd(mpd_context,1),*na=new_mpd(mpd_context,0),*d=new_mpd(mpd_context,0),*da=new_mpd(mpd_context,24);
 	// some constant decimals we need
@@ -1088,6 +1094,10 @@ Menvironment* _Menvironment; // this is the root (M) environment
 Mtoken* newToken(Mtoken* prevToken);
 
 bool initEnvironment(){
+
+	long long decimalprecision=getDP();
+	if(decimalprecision==M_LL_INVALID)return false; // let's force starting with a default decimal context
+	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
 
 	NAR_value=_getRealValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
@@ -3956,7 +3966,7 @@ int main(int argc, char **argv){
 
 	mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
 	if(predefinedVariableNames){
-		output("Predefined variables: %s.",string(predefinedVariableNames));
+		output("Predefined variables: %s.\n",string(predefinedVariableNames));
 		free_mstring(predefinedVariableNames); // no get rid of it!!!
 	}else
 		outputLine("No predefined variables!");
