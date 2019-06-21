@@ -49,7 +49,9 @@ mstring* new_mstring(char* s){
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
 mstring* string_copy(mstring* src){
-    return (src?new_mstring(src->chars):NULL);
+    if(!src)return NULL;
+    src->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
+    return new_mstring(src->chars);
     /* replacing:
     mstring* dst=string_create();
     if(dst){
