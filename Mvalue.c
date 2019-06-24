@@ -248,10 +248,13 @@ Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     return _decimalValue;
 }
 Mvalue* _getIntegerValue(long long ll){
-    Minteger* _integer=new_integer(ll);
-    Mvalue* _integervalue=(_integer?new_value():NULL);
-    if(_integervalue){_integervalue->type=VT_INTEGER;_integervalue->value._integer=_integer;}
-    return _integervalue;
+    if(amVerbose())output("Wrapping integer '%ll'.\n",ll);
+    Mvalue* _integerValue=new_value();
+    if(_integerValue){
+        _integerValue->value._integer=new_integer(ll);
+        if(!_integerValue->value._integer){free_value(_integerValue);_integerValue=NULL;}else _integerValue->type=VT_INTEGER;
+    }
+    return _integerValue;
 }
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     if(!_biginteger)return NULL;
@@ -260,11 +263,13 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     return _bigintegerValue;
 }
 Mvalue* _getRealValue(long double ld){
-    if(amVerbose())output("Wrapping long double '%.*Lf'.",ld);
-    Mreal* _real=new_real(ld);
-    Mvalue* _realvalue=(_real?new_value():NULL);
-    if(_realvalue){_realvalue->type=VT_REAL;_realvalue->value._real=_real;}
-    return _realvalue;
+    if(amVerbose())output("Wrapping real '%.*Lf'.\n",DBL_DIG,ld);
+    Mvalue* _realValue=new_value();
+    if(_realValue){
+        _realValue->value._real=new_real(ld);
+        if(!_realValue->value._real){free_value(_realValue);_realValue=NULL;}else _realValue->type=VT_REAL;
+    }
+    return _realValue;
 }
 Mvalue* _getStringValue(char* _s,bool freeonfailure){
     if(!_s)return NULL; // when no input, no go

@@ -5,6 +5,7 @@
  *   2. all these local variables should be freed before leaving the function (so technically there should be one exit point)
  *   3. if the pointer contents is passed along (in)to the result of the function the pointer should be NULLed to prevent releasing the memory pointed to (which needs to persist function execution)
  *   4. preferably this is done by calling the transfer<Mtype> function that will NULL the calling pointer
+ *   5. prefix the function name with _ if it returns a dynamically allocated pointer whose ownerships transfers to the caller
  */
 #include <limits.h>
 #include <math.h>
@@ -27,7 +28,8 @@ void outputError(const char* const error){if(error)output("%s%s.\n",ERROR_PREFIX
 void outputErrorAndText(const char* const error,const char* const text){if(error)output("%s%s",ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
 static int8_t littleEndian=-1;
-void initExecution(){
+// NOTE force execution immediately
+__attribute__((constructor)) void initExecution() {
     int i=1;
 	char* c=(char*)&i;
 	littleEndian=*c;
@@ -38,6 +40,7 @@ bool isLittleEndian(){
     if(littleEndian<0)initExecution();
     return(littleEndian>0);
 }
+
 
 mstring* _getUint64BinaryText(uint64_t ul,char presuffix){
     mstring* _binaryText=string_create();
@@ -112,6 +115,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
     return mpd_contexts[mpd_context_index];
 }
 
+// BIG INTEGER STUFF
 // new_biginteger returns an initialized big integer on success, or NULL when failing
 Mbiginteger* new_biginteger(){
     Mbiginteger* result=(Mbiginteger*)malloc(sizeof(mp_int));
