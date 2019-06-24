@@ -26,14 +26,13 @@
 // for heap_string_copy() to copy char* stuff
 #include "Mmemory.h"
 
-// Token and Mexpression is provided in Mexpression.h
-#include "Mexpression.h"
-
 // MDH@31MAY2019: big integer support switched from libzahl to libtommatch
 #include "tommath.h"
 
 // MDH@10JUN2019: decimal support by libmpdec
 #include "mpdecimal.h"
+
+#include "Mexpression.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -81,136 +80,24 @@ typedef struct Mdecimal{
     uint64_t repeating; // the number of decimals that repeat themselves at the end
 }Mdecimal;
 
-struct Mlist;
-struct Mmap;
-typedef union Mvalueunion{
-    Mtoken* _token;
-    Minteger* _integer;
-    Mbiginteger* _biginteger; // most convenient to immediately point to the Mbiginteger structure
-    Mdecimal* _decimal; // no longer pointing to the mpd_t structure, as we're going to store the number of repeating decimals as well!!!
-    Mrational* _rational;
-    Mreal* _real;
-    Mstring* _string;
-    struct Mlist* _list;
-    struct Mmap* _map;
-}Mvalueunion;
-
-// a Value is either a number (numeric literal), a string literal, a list of values or a map
-// you could say that a map is a list of variables, as such Menvironment holds a map of variables and a map of functions
-// and we could make a separate struct to hold a map
-typedef struct Mvalue{
-    size_t count; // keep track of the number of reference
-    Mvaluetype type;
-    Mvalueunion value;
-}Mvalue;
-
-typedef struct Mlistelement{
-    unsigned long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
-    Mvalue* _value;
-    struct Mlistelement* _next;
-}Mlistelement;
-
-// MDH@03MAY2019: we're going to allow a list to be sparse i.e. with each element we keep an offset
-//                this may come in handy if we fail to store something in a list
-typedef struct Mlist{
-    unsigned long long numberOfElements; // keep track of the total number of elements
-    Mvaluetype valuetype; // we can force a list to have elements of the same type
-    Mlistelement* _first;
-    Mlistelement* _last;
-}Mlist;
-
-typedef struct Mvariable{
-    char* _name;
-    bool immutable; // whether or not mutable
-    Mvaluetype valuetype; // MDH@01MAY2019: fixed type variables can only be assigned once, after that any value that is assigned to it has to have the same type as the first value
-    Mvalue* _value;
-}Mvariable;
-
-typedef struct Mmapelement{
-    Mvariable* _variable;
-    struct Mmapelement* _next;
-}Mmapelement;
-
-typedef struct Mmap{
-    unsigned long long numberOfElements; // keep track of the total number of variables
-    Mvaluetype valuetype; // the type all values in the map should have
-    Mmapelement* _first;
-    Mmapelement* _last;
-}Mmap;
-
-//Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
-
-typedef struct Mexpressionlistelement{
-    char* binop; // the binary operator to apply to the operands
-    Mvalue* _value; // the second operand
-    struct Mexpressionlistelement* _next;
-}Mexpressionlistelement;
-
-typedef struct Mexpressionlist{
-    Mvalue* _value; // the first value in the expression list
-    Mexpressionlistelement* _next;
-}Mexpressionlist;
-
-// functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
-// all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
-// MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
-/////////////struct Menvironment;
-typedef Mvalue* (*NoArgumentFunction)();
-typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
-typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
-
-typedef enum Mfunctiontype{FT_M,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
-
-typedef struct Mfunctiondefinition{
-    Mmap* _parameterMap;
-    Mexpressionlist* _expressionlist;
-}Mfunctiondefinition;
-
-typedef union Mfunctionunion{
-    NoArgumentFunction noArgumentFunction;
-    OneArgumentFunction oneArgumentFunction;
-    TwoArgumentFunction twoArgumentFunction;
-    Mfunctiondefinition* _functiondefinition; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
-}Mfunctionunion;
-
-struct Menvironment;
-typedef struct Mfunction{
-    mstring* _name;
-    Mmap* _parameterMap; // a map of values defines the parameters and their default values (implicitly defining the expected types)
-    struct Menvironment* _definitionEnvironment;
-    Mfunctiontype type; // whether internal or external
-    Mfunctionunion functionunion; // where either the internal function to call with the arguments is placed or 
-}Mfunction;
-
-typedef struct Mfunctionmapelement{
-    Mfunction* _function;
-    struct Mfunctionmapelement* _next;
-}Mfunctionmapelement;
-
-typedef struct MfunctionMap{
-    uint32_t numberOfFunctions;  // keeping track of the total number of functions...
-    Mfunctionmapelement* _first;
-    Mfunctionmapelement* _last;
-}Mfunctionmap;
-
-//Mvalue* getFunction(Mfunctionlist functionlist,char* name);
-
-// environments
-
-// an environment is a bag of variables and functions
-typedef struct Menvironment{
-    Mmap* _variableMap; // variables are stored by name
-    Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
-    struct Menvironment* _parent;
-}Menvironment;
-
-bool pushExecutionEnvironment(Menvironment* _environment);
-bool popExecutionEnvironment();
+Minteger* new_integer(long long ll);
+Mreal* new_real(long double ld);
+Mstring* new_string(char* _c);
+Mstring* new_charstring(char _char);
 
 ////////Menvironment* getExecutionEnvironment();
+void free_integer(Minteger* _integer);
+void free_real(Mreal* _real);
+void free_string(Mstring* _string);
+
+long long biginteger2long(Mbiginteger* _biginteger);
+bool strIsZero(char* str);
+mp_err mp_set_longdouble(Mbiginteger *a, long double b);
+mstring* getUndefinedValueText();
+bool isDecimalOne(Mdecimal* _decimal);
+mstring* appendll(mstring* const ms,long long ll);
 
 // MDH@20MAY2019: we need free_map to free the function argument maps!!
-void free_map(Mmap* _map);
 void free_biginteger(Mbiginteger* _biginteger);
 /* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside
 // pointer to these structs releasers
@@ -240,27 +127,6 @@ Mstring* get_string(mstring* s);
 Mvalue* getStringValue(Mstring* _string);
 */
 
-// MDH@01MAY2019: it's possible to somehow hide the structure pointers within an Menvironment that point to the variables and functions
-//                which basically means that only raw data should go in and out of public functions
-
-// function prototypes
-// read access
-uint32_t getNumberOfVariables(Menvironment* _environment);
-mstring* _getVariableNames(const Menvironment* _environment,char* sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
-/* replacing:
-Mvariable* getNewVariable(Menvironment* _environment,const char* name);
-Mvariable* getVariable(Menvironment* _environment,const char* name);
-*/
-bool containsVariable(Menvironment* _environment,const char* name);
-Mvaluetype getVariableType(Menvironment* _environment,const char* name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
-Mvaluetype getVariableValueType(Menvironment* _environment,const char* name); // same as getVariableType() if a type is defined for the given variable
-
-// write access
-bool setVariableType(Menvironment* _environment,const char* name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type
-// create a value of a certain value type initialized with either value NULL (atomic values) or an empty list or map (VT_LIST,VT_MAP)
-// NOTE when using VT_UNDEFINED, the value remains NULL but any value can be stored in it subsequently
-bool createVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype);
-
 // anybody can ask for a specific type of value (wrapping certain contents) and the pointer in it should be considered immutable i.e. Mvalue itself should be considered immutable
 // NOTE this doesn't mean that 
 /*
@@ -279,6 +145,9 @@ long long double2long(long double ld); // convert long double to long long
 
 // big integer stuff
 Mbiginteger* _getBiginteger(int64_t l);
+const Mbiginteger* getBigintegerOne();
+const Mbiginteger* getBigintegerTwo();
+const Mbiginteger* getBigintegerThree();
 Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger);
 Mbiginteger* getBigintegerLLMin();
 Mbiginteger* getBigintegerLLMax();
@@ -294,7 +163,6 @@ mstring* _getUint16BinaryText(uint16_t s,char presuffix);
 void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent); // so we can also put these into the decimal representation of a double!!!
 
 ///////////long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
-long double getValueReal(const Mvalue* const _value);
 long double getRealLongDouble(const Mreal* const _real);
 
 // decimal support
@@ -313,12 +181,10 @@ Mbiginteger* new_biginteger();
 bool isBigintegerZero(Mbiginteger* _biginteger);
 bool isBigintegerOne(Mbiginteger* _biginteger);
 Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger);
-Mbiginteger* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
 
 // rational support
 // the following two methods will use M_LD_Q_EPS as default cut-off value
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
-Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 long double getRationalLongDouble(const Mrational* const _rational);
 
 Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure); 
@@ -334,82 +200,6 @@ Mrational* _getInverseRational(const Mrational* const _rational);
 
 Mdecimal* _getRationalDecimal(const Mrational* const _rational); // converts a rational to a decimal
 
-// in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
-// data wrappers
-Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
-Mvalue* _getIntegerValue(long long ll);
-// MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure); // MDH@31MAY2019: we cannot use a big integer long here
-Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
-Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure);
-Mvalue* _getRealValue(long double ld);
-Mvalue* _getStringValue(char* text,bool freeonfailure);
-Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
-Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
-//////Mvalue* _getTokenValue(char* text);
-
-Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure);
-Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure);
-Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure);
-Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure);
-Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure);
-
-Mlist* _getListOfType(Mvaluetype valuetype);
-Mmap* _getMapOfType(Mvaluetype valuetype);
-
-// MDH@02MAY2019: not allowed to call free_value from the outside
-bool decrementReferenceCount(Mvalue* _value);
-bool incrementReferenceCount(Mvalue* _value);
-
-//////void free_value(Mvalue* _value);
-mstring* appendld(mstring* mstr,long double ld);
-
-unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
-void free_list(Mlist* _list);
-
-bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue);
-
-Mvalue* getValueAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
-Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
-
-long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);
-
-/*
-Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue);
-*/
-// once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
-// NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
-// decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mstring, Mlist or Mmap pointer)
-bool setValue(Menvironment* _environment,const char* name,Mvalue* _value);
-Mvalue* getValue(Menvironment* _environment,const char* name);
-
-bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype,bool immutable);
-/*
-// if you want to set a value you have to pass in a pointer to the contents
-bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real);
-bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer);
-bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string);
-*/
-
-// functions
-mstring* _getFunctionNames(const Menvironment* _environment,char* sep);
-Mfunction* newFunction(Menvironment* _environment,const char* functionName);
-bool registerInternalFunctions(Menvironment* _environment);
-// helper function to return the function
-Mfunction* getFunction(Menvironment* _environment,const char* functionName);
-// MDH@21MAY2019: the _ indicates that the caller has to free the map itself
-Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
-
-bool completedFunction(Mfunction* _function,NoArgumentFunction noArgumentFunction);
-bool completedValueFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
-bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
-bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
-bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoArgumentFunction);
-bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
-
-size_t getNumberOfRemovedValues();
-unsigned long long getNumberOfValues();
-
 // some helper functions (TODO or should we use this on Mreal values?????)
 bool ldIsZero(long double ld);
 bool ldIsNaN(long double ld);
@@ -422,47 +212,9 @@ mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
 mstring* _getRationalText(const Mrational* const _rational);
 mstring* _getRealText(Mreal* _real);
 mstring* _getStringText(Mstring* _string,bool dequoted);
-mstring* _getListText(Mlist* _list);
-mstring* _getMapText(Mmap* _map);
-
-mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
 
 Mbiginteger* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
 
-// getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
-long long getValueInteger(const Mvalue* const _value);
 void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
 void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);
 void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix);
-void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
-
-// list to map (list) conversions
-bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
-bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
-bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist);
-bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
-// map to (map) list conversions
-bool mapAppendedToList(Mlist* const _list,Mmap* const _map);
-bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map);
-
-bool isValueZero(Mvalue* _value);
-bool isValueOne(Mvalue* _value);
-
-// unary functions
-Mvalue* Mneg(Mvalue* _value); // negate a value
-Mvalue* Mbnot(Mvalue* _value); // binary not a value
-Mvalue* Mnot(Mvalue* _value); // not a value
-
-bool isNull(Mvalue* _value); // expose as well
-Mvalue* Mnull(Mvalue* _value); // whether null!!!
-Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
-
-Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
-Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
-Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)
-
-Mvalue* Mbi(Mvalue* _value); // convert to a big integer
-
-// MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
-void assignValue(Mvalue** _valueholder,Mvalue* const _value);
-

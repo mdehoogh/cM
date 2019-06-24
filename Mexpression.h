@@ -147,6 +147,7 @@ typedef struct Mtoken{
 	struct Mtoken* prev; // we need this during user input
 	struct Mtoken* next;
 }Mtoken;
+
 Mtoken* new_token();
 void free_token(Mtoken* _token);
 

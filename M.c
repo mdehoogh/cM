@@ -15,15 +15,19 @@
 #include "Moutput.h"
 #include "Msession.h"
 
-const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
+// Menvironment includes Mvalue includes Mexecution includes ...
+#include "Menvironment.h"
 
+// used externally in Mexecution.h, Mvalue.h, Menvironment.h
+const char* const MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
+const char* const IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
+const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
+const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
 
 const long long M_DP=20; // the default decimal precision
 
 // I guess we could allow the user to specify another eps value through the QEPS command line argument!!!
-
-const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
 
 void writeTimestamp(FILE* _file){
 	if(_file){
@@ -55,9 +59,6 @@ void debugWrite(const char* fmt,...){
     va_end(args);
 	}
 }
-
-// Mexecution includes mstring.h
-#include "Mexecution.h"
 
 /*
 Mvalueunion* getMNumberValueunion(Mnumber* pMnumber){
@@ -572,7 +573,7 @@ Mvalue* pi_d(Mvalue* _value){
 	long long decimalprecision=M_LL_INVALID;if(_value&&_value->type==VT_INTEGER)decimalprecision=_value->value._integer->ll;
 	mpd_context_t* mpd_context=(decimalprecision>0?get_mpd_context(decimalprecision):NULL);
 	if(!mpd_context){
-		if(decimalprecision>0)outputLine("Failed to create the requested decimal context. Will use the default instead.");
+		if(decimalprecision>0)output("%sFailed to create the requested decimal context. Will use the default instead.\n",ERROR_PREFIX);
 		mpd_context=_decimalContext;
 	}
 	/* replacing:
