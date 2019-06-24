@@ -117,3 +117,6 @@ bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgume
 bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
 bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoArgumentFunction);
 bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
+
+Mvalue* Mfacd(Mvalue* _value);
+Mvalue* Mfac(Mvalue* _value);

@@ -84,16 +84,6 @@ const long double LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decim
 
 const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
-Mvalue* Mfacd(Mvalue* _value){
-    // Stirling formula to compute the number of factorial digits in n!: return 
-    if(_value){
-        // get the integer out of the value
-        long long ll=getValueInteger(_value);
-        if(ll>0)return _getIntegerValue(floor( ((ll+0.5)*log(ll) - ll + 0.5*log(2*LD_PI))/log(10) ) + 1);
-    }
-    return NULL;
-}
-
 Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	// ASSERT do NOT call with either a or b NULL
 	Mbiginteger* sum=NULL;

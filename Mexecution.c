@@ -1,3 +1,11 @@
+/**
+ * MDH@24JUN2019:
+ * - memory safe checkup on each function based on the following guidelines:
+ *   1. all local variables to point to data in dynamic storage (heap) should be declared at the start (or just after input check)
+ *   2. all these local variables should be freed before leaving the function (so technically there should be one exit point)
+ *   3. if the pointer contents is passed along (in)to the result of the function the pointer should be NULLed to prevent releasing the memory pointed to (which needs to persist function execution)
+ *   4. preferably this is done by calling the transfer<Mtype> function that will NULL the calling pointer
+ */
 #include <limits.h>
 #include <math.h>
 

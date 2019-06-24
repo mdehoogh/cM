@@ -480,6 +480,13 @@ Mvalue* Mlen(Mvalue* _value){
 }
 
 // MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
+extern const long double LD_PI;
+Mvalue* Mfacd(Mvalue* _value){
+    // Stirling formula to compute the number of factorial digits in n!: return 
+    // get the integer out of the value
+    long long ll=getValueInteger(_value);
+    return (ll>0?_getIntegerValue(floor( ((ll+0.5)*log(ll) - ll + 0.5*log(2*LD_PI))/log(10) ) + 1):NULL);
+}
 Mvalue* Mfac(Mvalue* _value){
     if(!_value){if(amVerbose())output("No value!");return NULL;}
     if(amVerbose())outputValue("\nArgument of fac() function: '",_value,"'.");
@@ -510,9 +517,10 @@ Mvalue* Mfac(Mvalue* _value){
             }
             // get rid of intermediate big integers
             mp_clear(multiplier);
-        }
+        }else        
+            outputError("Failed to create big integer 3");
     }else
-        if(amVerbose())outputError("Failed to create a big integer representing 6");
+        outputError("Failed to create big integer 6");
     if(_value->type==VT_INTEGER)mp_clear(finalmultiplier);
     if(amVerbose())outputBiginteger("Result of applying the fac() function: '",result,"'.\n");
     return (result?_getBigintegerValue(result,true):NULL);
