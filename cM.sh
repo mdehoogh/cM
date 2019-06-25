@@ -2,8 +2,8 @@
 
 # force running as sudo check
 if [[ ! "$EUID" = 0 ]]; then
-	echo "Please sudo run me!"
-	exit 1
+    echo "Please sudo run me!"
+    exit 1
 fi
 
 # the actual stuff
@@ -63,27 +63,27 @@ if [[ ! -f ./libtommath.a && ! -d ./libtommath.a ]]; then
         # ascertain to hold tommath.h
         if [ ! -f tommath.h ]; then
             echo "Will copy 'tommath.h' from the libtommath subdirectory..."
-	    cp libtommath/tommath.h .
-	    if [ ! -f tommath.h ]; then
+            cp libtommath/tommath.h .
+            if [ ! -f tommath.h ]; then
                 echo "ERROR: Failed to copy 'tommath.h'."
-	        exit 1
+                exit 1
             else
                 sudo chmod 644 tommath.h
             fi
-	fi
-	echo "Will attempt to create 'libtommath.a'..."
-	# can I run the make from here?????
-	cd libtommath
+        fi
+        echo "Will attempt to create 'libtommath.a'..."
+        # can I run the make from here?????
+        cd libtommath
         # we want make to actually create the .o files now
         rm -f *.o
         rm -f *.a
         echo "About to create the libtommath static library..."
-	sudo make
-	if [ -f libtommath.a ]; then
+        sudo make
+        if [ -f libtommath.a ]; then
             echo "Static library 'libtommath.a' created successfully!"
-	    cd ..
-	    cp libtommath/libtommath.a .
-	    if [ -f libtommath.a ]; then
+            cd ..
+            cp libtommath/libtommath.a .
+            if [ -f libtommath.a ]; then
                 # ascertain that we can at least read it
                 sudo chmod 644 libtommath.a
             else
@@ -103,13 +103,13 @@ else
 fi
 
 echo "Compiling M..."
-/usr/bin/gcc  -L . -ltommath -lmpdec Malloc.c mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mvalue.c Menvironment.c M.c -o M -Wincompatible-pointer-types -Wdangling-else
+/usr/bin/cc  -L . -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mvalue.c Menvironment.c M.c -o M -Wincompatible-pointer-types -Wdangling-else
 
 # don't run M here, instead check whether it is there!!!
 if [ -f M ]; then
-	# ascertain to be able to run it
-	sudo chmod 755 M
-	echo "M has been created, run it with ./M!"
+    # ascertain to be able to run it
+    sudo chmod 755 M
+    echo "M has been created, run it with ./M!"
     echo "Command-line flags (specify behind a hyphen) include D (debug), s (verbose), A (assist)"
 else
     echo "ERROR: Failed to create the M executable!"

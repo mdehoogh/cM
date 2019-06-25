@@ -12,40 +12,39 @@ typedef struct{
     char* chars;
     uint32_t length;
     uint32_t blocks;
-}mstring;
+}Mstring;
 
-mstring* string_create();
+void free_string(Mstring* str); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
 
-mstring* new_mstring(char* s); // convenient constructor
+// functions that create new string instances (and therefore start with _)
+Mstring* __string();
+Mstring* _getString(char* s); // convenient constructor
+// copying
+Mstring* _stringCopy(Mstring* src);
 
-void free_mstring(mstring* str); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
+bool string_empty(Mstring* str);
+uint32_t string_length(Mstring* str);
+Mstring* string_setlength(Mstring* str, uint32_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
+void string_synclength(Mstring* str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
 
-bool string_empty(mstring* str);
-uint32_t string_length(mstring* str);
-mstring* string_setlength(mstring* str, uint32_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
-void string_synclength(mstring* str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
+char string_char(Mstring* str,uint32_t pos);
+char string_last_char(Mstring* str);
 
-char string_char(mstring* str,uint32_t pos);
-char string_last_char(mstring* str);
+char* string_remainder(Mstring* str,uint32_t pos);
+char* string(Mstring* str);
+bool string_shorten(Mstring* str,uint32_t length);
 
-char* string_remainder(mstring* str,uint32_t pos);
-char* string(mstring* str);
-bool string_shorten(mstring* str,uint32_t length);
-
-int32_t string_find(mstring* str,char c);
+int32_t string_find(Mstring* str,char c);
 
 // changing the string
-char string_removed_char(mstring* str,uint32_t pos);
+char string_removed_char(Mstring* str,uint32_t pos);
 
-mstring* string_insert_char(mstring* str,uint32_t pos,char c);
-mstring* string_append_char(mstring* str,char c);
+Mstring* string_insert_char(Mstring* str,uint32_t pos,char c);
+Mstring* string_append_char(Mstring* str,char c);
 
 // MDH@26FEB2019: can we append a text as a whole???
-mstring* string_append(mstring* str,const char* pc);
+Mstring* string_append(Mstring* str,const char* pc);
 
-void string_reverse(mstring* str);
-
-// copying
-mstring* string_copy(mstring* src);
+void string_reverse(Mstring* str);
 
 #endif /* __MSTRING_H__ */

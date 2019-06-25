@@ -2,7 +2,7 @@
 #include <math.h>
 
 #include "Malloc.h"
-#include "mstring.h"
+#include "Mstring.h"
 #include "Msettings.h"
 #include "Moutput.h"
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
@@ -57,7 +57,7 @@ Mvariable* new_variable(const char* name,Mvaluetype valuetype,bool immutable){
             case VT_UNDEFINED:
             case VT_INTEGER:
             case VT_REAL:break;
-            case VT_STRING:_variable->_value->value._string=(Mstring*)calloc(1,sizeof(Mstring));break;
+            case VT_TEXT:_variable->_value->value._text=(Mtext*)calloc(1,sizeof(Mtext));break;
             case VT_LIST:_variable->_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
             case VT_MAP:_variable->_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
         }
@@ -113,7 +113,7 @@ void free_value(Mvalue* _value){
             case VT_DECIMAL:if(_value->value._decimal)free_decimal(_value->value._decimal);break;
             case VT_RATIONAL:if(_value->value._rational)free_rational(_value->value._rational);break;
             case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
-            case VT_STRING:free_string(_value->value._string);break;
+            case VT_TEXT:free_text(_value->value._text);break;
             case VT_LIST:free_list(_value->value._list);break;
             case VT_MAP:free_map(_value->value._map);break;
         }
@@ -125,7 +125,7 @@ void free_value(Mvalue* _value){
 
 // keep a list of allocated values
 Mlist* _valueList=NULL;
-Mvalue* new_value(){
+Mvalue* __value(){
     Mvalue* _value=NULL;
     if(!_valueList)_valueList=(Mlist*)calloc(1,sizeof(Mlist));
     if(_valueList){
@@ -222,9 +222,9 @@ bool decrementReferenceCount(Mvalue* _value){
             */
             return true;
         }
-        mstring* _valueText=_getValueText(_value,false);
+        Mstring* _valueText=_getValueText(_value,false);
         output("BUG: Reference count of '%s' of type '%c' already zero.",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
-        free_mstring(_valueText);
+        free_string(_valueText);
     }else
         if(amVerbose())outputLine("No value to decrement the reference count of.");
     return true;
@@ -243,72 +243,72 @@ Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
 
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     if(!_decimal)return NULL;
-    Mvalue* _decimalValue=new_value();
+    Mvalue* _decimalValue=__value();
     if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
     return _decimalValue;
 }
 Mvalue* _getIntegerValue(long long ll){
     if(amVerbose())output("Wrapping integer '%ll'.\n",ll);
-    Mvalue* _integerValue=new_value();
+    Mvalue* _integerValue=__value();
     if(_integerValue){
-        _integerValue->value._integer=new_integer(ll);
+        _integerValue->value._integer=_getInteger(ll);
         if(!_integerValue->value._integer){free_value(_integerValue);_integerValue=NULL;}else _integerValue->type=VT_INTEGER;
     }
     return _integerValue;
 }
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     if(!_biginteger)return NULL;
-    Mvalue* _bigintegerValue=new_value();
+    Mvalue* _bigintegerValue=__value();
     if(_bigintegerValue){_bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;}else if(freeonfailure)free_biginteger(_biginteger);
     return _bigintegerValue;
 }
 Mvalue* _getRealValue(long double ld){
     if(amVerbose())output("Wrapping real '%.*Lf'.\n",DBL_DIG,ld);
-    Mvalue* _realValue=new_value();
+    Mvalue* _realValue=__value();
     if(_realValue){
-        _realValue->value._real=new_real(ld);
+        _realValue->value._real=_getReal(ld);
         if(!_realValue->value._real){free_value(_realValue);_realValue=NULL;}else _realValue->type=VT_REAL;
     }
     return _realValue;
 }
-Mvalue* _getStringValue(char* _s,bool freeonfailure){
+Mvalue* _getTextValue(char* _s,bool freeonfailure){
     if(!_s)return NULL; // when no input, no go
-    Mvalue* _stringValue=NULL; // the result, when NULL check freeonfailure
-    Mstring* _string=new_string(_s); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
-    if(_string){
-        _stringValue=new_value();
-        if(_stringValue){_stringValue->type=VT_STRING;_stringValue->value._string=_string;}else free_string(_string); // always free the Mstring if it is not bound!!!
+    Mvalue* _textValue=NULL; // the result, when NULL check freeonfailure
+    Mtext* _text=_getText(_s); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
+    if(_text){
+        _textValue=__value();
+        if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}else free_text(_text); // always free the Mtext if it is not bound!!!
     }
-    if(!_stringValue)if(freeonfailure)free(_s);
-    return _stringValue;
+    if(!_textValue)if(freeonfailure)free(_s);
+    return _textValue;
 }
-Mvalue* _getCharStringValue(char _c){
-    Mstring* _string=(_c?new_charstring(_c):NULL); // for mstring* sources pass string(mstring*) into getStringValue() (which points to mstring->chars which always start with the quote char used in declaring the literal)
-    Mvalue* _stringvalue=(_string?new_value():NULL);
-    if(_stringvalue){_stringvalue->type=VT_STRING;_stringvalue->value._string=_string;}
-    return _stringvalue;
+Mvalue* _getCharTextValue(char _c){
+    Mtext* _text=(_c?_getCharText(_c):NULL); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
+    Mvalue* _textValue=(_text?__value():NULL);
+    if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}
+    return _textValue;
 }
 // we can force all listelements to have the same type????
 Mvalue* _getListValue(Mvaluetype listValuetype){
     Mlist* _list=(Mlist*)calloc(1,sizeof(Mlist));
     _list->valuetype=listValuetype; // register what type of elements this list should have
-    Mvalue* _listvalue=(_list?new_value():NULL);
+    Mvalue* _listvalue=(_list?__value():NULL);
     if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}
     return _listvalue;
 }
 Mvalue* _getMapValue(Mvaluetype mapValuetype){
     Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
     _map->valuetype=mapValuetype;
-    Mvalue* _mapvalue=(_map?new_value():NULL);
+    Mvalue* _mapvalue=(_map?__value():NULL);
     if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}
     return _mapvalue;
 }
 
 // some other wrappers
-Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure){if(!_integer)return NULL;Mvalue* _value=new_value();if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);return _value;}
-Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure){if(!_real)return NULL;Mvalue* _value=new_value();if(_value){_value->type=VT_REAL;_value->value._real=_real;}else if(freeonfailure)free_real(_real);return _value;}
-Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){if(!_map)return NULL;Mvalue* _value=new_value();if(_value){_value->type=VT_MAP;_value->value._map=_map;}else if(freeonfailure)free_map(_map);return _value;}
-Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){if(!_token)return NULL;Mvalue* _value=new_value();if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);return _value;}
+Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure){if(!_integer)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);return _value;}
+Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure){if(!_real)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_REAL;_value->value._real=_real;}else if(freeonfailure)free_real(_real);return _value;}
+Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){if(!_map)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_MAP;_value->value._map=_map;}else if(freeonfailure)free_map(_map);return _value;}
+Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){if(!_token)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);return _value;}
 
 // helper function to create a parameter map with a single value
 // the following is a nuisance
@@ -383,8 +383,8 @@ Mmap* _getStringStringMap(char* name1,char* name2){
             Mmapelement* _mapelement1=(Mmapelement*)calloc(1,sizeof(Mmapelement));
             Mmapelement* _mapelement2=(Mmapelement*)calloc(1,sizeof(Mmapelement));
             if(_mapelement1&&_mapelement2){
-                _mapelement1->_variable=new_variable(name1,VT_STRING,true);
-                _mapelement2->_variable=new_variable(name2,VT_STRING,true);
+                _mapelement1->_variable=new_variable(name1,VT_TEXT,true);
+                _mapelement2->_variable=new_variable(name2,VT_TEXT,true);
                 if(_mapelement1->_variable&&_mapelement2->_variable){
                     Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
                     if(_map){
@@ -429,7 +429,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
 // end helper functions 
 
 // LIST STUFF
-Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure){if(!_list)return NULL;Mvalue* _value=new_value();if(_value){_value->type=VT_LIST;_value->value._list=_list;}else if(freeonfailure)free_list(_list);return _value;}
+Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure){if(!_list)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_LIST;_value->value._list=_list;}else if(freeonfailure)free_list(_list);return _value;}
 void checkList(Mlist* _list){
     if(_list){
         long long l=_list->numberOfElements;
@@ -536,7 +536,7 @@ bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue)
         if(!_mapelement)return false;
         _mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
         if(!_mapelement->_variable)return false;
-        _mapelement->_variable->_name=_strdup(attributeName); // if we change name into _name (as mstring*) we won't have to free attributeName which holds the character array 
+        _mapelement->_variable->_name=_strdup(attributeName); // if we change name into _name (as Mstring*) we won't have to free attributeName which holds the character array 
         if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
         _map->_last=_mapelement;
         _map->numberOfElements++;
@@ -559,13 +559,13 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
 }
 // END MAP STUFF
 
-Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){if(!_rational)return NULL;Mvalue* _value=new_value();if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);return _value;}
+Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){if(!_rational)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);return _value;}
 
-//////////mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
-mstring* _getListText(Mlist* _list){
+//////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
+Mstring* _getListText(Mlist* _list){
     ///////output("List to output.");char c;inputCharRead(&c);
-	mstring* s=string_create();
-    mstring* p=s;
+	Mstring* s=__string();
+    Mstring* p=s;
     if(amDebugging())p=string_append_char(p,'l');
 	if(p){
 		p=string_append_char(p,'['); // switch to using p in appends
@@ -582,10 +582,10 @@ mstring* _getListText(Mlist* _list){
 	        //////////outputChar('.');
 			_listelementValue=_listelement->_value;
 			if(_listelementValue){
-				mstring* _listelementValueText=_getValueText(_listelementValue,false);
+				Mstring* _listelementValueText=_getValueText(_listelementValue,false);
 				if(_listelementValueText){
 					p=string_append(p,string(_listelementValueText));
-					free_mstring(_listelementValueText); // release AFTER copying over
+					free_string(_listelementValueText); // release AFTER copying over
 				}
 			}
 			_listelement=_listelement->_next;
@@ -593,13 +593,13 @@ mstring* _getListText(Mlist* _list){
 		p=string_append_char(p,']');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
-		if(!p){free_mstring(s);s=NULL;}
+		if(!p){free_string(s);s=NULL;}
 	}
 	return s;
 }
-mstring* _getMapText(Mmap* _map){
-	mstring* s=string_create();
-	mstring* p=s;
+Mstring* _getMapText(Mmap* _map){
+	Mstring* s=__string();
+	Mstring* p=s;
     if(amDebugging())p=string_append_char(p,'m');
 	if(p){
         p=string_append_char(p,'{');
@@ -616,11 +616,11 @@ mstring* _getMapText(Mmap* _map){
 			/////output("%s",string(p));
 			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
 			/////output("%s",string(p));
-			mstring* mapelementValueText=_getValueText(_variable->_value,false);
+			Mstring* mapelementValueText=_getValueText(_variable->_value,false);
 			/////output("Map element: %s",string(p));
 			if(!mapelementValueText)continue;
 			p=string_append(p,string(mapelementValueText)); // append 
-			free_mstring(mapelementValueText); // release AFTER copying over
+			free_string(mapelementValueText); // release AFTER copying over
 			_mapelement=_mapelement->_next;
 			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
 			////output("%s","next");
@@ -629,14 +629,14 @@ mstring* _getMapText(Mmap* _map){
 		p=string_append_char(p,'}');
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){free_mstring(s);s=NULL;}
+		if(!p){free_string(s);s=NULL;}
 	}
 	return s;
 }
 
-mstring* _getValueText(const Mvalue* const _value,bool dequoted){
+Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
-	mstring* valueText=NULL;
+	Mstring* valueText=NULL;
     //////outputChar('.');
 	if(_value){
         ////////outputChar('+');
@@ -647,28 +647,28 @@ mstring* _getValueText(const Mvalue* const _value,bool dequoted){
             case VT_DECIMAL:valueText=_getDecimalText(_value->value._decimal,false);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
             case VT_RATIONAL:valueText=_getRationalText(_value->value._rational);break;
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
-			case VT_STRING:valueText=_getStringText(_value->value._string,dequoted);break; // TODO don't dequote the text!!
+			case VT_TEXT:valueText=_getStringText(_value->value._text,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
 			case VT_LIST:valueText=_getListText(_value->value._list);break;
-            case VT_TOKEN:valueText=string_copy(_value->value._token->text);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
+            case VT_TOKEN:valueText=_stringCopy(_value->value._token->text);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
 			default:break;
 		}
 	}
     if(valueText)if(amAssisting())valueText=appendll(string_append_char(valueText,'#'),_value->count); // show the reference count as well
     ////////outputChar('.');
-    return(valueText?valueText:getUndefinedValueText());
+    return(valueText?valueText:_getUndefinedValueText());
     /* replacing:
     if(valueText)return valueText;
 	////////if(amVerbose())if(valueText)output("Value text: '%s'.",string(valueText));else output("Value not represented.");
-    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
+    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
     return _UNDEFINED_VALUETEXT;
     */
 }
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_value){
-        mstring* _valueText=_getValueText(_value,false);
-        output("%s",string(_valueText));free_mstring(_valueText);
+        Mstring* _valueText=_getValueText(_value,false);
+        output("%s",string(_valueText));free_string(_valueText);
     }else
         outputChar('?');
     if(postfix)output("%s",postfix);
@@ -681,13 +681,13 @@ long long getValueInteger(const Mvalue* const _value){
             case VT_INTEGER:return _value->value._integer->ll;
 		    case VT_REAL:return double2long(_value->value._real->ld);
             case VT_BIGINTEGER:return biginteger2long(_value->value._biginteger);
-            case VT_STRING:
+            case VT_TEXT:
                 {
-                    // alternative which doesn't check for 0 explicitly I think: _strtoll(_value->value._string->_c,M_LL_INVALID);
+                    // alternative which doesn't check for 0 explicitly I think: _strtoll(_value->value._text->_c,M_LL_INVALID);
                     // we should check for 0 explicitly, which should always be represented by a single '0' character i.e. without signs!!!
                     // TODO are we allowing other zero representations as well???
-                    if(strIsZero(_value->value._string->_c))return 0;
-                    long long ll=atoll(_value->value._string->_c); // invalid if zero
+                    if(strIsZero(_value->value._text->_c))return 0;
+                    long long ll=atoll(_value->value._text->_c); // invalid if zero
                     if(ll)return ll; // valid if non-zero
                 }
                 break;
@@ -718,16 +718,16 @@ Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
         case VT_REAL:
             {
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
-                Mbiginteger* _biginteger=new_biginteger();
+                Mbiginteger* _biginteger=__biginteger();
                 if(mp_set_longdouble(_biginteger,_value->value._real->ld)==MP_OKAY)return _biginteger;
                 outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
                 mp_clear(_biginteger);
             }
             break;
-        case VT_STRING:
+        case VT_TEXT:
             {
-                Mbiginteger* _biginteger=new_biginteger();
-                if(mp_read_radix(_biginteger,_value->value._string->_c,10)==MP_OKAY)return _biginteger;
+                Mbiginteger* _biginteger=__biginteger();
+                if(mp_read_radix(_biginteger,_value->value._text->_c,10)==MP_OKAY)return _biginteger;
                 outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
                 mp_clear(_biginteger); // not used so free immediately
             }
@@ -742,10 +742,10 @@ bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a 
         if(_list){
             Mlistelement* _listelement=_list->_first;
             while(_listelement){
-                mstring* _indexValueText=appendll(string_create(),_listelement->index);
+                Mstring* _indexValueText=appendll(__string(),_listelement->index);
                 if(_indexValueText){
                     if(!appendedToMap(_map,string(_indexValueText),_listelement->_value))result=false;
-                    free_mstring(_indexValueText);
+                    free_string(_indexValueText);
                 }else{
                     result=false;
                     output("Failed to convert index %llu to attribute name.",_listelement->index);
@@ -811,15 +811,15 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist){
                     // the first element becomes the key the second element the attribute value
                     // BUT I suppose composite keys (maps or lists) are not allowed
                     Mvalue* _attributeNameValue=_maplistelementValue->value._list->_first->_value;
-                    mstring* _attributeNameValueText=NULL;
+                    Mstring* _attributeNameValueText=NULL;
                     if(_attributeNameValue){
                         if(_attributeNameValue->type==VT_INTEGER)_attributeNameValueText=_getIntegerText(_attributeNameValue->value._integer);else
                         if(_attributeNameValue->type==VT_REAL)_attributeNameValueText=_getRealText(_attributeNameValue->value._real);else
-                        if(_attributeNameValue->type==VT_STRING)_attributeNameValueText=_getStringText(_attributeNameValue->value._string,true); // effectively cutting of the presuffix character TODO other solution????????
+                        if(_attributeNameValue->type==VT_TEXT)_attributeNameValueText=_getStringText(_attributeNameValue->value._text,true); // effectively cutting of the presuffix character TODO other solution????????
                     }
                     if(_attributeNameValueText){
                         if(!string_length(_attributeNameValueText)||!appendedToMap(_map,string(_attributeNameValueText),_maplistelementValue->value._list->_first->_next->_value))result=false;
-                        free_mstring(_attributeNameValueText);
+                        free_string(_attributeNameValueText);
                     }
                 }
                 _maplistelement=_maplistelement->_next;
@@ -856,16 +856,16 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map){
                 if(_maplistelement){
                     // if we fail to construct the maplist element or to add it
                     // NOTE the attribute name does not start with a quote character wich we need to call _getStringValue
-                    mstring* _attributeName=string_create();
+                    Mstring* _attributeName=__string();
                     if(_attributeName){
                         string_append_char(_attributeName,'\'');
                         string_append(_attributeName,_mapelement->_variable->_name);
-                        Mvalue* _attributeNameValue=_getStringValue(string(_attributeName),false);
+                        Mvalue* _attributeNameValue=_getTextValue(string(_attributeName),false);
                         if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,0)){
                             if(!appendedToList(_maplistelement,_mapelement->_variable->_value,0)||!appendedToList(_maplist,_maplistelementValue,0))result=false;
                         }else
                             result=false;
-                        free_mstring(_attributeName);
+                        free_string(_attributeName);
                     }else
                         result=false;                
                 }else
@@ -910,7 +910,7 @@ bool isNull(Mvalue* _value){
         case VT_DECIMAL:return !_value->value._decimal;
         case VT_RATIONAL:return !_value->value._rational;
         case VT_REAL:return !_value->value._real;
-        case VT_STRING:return !_value->value._string;
+        case VT_TEXT:return !_value->value._text;
         case VT_LIST:return !_value->value._list;
         case VT_MAP:return !_value->value._map;
         case VT_TOKEN:return !_value->value._token;
@@ -959,7 +959,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                 Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
                 if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true,true);
             }else // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
-                _rational=_getRational(new_biginteger(),NULL,M_LD_NAN,false,true);
+                _rational=_getRational(__biginteger(),NULL,M_LD_NAN,false,true);
         }
         // _rational should contain the 'last' computed rational
         if(_rational){

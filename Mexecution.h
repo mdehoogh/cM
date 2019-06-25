@@ -42,7 +42,7 @@ void outputErrorAndText(const char* const error,const char* const text);
 
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
-typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_STRING,VT_LIST,VT_MAP}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -69,10 +69,10 @@ typedef struct Mrational{
     bool normalized; // MDH@05JUN2019: remember whether or not normalized...
 }Mrational;
 
-typedef struct Mstring{
+typedef struct Mtext{
     char presuffix;
-    char _c[]; // by using an array and not a pointer, it's easy to make one out of an mstring* by strcpy from string(mstring)
-}Mstring;
+    char _c[]; // by using an array and not a pointer, it's easy to make one out of an Mtext* by strcpy from string(Mstring)
+}Mtext;
 
 // MDH@17JUN2019: if we want to know when a decimal contains repeating fractions we should be able to remember how many decimals repeat themselves
 typedef struct Mdecimal{
@@ -80,28 +80,27 @@ typedef struct Mdecimal{
     uint64_t repeating; // the number of decimals that repeat themselves at the end
 }Mdecimal;
 
-Minteger* new_integer(long long ll);
-Mreal* new_real(long double ld);
-Mstring* new_string(char* _c);
-Mstring* new_charstring(char _char);
+bool isLittleEndian();
+
+Mstring* _getUndefinedValueText();
+
+Minteger* _getInteger(long long ll);
+
+void free_text(Mtext* _text);
+Mtext* _getText(char* _c);
+Mtext* _getCharText(char _char);
 
 ////////Menvironment* getExecutionEnvironment();
 void free_integer(Minteger* _integer);
 void free_real(Mreal* _real);
-void free_string(Mstring* _string);
 
-long long biginteger2long(Mbiginteger* _biginteger);
 bool strIsZero(char* str);
-mp_err mp_set_longdouble(Mbiginteger *a, long double b);
-mstring* getUndefinedValueText();
-bool isDecimalOne(Mdecimal* _decimal);
-mstring* appendll(mstring* const ms,long long ll);
+Mstring* appendll(Mstring* const ms,long long ll);
 
 // MDH@20MAY2019: we need free_map to free the function argument maps!!
-void free_biginteger(Mbiginteger* _biginteger);
 /* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside
 // pointer to these structs releasers
-void free_string(Mstring* _string);
+void free_string(Mtext* _string);
 void free_value(Mvalue* _value);
 void free_listelement(Mlistelement* listelement);
 void free_list(Mlist* _list);
@@ -122,9 +121,8 @@ Mreal* get_real(long double ld);
 Mvalue* getRealValue(Mreal* _real);
 Minteger* get_integer(long long ll);
 Mvalue* getIntegerValue(Minteger* _integer);
-// mstring* is assumed to start with the same prefix/suffix character
-Mstring* get_string(mstring* s);
-Mvalue* getStringValue(Mstring* _string);
+// Mstring* is assumed to start with the same prefix/suffix character
+Mtext* get_string(Mstring* s);
 */
 
 // anybody can ask for a specific type of value (wrapping certain contents) and the pointer in it should be considered immutable i.e. Mvalue itself should be considered immutable
@@ -143,46 +141,48 @@ long long double2long(long double ld); // convert long double to long long
 #define M_LL_MIN LLONG_MIN+1
 #define M_LL_MAX LLONG_MAX
 
-// big integer stuff
+// GENERAL FUNCTIONS
+Mstring* _getUint64BinaryText(uint64_t l,char presuffix);
+Mstring* _getUint16BinaryText(uint16_t s,char presuffix);
+
+Minteger* _getInteger(long long ll);
+
+void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent); // so we can also put these into the decimal representation of a double!!!
+///////////long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
+long double getRealLongDouble(const Mreal* const _real);
+Mreal* _getReal(long double ld);
+
+// BIG INTEGER STUFF
+void free_biginteger(Mbiginteger* _biginteger);
+Mbiginteger* __biginteger();
+Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger);
 Mbiginteger* _getBiginteger(int64_t l);
-const Mbiginteger* getBigintegerOne();
-const Mbiginteger* getBigintegerTwo();
-const Mbiginteger* getBigintegerThree();
 Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger);
 Mbiginteger* getBigintegerLLMin();
 Mbiginteger* getBigintegerLLMax();
+bool isBigintegerZero(Mbiginteger* _biginteger);
+bool isBigintegerOne(Mbiginteger* _biginteger);
 // big integer conversions
 mp_err mp_set_long_double(Mbiginteger *a, long double b); // MDH@01MAY2019: which I made myself
 long double mp_get_long_double(const Mbiginteger* const a); // MDH@07JUN2019: same here
+long long biginteger2long(Mbiginteger* _biginteger);
+mp_err mp_set_longdouble(Mbiginteger *a, long double b);
+const Mbiginteger* getBigintegerOne();
+const Mbiginteger* getBigintegerTwo();
+const Mbiginteger* getBigintegerThree();
 
-bool isLittleEndian();
-
-mstring* _getUint64BinaryText(uint64_t l,char presuffix);
-mstring* _getUint16BinaryText(uint16_t s,char presuffix);
-
-void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent); // so we can also put these into the decimal representation of a double!!!
-
-///////////long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
-long double getRealLongDouble(const Mreal* const _real);
-
-// decimal support
+// DECIMAL STUFF
 mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
-mpd_t* new_mpd(mpd_context_t* mpd_context,int64_t value);
-/////void free_mpd(mpd_t* _mpd);
-Mdecimal* new_decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating);
-Mdecimal* _getDecimal(mpd_t* _mpd,uint64_t repeating,bool freeonfailure);
-Mdecimal* _getDecimalCopy(Mdecimal* _decimal);
-void free_decimal(Mdecimal* _decimal);
-bool isDecimalZero(Mdecimal* _decimal);
+mpd_t* __mpd(mpd_context_t* mpd_context,int64_t value);
+void free_mpd(mpd_t* mpd);
+void free_decimal(Mdecimal* decimal);
+Mdecimal* __decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating);
+Mdecimal* _getDecimal(mpd_t* mpd,uint64_t repeating,bool freeonfailure);
+Mdecimal* _getDecimalCopy(Mdecimal* decimal);
+bool isDecimalZero(Mdecimal* decimal);
+bool isDecimalOne(Mdecimal* _decimal);
 
-// big integer support
-Mbiginteger* new_biginteger();
-
-bool isBigintegerZero(Mbiginteger* _biginteger);
-bool isBigintegerOne(Mbiginteger* _biginteger);
-Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger);
-
-// rational support
+// RATIONAL STUFF
 // the following two methods will use M_LD_Q_EPS as default cut-off value
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 long double getRationalLongDouble(const Mrational* const _rational);
@@ -206,12 +206,12 @@ bool ldIsNaN(long double ld);
 bool ldIsInf(long double ld);
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
-mstring* _getIntegerText(Minteger* _integer);
-mstring* _getBigintegerText(const Mbiginteger* const _biginteger);
-mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
-mstring* _getRationalText(const Mrational* const _rational);
-mstring* _getRealText(Mreal* _real);
-mstring* _getStringText(Mstring* _string,bool dequoted);
+Mstring* _getIntegerText(Minteger* _integer);
+Mstring* _getBigintegerText(const Mbiginteger* const _biginteger);
+Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
+Mstring* _getRationalText(const Mrational* const _rational);
+Mstring* _getRealText(Mreal* _real);
+Mstring* _getStringText(Mtext* _string,bool dequoted);
 
 Mbiginteger* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
 

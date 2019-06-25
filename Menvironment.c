@@ -5,7 +5,7 @@
 #include <math.h>
 
 #include "Malloc.h"
-#include "mstring.h"
+#include "Mstring.h"
 #include "Msettings.h"
 #include "Moutput.h"
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
@@ -98,16 +98,16 @@ uint32_t getNumberOfVariables(Menvironment* _environment){
     return(_environment?_environment->_variableMap->numberOfElements:0);
 }
 // the names of the variables may be requested
-mstring* _getVariableNames(const Menvironment* _environment,char* sep){
+Mstring* _getVariableNames(const Menvironment* _environment,char* sep){
     if(_environment!=NULL&&sep!=NULL){
-        mstring* variableNames=string_create();
+        Mstring* variableNames=__string();
         if(variableNames!=NULL){
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                mstring* parentVariableNames=_getVariableNames(_environment->_parent,sep);
+                Mstring* parentVariableNames=_getVariableNames(_environment->_parent,sep);
                 if(parentVariableNames){
                     string_append(variableNames,string(parentVariableNames));
-                    free_mstring(parentVariableNames); // we can do this because string_append copies the characters
+                    free_string(parentVariableNames); // we can do this because string_append copies the characters
                 }
             }
             // we'll be appending the names of the variables in the environment itself
@@ -182,7 +182,7 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
             if(!_value||_variable->valuetype==VT_UNDEFINED||_variable->valuetype==_value->type){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&_variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
-                if(amDebugging()){mstring* _valueText=_getValueText(_value,false);output("Value `%s` assigned to variable `%s`.",string(_valueText),name);free_mstring(_valueText);}
+                if(amDebugging()){Mstring* _valueText=_getValueText(_value,false);output("Value `%s` assigned to variable `%s`.",string(_valueText),name);free_string(_valueText);}
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }
@@ -221,16 +221,16 @@ Mvalue* getValue(Menvironment* _environment,const char* name){
 
 // FUNCTION STUFF
 // the names of the variables may be requested
-mstring* _getFunctionNames(const Menvironment* _environment,char* sep){
+Mstring* _getFunctionNames(const Menvironment* _environment,char* sep){
     if(_environment&&sep){
-        mstring* _functionNames=string_create();
+        Mstring* _functionNames=__string();
         if(_functionNames){
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                mstring* parentFunctionNames=_getFunctionNames(_environment->_parent,sep);
+                Mstring* parentFunctionNames=_getFunctionNames(_environment->_parent,sep);
                 if(parentFunctionNames){
                     string_append(_functionNames,string(parentFunctionNames));
-                    free_mstring(parentFunctionNames); // we can do this because string_append copies the characters that string() points to!!
+                    free_string(parentFunctionNames); // we can do this because string_append copies the characters that string() points to!!
                 }
             }
             // we'll be appending the names of the variables in the environment itself
@@ -253,7 +253,7 @@ Mfunction* getFunction(Menvironment* _environment,const char* functionName){
         Mfunctionmap* _functionmap=_environment->_functionMap;
         if(_functionmap){
             Mfunctionmapelement* _functionmapelement=_functionmap->_first;
-            // we need string() on the function name as function name is an mstring*
+            // we need string() on the function name as function name is an Mstring*
             while(_functionmapelement){
                 if(_functionmapelement->_function&&!strcmp(string(_functionmapelement->_function->_name),functionName)){
                     //////////printf("\nFunction '%s' matches '%s'.",string(_functionmapelement->_function->_name),functionName);
@@ -307,7 +307,7 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
             _function=(Mfunction*)calloc(1,sizeof(Mfunction));
             if(_function){
                 _function->_definitionEnvironment=_environment; // TODO why would we need this?????
-                mstring* _functionName=string_append(string_create(),name);
+                Mstring* _functionName=string_append(__string(),name);
                 if(_functionName){
                     // try to append it to the functionMap, if we succeed store _functioName in ->_name
                     Mfunctionmap* _functionmap=_environment->_functionMap;
@@ -346,13 +346,13 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
  */
 Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
     // check the types first, both should be strings
-    if(_variableName->type==VT_STRING&&_valuetype->type==VT_STRING){
-        char* variableName=_variableName->value._string->_c; // ignoring the presuffix exactly as we need to!!!
+    if(_variableName->type==VT_TEXT&&_valuetype->type==VT_TEXT){
+        char* variableName=_variableName->value._text->_c; // ignoring the presuffix exactly as we need to!!!
         if(strlen(variableName)){
             // get the value type, we can use uppercase to indicate an immutable (constant) variable?????
             bool immutable=false;
             Mvaluetype valuetype=VT_UNDEFINED;
-            switch(_valuetype->value._string->_c[0]){ // use the first character (which will be '\0' if the default value is used!!!)
+            switch(_valuetype->value._text->_c[0]){ // use the first character (which will be '\0' if the default value is used!!!)
                 case 'I':
                     immutable=true;
                 case 'i':
@@ -366,7 +366,7 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
                 case 'S':
                     immutable=true;
                 case 's':
-                    valuetype=VT_STRING;
+                    valuetype=VT_TEXT;
                     break;
                 case 'L':
                     immutable=true;
@@ -390,7 +390,7 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
                         }
                     }
                     // return the value type as text, which means we need to wrap the value type character
-                    return _getCharStringValue(_variable->immutable?IMMUTABLEVALUETYPECHARS[_variable->valuetype]:MUTABLEVALUETYPECHARS[_variable->valuetype]);
+                    return _getCharTextValue(_variable->immutable?IMMUTABLEVALUETYPECHARS[_variable->valuetype]:MUTABLEVALUETYPECHARS[_variable->valuetype]);
                 }
             }
         }
@@ -470,7 +470,7 @@ Mvalue* Mlen(Mvalue* _value){
     long long result=0;
     if(_value){
         switch(_value->type){
-            case VT_INTEGER:case VT_BIGINTEGER:case VT_REAL:case VT_STRING:result=1;break;
+            case VT_INTEGER:case VT_BIGINTEGER:case VT_REAL:case VT_TEXT:result=1;break;
             case VT_LIST:result=_value->value._list->numberOfElements;break;
             case VT_MAP:result=_value->value._map->numberOfElements;break;
             default:break;

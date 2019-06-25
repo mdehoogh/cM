@@ -3,7 +3,7 @@
  * - moved from M.c so we can refer to Mexpression (which uses Token) in Mexecution.h
 */
 
-#include "mstring.h"
+#include "Mstring.h"
 
 // MDH@19DEC2018: I want to represent the state transition from the current token type to the next token type
 // the list of possible token types
@@ -142,13 +142,13 @@ typedef struct Mtoken{
 	TokenType type; // actually the index into the TOKENTYPES array!!!
 	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
 	uint16_t offset; // number of characters in front of this token in the command
-	mstring* text;
+	Mstring* text; // NOTE this is not an Mtext, Mstring is mutable whereas Mtext is not!!!!
 	struct Mtoken* expr; // the expression this token is part of
 	struct Mtoken* prev; // we need this during user input
 	struct Mtoken* next;
 }Mtoken;
 
-Mtoken* new_token();
+Mtoken* __token();
 void free_token(Mtoken* _token);
 
 /* a list of Mexpressions holds the body of an M function

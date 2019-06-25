@@ -1,4 +1,4 @@
-#include "mstring.h"
+#include "Mstring.h"
 #include "Malloc.h"
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
@@ -12,8 +12,8 @@
  */
 
 /** Create a String */
-mstring* string_create(){
-    mstring* ans=CALLOC(1,sizeof *ans,'s');
+Mstring* __string(){
+    Mstring* ans=CALLOC(1,sizeof *ans,'s');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         ans->chars=MALLOC(BLOCK_SIZE*sizeof *(ans->chars),'c');
@@ -26,9 +26,9 @@ mstring* string_create(){
     return ans;
 }
 
-mstring* new_mstring(char* s){
+Mstring* _getString(char* s){
     if(!s)return NULL;
-    mstring* ans=CALLOC(1,sizeof *ans,'s');
+    Mstring* ans=CALLOC(1,sizeof *ans,'s');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
@@ -49,12 +49,12 @@ mstring* new_mstring(char* s){
 }
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
-mstring* string_copy(mstring* src){
+Mstring* _stringCopy(Mstring* src){
     if(!src)return NULL;
     src->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    return new_mstring(src->chars);
+    return _getString(src->chars);
     /* replacing:
-    mstring* dst=string_create();
+    Mstring* dst=__string();
     if(dst){
         if(src->length){ // there needs to be something to copy (NOTE we're not allocating down ever!!!!)
             // if we have more blocks for chars in src we have to realloc
@@ -76,10 +76,10 @@ mstring* string_copy(mstring* src){
 /** 
  * Free the memory associated with a String
  */
-void free_mstring(mstring* str){if(str){if(str->chars)FREE(str->chars,'c');FREE(str,'s');}}
+void free_string(Mstring* str){if(str){if(str->chars)FREE(str->chars,'c');FREE(str,'s');}}
 
 /** Is the String empty? */
-bool string_empty(mstring *str){
+bool string_empty(Mstring *str){
     return(!str||!str->length); // MDH@21JUN2019 replacing: chars[0]=='\0'); // MDH@25APR2019: checking the first character probably is easiest
     /* replacing:
     if(str==NULL)return true;
@@ -88,11 +88,11 @@ bool string_empty(mstring *str){
     */
 }
 
-uint32_t string_length(mstring* str){
+uint32_t string_length(Mstring* str){
     return(str==NULL?0:str->length);
 }
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
-mstring* string_setlength(mstring* str,uint32_t length){
+Mstring* string_setlength(Mstring* str,uint32_t length){
     if(!str)return NULL;
     if(length>str->length){ // we're supposed to increment the length
         // how many blocks do we need
@@ -114,14 +114,14 @@ mstring* string_setlength(mstring* str,uint32_t length){
     }
     return str;
 }
-void string_synclength(mstring* str){
+void string_synclength(Mstring* str){
     if(!str)return;
     uint32_t l=str->length;
     while(l>0)if(str->chars[--l]=='\0')break;
     str->length=l;
 }
 
-bool string_shorten(mstring* str,uint32_t length){
+bool string_shorten(Mstring* str,uint32_t length){
     if(!str)return false;
     if(length>str->length)return false;
     str->length-=length;
@@ -129,15 +129,15 @@ bool string_shorten(mstring* str,uint32_t length){
     return true;
 }
 
-char string_char(mstring* str,uint32_t pos){
+char string_char(Mstring* str,uint32_t pos){
     return(str!=NULL?(pos<str->length?str->chars[pos]:'\0'):'\0');
 }
 
-char string_last_char(mstring *str){
+char string_last_char(Mstring *str){
     return(str!=NULL?(str->length>0?str->chars[str->length-1]:'\0'):'\0');
 }
 
-char string_removed_char(mstring* str,uint32_t pos){
+char string_removed_char(Mstring* str,uint32_t pos){
     char rc='\0';
     if(str!=NULL){
         uint32_t l=str->length;
@@ -157,7 +157,7 @@ char string_removed_char(mstring* str,uint32_t pos){
  * insert char c at position pos in the given string 
  * NOTE: returns NULL on failure, @str otherwise 
  */
-mstring* string_insert_char(mstring* str,uint32_t pos,char c){
+Mstring* string_insert_char(Mstring* str,uint32_t pos,char c){
     if(str!=NULL){
         uint32_t l=str->length+1; // the 'length' of the text plus 1
         // pos should never be larger than l
@@ -190,7 +190,7 @@ mstring* string_insert_char(mstring* str,uint32_t pos,char c){
  * Add a character to the end of the String 
  * NOTE: returns NULL on failure
  */
-mstring* string_append_char(mstring* str,char c){
+Mstring* string_append_char(Mstring* str,char c){
     if(str!=NULL){
         uint32_t l=str->length+1;
         /////printf("{%hu-%d}",l,str->blocks);
@@ -210,7 +210,7 @@ mstring* string_append_char(mstring* str,char c){
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array
-mstring* string_append(mstring* str,const char* pc){
+Mstring* string_append(Mstring* str,const char* pc){
     if(str!=NULL&&pc!=NULL){ // something to append
         char c;
         uint32_t index=0;
@@ -220,7 +220,7 @@ mstring* string_append(mstring* str,const char* pc){
     return str;
 }
 
-char* string_remainder(mstring* str,uint32_t firstpos){
+char* string_remainder(Mstring* str,uint32_t firstpos){
     if(!str)return NULL;
     if(!firstpos)return string(str);
     if(firstpos>str->length)return NULL;
@@ -230,9 +230,9 @@ char* string_remainder(mstring* str,uint32_t firstpos){
 
 /** 
  * Get a C-String with the proper null-terminator 
- * NOTE: returning the pointer to the characters stored in the mstring (which is str->chars)
+ * NOTE: returning the pointer to the characters stored in the Mstring (which is str->chars)
 */
-char* string(mstring* str){
+char* string(Mstring* str){
     if(!str)return NULL;
     str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
     return str->chars;
@@ -240,7 +240,7 @@ char* string(mstring* str){
 }
 
 /** Get where the first occurrence of a character in the String is */
-int32_t string_find(mstring *str,char c){
+int32_t string_find(Mstring *str,char c){
     if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
         int32_t pos=0;
@@ -254,7 +254,7 @@ int32_t string_find(mstring *str,char c){
     return -1;
 }
 
-void string_reverse(mstring* str){
+void string_reverse(Mstring* str){
     if(!str)return;
     uint32_t l=str->length;
     if(!l)return;

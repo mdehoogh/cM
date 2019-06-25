@@ -27,7 +27,7 @@ typedef union Mfunctionunion{
 
 struct Menvironment;
 typedef struct Mfunction{
-    mstring* _name;
+    Mstring* _name;
     Mmap* _parameterMap; // a map of values defines the parameters and their default values (implicitly defining the expected types)
     struct Menvironment* _definitionEnvironment;
     Mfunctiontype type; // whether internal or external
@@ -68,7 +68,7 @@ bool popExecutionEnvironment();
 // function prototypes
 // read access
 uint32_t getNumberOfVariables(Menvironment* _environment);
-mstring* _getVariableNames(const Menvironment* _environment,char* sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
+Mstring* _getVariableNames(const Menvironment* _environment,char* sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
 /* replacing:
 Mvariable* getNewVariable(Menvironment* _environment,const char* name);
 Mvariable* getVariable(Menvironment* _environment,const char* name);
@@ -90,7 +90,7 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 */
 // once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
-// decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mstring, Mlist or Mmap pointer)
+// decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mtext, Mlist or Mmap pointer)
 bool setValue(Menvironment* _environment,const char* name,Mvalue* _value);
 Mvalue* getValue(Menvironment* _environment,const char* name);
 
@@ -99,11 +99,11 @@ bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetyp
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real);
 bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer);
-bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string);
+bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string);
 */
 
 // functions
-mstring* _getFunctionNames(const Menvironment* _environment,char* sep);
+Mstring* _getFunctionNames(const Menvironment* _environment,char* sep);
 Mfunction* newFunction(Menvironment* _environment,const char* functionName);
 bool registerInternalFunctions(Menvironment* _environment);
 // helper function to return the function

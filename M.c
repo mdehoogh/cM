@@ -89,7 +89,7 @@ Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	Mbiginteger* sum=NULL;
 	if(a&&b){
 		if(!isBigintegerZero(a)&&!isBigintegerZero(b)){
-			sum=new_biginteger();
+			sum=__biginteger();
 			if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);sum=NULL;} // if the addition fails return 0
 		}else
 			sum=_getBigintegerCopy(isBigintegerZero(a)?b:a);
@@ -102,7 +102,7 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	Mbiginteger* product=NULL;
 	if(a&&b){
 		if(!isBigintegerOne(a)&&!isBigintegerOne(b)){
-			product=new_biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
+			product=__biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
 			if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
 		}else
 			product=_getBigintegerCopy(isBigintegerOne(a)?b:a);
@@ -117,7 +117,7 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 	if(!a&&!b)return NULL;
 	if(!a)return _getBigintegerCopy(b);
 	if(!b)return _getBigintegerCopy(a);
-	Mbiginteger* product=new_biginteger();
+	Mbiginteger* product=__biginteger();
 	if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
 	return product;
 }
@@ -336,7 +336,7 @@ Mvalue* setdp(Mvalue* _value){
 ////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
 
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
-	Mdecimal* _result=new_decimal(_decimalContext,0,0);
+	Mdecimal* _result=__decimal(_decimalContext,0,0);
 	mpd_add(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext);
 	return _result;
 }
@@ -574,13 +574,13 @@ Mvalue* pi_d(Mvalue* _value){
 
 	// initialize the variables we need for the iterations
 #ifdef __ADEBUG__
-	Mdecimal *lasts=new_decimal(mpd_context,0,0),*t=new_decimal(mpd_context,3,0),*s=new_decimal(mpd_context,3,0),*n=new_decimal(mpd_context,1,0),*na=new_decimal(mpd_context,0,0),*d=new_decimal(mpd_context,0,0),*da=new_decimal(mpd_context,24,0);
+	Mdecimal *lasts=__decimal(mpd_context,0,0),*t=__decimal(mpd_context,3,0),*s=__decimal(mpd_context,3,0),*n=__decimal(mpd_context,1,0),*na=__decimal(mpd_context,0,0),*d=__decimal(mpd_context,0,0),*da=__decimal(mpd_context,24,0);
 	// some constant decimals we need
-	Mdecimal *d8=new_decimal(mpd_context,8,0),*d32=new_decimal(mpd_context,32,0);
+	Mdecimal *d8=__decimal(mpd_context,8,0),*d32=__decimal(mpd_context,32,0);
 #else
-	mpd_t *lasts=new_mpd(mpd_context,0),*t=new_mpd(mpd_context,3),*s=new_mpd(mpd_context,3),*n=new_mpd(mpd_context,1),*na=new_mpd(mpd_context,0),*d=new_mpd(mpd_context,0),*da=new_mpd(mpd_context,24);
+	mpd_t *lasts=__mpd(mpd_context,0),*t=__mpd(mpd_context,3),*s=__mpd(mpd_context,3),*n=__mpd(mpd_context,1),*na=__mpd(mpd_context,0),*d=__mpd(mpd_context,0),*da=__mpd(mpd_context,24);
 	// some constant decimals we need
-	mpd_t *d8=new_mpd(mpd_context,8),*d32=new_mpd(mpd_context,32);
+	mpd_t *d8=__mpd(mpd_context,8),*d32=__mpd(mpd_context,32);
 #endif
 	if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
 	if(amVerbose())output("Initial decimals created!\n");
@@ -833,8 +833,8 @@ Mvalue* getRealDecimalMapValue(long double ld,bool littleEndianOrder){
 	// how about extracting the mantisse and the exponent as well
 	uint64_t mantisse;uint16_t exponent;extractMantisseAndExponent(ld,&mantisse,&exponent);
 	// let's return the binary representation of exponent and mantisse with single quotes around it!!
-	mstring* _mantisseText=_getUint64BinaryText(mantisse,'\'');if(_mantisseText){appendedToMap(_dmap,"m",_getStringValue(string(_mantisseText),false));free_mstring(_mantisseText);}
-	mstring* _exponentText=_getUint16BinaryText(exponent,'\'');if(_exponentText){appendedToMap(_dmap,"e",_getStringValue(string(_exponentText),false));free_mstring(_exponentText);}
+	Mstring* _mantisseText=_getUint64BinaryText(mantisse,'\'');if(_mantisseText){appendedToMap(_dmap,"m",_getTextValue(string(_mantisseText),false));free_string(_mantisseText);}
+	Mstring* _exponentText=_getUint16BinaryText(exponent,'\'');if(_exponentText){appendedToMap(_dmap,"e",_getTextValue(string(_exponentText),false));free_string(_exponentText);}
 	/* replacing:
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
 	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
@@ -1024,8 +1024,8 @@ Mrational* _getValueRational(Mvalue* _value){
 				}
 				*/
 				break;
-			case VT_STRING:
-				_rational=_getDecimalTextRational(_value->value._string->_c,false);
+			case VT_TEXT:
+				_rational=_getDecimalTextRational(_value->value._text->_c,false);
 				break;
 			case VT_RATIONAL:
 				_rational=_getRationalCopy(_value->value._rational); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
@@ -1050,16 +1050,16 @@ Mdecimal* _getValueDecimal(Mvalue* _value){
 		if(_value->type!=VT_LIST&&_value->type!=VT_MAP){
 			switch(_value->type){
 				case VT_DECIMAL:_decimal=_getDecimalCopy(_value->value._decimal);break;
-				case VT_INTEGER:_decimal=_getDecimal(new_mpd(_decimalContext,_value->value._integer->ll),0,true);break;
+				case VT_INTEGER:_decimal=_getDecimal(__mpd(_decimalContext,_value->value._integer->ll),0,true);break;
 				case VT_RATIONAL:
 					{ // a rational text representation still contains the numerator/denominator pair, so can't be parsed into a decimal
 						// TODO we need to find the decimal approximation with precision equal to the default decimal precision
 					}
 					break;
 				default:
-					{
-						mstring* _valueText=_getValueText(_value,true);
-						if(_valueText){mpd_set_string(_decimal->mpd,string(_valueText),_decimalContext);free_mstring(_valueText);}
+					{ // TODO: use _getTextDecimal instead!!!
+						Mstring* _valueText=_getValueText(_value,true);
+						if(_valueText){mpd_set_string(_decimal->mpd,string(_valueText),_decimalContext);free_string(_valueText);}
 					}
 					break;
 			}
@@ -1108,7 +1108,7 @@ Mvalue* r(Mvalue* _value){
 			case VT_DECIMAL:_realValue=_getRealValue(getDecimalLongDouble(_value->value._decimal));break;
 			case VT_RATIONAL:_realValue=_getRealValue(getRationalLongDouble(_value->value._rational));break;
 			case VT_REAL:_realValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
-			case VT_STRING:_realValue=_getRealValue(_strtold(_value->value._string->_c,getNAR()));break;
+			case VT_TEXT:_realValue=_getRealValue(_strtold(_value->value._text->_c,getNAR()));break;
 			default:break;
 		}
 	}
@@ -1119,16 +1119,16 @@ Mvalue* r(Mvalue* _value){
 Mvalue* t(Mvalue* _value){
 	if(_value)
 	switch(_value->type){
-		case VT_TOKEN:return _getStringValue("'t",false);
-		case VT_INTEGER:return _getStringValue("'i",false);
-		case VT_BIGINTEGER:return _getStringValue("'I",false);
-		case VT_DECIMAL:return _getStringValue("'d",false);
-		case VT_RATIONAL:return _getStringValue("'q",false);
-		case VT_REAL:return _getStringValue("'r",false);
-		case VT_STRING:return _getStringValue("'s",false);
-		case VT_LIST:return _getStringValue("'l",false);
-		case VT_MAP:return _getStringValue("'m",false);
-		case VT_UNDEFINED:return _getStringValue("'u",false);
+		case VT_TOKEN:return _getTextValue("'t",false);
+		case VT_INTEGER:return _getTextValue("'i",false);
+		case VT_BIGINTEGER:return _getTextValue("'I",false);
+		case VT_DECIMAL:return _getTextValue("'d",false);
+		case VT_RATIONAL:return _getTextValue("'q",false);
+		case VT_REAL:return _getTextValue("'r",false);
+		case VT_TEXT:return _getTextValue("'s",false);
+		case VT_LIST:return _getTextValue("'l",false);
+		case VT_MAP:return _getTextValue("'m",false);
+		case VT_UNDEFINED:return _getTextValue("'u",false);
 	}
 	return NULL;
 }
@@ -1156,7 +1156,7 @@ Mvalue* Msum(Mvalue* _value){
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
-Mtoken* newToken(Mtoken* prevToken);
+Mtoken* _getToken(Mtoken* prevToken);
 
 bool initEnvironment(){
 
@@ -1166,7 +1166,7 @@ bool initEnvironment(){
 
 	NAR_value=_getRealValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
-	NULL_value=_getValueOfToken(newToken(NULL),true);NULL_value->value._token->text=new_mstring("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
+	NULL_value=_getValueOfToken(_getToken(NULL),true);NULL_value->value._token->text=__string("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
 
 	// either set the DP_value to 0 (failed to get a decimal context somehow)
 	/* MDH@20JUN2019: no need for DP_value anymore (as setdp() return _decimalContext->prec now): 
@@ -1343,10 +1343,10 @@ char* getFormattedText(char* fmt,uint8_t maxlength,...){
 #endif
 */
 
-mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
-	mstring* s=string_create();
+Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
+	Mstring* s=__string();
 	if(s){
-		mstring* p=string_append_char(s,'[');
+		Mstring* p=string_append_char(s,'[');
 		if(_functionmap){
 			///printf("\n%s(%d)",string(p),_functionmap->numberOfFunctions);
 			Mfunctionmapelement* _functionmapelement=_functionmap->_first;
@@ -1361,10 +1361,10 @@ mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 				// I guess we might show the parameter map (if any)
 				string_append_char(p,'(');
 				if(_function->_parameterMap){
-					mstring* parameterMapText=_getMapText(_function->_parameterMap);
+					Mstring* parameterMapText=_getMapText(_function->_parameterMap);
 					if(parameterMapText){
 						string_append(p,string(parameterMapText));
-						free_mstring(parameterMapText);
+						free_string(parameterMapText);
 					}
 				}
 				///printf("\n%s","params");
@@ -1378,20 +1378,20 @@ mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 		p=string_append_char(p,']');
 		///printf("\n%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){free_mstring(s);s=NULL;}
+		if(!p){free_string(s);s=NULL;}
 	}
 	return s;
 }
 void outputFunctions(){
-	mstring* functionsText=_getFunctionMapText(_Menvironment->_functionMap);
+	Mstring* functionsText=_getFunctionMapText(_Menvironment->_functionMap);
 	output("Functions: %s.\n",string(functionsText));
-	free_mstring(functionsText);
+	free_string(functionsText);
 }
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
-	mstring* variablesText=_getMapText(_Menvironment->_variableMap);
+	Mstring* variablesText=_getMapText(_Menvironment->_variableMap);
 	output("Variables: %s.\n",string(variablesText));
-	free_mstring(variablesText);
+	free_string(variablesText);
 }
 
 enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input modes: command, control, and shell
@@ -1424,8 +1424,8 @@ void outputFlags(){
 long long commandCount=0; // the total number of command input
 long long commandIndex=0;
 
-mstring* behindCursorText=NULL; // MDH@27FEB2019: we keep track of the characters behind the cursor
-mstring* shellCommand=NULL;
+Mstring* behindCursorText=NULL; // MDH@27FEB2019: we keep track of the characters behind the cursor
+Mstring* shellCommand=NULL;
 Mtoken* pCommandToEvaluate=NULL;
 Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
 
@@ -1579,8 +1579,8 @@ void outputStatus(char inputChar,char inputCharType){
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 }
 
-Mtoken* newToken(Mtoken* prevToken){
-	Mtoken* pNewToken=new_token();
+Mtoken* _getToken(Mtoken* prevToken){
+	Mtoken* pNewToken=__token();
 	if(pNewToken){
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
 		if(prevToken){
@@ -1613,7 +1613,7 @@ Mtoken* newToken(Mtoken* prevToken){
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
 		}
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
-		pNewToken->text=string_create();
+		pNewToken->text=__string();
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->next=NULL;
@@ -1887,8 +1887,8 @@ Mvaluepointeritem* getLastValuepointeritem(Mvaluepointer* _valuepointer){
 			if(_itemvalue->type==VT_INTEGER&&_value->type==VT_LIST){
 				_value=getListElement(_value->value._list,_itemvalue->value._integer);
 			}else
-			if(_itemvalue->type==VT_STRING&&_value->type==VT_MAP){
-				_value=getMapElement(_value->value._list,_itemvalue->value._string);
+			if(_itemvalue->type==VT_TEXT&&_value->type==VT_MAP){
+				_value=getMapElement(_value->value._list,_itemvalue->value._text);
 			}else // invalid reference
 				_value=NULL;
 		}
@@ -1935,7 +1935,7 @@ Mvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
 		switch(_value->type){
 			case VT_INTEGER:_value->value._integer=(Minteger*)calloc(1,sizeof(Minteger));break; // initialized to 0 I presume
 			case VT_REAL:_value->value._real=(Mreal*)calloc(1,sizeof(Mreal));break; // initialized to 0.0 I presume
-			case VT_STRING:_value->value._string=(Mstring*)calloc(1,sizeof(Mstring));break;
+			case VT_TEXT:_value->value._text=(Mtext*)calloc(1,sizeof(Mtext));break;
 			case VT_LIST:_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
 			case VT_MAP:_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
 			default:break;
@@ -2041,10 +2041,10 @@ Mvalue* getValueOfMap(){
 		if(expressionToken->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
 		expressionToken=expressionToken->next; // move to first element after the colon
 		Mvalue* _attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
-		mstring* attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value 
+		Mstring* attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
 		if(!appendedToMap(_map,string(attributeName),_attributeValueValue))outputValue("\nERROR: Failed to append the value of attribute '",_attributeNameValue,"'."); // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
-		free_mstring(attributeName); // ALWAYS free the value text
+		free_string(attributeName); // ALWAYS free the value text
 		if(expressionToken->type==TT_END_OF_MAP)break;
 	}
 	return _mapValue;
@@ -2138,10 +2138,10 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 				if(indexorattributenameListelementValue){
 					// if we are accessing a map we have to ascertain that the attribute name in a string
 					if(_value->type==VT_MAP){
-						mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
+						Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
 						if(attributenameText){
 							_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
-							free_mstring(attributenameText);
+							free_string(attributenameText);
 							continue;	
 						}
 						outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
@@ -2162,7 +2162,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					return NULL;
 					/* replacing:
 					// check the validity of the index or attribute name against the current value
-					if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_STRING){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
+					if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
 					if(indexorattributenameListelementValue->type==VT_INTEGER){
 						if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
 						_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
@@ -2197,10 +2197,10 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 					if(indexorattributenameListelementValue){
 						// if we are accessing a map we have to ascertain that the attribute name in a string
 						if(_value->type==VT_MAP){
-							mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
+							Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
 							if(attributenameText){
 								_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
-								free_mstring(attributenameText);
+								free_string(attributenameText);
 								continue;	
 							}
 							outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
@@ -2218,11 +2218,11 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				}
 				// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
 				if(_value->type==VT_MAP){
-					mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
+					Mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
 					if(!appendedToMap(_value->value._map,string(_attributeName),_newValue)){
 						result=false;
 					}
-					free_mstring(_attributeName);
+					free_string(_attributeName);
 					if(!result)return false;
 				}else
 				if(_value->type==VT_LIST){
@@ -2273,12 +2273,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	Mvaluereference* _valueReference=NULL;
 
-	mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
+	Mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
 		
 	while(expressionToken&&expressionToken->type==TT_UNARY){
 		char unaryOperatorChar=string_char(expressionToken->text,0);
 		if(unaryOperatorChar!='+'){
-			if(!unaryOperators)unaryOperators=string_create();
+			if(!unaryOperators)unaryOperators=__string();
 			string_append_char(unaryOperators,unaryOperatorChar);
 		}
 		expressionToken=expressionToken->next;
@@ -2371,10 +2371,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
-					mstring* _realText=new_mstring(string(expressionToken->text)); // the integer part
+					Mstring* _realText=__string(string(expressionToken->text)); // the integer part
 					expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
-					mstring* pRealText=_realText;
+					Mstring* pRealText=_realText;
 					if(pRealText){
 						pRealText=string_append(pRealText,string(expressionToken->text));
 						if(amDebugging())outputLine("Fractional part appended!");
@@ -2387,7 +2387,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						if(amDebugging())output("Real part string length: %u.\n",l);
 						if(getDP()<l)output("WARNING: More decimals present in literal than expected. Rounding may occur.\n");
 						if(amDebugging())outputLine("Decimal precision checked!");
-						Mdecimal* _decimal=new_decimal(_decimalContext,0,0);
+						Mdecimal* _decimal=__decimal(_decimalContext,0,0);
 						if(amDebugging())outputLine("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),_decimalContext);
@@ -2404,13 +2404,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
 						if(amDebugging())outputLine("Releasing decimal text.");
-						free_mstring(_realText);
+						free_string(_realText);
 						if(amDebugging())outputLine("Decimal text released.");
 					}else
 						outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
-					Mbiginteger* _biginteger=new_biginteger();
+					Mbiginteger* _biginteger=__biginteger();
 					if(mp_read_radix(_biginteger,string(expressionToken->text),10)==MP_OKAY){
 						if(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT){
               				assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
@@ -2429,7 +2429,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 			case TT_DQSTRING:
 			case TT_SQSTRING: // a string literal
-				assignValue(&_valueReference->_value,_getStringValue(string(expressionToken->text),false));
+				assignValue(&_valueReference->_value,_getTextValue(string(expressionToken->text),false));
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST: // a list literal
@@ -2614,23 +2614,23 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		if(!_sumDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_sumDecimal,true);
 	}
-	if(_value1->type==VT_STRING){ // force string concatenation using the quote character in the Mvalue in the resulting text
-		mstring* _valueText=string_create();
-		mstring* p=_valueText;
-		p=string_append_char(p,_value1->value._string->presuffix);
-		p=string_append(p,_value1->value._string->_c);
-		mstring* _value2Text=_getValueText(_value2,true); // get the text representation of the second argument without quotes
-		if(_value2Text){p=string_append(p,string(_value2Text));free_mstring(_value2Text);}
-		Mvalue* _value=(p?_getStringValue(string(_valueText),false):NULL);
-		free_mstring(_valueText);
+	if(_value1->type==VT_TEXT){ // force string concatenation using the quote character in the Mvalue in the resulting text
+		Mstring* _valueText=__string();
+		Mstring* p=_valueText;
+		p=string_append_char(p,_value1->value._text->presuffix);
+		p=string_append(p,_value1->value._text->_c);
+		Mstring* _value2Text=_getValueText(_value2,true); // get the text representation of the second argument without quotes
+		if(_value2Text){p=string_append(p,string(_value2Text));free_string(_value2Text);}
+		Mvalue* _value=(p?_getTextValue(string(_valueText),false):NULL);
+		free_string(_valueText);
 		return _value;
 	}
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_STRING)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_TEXT)){
 		// if the second argument is text, convert it to a real or integer number
-		if(_value2->type==VT_STRING){
+		if(_value2->type==VT_TEXT){
 			// are we going to convert it to an integer or a real????
 			// NOTE a real has a period in the text, so use that
-			char* valueText=_value2->value._string->_c;
+			char* valueText=_value2->value._text->_c;
 			if(strchr(valueText,'.')!=NULL){ // a period 
 				////////if(strlen(_valueText)==1)return _value1; // if a single period no need to actually add it unless someone want to change an integer in a real????
 				////// we can use _strtold!!! long double ld=0;if(strlen(valueText)>1){char *endPtr=NULL;ld=strtold(valueText,&endPtr);if(endPtr==valueText){output("ERROR: Can't add '%s'.",valueText);return NULL;}} // failure
@@ -2693,7 +2693,7 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){
 		case VT_BIGINTEGER: return _getBigintegerValue(_getBiginteger(1),true);
 		case VT_REAL: return _getRealValue(1.0);
 		case VT_RATIONAL: return _getRationalValue(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),true);
-		case VT_DECIMAL: return _getDecimalValue(_getDecimal(new_mpd(_decimalContext,1),0,true),true);
+		case VT_DECIMAL: return _getDecimalValue(_getDecimal(__mpd(_decimalContext,1),0,true),true);
 		default:break;
 	}
 	return NULL;
@@ -2763,7 +2763,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
 		Mdecimal* _baseDecimal=getValueDecimal(_value1);
 		Mdecimal* _exponentDecimal=getValueDecimal(_value2);
-		Mdecimal* _powerDecimal=new_decimal(_decimalContext,0,0);
+		Mdecimal* _powerDecimal=__decimal(_decimalContext,0,0);
 		if(_powerDecimal){
 			mpd_pow(_powerDecimal->mpd,_baseDecimal->mpd,_exponentDecimal->mpd,_decimalContext);
 			// TODO are we converting back?
@@ -2995,7 +2995,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 
 typedef struct Mformulaelement{
 	Mvaluereference* _operand; // an operand to apply the binary operator to
-	mstring* _operator; // a (shortcut) binary operator 
+	Mstring* _operator; // a (shortcut) binary operator 
 	struct Mformulaelement* _next;
 	struct Mformulaelement* _prev; // MDH@21MAY2019: unfortunately needed for moving back!!
 }Mformulaelement;
@@ -3064,7 +3064,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			if(expressionToken){
 				if(amVerbose())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-				_formulaelement->_operator=string_copy(expressionToken->text);
+				_formulaelement->_operator=_stringCopy(expressionToken->text);
 				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
 				string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
@@ -3125,9 +3125,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				while(_formulaelement){
 					_valuereference=_formulaelement->_operand;
 					if(amVerbose()){
-						mstring* _indexidText=_getValueText(_valuereference->_itemid,false);
+						Mstring* _indexidText=_getValueText(_valuereference->_itemid,false);
 						output("Assignment to %s%s using operator %s!",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
-						if(_indexidText)free_mstring(_indexidText);
+						if(_indexidText)free_string(_indexidText);
 					}
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
 					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
@@ -3161,7 +3161,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;
 			while(_formulaelement){
-				free_mstring(_formulaelement->_operator);
+				free_string(_formulaelement->_operator);
 				free_valuereference(_formulaelement->_operand);
 				_nextformulaelement=_formulaelement->_next;
 				free(_formulaelement);
@@ -3209,8 +3209,8 @@ Mexpressionvalue* getFunctionValue(Mtoken* _offsetToken,char* functionName){
 }
 */
 
-mstring* _getCommandText(bool color){
-	mstring* commandText=string_create();
+Mstring* _getCommandText(bool color){
+	Mstring* commandText=__string();
 	Mtoken* pCommandToken=pCommandToEvaluate; // TODO can we get rid of using commandcount-1 here????
 	while(pCommandToken){
 		// if we bump into a comment we're done!!!
@@ -3252,11 +3252,11 @@ void outputValueColored(Mvalue* _value){
 				if(_value->value._rational->delta){
 					outputTokenTypeColor(TT_REAL);
 					if(_value->value._rational->delta->ld>=0)output("+");
-					mstring* _realValueText=string_create();
+					Mstring* _realValueText=__string();
 					if(_realValueText){
 						appendld(_realValueText,_value->value._rational->delta->ld);
 						output("%s",string(_realValueText));
-						free_mstring(_realValueText);
+						free_string(_realValueText);
 					}
 					// replacing:	output("%.*Lf",LDBL_DIG,_value->value._rational->delta->ld);
 					resetOutputColor();
@@ -3264,7 +3264,7 @@ void outputValueColored(Mvalue* _value){
 			}
 			break;
 		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
-		case VT_STRING:outputTokenTypeColor(_value->value._string->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
+		case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
 		case VT_LIST:
 			// TODO not using _getListText() as defined in Mexecution
 			outputChar('[');
@@ -3361,7 +3361,7 @@ bool evaluateCommand(){
 
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
-	mstring* commandText=_getCommandText(true);
+	Mstring* commandText=_getCommandText(true);
 	expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
 	clock_t then=clock();
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
@@ -3374,7 +3374,7 @@ bool evaluateCommand(){
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputLine("Result released!"); // TODO do we need to do this?????
 
 	///////if(amVerbose())outputLine("Command to release!");
-	free_mstring(commandText);
+	free_string(commandText);
 	////////if(amVerbose())outputLine("Command released!");
 	return true;
 }
@@ -3420,7 +3420,7 @@ void showPreviousCommandPage(){
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
 char* removedRestOfCommand(){
 	if(cursorPosition()<commandLength()){
-		mstring* restOfCommand=string_create();
+		Mstring* restOfCommand=__string();
 		if(restOfCommand!=NULL){
 			uint16_t tokenPosition=cursorPosition()-pLastCommandToEvaluateToken->offset;
 			if(tokenPosition)string_append(restOfCommand,string_remainder(pLastCommandToEvaluateToken->text,tokenPosition));
@@ -3552,9 +3552,9 @@ bool commandUp(){
 void newCommand(){
 	// MDH@24APR2019 obsolete: commandLength()=string_length(behindCursorText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
-	pLastCommandToEvaluateToken=pCommandToEvaluate=newToken(NULL);
+	pLastCommandToEvaluateToken=pCommandToEvaluate=_getToken(NULL);
 	// MDH@27MAY2019: NO let's just keep expr NULL!!!
-	pCommandToEvaluate->expr=NULL; // TODO do I need this???? YES, because we used newToken()! PERHAPS NOT as prevToken is NULL???????
+	pCommandToEvaluate->expr=NULL; // TODO do I need this???? YES, because we used _getToken()! PERHAPS NOT as prevToken is NULL???????
 }
 
 // TODO copyCommand() should set ->expr correctly
@@ -3564,9 +3564,9 @@ void copyCommand(){
 	Mtoken* _tokenToCopy=pCommandToEvaluate;
 	pCommandToEvaluate=NULL;
 	// the essence is that pLastCommandToEvaluateToken points to the last token in pCommandToEvaluate
-	// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to newToken() failing to create a new token
+	// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to _getToken() failing to create a new token
 	while(_tokenToCopy){
-		pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
+		pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken);
 		pLastCommandToEvaluateToken->type=_tokenToCopy->type;
 		/* TODO check whether the following is correct!!! guess not!!
 		if(pLastCommandToEvaluateToken->type==TT_END_OF_FUNCTION_CALL||pLastCommandToEvaluateToken->type==TT_END_OF_LIST||pLastCommandToEvaluateToken->type==TT_END_OF_MAP){
@@ -3579,7 +3579,7 @@ void copyCommand(){
 		pLastCommandToEvaluateToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
 		pLastCommandToEvaluateToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
 		// if failing to copy the text over get rid of the command constructed so far, and break
-		pLastCommandToEvaluateToken->text=string_copy(_tokenToCopy->text);
+		pLastCommandToEvaluateToken->text=_stringCopy(_tokenToCopy->text);
 		if(!pLastCommandToEvaluateToken->text){pLastCommandToEvaluateToken=NULL;break;}
 		// MDH@24APR2019 obsolete: commandLength()+=string_length(pLastCommandToEvaluateToken->text);
 		// some additional fields to copy over (NOT the offset is that is set automatically)
@@ -3617,10 +3617,10 @@ void setCommand(Mtoken* pNewCommand){
 	if(pNewCommand){ // something to copy
 		// at least once we need to set pLastCommandToEvaluateToken!!!
 		Mtoken* pNewToken=pNewCommand; // first token to copy!!
-		// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to newToken() failing to create a new token
+		// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to _getToken() failing to create a new token
 		while(pLastCommandToEvaluateToken){
 			// if failing to copy the text over get rid of the command constructed so far, and break
-			if(!string_copy(pNewToken->text,pLastCommandToEvaluateToken->text)){clearCommand();break;}
+			if(!_stringCopy(pNewToken->text,pLastCommandToEvaluateToken->text)){clearCommand();break;}
 			// MDH@24APR2019 obsolete: commandLength()+=string_length(pLastCommandToEvaluateToken->text);
 			// some additional fields to copy over (NOT the offset is that is set automatically)
 			pLastCommandToEvaluateToken->type=pNewToken->type;
@@ -3630,7 +3630,7 @@ void setCommand(Mtoken* pNewCommand){
 			pNewToken=pNewToken->next;
 			if(!pNewToken)break;
 			// we're going to need another token!!!
-			pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
+			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken);
 		}
 		// if the user decides to start typing ascertain to show it in the right color!!
 		if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken);
@@ -3757,7 +3757,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	*/
 	/*
 	// MDH@26FEB2019: when a user starts inserting characters instead of appending them we can cut off the rest of the characters in the command
-	//                and put it in a single mstring instance and append these one at a time 
+	//                and put it in a single Mstring instance and append these one at a time 
 	char* removed=removedRestOfCommand();
 	*/
 	// determine the token type associated with the newly inputted character
@@ -3832,7 +3832,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				}
 			}
 
-			pLastCommandToEvaluateToken=newToken(pLastCommandToEvaluateToken);
+			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken);
 /*
 #ifdef __DEBUG__
 			printf("@%p=%p?:%s",pCommandToEvaluate,pLastCommandToEvaluateToken,string(pCommandToEvaluate->text));
@@ -4041,17 +4041,17 @@ int main(int argc, char **argv){
 	}
 	if(amVerbose())output("M environment initialized with %llu predefined values.",getNumberOfValues());
 
-	mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
+	Mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
 	if(predefinedVariableNames){
 		output("Predefined variables: %s.\n",string(predefinedVariableNames));
-		free_mstring(predefinedVariableNames); // no get rid of it!!!
+		free_string(predefinedVariableNames); // no get rid of it!!!
 	}else
 		outputLine("No predefined variables!");
 	//////////output("Number of predefined variables: %d.",getNumberOfVariables(mEnvironment));
 	
 	// initialize commands and input mode
-	shellCommand=string_create(); // MDH@12APR2019: allow executing shell commands (calling system())
-	behindCursorText=string_create(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
+	shellCommand=__string(); // MDH@12APR2019: allow executing shell commands (calling system())
+	behindCursorText=__string(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
 	pCommandToEvaluate=NULL; // the current command (token)
 
 	///// writeCommand() will take care of this!!!! commandLength()=0; // keep track of the total command length...
@@ -4499,13 +4499,13 @@ int main(int argc, char **argv){
 					}else
 						outputLine("No allocations to unmark.");
 					if(!commandEvaluated){
-						mstring* commandText=_getCommandText(false);
+						Mstring* commandText=_getCommandText(false);
 						if(!string_length(commandText)){
 							clearCommand();
 							outputLine("Nothing to evaluate!");
 						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
 							outputLine("Please complete, correct or cancel the command.");
-						free_mstring(commandText);
+						free_string(commandText);
 						continue;
 					}
 					if(amVerbose())outputLine("Command evaluated!");

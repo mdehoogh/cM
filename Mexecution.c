@@ -6,12 +6,13 @@
  *   3. if the pointer contents is passed along (in)to the result of the function the pointer should be NULLed to prevent releasing the memory pointed to (which needs to persist function execution)
  *   4. preferably this is done by calling the transfer<Mtype> function that will NULL the calling pointer
  *   5. prefix the function name with _ if it returns a dynamically allocated pointer whose ownerships transfers to the caller
+ *   6. prefix a function validated with the validated comment: VALIDATED@<timestamp>
  */
 #include <limits.h>
 #include <math.h>
 
 #include "Malloc.h"
-#include "mstring.h"
+#include "Mstring.h"
 #include "Msettings.h"
 #include "Moutput.h"
 // TODO find a way NOT to have to include Msession here (now for using outputLine!!)
@@ -28,42 +29,62 @@ void outputError(const char* const error){if(error)output("%s%s.\n",ERROR_PREFIX
 void outputErrorAndText(const char* const error,const char* const text){if(error)output("%s%s",ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
 static int8_t littleEndian=-1;
-// NOTE force execution immediately
-__attribute__((constructor)) void initExecution() {
+// NOTE force execution immediately (don't think this is working)
+/**
+ * \brief determines whether the hardware stores data in little or big endian format
+ */
+__attribute__((constructor)) void initExecution(){
     int i=1;
 	char* c=(char*)&i;
 	littleEndian=*c;
-	if(amVerbose())output(littleEndian?"\nLittle endian.":"\nBig endian.");
+	if(amVerbose())output("On this system data is stored in %s endian format.\n",(littleEndian?"little":"big"));
 }
 
+/**
+ * \brief returns true if the hardware supports little endian, false otherwise
+ */
 bool isLittleEndian(){
     if(littleEndian<0)initExecution();
     return(littleEndian>0);
 }
 
-
-mstring* _getUint64BinaryText(uint64_t ul,char presuffix){
-    mstring* _binaryText=string_create();
+// NOTE when binaryText is returned, it does not need to be freed internally, otherwise it does
+/**
+ * \brief determines the binary text representation of the 64-bit unsigned integer \p ul using text prefix and postfix \p presuffix
+ * \param ul the 64-bit positive integer to represent in 0s and 1s
+ * \param presuffix character to enquote the binary representation when displayed
+ * \return the newly created Mstring containing the binary representation on success, NULL on failure
+ * needs to be freed with free_string() after use (e.g. of its string representation) as indicated by the _ that starts the name
+ */
+Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){
+    Mstring* _binaryText=__string();
     if(_binaryText){
-        mstring* _p=_binaryText;
+        Mstring* _p=_binaryText;
         int l=64;
         while(--l>=0&&_p){_p=string_append_char(_p,ul&1?'1':'0');ul>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
         if(presuffix)_p=string_append_char(_p,presuffix);
-        if(!_p){free_mstring(_binaryText);_binaryText=NULL;}else string_reverse(_p);
+        if(!_p){free_string(_binaryText);_binaryText=NULL;}else string_reverse(_p);
     }
     return _binaryText;
-}
-mstring* _getUint16BinaryText(uint16_t us,char presuffix){
-    mstring* _binaryText=string_create();
+}/* VALIDATED */
+/**
+ * \brief determines the binary text representation of the 16-bit unsigned integer \p us using text prefix and postfix \p presuffix
+ * \param us the 16-bit unsigned integer to represent in 0s and 1s
+ * \param presuffix character to enquote the binary representation when displayed
+ * \return the newly created Mstring containing the binary representation on success, NULL on failure
+ * needs to be freed with free_string() after use (e.g. of its string representation) as indicated by the _ that starts the name
+ */
+Mstring* _getUint16BinaryText(uint16_t us,char presuffix){
+    Mstring* _binaryText=__string();
     if(_binaryText){
-        mstring* _p=_binaryText;
+        Mstring* _p=_binaryText;
         int l=16;
         while(--l>=0&&_p){_p=string_append_char(_p,us&1?'1':'0');us>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
         if(presuffix)_p=string_append_char(_p,presuffix);
-        if(!_p){free_mstring(_binaryText);_binaryText=NULL;}else string_reverse(_p);
+        if(!_p){free_string(_binaryText);_binaryText=NULL;}else string_reverse(_p);
     }
     return _binaryText;
-}
+}/* VALIDATED */
 
 /* initialization for big integer arithmetic
 jmp_buf env;
@@ -83,116 +104,178 @@ size_t mpd_context_count=0;
 const size_t MAXIMUM_NUMBER_OF_CONTEXTS=2; // quick fix to ascertain to use the same context over and over again
 
 mpd_context_t** mpd_contexts=NULL; // keep track of all decimal contexts
+/**
+ * \brief returns the multiple-precision decimal context with the \p decimalprecision requested
+ * \param decimalprecision the number of decimal digits a decimal should (minimally) hold
+ * \return NULL on failing to obtain such a decimal context, otherwise that decimal context
+ * if the number of stored decimal context equals the maximum number of contexts, the last context will be reused
+ * if creating a new context succeeded it will be returned even when failing to remember the decimal context
+ */
 mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
+    mpd_context_t* mpd_context=NULL; // the context we will be returning
     if(amVerbose())output("Retrieving the decimal context with precision %lld.\n",decimalprecision);
+    // locate the context with the requested decimal precision
     int mpd_context_index=mpd_context_count;
-    while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimalprecision)break;
-    if(mpd_context_index<0){
-        if(mpd_context_count<MAXIMUM_NUMBER_OF_CONTEXTS){
+    while(--mpd_context_index>=0)if(mpd_getprec(mpd_contexts[mpd_context_index])==decimalprecision){mpd_context=mpd_contexts[mpd_context_index];break;}
+    // if we haven't found a match, try to get one
+    if(!mpd_context){ // wasn't found
+        // TODO perhaps re-using is not such a good idea...
+        if(mpd_context_count>=MAXIMUM_NUMBER_OF_CONTEXTS){ // re-use the last one
+            mpd_context=mpd_contexts[mpd_context_count-1];
+            output("Changing the decimal precision of the last remembered decimal context to %llu.\n",decimalprecision);
+            mpd_qsetprec(mpd_contexts[mpd_context_count-1],decimalprecision);
+        }else{
             if(amVerbose())output("About to create the decimal context with precision %lld.\n",decimalprecision);
-            mpd_context_t** new_mpd_contexts=(mpd_context_count>0?realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t*)):(mpd_context_t**)malloc(sizeof(mpd_context_t*)));
-            if(!new_mpd_contexts){
-                output("%sFailed to return a decimal context with precision %u.\n",ERROR_PREFIX,decimalprecision);
-                return NULL;
-            }
-            mpd_contexts=new_mpd_contexts;
-            mpd_context_index=mpd_context_count;
-            mpd_context_count++;
-            mpd_contexts[mpd_context_index]=(mpd_context_t*)malloc(sizeof(mpd_context_t)); // TODO do we need to do this???
-            if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
-            // initialize the new context to the default context
-            mpd_init(mpd_contexts[mpd_context_index],decimalprecision);
-            if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_contexts[mpd_context_index]));
-        }else{ // re-use the last context
-            mpd_context_index=mpd_context_count-1;
-            output("Changing the decimal precision to %llu.\n",decimalprecision);
-            mpd_qsetprec(mpd_contexts[mpd_context_index],decimalprecision);
+            mpd_context=(mpd_context_t*)malloc(sizeof(mpd_context_t));
+            if(mpd_context){
+                if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
+                // initialize the new context to the default context (specification)
+                mpd_init(mpd_context,decimalprecision);
+                if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(mpd_context));
+                // try to append this context
+                mpd_context_t**__mpd_contexts=realloc(mpd_contexts,(mpd_context_count+1)*sizeof(mpd_context_t*)); // realloc will work anyway
+                if(__mpd_contexts){
+                    mpd_contexts=__mpd_contexts;
+                    mpd_contexts[mpd_context_count++]=mpd_context;
+                    if(amVerbose())output("Decimal context with precision %u remembered.\n",mpd_getprec(mpd_context));
+                }else
+                    output("%sFailed to return a decimal context with precision %u.\n",ERROR_PREFIX,decimalprecision);
+            }else
+                outputError("Failed to create a new decimal context");
         }
         ////Mdecimalraphandler=MMdecimalraphandler;
     }
-    // reset the status
-    mpd_qsetstatus(mpd_contexts[mpd_context_index],0); // using the setter is preferred over ->status=0 assignment
-    return mpd_contexts[mpd_context_index];
-}
+    // reset the status, so we can use the context as if it were new
+    if(mpd_context)mpd_qsetstatus(mpd_context,0); // using the setter is preferred over ->status=0 assignment
+    return mpd_context;
+}/* VALIDATED */
 
 // BIG INTEGER STUFF
-// new_biginteger returns an initialized big integer on success, or NULL when failing
-Mbiginteger* new_biginteger(){
-    Mbiginteger* result=(Mbiginteger*)malloc(sizeof(mp_int));
-    if(result&&mp_init(result)!=MP_OKAY){mp_clear((mp_int*)result);result=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
-    return result;
-}
-mp_int* new_mp_int(){return (mp_int*)new_biginteger();}
-Mbiginteger* _getBiginteger(int64_t l){
-    Mbiginteger* _biginteger=new_biginteger();
-    if(l)mp_set_i64((mp_int*)_biginteger,l); // TODO mp_set_i64 can fail can't it? then why is it of type void???
-    return _biginteger;
-}
-Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger){
-    Mbiginteger* _bigintegerNeg=new_biginteger();
-    if(mp_neg(_biginteger,_bigintegerNeg)!=MP_OKAY){free_biginteger(_bigintegerNeg);_bigintegerNeg=NULL;}
-    return _bigintegerNeg;
-}
+/** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
+ *  \return a newly created big integer
+ */
+void free_biginteger(Mbiginteger* biginteger){
+    if(biginteger){
+        if(amVerbose())outputLine("Freeing a big integer."); // TODO can we display the value?
+        mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
+    }else
+    if(amVerbose())outputLine("No big integer to free!");
+}/* VALIDATED */
+Mbiginteger* __biginteger(){
+    Mbiginteger* biginteger=(Mbiginteger*)malloc(sizeof(mp_int));
+    if(biginteger&&mp_init(biginteger)!=MP_OKAY){free_biginteger(biginteger);biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
+    return biginteger;
+}/* VALIDATED */
+Mbiginteger* _getBiginteger(int64_t ll){
+    Mbiginteger* biginteger=__biginteger();
+    if(biginteger)mp_set_i64((mp_int*)biginteger,ll); // even if l equals 0 set it TODO check is that necessary???
+    return biginteger;
+}/* VALIDATED */
+Mbiginteger* _getBigintegerNeg(Mbiginteger* biginteger){
+    Mbiginteger* bigintegerNeg=__biginteger(); // the result we will be returning
+    if(bigintegerNeg&&mp_neg(biginteger,bigintegerNeg)!=MP_OKAY){free_biginteger(bigintegerNeg);bigintegerNeg=NULL;}
+    return bigintegerNeg;
+}/* VALIDATED */
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
-Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
-    if(!_biginteger)return NULL;
-    Mbiginteger* _result=new_biginteger();
-    if(mp_copy(_biginteger,_result)!=MP_OKAY){free_biginteger(_result);return NULL;}
-    return _result;
-}
+Mbiginteger* _getBigintegerCopy(Mbiginteger* biginteger){
+    if(!biginteger)return NULL;
+    Mbiginteger* bigintegerCopy=__biginteger();
+    if(bigintegerCopy&&mp_copy(biginteger,bigintegerCopy)!=MP_OKAY){free_biginteger(bigintegerCopy);bigintegerCopy=NULL;}
+    return bigintegerCopy;
+}/* VALIDATED */
+mp_int* _mp_int(){return (mp_int*)__biginteger();}/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}
-const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
-const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}
-const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}
+// NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
+const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}/* VALIDATED */
+const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}/* VALIDATED */
+const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}/* VALIDATED */
+const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}/* VALIDATED */
 
-bool isBigintegerZero(Mbiginteger* _biginteger){return(_biginteger?mp_iszero((mp_int*)_biginteger)==MP_YES:false);}
-bool isBigintegerOne(Mbiginteger* _biginteger){return(_biginteger?mp_cmp((mp_int*)_biginteger,getBigintegerOne())==MP_EQ:false);}
+bool isBigintegerZero(Mbiginteger* biginteger){return(biginteger?mp_iszero((mp_int*)biginteger)==MP_YES:false);}/* VALIDATED */
+bool isBigintegerOne(Mbiginteger* biginteger){return(biginteger?mp_cmp((mp_int*)biginteger,getBigintegerOne())==MP_EQ:false);}/* VALIDATED */
+// END BIG INTEGER STUFF
 
+// DECIMAL STUFF
 extern mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
 // MDH@17JUN2019: convenient to expose _get_mpd (e.g. for use in approximating pi with a decimal)
-mpd_t* new_mpd(mpd_context_t* mpd_context,int64_t value){
+/**
+ * \brief returns an mpd_t instance (from the mpdecimal libray) with the precision given by \p mpd_context equal to \p value
+ * \param value the (initial) value of the returned mpd_t instance
+ * \return on success the mpd_t instance equal to \p value, NULL otherwise
+ */
+mpd_t* __mpd(mpd_context_t* mpd_context,int64_t value){
     // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
-    mpd_t* _mpd=mpd_qnew(); // replacing: mpd_context mpd_context?mpd_context:_decimalContext);
+    mpd_t* mpd=mpd_qnew(); // replacing: mpd_context mpd_context?mpd_context:_decimalContext);
     // NOTE it is essential to initialize the stored value even when 0 as we would otherwise get errors on mpd_to_sci calls
-    if(_mpd)
-        mpd_set_i64(_mpd,value,(mpd_context?mpd_context:_decimalContext));
+    if(mpd)
+        mpd_set_i64(mpd,value,(mpd_context?mpd_context:_decimalContext));
     else
-        outputError("Failed to allocate a decimal");
+        outputError("Failed to create an mpdecimal");
     /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
-    return _mpd;
-}
-Mdecimal* new_decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating){
-    Mdecimal* _decimal=(Mdecimal*)MALLOC(sizeof(Mdecimal),'D');
-    if(_decimal){
-        _decimal->mpd=new_mpd(mpd_context,value); // initialize to zero by default
-        if(!_decimal->mpd){outputError("Failed to create a decimal");FREE(_decimal,'D');_decimal=NULL;}else _decimal->repeating=repeating;
+    return mpd;
+}/* VALIDATED */
+/**
+ * \brief frees \p mpd, calling mpd_del()
+ * \param mpd the mpdecimal instance to free
+ */
+void free_mpd(mpd_t* mpd){if(mpd)mpd_del(mpd);}/* VALIDATED */
+
+/**
+ * \brief frees \p decimal, delegating to free_mpd() for freeing the contained mpdecimal instance
+ */
+void free_decimal(Mdecimal* decimal){
+    if(decimal){
+        if(amVerbose())output("Freeing decimal.\n");
+        free_mpd(decimal->mpd);
+        FREE(decimal,'D');
+    }else
+    if(amVerbose())output("No decimal to free.\n");
+}/* VALIDATED */
+/**
+ * \brief returns a decimal initialized to \p value with the precision specified by \p mpd_context and number of repeating digits equal to \p repeating
+ * \param mpd_context the decimal context to use
+ * \param value the initial (integer) value of the decimal
+ * \param repeating the number of repeating decimal digits at the end
+ */
+Mdecimal* __decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating){
+    Mdecimal* decimal=(Mdecimal*)MALLOC(sizeof(Mdecimal),'D');
+    if(decimal){
+        decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
+        if(!decimal->mpd){outputError("Failed to create a decimal");FREE(decimal,'D');decimal=NULL;}else decimal->repeating=repeating;
     }
-    return _decimal;
-}
-Mdecimal* _getDecimal(mpd_t* _mpd,uint64_t repeating,bool freeonfailure){
-    Mdecimal* _decimal=NULL;
-    if(_mpd){
-        _decimal=new_decimal(NULL,0,repeating); // always using the default decimal context
-        if(_decimal)_decimal->mpd=_mpd;else if(freeonfailure)mpd_del(_mpd);
-    }
-    return _decimal;
-}
+    return decimal;
+}/* VALIDATED */
+/**
+ * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
+ */
+Mdecimal* _getDecimal(mpd_t* mpd,uint64_t repeating,bool freeonfailure){
+    if(!mpd)return NULL; // can do this as won't have to free mpd anyway
+    Mdecimal* decimal=__decimal(NULL,0,repeating); // always using the default decimal context
+    if(decimal)decimal->mpd=mpd;else if(freeonfailure)free_mpd(mpd);
+    return decimal;
+}/* VALIDATED */
+/**
+ * \brief returns a decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
+ */
 Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
-    Mdecimal* _decimal=NULL;
-    if(decimalText&&strlen(decimalText)){
+    if(!decimalText)return NULL;
+    Mdecimal* decimal=NULL;
+    if(strlen(decimalText)){
         if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
         // can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
         // the rounding at the end of course could prove to be problematic
-        _decimal=new_decimal(_decimalContext,0,repeating);
-        if(_decimal)mpd_set_string(_decimal->mpd,decimalText,_decimalContext);
+        decimal=__decimal(NULL,0,repeating);
+        if(decimal){
+            mpd_set_string(decimal->mpd,decimalText,_decimalContext); // NOTE here we have to pass in the default decimal context
+            if(!decimal->mpd){free_decimal(decimal);decimal=NULL;} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
+        }
+        if(!decimal)output("%sFailed to create a decimal from '%s'.\n",ERROR_PREFIX,decimalText);
     }else
         outputError("No decimal text to parse");
-    if(!_decimal)outputError("Failed to create a decimal");
-    return _decimal;
-}
+    return decimal;
+}/* VALIDATED */
 
 // MDH@24JUN2019: used an Mlist before to store the remainders, but because Mlist uses Mvalue instances, which we do not have access to here anymore (we have to create our own list for storing the remainders)
 typedef struct MbigintegerListelement{
@@ -207,10 +290,10 @@ void free_bigintegerListelement(MbigintegerListelement* _bile){
 Mdecimal* _getRationalDecimal(const Mrational* const _rational){
     if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     Mbiginteger *_numerator=_rational->num,*_denominator=_rational->den;
-    mstring* _decimalText=NULL;
+    Mstring* _decimalText=NULL;
     uint64_t repeating=0;
     if(_denominator){
-        Mbiginteger *_digit=new_biginteger(),*_remainder=new_biginteger();
+        Mbiginteger *_digit=__biginteger(),*_remainder=__biginteger();
         if(_digit&&_remainder&&mp_div(_numerator,_denominator,_digit,_remainder)==MP_OKAY){
             // the integer part is _dividend
             _decimalText=_getBigintegerText(_digit);
@@ -230,7 +313,7 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
                 uint64_t remainderIndex,remainderCount=0; // where we found a match
                 long long decimalsLeft=_decimalContext->prec+2; // stop as soon as we have sufficient decimals
                 if(amVerbose())output("Number of decimals to determine: %llu.\n",decimalsLeft);
-                mstring* _digitText; // for storing the dividend digit character
+                Mstring* _digitText; // for storing the dividend digit character
                 MbigintegerListelement* _remainderListelement=NULL;
                 bool failure=false;
                 while(--decimalsLeft>=0){
@@ -272,14 +355,14 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
                     if(!_digitText){outputError("Failed to store the next decimal character");failure=true;break;}
                     string_append(_decimalText,string(_digitText));
                     if(amVerbose())output("Decimal text so far: '%s'.\n",string(_decimalText));
-                    free_mstring(_digitText);
+                    free_string(_digitText);
                     free_biginteger(_digit);
                     // if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
                     if(isBigintegerZero(_remainderListelement->_biginteger)){if(amVerbose())outputLine("Remainder is zero, so the decimal is finished.");break;}
                 }
                 free_biginteger(_bi10);
                 if(_firstRemainderListelement)free_bigintegerListelement(_firstRemainderListelement); // replacing: free_list(_remainderList);
-                if(failure){free_mstring(_decimalText);_decimalText=NULL;}
+                if(failure){free_string(_decimalText);_decimalText=NULL;}
             }
         }
         free_biginteger(_digit);free_biginteger(_remainder);
@@ -290,13 +373,13 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
     if(_decimalText){
         _decimal=_getTextDecimal(string(_decimalText),repeating);
         if(!_decimal)outputError("Failed to parse the decimal text of the corresponding rational");
-        free_mstring(_decimalText);
+        free_string(_decimalText);
     }
     return _decimal;
 }
 
 static mpd_t* d1=NULL;
-const mpd_t* get_mpdOne(){if(!d1)d1=new_mpd(NULL,1);return d1;}
+const mpd_t* get_mpdOne(){if(!d1)d1=__mpd(NULL,1);return d1;}
 bool isDecimalOne(Mdecimal* _decimal){
     // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
     return (_decimal->repeating&&mpd_cmp(_decimal->mpd,get_mpdOne(),_decimalContext)==MP_EQ);
@@ -304,7 +387,7 @@ bool isDecimalOne(Mdecimal* _decimal){
 
 Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
     if(!_decimal)return NULL;
-    Mdecimal* _decimalCopy=new_decimal(_decimalContext,0,_decimal->repeating);
+    Mdecimal* _decimalCopy=__decimal(_decimalContext,0,_decimal->repeating);
     if(_decimalCopy)mpd_copy(_decimalCopy->mpd,_decimal->mpd,_decimalContext);
     return _decimalCopy;
 }
@@ -322,7 +405,7 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 		bool neg=(*rationalText=='-');if(neg)rationalText++; // get the sign
 		// get the e-part (if any)
 		char* exponentText=strchr(rationalText,'e'); // assume lowercase e
-		Mbiginteger* _exponent=new_biginteger();
+		Mbiginteger* _exponent=__biginteger();
 		if(exponentText){
 			*exponentText='\0'; // 'cuf off' the e-part!!!!
 			l=(int)(exponentText-rationalText); // this will be the new l we need below!!!
@@ -343,14 +426,14 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
 			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
 			if(amVerbose())output("With decimal part removed: '%s'.",rationalText);
 			// now ready to check the integer part 
-			Mbiginteger* _numerator=new_biginteger();
+			Mbiginteger* _numerator=__biginteger();
 			Mbiginteger* _denominator=NULL;
 			if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
 				Mbiginteger* _decimalPartBiginteger=NULL;
 				if(decimalPartText){
 					int decimalPartIndex=(int)(decimalPartText-rationalText);
 					decimalPartText++; // point to the first character of the decimal part
-					_decimalPartBiginteger=new_biginteger();
+					_decimalPartBiginteger=__biginteger();
 					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY){
                         if(!isBigintegerZero(_decimalPartBiginteger)){
 						    // compute the power of ten denominator
@@ -411,12 +494,14 @@ Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
     if(!_rational)if(freeonfailure)free(rationalText);
 	return _rational;
 }
+
+mp_int* __mp_int(){return (mp_int*)MALLOC(sizeof(mp_int),'I');}
 // MDH@17JUN2019: convert a decimal (back) to a rational
 Mrational* _getDecimalRational(Mdecimal* _decimal){
     if(!_decimal)return NULL;
     Mrational* _rational=NULL;
     // get the decimal text in fixed point format if it is not repeating, otherwise we always get in in fixed point but then without the closing ]
-    mstring* _decimalString=_getDecimalText(_decimal,_decimal->repeating>0); // replacing: mpd_to_sci(_decimal->mpd,0);
+    Mstring* _decimalString=_getDecimalText(_decimal,_decimal->repeating>0); // replacing: mpd_to_sci(_decimal->mpd,0);
     if(_decimalString){
         char* decimalText=string(_decimalString); // a pointer to the chars array in _decimalString
         if(_decimal->repeating){
@@ -430,7 +515,7 @@ Mrational* _getDecimalRational(Mdecimal* _decimal){
                 *repeatingText='\0'; // we don't need the [ for parsing
                 repeatingText++;
                 // 2. extract the big integer representing the repeating digits (which will be the third part of the numerator)
-                mp_int* _num3=new_mp_int();
+                mp_int* _num3=__mp_int();
                 if(_num3&&mp_read_radix(_num3,repeatingText,10)==MP_OKAY){
                     if(amVerbose())outputBiginteger("\nRepeating digits numerator part: '",_num3,"'.");
                     // now ready to compute _den1 and _den2
@@ -445,7 +530,7 @@ Mrational* _getDecimalRational(Mdecimal* _decimal){
                         if(numberOfNonRepeatingDecimalDigits>0){
                             while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(_den1,_bi10,_den1)!=MP_OKAY){output("WERROR: Failed to multiply the first rational denominator part by 10.");free_biginteger(_den1);_den1=NULL;}
                             if(_den1){
-                                _den=new_mp_int();
+                                _den=__mp_int();
                                 if(mp_mul(_den1,_den2,_den)!=MP_OKAY){free_biginteger(_den);_den=NULL;}else if(amVerbose())outputBiginteger("\nFirst denominator multiplier: '",_den1,"'.");
                                 free_biginteger(_den1);
                             }
@@ -459,13 +544,13 @@ Mrational* _getDecimalRational(Mdecimal* _decimal){
                             mp_int* _num=_getBigintegerCopy(_num3); // initialize _num to the repeating digits integer
                             // add the fixed part of the decimal digits (treated as integer)
                             if(strlen(periodText)){ // something between the period and the repeating digits
-                                mp_int* _num2=new_mp_int();
+                                mp_int* _num2=__mp_int();
                                 if(mp_read_radix(_num2,periodText,10)!=MP_OKAY||mp_mul(_num2,_den2,_num2)!=MP_OKAY||mp_add(_num,_num2,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}else if(amVerbose())outputBiginteger("\nNon-repeating digits numerator part: '",_num2,"'.");
                                 free_biginteger(_num2);
                             }
                             if(_num){ // so far so good
                                 // add the part in front of the period multiplied by _den1 but it could be zero of course
-                                mp_int* _num1=new_mp_int();
+                                mp_int* _num1=__mp_int();
                                 if(mp_read_radix(_num1,decimalText,10)==MP_OKAY){
                                     // of course the integer part could well be zero!!!!
                                     if(!isBigintegerZero(_num1)){
@@ -493,7 +578,7 @@ Mrational* _getDecimalRational(Mdecimal* _decimal){
                 free_biginteger(_num3);
             }else{
                 if(amVerbose())outputDecimal("\nNo decimal digits in decimal '",_decimal,"'.");
-                mp_int* _num=new_mp_int();
+                mp_int* _num=__mp_int();
                 if(mp_read_radix(_num,decimalText,10)==MP_OKAY)
                     _rational=_getRational(_num,NULL,M_LD_NAN,false,true);
                 else
@@ -537,7 +622,7 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
     }
 }
 
-///////mstring* _getBigintegerText(const Mbiginteger* const _biginteger); // prototype declaration
+///////Mstring* _getBigintegerText(const Mbiginteger* const _biginteger); // prototype declaration
 
 /* replacing:
 Mrational* _getLongDoubleRational(long double ld){
@@ -549,14 +634,14 @@ Mrational* _getLongDoubleRational(long double ld){
     // if exponent is all ones, the long double represents a NaN or Inf
     if(exp==0x7FFF){if(amVerbose())output("Can't convert an invalid or infinite real to a rational!");return NULL;}
     // if exponent is all zeroes, the long double represents zero
-    Mbiginteger* _numerator=new_biginteger();
+    Mbiginteger* _numerator=__biginteger();
     if(exp==0)return _getRational(_numerator,NULL,false);
     // set the numerator to the mantisse (which luckily is uint64_t)
     mp_set_u64(_numerator,mantisse);
     exp-=0x403E; // determine the 'true' exponent
     // if the true exponent is negative, the multiplier is below 1 and cannot be used as denominator, instead the numerator should be multiplied by 2 to the power -exp
     if(exp<0){
-        Mbiginteger* _shiftedout=new_biginteger();
+        Mbiginteger* _shiftedout=__biginteger();
         mp_err err=mp_div_2d(_numerator,-exp,_numerator,_shiftedout);
         if(err!=MP_OKAY){
             free_biginteger(_shiftedout);
@@ -565,8 +650,8 @@ Mrational* _getLongDoubleRational(long double ld){
             return NULL;
         }
         // we may assume that what got shifted out fits in an uint64_t
-        uint64_t shiftedout=mp_get_u64(_shiftedout);mstring* _shiftedoutText=_getUint64BinaryText(shiftedout,'\0');output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
-        // replacing: mstring* _shiftedoutText=_getBigintegerText(_shiftedout);output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_mstring(_shiftedoutText);
+        uint64_t shiftedout=mp_get_u64(_shiftedout);Mstring* _shiftedoutText=_getUint64BinaryText(shiftedout,'\0');output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_string(_shiftedoutText);
+        // replacing: Mstring* _shiftedoutText=_getBigintegerText(_shiftedout);output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_string(_shiftedoutText);
         free_biginteger(_shiftedout);
     }
     // make the numerator negative if the long double is negative (this is when bit 15 of the exponent equals 1)
@@ -582,8 +667,8 @@ Mrational* _getLongDoubleRational(long double ld){
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
-void free_string(Mstring* _string){
-    free(_string); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_mstring(_string->_m);_string->_m=NULL;free(_string);}
+void free_text(Mtext* _text){
+    if(_text)free(_text); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
 }
 void free_integer(Minteger* _integer){
     if(_integer){
@@ -591,21 +676,6 @@ void free_integer(Minteger* _integer){
         free(_integer);
     }else
         output("BUG: No integer to free!");
-}
-void free_biginteger(Mbiginteger* _biginteger){
-    if(_biginteger){
-        if(amVerbose())output("Freeing big integer."); // TODO can we display the value?
-        mp_clear(_biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
-    }else
-        output("BUG: No big integer to free!");
-}
-void free_decimal(Mdecimal* _decimal){
-    if(_decimal){
-        if(amVerbose())output("Freeing decimal.");
-        mpd_del(_decimal->mpd); // assuming -> precedes the address of operator
-        FREE(_decimal,'D');
-    }else
-        output("BUG: No decimal to free.");
 }
 void free_real(Mreal* _real){
     if(_real){
@@ -627,13 +697,13 @@ void free_rational(Mrational* _rational){
 // ALLOCATORS (private)
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
-Minteger* new_integer(long long ll){
+Minteger*__integer(long long ll){
     Minteger* _integer=malloc(sizeof(Minteger));
     if(_integer)_integer->ll=ll;
     return _integer;
 }
 /*
-Mbiginteger* new_biginteger(z_t zt){
+Mbiginteger*__biginteger(z_t zt){
     Mbiginteger* _biginteger=malloc(sizeof(Mbiginteger));
     if(_biginteger){
         zset(_biginteger->bi,zt);
@@ -641,18 +711,19 @@ Mbiginteger* new_biginteger(z_t zt){
     return _biginteger;
 }
 */
-Mreal* new_real(long double ld){
-    Mreal* _real=malloc(sizeof(Mreal));
-    if(_real)_real->ld=ld;
-    return _real;
+
+Mreal* _getReal(long double ld){
+    Mreal* real=MALLOC(sizeof(Mreal),'R');if(real)real->ld=ld;return real;
 }
-// Mstring is an immutable version of mstring* in that it cannot be changed
-Mstring* new_string(char* _text){ // _text assumed to be string(mstring*), so we can simply copy it over with the starting quote character (" or ')
-    return (Mstring*)_strdup(_text);
+
+// Mtext is an immutable version of Mstring* in that it cannot be changed
+Mtext* _getText(char* _text){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
+    return (Mtext*)_strdup(_text);
 }
-Mstring* new_charstring(char _char){ // _text assumed to be string(mstring*), so we can simply copy it over with the starting quote character (" or ')
-    mstring* charstring=string_create();string_append_char(charstring,'"');string_append_char(charstring,_char);
-    Mstring* char_string=new_string(string(charstring));
+
+Mtext* _getCharText(char _char){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
+    Mstring* charstring=__string();string_append_char(charstring,'"');string_append_char(charstring,_char);
+    Mtext* char_string=_getText(string(charstring));
     free(charstring);
     return char_string;
 }
@@ -707,34 +778,19 @@ Mvalue* getIntegerValue(Minteger* _integer){
     return NULL;
 }
 
-// mstring* is assumed to start with the same prefix/suffix character
-Mstring* get_string(mstring* s){
-	Mstring* _string=(s?(Mstring*)malloc(sizeof(Mstring)):NULL);
+// Mstring* is assumed to start with the same prefix/suffix character
+Mtext* get_string(Mstring* s){
+	Mtext* _string=(s?(Mtext*)malloc(sizeof(Mtext)):NULL);
 	if(_string){
 		_string->presuffix=string_char(s,0);
-		_string->_m=string_create();
+		_string->_m=__string();
 		if(_string->_m==NULL)return NULL;
 		string_append(_string->_m,string_remainder(s,1)); // NOTE string_remainder might return NULL of course
 	}
 	return _string;
 }
-Mvalue* getStringValue(Mstring* _string){
-    if(_string){
-        Mvalue* _stringValue=calloc(1,sizeof(Mvalue));
-        if(_stringValue){
-            _stringValue->type=VT_STRING;
-            _stringValue->value._string=_string;
-            return _stringValue;
-        }
-    }else
-        printf("\nERROR: No string to wrap!");
-    return NULL;
-}
 // end helper functions
-*/
 
-
-/*
 Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue){
     if(_environment&&name){
         Mvariable* _variable=getVariable(_environment,name,amVerbose());
@@ -777,7 +833,7 @@ bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real){
     }
     return false;
 }
-bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string){
+bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string){
     if(_variable){        
         Mvalue* _stringValue=getStringValue(_string); // wrap in value
         if(_stringValue){
@@ -791,21 +847,21 @@ bool setValueOfStringVariable(Mvariable* _variable,Mstring* _string){
  }
 */
 
-
-
-
-mstring* appendull(mstring* const ms,unsigned long long ll){
+Minteger* _getInteger(long long ll){
+    Minteger* integer=MALLOC(sizeof(Minteger),'i');if(integer)integer->ll=ll;return integer;
+}
+Mstring* appendull(Mstring* const ms,unsigned long long ll){
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
 	return string_append(ms,llText);
 }
 // helper function
-mstring* appendll(mstring* const ms,long long ll){
+Mstring* appendll(Mstring* const ms,long long ll){
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
 	return string_append(ms,llText);
 }
-mstring* appendld(mstring* const ms,long double ld){
+Mstring* appendld(Mstring* const ms,long double ld){
 	char ldText[80];
     // how about using scientific notation here?????
 	snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); //////snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); // replaced f with e to get scientific notation!!
@@ -858,12 +914,12 @@ mstring* appendld(mstring* const ms,long double ld){
 
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
-mstring* _getIntegerText(Minteger* _integer){
-	mstring* s=string_create();
-    mstring* p=s;
+Mstring* _getIntegerText(Minteger* _integer){
+	Mstring* s=__string();
+    Mstring* p=s;
     if(amDebugging())p=string_append_char(p,'i');
 	if(p&&_integer)p=appendll(p,_integer->ll);
-    if(!p){free_mstring(s);s=NULL;}
+    if(!p){free_string(s);s=NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return s;
 }
@@ -885,15 +941,15 @@ long long getInteger(Mvalue* _value){
 */
 
 // BigInteger stuff
-mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
+Mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
     // determine the required size
     int arepsize;
     if(mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())outputError("Can't determine the size of a big integer");return NULL;}
     if(arepsize>0xFFFFFFFF){output("%sCan't store more than %u characters in a string.",ERROR_PREFIX,0xFFFFFFFF);return NULL;}
-    mstring* _rep=string_setlength(string_create(),arepsize);
+    Mstring* _rep=string_setlength(__string(),arepsize);
     if(!_rep){output("%sFailed to create a string to hold %d characters.\n",ERROR_PREFIX,arepsize);return NULL;}
     if(mp_toradix(_biginteger,_rep->chars,10)==MP_OKAY){string_synclength(_rep);return _rep;} // return _rep if we succeed in storing the text representation of a
-    free_mstring(_rep); // get rid of the mstring that we would have returned on success
+    free_string(_rep); // get rid of the Mstring that we would have returned on success
     outputError("Failed to create the text representation of a big integer");
     return NULL;
 }
@@ -934,13 +990,13 @@ void normalizeRational(Mrational* _rational){
     if(!_rational->normalized&&!_rational->den){output("BUG: Normalized flag of rational not set although the denominator equals 1; flag set.");_rational->normalized=true;}
     if(_rational->normalized)return; // apparently already normalized
     // normalization means dividing by the gcd unless the gcd is one
-    Mbiginteger* _gcd=new_biginteger();
+    Mbiginteger* _gcd=__biginteger();
     if(!_gcd){outputError("Can't normalize a rational: failed to create the big integer to store the GCD");return;}
     // ASSERT at the end of the following block always free _gcd
     if(mp_gcd(_rational->num,_rational->den,_gcd)==MP_OKAY){
         if(mp_cmp(_gcd,getBigintegerOne())!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
             // won't do an in-place division as we need both to succeed, if only one does we would be in trouble
-            Mbiginteger *new_num=new_biginteger(),*new_den=new_biginteger();
+            Mbiginteger *new_num=__biginteger(),*new_den=__biginteger();
             if(mp_div(_rational->num,_gcd,new_num,NULL)==MP_OKAY&&mp_div(_rational->den,_gcd,new_den,NULL)==MP_OKAY){
                 free_biginteger(_rational->num);_rational->num=new_num;
                 free_biginteger(_rational->den);_rational->den=new_den;
@@ -968,7 +1024,7 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
         _rational=(Mrational*)calloc(1,sizeof(Mrational));
         if(_rational){
             // TODO what if a delta is defined and the denominator is undefined (i.e. 1)
-            if(!ldIsNaN(delta)&&!ldIsInf(delta)&&!ldIsZero(delta))_rational->delta=new_real(delta); // store the delta if a valid value
+            if(!ldIsNaN(delta)&&!ldIsInf(delta)&&!ldIsZero(delta))_rational->delta=_getReal(delta); // store the delta if a valid value
             // force using a nonnullnumerator, if NULL was provided (typically when inverting a rational)
             Mbiginteger* _nonnullnumerator=(_numerator?_numerator:_getBiginteger(1));
             if(_nonnullnumerator){
@@ -1073,9 +1129,9 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
     if(exp!=0){
         mp_set_u64(a,mantisse);
         if(amVerbose()){
-            mstring* _mantisseBigIntegerText=_getBigintegerText(a);
+            Mstring* _mantisseBigIntegerText=_getBigintegerText(a);
             output("Value after setting the fraction: %s.",string(_mantisseBigIntegerText));
-            free_mstring(_mantisseBigIntegerText);
+            free_string(_mantisseBigIntegerText);
         }
         if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.",exp,mantisse);
         if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
@@ -1087,9 +1143,9 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
             if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
         }
         if(amVerbose()){
-            mstring* _bigIntegerText=_getBigintegerText(a);
+            Mstring* _bigIntegerText=_getBigintegerText(a);
             output("Value after applying the exponent: %s.",string(_bigIntegerText));
-            free_mstring(_bigIntegerText);
+            free_string(_bigIntegerText);
         }
         if(exponent>>15){ // negative
             // take over the sign from the long double (bit 15 in the signandexponent part)
@@ -1217,9 +1273,9 @@ long long double2long(long double ld){
     if(tld<M_LL_MIN||tld>M_LL_MAX)return M_LL_INVALID; // out of range
     return(long long)tld;
 }
-mstring* _getRealText(Mreal* _real){
-	mstring* s=string_create();
-    mstring* p=s;
+Mstring* _getRealText(Mreal* _real){
+	Mstring* s=__string();
+    Mstring* p=s;
     if(amDebugging())p=string_append_char(p,'r');
 	if(p&&_real){
 		switch(fpclassify(_real->ld)){
@@ -1227,35 +1283,35 @@ mstring* _getRealText(Mreal* _real){
 			case FP_INFINITE:p=string_append(p,M_INF);break;
 			default:p=appendld(p,_real->ld);break;
 		}
-        if(!p){free_mstring(s);s=NULL;}
+        if(!p){free_string(s);s=NULL;}
 	}
 	return s;
 }
-mstring* _getStringText(Mstring* _string,bool dequoted){
-	mstring* s=string_create();
-    mstring* p=s;
+Mstring* _getStringText(Mtext* _string,bool dequoted){
+	Mstring* s=__string();
+    Mstring* p=s;
     if(amDebugging())p=string_append_char(p,'s');
     if(p&&_string){
         if(!dequoted)p=string_append_char(p,_string->presuffix);
         p=string_append(p,_string->_c);
         if(!dequoted)p=string_append_char(p,_string->presuffix);
-        if(!p){free_mstring(s);s=NULL;}
+        if(!p){free_string(s);s=NULL;}
     }
 	return s;
 }
 
-mstring* _getRationalText(const Mrational* const _rational){
+Mstring* _getRationalText(const Mrational* const _rational){
     if(_rational){
-        mstring* _rationalText=string_create();
+        Mstring* _rationalText=__string();
         if(_rationalText){
-            mstring* _p=_rationalText;
+            Mstring* _p=_rationalText;
             _p=string_append_char(_p,'(');
-            mstring* _numeratorBigintegerText=_getBigintegerText(_rational->num);
-            if(_numeratorBigintegerText){_p=string_append(_p,string(_numeratorBigintegerText));free_mstring(_numeratorBigintegerText);}
+            Mstring* _numeratorBigintegerText=_getBigintegerText(_rational->num);
+            if(_numeratorBigintegerText){_p=string_append(_p,string(_numeratorBigintegerText));free_string(_numeratorBigintegerText);}
             if(_rational->den){
                 _p=string_append_char(_p,'/');
-                mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
-                if(_denominatorBigintegerText){_p=string_append(_p,string(_denominatorBigintegerText));free_mstring(_denominatorBigintegerText);}
+                Mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
+                if(_denominatorBigintegerText){_p=string_append(_p,string(_denominatorBigintegerText));free_string(_denominatorBigintegerText);}
             }
             _p=string_append_char(_p,')');
             // if a delta is known, append that as well!!!
@@ -1265,20 +1321,20 @@ mstring* _getRationalText(const Mrational* const _rational){
                 _p=appendld(_p,_rational->delta->ld);
             }
             if(_p)return _rationalText;
-            free_mstring(_rationalText);
+            free_string(_rationalText);
         }
     }
     return NULL;
 }
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
-mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
-    mstring* _decimalText=NULL;
+Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
+    Mstring* _decimalText=NULL;
     if(_decimal){
         // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
         // NOTE if _decimal->repeating always use fixed-point notation
         char* _decimalRep=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),_decimalContext);
         if(_decimalRep){
-            _decimalText=new_mstring(_decimalRep);
+            _decimalText=__string(_decimalRep);
             free(_decimalRep);
             // TODO what if the decimal text representation has an e-part?????
             // bracket the repeating part
@@ -1289,13 +1345,13 @@ mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
     return NULL;
 }
 
-/////////////mstring* _UNDEFINED_VALUETEXT=NULL;
+/////////////Mstring* _UNDEFINED_VALUETEXT=NULL;
 // the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
 // we can solve that by returning a new undefined value text instance every time
-mstring* getUndefinedValueText(){
-    return new_mstring(UNDEFINED_VALUETEXT); // just wrapping UNDEFINED_VALUETEXT again...
+Mstring* _getUndefinedValueText(){
+    return _getString(UNDEFINED_VALUETEXT); // just wrapping UNDEFINED_VALUETEXT again...
     /* replacing:
-    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(string_create(),UNDEFINED_VALUETEXT);
+    if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
     return string_copy(_UNDEFINED_VALUETEXT);
     */
 }
@@ -1303,10 +1359,10 @@ mstring* getUndefinedValueText(){
 void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_biginteger){
-        mstring* _bigintegerText=_getBigintegerText(_biginteger);
+        Mstring* _bigintegerText=_getBigintegerText(_biginteger);
         if(_bigintegerText){
             output("%s",string(_bigintegerText));
-            free_mstring(_bigintegerText);
+            free_string(_bigintegerText);
         }else
             output("too large for buffer");
     }else
@@ -1316,10 +1372,10 @@ void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginte
 void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_decimal){
-        mstring* _decimalText=_getDecimalText(_decimal,false);
+        Mstring* _decimalText=_getDecimalText(_decimal,false);
         if(_decimalText){
             output("%s",string(_decimalText));
-            free_mstring(_decimalText);
+            free_string(_decimalText);
         }else
             output("no decimal text representation");
     }else
@@ -1329,10 +1385,10 @@ void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const
 void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_rational){
-        mstring* _rationalText=_getRationalText(_rational);
+        Mstring* _rationalText=_getRationalText(_rational);
         if(_rationalText){
             output("%s",string(_rationalText));
-            free_mstring(_rationalText);
+            free_string(_rationalText);
         }else
             output("no rational text representation");
     }else
@@ -1355,7 +1411,7 @@ bool strIsZero(char* str){
 // NOTE the _ indicates that what is returned has to be freed after being used
 Mbiginteger* _rational2biginteger(Mrational* _rational){
     if(!_rational)return NULL;
-    Mbiginteger* _biginteger=new_biginteger();
+    Mbiginteger* _biginteger=__biginteger();
     if(!_biginteger){outputError("Failed to create a big integer");return NULL;}
     if(_rational->den){
         if(mp_div(_rational->num,_rational->den,_biginteger,NULL)!=MP_OKAY){
@@ -1423,7 +1479,7 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
             }
             if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);}
         }else // long double is zero
-            _rational=_getRational(new_biginteger(),NULL,M_LD_NAN,false,true);
+            _rational=_getRational(__biginteger(),NULL,M_LD_NAN,false,true);
     }
     // _rational should contain the 'last' computed rational
     return _rational;
