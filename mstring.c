@@ -99,6 +99,7 @@ Mstring* string_setlength(Mstring* str,uint32_t length){
         uint32_t blocks=(length/BLOCK_SIZE)+1;
         // if we do not have enough blocks ascertain to have enough...
         if(blocks>str->blocks){
+            /////////printf("Realloc string_setlength().\n");
             char* new_str=realloc(str->chars,BLOCK_SIZE*blocks*sizeof *(str->chars));
             if (!new_str)return NULL; // failure!!
             str->chars=new_str;
@@ -166,6 +167,7 @@ Mstring* string_insert_char(Mstring* str,uint32_t pos,char c){
                 ////////printf("{%hu-%d}",l,str->blocks);
                 // do we need to get another block?    
                 if(l==str->blocks*BLOCK_SIZE){
+                    /////////printf("Realloc string_insert_char().\n");
                     char *new_str=realloc(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars));
                     if (new_str==NULL)return NULL;
                     ++(str->blocks);
@@ -195,6 +197,7 @@ Mstring* string_append_char(Mstring* str,char c){
         uint32_t l=str->length+1;
         /////printf("{%hu-%d}",l,str->blocks);
         if(l==str->blocks*BLOCK_SIZE){
+            //////////////printf("Realloc string_append_char().\n");
             char *new_str=realloc(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars));
             if (new_str==NULL)return NULL; // failure!!
             ++(str->blocks);

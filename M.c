@@ -1009,7 +1009,7 @@ Mrational* _getRationalCopy(Mrational* _rational){
 Mrational* _getValueRational(Mvalue* _value){
 	Mrational* _rational=NULL;
 	if(_value){
-		if(amVerbose())outputValue("\nExtracting the rational from '",_value,"'.");
+		if(amVerbose())outputValue("Extracting the rational from '",_value,"'.\n");
 		switch(_value->type){
 			case VT_INTEGER:
 			case VT_BIGINTEGER:
@@ -1467,7 +1467,7 @@ void prompt(){
 void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
-	output("\n\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
+	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
 	prompt();
 }
 
@@ -4061,7 +4061,7 @@ int main(int argc, char **argv){
 
 	outputLine("");
 	outputLine("Use Ctrl-Z to exit M immediately at any time.");
-	output("In any mode press the Enter key on an empty line to switch modes.");
+	outputLine("In any mode press the Enter key on an empty line to switch modes.");
 
 	// let's mark the allocations BEFORE we start looping
 	addallocationtype('!');
@@ -4490,14 +4490,14 @@ int main(int argc, char **argv){
 				// if we succeeded in evaluating a command we should register it
 				if(pCommandToEvaluate){ // technically something to evaluate
 					size_t mark=allocationmark();
-					output("Mark: %zu.\n",mark);
+					if(amVerbose())output("Mark: %zu.\n",mark);
 					bool commandEvaluated=evaluateCommand();
 					outputChar('\n');
 					if(mark>0){
-						output("Left after unmarking: %zu.\n",unmarkallocation(mark));
+						if(amVerbose())output("Left after unmarking: %zu.\n",unmarkallocation(mark));
 						allocationreport(1); //syncallocations(); // will also do allocationreport(1)
 					}else
-						outputLine("No allocations to unmark.");
+					if(amVerbose())outputLine("No allocations to unmark.");
 					if(!commandEvaluated){
 						Mstring* commandText=_getCommandText(false);
 						if(!string_length(commandText)){
