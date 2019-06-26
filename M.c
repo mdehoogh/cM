@@ -1025,7 +1025,7 @@ Mrational* _getValueRational(Mvalue* _value){
 				*/
 				break;
 			case VT_TEXT:
-				_rational=_getDecimalTextRational(_value->value._text->_c,false);
+				_rational=_getDecimalTextRational(_value->value._text->_c);
 				break;
 			case VT_RATIONAL:
 				_rational=_getRationalCopy(_value->value._rational); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
@@ -2094,15 +2094,15 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
  */
 
 /**
- * get_valuereference() wraps a single Mvalue instance
+ * \brief wraps \p _value
+ * \param _value the Mvalue to wrap
  */
-Mvaluereference* get_valuereference(Mvalue* _value){
+Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("\nWrapping value '",_value,"'.");
-	Mvaluereference* _valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
-	assignValue(&_valueReference->_value,_value);
-	////////////////////incrementReferenceCount(_valueReference->_value); // TODO is this correct???
-	if(amVerbose())outputValue("\nValue '",_value,"' wrapped in value reference.");
-	return _valueReference;
+	Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+	assignValue(&_valuereference->_value,_value);
+	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
+	return _valuereference;
 }
 void free_valuereference(Mvaluereference* _valuereference){
 	if(_valuereference){
@@ -2371,15 +2371,16 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
-					Mstring* _realText=__string(string(expressionToken->text)); // the integer part
+					Mstring* _realText=_getString(string(expressionToken->text)); // the integer part
 					expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
 					Mstring* pRealText=_realText;
 					if(pRealText){
+						if(amVerbose())output("Integer part of decimal text: '%s'.\n",string(pRealText));
 						pRealText=string_append(pRealText,string(expressionToken->text));
 						if(amDebugging())outputLine("Fractional part appended!");
 						if(string_length(expressionToken->text)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
-						if(amDebugging())outputLine("Fractional part corrected!");
+						if(amVerbose())output("Parsing '%s' to a decimal.\n",string(pRealText));
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
 						//                the problem is that we need a context, and therefore a decimal precision 
 						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
@@ -2433,13 +2434,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST: // a list literal
-				_valueReference=get_valuereference(getValueOfList(TT_END_OF_LIST,0));
+				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0));
 				break;
 			case TT_MAP: // a map literal
 			{	
 				Mvalue* _mapValue=getValueOfMap();
 				if(amVerbose())outputValue("Map extracted: '",_mapValue,"'.\n");
-				_valueReference=get_valuereference(_mapValue);
+				_valueReference=_getValuereference(_mapValue);
 				break;
 			}
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
@@ -2449,9 +2450,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// well, actually, we need the first element of the list that is returned!!!
 				// use only the first element if the list only has one element, otherwise use the list itself
 				if(_expressionListValue->value._list->numberOfElements==1){
-					_valueReference=get_valuereference(_expressionListValue->value._list->_first->_value);
+					_valueReference=_getValuereference(_expressionListValue->value._list->_first->_value);
 				}else
-					_valueReference=get_valuereference(_expressionListValue);
+					_valueReference=_getValuereference(_expressionListValue);
 				if(amVerbose())outputLine("Extracted list wrapped!");
 				break;
 			}

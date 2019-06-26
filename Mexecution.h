@@ -187,7 +187,7 @@ bool isDecimalOne(Mdecimal* _decimal);
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 long double getRationalLongDouble(const Mrational* const _rational);
 
-Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure); 
+Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/); 
 // used by:
 Mrational* _getDecimalRational(Mdecimal* _decimal);
 

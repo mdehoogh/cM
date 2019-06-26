@@ -391,122 +391,134 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
     return _decimal;
 }/* VALIDATED */
 
-static mpd_t* d1=NULL;
-const mpd_t* get_mpdOne(){if(!d1)d1=__mpd(NULL,1);return d1;}
+static mpd_t* decimalOne=NULL;
+// getDecimalOne() return a decimal but this is a decimal that should never be freed
+const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(NULL,1);return decimalOne;}/* VALIDATED */
 bool isDecimalOne(Mdecimal* _decimal){
     // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
-    return (_decimal->repeating&&mpd_cmp(_decimal->mpd,get_mpdOne(),_decimalContext)==MP_EQ);
-}
+    return (_decimal->repeating&&mpd_cmp(_decimal->mpd,getDecimalOne(),_decimalContext)==MP_EQ);
+}/* VALIDATED */
 
+/**
+ * \brief returns a copy of \p _decimal
+ * \param _decimal the decimal to copy
+ * \return a copy of \p _decimal on success, or NULL otherwise
+ */
 Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
     if(!_decimal)return NULL;
     Mdecimal* _decimalCopy=__decimal(_decimalContext,0,_decimal->repeating);
-    if(_decimalCopy)mpd_copy(_decimalCopy->mpd,_decimal->mpd,_decimalContext);
+    if(_decimalCopy){
+        _decimalCopy->mpd=NULL; // TODO check if __decimal uses calloc or malloc
+        mpd_copy(_decimalCopy->mpd,_decimal->mpd,_decimalContext); // copy attempt
+        if(!_decimalCopy->mpd){free_decimal(_decimalCopy);_decimalCopy=NULL;} // on failure, release the decimal
+    }else
+        outputError("Failed to copy a decimal");
     return _decimalCopy;
-}
+}/* VALIDATED */
 
 // MDH@07JUN2019: we are going to store real text representations (like 100.1) as rationals from now on with delta equal to 0 (so we know where they came from, and that the denominator is a power of 10)
 //                because if we convert them to a long double we might loose precision in converting the decimal representation to the binary (internal) representation
 // MDH@14JUN2019: now also possible that the text has an e-part (which will change the denominator!!!!)
-Mrational* _getDecimalTextRational(char* rationalText,bool freeonfailure){
+// MDH@26JUN2019: decimalText is adjusted in the process, so freeonfailure is ommitted as that would complicate matters significantly NOTE that it's pass by value so even if decimalText pointer is adjusted locally, the variable itself is not adjusted 
+Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 	// the text should represent an integer or a real
-	if(!rationalText)return NULL;
-    if(amVerbose())output("Converting '%s' to a rational.",rationalText);
-	Mrational* _rational=NULL;
-	int l=strlen(rationalText);
-	if(l){
-		bool neg=(*rationalText=='-');if(neg)rationalText++; // get the sign
+	if(!decimalText)return NULL;
+    if(amVerbose())output("Converting decimal text '%s' to a rational.",decimalText);
+	Mrational* rational=NULL; // where the result is stored!!!
+	int l=strlen(decimalText); // NOT needed, only used once
+	if(l>0){
+		bool neg=(*decimalText=='-');if(neg)decimalText++; // get the sign
 		// get the e-part (if any)
-		char* exponentText=strchr(rationalText,'e'); // assume lowercase e
-		Mbiginteger* _exponent=__biginteger();
+		char* exponentText=strchr(decimalText,'e'); // assume lowercase e
+		Mbiginteger* _exponent=NULL;
 		if(exponentText){
 			*exponentText='\0'; // 'cuf off' the e-part!!!!
-			l=(int)(exponentText-rationalText); // this will be the new l we need below!!!
-			if(amVerbose())output("With exponent removed: '%s'.",rationalText);
+			l=(int)(exponentText-decimalText); // this will be the new l we need below!!!
+			if(amVerbose())output("Decimal text with exponent removed: '%s'.",decimalText);
 			exponentText++; // point to the first character of the exponent
+            _exponent=__biginteger(); // need it before calling mp_read_radix()
 			if(mp_read_radix(_exponent,exponentText,10)!=MP_OKAY){
-				output("%sFailed to extract the exponent its text representation '%s'.\n",ERROR_PREFIX,exponentText);
+				output("%sFailed to extract the exponent from its text representation '%s'.\n",ERROR_PREFIX,exponentText);
 				free_biginteger(_exponent);
 				_exponent=NULL;
 			}else
-			//if(amVerbose())
-				outputBiginteger("\nExponent '",_exponent,"'.");
+			if(amVerbose())outputBiginteger("Exponent '",_exponent,"'.\n");
 		}
 		if(!exponentText||_exponent){ // either we do not have an exponentText or we have an exponent big integer (to apply later on)
 			// TODO if we would just have an eval to get the value out of the token text
-			char* decimalPartText=strchr(rationalText,'.');
+			char* decimalPartText=strchr(decimalText,'.');
 			int decimalPartIndex=0;
 			if(decimalPartText)*decimalPartText='\0'; // 'cut off' the decimal part (for now)
-			if(amVerbose())output("With decimal part removed: '%s'.",rationalText);
+			if(amVerbose())output("With decimal part removed: '%s'.",decimalText);
 			// now ready to check the integer part 
-			Mbiginteger* _numerator=__biginteger();
-			Mbiginteger* _denominator=NULL;
-			if(mp_read_radix(_numerator,rationalText,10)==MP_OKAY){ // apparently a valid (big) integer
-				Mbiginteger* _decimalPartBiginteger=NULL;
+			Mbiginteger *_numerator=__biginteger(),*_denominator=NULL; // two big integers to free if unbound!!
+			if(mp_read_radix(_numerator,decimalText,10)==MP_OKAY){ // apparently a valid (big) integer
+				Mbiginteger* _decimalPartBiginteger=NULL; // freeable...
 				if(decimalPartText){
-					int decimalPartIndex=(int)(decimalPartText-rationalText);
+					int decimalPartIndex=(int)(decimalPartText-decimalText);
 					decimalPartText++; // point to the first character of the decimal part
 					_decimalPartBiginteger=__biginteger();
-					if(mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY){
+					if(_decimalPartBiginteger&&mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY){
                         if(!isBigintegerZero(_decimalPartBiginteger)){
 						    // compute the power of ten denominator
-						    _denominator=_getBiginteger(1);
-						    Mbiginteger* _tenBiginteger=_getBiginteger(10);
-						    while(++decimalPartIndex<l)if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;break;}
-						    free_biginteger(_tenBiginteger);
+						    Mbiginteger* _bi10=_getBiginteger(10); // must be freed (see three lines down)
+                            if(_bi10){
+                                // make a denominator, and keep multiplying by 10, but if something goes wrong free and NULL it again to indicate an error
+    						    _denominator=_getBiginteger(1);
+	    					    while(++decimalPartIndex<l){if(!_denominator)break;if(mp_mul(_denominator,_bi10,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;}}
+		    				    free_biginteger(_bi10);
+                            }
+        					if(amVerbose())if(_denominator)outputBiginteger("Denominator: '",_denominator,"'.\n");
                         }else // the decimal part is zero therefore we do not officially have a decimal part (but we do want the associated rational even with _denominator NULL)
                             decimalPartText=NULL;
+    					if(amVerbose())outputBiginteger("Decimal part integer: '",_decimalPartBiginteger,"'.\n");
 					}
-					if(amVerbose())outputBiginteger("\nDecimal part integer: '",_decimalPartBiginteger,"'.");
-					if(amVerbose())if(_denominator)outputBiginteger("\nDenominator: '",_denominator,"'.");
 				}
 				// if we have a decimalPartText we need a denominator
 				if(!decimalPartText||_denominator){
 					// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
 					// NOTE do NOT free the numerator and denominator in the call to _getRational, as we free them if _rational ends of being NULL afterwards
 					if(!_denominator||(mp_mul(_numerator,_denominator,_numerator)==MP_OKAY&&mp_add(_numerator,_decimalPartBiginteger,_numerator)==MP_OKAY)){
-						if(amVerbose())outputBiginteger("\nNumerator before applying the exponent: '",_numerator,"'.");
-						if(amVerbose())if(_denominator)outputBiginteger("\nDenominator before applying the exponent: '",_denominator,"'.");
+						if(amVerbose())outputBiginteger("Numerator before applying the exponent: '",_numerator,"'.\n");
+						if(amVerbose())if(_denominator)outputBiginteger("Denominator before applying the exponent: '",_denominator,"'.\n");
 						// if we have an non-zero exponent, we have to adjust the numerator or denominator BEFORE trying to create the rational!!!
 						if(exponentText&&mp_iszero(_exponent)==MP_NO){
-							Mbiginteger* _tenBiginteger=_getBiginteger(10);
-							if(_tenBiginteger){
+							Mbiginteger* _bi10=_getBiginteger(10);
+							if(_bi10){
 								if(mp_isneg(_exponent)==MP_YES){ // a negative exponent goes into the denominator
 									if(!_denominator)_denominator=_getBiginteger(1);
 									if(_denominator){
 										while(mp_iszero(_exponent)==MP_NO){
-											if(mp_mul(_denominator,_tenBiginteger,_denominator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+											if(mp_mul(_denominator,_bi10,_denominator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
 											if(mp_incr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
 										}
 									}else{free_biginteger(_exponent);_exponent=NULL;}
 								}else{ // a positive exponent goes into the numerator
 									while(mp_iszero(_exponent)==MP_NO){
-										if(mp_mul(_numerator,_tenBiginteger,_numerator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+										if(mp_mul(_numerator,_bi10,_numerator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
 										if(mp_decr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
 									}
 								}
-								free_biginteger(_tenBiginteger);
+								free_biginteger(_bi10);
 							}else{free_biginteger(_exponent);_exponent=NULL;}
 						}
 						// check again whether we still have an exponent (when we should)
 						if(!exponentText||_exponent)
                             if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)
-                                _rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
+                                rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
 					}
 				}
-                if(_decimalPartBiginteger)free_biginteger(_decimalPartBiginteger);
+                free_biginteger(_decimalPartBiginteger);
 			}else
-				output("%sInteger part of rational text '%s' invalid.\n",ERROR_PREFIX,rationalText);
+				output("%sInteger part of rational text '%s' invalid.\n",ERROR_PREFIX,decimalText);
 			// if we haven't got a rational that binded _numerator and _denominator free both of them
-			if(!_rational){
-                free_biginteger(_numerator);
-                if(_denominator)free_biginteger(_denominator);
-             }
+			if(!rational){free_biginteger(_numerator);free_biginteger(_denominator);}
 		}
+        free_biginteger(_exponent); // if it's still around, release _exponent
 	}
-    if(!_rational)if(freeonfailure)free(rationalText);
-	return _rational;
-}
+    ///////////////////////if(!rational)if(freeonfailure)free(rationalText);
+	return rational;
+}/* VALIDATED */
 
 /////////mp_int* __mp_int(){return (mp_int*)MALLOC(sizeof(mp_int),'I');}
 // MDH@17JUN2019: convert a decimal (back) to a rational
@@ -592,15 +604,15 @@ Mrational* _getDecimalRational(Mdecimal* decimal){
                     free_biginteger(_den2);
                     free_biginteger(_den1);
                 }else{
-                    if(amVerbose())outputDecimal("No decimal digits in decimal '",decimal,"'.\n");
+                    if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
                     Mbiginteger* _num=__biginteger();
-                    if(_num&&mp_read_radix(_num,decimalText,10)==MP_OKAY)
-                        rational=_getRational(_num,NULL,M_LD_NAN,false,true);
-                    else
-                        free_biginteger(_num);
+                    if(_num){
+                        if(mp_read_radix(_num,decimalText,10)==MP_OKAY)rational=_getRational(_num,NULL,M_LD_NAN,false,false);
+                        if(!rational)free_biginteger(_num); // if no rational _num is unbound and must be freed
+                    }
                 }
             }else // we can go through the text????
-                rational=_getDecimalTextRational(decimalText,false);
+                rational=_getDecimalTextRational(decimalText);
             free_string(_decimalText); // OOPS use free_string() not free()!
         }else
             outputError("Failed to convert the decimal to text");
@@ -637,7 +649,7 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
         *mantisse=bELDU.bELD.mantisse;
         *exponent=bELDU.bELD.exponent;
     }
-}
+}/* VALIDATED */
 
 ///////Mstring* _getBigintegerText(const Mbiginteger* const _biginteger); // prototype declaration
 
@@ -685,22 +697,25 @@ Mrational* _getLongDoubleRational(long double ld){
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
 void free_text(Mtext* _text){
-    if(_text)free(_text); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
-}
+    if(_text){
+        free(_text); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
+    }else
+    if(amDebugging())outputLine("No text to free!");
+}/* VALIDATED */
 void free_integer(Minteger* _integer){
     if(_integer){
-        if(amVerbose())output("Freeing integer %llu.",_integer->ll);
+        if(amVerbose())output("Freeing integer %llu.\n",_integer->ll);
         free(_integer);
     }else
-        output("BUG: No integer to free!");
-}
+    if(amDebugging())outputLine("No integer to free!");
+}/* VALIDATED */
 void free_real(Mreal* _real){
     if(_real){
-        if(amVerbose())output("Freeing real %.*Lf.",23,_real->ld);
+        if(amVerbose())output("Freeing real %.*Lf.\n",DBL_DIG,_real->ld);
         free(_real);
     }else
-        output("BUG: No real to free!");
-}
+    if(amDebugging())outputLine("No real to free!");
+}/* VALIDATED */
 void free_rational(Mrational* _rational){
     if(_rational){
         if(_rational->num)free_biginteger(_rational->num);
@@ -708,17 +723,17 @@ void free_rational(Mrational* _rational){
         if(_rational->delta)free_real(_rational->delta);
         free(_rational);
     }else
-        output("No rational to free!");
-}
+    if(amDebugging())outputLine("No rational to free!");
+}/* VALIDATED */
 
 // ALLOCATORS (private)
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
-Minteger*__integer(long long ll){
-    Minteger* _integer=malloc(sizeof(Minteger));
+Minteger* _getInteger(long long ll){
+    Minteger* _integer=MALLOC(sizeof(Minteger),'i');
     if(_integer)_integer->ll=ll;
     return _integer;
-}
+}/* VALIDATED */
 /*
 Mbiginteger*__biginteger(z_t zt){
     Mbiginteger* _biginteger=malloc(sizeof(Mbiginteger));
@@ -730,20 +745,25 @@ Mbiginteger*__biginteger(z_t zt){
 */
 
 Mreal* _getReal(long double ld){
-    Mreal* real=MALLOC(sizeof(Mreal),'R');if(real)real->ld=ld;return real;
-}
+    Mreal* _real=MALLOC(sizeof(Mreal),'R');
+    if(_real)_real->ld=ld;
+    return _real;
+}/* VALIDATED */
 
 // Mtext is an immutable version of Mstring* in that it cannot be changed
 Mtext* _getText(char* _text){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
     return (Mtext*)_strdup(_text);
-}
+}/* VALIDATED */
 
-Mtext* _getCharText(char _char){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
-    Mstring* charstring=__string();string_append_char(charstring,'"');string_append_char(charstring,_char);
-    Mtext* char_string=_getText(string(charstring));
-    free(charstring);
-    return char_string;
-}
+Mtext* _getCharText(char c){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
+    Mtext* _charText=NULL;
+    Mstring* _charString=_getString("\"");
+    if(_charString){
+        if(string_append_char(_charString,c))_charText=_getText(string(_charString));
+        free_string(_charString);
+    }
+    return _charText;
+}/* VALIDATED */
 /*
 void free_list(Mlist* _list);
 void free_variable(Mvariable* _variable);
@@ -863,10 +883,11 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string){
    return false;
  }
 */
-
+/*
 Minteger* _getInteger(long long ll){
     Minteger* integer=MALLOC(sizeof(Minteger),'i');if(integer)integer->ll=ll;return integer;
 }
+*/
 Mstring* appendull(Mstring* const ms,unsigned long long ll){
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
@@ -1057,17 +1078,17 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
                 */
                 _rational->normalized=(!_rational->den||!_rational->num); // if either numerator or denominator is NULL assume normalized!!!
                 if(amVerbose())
-                outputRational("\nRational before normalization: ",_rational,".");
+                outputRational("Rational before normalization: ",_rational,".\n");
                 if(normalize&&!_rational->normalized){
                     normalizeRational(_rational); // normalize the rational if we are supposed to
-                    if(_denominator&&!_rational->normalized)output("WARNING: Failed to normalize a rational number.");
+                    if(_denominator&&!_rational->normalized)output("WARNING: Failed to normalize a rational number.\n");
                     if(amVerbose())
-                    outputRational("\nRational after normalization: ",_rational,".");
+                    outputRational("Rational after normalization: ",_rational,".\n");
                 }
                 ///////// AS LONG AS WE FREE THE RATIONAL IN THE ELSE PART NO NEED TO DO: return _rational; // return whether normalized or not
             }else{
                 free_rational(_rational);_rational=NULL;
-                if(amVerbose())output("WARNING: Undefined rational numerator.");
+                if(amVerbose())output("WARNING: Undefined rational numerator.\n");
             }
             // NOTE if we get here we failed to create the big integer 1 to use as numerator!!!
         }
