@@ -26,7 +26,7 @@ Mstring* __string(){
     return ans;
 }
 
-Mstring* _getString(char* s){
+Mstring* _getString(const char* const s){
     if(!s)return NULL;
     Mstring* ans=CALLOC(1,sizeof *ans,'s');
     if(ans){
@@ -37,10 +37,10 @@ Mstring* _getString(char* s){
         if(ans->chars){
             //////////////strcpy(ans->chars,s);ans->length=l; // also copies the ending '\0' over but memcpy() does not have to check for '\0' so we use memcpy()
             ans->length=l; // MDH@21JUN2019: no need to copy '\0' at the end!!! replacing: ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
-            memcpy(ans->chars,s,l); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
-        }else{
+            memcpy(ans->chars,s,ans->length); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
+        }else{ // failure
             FREE(ans,'s');ans=NULL;
-        } // failure
+        }
     }
 #ifdef __DEBUGGING__
     if(!ans)printf("\nFailed to create a string.");
@@ -49,7 +49,7 @@ Mstring* _getString(char* s){
 }
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
-Mstring* _stringCopy(Mstring* src){
+Mstring* _stringCopy(Mstring* const src){
     if(!src)return NULL;
     src->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
     return _getString(src->chars);
@@ -79,7 +79,7 @@ Mstring* _stringCopy(Mstring* src){
 void free_string(Mstring* str){if(str){if(str->chars)FREE(str->chars,'c');FREE(str,'s');}}
 
 /** Is the String empty? */
-bool string_empty(Mstring *str){
+bool string_empty(const Mstring* const str){
     return(!str||!str->length); // MDH@21JUN2019 replacing: chars[0]=='\0'); // MDH@25APR2019: checking the first character probably is easiest
     /* replacing:
     if(str==NULL)return true;
@@ -88,11 +88,11 @@ bool string_empty(Mstring *str){
     */
 }
 
-uint32_t string_length(Mstring* str){
+uint32_t string_length(const Mstring* const str){
     return(str==NULL?0:str->length);
 }
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
-Mstring* string_setlength(Mstring* str,uint32_t length){
+Mstring* string_setlength(Mstring* const str,uint32_t length){
     if(!str)return NULL;
     if(length>str->length){ // we're supposed to increment the length
         // how many blocks do we need
@@ -115,14 +115,14 @@ Mstring* string_setlength(Mstring* str,uint32_t length){
     }
     return str;
 }
-void string_synclength(Mstring* str){
+void string_synclength(Mstring* const str){
     if(!str)return;
     uint32_t l=str->length;
     while(l>0)if(str->chars[--l]=='\0')break;
     str->length=l;
 }
 
-bool string_shorten(Mstring* str,uint32_t length){
+bool string_shorten(Mstring* const str,uint32_t length){
     if(!str)return false;
     if(length>str->length)return false;
     str->length-=length;
@@ -130,15 +130,15 @@ bool string_shorten(Mstring* str,uint32_t length){
     return true;
 }
 
-char string_char(Mstring* str,uint32_t pos){
+char string_char(const Mstring* const str,uint32_t pos){
     return(str!=NULL?(pos<str->length?str->chars[pos]:'\0'):'\0');
 }
 
-char string_last_char(Mstring *str){
+char string_last_char(const Mstring* const str){
     return(str!=NULL?(str->length>0?str->chars[str->length-1]:'\0'):'\0');
 }
 
-char string_removed_char(Mstring* str,uint32_t pos){
+char string_removed_char(Mstring* const str,uint32_t pos){
     char rc='\0';
     if(str!=NULL){
         uint32_t l=str->length;
@@ -158,7 +158,7 @@ char string_removed_char(Mstring* str,uint32_t pos){
  * insert char c at position pos in the given string 
  * NOTE: returns NULL on failure, @str otherwise 
  */
-Mstring* string_insert_char(Mstring* str,uint32_t pos,char c){
+Mstring* string_insert_char(Mstring* const str,uint32_t pos,char c){
     if(str!=NULL){
         uint32_t l=str->length+1; // the 'length' of the text plus 1
         // pos should never be larger than l
@@ -192,7 +192,7 @@ Mstring* string_insert_char(Mstring* str,uint32_t pos,char c){
  * Add a character to the end of the String 
  * NOTE: returns NULL on failure
  */
-Mstring* string_append_char(Mstring* str,char c){
+Mstring* string_append_char(Mstring* const str,char c){
     if(str!=NULL){
         uint32_t l=str->length+1;
         /////printf("{%hu-%d}",l,str->blocks);
@@ -213,7 +213,7 @@ Mstring* string_append_char(Mstring* str,char c){
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array
-Mstring* string_append(Mstring* str,const char* pc){
+Mstring* string_append(Mstring* const str,const char* pc){
     if(str!=NULL&&pc!=NULL){ // something to append
         char c;
         uint32_t index=0;
@@ -223,7 +223,7 @@ Mstring* string_append(Mstring* str,const char* pc){
     return str;
 }
 
-char* string_remainder(Mstring* str,uint32_t firstpos){
+char* string_remainder(Mstring* const str,uint32_t firstpos){
     if(!str)return NULL;
     if(!firstpos)return string(str);
     if(firstpos>str->length)return NULL;
@@ -235,7 +235,7 @@ char* string_remainder(Mstring* str,uint32_t firstpos){
  * Get a C-String with the proper null-terminator 
  * NOTE: returning the pointer to the characters stored in the Mstring (which is str->chars)
 */
-char* string(Mstring* str){
+char* string(Mstring* const str){
     if(!str)return NULL;
     str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
     return str->chars;
@@ -243,7 +243,7 @@ char* string(Mstring* str){
 }
 
 /** Get where the first occurrence of a character in the String is */
-int32_t string_find(Mstring *str,char c){
+int32_t string_find(const Mstring* const str,char c){
     if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
         int32_t pos=0;
@@ -257,7 +257,7 @@ int32_t string_find(Mstring *str,char c){
     return -1;
 }
 
-void string_reverse(Mstring* str){
+void string_reverse(Mstring* const str){
     if(!str)return;
     uint32_t l=str->length;
     if(!l)return;

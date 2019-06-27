@@ -165,7 +165,7 @@ bool isBigintegerOne(Mbiginteger* _biginteger);
 // big integer conversions
 mp_err mp_set_long_double(Mbiginteger *a, long double b); // MDH@01MAY2019: which I made myself
 long double mp_get_long_double(const Mbiginteger* const a); // MDH@07JUN2019: same here
-long long biginteger2long(Mbiginteger* _biginteger);
+long long biginteger2long(const Mbiginteger* const _biginteger);
 mp_err mp_set_longdouble(Mbiginteger *a, long double b);
 const Mbiginteger* getBigintegerOne();
 const Mbiginteger* getBigintegerTwo();

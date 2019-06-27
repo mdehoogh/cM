@@ -18,33 +18,33 @@ void free_string(Mstring* str); // changed from string_dispose() to free_mstring
 
 // functions that create new string instances (and therefore start with _)
 Mstring* __string();
-Mstring* _getString(char* s); // convenient constructor
+Mstring* _getString(const char* const s); // convenient constructor
 // copying
-Mstring* _stringCopy(Mstring* src);
+Mstring* _stringCopy(Mstring* const src);
 
-bool string_empty(Mstring* str);
-uint32_t string_length(Mstring* str);
-Mstring* string_setlength(Mstring* str, uint32_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
-void string_synclength(Mstring* str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
+bool string_empty(const Mstring* const str);
+uint32_t string_length(const Mstring* const str);
+Mstring* string_setlength(Mstring* const str, uint32_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
+void string_synclength(Mstring* const str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
 
-char string_char(Mstring* str,uint32_t pos);
-char string_last_char(Mstring* str);
+char string_char(const Mstring* const str,uint32_t pos);
+char string_last_char(const Mstring* const str);
 
-char* string_remainder(Mstring* str,uint32_t pos);
-char* string(Mstring* str);
-bool string_shorten(Mstring* str,uint32_t length);
+char* string_remainder(Mstring* const str,uint32_t pos);
+char* string(Mstring* const str);
+bool string_shorten(Mstring* const str,uint32_t length);
 
-int32_t string_find(Mstring* str,char c);
+int32_t string_find(const Mstring* const str,char c);
 
 // changing the string
-char string_removed_char(Mstring* str,uint32_t pos);
+char string_removed_char(Mstring* const str,uint32_t pos);
 
-Mstring* string_insert_char(Mstring* str,uint32_t pos,char c);
-Mstring* string_append_char(Mstring* str,char c);
+Mstring* string_insert_char(Mstring* const str,uint32_t pos,char c);
+Mstring* string_append_char(Mstring* const str,char c);
 
 // MDH@26FEB2019: can we append a text as a whole???
-Mstring* string_append(Mstring* str,const char* pc);
+Mstring* string_append(Mstring* const str,const char* pc);
 
-void string_reverse(Mstring* str);
+void string_reverse(Mstring* const str);
 
 #endif /* __MSTRING_H__ */

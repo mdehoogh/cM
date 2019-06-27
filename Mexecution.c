@@ -711,7 +711,7 @@ void free_integer(Minteger* _integer){
 }/* VALIDATED */
 void free_real(Mreal* _real){
     if(_real){
-        if(amVerbose())output("Freeing real %.*Lf.\n",DBL_DIG,_real->ld);
+        if(amVerbose())output("Freeing real %.*Lf.\n",LDBL_DIG,_real->ld);
         free(_real);
     }else
     if(amDebugging())outputLine("No real to free!");
@@ -888,17 +888,18 @@ Minteger* _getInteger(long long ll){
     Minteger* integer=MALLOC(sizeof(Minteger),'i');if(integer)integer->ll=ll;return integer;
 }
 */
+
 Mstring* appendull(Mstring* const ms,unsigned long long ll){
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
 	return string_append(ms,llText);
-}
+}/* VALIDATED */
 // helper function
 Mstring* appendll(Mstring* const ms,long long ll){
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
 	return string_append(ms,llText);
-}
+}/* VALIDATED */
 Mstring* appendld(Mstring* const ms,long double ld){
 	char ldText[80];
     // how about using scientific notation here?????
@@ -948,19 +949,21 @@ Mstring* appendld(Mstring* const ms,long double ld){
 	if(!string_append(ms,ldText))return NULL;
     if(exponent!=0)if(!string_append_char(ms,'e')||!appendll(ms,exponent))return NULL; // append the exponent
     return ms;
-}
+}/* VALIDATED */
 
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getIntegerText(Minteger* _integer){
-	Mstring* s=__string();
-    Mstring* p=s;
-    if(amDebugging())p=string_append_char(p,'i');
-	if(p&&_integer)p=appendll(p,_integer->ll);
-    if(!p){free_string(s);s=NULL;}
+	Mstring* _s=__string();
+    if(_s){
+        Mstring* _p=_s;
+        if(amDebugging())_p=string_append_char(_p,'i');
+	    if(_p&&_integer)_p=appendll(_p,_integer->ll);
+        if(!_p){free_string(_s);_s=NULL;}
+    }
 	////////if(amVerbose())output("Integer '%s'.",string(s));
-	return s;
-}
+	return _s;
+}/* VALIDATED */
 /* replaced by getValueInteger()
 long long getInteger(Mvalue* _value){
     if(_value)
@@ -982,20 +985,23 @@ long long getInteger(Mvalue* _value){
 Mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
     // determine the required size
     int arepsize;
-    if(mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())outputError("Can't determine the size of a big integer");return NULL;}
+    if(!_biginteger||mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())outputError("Couldn't determine the size of a big integer");return NULL;}
     if(arepsize>0xFFFFFFFF){output("%sCan't store more than %u characters in a string.",ERROR_PREFIX,0xFFFFFFFF);return NULL;}
-    Mstring* _rep=string_setlength(__string(),arepsize);
-    if(!_rep){output("%sFailed to create a string to hold %d characters.\n",ERROR_PREFIX,arepsize);return NULL;}
-    if(mp_toradix(_biginteger,_rep->chars,10)==MP_OKAY){string_synclength(_rep);return _rep;} // return _rep if we succeed in storing the text representation of a
-    free_string(_rep); // get rid of the Mstring that we would have returned on success
-    outputError("Failed to create the text representation of a big integer");
-    return NULL;
-}
+    Mstring* _bigintegerText=__string();
+    if(_bigintegerText){
+        Mstring* _p=_bigintegerText;
+        _p=string_setlength(_p,arepsize);
+        if(_p&&mp_toradix(_biginteger,_p->chars,10)==MP_OKAY)string_synclength(_p);else _p=NULL;
+        if(!_p){outputError("Failed to stringify a big integer");free_string(_bigintegerText);_bigintegerText=NULL;}
+    }else
+        output("%sFailed to create a text to hold the %d characters of a big integer.\n",ERROR_PREFIX,arepsize);
+    return _bigintegerText;
+}/* VALIDATED */
 
 Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
 
-Mbiginteger* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);return _biLLMin;}
-Mbiginteger* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}
+Mbiginteger* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);return _biLLMin;}/* VALIDATED */
+Mbiginteger* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}/* VALIDATED */
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
 /*
@@ -1022,53 +1028,63 @@ void mp_set_u128(Mbiginteger* a,uint128_t b){
 }
 */
 // TODO should we free the given big integers when they are NOT bound to the rational that is being returned????
-void normalizeRational(Mrational* _rational){
-    if(!_rational)return;
+void normalizeRational(Mrational* rational){
+    if(!rational)return;
     // checking on the validity of the flag (which would actually be a bug)
-    if(!_rational->normalized&&!_rational->den){output("BUG: Normalized flag of rational not set although the denominator equals 1; flag set.");_rational->normalized=true;}
-    if(_rational->normalized)return; // apparently already normalized
+    if(!rational->normalized&&!rational->den){output("BUG: Normalized flag of rational not set although the denominator equals 1; flag set.\n");rational->normalized=true;}
+    if(rational->normalized)return; // apparently already normalized
     // normalization means dividing by the gcd unless the gcd is one
-    Mbiginteger* _gcd=__biginteger();
+    Mbiginteger* _gcd=__biginteger(); // to be freed in all cases!
     if(!_gcd){outputError("Can't normalize a rational: failed to create the big integer to store the GCD");return;}
     // ASSERT at the end of the following block always free _gcd
-    if(mp_gcd(_rational->num,_rational->den,_gcd)==MP_OKAY){
+    if(mp_gcd(rational->num,rational->den,_gcd)==MP_OKAY){
         if(mp_cmp(_gcd,getBigintegerOne())!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
             // won't do an in-place division as we need both to succeed, if only one does we would be in trouble
-            Mbiginteger *new_num=__biginteger(),*new_den=__biginteger();
-            if(mp_div(_rational->num,_gcd,new_num,NULL)==MP_OKAY&&mp_div(_rational->den,_gcd,new_den,NULL)==MP_OKAY){
-                free_biginteger(_rational->num);_rational->num=new_num;
-                free_biginteger(_rational->den);_rational->den=new_den;
-                _rational->normalized=true;
-            }else{
-                free_biginteger(new_num);
-                free_biginteger(new_den);
+            Mbiginteger *_newnum=__biginteger(),*_newden=__biginteger(); // to be freed if failing to bind them!!!
+            if(_newnum&&_newden&&mp_div(rational->num,_gcd,_newnum,NULL)==MP_OKAY&&mp_div(rational->den,_gcd,_newden,NULL)==MP_OKAY){
+                free_biginteger(rational->num);rational->num=_newnum;
+                free_biginteger(rational->den);rational->den=NULL;if(isBigintegerOne(_newden))free_biginteger(_newden);else rational->den=_newden; // if _newden equals 1, get rid of it, otherwise assign
+                rational->normalized=true;
+            }else{ // if the normalization failed, newnum and newden are not bound to the rational!!
+                free_biginteger(_newnum);
+                free_biginteger(_newden);
                 outputError("Normalization of rational failed");
             }
         }else // the GCD equals 1 which means that the thing is normalized!!!
-            _rational->normalized=true;
+            rational->normalized=true;
     }else
         outputError("Can't normalize a rational: failed to compute the GCD");
-}
+    free_biginteger(_gcd); // OOPS essential!!
+}/* VALIDATED */
 
 // MDH@07JUN2019: _getRational does NOT free the numerator and denominator supplied!!!
 //                as it does not know whether _numerator or _denominator should be released on failure
+Mrational* __rational(){
+    Mrational* _rational=(Mrational*)CALLOC(1,sizeof(Mrational),'R');
+    if(!_rational)outputError("Failed to create a rational");
+    return _rational;
+}/* VALIDATED */
 Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure){
     // if the given numerator is NULL assume 1
     Mrational* _rational=NULL;
-    if(amVerbose()){
-        outputBiginteger("\nDetermining the rational with numerator ",_numerator,NULL);outputBiginteger(" and denominator ",_denominator,".");
-    }
+    if(amVerbose()){outputBiginteger("Determining the rational with numerator ",_numerator,NULL);outputBiginteger(" and denominator ",_denominator,".\n");}
     if(!_denominator||!isBigintegerZero(_denominator)){ // we have a numerator (any would do), and either NO denominator or a non-zero denominator
-        _rational=(Mrational*)calloc(1,sizeof(Mrational));
+        Mreal* _delta=NULL;
+        if(!ldIsNaN(delta)&&!ldIsInf(delta)){ // we need a delta
+            _delta=_getReal(delta); // store the delta if a valid value
+            if(_delta)_rational=__rational();else outputError("Failed to create a new delta");
+        }else
+            _rational=__rational();
         if(_rational){
+            if(_delta)_rational->delta=_delta; // _delta now bound to the rational, and will be freed if we free the rational, so we don't have to take care of that ourselves
             // TODO what if a delta is defined and the denominator is undefined (i.e. 1)
-            if(!ldIsNaN(delta)&&!ldIsInf(delta)&&!ldIsZero(delta))_rational->delta=_getReal(delta); // store the delta if a valid value
             // force using a nonnullnumerator, if NULL was provided (typically when inverting a rational)
             Mbiginteger* _nonnullnumerator=(_numerator?_numerator:_getBiginteger(1));
             if(_nonnullnumerator){
                 _rational->num=_nonnullnumerator; // could be NULL now when it's the inverse of another rational
                 _rational->den=_denominator;
-                if(amVerbose())outputRational("\nRational created: ",_rational,".");
+                if(amVerbose())outputRational("Rational initialized: ",_rational,".\n");
+                // NOTE _nonnullnumerator and _denominator NOW bound, so no need to free them anymore
                 /* STORING 1 AS DENOMINATOR ISN'T WRONG per se 
                 if(_denominator&&mp_cmp(_denominator,getBigintegerOne())==MP_EQ){
                     free_biginteger(_denominator); // won't store denominator equal to 1
@@ -1076,21 +1092,21 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
                 }else // either NULL or not equal to 1
                     _rational->den=_denominator;
                 */
-                _rational->normalized=(!_rational->den||!_rational->num); // if either numerator or denominator is NULL assume normalized!!!
-                if(amVerbose())
-                outputRational("Rational before normalization: ",_rational,".\n");
+                _rational->normalized=(!_rational->den||isBigintegerOne(_rational->num)); // if either numerator or denominator is NULL assume normalized!!!
                 if(normalize&&!_rational->normalized){
+                    if(amVerbose())outputRational("Rational before normalization: ",_rational,".\n");
                     normalizeRational(_rational); // normalize the rational if we are supposed to
-                    if(_denominator&&!_rational->normalized)output("WARNING: Failed to normalize a rational number.\n");
-                    if(amVerbose())
-                    outputRational("Rational after normalization: ",_rational,".\n");
+                    if(_denominator&&!_rational->normalized)outputError("Failed to normalize a rational");else if(amVerbose())outputRational("Rational after normalization: ",_rational,".\n");
                 }
                 ///////// AS LONG AS WE FREE THE RATIONAL IN THE ELSE PART NO NEED TO DO: return _rational; // return whether normalized or not
-            }else{
+            }else{ // either _numerator NULL or _getBiginteger(1) NULL, in the last case nothing created that needs to be freed (except for _rational)
                 free_rational(_rational);_rational=NULL;
-                if(amVerbose())output("WARNING: Undefined rational numerator.\n");
+                outputError(_numerator?"Undefined rational numerator":"Failed to create big integer 1");
             }
             // NOTE if we get here we failed to create the big integer 1 to use as numerator!!!
+        }else{
+            if(_delta)free_real(_delta);
+            outputError("Failed to create a rational");
         }
     }
     /* NOT OUR RESPONSIBILITY unless we decide to do that
@@ -1100,54 +1116,42 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
     */
     if(!_rational)if(freeonfailure){free_biginteger(_numerator);free_biginteger(_denominator);}
     return _rational;
-}
+}/* VALIDATED */
 // _getInverseRational() will take care of releasing the newly created rational parts when failing to wrap them in a rational
 Mrational* _getInverseRational(const Mrational* const _rational){
-    if(!_rational){output("WARNING: No rational to invert.");return NULL;}
+    if(!_rational){outputError("No rational to invert");return NULL;}
     Mrational* _inverseRational=NULL;
     // for now only allow inverting pure rationals!!!
-    if(!_rational->delta||ldIsZero(_rational->delta->ld)){
-        Mbiginteger* _inverseRationalNumerator=NULL;
-        if(_rational->den){
-            _inverseRationalNumerator=_getBigintegerCopy(_rational->den);
-            if(!_inverseRationalNumerator){outputError("Failed to copy the rational denominator");return NULL;}
-        }
-        Mbiginteger* _inverseRationalDenominator=NULL;
-        if(_rational->num){
-            _inverseRationalDenominator=_getBigintegerCopy(_rational->num);
-            if(!_inverseRationalDenominator){outputError("Failed to copy the rational numerator");return NULL;}
-        }
-        // if the original is not normalized normalize, otherwise just copy the normalized flag!!
-        _inverseRational=_getRational(_inverseRationalNumerator,_inverseRationalDenominator,M_LD_NAN,!_rational->normalized,true);
-        if(!_inverseRational)
-            outputError("Failed to create the inverse rational");
-        else
-        if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
+    if(!_rational->delta||ldIsZero(_rational->delta->ld)||ldIsNaN(_rational->delta->ld)){
+        Mbiginteger *_inverseNumerator=(_rational->den?_getBigintegerCopy(_rational->den):_getBiginteger(1)),*_inverseDenominator=(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1)); // free on failure
+        if(_inverseNumerator&&_inverseDenominator)_inverseRational=_getRational(_inverseNumerator,_inverseDenominator,M_LD_NAN,!_rational->normalized,false);
+        if(!_inverseRational){free_biginteger(_inverseNumerator);free_biginteger(_inverseDenominator);outputError("Failed to create the inverse rational");}else if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
     }else
         outputError("Can't invert an unpure rational");
     return _inverseRational;
-}
+}/* VALIDATED */
 
 // MDH@08JUN2019 NOTE: adapted so that if the numerator is NULL will assume the numerator to equal 1
 // BUT _getRational has been adapted to NOT allow a NULL numerator, i.e. replacing NULL with big integer 1, so actually a NULL numerator is unlikely to occur!!!
 // rationals can equal zero or one but only when the delta value equals 0 (or is not defined which is the same)
 bool isRationalZero(Mrational* _rational){
     // if the rational does not have a num, the numerator equals 1, and obviously is NOT zero
-    return(_rational&&_rational->num?isBigintegerZero(_rational->num)&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false); // the delta needs to be undefined (i.e. zero)
-}
+    return(_rational&&_rational->num?isBigintegerZero(_rational->num)&&(!_rational->delta||ldIsZero(_rational->delta->ld)||ldIsNaN(_rational->delta->ld)):false); // the delta needs to be undefined (i.e. zero)
+}/* VALIDATED */
 bool isRationalOne(Mrational* _rational){
     // when the numerator is NULL, it is considered to be equal to 1
     if(!_rational)return false;
     // basically a rational equals 1 if the numerator and denominator are the same
-    if(_rational->delta&&!ldIsZero(_rational->delta->ld))return false; // TODO if the rational delta is not zero, do not consider to be equal to 1 (although theoretically it could be)
-    return (_rational->den?mp_cmp(_rational->num,_rational->den)==MP_EQ:isBigintegerOne(_rational->num));
+    if(_rational->delta)if(!ldIsZero(_rational->delta->ld)&&!ldIsNaN(_rational->delta->ld))return false; // TODO if the rational delta is not zero, do not consider to be equal to 1 (although theoretically it could be)
+    return (_rational->den?mp_cmp(_rational->num,_rational->den)==MP_EQ:!_rational->num||isBigintegerOne(_rational->num));
     // replacing: return(_rational?!(_rational->num||isBigintegerOne(_rational->num))&&(!_rational->den||isBigintegerOne(_rational->den))&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false);
-}
+}/* VALIDATED */
 
 // we can use the method below to come up with the numerator and denominator of a given double that matches the double exactly
 // for dealing with long double to big integer conversion
 // MDH@17JUN2019: although a typically is of type Mbiginteger, for a function that starts with mp_ we can use the primitive type mp_int instead of the alias Mbiginteger
 mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
+    if(!a)return MP_ERR;
     int32_t exp=(exponent&0x7FFF); // cut off the sign
     if(exp==0x7FFF)return MP_VAL; // +-inf, NaN
     if(exp!=0){
@@ -1161,49 +1165,51 @@ mp_err mp_set_me(mp_int* a,uint64_t mantisse,uint16_t exponent){
     }else // all zeros in exponent
         mp_zero(a);
     return MP_OKAY;
-}
+}/* VALIDATED */
 mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
+    if(!a)return MP_ERR;
     int32_t exp=(exponent&0x7FFF); // cut off the sign
     if(exp!=0){
         mp_set_u64(a,mantisse);
         if(amVerbose()){
             Mstring* _mantisseBigIntegerText=_getBigintegerText(a);
-            output("Value after setting the fraction: %s.",string(_mantisseBigIntegerText));
+            output("Value after setting the fraction: %s.\n",string(_mantisseBigIntegerText));
             free_string(_mantisseBigIntegerText);
         }
-        if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.",exp,mantisse);
+        if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.\n",exp,mantisse);
         if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
         exp-=0x403E; // same as exp-=(16383+63); // the actual exponent (as 63 out of 64 mantisse bits are 'significant', bit 63 equals 1 for normalized numbers) 
         //////////frac=(frac<<1)>>1;/// replacing: &0x7FFFFFFFuLL; // I have to cut off bit 63
-        if(amVerbose())output("Power of two exponent: %d.",exp);  
+        if(amVerbose())output("Power of two exponent: %d.\n",exp);  
         if(exp!=0){
             mp_err err=(exp>0?mp_mul_2d(a,exp,a):mp_div_2d(a,-exp,a,NULL));
             if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
         }
         if(amVerbose()){
             Mstring* _bigIntegerText=_getBigintegerText(a);
-            output("Value after applying the exponent: %s.",string(_bigIntegerText));
+            output("Value after applying the exponent: %s.\n",string(_bigIntegerText));
             free_string(_bigIntegerText);
         }
         if(exponent>>15){ // negative
             // take over the sign from the long double (bit 15 in the signandexponent part)
             if(mp_iszero(a)==MP_NO){ // TODO preferable NOT to use used directly!!
                 a->sign=MP_NEG;
-                if(amVerbose())output("Sign part of real used to set the sign of the big integer.");
+                if(amVerbose())output("Sign part of real used to set the sign of the big integer.\n");
             }else
-                if(amVerbose())output("No need to set the sign on a big integer equal to zero.");           
+                if(amVerbose())output("No need to set the sign on a big integer equal to zero.\n");           
         }
     }else // all zeros in exponent
         mp_zero(a);
     return MP_OKAY;
-}
+}/* VALIDATED */
 mp_err mp_set_longdouble(Mbiginteger *a, long double b){
     // always assume 10-byte long double (extended precision)
     uint64_t mantisse;
     uint16_t exponent; // including bit 63
     extractMantisseAndExponent(b,&mantisse,&exponent);
     // determine the sign, and the 15-bit power of two exponent
-    return mp_set_me_verbose(a,mantisse,exponent); ///////////return (amVerbose()?mp_set_me_verbose(a,mantisse,exponent):mp_set_me(a,mantisse,exponent));
+    ////////return mp_set_me_verbose(a,mantisse,exponent); 
+    return (amVerbose()?mp_set_me_verbose(a,mantisse,exponent):mp_set_me(a,mantisse,exponent));
     /*
     if(sizeof(long double)==16){
         int exp;
@@ -1255,7 +1261,7 @@ mp_err mp_set_longdouble(Mbiginteger *a, long double b){
      if(amVerbose())output("The size of a long double is %u.",sizeof(long double));
     return MP_VAL;
    */
-}
+}/* VALIDATED */
 // MDH@07JUN2019: based on mp_get_double in libtommath:
 /*
 double mp_get_double(const Mbiginteger *a)
@@ -1283,26 +1289,26 @@ long double mp_get_long_double(const Mbiginteger* const a){
         while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
     }
     long double d=(long double)a->dp[i]; // initialize d to the most significant big integer digit
-    if(amVerbose())output("Real of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.",a->dp[i],LDBL_DIG,d,i);
+    if(amVerbose())output("Real of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",a->dp[i],LDBL_DIG,d,i);
     while(--i>=0){
-        if(amVerbose())output("Multiplying '%.*Lf' by %Lf.",d,M_LD_DIGIT_MULTIPLIER);
+        if(amVerbose())output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
         d*=M_LD_DIGIT_MULTIPLIER;
-        if(amVerbose())output("Result of multiplying by '%Lf': '%.*Lf'.",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
+        if(amVerbose())output("Result of multiplying by '%Lf': '%.*Lf'.\n",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
         d+=(long double)a->dp[i];
-        if(amVerbose())output("Result of adding '%lld': '%.*Lf'.",a->dp[i],LDBL_DIG,d);
+        if(amVerbose())output("Result of adding '%lld': '%.*Lf'.\n",a->dp[i],LDBL_DIG,d);
     }
     if(a->sign==MP_NEG&&!ldIsNaN(d))return -d;
-    if(amVerbose())output("Conversion of big integer to long double '%.*Lf' done!",LDBL_DIG,d);
+    if(amVerbose())output("Conversion of big integer to long double '%.*Lf' done!\n",LDBL_DIG,d);
     return d;
     // replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
-}
+}/* VALIDATED */
 
 // part of implementing _getRealText (so not present in the header)
 const char* M_NAN="NaN";
 const char* M_INF="Inf";
-bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}
-bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}
-bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}
+bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}/* VALIDATED */
+bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
+bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
 long long double2long(long double ld){
     if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
     // TODO perhaps there are some other 
@@ -1310,37 +1316,43 @@ long long double2long(long double ld){
     long double tld=truncl(ld); // extract the integer part i.e. floor towards zero (which is called truncate)
     if(tld<M_LL_MIN||tld>M_LL_MAX)return M_LL_INVALID; // out of range
     return(long long)tld;
-}
-Mstring* _getRealText(Mreal* _real){
-	Mstring* s=__string();
-    Mstring* p=s;
-    if(amDebugging())p=string_append_char(p,'r');
-	if(p&&_real){
-		switch(fpclassify(_real->ld)){
-			case FP_NAN:p=string_append(p,M_NAN);break;
-			case FP_INFINITE:p=string_append(p,M_INF);break;
-			default:p=appendld(p,_real->ld);break;
-		}
-        if(!p){free_string(s);s=NULL;}
-	}
-	return s;
-}
-Mstring* _getStringText(Mtext* _string,bool dequoted){
-	Mstring* s=__string();
-    Mstring* p=s;
-    if(amDebugging())p=string_append_char(p,'s');
-    if(p&&_string){
-        if(!dequoted)p=string_append_char(p,_string->presuffix);
-        p=string_append(p,_string->_c);
-        if(!dequoted)p=string_append_char(p,_string->presuffix);
-        if(!p){free_string(s);s=NULL;}
-    }
-	return s;
-}
+}/* VALIDATED */
 
+// STRINGIFY FUNCTIONS
+Mstring* _getRealText(Mreal* _real){
+	Mstring* _realText=(_real?__string():NULL);
+    if(_realText){
+        Mstring* _p=_realText;
+        if(amDebugging())_p=string_append_char(_p,'r');
+        if(_p){
+            switch(fpclassify(_real->ld)){
+                case FP_NAN:_p=string_append(_p,M_NAN);break;
+                case FP_INFINITE:_p=string_append(_p,M_INF);break;
+                default:_p=appendld(_p,_real->ld);break;
+            }
+        }
+        if(!_p){free_string(_realText);_realText=NULL;}
+    }
+	return _realText;
+}/* VALIDATED */
+Mstring* _getStringText(Mtext* _text,bool dequoted){
+	Mstring* _stringText=(_text?__string():NULL);
+    if(_stringText){
+        Mstring* _p=_stringText;
+        if(amDebugging())_p=string_append_char(_p,'s');
+        if(_p){
+            if(!dequoted)_p=string_append_char(_p,_text->presuffix);
+            _p=string_append(_p,_text->_c);
+            if(!dequoted)_p=string_append_char(_p,_text->presuffix);
+        }
+        if(!_p){free_string(_stringText);_stringText=NULL;}
+    }
+	return _stringText;
+}/* VALIDATED */
 Mstring* _getRationalText(const Mrational* const _rational){
+    Mstring*  _rationalText=NULL;
     if(_rational){
-        Mstring* _rationalText=__string();
+        _rationalText=__string();
         if(_rationalText){
             Mstring* _p=_rationalText;
             _p=string_append_char(_p,'(');
@@ -1358,24 +1370,32 @@ Mstring* _getRationalText(const Mrational* const _rational){
                 if(_rational->delta>=0)string_append_char(_p,'+');
                 _p=appendld(_p,_rational->delta->ld);
             }
-            if(_p)return _rationalText;
-            free_string(_rationalText);
+            if(!_p){free_string(_rationalText);_rationalText=NULL;} // if something went wrong, return NULL and free _rationalText
         }
     }
-    return NULL;
-}
+    return _rationalText;
+}/* VALIDATED */
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
 Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
     Mstring* _decimalText=NULL;
     if(_decimal){
-        // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
-        // NOTE if _decimal->repeating always use fixed-point notation
-        char* _decimalRep=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),_decimalContext);
-        ///////////output("Decimal rep: '%s'.\n",_decimalRep);
-        if(_decimalRep){
-            _decimalText=_getString(_decimalRep);
-            free(_decimalRep);
-            if(_decimalText)if(_decimal->repeating){string_insert_char(_decimalText,string_length(_decimalText)-_decimal->repeating,'[');if(!fixedpoint)string_append_char(_decimalText,']');}
+        _decimalText=__string();
+        if(_decimalText){
+            Mstring* _p=_decimalText;
+            // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
+            // NOTE if _decimal->repeating always use fixed-point notation
+            char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),_decimalContext);
+            ///////////output("Decimal rep: '%s'.\n",_decimalRep);
+            if(_decimalChars){
+                _p=string_append(_p,_decimalChars);
+                free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
+                if(_p)if(_decimal->repeating){
+                    _p=string_insert_char(_p,string_length(_p)-_decimal->repeating,'[');
+                    if(_p&&!fixedpoint)_p=string_append_char(_p,']');
+                }
+            }else
+                _p=NULL;
+            if(!_p){free_string(_decimalText);_decimalText=NULL;}
         }
     }
     return _decimalText;
@@ -1390,7 +1410,7 @@ Mstring* _getUndefinedValueText(){
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
     return string_copy(_UNDEFINED_VALUETEXT);
     */
-}
+}/* VALIDATED */
 
 void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix){
     if(prefix)output("%s",prefix);
@@ -1400,11 +1420,11 @@ void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginte
             output("%s",string(_bigintegerText));
             free_string(_bigintegerText);
         }else
-            output("too large for buffer");
+            output("no big integer text representation");
     }else
         outputChar('?');
     if(postfix)output("%s",postfix);
-}
+}/* VALIDATED */
 void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_decimal){
@@ -1417,7 +1437,7 @@ void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const
     }else
         outputChar('?');
     if(postfix)output("%s",postfix);
-}
+}/* VALIDATED */
 void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_rational){
@@ -1430,40 +1450,51 @@ void outputRational(const char* const prefix,const Mrational* const _rational,co
     }else
         outputChar('?');
     if(postfix)output("%s",postfix);
-}
+}/* VALIDATED */
 
 // conversion from big integer to the long long it contains (when in range)
-long long biginteger2long(Mbiginteger* _biginteger){
-	return(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT?mp_get_i64(_biginteger):M_LL_INVALID);
-}
+long long biginteger2long(const Mbiginteger* const _biginteger){
+	return(_biginteger&&mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT?mp_get_i64(_biginteger):M_LL_INVALID);
+}/* VALIDATED */
 bool strIsZero(char* str){
     size_t l=strlen(str);
     //// NOTE do not accept integer literal postfixes when checking for 1: if(l>0&&str[l-1]=='i'||str[l-1]=='I'||str[l-1]=='q'||str[l-1]=='r')l-=1; // skip any accepted integer postfix!!
     // if l already is zero str[0] will equal '\0' which (see below) is not considered a zero integer!!!!
     while(l>0){l--;if(str[l]!='0')break;} // stop as soon as the character does not match '0' (any sign is only allowed at position 0)
     return(!l?false:str[l]=='-'||str[l]=='+'||str[l]=='0');
-}
+}/* VALIDATED */
 
 // NOTE the _ indicates that what is returned has to be freed after being used
 Mbiginteger* _rational2biginteger(Mrational* _rational){
-    if(!_rational)return NULL;
-    Mbiginteger* _biginteger=__biginteger();
-    if(!_biginteger){outputError("Failed to create a big integer");return NULL;}
-    if(_rational->den){
-        if(mp_div(_rational->num,_rational->den,_biginteger,NULL)!=MP_OKAY){
-            outputError("Failed to divide the rational numerator and denominator");
-            free_biginteger(_biginteger);
-            return NULL;
-        }
-    }else // copy the numerator
-        if(mp_copy(_rational->num,_biginteger)!=MP_OKAY){outputError("Failed to copy the rational numerator");free_biginteger(_biginteger);return NULL;}
+    Mbiginteger* _biginteger=(_rational?__biginteger():NULL);
+    if(_biginteger){        
+        if(_rational->den){
+            // if the numerator is NULL or 0 _biginteger should remain what it is (i.e. 0)
+            if(_rational->num&&!isBigintegerZero(_rational->num)){
+                Mbiginteger* absnum=NULL;
+                bool neg=mp_isneg(_rational->num);
+                if(neg){absnum=__biginteger();if(absnum&&mp_neg(_rational->num,absnum)!=MP_OKAY){free_biginteger(absnum);absnum=NULL;}}else absnum=_rational->num;
+                // we need absnum, if we haven't got one, negating the negative numerator failed
+                if(!absnum||mp_div(absnum,_rational->den,_biginteger,NULL)!=MP_OKAY){
+                    outputError("Failed to (integer) divide the rational numerator by its denominator");
+                    free_biginteger(_biginteger);
+                    _biginteger=NULL;
+                }else
+                if(absnum&&neg){ // we have to negate _biginteger
+                    if(mp_neg(_biginteger,_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                    free_biginteger(absnum); // free absnum
+                }
+            }
+        }else // copy the numerator
+            if(mp_copy(_rational->num,_biginteger)!=MP_OKAY){outputError("Failed to copy the rational numerator");free_biginteger(_biginteger);_biginteger=NULL;}
+    }
     return _biginteger;
-}
+}/* VALIDATED */
 
 
 bool isDecimalZero(Mdecimal* _decimal){
     return(_decimal&&mpd_iszero((mpd_t*)_decimal)==0); // TODO apparently 0 means true, something else means false
-}
+}/* VALIDATED */
 
 /*
 // big integer arithmetic
@@ -1508,18 +1539,16 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
             }
             // construct the last rational (i.e. the result) from p and q
             Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
-            if(_numerator&&_denominator){ // we've got both of them
-                if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY){
+            if(_numerator&&_denominator) // we've got both of them
+                if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)
                     _rational=_getRational(_numerator,_denominator,delta,true,false); // NOTE there should always be a delta!!!!
-                }
-            }
             if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);}
         }else // long double is zero
             _rational=_getRational(__biginteger(),NULL,M_LD_NAN,false,true);
     }
     // _rational should contain the 'last' computed rational
     return _rational;
-}
+}/* VALIDATED */
 // MDH@07JUN2019: converting a rational to a double
 long double getRationalLongDouble(const Mrational* const _rational){
     if(_rational){
@@ -1542,4 +1571,4 @@ long double getRationalLongDouble(const Mrational* const _rational){
         if(amVerbose())outputError("Failed to convert a rational numerator to a real");
     }
     return M_LD_NAN; // if something went wrong
-}
+}/* VALIDATED */
