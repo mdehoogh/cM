@@ -148,7 +148,7 @@ bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetyp
     if(_environment&&name){ // input valid
         _variable=getVariable(_environment,name,false);
         if(!_variable){ // non-existing...
-            _variable=new_variable(name,valuetype,immutable);
+            _variable=_getVariable(name,valuetype,immutable);
             //////printf("\nVariable created!");
             if(_variable){
                 Mmapelement* _variableMapelement=(Mmapelement*)malloc(sizeof(Mmapelement));

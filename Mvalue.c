@@ -22,13 +22,13 @@ void free_variable(Mvariable* _variable){
         if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
         free(_variable);
     }
-}
-Mvariable* new_variable(const char* name,Mvaluetype valuetype,bool immutable){
+}/* VALIDATED */
+Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
     if(!name||!strlen(name)){
         outputError("No variable name defined");
         return NULL;
     }
-    Mvariable* _variable=(Mvariable*)calloc(1,sizeof(Mvariable)); // all pointers will be NULL!!
+    Mvariable* _variable=(Mvariable*)CALLOC(1,sizeof(Mvariable),'V'); // all pointers will be NULL!!
     if(!_variable){
         outputErrorAndText("Failed to allocate memory to store variable ",name);
         return NULL;
@@ -65,7 +65,7 @@ Mvariable* new_variable(const char* name,Mvaluetype valuetype,bool immutable){
         _variable->_value=NULL;
     */
     return _variable;
-}
+}/* VALIDATED */
 
 void free_listelement(Mlistelement* _listelement){
     if(_listelement){
@@ -73,32 +73,26 @@ void free_listelement(Mlistelement* _listelement){
         if(_listelement->_value)decrementReferenceCount(_listelement->_value); ///////// replacing: free_value(_listelement->_value);
         free(_listelement);
     }
-}
+}/* VALIDATED */
 void free_list(Mlist* _list){
     if(_list){
-        if(_list->numberOfElements){
-            free_listelement(_list->_first);
-            _list->numberOfElements=0; // just a precaution to not do it again
-        }
+        if(_list->_first)free_listelement(_list->_first);
         free(_list);
     }
-}
+}/* VALIDATED */
 void free_mapelement(Mmapelement* _mapelement){
     if(_mapelement){
-        free_mapelement(_mapelement->_next);
-        free_variable(_mapelement->_variable);
+        if(_mapelement->_next)free_mapelement(_mapelement->_next);
+        if(_mapelement->_variable)free_variable(_mapelement->_variable);
         free(_mapelement);
     }
-}
+}/* VALIDATED */
 void free_map(Mmap* _map){
     if(_map){
-        if(_map->numberOfElements){
-            free_mapelement(_map->_first);
-            _map->numberOfElements=0;
-        }
+        if(_map->_first)free_mapelement(_map->_first);
         free(_map);
     }
-}
+}/* VALIDATED */
 
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
@@ -113,29 +107,29 @@ void free_value(Mvalue* _value){
             case VT_DECIMAL:if(_value->value._decimal)free_decimal(_value->value._decimal);break;
             case VT_RATIONAL:if(_value->value._rational)free_rational(_value->value._rational);break;
             case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
-            case VT_TEXT:free_text(_value->value._text);break;
-            case VT_LIST:free_list(_value->value._list);break;
-            case VT_MAP:free_map(_value->value._map);break;
+            case VT_TEXT:if(_value->value._text)free_text(_value->value._text);break;
+            case VT_LIST:if(_value->value._list)free_list(_value->value._list);break;
+            case VT_MAP:if(_value->value._map)free_map(_value->value._map);break;
         }
         if(amVerbose())output("Type-specific value freed.");
         free(_value);
     }else
         output("BUG: No value to free!");
-}
+}/* VALIDATED */
 
-// keep a list of allocated values
+// manage a list of created values
 Mlist* _valueList=NULL;
 Mvalue* __value(){
     Mvalue* _value=NULL;
-    if(!_valueList)_valueList=(Mlist*)calloc(1,sizeof(Mlist));
+    if(!_valueList)_valueList=(Mlist*)CALLOC(1,sizeof(Mlist),'X');
     if(_valueList){
-        Mlistelement* _valueListelement=(Mlistelement*)calloc(1,sizeof(Mlistelement)); // both pointers NULL
+        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'x'); // both pointers NULL
         if(_valueListelement){
-            _value=(Mvalue*)calloc(1,sizeof(Mvalue));
+            _value=(Mvalue*)CALLOC(1,sizeof(Mvalue),'V');
             if(_value){
                 // shouldn't pose a problem now...
-               _valueListelement->_value=_value;
-                 if(_valueList->_last)_valueList->_last->_next=_valueListelement;else _valueList->_first=_valueListelement;
+                _valueListelement->_value=_value;
+                if(_valueList->_last)_valueList->_last->_next=_valueListelement;else _valueList->_first=_valueListelement;
                 _valueList->_last=_valueListelement;
                 _valueList->numberOfElements++;
             }else // couldn't get a new value, so free the value list element immediately
@@ -144,14 +138,14 @@ Mvalue* __value(){
     }
     if(!_value)if(amVerbose())outputLine("ERROR: Failed to create value!");
     return _value;
-}
+}/* VALIDATED */
 
-const char* VALUETYPENAMES[]={"unknown","integer","real","string","list","map"};
+const char* VALUETYPENAMES[]={"unknown","integer","real","text","big integer","rational","decimal","list","map"};
 
 // can be asked to remove unused values
+// TODO check whether it functions correctly (think so though)
 size_t getNumberOfRemovedValues(){
-    unsigned long long removed=0;
-    unsigned long long tofree=0; // how many value elements we should free
+    unsigned long long tofree=0,removed=0;
     if(_valueList){
         Mlistelement* _valueListelement=_valueList->_first;
         if(amVerbose())output("Number of values to check: %llu.\n",_valueList->numberOfElements);
@@ -204,9 +198,9 @@ size_t getNumberOfRemovedValues(){
         if(tofree>removed)output("WARNING: Failed to free %llu unused value list elements.\n",(tofree-removed));else if(amVerbose())outputLine("All unused value list elements freed!");
     }
     return removed;
-}
+}/* VALIDATED */
 
-unsigned long long getNumberOfValues(){return _valueList->numberOfElements;}
+unsigned long long getNumberOfValues(){return (_valueList?_valueList->numberOfElements:0);}/* VALIDATED */
 
 bool decrementReferenceCount(Mvalue* _value){
     if(_value){
@@ -223,12 +217,12 @@ bool decrementReferenceCount(Mvalue* _value){
             return true;
         }
         Mstring* _valueText=_getValueText(_value,false);
-        output("BUG: Reference count of '%s' of type '%c' already zero.",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
+        output("BUG: Reference count of '%s' of type '%c' already zero.\n",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
         free_string(_valueText);
     }else
-        if(amVerbose())outputLine("No value to decrement the reference count of.");
+    if(amVerbose())outputLine("No value to decrement the reference count of.");
     return true;
-}
+}/* VALIDATED */
 bool incrementReferenceCount(Mvalue* _value){
     if(_value){
         (_value->count)++;
@@ -236,17 +230,17 @@ bool incrementReferenceCount(Mvalue* _value){
     }
     if(amVerbose())outputLine("No value to increment the reference count of.");
     return false;
-}
+}/* VALIDATED */
 // interface functions that use the above functions
 // wrapping the different value type instances
-Mvalue* _getUndefinedValue(){return (Mvalue*)calloc(1,sizeof(Mvalue));}
+Mvalue* _getUndefinedValue(){return (Mvalue*)CALLOC(1,sizeof(Mvalue),'U');}/* VALIDATED */
 
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     if(!_decimal)return NULL;
     Mvalue* _decimalValue=__value();
     if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
     return _decimalValue;
-}
+}/* VALIDATED */
 Mvalue* _getIntegerValue(long long ll){
     if(amVerbose())output("Wrapping integer '%ll'.\n",ll);
     Mvalue* _integerValue=__value();
@@ -255,13 +249,13 @@ Mvalue* _getIntegerValue(long long ll){
         if(!_integerValue->value._integer){free_value(_integerValue);_integerValue=NULL;}else _integerValue->type=VT_INTEGER;
     }
     return _integerValue;
-}
+}/* VALIDATED */
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     if(!_biginteger)return NULL;
     Mvalue* _bigintegerValue=__value();
     if(_bigintegerValue){_bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;}else if(freeonfailure)free_biginteger(_biginteger);
     return _bigintegerValue;
-}
+}/* VALIDATED */
 Mvalue* _getRealValue(long double ld){
     if(amVerbose())output("Wrapping real '%.*Lf'.\n",DBL_DIG,ld);
     Mvalue* _realValue=__value();
@@ -270,7 +264,7 @@ Mvalue* _getRealValue(long double ld){
         if(!_realValue->value._real){free_value(_realValue);_realValue=NULL;}else _realValue->type=VT_REAL;
     }
     return _realValue;
-}
+}/* VALIDATED */
 Mvalue* _getTextValue(char* _s,bool freeonfailure){
     if(!_s)return NULL; // when no input, no go
     Mvalue* _textValue=NULL; // the result, when NULL check freeonfailure
@@ -281,155 +275,192 @@ Mvalue* _getTextValue(char* _s,bool freeonfailure){
     }
     if(!_textValue)if(freeonfailure)free(_s);
     return _textValue;
-}
+}/* VALIDATED */
 Mvalue* _getCharTextValue(char _c){
     Mtext* _text=(_c?_getCharText(_c):NULL); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
     Mvalue* _textValue=(_text?__value():NULL);
-    if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}
+    if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}else if(_text)free_text(_text); // ah do NOT forget to free _text if we haven't been able to create a value!!
     return _textValue;
-}
+}/* VALIDATED */
 // we can force all listelements to have the same type????
 Mvalue* _getListValue(Mvaluetype listValuetype){
-    Mlist* _list=(Mlist*)calloc(1,sizeof(Mlist));
+    Mlist* _list=(Mlist*)CALLOC(1,sizeof(Mlist),'L');
+    if(!_list)return NULL;
     _list->valuetype=listValuetype; // register what type of elements this list should have
-    Mvalue* _listvalue=(_list?__value():NULL);
-    if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}
+    Mvalue* _listvalue=__value();
+    if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}else free_list(_list);
     return _listvalue;
-}
+}/* VALIDATED */
 Mvalue* _getMapValue(Mvaluetype mapValuetype){
-    Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
+    Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+    if(!_map)return NULL;
     _map->valuetype=mapValuetype;
-    Mvalue* _mapvalue=(_map?__value():NULL);
-    if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}
+    Mvalue* _mapvalue=__value();
+    if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}else free_map(_map);
     return _mapvalue;
-}
+}/* VALIDATED */
 
 // some other wrappers
-Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure){if(!_integer)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);return _value;}
-Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure){if(!_real)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_REAL;_value->value._real=_real;}else if(freeonfailure)free_real(_real);return _value;}
-Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){if(!_map)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_MAP;_value->value._map=_map;}else if(freeonfailure)free_map(_map);return _value;}
-Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){if(!_token)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);return _value;}
+Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure){
+    if(!_integer)return NULL;
+    Mvalue* _value=__value();
+    if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);
+    return _value;
+}/* VALIDATED */
+Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure){
+    if(!_real)return NULL;
+    Mvalue* _value=__value();
+    if(_value){_value->type=VT_REAL;_value->value._real=_real;}else if(freeonfailure)free_real(_real);
+    return _value;
+}/* VALIDATED */
+Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){
+    if(!_map)return NULL;
+    Mvalue* _value=__value();
+    if(_value){_value->type=VT_MAP;_value->value._map=_map;}else if(freeonfailure)free_map(_map);
+    return _value;
+}/* VALIDATED */
+Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){
+    if(!_token)return NULL;
+    Mvalue* _value=__value();
+    if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);
+    return _value;
+}/* VALIDATED */
 
 // helper function to create a parameter map with a single value
 // the following is a nuisance
 Mmap* _getRealMap(char* name,Mvalue* _realValue){
     if(name&&_realValue){
-        Mvariable* _realVariable=new_variable(name,VT_REAL,true);
+        Mvariable* _realVariable=_getVariable(name,VT_REAL,true);
         if(_realVariable){
-            assignValue(&_realVariable->_value,_realValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
-            Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
             if(_mapelement){
-                _mapelement->_variable=_realVariable;
-                Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
                 if(_map){
+                    assignValue(&_realVariable->_value,_realValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
+                    _mapelement->_variable=_realVariable;
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
+                    _map->_last=_mapelement;
                     if(amDebugging())outputLine("Returning the single real map!");
                     return _map;
                 }
                 outputError("Failed to create the real variable map");
-               free_mapelement(_mapelement);
-            }else{
+                free_mapelement(_mapelement);
+            }else
                 outputError("Failed to create the real variable map element");
-                free_variable(_realVariable);
-            }
+            free_variable(_realVariable);
         }else
             outputError("Failed to create the real variable");
     }
     return NULL;
-}
+}/* VALIDATED */
 Mmap* _getMap(char *name){
-    Mvariable* _variable=new_variable(name,VT_UNDEFINED,true);
-    Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
-    if(_mapelement){
-        _mapelement->_variable=_variable;
-        Mmap* _map=calloc(1,sizeof(Mmap));
-        _map->_first=_mapelement;
-        _map->_last=_mapelement;
-        _map->numberOfElements=1;
-        return _map;
+    Mvariable* _variable=_getVariable(name,VT_UNDEFINED,true);
+    if(_variable){
+        Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+        if(_mapelement){
+            Mmap* _map=CALLOC(1,sizeof(Mmap),'M');
+            if(_map){
+                _mapelement->_variable=_variable;
+                _map->_first=_mapelement;
+                _map->_last=_mapelement;
+                _map->numberOfElements=1;
+                return _map;
+            }
+            free_mapelement(_mapelement);
+        }
+        free_variable(_variable);
     }
     return NULL;
-}
+}/* VALIDATED */
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
+    // NOTE wait with filling the single integer value map until we have all the ingredients
     if(name&&_integerValue){
-        Mvariable* _integerVariable=new_variable(name,VT_INTEGER,true);
+        Mvariable* _integerVariable=_getVariable(name,VT_INTEGER,true);
         if(_integerVariable){
-            assignValue(&_integerVariable->_value,_integerValue); ///////  incrementReferenceCount(_integerValue); // now bound to the integer variable
-            Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
             if(_mapelement){
-                _mapelement->_variable=_integerVariable;
-                Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
                 if(_map){
+                    assignValue(&_integerVariable->_value,_integerValue); ///////  incrementReferenceCount(_integerValue); // now bound to the integer variable
+                    _mapelement->_variable=_integerVariable;
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     if(amVerbose())outputLine("Returning the single integer map!");
                     return _map;
                 }
                 outputError("Failed to create the integer variable map");
-               free_mapelement(_mapelement);
-            }else{
+                free_mapelement(_mapelement);
+            }else
                 outputError("Failed to create the integer variable map element");
-                free_variable(_integerVariable);
-            }
+            free_variable(_integerVariable);
         }else
             outputError("Failed to create the integer variable");
     }
     return NULL;
-}
+}/* VALIDATED */
 Mmap* _getStringStringMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&!strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)calloc(1,sizeof(Mmapelement));
-            Mmapelement* _mapelement2=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2){
-                _mapelement1->_variable=new_variable(name1,VT_TEXT,true);
-                _mapelement2->_variable=new_variable(name2,VT_TEXT,true);
-                if(_mapelement1->_variable&&_mapelement2->_variable){
-                    Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
-                    if(_map){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_TEXT,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_TEXT,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable){
                         _map->_first=_mapelement1;
                         _mapelement1->_next=_mapelement2;
                         _map->_last=_mapelement2;
                         _map->numberOfElements=2;
                         return _map;
                     }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
                 }
             }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1);
+            free_mapelement(_mapelement2);
         }
     }
     return NULL;
-}
+}/* VALIDATED */
 Mmap* _getListMap(char* name,Mvalue* _listValue){
     if(name&&_listValue){
-        Mvariable* _listVariable=new_variable(name,VT_LIST,true);
+        Mvariable* _listVariable=_getVariable(name,VT_LIST,true);
         if(_listVariable){
-            assignValue(&_listVariable->_value,_listValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
-            Mmapelement* _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
             if(_mapelement){
-                _mapelement->_variable=_listVariable;
-                Mmap* _map=(Mmap*)calloc(1,sizeof(Mmap));
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
                 if(_map){
-                    _map->numberOfElements=1;
+                    assignValue(&_listVariable->_value,_listValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
+                    _mapelement->_variable=_listVariable;
+                   _map->numberOfElements=1;
                     _map->_first=_mapelement;
+                    _map->_last=_mapelement;
                     if(amDebugging())outputLine("Returning the single list map");
                     return _map;
                 }
                 outputError("Failed to create the list variable map");
-               free_mapelement(_mapelement);
-            }else{
+                free_mapelement(_mapelement);
+            }else
                 outputError("Failed to create the list variable map element");
-                free_variable(_listVariable);
-            }
-        }else
+            free_variable(_listVariable);
+       }else
             outputError("Failed to create the list variable");
     }
     return NULL;
-}
+}/* VALIDATED */
 // end helper functions 
 
 // LIST STUFF
-Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure){if(!_list)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_LIST;_value->value._list=_list;}else if(freeonfailure)free_list(_list);return _value;}
+Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure){
+    if(!_list)return NULL;
+    Mvalue* _value=__value();
+    if(_value){_value->type=VT_LIST;_value->value._list=_list;}else if(freeonfailure)free_list(_list);
+    return _value;
+}/* VALIDATED */
 void checkList(Mlist* _list){
     if(_list){
         long long l=_list->numberOfElements;
@@ -441,7 +472,7 @@ void checkList(Mlist* _list){
                 while(true){
                     if(l==0)outputError("More elements in list than accounted for");
                     l--;
-                    if(_listelement->index<=listelementindex)output("%sList element index (%lld) below the expected list element index (%lld).",ERROR_PREFIX,_listelement->index,listelementindex);
+                    if(_listelement->index<=listelementindex)output("%sList element index (%lld) below the expected list element index (%lld).\n",ERROR_PREFIX,_listelement->index,listelementindex);
                     listelementindex=_listelement->index;
                     if(!_listelement->_next){
                         if(_list->_last!=_listelement)outputError("Registered last list element not equal to the actual last list element");
@@ -451,15 +482,15 @@ void checkList(Mlist* _list){
                     _listelement=_listelement->_next;
                 }
                 if(l>0)outputError("Less elements in list than accounted for");else 
-                if(l<0)output("%s%lld more elements in list than counted.",ERROR_PREFIX,(-l));
+                if(l<0)output("%s%lld more elements in list than counted.\n",ERROR_PREFIX,(-l));
             }else
-                output("%sList with %lld elements does not have a first element!",ERROR_PREFIX,l);
+                output("%sList with %lld elements does not have a first element!\n",ERROR_PREFIX,l);
         }else{
             if(_list->_first)outputError("Empty list with first element");
             if(_list->_last)outputError("Empty list with last element");
         }
     }
-}
+}/* VALIDATED */
 // instead of returning a boolean we could return the assigned index (0 on failure)
 // MDH@02JUN2019: check (and correct) prepending
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index){
@@ -467,8 +498,8 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long l
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     if(index<=0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
-    if(index<=0){output("%sIndex %lld of (new) list element too small.\n",index);return 0;}
-    if(amVerbose())outputValue("\nAppending '",_value,"' to list.");
+    if(index<=0){output("%sIndex %lld of (new) list element too small.\n",ERROR_PREFIX,index);return 0;}
+    if(amVerbose())outputValue("Appending '",_value,"' to list.\n");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
     Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index<=lastindex?_list->_first:NULL);
@@ -485,7 +516,7 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long l
         _prevListelement=_list->_last;
     // if we do not have a list element ascertain to have one
     if(!_listelement){ // not yet present in list, so we have to create a new element
-        _listelement=(Mlistelement*)calloc(1,sizeof(Mlistelement));
+        _listelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l');
         if(!_listelement){outputError("Failed to create a list element to insert/append");return 0;} // failure
     }
     assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
@@ -499,7 +530,7 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long l
     }
     if(amVerbose())checkList(_list);
     return _listelement->index;
-}
+}/* VALIDATED */
 
 Mvalue* getValueAtIndex(Mlist* _list,long long index){
     // NOTE if index is equal to zero definitely no value there!!!
@@ -521,29 +552,37 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index){
         }
     }
     return NULL;
-}
+}/* VALIDATED */
 // END LIST STUFF
 
 // MAP STUFF
 // MDH@24MAY2019: if already in the map should replace the current value
-bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue){
-    if(!_map||!attributeName)return false;
-    if(amVerbose()){output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.");}
-    Mmapelement* _mapelement=_map->_first;
-    while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
-    if(!_mapelement){ // not found
-        _mapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement)); // NOTE no need to set _next because it is now NULL
-        if(!_mapelement)return false;
-        _mapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
-        if(!_mapelement->_variable)return false;
-        _mapelement->_variable->_name=_strdup(attributeName); // if we change name into _name (as Mstring*) we won't have to free attributeName which holds the character array 
-        if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
-        _map->_last=_mapelement;
-        _map->numberOfElements++;
+bool appendedToMap(Mmap* const _map,const char* const attributeName,Mvalue* const _attributeValue){
+    if(_map&&attributeName){
+        if(amVerbose()){output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
+        Mmapelement* _mapelement=_map->_first;
+        while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+        if(!_mapelement){ // not found
+            _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
+            if(_mapelement){
+                _mapelement->_variable=_getVariable(attributeName,VT_UNDEFINED,false);
+                if(_mapelement->_variable){ // the variable was created so attach in map
+                    if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
+                    _map->_last=_mapelement;
+                    _map->numberOfElements++;
+                }else{ // we have a map element BUT no variable, so no go
+                    free_mapelement(_mapelement);_mapelement=NULL;
+                }
+            }else
+            if(amVerbose())outputError("Failed to create new map element");
+        }
+        if(_mapelement){
+            assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
+            return true;
+        }
     }
-    assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
-    return true;
-}
+    return false;
+}/* VALIDATED */
 
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
     if(_map&&attributeName&&strlen(attributeName)){
@@ -556,10 +595,15 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
         }
     }
     return NULL;
-}
+}/* VALIDATED */
 // END MAP STUFF
 
-Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){if(!_rational)return NULL;Mvalue* _value=__value();if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);return _value;}
+Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){
+    if(!_rational)return NULL;
+    Mvalue* _value=__value();
+    if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);
+    return _value;
+}/* VALIDATED */
 
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
 Mstring* _getListText(Mlist* _list){
@@ -917,7 +961,7 @@ bool isNull(Mvalue* _value){
         default:break;
     }
     return true;
-}
+}/* VALIDATED */
 
 // MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
@@ -983,4 +1027,4 @@ void assignValue(Mvalue** _valueholder,Mvalue* const _value){
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
     *_valueholder=_value; // replace what's being pointed to
     if(*_valueholder)incrementReferenceCount(*_valueholder); // increment what it's pointing to now (if not NULL)
-}
+}/* VALIDATED */

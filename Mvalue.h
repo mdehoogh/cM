@@ -119,7 +119,7 @@ Mstring* appendld(Mstring* mstr,long double ld);
 unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 void free_list(Mlist* _list);
 
-bool appendedToMap(Mmap* _map,const char* attributeName,Mvalue* _attributeValue);
+bool appendedToMap(Mmap* const _map,const char* const attributeName,Mvalue* const _attributeValue);
 
 long double getValueReal(const Mvalue* const _value);
 Mbiginteger* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
@@ -171,5 +171,5 @@ Mvalue* __value(); // TODO expose __value()????? yes
 size_t getNumberOfRemovedValues();
 unsigned long long getNumberOfValues();
 
-Mvariable* new_variable(const char* name,Mvaluetype valuetype,bool immutable);
+Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);
 void free_variable(Mvariable* _variable);
