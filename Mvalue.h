@@ -142,8 +142,8 @@ bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list); // a
 bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist);
 bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
 // map to (map) list conversions
-bool mapAppendedToList(Mlist* const _list,Mmap* const _map);
-bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map);
+bool mapAppendedToList(Mlist* const _list,const Mmap* const _map);
+bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map);
 
 bool isValueZero(Mvalue* _value);
 bool isValueOne(Mvalue* _value);

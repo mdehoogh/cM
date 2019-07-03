@@ -608,10 +608,10 @@ Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
 Mstring* _getListText(Mlist* _list){
     ///////output("List to output.");char c;inputCharRead(&c);
-	Mstring* s=__string();
-    Mstring* p=s;
-    if(amDebugging())p=string_append_char(p,'l');
-	if(p){
+	Mstring* result=__string();
+    if(result){
+        Mstring* p=result;
+        if(amDebugging())p=string_append_char(p,'l');
 		p=string_append_char(p,'['); // switch to using p in appends
 		/////////size_t l=_list->numberOfElements;
         unsigned long long listindex=1;
@@ -620,13 +620,13 @@ Mstring* _getListText(Mlist* _list){
 		while(p&&_listelement){
             ///////outputChar('$');
             // increment listindex until it is equal to _listelement->index
-            if(!_listelement->index)break;
+            if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
             while(listindex<_listelement->index){listindex++;p=string_append_char(p,',');}
             /////////p=appendull(p,_listelement->index);p=string_append_char(p,':');if(!p)break;
 	        //////////outputChar('.');
 			_listelementValue=_listelement->_value;
 			if(_listelementValue){
-				Mstring* _listelementValueText=_getValueText(_listelementValue,false);
+				Mstring* _listelementValueText=_getValueText(_listelementValue,false); // to be freed asap
 				if(_listelementValueText){
 					p=string_append(p,string(_listelementValueText));
 					free_string(_listelementValueText); // release AFTER copying over
@@ -637,34 +637,37 @@ Mstring* _getListText(Mlist* _list){
 		p=string_append_char(p,']');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
-		if(!p){free_string(s);s=NULL;}
+		if(!p){free_string(result);result=NULL;}
 	}
-	return s;
-}
+	return result;
+}/* VALIDATED */
 Mstring* _getMapText(Mmap* _map){
-	Mstring* s=__string();
-	Mstring* p=s;
-    if(amDebugging())p=string_append_char(p,'m');
-	if(p){
+	Mstring* result=__string();
+    if(result){
+	    Mstring* p=result;
+        if(amDebugging())p=string_append_char(p,'m');
         p=string_append_char(p,'{');
 		//////output("%s",string(p));
 		Mmapelement* _mapelement=_map->_first;
 		while(p&&_mapelement){
 			//////output("%s","start");
-			Mvariable* _variable=_mapelement->_variable;
-			if(!_variable)continue;
-            // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
-            p=string_append_char(p,'\'');
-			p=string_append(p,_variable->_name);
-            p=string_append_char(p,'\'');
-			/////output("%s",string(p));
-			p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
-			/////output("%s",string(p));
-			Mstring* mapelementValueText=_getValueText(_variable->_value,false);
-			/////output("Map element: %s",string(p));
-			if(!mapelementValueText)continue;
-			p=string_append(p,string(mapelementValueText)); // append 
-			free_string(mapelementValueText); // release AFTER copying over
+			Mvariable* _mapVariable=_mapelement->_variable;
+			if(_mapVariable){
+                // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
+                p=string_append_char(p,'\'');
+                p=string_append(p,_mapVariable->_name);
+                p=string_append_char(p,'\'');
+                /////output("%s",string(p));
+                p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+                /////output("%s",string(p));
+                Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
+                /////output("Map element: %s",string(p));
+                // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
+                if(_mapelementValueText){
+                    p=string_append(p,string(_mapelementValueText)); // append 
+                    free_string(_mapelementValueText); // release AFTER copying over
+                }
+            }
 			_mapelement=_mapelement->_next;
 			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
 			////output("%s","next");
@@ -673,10 +676,10 @@ Mstring* _getMapText(Mmap* _map){
 		p=string_append_char(p,'}');
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){free_string(s);s=NULL;}
+		if(!p){free_string(result);result=NULL;}
 	}
-	return s;
-}
+	return result;
+}/* VALIDATED */
 
 Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
@@ -707,16 +710,16 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
     return _UNDEFINED_VALUETEXT;
     */
-}
-void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix){
+}/* VALIDATED */
+void outputValue(const char* const prefix,const Mvalue* const _value,const char* const postfix){
     if(prefix)output("%s",prefix);
     if(_value){
-        Mstring* _valueText=_getValueText(_value,false);
-        output("%s",string(_valueText));free_string(_valueText);
+        Mstring* _valueText=_getValueText(_value,false); // free asap
+        if(_valueText){output("%s",string(_valueText));free_string(_valueText);}
     }else
         outputChar('?');
     if(postfix)output("%s",postfix);
-}
+}/* VALIDATED */
 
 long long getValueInteger(const Mvalue* const _value){
     // ASSERTION if _value can be converted to an integer,it should not equal invalid!!!!
@@ -732,7 +735,15 @@ long long getValueInteger(const Mvalue* const _value){
                     // TODO are we allowing other zero representations as well???
                     if(strIsZero(_value->value._text->_c))return 0;
                     long long ll=atoll(_value->value._text->_c); // invalid if zero
-                    if(ll)return ll; // valid if non-zero
+                    if(ll!=0)return ll; // valid if non-zero
+                }
+                break;
+            case VT_TOKEN:
+                {
+                    Mstring* tokenText=_value->value._token->text;
+                    if(strIsZero(string(tokenText)))return 0;
+                    long long ll=atoll(string(tokenText)); // invalid if zero
+                    if(ll!=0)return ll; // valid if non-zero
                 }
                 break;
             case VT_RATIONAL:
@@ -749,9 +760,9 @@ long long getValueInteger(const Mvalue* const _value){
         // TODO sometimes reals can also represent integers!!!
     }
     return M_LL_INVALID;
-}
-long double getValueReal(const Mvalue* const _value){return(_value&&_value->type==VT_REAL?_value->value._real->ld:M_LD_NAN);}
-long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}
+}/* VALIDATED */
+long double getValueReal(const Mvalue* const _value){return(_value&&_value->type==VT_REAL?_value->value._real->ld:M_LD_NAN);}/* VALIDATED */
+long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}/* VALIDATED */
 
 Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
     if(_value)
@@ -763,22 +774,28 @@ Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
             {
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
                 Mbiginteger* _biginteger=__biginteger();
-                if(mp_set_longdouble(_biginteger,_value->value._real->ld)==MP_OKAY)return _biginteger;
-                outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
-                mp_clear(_biginteger);
+                if(_biginteger&&mp_set_longdouble(_biginteger,_value->value._real->ld)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+                return _biginteger;
             }
-            break;
         case VT_TEXT:
             {
                 Mbiginteger* _biginteger=__biginteger();
-                if(mp_read_radix(_biginteger,_value->value._text->_c,10)==MP_OKAY)return _biginteger;
-                outputValue("\nERROR: Failed to convert `",_value,"` to a big integer.");
-                mp_clear(_biginteger); // not used so free immediately
+                if(_biginteger&&mp_read_radix(_biginteger,_value->value._text->_c,10)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+                return _biginteger;
+            }
+        case VT_TOKEN:
+            {
+                Mbiginteger* _biginteger=__biginteger();
+                if(_biginteger&&mp_read_radix(_biginteger,string(_value->value._token->text),10)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
+                return _biginteger;
             }
         default:break;
     }
     return NULL;
-}
+}/* VALIDATED */
 // (map) list conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a list to a (possibly empty) map using the indices as attribute name
     bool result=(_map!=NULL); // no map, no result!
@@ -786,13 +803,13 @@ bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a 
         if(_list){
             Mlistelement* _listelement=_list->_first;
             while(_listelement){
-                Mstring* _indexValueText=appendll(__string(),_listelement->index);
+                Mstring* _indexValueText=appendll(__string(),_listelement->index); // free asap
                 if(_indexValueText){
-                    if(!appendedToMap(_map,string(_indexValueText),_listelement->_value))result=false;
-                    free_string(_indexValueText);
+                    if(!appendedToMap(_map,string(_indexValueText),_listelement->_value)){outputError("Failed to append a list element to a map");result=false;}
+                    free_string(_indexValueText); // freeing
                 }else{
                     result=false;
-                    output("Failed to convert index %llu to attribute name.",_listelement->index);
+                    output("ERROR: Failed to convert list element index %llu to an attribute name.\n",_listelement->index);
                 }
                 if(!result)break;
                 _listelement=_listelement->_next;
@@ -800,7 +817,7 @@ bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a 
         }
     }
     return result;
-}
+}/* VALIDATED */
 bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list){
     bool result=(_maplist&&_maplist->valuetype==VT_LIST); // the destination list should only allow for list elements
     if(result){
@@ -808,18 +825,20 @@ bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list){
             Mlistelement* _listelement=_list->_first;
             while(result&&_listelement){
                 // index and value of the list element are stored in a new list!!
-                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED);
-                Mlist* _maplistelement=(_maplistelementValue?_maplistelementValue->value._list:NULL);
+                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
+                if(!_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
+                Mlist* _maplistelement=_maplistelementValue->value._list;
                 // if we fail to construct the maplist element or to add it
-                if(!_maplistelement||!appendedToList(_maplistelement,_getIntegerValue(_listelement->index),0)||!appendedToList(_maplistelement,_listelement->_value,0)||!appendedToList(_maplist,_maplistelementValue,0))
+                if(!_maplistelement||!appendedToList(_maplistelement,_getIntegerValue(_listelement->index),0)||!appendedToList(_maplistelement,_listelement->_value,0)||!appendedToList(_maplist,_maplistelementValue,0)){
+                    outputError("Failed to create or populate map list element");
                     result=false;
-                else
+                }else
                     _listelement=_listelement->_next;
             }
         }
     }
     return result;
-}
+}/* VALIDATED */
 bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist){
     bool result=(_list!=NULL); // no list, no result!
     if(result){
@@ -833,15 +852,16 @@ bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist){
                     // the first element in the map list element should be a positive integer that we can use as index
                     long long index=getValueInteger(_maplistelementValue->value._list->_first->_value);
                     // if the index is positive AND we fail to copy the second list element over, we failed!!!
-                    if(index>0&&!appendedToList(_list,_maplistelementValue->value._list->_first->_next->_value,index))
-                        result=false;
+                    // TODO we're appending the value as is (i.e. without copying so any change will also be present in the list)
+                    // DONE this is ok because values are immutable in essence
+                    if(index>0&&!appendedToList(_list,_maplistelementValue->value._list->_first->_next->_value,index))result=false;
                 }
                 _maplistelement=_maplistelement->_next;
             }
         }
     }
     return result;
-}
+}/* VALIDATED */
 bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist){
     bool result=(_map!=NULL);
     if(result){
@@ -855,15 +875,24 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist){
                     // the first element becomes the key the second element the attribute value
                     // BUT I suppose composite keys (maps or lists) are not allowed
                     Mvalue* _attributeNameValue=_maplistelementValue->value._list->_first->_value;
-                    Mstring* _attributeNameValueText=NULL;
+                    Mstring* _attributeNameValueText=_getValueText(_attributeNameValue,true); // using common _getValueText to text the first element
+                    /* replacing:
                     if(_attributeNameValue){
                         if(_attributeNameValue->type==VT_INTEGER)_attributeNameValueText=_getIntegerText(_attributeNameValue->value._integer);else
                         if(_attributeNameValue->type==VT_REAL)_attributeNameValueText=_getRealText(_attributeNameValue->value._real);else
                         if(_attributeNameValue->type==VT_TEXT)_attributeNameValueText=_getStringText(_attributeNameValue->value._text,true); // effectively cutting of the presuffix character TODO other solution????????
                     }
+                    */
                     if(_attributeNameValueText){
-                        if(!string_length(_attributeNameValueText)||!appendedToMap(_map,string(_attributeNameValueText),_maplistelementValue->value._list->_first->_next->_value))result=false;
+                        // TODO again the value is appended as is, but 
+                        // DONE that should be OK, because values are essentially immutable!!!
+                        if(!string_length(_attributeNameValueText)||!appendedToMap(_map,string(_attributeNameValueText),_maplistelementValue->value._list->_first->_next->_value)){
+                            outputError("Failed to append a list element to a map (using the index text as attribute name)");
+                            result=false;
+                        }
                         free_string(_attributeNameValueText);
+                        // TODO is this Ok?
+                        // DONE yes, because appendedToMap will _strdup the char* (i.e. string(_attributeNameValueText) )
                     }
                 }
                 _maplistelement=_maplistelement->_next;
@@ -871,9 +900,9 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist){
         }
     }
     return result;
-}
+}/* VALIDATED */
 // map to (map) list conversions
-bool mapAppendedToList(Mlist* const _list,Mmap* const _map){
+bool mapAppendedToList(Mlist* const _list,const Mmap* const _map){
     bool result=(_list!=NULL);
     if(result){
         if(_map&&_map->_first){
@@ -881,14 +910,17 @@ bool mapAppendedToList(Mlist* const _list,Mmap* const _map){
             while(result&&_mapelement){
                 // only add those map elements of which the key can be converted to a positive integer
                 long long index=atoll(_mapelement->_variable->_name);
-                if(index>0&&!appendedToList(_list,_mapelement->_variable->_value,index))result=false;
+                if(index>0&&!appendedToList(_list,_mapelement->_variable->_value,index)){
+                    outputError("Failed to append a map element to a list (using the integer value of the name as index)");
+                    result=false;
+                }
                 _mapelement=_mapelement->_next;
             }
         }
     }
     return result;
-}
-bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map){
+}/* VALIDATED */
+bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map){
     bool result=(_maplist&&_maplist->valuetype==VT_LIST);
     if(result){
         if(_map&&_map->_first){
@@ -899,30 +931,46 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mmap* const _map){
                 Mlist* _maplistelement=(_maplistelementValue?_maplistelementValue->value._list:NULL);
                 if(_maplistelement){
                     // if we fail to construct the maplist element or to add it
-                    // NOTE the attribute name does not start with a quote character wich we need to call _getStringValue
+                    // NOTE the attribute name does not start with a quote character wich we need to call _getTextValue
+                    // TODO the following could be restructured I suppose
                     Mstring* _attributeName=__string();
-                    if(_attributeName){
-                        string_append_char(_attributeName,'\'');
-                        string_append(_attributeName,_mapelement->_variable->_name);
-                        Mvalue* _attributeNameValue=_getTextValue(string(_attributeName),false);
-                        if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,0)){
-                            if(!appendedToList(_maplistelement,_mapelement->_variable->_value,0)||!appendedToList(_maplist,_maplistelementValue,0))result=false;
-                        }else
+                    if(_attributeName){ // should be freed
+                        Mstring* p=_attributeName;
+                        p=string_append_char(p,'\'');
+                        p=string_append(p,_mapelement->_variable->_name);
+                        if(p){
+                            Mvalue* _attributeNameValue=_getTextValue(string(_attributeName),false);
+                            if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,0)){
+                                if(!appendedToList(_maplistelement,_mapelement->_variable->_value,0)||!appendedToList(_maplist,_maplistelementValue,0)){
+                                    result=false;
+                                    outputError("Failed to append the attribute value in constructing a map list element");
+                                }
+                            }else{
+                                result=false;
+                                outputError("Failed to create or add the attribute name in constructing a map list element");
+                            }
+                        }else{
                             result=false;
-                        free_string(_attributeName);
-                    }else
-                        result=false;                
-                }else
+                            outputError("Failed to construct the attribute name text in constructing a map list element");
+                        }
+                        free_string(_attributeName); // freed!
+                    }else{
+                        result=false;
+                        outputError("Failed to create a text");
+                    }               
+                }else{
                     result=false;
+                    outputError("Failed to create a map list element list");
+                }
                 _mapelement=_mapelement->_next;
             }
         }
     }
     return result;
-}
+}/* VALIDATED */
 
-Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=calloc(1,sizeof(Mlist));_list->valuetype=valuetype;return _list;}
-Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=calloc(1,sizeof(Mmap));_map->valuetype=valuetype;return _map;}
+Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=CALLOC(1,sizeof(Mlist),'L');_list->valuetype=valuetype;return _list;}/* VALIDATED */
+Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=CALLOC(1,sizeof(Mmap),'M');_map->valuetype=valuetype;return _map;}/* VALIDATED */
 
 bool isValueZero(Mvalue* _value){
     if(_value){
@@ -933,17 +981,17 @@ bool isValueZero(Mvalue* _value){
         if(_value->type==VT_RATIONAL)return isBigintegerZero(_value->value._rational->num);
     }
     return false;
-}
+}/* VALIDATED */
 bool isValueOne(Mvalue* _value){
     if(_value){
         if(_value->type==VT_INTEGER)return _value->value._integer->ll==1;
         if(_value->type==VT_BIGINTEGER)return isBigintegerOne(_value->value._biginteger);
+        if(_value->type==VT_REAL)return _value->value._real->ld==1;
         if(_value->type==VT_DECIMAL)return isDecimalOne(_value->value._decimal);
         if(_value->type==VT_RATIONAL)return isRationalOne(_value->value._rational);
-        if(_value->type==VT_REAL)return _value->value._real->ld==1;
     }
     return false;
-}
+}/* VALIDATED */
 
 // null test for the value to be considered NULL
 bool isNull(Mvalue* _value){
@@ -967,7 +1015,7 @@ bool isNull(Mvalue* _value){
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
     // if iterations, you're supposed to return all iteration results
     Mlist* _iterationsList=_getListOfType(VT_UNDEFINED);
-    if(_iterationsList){
+    if(_iterationsList){ // should be freed when NOT returned!!
         Mrational* _rational=NULL; // the last (computed) rational
         if(!ldIsNaN(ld)&&!ldIsInf(ld)){ // neither a NaN nor Inf      
             if(!ldIsZero(ld)){
@@ -985,26 +1033,39 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     ///////printf(" - delta: %.*Lf, rem: %.*Lf",LDBL_DIG,delta,LDBL_DIG,rem);
                     ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
                     delta=(ld*q)-p;
-                    if(ldIsZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
                     ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
                     _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false,true); // construct the intermediate result without normalizing
-                    if(!_rational){output("%sFailed to construct the intermediate rational %lld/%lld",ERROR_PREFIX,p,q);break;}
+                    if(!_rational){output("%sFailed to construct the rational approximation %lld/%lld",ERROR_PREFIX,p,q);break;}
+                    // NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
                     Mvalue* _rationalValue=_getRationalValue(_rational,true);
                     if(!_rationalValue){outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
-                    if(!appendedToList(_iterationsList,_rationalValue,i)){free_rational(_rational);outputError("Failed to register a intermediate rational approximation");/*break;*/}
+                    // NOTE probably best to break if we can't append approximations!!
+                    // NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
+                    if(!appendedToList(_iterationsList,_rationalValue,i)){/*free_rational(_rational);*/outputError("Failed to register a rational approximation");break;}
+                    // if we get here success in updating the iterations list!!!!
+                    // if delta is now zero, we're done!!!
+                    if(ldIsZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
                     rem-=a;
                     rem=1/rem;
                     // shift the lot
                     pmin2=pmin1;qmin2=qmin1;
                     pmin1=p;qmin1=q;
                 }
-                // construct the last rational (i.e. the result) from p and q
-                Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
-                if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true,true);
-            }else // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
-                _rational=_getRational(__biginteger(),NULL,M_LD_NAN,false,true);
+                /* NO NEED FOR THIS ANYMORE NOW WE'VE PLACED THE CHECK FOR delta IS zero AFTER APPENDING THE RATIONAL
+                if(ldIsZero(delta)){ // success but the final rational has not yet been appended to the list!!
+                    // construct the last rational (i.e. the result) from p and q
+                    Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q); // have to be freed when not bound in _rational
+                    if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true,false);
+                    if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);} // DIY freeing if failing to construct the rational
+                }
+                */
+            }else{ // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
+                Mvalue* _rationalValue=_getRationalValue(_getRational(__biginteger(),NULL,M_LD_NAN,false,true),true); // OK free __biginteger() if failing to get that _rational
+                if(_rationalValue&&!appendedToList(_iterationsList,_rationalValue,0))outputError("Failed to append rational approximation to the result list");
+            }
         }
+        /* 
         // _rational should contain the 'last' computed rational
         if(_rational){
             Mvalue* _rationalValue=_getRationalValue(_rational,true);
@@ -1018,10 +1079,12 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
             }else // failed to wrap the rational
                 outputError("Failed to store the rational approximation");
         }
-        if(_iterationsList)free_list(_iterationsList);
-    }
-    return NULL;
-}
+        free_list(_iterationsList);
+        */
+    }else
+        outputError("Failed to create a list for storing the rational approximations");
+    return _iterationsList;
+}/* VALIDATED */
 
 void assignValue(Mvalue** _valueholder,Mvalue* const _value){
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
