@@ -67,23 +67,23 @@ bool popExecutionEnvironment();
 
 // function prototypes
 // read access
-uint32_t getNumberOfVariables(Menvironment* _environment);
-Mstring* _getVariableNames(const Menvironment* _environment,char* sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
+uint32_t getNumberOfVariables(const Menvironment* const _environment);
+Mstring* _getVariableNames(const Menvironment* const _environment,const char* const sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
 /* replacing:
 Mvariable* getNewVariable(Menvironment* _environment,const char* name);
 Mvariable* getVariable(Menvironment* _environment,const char* name);
 */
-bool containsVariable(Menvironment* _environment,const char* name);
-Mvaluetype getVariableType(Menvironment* _environment,const char* name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
-Mvaluetype getVariableValueType(Menvironment* _environment,const char* name); // same as getVariableType() if a type is defined for the given variable
+bool containsVariable(const Menvironment* const _environment,const char* const name);
+Mvaluetype getVariableType(const Menvironment* const _environment,const char* const name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
+Mvaluetype getVariableValueType(const Menvironment* const _environment,const char* const name); // same as getVariableType() if a type is defined for the given variable
 
 // write access
-bool setVariableType(Menvironment* _environment,const char* name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type
+bool setVariableType(const Menvironment* const _environment,const char* const name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type
 // create a value of a certain value type initialized with either value NULL (atomic values) or an empty list or map (VT_LIST,VT_MAP)
 // NOTE when using VT_UNDEFINED, the value remains NULL but any value can be stored in it subsequently
-bool createVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype);
+bool createVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype);
 
-long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value);
+long long appendToListVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
 
 /*
 Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue);
@@ -91,10 +91,10 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 // once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
 // decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mtext, Mlist or Mmap pointer)
-bool setValue(Menvironment* _environment,const char* name,Mvalue* _value);
-Mvalue* getValue(Menvironment* _environment,const char* name);
+bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
+Mvalue* getValue(const Menvironment* const _environment,const char* const name);
 
-bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype,bool immutable);
+bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable);
 /*
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real);
@@ -103,20 +103,20 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string);
 */
 
 // functions
-Mstring* _getFunctionNames(const Menvironment* _environment,char* sep);
-Mfunction* newFunction(Menvironment* _environment,const char* functionName);
-bool registerInternalFunctions(Menvironment* _environment);
+Mstring* _getFunctionNames(const Menvironment* const _environment,const char* const sep);
+Mfunction* _getFunction(Menvironment* const _environment,const char* const functionName); // creates the function if it does not exist yet
+bool registerInternalFunctions(Menvironment* const _environment);
 // helper function to return the function
-Mfunction* getFunction(Menvironment* _environment,const char* functionName);
+Mfunction* getFunction(const Menvironment* const _environment,const char* const functionName);
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
-Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList);
+Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList);
 
-bool completedFunction(Mfunction* _function,NoArgumentFunction noArgumentFunction);
-bool completedValueFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
-bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
-bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
-bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoArgumentFunction);
-bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction);
+bool completedFunction(const Mfunction* const _function,NoArgumentFunction noArgumentFunction);
+bool completedValueFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedIntegerFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedRealFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedStringStringFunction(const Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
+bool completedListFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
 
-Mvalue* Mfacd(Mvalue* _value);
-Mvalue* Mfac(Mvalue* _value);
+Mvalue* Mfacd(const Mvalue* const _value);
+Mvalue* Mfac(const Mvalue* const _value);

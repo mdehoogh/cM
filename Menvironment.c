@@ -26,31 +26,38 @@ void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
         free_value(_expressionlistelement->_value);
         free(_expressionlistelement);
     }
-}
+}/* VALIDATED */
 void free_expressionlist(Mexpressionlist* _expressionlist){
     if(_expressionlist){
         free_expressionlistelement(_expressionlist->_next);
+        free_value(_expressionlist->_value);
         free(_expressionlist);
     }
-}
+}/* VALIDATED */
 void free_functiondefinition(Mfunctiondefinition* _functiondefinition){
     if(_functiondefinition){
         if(_functiondefinition->_parameterMap)free_map(_functiondefinition->_parameterMap);
         if(_functiondefinition->_expressionlist)free_expressionlist(_functiondefinition->_expressionlist);
         free(_functiondefinition);
     }
-}
+}/* VALIDATED */
 // NOTE typically you're not supposed to free internal functions safe M function definitions 
+// TODO if a function map is freed, we shouldn't free internal functions BUT those are only present in the main environment which is never released!!
 bool free_function(Mfunction* _function){
     if(_function){
         if(_function->type==FT_M){
+            free_string(_function->_name);
+            free_map(_function->_parameterMap);
+            // TODO should we actually free the definitiona environment as it is a reference to an environment
+            // DONE I guess not
+            //////////free_environment(_function->_definitionEnvironment);
             free_functiondefinition(_function->functionunion._functiondefinition);
             free(_function);
             return true;
         }
     }
     return false;
-}
+}/* VALIDATED */
 bool free_functionmapelement(Mfunctionmapelement* _functionmapelement){
     if(_functionmapelement){
         if(free_functionmapelement(_functionmapelement->_next))_functionmapelement->_next=NULL;
@@ -60,20 +67,20 @@ bool free_functionmapelement(Mfunctionmapelement* _functionmapelement){
         }
     }
     return false;
-}
+}/* VALIDATED */
 void free_functionmap(Mfunctionmap* _functionmap){
     if(_functionmap){
         free_functionmapelement(_functionmap->_first);
         free(_functionmap);
     }
-}
+}/* VALIDATED */
 void free_environment(Menvironment* _environment){
     if(_environment){
         free_map(_environment->_variableMap);
         free_functionmap(_environment->_functionMap);
         free(_environment);
     }
-}
+}/* VALIDATED */
 // END RELEASERS
 // keep track of the current execution environment
 static Menvironment* _executionEnvironment=NULL;
@@ -83,75 +90,83 @@ bool pushExecutionEnvironment(Menvironment* _environment){
     _environment->_parent=_executionEnvironment;
     _executionEnvironment=_environment;
     return true;
-}
+}/* VALIDATED */
 bool popExecutionEnvironment(){
+    // NOTE only execution environments that have a parent can be popped!!!
     Menvironment* _parentExecutionEnvironment=(_executionEnvironment?_executionEnvironment->_parent:NULL);
     if(!_parentExecutionEnvironment)return false;
     _executionEnvironment->_parent=NULL; // clear the parent of the current execution environment
     free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     _executionEnvironment=_parentExecutionEnvironment;
     return true;
-}
+}/* VALIDATED */
 
 // read access to the elements defined in an environment
-uint32_t getNumberOfVariables(Menvironment* _environment){
-    return(_environment?_environment->_variableMap->numberOfElements:0);
-}
+uint32_t getNumberOfVariables(const Menvironment* const _environment){
+    return(_environment&&_environment->_variableMap?_environment->_variableMap->numberOfElements:0);
+}/* VALIDATED */
+
 // the names of the variables may be requested
-Mstring* _getVariableNames(const Menvironment* _environment,char* sep){
-    if(_environment!=NULL&&sep!=NULL){
-        Mstring* variableNames=__string();
-        if(variableNames!=NULL){
+Mstring* _getVariableNames(const Menvironment* const _environment,const char* const sep){
+    Mstring* _variableNames=NULL;
+    if(_environment&&sep){
+        _variableNames=__string();
+        if(_variableNames){
+            Mstring* p=_variableNames;
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                Mstring* parentVariableNames=_getVariableNames(_environment->_parent,sep);
-                if(parentVariableNames){
-                    string_append(variableNames,string(parentVariableNames));
-                    free_string(parentVariableNames); // we can do this because string_append copies the characters
+                Mstring* _parentVariableNames=_getVariableNames(_environment->_parent,sep); // free asap
+                if(_parentVariableNames){
+                    p=string_append(p,string(_parentVariableNames));
+                    free_string(_parentVariableNames); // we can do this because string_append copies the characters
                 }
             }
             // we'll be appending the names of the variables in the environment itself
-            Mmapelement* _variableMapelement=_environment->_variableMap->_first;
-            while(_variableMapelement){
-                if(strlen(sep))if(!string_empty(variableNames))string_append(variableNames,sep);
-                string_append(variableNames,_variableMapelement->_variable->_name);
-                _variableMapelement=_variableMapelement->_next;
+            if(_environment->_variableMap){
+                Mmapelement* _variableMapelement=_environment->_variableMap->_first;
+                while(p&&_variableMapelement){
+                    if(_variableMapelement->_variable){
+                        if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
+                        p=string_append(p,_variableMapelement->_variable->_name);
+                    }
+                    _variableMapelement=_variableMapelement->_next;
+                }
             }
-            return variableNames;
+            if(!p){free_string(_variableNames);_variableNames=NULL;}
         }
     }
-    return NULL;
-}
+    return _variableNames;
+}/* VALIDATED */
 
-Mvariable* getVariable(Menvironment* _environment,const char* name, bool verbose){
+Mvariable* getVariable(const Menvironment* const _environment,const char* const name, bool verbose){
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     // input valid        
     if(!_environment->_variableMap){outputError("No variables in environment");return NULL;}
-    if(verbose)output("Looking for variable '%s'.",name);
-    Mmapelement*_variableMapelement=_environment->_variableMap->_first;
+    if(amVerbose())output("Looking for variable '%s'.\n",name);
+    Mmapelement* _variableMapelement=_environment->_variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
     while(_variableMapelement&&(!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))_variableMapelement=_variableMapelement->_next;
     if(!_variableMapelement){
-        if(verbose)outputLine("Found!");
+        if(amVerbose())output("Not found!\n");
         return NULL;
     }
     return _variableMapelement->_variable;
-}
-bool containsVariable(Menvironment* _environment,const char* name){return(getVariable(_environment,name,false)!=NULL);}
+}/* VALIDATED */
+bool containsVariable(const Menvironment* const _environment,const char* const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
 
 // write access
 // helper function to create a new variable with a given name and of a given type
 
 // addVariable returns the value map element that was created (if successful)
-bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetype,bool immutable){
+bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
     if(_environment&&name){ // input valid
         _variable=getVariable(_environment,name,false);
         if(!_variable){ // non-existing...
-            _variable=_getVariable(name,valuetype,immutable);
+            _variable=_getVariable(name,valuetype,immutable); // creates the variable, free when not bound
             //////printf("\nVariable created!");
             if(_variable){
-                Mmapelement* _variableMapelement=(Mmapelement*)malloc(sizeof(Mmapelement));
+                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'V');
                 if(_variableMapelement){
                     // store the references
                     _variableMapelement->_next=NULL;
@@ -170,18 +185,18 @@ bool addVariable(Menvironment* _environment,const char* name,Mvaluetype valuetyp
         }
     }
     return false;
-}
+}/* VALIDATED */
 
-bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
+bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!_environment||!name){outputError("Cannot set the value: no environment or name");return false;}
-    Mvariable* _variable=getVariable(_environment,name,false);
-    if(_variable){
-        if(!_variable->_value||!_variable->immutable){
+    Mvariable* variable=getVariable(_environment,name,false);
+    if(variable){
+        if(!variable->_value||!variable->immutable){
             // _value needs to be of the right type
-            if(!_value||_variable->valuetype==VT_UNDEFINED||_variable->valuetype==_value->type){
+            if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
-                assignValue(&_variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
+                assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
                 if(amDebugging()){Mstring* _valueText=_getValueText(_value,false);output("Value `%s` assigned to variable `%s`.",string(_valueText),name);free_string(_valueText);}
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
@@ -192,142 +207,159 @@ bool setValue(Menvironment* _environment,const char* name,Mvalue* _value){
     }else
         output("%sCannot set the value of variable `%s`:it is unknown.\n",ERROR_PREFIX,name);
     return false;
-}
+}/* VALIDATED */
 
-long long appendToListVariable(Menvironment* _environment,const char* name,Mvalue* _value){
-    if(!_environment||!name||!_value){outputError("No environment, variable name of value specified");return 0;}
-    Mvariable* _variable=getVariable(_environment,name,amVerbose());
-    if(_variable){
-        Mvalue* _variableValue=_variable->_value; // OOPS shouldn't assign to _value (that's the parameter name DUMMY)
-        if(_variableValue->type==VT_LIST){ // yes a list we can append to
+long long appendToListVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
+    if(!_environment||!name){outputError("No environment or variable name specified");return 0;}
+    Mvariable* variable=getVariable(_environment,name,amVerbose());
+    if(variable){
+        Mvalue* variableValue=variable->_value; // OOPS shouldn't assign to _value (that's the parameter name DUMMY)
+        if(variableValue&&variableValue->type==VT_LIST){ // yes a list we can append to
             // we should prevent circular references
-            if(_variableValue==_value)_value=NULL;
-            Mlist* _list=_variableValue->value._list;
-            unsigned long long index=appendedToList(_list,_value,0); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
-            if(index)return index;
-            output("%sDidn't append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",ERROR_PREFIX,name,_value->type);
+            if(variableValue!=_value){
+                unsigned long long index=appendedToList(variableValue->value._list,_value,0); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
+                if(index>0)return index;
+                output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",ERROR_PREFIX,name,(_value?_value->type:-1));
+            }else
+                outputError("Circular reference not allowed");
         }else
-            output("%sCannot append the value to variable '%s': it does not contain a list!\n",name);
+            output("%sCannot append the value to variable '%s': it does not contain a list!\n",ERROR_PREFIX,name);
     }else
         output("%sCannot set the value of variable '%s':it is unknown.\n",ERROR_PREFIX,name);
     return 0;
-}
+}/* VALIDATED */
 
-Mvalue* getValue(Menvironment* _environment,const char* name){
+Mvalue* getValue(const Menvironment* const _environment,const char* const name){
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
-    Mvariable* _variable=getVariable(_environment,name,false);
-    return(_variable?_variable->_value:NULL);
-}
+    Mvariable* variable=getVariable(_environment,name,false);
+    return(variable?variable->_value:NULL);
+}/* VALIDATED */
 
 // FUNCTION STUFF
 // the names of the variables may be requested
-Mstring* _getFunctionNames(const Menvironment* _environment,char* sep){
+Mstring* _getFunctionNames(const Menvironment* const _environment,const char* const sep){
+    Mstring* _functionNames=NULL;
     if(_environment&&sep){
-        Mstring* _functionNames=__string();
+        _functionNames=__string();
         if(_functionNames){
+            Mstring* p=_functionNames;
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                Mstring* parentFunctionNames=_getFunctionNames(_environment->_parent,sep);
-                if(parentFunctionNames){
-                    string_append(_functionNames,string(parentFunctionNames));
-                    free_string(parentFunctionNames); // we can do this because string_append copies the characters that string() points to!!
+                Mstring* _parentFunctionNames=_getFunctionNames(_environment->_parent,sep);
+                if(_parentFunctionNames){
+                    p=string_append(p,string(_parentFunctionNames));
+                    free_string(_parentFunctionNames); // we can do this because string_append copies the characters that string() points to!!
                 }
             }
             // we'll be appending the names of the variables in the environment itself
-            if(_environment->_functionMap){
-                Mfunctionmapelement* _functionmapelement=_environment->_functionMap->_first;
-                while(_functionmapelement){
-                    if(strlen(sep))if(!string_empty(_functionNames))string_append(_functionNames,sep);
-                    string_append(_functionNames,string(_functionmapelement->_function->_name));
-                    _functionmapelement=_functionmapelement->_next;
+            if(p&&_environment->_functionMap){
+                Mfunctionmapelement* functionmapelement=_environment->_functionMap->_first;
+                while(p&&functionmapelement){
+                    if(functionmapelement->_function){
+                        if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
+                        p=string_append(p,string(functionmapelement->_function->_name));
+                    }
+                    functionmapelement=functionmapelement->_next;
                 }
-                return _functionNames;
             }
+            if(!p){free_string(_functionNames);_functionNames=NULL;}
         }
     }
-    return NULL;
-}
+    return _functionNames;
+}/* VALIDATED */
 
-Mfunction* getFunction(Menvironment* _environment,const char* functionName){
+Mfunction* getFunction(const Menvironment* const _environment,const char* const functionName){
     if(_environment&&functionName&&strlen(functionName)){
-        Mfunctionmap* _functionmap=_environment->_functionMap;
-        if(_functionmap){
-            Mfunctionmapelement* _functionmapelement=_functionmap->_first;
+        Mfunctionmap* functionmap=_environment->_functionMap;
+        if(functionmap){
+            Mfunctionmapelement* functionmapelement=functionmap->_first;
             // we need string() on the function name as function name is an Mstring*
-            while(_functionmapelement){
-                if(_functionmapelement->_function&&!strcmp(string(_functionmapelement->_function->_name),functionName)){
+            while(functionmapelement){
+                if(functionmapelement->_function&&!strcmp(string(functionmapelement->_function->_name),functionName)){
                     //////////printf("\nFunction '%s' matches '%s'.",string(_functionmapelement->_function->_name),functionName);
-                    return _functionmapelement->_function;
+                    return functionmapelement->_function;
                 }
-                _functionmapelement=_functionmapelement->_next;
+                functionmapelement=functionmapelement->_next;
             }
         }
     }
     return NULL;    
-}
+}/* VALIDATED */
 
-Mmap* _getFunctionArgumentMap(Mfunction* _function,Mlist* _argumentList){
+Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList){
+    Mmap* _functionArgumentMap=NULL;
     if(_function&&_argumentList){
-        Mmap* _argumentMap=(Mmap*)calloc(1,sizeof(Mmap));
-        Mmap* _functionParameterMap=_function->_parameterMap;
-        if(_functionParameterMap){
+        _functionArgumentMap=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+        Mmap* functionParameterMap=_function->_parameterMap;
+        if(functionParameterMap){
             if(amVerbose())output("Matching the function parameters!");
-            Mmapelement* _functionParameterMapelement=_functionParameterMap->_first;
-            Mlistelement* _argumentListelement=_argumentList->_first;
-            while(_functionParameterMapelement){
-                Mmapelement* _argumentmapelement=(Mmapelement*)calloc(1,sizeof(Mmapelement));
+            Mmapelement* functionParameterMapelement=functionParameterMap->_first;
+            Mlistelement* argumentListelement=_argumentList->_first;
+            while(functionParameterMapelement){
+                Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+                if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
-                _argumentmapelement->_variable=(Mvariable*)calloc(1,sizeof(Mvariable));
+                _argumentmapelement->_variable=(Mvariable*)CALLOC(1,sizeof(Mvariable),'V');
+                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement);break;}
                 // probably can't simply assign??? let's use _strdup then
-                _argumentmapelement->_variable->_name=_strdup(_functionParameterMapelement->_variable->_name);
+                _argumentmapelement->_variable->_name=_strdup(functionParameterMapelement->_variable->_name);
+                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement);break;}
                 // associate the argument list element value (if available)
-                if(_argumentListelement){
-                    assignValue(&_argumentmapelement->_variable->_value,_argumentListelement->_value);
-                    _argumentListelement=_argumentListelement->_next;
+                if(argumentListelement){
+                    assignValue(&_argumentmapelement->_variable->_value,argumentListelement->_value);
+                    argumentListelement=argumentListelement->_next;
                 }else // use the default!!!
-                    assignValue(&_argumentmapelement->_variable->_value,_functionParameterMapelement->_variable->_value);
+                    assignValue(&_argumentmapelement->_variable->_value,functionParameterMapelement->_variable->_value);
                 // append to _argumentMap
-                if(_argumentMap->_last)_argumentMap->_last->_next=_argumentmapelement;else _argumentMap->_first=_argumentmapelement;
-                _argumentMap->_last=_argumentmapelement;
-                _argumentMap->numberOfElements++;
-                _functionParameterMapelement=_functionParameterMapelement->_next;
+                if(_functionArgumentMap->_last)_functionArgumentMap->_last->_next=_argumentmapelement;else _functionArgumentMap->_first=_argumentmapelement;
+                _functionArgumentMap->_last=_argumentmapelement;
+                _functionArgumentMap->numberOfElements++;
+                functionParameterMapelement=functionParameterMapelement->_next;
             }
         }
         if(amVerbose())output("Argument map created.");
-        return _argumentMap;
     }
-    return NULL;
-}
+    return _functionArgumentMap;
+}/* VALIDATED */
 
-Mfunction* newFunction(Menvironment* _environment,const char* name){
+// newFunction renamed to _getFunction(), not to be confused with getFunction()
+// _getFunction() will create the function
+Mfunction* _getFunction(Menvironment* const _environment,const char* const name){
     Mfunction* _function=NULL;
     if(_environment&&name&&strlen(name)){
         _function=getFunction(_environment,name);
         if(!_function){ // doesn't exist yet
-            _function=(Mfunction*)calloc(1,sizeof(Mfunction));
+            _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'F');
             if(_function){
                 _function->_definitionEnvironment=_environment; // TODO why would we need this?????
-                Mstring* _functionName=string_append(__string(),name);
+                Mstring* _functionName=__string();
                 if(_functionName){
-                    // try to append it to the functionMap, if we succeed store _functioName in ->_name
-                    Mfunctionmap* _functionmap=_environment->_functionMap;
-                    if(_functionmap){
-                        Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)calloc(1,sizeof(Mfunctionmapelement));
-                        if(_functionmapelement){
-                            _functionmapelement->_function=_function; // no worries here
-                            Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
-                            if(_lastFunctionmapelement){
-                                _lastFunctionmapelement->_next=_functionmapelement;
+                    Mstring* p=_functionName;
+                    p=string_append(p,name);
+                    if(p){
+                        Mfunctionmap* _functionmap=_environment->_functionMap;
+                        if(_functionmap){
+                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(1,sizeof(Mfunctionmapelement),'f');
+                            if(_functionmapelement){
+                                _functionmapelement->_function=_function; // no worries here
+                                Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
+                                if(_lastFunctionmapelement){
+                                    _lastFunctionmapelement->_next=_functionmapelement;
+                                    _functionmap->_last=_functionmapelement;
+                                }else
+                                    _functionmap->_first=_functionmapelement;
                                 _functionmap->_last=_functionmapelement;
-                            }else
-                                _functionmap->_first=_functionmapelement;
-                            _functionmap->_last=_functionmapelement;
-                            _functionmap->numberOfFunctions++;
-                             _function->_name=_functionName; // success!!!!!
-                            if(amVerbose())output("Function '%s' registered as function #%d.\n",string(_function->_name),_functionmap->numberOfFunctions);
-                        }
+                                _functionmap->numberOfFunctions++;
+                                _function->_name=_functionName; // success!!!!!
+                                if(amVerbose())output("Function '%s' registered as function #%d.\n",string(_function->_name),_functionmap->numberOfFunctions);
+                            }else // failure
+                                p=NULL;
+                        }else
+                            p=NULL;
                     }
-                }else
+                    if(!p)free_string(_functionName); // p==NULL indicates _functionName not bound in _function->_name
+                    // try to append it to the functionMap, if we succeed store _functioName in ->_name
+                 }else
                     output("%sFailed to store function name '%s'.\n",ERROR_PREFIX,name);
                 // if we fail to register the name and/or the function with the environment free the function!!
                 if(!_function->_name){free_function(_function);_function=NULL;}   
@@ -337,14 +369,14 @@ Mfunction* newFunction(Menvironment* _environment,const char* name){
             output("NOTE: Function '%s' already exists.\n",name);
     }
     return _function;
-}
+}/* VALIDATED */
 // END FUNCTION STUFF
 
 // the internal functions
 /**
  * Msettype() to set the (value) type of a variable
  */
-Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
+Mvalue* Msettype(const Mvalue* const _variableName,const Mvalue* const _valuetype){
     // check the types first, both should be strings
     if(_variableName->type==VT_TEXT&&_valuetype->type==VT_TEXT){
         char* variableName=_variableName->value._text->_c; // ignoring the presuffix exactly as we need to!!!
@@ -396,7 +428,7 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
         }
     }
     return NULL;
-}
+}/* VALIDATED */
 
 // applying unary operators by means of functions
 Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction){
