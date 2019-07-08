@@ -1152,34 +1152,53 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){
     // BUT if we multiply the numerator with 2 we can divide and compare with 
     // TODO ignores delta for now
     if(_rational){
-        if(!_rational->den)return (_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1));
-        // if the numerator equals 1, the result is 0 for denominator equals 1 or 2
-        if(!_rational->num)return _getBiginteger(_rational->den||mp_cmp(_rational->den,getBigintegerOne())==MP_EQ?1:0); // if the numerator is undefined (i.e. equals 1), either return 0 or 1 (denominator 1)
+        // denominator equal to 1?
+        if(!_rational->den||mp_cmp(_rational->den,getBigintegerOne())==MP_EQ)return(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1));
+        // if the numerator equals 1, the result is 0
+        if(!_rational->num||mp_cmp(_rational->num,getBigintegerOne())==MP_EQ)return _getBiginteger(0); // with the numerator at least equal to 2 the result will always be 0
         bool neg=mp_isneg(_rational->num); // determine whether negative or not
         // get the absolute value of the numerator
-        Mbiginteger* _absnum=__biginteger(); // to be freed asap
-        if(mp_abs(_rational->num,_absnum)!=MP_OKAY){free_biginteger(_absnum);outputError("Failed to compute the absolute of a big integer");return NULL;}
-        Mbiginteger* _twicenum=__biginteger();
         Mbiginteger* _dividend=NULL;
-        if(mp_mul_2(_absnum,_twicenum)==MP_OKAY){
-            Mbiginteger* _twiceden=__biginteger();
-            if(mp_mul_2(_rational->den,_twiceden)==MP_OKAY){
-                Mbiginteger* _remainder=__biginteger();
-                _dividend=__biginteger();
-                bool success=(mp_div(_twicenum,_twiceden,_dividend,_remainder)==MP_OKAY);
-                if(success&&mp_cmp(_remainder,_rational->den)==MP_GT&&mp_incr(_dividend)!=MP_OKAY)success=false;
-                if(success&&neg&&mp_neg(_dividend,_dividend)!=MP_OKAY)success=false;
-                if(!success){free_biginteger(_dividend);_dividend=NULL;}
-                free_biginteger(_remainder);
-            }
-            free_biginteger(_twiceden);
+        Mbiginteger* _absnum=__biginteger(); // to be freed asap
+        if(_absnum){ // freeable
+            if(mp_abs(_rational->num,_absnum)==MP_OKAY){
+                Mbiginteger* _twicenum=__biginteger();
+                if(_twicenum){ // freeable
+                    if(mp_mul_2(_absnum,_twicenum)==MP_OKAY){
+                        Mbiginteger* _twiceden=__biginteger();
+                        if(_twiceden){
+                            if(mp_mul_2(_rational->den,_twiceden)==MP_OKAY){
+                                Mbiginteger* _remainder=__biginteger();
+                                if(_remainder){
+                                    _dividend=__biginteger();
+                                    if(_dividend){
+                                        bool success=(mp_div(_twicenum,_twiceden,_dividend,_remainder)==MP_OKAY);
+                                        // increment _dividend if _remainder larger than denominator
+                                        if(success&&mp_cmp(_remainder,_rational->den)==MP_GT&&mp_incr(_dividend)!=MP_OKAY)success=false;
+                                        if(success&&neg&&mp_neg(_dividend,_dividend)!=MP_OKAY)success=false;
+                                        if(!success){free_biginteger(_dividend);_dividend=NULL;}
+                                    }else 
+                                        outputError("Failed to create big integer dividend");
+                                    free_biginteger(_remainder);
+                                }else 
+                                    outputError("Failed to create big integer remainder");
+                            }else
+                                outputError("Failed to double big integer denominator");
+                            free_biginteger(_twiceden);
+                        }
+                    }else
+                        outputError("Failed to double big integger numerator");
+                    free_biginteger(_twicenum); // freed!
+                }else
+                    outputError("Failed to create big integer");
+            }else
+                outputError("Failed to compute the absolute of a big integer");
+            free_biginteger(_absnum); // freed!
         }
-        free_biginteger(_twicenum);
-        free_biginteger(_absnum);
         return _dividend;
     }
     return NULL;
-}
+}/* VALIDATED */
 /*
  * \parameter floor  when true, returns the integer part of the rational, which actually is the trunc value
  * \parameter towardszero is true, returns the integer part of the rational, which actually is the trunc version
