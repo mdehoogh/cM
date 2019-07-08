@@ -1255,58 +1255,58 @@ bool initEnvironment(){
 				return false;
 			}
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
-			if(_resultListValue&&!completedIntegerFunction(newFunction(_Menvironment,"M"),getResult)){
+			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),getResult)){
 				outputError("Failed to register function M (for requesting previous results)");
 				return false;
 			}
 			/*
-			if(!completedFunction(newFunction(_Menvironment,"ml"),ml)){
+			if(!completedFunction(_getFunction(_Menvironment,"ml"),ml)){
 				outputLine("ERROR: Failed to register map list (constructor) function.");
 				return false;
 			}
 			*/
-			if(!completedIntegerFunction(newFunction(_Menvironment,"setdp"),setdp)){
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),setdp)){
 				outputError("Failed to register the setdp function");
 				return false;
 			}
 			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(newFunction(_Menvironment,"pi$q"),pi_q)||!completedIntegerFunction(newFunction(_Menvironment,"pi$ql"),pi_ql)||!completedIntegerFunction(newFunction(_Menvironment,"pi"),pi_d)){
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),pi_ql)||!completedIntegerFunction(_getFunction(_Menvironment,"pi"),pi_d)){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return false;
 			}
 			// conversions
-			if(!completedValueFunction(newFunction(_Menvironment,"i"),i)||!completedValueFunction(newFunction(_Menvironment,"I"),I)
-					||!completedValueFunction(newFunction(_Menvironment,"t"),t)
-					||!completedValueFunction(newFunction(_Menvironment,"r"),r)
-					||!completedValueFunction(newFunction(_Menvironment,"q"),q)||!completedValueFunction(newFunction(_Menvironment,"Q"),Q)
-					||!completedValueFunction(newFunction(_Menvironment,"d"),d)
-					||!completedValueFunction(newFunction(_Menvironment,"b"),b)||!completedValueFunction(newFunction(_Menvironment,"B"),B)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"i"),i)||!completedValueFunction(_getFunction(_Menvironment,"I"),I)
+					||!completedValueFunction(_getFunction(_Menvironment,"t"),t)
+					||!completedValueFunction(_getFunction(_Menvironment,"r"),r)
+					||!completedValueFunction(_getFunction(_Menvironment,"q"),q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),Q)
+					||!completedValueFunction(_getFunction(_Menvironment,"d"),d)
+					||!completedValueFunction(_getFunction(_Menvironment,"b"),b)||!completedValueFunction(_getFunction(_Menvironment,"B"),B)){
 				outputError("Failed to register value type conversion functions");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"neg"),Mneg)||!completedValueFunction(newFunction(_Menvironment,"bnot"),Mbnot)||!completedValueFunction(newFunction(_Menvironment,"not"),Mnot)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),Mnot)){
 				outputError("Failed to register all unary functions");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"null"),Mnull)||!completedValueFunction(newFunction(_Menvironment,"undefined"),Mundefined)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"null"),Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),Mundefined)){
 				outputError("Failed to register the null and undefined function");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"sum"),Msum)||!completedValueFunction(newFunction(_Menvironment,"len"),Mlen)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),Mlen)){
 				outputError("Failed to register all list functions");
 				return false;
 			}
-			if(!completedValueFunction(newFunction(_Menvironment,"fac"),Mfac)||!completedValueFunction(newFunction(_Menvironment,"facd"),Mfacd)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),Mfacd)){
 				outputError("Failed to register the fac and facd function");
 				return false;
 			}
 			// register list conversions
-			if(!completedListFunction(newFunction(_Menvironment,"l2m"),l2m)||!completedListFunction(newFunction(_Menvironment,"l2ml"),l2ml)||!completedListFunction(newFunction(_Menvironment,"ml2l"),ml2l)||!completedListFunction(newFunction(_Menvironment,"ml2m"),ml2m)){
+			if(!completedListFunction(_getFunction(_Menvironment,"l2m"),l2m)||!completedListFunction(_getFunction(_Menvironment,"l2ml"),l2ml)||!completedListFunction(_getFunction(_Menvironment,"ml2l"),ml2l)||!completedListFunction(_getFunction(_Menvironment,"ml2m"),ml2m)){
 				outputError("Failed to register list conversion functions");
 				return false;
 			}
 			// register map conversions
-			if(!completedListFunction(newFunction(_Menvironment,"m2ml"),m2ml)||!completedListFunction(newFunction(_Menvironment,"m2l"),m2l)){
+			if(!completedListFunction(_getFunction(_Menvironment,"m2ml"),m2ml)||!completedListFunction(_getFunction(_Menvironment,"m2l"),m2l)){
 				outputError("Failed to register map conversion functions");
 				return false;
 			}

@@ -7,9 +7,6 @@
 // all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
 // MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
 /////////////struct Menvironment;
-typedef Mvalue* (*NoArgumentFunction)();
-typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
-typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
 
 typedef enum Mfunctiontype{FT_M,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
 
@@ -111,12 +108,11 @@ Mfunction* getFunction(const Menvironment* const _environment,const char* const 
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList);
 
-bool completedFunction(const Mfunction* const _function,NoArgumentFunction noArgumentFunction);
-bool completedValueFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
-bool completedIntegerFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
-bool completedRealFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
-bool completedStringStringFunction(const Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
-bool completedListFunction(const Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedFunction(Mfunction* const _function,NoArgumentFunction noArgumentFunction);
+bool completedValueFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedIntegerFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedRealFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedListFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
 
-Mvalue* Mfacd(const Mvalue* const _value);
-Mvalue* Mfac(const Mvalue* const _value);
+bool completedStringStringFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
+bool completedRealRealFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);

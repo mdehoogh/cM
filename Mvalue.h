@@ -84,6 +84,7 @@ Mmap* _getRealMap(char* name,Mvalue* _realValue);
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
 Mmap* _getListMap(char* name,Mvalue* _listValue);
 Mmap* _getStringStringMap(char* name1,char* name2);
+Mmap* _getRealRealMap(char* name1,char* name2);
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 // data wrappers
@@ -116,10 +117,10 @@ bool incrementReferenceCount(Mvalue* _value);
 void free_value(Mvalue* _value);
 Mstring* appendld(Mstring* mstr,long double ld);
 
-unsigned long long appendedToList(Mlist* const _list,Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+unsigned long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 void free_list(Mlist* _list);
 
-bool appendedToMap(Mmap* const _map,const char* const attributeName,Mvalue* const _attributeValue);
+bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);
 
 long double getValueReal(const Mvalue* const _value);
 Mbiginteger* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
@@ -147,7 +148,7 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map);
 
 bool isValueZero(Mvalue* _value);
 bool isValueOne(Mvalue* _value);
-
+ 
 // unary functions
 Mvalue* Mneg(Mvalue* _value); // negate a value
 Mvalue* Mbnot(Mvalue* _value); // binary not a value
@@ -159,9 +160,27 @@ Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
 
 Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
 Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
+Mvalue* Mfacd(Mvalue* _value); // faculty (for an integer)
 Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)
 
 Mvalue* Mbi(Mvalue* _value); // convert to a big integer
+
+// math unary functions
+Mvalue* Mfloor(Mvalue* _value);
+Mvalue* Mtrunc(Mvalue* _value);
+Mvalue* Mround(Mvalue* _value);
+Mvalue* Mceil(Mvalue* _value);
+Mvalue* Msin(Mvalue* _value);
+Mvalue* Mcos(Mvalue* _value);
+Mvalue* Mtan(Mvalue* _value);
+Mvalue* Msinh(Mvalue* _value);
+Mvalue* Mcosh(Mvalue* _value);
+Mvalue* Mtanh(Mvalue* _value);
+Mvalue* Mexp(Mvalue* _value);
+Mvalue* Mlog(Mvalue* _value);
+Mvalue* Mlog10(Mvalue* _value);
+Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue);
+Mvalue* Msqrt(Mvalue* _value);
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);
@@ -173,3 +192,9 @@ unsigned long long getNumberOfValues();
 
 Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);
 void free_variable(Mvariable* _variable);
+
+void free_mapelement(Mmapelement* _mapelement);
+
+typedef Mvalue* (*NoArgumentFunction)();
+typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
+typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);

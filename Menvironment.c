@@ -376,7 +376,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
 /**
  * Msettype() to set the (value) type of a variable
  */
-Mvalue* Msettype(const Mvalue* const _variableName,const Mvalue* const _valuetype){
+Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
     // check the types first, both should be strings
     if(_variableName->type==VT_TEXT&&_valuetype->type==VT_TEXT){
         char* variableName=_variableName->value._text->_c; // ignoring the presuffix exactly as we need to!!!
@@ -430,215 +430,119 @@ Mvalue* Msettype(const Mvalue* const _variableName,const Mvalue* const _valuetyp
     return NULL;
 }/* VALIDATED */
 
-// applying unary operators by means of functions
-Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction){
-    Mlist* _result=NULL;
-    if(_list){
-        _result=_getListOfType(_list->valuetype);
-        Mlistelement* _listelement=_list->_first;
-        while(_listelement&&appendedToList(_result,oneArgumentFunction(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
-    }
-    return _result;
-}
-Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
-    Mmap* _result=NULL;
-    if(_map){
-        _result=_getMapOfType(_map->valuetype);
-        Mmapelement* _mapelement=_map->_first;
-        while(_mapelement&&appendedToMap(_result,_mapelement->_variable->_name,oneArgumentFunction(_mapelement->_variable->_value)))_mapelement=_mapelement->_next;
-    }
-    return _result;
-}
-
-// math functions: independent of the execution environment but still receive it...
-Mvalue* Msin(Mvalue* _value){
-    if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(sin(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
-    }
-    return NULL;
-}
-Mvalue* Mcos(Mvalue* _value){
-    if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(cos(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(cos(_value->value._integer->ll));
-    }
-    return NULL;
-}
-Mvalue* Mneg(Mvalue* _value){ // negate a value
-    if(_value){
-        if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
-        if(_value->type==VT_REAL)return _getRealValue(-_value->value._real->ld);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg),true);
-    }
-    return NULL;
-}
-Mvalue* Mnot(Mvalue* _value){ // not a value
-    if(_value){
-        if(_value->type==VT_INTEGER)return _getIntegerValue(!_value->value._integer->ll);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot),true);
-    }
-    return NULL;
-}
-// TODO can we not a string??????
-Mvalue* Mbnot(Mvalue* _value){ // not a value
-    if(_value){
-        if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot),true);
-    }
-    return NULL;
-}
-Mvalue* Mnull(Mvalue* _value){
-    return _getIntegerValue(isNull(_value)?1:0);
-}
-Mvalue* Mundefined(Mvalue* _value){
-    return _getIntegerValue(!_value?1:0);
-}
-
-Mvalue* Mlen(Mvalue* _value){
-    long long result=0;
-    if(_value){
-        switch(_value->type){
-            case VT_INTEGER:case VT_BIGINTEGER:case VT_REAL:case VT_TEXT:result=1;break;
-            case VT_LIST:result=_value->value._list->numberOfElements;break;
-            case VT_MAP:result=_value->value._map->numberOfElements;break;
-            default:break;
-        }
-    }
-    return _getIntegerValue(result);
-}
-
-// MDH@29MAY2019: how about forcing the result to be a big integer instead of a long double?????
-extern const long double LD_PI;
-Mvalue* Mfacd(Mvalue* _value){
-    // Stirling formula to compute the number of factorial digits in n!: return 
-    // get the integer out of the value
-    long long ll=getValueInteger(_value);
-    return (ll>0?_getIntegerValue(floor( ((ll+0.5)*log(ll) - ll + 0.5*log(2*LD_PI))/log(10) ) + 1):NULL);
-}
-Mvalue* Mfac(Mvalue* _value){
-    if(!_value){if(amVerbose())output("No value!");return NULL;}
-    if(amVerbose())outputValue("\nArgument of fac() function: '",_value,"'.");
-    if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){outputValue("\nERROR: Non-integer argument '",_value,"' to fac() function!");return NULL;}
-    // some special cases (i.e. the input number is smaller than 2)
-    Mbiginteger* finalmultiplier=NULL;
-    if(_value->type==VT_INTEGER){
-        if(_value->value._integer->ll<0){outputError("Invalid (negative integer) argument to fac() function");return NULL;}
-        if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
-        finalmultiplier=_getBiginteger(_value->value._integer->ll);
-    }else{
-        if(mp_isneg(_value->value._biginteger)){outputError("Invalid (negative integer) argument to fac() function");return NULL;}
-        if(mp_cmp(_value->value._biginteger,getBigintegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
-        finalmultiplier=_value->value._biginteger;
-    }
-    if(!finalmultiplier){output("%s",ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");return NULL;}
-    if(amVerbose()&&amDebugging())outputBiginteger("\nFinal multiplier: '",finalmultiplier,"'.");
-    Mbiginteger* result=_getBiginteger(6); // the smallest value to return
-    if(result){
-        // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
-        // we could start at some intermediate value????
-        Mbiginteger *multiplier=_getBiginteger(3);
-        if(multiplier){
-            while(mp_cmp(multiplier,finalmultiplier)==MP_LT){
-                if(mp_incr(multiplier)!=MP_OKAY){if(amVerbose())outputError("Failed to increment big integer");result=NULL;break;} // if we fail to increment break
-                if(mp_mul(result,multiplier,result)!=MP_OKAY){if(amVerbose())outputError("Failed to multiply a big integer by 6");result=NULL;break;}
-                //////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
-            }
-            // get rid of intermediate big integers
-            mp_clear(multiplier);
-        }else        
-            outputError("Failed to create big integer 3");
-    }else
-        outputError("Failed to create big integer 6");
-    if(_value->type==VT_INTEGER)mp_clear(finalmultiplier);
-    if(amVerbose())outputBiginteger("Result of applying the fac() function: '",result,"'.\n");
-    return (result?_getBigintegerValue(result,true):NULL);
-    /* replacing:
-    // 39 is about the maximum that we can store in a long long
-    if(n<40){
-        long long result=n;while(--n>1)result*=n; // TODO should we use multiply here NO I guess not, although we could get overflow at some point!!!
-        return _getIntegerValue(result);
-    }
-    long double result=n;
-    while(--n>1)result*=n;
-    return _getRealValue(result);
-    */
-}
-
-bool completedFunction(Mfunction* _function,NoArgumentFunction noArgumentFunction){
+bool completedFunction(Mfunction* const _function,NoArgumentFunction noArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_NO_ARGUMENTS;
         _function->functionunion.noArgumentFunction=noArgumentFunction;
         _function->_parameterMap=NULL;
-        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered no-argument function '%s' completed.\n",string(_function->_name));
         return true;
     }
     return false;
-}
-bool completedValueFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+}/* VALIDATED */
+bool completedValueFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getMap("v");
-        // no defaults here!!!
-        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
-        return true;
+        if(_function->_parameterMap){
+            // no defaults here!!!
+            if(amVerbose())output("Registered single value argument function '%s' completed.\n",string(_function->_name));
+            return true;
+        }
+        output("%sFailed to register single value argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
     }
     return false;
-}
-bool completedRealFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+}/* VALIDATED */
+bool completedRealFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getRealMap("x",_getRealValue(M_LD_NAN)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
-        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
-        return true;
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered single real argument function '%s' completed.\n",string(_function->_name));
+            return true;
+        }
+        output("%sFailed to register single real argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
     }
     return false;
-}
-bool completedIntegerFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+}/* VALIDATED */
+bool completedIntegerFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
-        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
-        return true;
+        if(_function->_parameterMap){
+           if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+            return true;    
+        }
+        output("%sFailed to register single integer argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
     }
     return false;
-}
-bool completedListFunction(Mfunction* _function,OneArgumentFunction oneArgumentFunction){
+}/* VALIDATED */
+bool completedListFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED));
-        if(amVerbose())output("Registered list function '%s' completed.\n",string(_function->_name));
-        return true;
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered list function '%s' completed.\n",string(_function->_name));
+            return true;
+        }
+        output("%sFailed to register single list argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
     }
     return false;
-}
-bool completedStringStringFunction(Mfunction* _function,TwoArgumentFunction twoArgumentFunction){
+}/* VALIDATED */
+bool completedStringStringFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=_getStringStringMap("variable","type");
-        if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
-        return true;
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+            return true;
+        }
+        output("%sFailed to register double string argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
     }
     return false;
-}
+}/* VALIDATED */
+bool completedRealRealFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=_getRealRealMap("base","exponent");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+            return true;
+        }
+        output("%sFailed to register double real argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+    }
+    return false;
+}/* VALIDATED */
 
 // these internal functions do NOT have a body as M defined functions have...
-bool registerInternalFunctions(Menvironment* _environment){
+bool registerInternalFunctions(Menvironment* const _environment){
     // variable functions
-
     // math functions
-    if(!completedRealFunction(newFunction(_environment,"cos"),Mcos))return false;
-    if(!completedRealFunction(newFunction(_environment,"sin"),Msin))return false;
-    if(!completedStringStringFunction(newFunction(_environment,"settype"),Msettype))return false;
+    if(!completedRealFunction(_getFunction(_environment,"cos"),Mcos))return false;
+    if(!completedRealFunction(_getFunction(_environment,"sin"),Msin))return false;
+    if(!completedRealFunction(_getFunction(_environment,"tan"),Mtan))return false;
+    if(!completedRealFunction(_getFunction(_environment,"cosh"),Mcosh))return false;
+    if(!completedRealFunction(_getFunction(_environment,"sinh"),Msinh))return false;
+    if(!completedRealFunction(_getFunction(_environment,"tanh"),Mtanh))return false;
+    if(!completedRealFunction(_getFunction(_environment,"sqrt"),Msqrt))return false;
+    if(!completedRealFunction(_getFunction(_environment,"log"),Mlog))return false;
+    if(!completedRealFunction(_getFunction(_environment,"log10"),Mlog10))return false;
+    if(!completedRealFunction(_getFunction(_environment,"floor"),Mfloor))return false;
+    if(!completedRealFunction(_getFunction(_environment,"trunc"),Mtrunc))return false;
+    if(!completedRealFunction(_getFunction(_environment,"round"),Mround))return false;
+    if(!completedRealFunction(_getFunction(_environment,"ceil"),Mceil))return false;
+    if(!completedRealFunction(_getFunction(_environment,"exp"),Mexp))return false;
+
+    if(!completedStringStringFunction(_getFunction(_environment,"settype"),Msettype))return false;
+    if(!completedRealRealFunction(_getFunction(_environment,"pow"),Mpow))return false;
+
     return true;
-}
+}/* VALIDATED */
