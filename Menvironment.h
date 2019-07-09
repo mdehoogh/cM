@@ -58,6 +58,7 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
 
 bool pushExecutionEnvironment(Menvironment* _environment);
 bool popExecutionEnvironment();
+Menvironment* getEnvironment(); // the current environment
 
 // MDH@01MAY2019: it's possible to somehow hide the structure pointers within an Menvironment that point to the variables and functions
 //                which basically means that only raw data should go in and out of public functions
@@ -116,3 +117,10 @@ bool completedListFunction(Mfunction* const _function,OneArgumentFunction oneArg
 
 bool completedStringStringFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
 bool completedRealRealFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
+
+
+// MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
+bool completedMapListFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
+Mvalue* Mdefinefunction(Mvalue* _parameterMap,Mvalue* _body);
+//                the return function returns its value as result of the function it is executing
+Mvalue* Mreturn(Mvalue* _value);

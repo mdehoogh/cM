@@ -3731,6 +3731,14 @@ bool isOneCharacterTokenType(uint8_t tokenType){
 	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL);
 }
 
+// MDH@09JUL2019: count the number of list elements in front of the current token
+uint32_t getListElementCount(){
+	uint32_t listElementCount=0;
+	Mtoken* token=pLastCommandToEvaluateToken;
+	Mtoken* startToken=pLastCommandToEvaluateToken->expr;
+	while(token!=startToken){if(token->expr==startToken&&token->type==TT_LISTELEMENT)listElementCount++;token=token->prev;}
+	return listElementCount;
+}
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
 //       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
 //                the endofinput flag is used to indicate whether this is the end of the input
@@ -3852,9 +3860,28 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							}
 							break;
 						case TT_LISTELEMENT:
+							// MDH@09JUL2019: a comma (starting a list element) is allowed in a function call accepting multiple parameters)
 							if(pLastCommandToEvaluateToken->expr->type!=TT_LIST&&pLastCommandToEvaluateToken->expr->type!=TT_MAP){
-								inputError("First expression token '%s' of type '%s' does not start a list or map!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
-								newTokenType=TT_ERROR;
+								// so if it's a function call it might be allowed
+								if(pLastCommandToEvaluateToken->expr->type!=TT_FUNCTION_CALL){
+									inputError("First expression token '%s' of type '%s' does not start a list or map!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
+									newTokenType=TT_ERROR;
+								}else{
+									// the token in front of the function call token should denote a function
+									char* functionName=string(pLastCommandToEvaluateToken->expr->prev->text);
+									Mfunction* function=getFunction(getEnvironment(),functionName);
+									/////////////if(amVerbose())output("Function '%s'.\n",functionName);
+									// TODO this works for two-argument functions but can we tell which argument this is?????
+									// we have to count the parameters by counting the list elements
+									uint32_t listElementCount=getListElementCount()+1;
+									if(!function||listElementCount>=function->_parameterMap->numberOfElements){
+										if(function)
+											inputError("Function '%s' does not allow for more than %u argument(s).",functionName,listElementCount);
+										else
+											inputError("Cannot tell whether function '%s' allows for more than %u argument(s).",functionName,listElementCount);
+										newTokenType=TT_ERROR;
+									}
+								}
 							}
 							break;
 						case TT_END_OF_LIST:

@@ -485,6 +485,33 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
     }
     return NULL;
 }/* VALIDATED */
+Mmap* _getMapListMap(char* name1,char* name2){
+    if(name1&&name2){
+        if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_MAP,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_LIST,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _map->_last=_mapelement2;
+                        _map->numberOfElements=2;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1);
+            free_mapelement(_mapelement2);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
 // end helper functions 
 
 // LIST STUFF
@@ -1501,3 +1528,12 @@ Mvalue* Mfac(Mvalue* _value){
     return _getRealValue(result);
     */
 }/* VALIDATED */
+
+// MDH@09JUL2019: a function is defined as a parameter map (with defaults) and a body list
+Mvalue* Mdefinefunction(Mvalue* _parameterMap,Mvalue* _bodyList){
+    // obviously we are NOT receiving the unevaluated tokens but the evaluated parameter map and body list
+    // unless defining a function prevents evaluation of its parameters (just like a for or while statement would do that!!!!)
+}
+Mvalue* Mreturn(Mvalue* _value){
+    return _value;
+}

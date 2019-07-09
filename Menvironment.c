@@ -100,6 +100,7 @@ bool popExecutionEnvironment(){
     _executionEnvironment=_parentExecutionEnvironment;
     return true;
 }/* VALIDATED */
+Menvironment* getEnvironment(){return _executionEnvironment;}/* VALIDATED */
 
 // read access to the elements defined in an environment
 uint32_t getNumberOfVariables(const Menvironment* const _environment){
@@ -521,6 +522,19 @@ bool completedRealRealFunction(Mfunction* const _function,TwoArgumentFunction tw
     }
     return false;
 }/* VALIDATED */
+bool completedMapListFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=_getMapListMap("parameters","body");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+            return true;
+        }
+        output("%sFailed to register map list argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+    }
+    return false;
+}/* VALIDATED */
 
 // these internal functions do NOT have a body as M defined functions have...
 bool registerInternalFunctions(Menvironment* const _environment){
@@ -543,6 +557,9 @@ bool registerInternalFunctions(Menvironment* const _environment){
 
     if(!completedStringStringFunction(_getFunction(_environment,"settype"),Msettype))return false;
     if(!completedRealRealFunction(_getFunction(_environment,"pow"),Mpow))return false;
+
+    if(!completedMapListFunction(_getFunction(_environment,"function"),Mdefinefunction))return false;
+    if(!completedValueFunction(_getFunction(_environment,"return"),Mreturn))return false;
 
     return true;
 }/* VALIDATED */
