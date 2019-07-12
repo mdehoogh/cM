@@ -49,10 +49,12 @@ Mstring* _getString(const char* const s){
 }
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
-Mstring* _stringCopy(Mstring* const src){
+Mstring* _stringCopy(Mstring* const src,uint32_t length){
     if(!src)return NULL;
     src->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    return _getString(src->chars);
+    Mstring* _result=_getString(src->chars);
+    if(length)if(_result)string_setlength(_result,length);
+    return _result;
     /* replacing:
     Mstring* dst=__string();
     if(dst){
@@ -210,6 +212,21 @@ Mstring* string_append_char(Mstring* const str,char c){
         // MDH@21JUN2019 removing: str->chars[str->length]='\0';
     }
     return str;
+}
+
+// MDH@12JUL2019: we can set a specific char which should only fail if pos is larger than the length
+Mstring* string_setchar(Mstring* const str,char c,uint32_t pos){
+    if(!str)return NULL;
+    if(pos>=str->length)return NULL;
+    str->chars[pos]=c;
+    return str;
+}
+char* _stringstart(const Mstring* const str,uint32_t length){
+    if(!str)return NULL;
+    str->chars[str->length]='\0'; // mark the end of the string
+    char* _result=strdup(str->chars); // create a copy of the entire string
+    if(_result)if(length>0&&length<str->length)_result[length]='\0'; // 'cut off' the part we don't want!!
+    return _result;
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array

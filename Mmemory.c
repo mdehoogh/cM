@@ -8,7 +8,7 @@
 /**
  * _strdup() adds writing a error message to strdup()
  */
-char* _strdup(const char* _c){
+char* _strdup(const char* const _c){
     if(_c){
         char* _hc=strdup(_c);
         if(_hc)return _hc;

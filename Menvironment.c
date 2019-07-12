@@ -34,27 +34,16 @@ void free_expressionlist(Mexpressionlist* _expressionlist){
         free(_expressionlist);
     }
 }/* VALIDATED */
-void free_functiondefinition(Mfunctiondefinition* _functiondefinition){
-    if(_functiondefinition){
-        if(_functiondefinition->_parameterMap)free_map(_functiondefinition->_parameterMap);
-        if(_functiondefinition->_expressionlist)free_expressionlist(_functiondefinition->_expressionlist);
-        free(_functiondefinition);
-    }
-}/* VALIDATED */
+
 // NOTE typically you're not supposed to free internal functions safe M function definitions 
 // TODO if a function map is freed, we shouldn't free internal functions BUT those are only present in the main environment which is never released!!
 bool free_function(Mfunction* _function){
     if(_function){
-        if(_function->type==FT_M){
-            free_string(_function->_name);
-            free_map(_function->_parameterMap);
-            // TODO should we actually free the definitiona environment as it is a reference to an environment
-            // DONE I guess not
-            //////////free_environment(_function->_definitionEnvironment);
-            free_functiondefinition(_function->functionunion._functiondefinition);
-            free(_function);
-            return true;
-        }
+        /////// MDH@10JUL2019: moved over to the map element containing the function! free_string(_function->_name);
+        free_map(_function->_parameterMap);
+        if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction);
+        free(_function);
+        return true;
     }
     return false;
 }/* VALIDATED */
@@ -62,22 +51,24 @@ bool free_functionmapelement(Mfunctionmapelement* _functionmapelement){
     if(_functionmapelement){
         if(free_functionmapelement(_functionmapelement->_next))_functionmapelement->_next=NULL;
         if(free_function(_functionmapelement->_function)){
+            free_string(_functionmapelement->_name);
             free(_functionmapelement);
             return true;
         }
     }
     return false;
-}/* VALIDATED */
+}// VALIDATED
 void free_functionmap(Mfunctionmap* _functionmap){
     if(_functionmap){
         free_functionmapelement(_functionmap->_first);
         free(_functionmap);
     }
-}/* VALIDATED */
+}// VALIDATED
+
 void free_environment(Menvironment* _environment){
     if(_environment){
         free_map(_environment->_variableMap);
-        free_functionmap(_environment->_functionMap);
+        // MDH@10JUL2019: only Menvironment has a function map!!   if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
         free(_environment);
     }
 }/* VALIDATED */
@@ -258,7 +249,7 @@ Mstring* _getFunctionNames(const Menvironment* const _environment,const char* co
                 while(p&&functionmapelement){
                     if(functionmapelement->_function){
                         if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
-                        p=string_append(p,string(functionmapelement->_function->_name));
+                        p=string_append(p,string(functionmapelement->_name)); //////_function->_name));
                     }
                     functionmapelement=functionmapelement->_next;
                 }
@@ -276,7 +267,8 @@ Mfunction* getFunction(const Menvironment* const _environment,const char* const 
             Mfunctionmapelement* functionmapelement=functionmap->_first;
             // we need string() on the function name as function name is an Mstring*
             while(functionmapelement){
-                if(functionmapelement->_function&&!strcmp(string(functionmapelement->_function->_name),functionName)){
+                // MDH@10JUL2019: _name moved to the map element instead of in the function
+                if(functionmapelement->_function&&!strcmp(string(functionmapelement->_name),functionName)){
                     //////////printf("\nFunction '%s' matches '%s'.",string(_functionmapelement->_function->_name),functionName);
                     return functionmapelement->_function;
                 }
@@ -286,7 +278,15 @@ Mfunction* getFunction(const Menvironment* const _environment,const char* const 
     }
     return NULL;    
 }/* VALIDATED */
-
+/*
+Muserfunction* getUserfunction(const Menvironment* const _environment,const char* const userfunctionName){
+    if(_environment&&userfunctionName&&strlen(userfunctionName)){
+        Mvariable* _functionVariable=getVariable(_environment,userfunctionName,false);
+        if(_functionVariable)if(_functionVariable->_value->type==VT_USERFUNCTION)return _functionVariable->_value->value._userfunction;
+    }
+    return NULL;
+}// VALIDATED
+*/
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList){
     Mmap* _functionArgumentMap=NULL;
     if(_function&&_argumentList){
@@ -332,6 +332,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
         if(!_function){ // doesn't exist yet
             _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'F');
             if(_function){
+                ///////////_function->type=functionType;
                 _function->_definitionEnvironment=_environment; // TODO why would we need this?????
                 Mstring* _functionName=__string();
                 if(_functionName){
@@ -342,6 +343,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
                         if(_functionmap){
                             Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(1,sizeof(Mfunctionmapelement),'f');
                             if(_functionmapelement){
+                                _functionmapelement->_name=_functionName; // MDH@10JUL2019: moved over to the function map element
                                 _functionmapelement->_function=_function; // no worries here
                                 Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
                                 if(_lastFunctionmapelement){
@@ -351,19 +353,19 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
                                     _functionmap->_first=_functionmapelement;
                                 _functionmap->_last=_functionmapelement;
                                 _functionmap->numberOfFunctions++;
-                                _function->_name=_functionName; // success!!!!!
-                                if(amVerbose())output("Function '%s' registered as function #%d.\n",string(_function->_name),_functionmap->numberOfFunctions);
+                                ///////_function->_name=_functionName; // success!!!!!
+                                if(amVerbose())output("Function '%s' registered as function #%d.\n",name,_functionmap->numberOfFunctions);
                             }else // failure
                                 p=NULL;
                         }else
                             p=NULL;
                     }
-                    if(!p)free_string(_functionName); // p==NULL indicates _functionName not bound in _function->_name
+                    if(!p){free_string(_functionName);_functionName=NULL;} // p==NULL indicates _functionName not bound in _function->_name
                     // try to append it to the functionMap, if we succeed store _functioName in ->_name
-                 }else
+                }else
                     output("%sFailed to store function name '%s'.\n",ERROR_PREFIX,name);
                 // if we fail to register the name and/or the function with the environment free the function!!
-                if(!_function->_name){free_function(_function);_function=NULL;}   
+                if(!_functionName){free_function(_function);_function=NULL;}   
             }
             if(!_function)output("%sFailed to create function '%s'.\n",ERROR_PREFIX,name);
         }else
@@ -371,6 +373,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
     }
     return _function;
 }/* VALIDATED */
+
 // END FUNCTION STUFF
 
 // the internal functions
@@ -431,107 +434,107 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
     return NULL;
 }/* VALIDATED */
 
-bool completedFunction(Mfunction* const _function,NoArgumentFunction noArgumentFunction){
+bool completedFunction(Mfunction* const _function,char* functionName,NoArgumentFunction noArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_NO_ARGUMENTS;
         _function->functionunion.noArgumentFunction=noArgumentFunction;
         _function->_parameterMap=NULL;
-        if(amVerbose())output("Registered no-argument function '%s' completed.\n",string(_function->_name));
+        if(amVerbose())output("Registered no-argument function '%s' completed.\n",functionName);
         return true;
     }
     return false;
 }/* VALIDATED */
-bool completedValueFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
+bool completedValueFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getMap("v");
         if(_function->_parameterMap){
             // no defaults here!!!
-            if(amVerbose())output("Registered single value argument function '%s' completed.\n",string(_function->_name));
+            if(amVerbose())output("Registered single value argument function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register single value argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+        output("%sFailed to register single value argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
-bool completedRealFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
+bool completedRealFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=_getRealMap("x",_getRealValue(M_LD_NAN)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
         if(_function->_parameterMap){
-            if(amVerbose())output("Registered single real argument function '%s' completed.\n",string(_function->_name));
+            if(amVerbose())output("Registered single real argument function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register single real argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+        output("%sFailed to register single real argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
-bool completedIntegerFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
+bool completedIntegerFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
         if(_function->_parameterMap){
-           if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+           if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;    
         }
-        output("%sFailed to register single integer argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+        output("%sFailed to register single integer argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
-bool completedListFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction){
+bool completedListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED));
         if(_function->_parameterMap){
-            if(amVerbose())output("Registered list function '%s' completed.\n",string(_function->_name));
+            if(amVerbose())output("Registered list function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register single list argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+        output("%sFailed to register single list argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
-bool completedStringStringFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction){
+bool completedStringStringFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=_getStringStringMap("variable","type");
         if(_function->_parameterMap){
-            if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register double string argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+        output("%sFailed to register double string argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
-bool completedRealRealFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction){
+bool completedRealRealFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=_getRealRealMap("base","exponent");
         if(_function->_parameterMap){
-            if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register double real argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+        output("%sFailed to register double real argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
-bool completedMapListFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction){
+bool completedMapTokenFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=_getMapListMap("parameters","body");
+        _function->_parameterMap=_getMapTokenMap("parameters","body");
         if(_function->_parameterMap){
-            if(amVerbose())output("Registered function '%s' completed.\n",string(_function->_name));
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register map list argument function '%s'.\n",ERROR_PREFIX,string(_function->_name));
+        output("%sFailed to register map list argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -540,26 +543,26 @@ bool completedMapListFunction(Mfunction* const _function,TwoArgumentFunction two
 bool registerInternalFunctions(Menvironment* const _environment){
     // variable functions
     // math functions
-    if(!completedRealFunction(_getFunction(_environment,"cos"),Mcos))return false;
-    if(!completedRealFunction(_getFunction(_environment,"sin"),Msin))return false;
-    if(!completedRealFunction(_getFunction(_environment,"tan"),Mtan))return false;
-    if(!completedRealFunction(_getFunction(_environment,"cosh"),Mcosh))return false;
-    if(!completedRealFunction(_getFunction(_environment,"sinh"),Msinh))return false;
-    if(!completedRealFunction(_getFunction(_environment,"tanh"),Mtanh))return false;
-    if(!completedRealFunction(_getFunction(_environment,"sqrt"),Msqrt))return false;
-    if(!completedRealFunction(_getFunction(_environment,"log"),Mlog))return false;
-    if(!completedRealFunction(_getFunction(_environment,"log10"),Mlog10))return false;
-    if(!completedRealFunction(_getFunction(_environment,"floor"),Mfloor))return false;
-    if(!completedRealFunction(_getFunction(_environment,"trunc"),Mtrunc))return false;
-    if(!completedRealFunction(_getFunction(_environment,"round"),Mround))return false;
-    if(!completedRealFunction(_getFunction(_environment,"ceil"),Mceil))return false;
-    if(!completedRealFunction(_getFunction(_environment,"exp"),Mexp))return false;
+    if(!completedRealFunction(_getFunction(_environment,"cos"),"cos",Mcos))return false;
+    if(!completedRealFunction(_getFunction(_environment,"sin"),"sin",Msin))return false;
+    if(!completedRealFunction(_getFunction(_environment,"tan"),"tan",Mtan))return false;
+    if(!completedRealFunction(_getFunction(_environment,"cosh"),"cosh",Mcosh))return false;
+    if(!completedRealFunction(_getFunction(_environment,"sinh"),"sinh",Msinh))return false;
+    if(!completedRealFunction(_getFunction(_environment,"tanh"),"tanh",Mtanh))return false;
+    if(!completedRealFunction(_getFunction(_environment,"sqrt"),"sqrt",Msqrt))return false;
+    if(!completedRealFunction(_getFunction(_environment,"log"),"log",Mlog))return false;
+    if(!completedRealFunction(_getFunction(_environment,"log10"),"log10",Mlog10))return false;
+    if(!completedRealFunction(_getFunction(_environment,"floor"),"floor",Mfloor))return false;
+    if(!completedRealFunction(_getFunction(_environment,"trunc"),"trunc",Mtrunc))return false;
+    if(!completedRealFunction(_getFunction(_environment,"round"),"round",Mround))return false;
+    if(!completedRealFunction(_getFunction(_environment,"ceil"),"ceil",Mceil))return false;
+    if(!completedRealFunction(_getFunction(_environment,"exp"),"exp",Mexp))return false;
 
-    if(!completedStringStringFunction(_getFunction(_environment,"settype"),Msettype))return false;
-    if(!completedRealRealFunction(_getFunction(_environment,"pow"),Mpow))return false;
+    if(!completedStringStringFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
+    if(!completedRealRealFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
 
-    if(!completedMapListFunction(_getFunction(_environment,"function"),Mdefinefunction))return false;
-    if(!completedValueFunction(_getFunction(_environment,"return"),Mreturn))return false;
+    if(!completedMapTokenFunction(_getFunction(_environment,"function"),"function",Mdefinefunction))return false;
+    if(!completedValueFunction(_getFunction(_environment,"return"),"return",Mreturn))return false;
 
     return true;
 }/* VALIDATED */

@@ -8,23 +8,18 @@
 // MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
 /////////////struct Menvironment;
 
-typedef enum Mfunctiontype{FT_M,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
-
-typedef struct Mfunctiondefinition{
-    Mmap* _parameterMap;
-    Mexpressionlist* _expressionlist;
-}Mfunctiondefinition;
+typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
 
 typedef union Mfunctionunion{
     NoArgumentFunction noArgumentFunction;
     OneArgumentFunction oneArgumentFunction;
     TwoArgumentFunction twoArgumentFunction;
-    Mfunctiondefinition* _functiondefinition; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
+    Muserfunction* _userfunction; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
 }Mfunctionunion;
 
 struct Menvironment;
 typedef struct Mfunction{
-    Mstring* _name;
+    ////////Mstring* _name;
     Mmap* _parameterMap; // a map of values defines the parameters and their default values (implicitly defining the expected types)
     struct Menvironment* _definitionEnvironment;
     Mfunctiontype type; // whether internal or external
@@ -32,6 +27,7 @@ typedef struct Mfunction{
 }Mfunction;
 
 typedef struct Mfunctionmapelement{
+    Mstring* _name;
     Mfunction* _function;
     struct Mfunctionmapelement* _next;
 }Mfunctionmapelement;
@@ -102,25 +98,27 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string);
 
 // functions
 Mstring* _getFunctionNames(const Menvironment* const _environment,const char* const sep);
-Mfunction* _getFunction(Menvironment* const _environment,const char* const functionName); // creates the function if it does not exist yet
 bool registerInternalFunctions(Menvironment* const _environment);
+
 // helper function to return the function
 Mfunction* getFunction(const Menvironment* const _environment,const char* const functionName);
+Muserfunction* getUserfunction(const Menvironment* const _environment,const char* const userfunctionName);
+
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList);
+Mfunction* _getFunction(Menvironment* const _environment,const char* const functionName); // creates the function if it does not exist yet
 
-bool completedFunction(Mfunction* const _function,NoArgumentFunction noArgumentFunction);
-bool completedValueFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
-bool completedIntegerFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
-bool completedRealFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
-bool completedListFunction(Mfunction* const _function,OneArgumentFunction oneArgumentFunction);
+bool completedFunction(Mfunction* const _function,char* functionName,NoArgumentFunction noArgumentFunction);
+bool completedValueFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
+bool completedIntegerFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
+bool completedRealFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
+bool completedListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
 
-bool completedStringStringFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
-bool completedRealRealFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
-
+bool completedStringStringFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedRealRealFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
 
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
-bool completedMapListFunction(Mfunction* const _function,TwoArgumentFunction twoArgumentFunction);
+bool completedMapTokenFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
 Mvalue* Mdefinefunction(Mvalue* _parameterMap,Mvalue* _body);
 //                the return function returns its value as result of the function it is executing
 Mvalue* Mreturn(Mvalue* _value);

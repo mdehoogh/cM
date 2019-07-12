@@ -20,7 +20,7 @@ void free_string(Mstring* str); // changed from string_dispose() to free_mstring
 Mstring* __string();
 Mstring* _getString(const char* const s); // convenient constructor
 // copying
-Mstring* _stringCopy(Mstring* const src);
+Mstring* _stringCopy(Mstring* const src,uint32_t length);
 
 bool string_empty(const Mstring* const str);
 uint32_t string_length(const Mstring* const str);
@@ -29,9 +29,11 @@ void string_synclength(Mstring* const str); // MDH@02JUN2019: check the length (
 
 char string_char(const Mstring* const str,uint32_t pos);
 char string_last_char(const Mstring* const str);
-
 char* string_remainder(Mstring* const str,uint32_t pos);
 char* string(Mstring* const str);
+
+char* _stringstart(const Mstring* const str,uint32_t length); // returns a copy of the first part of the string
+
 bool string_shorten(Mstring* const str,uint32_t length);
 
 int32_t string_find(const Mstring* const str,char c);
@@ -41,6 +43,7 @@ char string_removed_char(Mstring* const str,uint32_t pos);
 
 Mstring* string_insert_char(Mstring* const str,uint32_t pos,char c);
 Mstring* string_append_char(Mstring* const str,char c);
+Mstring* string_setchar(Mstring* const str,char c,uint32_t pos);
 
 // MDH@26FEB2019: can we append a text as a whole???
 Mstring* string_append(Mstring* const str,const char* pc);

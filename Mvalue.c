@@ -94,7 +94,13 @@ void free_map(Mmap* _map){
         free(_map);
     }
 }/* VALIDATED */
-
+void free_userfunction(Muserfunction* _userfunction){
+    if(_userfunction){
+        ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
+        if(_userfunction->_bodyToken)free_token(_userfunction->_bodyToken);
+        free(_userfunction);
+    }
+}/* VALIDATED */
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
@@ -111,6 +117,7 @@ void free_value(Mvalue* _value){
             case VT_TEXT:if(_value->value._text)free_text(_value->value._text);break;
             case VT_LIST:if(_value->value._list)free_list(_value->value._list);break;
             case VT_MAP:if(_value->value._map)free_map(_value->value._map);break;
+            //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         if(amVerbose())output("Type-specific value freed.");
         free(_value);
@@ -235,7 +242,14 @@ bool incrementReferenceCount(Mvalue* _value){
 // interface functions that use the above functions
 // wrapping the different value type instances
 Mvalue* _getUndefinedValue(){return (Mvalue*)CALLOC(1,sizeof(Mvalue),'U');}/* VALIDATED */
-
+/*
+Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
+    if(!_userfunction)return NULL;
+    Mvalue* _userfunctionValue=__value();
+    if(_userfunctionValue){_userfunctionValue->type=VT_USERFUNCTION;_userfunctionValue->value._userfunction=_userfunction;}else if(freeonfailure)free_userfunction(_userfunction);
+    return _userfunctionValue;
+}// VALIDATED 
+*/
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     if(!_decimal)return NULL;
     Mvalue* _decimalValue=__value();
@@ -485,7 +499,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
     }
     return NULL;
 }/* VALIDATED */
-Mmap* _getMapListMap(char* name1,char* name2){
+Mmap* _getMapTokenMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
             Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
@@ -494,7 +508,7 @@ Mmap* _getMapListMap(char* name1,char* name2){
                 Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_MAP,true);
-                    _mapelement2->_variable=_getVariable(name2,VT_LIST,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
                     if(_mapelement1->_variable&&_mapelement2->_variable){
                         _map->_first=_mapelement1;
                         _mapelement1->_next=_mapelement2;
@@ -757,7 +771,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 			case VT_TEXT:valueText=_getStringText(_value->value._text,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map);break;
 			case VT_LIST:valueText=_getListText(_value->value._list);break;
-            case VT_TOKEN:valueText=_stringCopy(_value->value._token->text);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
+            case VT_TOKEN:valueText=_stringCopy(_value->value._token->text,0);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
 			default:break;
 		}
 	}
@@ -1529,10 +1543,27 @@ Mvalue* Mfac(Mvalue* _value){
     */
 }/* VALIDATED */
 
-// MDH@09JUL2019: a function is defined as a parameter map (with defaults) and a body list
-Mvalue* Mdefinefunction(Mvalue* _parameterMap,Mvalue* _bodyList){
-    // obviously we are NOT receiving the unevaluated tokens but the evaluated parameter map and body list
-    // unless defining a function prevents evaluation of its parameters (just like a for or while statement would do that!!!!)
+// MDH@09JUL2019: a function is defined as a parameter map (with defaults) and a body token
+// MDH@10JUL2019: the caller will need to register the function in the function map of the definition environment
+//                here we only need to return the wrapped user function
+Mvalue* Mdefinefunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
+    /*
+    // the user specifies the body as a text (to prevent evaluation during defining the function)
+    // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
+    // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
+    if(_parameterMapValue&&_bodyTokenValue){
+        if(_parameterMapValue->type==VT_MAP&&_bodyTokenValue->type==VT_TOKEN){
+            Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'F');
+            if(_userfunction){
+                assignValue(&_userfunction->_bodyValue,_bodyTokenValue);
+                ///////_userfunction->_parameterMap=_parameterMapValue->value._map;
+            }
+            return _getUserfunctionValue(_userfunction,true);
+        }else
+            outputError("Invalid parameter map or body");
+    }else
+        outputError("No parameter map or body");
+    */
 }
 Mvalue* Mreturn(Mvalue* _value){
     return _value;

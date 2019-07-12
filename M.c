@@ -1129,6 +1129,7 @@ Mvalue* t(Mvalue* _value){
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
 		case VT_UNDEFINED:return _getTextValue("'u",false);
+		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
 	return NULL;
 }
@@ -1255,7 +1256,7 @@ bool initEnvironment(){
 				return false;
 			}
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
-			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),getResult)){
+			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),"M",getResult)){
 				outputError("Failed to register function M (for requesting previous results)");
 				return false;
 			}
@@ -1265,48 +1266,48 @@ bool initEnvironment(){
 				return false;
 			}
 			*/
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),setdp)){
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)){
 				outputError("Failed to register the setdp function");
 				return false;
 			}
 			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),pi_ql)||!completedIntegerFunction(_getFunction(_Menvironment,"pi"),pi_d)){
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),"pi$q",pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),"pi$ql",pi_ql)||!completedIntegerFunction(_getFunction(_Menvironment,"pi"),"pi",pi_d)){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return false;
 			}
 			// conversions
-			if(!completedValueFunction(_getFunction(_Menvironment,"i"),i)||!completedValueFunction(_getFunction(_Menvironment,"I"),I)
-					||!completedValueFunction(_getFunction(_Menvironment,"t"),t)
-					||!completedValueFunction(_getFunction(_Menvironment,"r"),r)
-					||!completedValueFunction(_getFunction(_Menvironment,"q"),q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),Q)
-					||!completedValueFunction(_getFunction(_Menvironment,"d"),d)
-					||!completedValueFunction(_getFunction(_Menvironment,"b"),b)||!completedValueFunction(_getFunction(_Menvironment,"B"),B)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"I"),"I",I)
+					||!completedValueFunction(_getFunction(_Menvironment,"t"),"t",t)
+					||!completedValueFunction(_getFunction(_Menvironment,"r"),"r",r)
+					||!completedValueFunction(_getFunction(_Menvironment,"q"),"q",q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),"Q",Q)
+					||!completedValueFunction(_getFunction(_Menvironment,"d"),"d",d)
+					||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)||!completedValueFunction(_getFunction(_Menvironment,"B"),"B",B)){
 				outputError("Failed to register value type conversion functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),Mnot)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),"neg",Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),"bnot",Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),"not",Mnot)){
 				outputError("Failed to register all unary functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"null"),Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),Mundefined)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
 				outputError("Failed to register the null and undefined function");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),Mlen)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),"sum",Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),"len",Mlen)){
 				outputError("Failed to register all list functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),Mfacd)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),"fac",Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),"facd",Mfacd)){
 				outputError("Failed to register the fac and facd function");
 				return false;
 			}
 			// register list conversions
-			if(!completedListFunction(_getFunction(_Menvironment,"l2m"),l2m)||!completedListFunction(_getFunction(_Menvironment,"l2ml"),l2ml)||!completedListFunction(_getFunction(_Menvironment,"ml2l"),ml2l)||!completedListFunction(_getFunction(_Menvironment,"ml2m"),ml2m)){
+			if(!completedListFunction(_getFunction(_Menvironment,"l2m"),"l2m",l2m)||!completedListFunction(_getFunction(_Menvironment,"l2ml"),"l2ml",l2ml)||!completedListFunction(_getFunction(_Menvironment,"ml2l"),"ml2l",ml2l)||!completedListFunction(_getFunction(_Menvironment,"ml2m"),"ml2m",ml2m)){
 				outputError("Failed to register list conversion functions");
 				return false;
 			}
 			// register map conversions
-			if(!completedListFunction(_getFunction(_Menvironment,"m2ml"),m2ml)||!completedListFunction(_getFunction(_Menvironment,"m2l"),m2l)){
+			if(!completedListFunction(_getFunction(_Menvironment,"m2ml"),"m2ml",m2ml)||!completedListFunction(_getFunction(_Menvironment,"m2l"),"m2l",m2l)){
 				outputError("Failed to register map conversion functions");
 				return false;
 			}
@@ -1355,7 +1356,7 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 				Mfunction* _function=_functionmapelement->_function;
 				if(!_function)continue;
 				///printf("\n%s","func");
-				p=string_append(p,string(_function->_name));
+				p=string_append(p,string(_functionmapelement->_name)); // _name moved from _function to _functionmapelement
 				if(!p)break;
 				///printf("\n%s","name");
 				// I guess we might show the parameter map (if any)
@@ -2051,22 +2052,22 @@ Mvalue* getValueOfMap(){
 }
 
 // a function call needs a function and a map of arguments (defining the values to use for the formal parameters of the function)
-Mvalue* getValueOfFunctionCall(Mfunction* _function,Mmap* _argumentMap){
+Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _argumentMap){
 	////////Mvalue* _resultValue=NULL;
 	switch(_function->type){
-		case FT_M:{
+		case FT_USER:{
 			// TODO create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 
 				break;
 			}
 		case FT_INTERNAL_NO_ARGUMENTS:
-			if(amVerbose())output("Calling no-argument function %s.",string(_function->_name));
+			if(amVerbose())output("Calling no-argument function %s.",functionName);
 			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
-			if(amVerbose())output("Calling one-argument function %s.",string(_function->_name));
+			if(amVerbose())output("Calling one-argument function %s.",functionName);
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:{
-			if(amVerbose())output("Calling two-argument function %s.",string(_function->_name));
+			if(amVerbose())output("Calling two-argument function %s.",functionName);
 			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 			Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 			return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
@@ -2299,11 +2300,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}
 		}
 		*/
+		char* _significantTokenText=_stringstart(expressionToken->text,expressionToken->significantCharacterCount);
 		switch(expressionToken->type){
 			case TT_FUNCTION:
 				{
-					if(amVerbose())output("Call of function '%s'.",string(expressionToken->text));
-					Mfunction* function=getFunction(_Menvironment,string(expressionToken->text)); // get the function associated with the name of the function
+					if(amVerbose())output("Call of function '%s'.",_significantTokenText);
+					Mfunction* function=getFunction(_Menvironment,_significantTokenText); // get the function associated with the name of the function
 					if(function){					
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=expressionToken->next;
@@ -2319,7 +2321,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							if(amVerbose())output("Reference count of the function arguments value decremented!");
 							*/
 							// 3. the result of applying the function to the arguments is the end result
-							assignValue(&_valueReference->_value,getValueOfFunctionCall(function,_functionArgumentMap));
+							assignValue(&_valueReference->_value,getValueOfFunctionCall(function,_significantTokenText,_functionArgumentMap));
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
 							if(amVerbose())output("Freeing the function argument map!");
 							free_map(_functionArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
@@ -2327,14 +2329,15 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						}else
 							output("ERROR: No function arguments!");
 					}else
-						output("ERROR: Function '%s' unknown!",string(expressionToken->text));
+						output("ERROR: Function '%s' unknown!",_significantTokenText);
 				}
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
 				// we have to create the variable first (TODO should we wait until actually assigning???)
-				if(!addVariable(_Menvironment,string(expressionToken->text),VT_UNDEFINED,false))break; // NO retrieves the undefined value subsequently!!
+				if(!addVariable(_Menvironment,_significantTokenText,VT_UNDEFINED,false))break; // NO retrieves the undefined value subsequently!!
 			case TT_VARIABLE: // a value reference
-				_valueReference->_name=_strdup(string(expressionToken->text)); // store a copy of the name of the variable being referenced
+				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
+				if(amVerbose())output("Variable name: '%s'.\n",_valueReference->_name);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
 				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
@@ -2371,20 +2374,22 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
-					Mstring* _realText=_getString(string(expressionToken->text)); // the integer part
+					Mstring* _realText=_getString(_significantTokenText); // the integer part
 					expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
 					Mstring* pRealText=_realText;
 					if(pRealText){
+						char* _realSignificantTokenText=_stringstart(expressionToken->text,expressionToken->significantCharacterCount); // free asap
 						if(amVerbose())output("Integer part of decimal text: '%s'.\n",string(pRealText));
-						pRealText=string_append(pRealText,string(expressionToken->text));
+						pRealText=string_append(pRealText,_realSignificantTokenText);
 						if(amDebugging())outputLine("Fractional part appended!");
-						if(string_length(expressionToken->text)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
+						if(strlen(_realSignificantTokenText)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
 						if(amVerbose())output("Parsing '%s' to a decimal.\n",string(pRealText));
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
 						//                the problem is that we need a context, and therefore a decimal precision 
 						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
-						uint32_t l=string_length(expressionToken->text);
+						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
+						free(_realSignificantTokenText); // freed!!!
 						if(amDebugging())output("Real part string length: %u.\n",l);
 						if(getDP()<l)output("WARNING: More decimals present in literal than expected. Rounding may occur.\n");
 						if(amDebugging())outputLine("Decimal precision checked!");
@@ -2412,7 +2417,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=__biginteger();
-					if(mp_read_radix(_biginteger,string(expressionToken->text),10)==MP_OKAY){
+					if(mp_read_radix(_biginteger,_significantTokenText,10)==MP_OKAY){
 						if(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT){
               				assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
 							free_biginteger(_biginteger);
@@ -2420,17 +2425,17 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
 					}else{
 						free_biginteger(_biginteger);
-						outputErrorAndText("Failed to create the big integer to store integer ",string(expressionToken->text));
+						outputErrorAndText("Failed to create the big integer to store integer ",_significantTokenText);
 					}
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
-				assignValue(&_valueReference->_value,_getRealValue(_strtold(string(expressionToken->text),getNAR())));
+				assignValue(&_valueReference->_value,_getRealValue(_strtold(_significantTokenText,getNAR())));
 				///////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_DQSTRING:
 			case TT_SQSTRING: // a string literal
-				assignValue(&_valueReference->_value,_getTextValue(string(expressionToken->text),false));
+				assignValue(&_valueReference->_value,_getTextValue(_significantTokenText,false));
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST: // a list literal
@@ -2459,7 +2464,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			default:
 				break;
 		}
-
+		if(_significantTokenText)free(_significantTokenText); // free the (duplicated significant) token text
 		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("Value: `",_valueReference->_value,"`.\n");else output("No result!");}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
@@ -3008,6 +3013,30 @@ typedef struct Mformula{
 */
 // once we have constructed a formula it needs to be computed
 
+/* MDH@12JUL2019: we need the significant part of the token text
+char* getSignificantTokenText(Mtoken* token){
+	Mstring* tokenText=token->text; // get a reference to the token's text
+	uint32_t tokenTextLength;char firstInsignificantTokenCharacter;
+	if(token->significantCharacterCount){
+		tokenTextLength=string_length(tokenText);
+		firstInsignificantTokenCharacter=string_char(tokenText,token->significantCharacterCount);
+		if(!string_shorten(tokenText,expressionToken->significantCharacterCount)){
+			outputError("Failed to shorten token text");
+			return NULL;
+		}
+	}
+	// we can't call string() as that will write the '\0' overwriting the character we need back
+	char* significantTokenText=string(tokenText);
+	if(token->significantCharacterCount){
+		if(!string_setlength(tokenText,tokenTextLength)||!string_setchar(tokenText,firstInsignificantTokenCharacter,token->significantCharacterCount)){
+			// this would be very serious but also very unlikely because we're resetting the length, and writing a character in front of that length
+			output("BUG: Failed to restore the token text.\n"); 
+			significantTokenText=NULL;
+		}
+	}
+	return significantTokenText;
+}
+*/
 /**
  * an expression is the top-level element of the M language hierarchy
  * which optionally starts with an assignment to a single variable, BUT it makes sense to allow for multiple assignments in a row?????
@@ -3065,9 +3094,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			if(expressionToken){
 				if(amVerbose())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-				_formulaelement->_operator=_stringCopy(expressionToken->text);
+				// MDH@12JUL2019: 'remove' non-significant characters
+				_formulaelement->_operator=_stringCopy(expressionToken->text,expressionToken->significantCharacterCount); // replacing: _stringCopy(expressionToken->text);
 				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
-				string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
+				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
 				while(expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
 					expressionToken=expressionToken->next;
@@ -3580,7 +3610,7 @@ void copyCommand(){
 		pLastCommandToEvaluateToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
 		pLastCommandToEvaluateToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
 		// if failing to copy the text over get rid of the command constructed so far, and break
-		pLastCommandToEvaluateToken->text=_stringCopy(_tokenToCopy->text);
+		pLastCommandToEvaluateToken->text=_stringCopy(_tokenToCopy->text,0);
 		if(!pLastCommandToEvaluateToken->text){pLastCommandToEvaluateToken=NULL;break;}
 		// MDH@24APR2019 obsolete: commandLength()+=string_length(pLastCommandToEvaluateToken->text);
 		// some additional fields to copy over (NOT the offset is that is set automatically)
@@ -3673,21 +3703,23 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 	}
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
 	if(result){ // a variable or function
+		char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
 		// check whether the variable exists or not
 		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
-			if(!containsVariable(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // apparently does NOT exist
+			if(!containsVariable(_Menvironment,_identifierName)){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else
 		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
-			if(containsVariable(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // now an existing variable
+			if(containsVariable(_Menvironment,_identifierName)){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			}
 		}
+		free(_identifierName); // freed
 	}
 	return result;
 }

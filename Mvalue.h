@@ -6,6 +6,12 @@
 
 struct Mlist;
 struct Mmap;
+// MDH@10JUL2019: user functions are stored differently than M functions
+typedef struct Muserfunction{
+    //////////struct Mmap* _parameterMap;
+    Mtoken* _bodyToken; // wraps the tokens that constitute the body text of the user function
+}Muserfunction;
+void free_userfunction(Muserfunction* _userfunction);
 typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
@@ -16,6 +22,7 @@ typedef union Mvalueunion{
     Mtext* _text;
     struct Mlist* _list;
     struct Mmap* _map;
+    //////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
 // a Value is either a number (numeric literal), a string literal, a list of values or a map
@@ -99,6 +106,7 @@ Mvalue* _getRealValue(long double ld);
 Mvalue* _getTextValue(char* text,bool freeonfailure);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
+Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
 Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure);
@@ -136,6 +144,8 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only a
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
+
+Mmap* _getMapTokenMap(char* name1,char* name2);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
