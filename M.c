@@ -3099,11 +3099,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
-				while(expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
+				while(expressionToken->next&&expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
 					expressionToken=expressionToken->next;
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
-				if(expressionToken->next->type==TT_ASSIGNMENT){
+				if(expressionToken->next&&expressionToken->next->type==TT_ASSIGNMENT){
 					expressionToken=expressionToken->next;
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
@@ -3112,10 +3112,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_formulaelement->_next;
 				expressionToken=expressionToken->next;
 			}else
-			{
-				if(amVerbose())outputLine("No further formula elements!");
-			}
-			
+			if(amVerbose())outputLine("No further formula elements!");
 		}
 
 		// evaluate the formula
@@ -3818,12 +3815,13 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// some combinations are (still) not allowed...
 		if(newTokenType<0||newTokenType==pLastCommandToEvaluateToken->type){
 			/* MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
+			MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again */
+			if(newTokenType==pLastCommandToEvaluateToken->type&&pLastCommandToEvaluateToken->significantCharacterCount>0)
 			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
-			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->significantCharacterCount>0){
+			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT){
 				newTokenType=TT_ERROR;
 				if(amVerbose())inputError("Token already finished!");
 			}
-			*/
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
 			if(inputCharacterType=='='&&pLastCommandToEvaluateToken->type==TT_ASSIGNMENT&&(pLastCommandToEvaluateToken->prev->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->prev->type==TT_BINARY_Aeru)){
