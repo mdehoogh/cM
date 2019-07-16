@@ -135,12 +135,12 @@ Mvariable* getVariable(const Menvironment* const _environment,const char* const 
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     // input valid        
     if(!_environment->_variableMap){outputError("No variables in environment");return NULL;}
-    if(amVerbose())output("Looking for variable '%s'.\n",name);
+    ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=_environment->_variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
     while(_variableMapelement&&(!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))_variableMapelement=_variableMapelement->_next;
     if(!_variableMapelement){
-        if(amVerbose())output("Not found!\n");
+        ///////if(amVerbose())output("Not found!\n");
         return NULL;
     }
     return _variableMapelement->_variable;

@@ -1746,7 +1746,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (     ,         {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:     {}="}, /* LIST ELEMENT (similar to expression) */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
 {""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
@@ -1981,29 +1981,74 @@ but <value><operator><value> here operator is a set of token types that separate
 Mtoken* expressionToken=NULL; // the current evaluation token
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
 
+/*
+ * \brief makes a copy useful for evaluation (not for editing)
+ */
+Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
+	Mtoken* _tokenCopy=(_token?__token():NULL);
+	if(_tokenCopy){
+		if(amVerbose()){
+			output("Copying token of type '%s' with text '%s'.\n",TOKENTYPE_STRING[_token->type],string(_token->text));
+			if(_token->expr)output("\tpointing to token of type '%s' with text '%s'.\n",TOKENTYPE_STRING[_token->expr->type],string(_token->expr->text));
+		}
+		_tokenCopy->type=_token->type;
+		_tokenCopy->significantCharacterCount=_token->significantCharacterCount;
+		if(_token->text)_tokenCopy->text=_stringCopy(_token->text,0);
+		_tokenCopy->expr=_token->expr; // TODO do I need to do this??? this is also an issue because if we start comparing expr (on evaluation)
+		// we're NOT copying _next, _prev, _offset
+		//////_tokenCopy->prev=NULL;_tokenCopy->next=NULL;_tokenCopy->offset=0;
+	}
+	return _tokenCopy;
+}
+// TODO move elsewhere
+Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
+	if(!_token)return NULL;
+	Mvalue* _tokenValue=__value();
+	if(_tokenValue){_tokenValue->type=VT_TOKEN;_tokenValue->value._token=_token;}else if(freeonfailure)free_token(_token);
+	return _tokenValue;
+}
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
-Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
-	if(amVerbose())output("Composing a list starting with '%s'.",string(expressionToken->text));
+Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate){
+	if(amVerbose())output("Composing a list starting with '%s'.\n",string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mvalue* _listValue=_getListValue(VT_UNDEFINED); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
-	if(!_list){output("Failed to create a list to return.");return NULL;}
-	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.");return NULL;}
-	if(amVerbose())output("Composing a list starting with token '%s' of type '%s'.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(!_list){output("Failed to create a list to return.\n");return NULL;}
+	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.\n");return NULL;}
+	if(amVerbose())output("Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	unsigned long long listElementIndex=0;
+	uint32_t firstElementToNotEvaluate=(maximumNumberOfElements==0||numberOfElementsToNotEvaluate>maximumNumberOfElements?0:maximumNumberOfElements-numberOfElementsToNotEvaluate+1);
+	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	while(true){
 		expressionToken=expressionToken->next; // now on the first element
 		if(!expressionToken)break;
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
-		if(amVerbose())output("Processing list element #%llu starting with token '%s' of type '%s'.",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerbose())output("Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		Mvalue* _listElementValue=NULL;
+		if(firstElementToNotEvaluate>0&&listElementIndex>=firstElementToNotEvaluate){ // copy the tokens in the argument
+			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
+			// however this would require passing the bool argument along to every function getValueOfExpression calls
+			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
+			Mtoken* _firstUnevaluatedToken=_getEvaluatableTokenCopy(expressionToken);
+			Mtoken* unevaluatedToken=_firstUnevaluatedToken;
+			while(unevaluatedToken){
+				expressionToken=expressionToken->next;
+				if(!expressionToken)break; // NOTE shouldn't happen though
+				if(!expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
+				unevaluatedToken->next=_getEvaluatableTokenCopy(expressionToken); // set next to the copy of the expression token
+				unevaluatedToken=unevaluatedToken->next;
+			}
+			_listElementValue=_getTokenValue(_firstUnevaluatedToken,true);
+		}else{ // evaluate
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
-		Mvalue* _listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
-		if(!_listElementValue){if(amVerbose())output("List element missing!");continue;} // undefined list elements should NEVER be added to the list
-		if(amVerbose())output("List element ending token: %s.",TOKENTYPE_STRING[expressionToken->type]);
+			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
+		}
+		if(!_listElementValue){if(amVerbose())output("List element missing!\n");continue;} // undefined list elements should NEVER be added to the list
+		if(amVerbose())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
@@ -2011,15 +2056,16 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements){
 			unsigned long long newListElementIndex=appendedToList(_list,_listElementValue,listElementIndex);
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex==0){
-				outputValue("\nERROR: Failed to append list element '",_listElementValue,"'.");
+				output("%s",ERROR_PREFIX);
+				outputValue("Failed to append list element '",_listElementValue,"'.\n");
 				break;
 			}
-			if(amVerbose())output("List element #%lld appended to list with index %lld!",listElementIndex,newListElementIndex);
+			if(amVerbose())output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
 		}else
-		if(amVerbose())output("Maximum number of elements reached.");
+		if(amVerbose())output("Maximum number of elements reached.\n");
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
-	if(amVerbose())output("List extracted!");
+	if(amVerbose())output("List extracted!\n");
 	return _listValue;
 }
 
@@ -2062,14 +2108,14 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 			}
 			break;
 		case FT_INTERNAL_NO_ARGUMENTS:
-			if(amVerbose())output("Calling no-argument function %s.",functionName);
+			if(amVerbose())output("Calling no-argument function '%s'.\n",functionName);
 			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
-			if(amVerbose())output("Calling one-argument function %s.",functionName);
+			if(amVerbose())output("Calling one-argument function '%s'.\n",functionName);
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:
 			{
-				if(amVerbose())output("Calling two-argument function %s.",functionName);
+				if(amVerbose())output("Calling two-argument function '%s'.\n",functionName);
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 				return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
@@ -2077,7 +2123,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 			}
 		case FT_INTERNAL_THREE_ARGUMENTS:
 			{
-				if(amVerbose())output("Calling three-argument function %s.",functionName);
+				if(amVerbose())output("Calling three-argument function '%s'.\n",functionName);
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
@@ -2157,7 +2203,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 							free_string(attributenameText);
 							continue;	
 						}
-						outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
+						output("%s",ERROR_PREFIX);
+						outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
 					}
 					if(_value->type==VT_LIST){
 						// try to convert the index value into a positive integer
@@ -2166,10 +2213,11 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 							_value=getValueAtIndex(_value->value._list,index);
 							continue;
 						}
-						if(index)
-							outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.");
-						else
-							output("ERROR: A zero index is not allowed.");
+						if(index){
+							output("%s",ERROR_PREFIX);
+							outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
+						}else
+							outputError("A zero index is not allowed");
 					}
 					// neither a list nor a map, so nothing to return!!!
 					return NULL;
@@ -2263,7 +2311,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	if(amVerbose()){
 		output("Applying unary operator '%c'",operator);
-		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.",_value->type);}
+		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.\n",_value->type);}else output(".\n");
 	}
 	// delegating to the one argument functions that we have is best!!!
 	switch(operator){
@@ -2282,7 +2330,7 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 */
 Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
 
-	if(amVerbose())output("getValueReference() extracting a(n) %s value that starts with token '%s' of type '%s'.",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(amVerbose())output("getValueReference() extracting a(n) '%s' value that starts with token '%s' of type '%s'.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
 	Mvaluereference* _valueReference=NULL;
 
@@ -2296,11 +2344,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		}
 		expressionToken=expressionToken->next;
 	}
-	if(amVerbose()){if(unaryOperators)output("Unary operators: '%s'.",string(unaryOperators));else output("No unary operators!");}
+	if(amVerbose()){if(unaryOperators)output("Unary operators: '%s'.\n",string(unaryOperators));else output("No unary operators!\n");}
 	// ASSERT unary operators extracted
 
 	if(expressionToken){
-		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		_valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
@@ -2316,14 +2364,19 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		switch(expressionToken->type){
 			case TT_FUNCTION:
 				{
-					if(amVerbose())output("Call of function '%s'.",_significantTokenText);
+					if(amVerbose())output("Call of function '%s'.\n",_significantTokenText);
 					Mfunction* function=getFunction(_Menvironment,_significantTokenText); // get the function associated with the name of the function
-					if(function){					
+					if(function){		
+						// MDH@17JUL2019: we know the function and when the name is one of the special functions
+						//                like 'function' to define a function we know not to evaluate the third argument!!
+						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
+						uint32_t numberOfElementsToNotEvaluate=0;
+						if(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME))numberOfElementsToNotEvaluate=1;		
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=expressionToken->next;
-						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1));
+						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1),numberOfElementsToNotEvaluate);
 						if(_functionArgumentsValue){
-							if(amVerbose())output("Constructing the function call argument map!");
+							if(amVerbose())output("Constructing the function call argument map!\n");
 							// 2. get the arguments map
 							Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
@@ -2335,13 +2388,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// 3. the result of applying the function to the arguments is the end result
 							assignValue(&_valueReference->_value,getValueOfFunctionCall(function,_significantTokenText,_functionArgumentMap));
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
-							if(amVerbose())output("Freeing the function argument map!");
+							if(amVerbose())outputLine("Freeing the function argument map!");
 							free_map(_functionArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
-							if(amVerbose())output("Function argument map freed!");
+							if(amVerbose())outputLine("Function argument map freed!");
 						}else
-							output("ERROR: No function arguments!");
+							outputError("No function arguments");
 					}else
-						output("ERROR: Function '%s' unknown!",_significantTokenText);
+						output("%sFunction '%s' unknown!\n",ERROR_PREFIX,_significantTokenText);
 				}
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
@@ -2356,7 +2409,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// a variable can be followed by an index that we should store in the value reference's itemid field
 				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
 					expressionToken=expressionToken->next;
-					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0); // typically allow for any number of indices (although perhaps we should check!!)
+					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0); // typically allow for any number of indices (although perhaps we should check!!)
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->_first){ // a non-empty list
@@ -2451,7 +2504,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST: // a list literal
-				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0));
+				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0,0));
 				break;
 			case TT_MAP: // a map literal
 			{	
@@ -2462,7 +2515,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
 			{
-				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1);
+				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0);
 				if(amVerbose())outputLine("Going to wrap the list extracted!");
 				// well, actually, we need the first element of the list that is returned!!!
 				// use only the first element if the list only has one element, otherwise use the list itself
@@ -2480,16 +2533,16 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("Value: `",_valueReference->_value,"`.\n");else output("No result!");}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
-			if(amVerbose())output("Applying unary operators: `%s`.",string(unaryOperators));
+			if(amVerbose())output("Applying unary operators: '%s'.\n",string(unaryOperators));
 			uint16_t l=string_length(unaryOperators);
 			while(l>0&&_valueReference->_value){
 				/////////////decrementReferenceCount(_valueReference->_value);
 				assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 			}
-			if(amVerbose())outputValue("\nResult after applying unary operators: `",_valueReference->_value,"`.");
+			if(amVerbose())outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
 		}else
-			if(amVerbose())output("No unary operators to apply!");
+			if(amVerbose())outputLine("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=expressionToken->next;
@@ -2823,14 +2876,14 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 						if(exponentOf10==0)
 							_rational=_getRational(_numerator,_getBigintegerCopy(_value1->value._rational->den),getReal(_value1->value._rational->delta),true,true);
 						else
-							output("ERROR: Failed to multiply the numerator of the rational by an integer power of 10.");
+							outputError("Failed to multiply the numerator of the rational by an integer power of 10.");
 					}else{
 						Mbiginteger* _denominator=(!_value1->value._rational->den?_getBiginteger(1):_getBigintegerCopy(_value1->value._rational->den));
 						while(exponentOf10<0)if(mp_mul(_denominator,_biginteger10,_denominator)==MP_OKAY)exponentOf10++;else break;
 						if(exponentOf10==0)
 							_rational=_getRational(_getBigintegerCopy(_value1->value._rational->num),_denominator,getReal(_value1->value._rational->delta),true,true);
 						else
-							output("ERROR: Failed to multiply the denominator of the rational by an integer power of 10.");
+							outputError("Failed to multiply the denominator of the rational by an integer power of 10.");
 					}
 					free_biginteger(_biginteger10);
 				}
@@ -2987,7 +3040,7 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	if(_value1&&_value2){
-		if(amVerbose()){outputValue("\nComputing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.");}
+		if(amVerbose()){outputValue("Computing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.\n");}
 		switch(operator[0]){
 			// real arithmetic
 			case '+' :return add(_value1,_value2);
@@ -3070,18 +3123,16 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				uint8_t endTokenTypeIndex=0;
 				while(endTokenTypeIndex<endTokenTypeCount){output(endTokenTypeIndex?" or ":" with ");output(TOKENTYPE_STRING[endTokenTypes[endTokenTypeIndex++]]);}
 			}
-			outputChar('.');
+			output(".\n");
 		}
-
-		// construct a formula
-		Mformulaelement* formula=calloc(1,sizeof(Mformulaelement));
-		Mformulaelement* _formulaelement=formula; // the current formula element!!!
+		
 		Mvaluereference* _valuereference;
+		Mformulaelement* formula=CALLOC(1,sizeof(Mformulaelement),'F');
+		Mformulaelement* _formulaelement=formula;
 
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 
 		while(expressionToken){
-
 			if(amVerbose())output("getValueOfExpression() processing %s expression token '%s' of type %s.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			// does this token end the expression????
 			endTokenTypeIndex=endTokenTypeCount;
@@ -3089,9 +3140,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			while(endTokenTypeIndex>0&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1])endTokenTypeIndex--; // replacing: &&expressionToken->type>=8)endTokenTypeIndex--;
 			if(endTokenTypeIndex>0){if(amVerbose())output("End of %s expression.\n",info);break;}
 			
-			_formulaelement->_operand=getValueReference("operand",endTokenTypes,endTokenTypeCount);
-
-			if(amVerbose())outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.\n");
+			if(_formulaelement){
+				_formulaelement->_operand=getValueReference("operand",endTokenTypes,endTokenTypeCount);
+				if(amVerbose())outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.\n");
+			}
 
 			// the next token(s) should be a binary operator
 			// NOTE some binary operators are stored in a couple of tokens!!!
@@ -3160,13 +3212,13 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			
 			// perform assignments right-to-left (which is a little problematic though)
 			if(numberOfAssignments){
-				if(amVerbose())output("Performing %u assignments.",numberOfAssignments);
+				if(amVerbose())output("Performing %u assignments.\n",numberOfAssignments);
 				_formulaelement=_lastAssignmentFormulaelement;
 				while(_formulaelement){
 					_valuereference=_formulaelement->_operand;
 					if(amVerbose()){
 						Mstring* _indexidText=_getValueText(_valuereference->_itemid,false);
-						output("Assignment to %s%s using operator %s!",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
+						output("Assignment to %s%s using operator %s!\n",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
 						if(_indexidText)free_string(_indexidText);
 					}
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
@@ -3757,11 +3809,14 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 void outputTokenInfo(){
 	Mtoken* token=pCommandToEvaluate;
 	uint16_t tokenIndex=0;
-	output("%s:","Tokens");
-	output("%s\t%s\t%s\t%s\t%s\t\t\t%s","#","OFFSET","USED","LENGTH","TYPE","TEXT");
+	output("%s:\n","Tokens");
+	output("%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","TYPE","TEXT","EXPR");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),TOKENTYPE_STRING[token->type],string(token->text));
+		if(token->expr){
+			output("%s\t%u\t%s\t%s\t%-24s`%s`\n","part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type],string(token->expr->text));
+		}
 		token=token->next;
 	}
 }
@@ -4559,6 +4614,7 @@ int main(int argc, char **argv){
 
 				// if we succeeded in evaluating a command we should register it
 				if(pCommandToEvaluate){ // technically something to evaluate
+					if(amVerbose())outputTokenInfo();
 					size_t mark=allocationmark();
 					if(amVerbose())output("Mark: %zu.\n",mark);
 					bool commandEvaluated=evaluateCommand();
