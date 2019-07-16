@@ -6,12 +6,6 @@
 
 struct Mlist;
 struct Mmap;
-// MDH@10JUL2019: user functions are stored differently than M functions
-typedef struct Muserfunction{
-    //////////struct Mmap* _parameterMap;
-    Mtoken* _bodyToken; // wraps the tokens that constitute the body text of the user function
-}Muserfunction;
-void free_userfunction(Muserfunction* _userfunction);
 typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
@@ -22,7 +16,7 @@ typedef union Mvalueunion{
     Mtext* _text;
     struct Mlist* _list;
     struct Mmap* _map;
-    //////struct Muserfunction* _userfunction;
+    struct Muserfunction* _userfunction;
 }Mvalueunion;
 
 // a Value is either a number (numeric literal), a string literal, a list of values or a map
@@ -33,6 +27,13 @@ typedef struct Mvalue{
     Mvaluetype type;
     Mvalueunion value;
 }Mvalue;
+
+// MDH@10JUL2019: user functions are stored differently than M functions
+typedef struct Muserfunction{
+    //////////struct Mmap* _parameterMap;
+    Mvalue* _bodyTokenValue; // wraps the tokens that constitute the body text of the user function
+}Muserfunction;
+void free_userfunction(Muserfunction* _userfunction);
 
 // a variable is a named value of a certain value type
 typedef struct Mvariable{
@@ -145,7 +146,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only a
 long long getValueInteger(const Mvalue* const _value);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
-Mmap* _getMapTokenMap(char* name1,char* name2);
+Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
@@ -208,3 +209,4 @@ void free_mapelement(Mmapelement* _mapelement);
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
 typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
+typedef Mvalue* (*ThreeArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value);

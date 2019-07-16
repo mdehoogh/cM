@@ -14,6 +14,7 @@
 #include "Menvironment.h"
 
 // externally (in M.c) defined constants
+const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* const ERROR_PREFIX;
@@ -525,19 +526,65 @@ bool completedRealRealFunction(Mfunction* const _function,char* functionName,Two
     }
     return false;
 }/* VALIDATED */
-bool completedMapTokenFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction){
+bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){
     if(_function){
-        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
-        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=_getMapTokenMap("parameters","body");
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=_getStringMapTokenMap("name","parameters","body");
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register map list argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register string map list argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
+
+// MDH@09JUL2019: a function is defined as a parameter map (with defaults) and a body token
+// MDH@10JUL2019: the caller will need to register the function in the function map of the definition environment
+//                here we only need to return the wrapped user function
+/*
+Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
+    Mvalue* _value=__value();
+    if(_value){_value->type=VT_TOKEN;_value->value._userfunction=_userfunction->_bodyTokenValue->value._token;}
+    if(!_value)free_userfunction(_userfunction);
+    return _value;
+}
+*/
+Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
+    // the user specifies the body as a text (to prevent evaluation during defining the function)
+    // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
+    // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
+    if(_nameValue&&_parameterMapValue&&_bodyTokenValue){
+        if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&_bodyTokenValue->type==VT_TOKEN){
+            Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'U');
+            if(_userfunction){
+                assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
+                //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
+                ///////if(_userfunctionValue){
+                    // MDH@17JUL2019: the map needs to be stored with the Mfunction
+                Mtext* functionName=_nameValue->value._text;
+                Mfunction* _function=_getFunction(getEnvironment(),functionName->_c);
+                if(_function){
+                    _function->_parameterMap=_parameterMapValue->value._map;
+                    _function->functionunion._userfunction=_userfunction;
+                    // return the result of applying the function to the default parameter map
+
+                    return _getIntegerValue(1);
+                }
+                ///////////free_value(_userfunctionValue); // freed
+                output("%sFailed to create function '%s'.",functionName);
+                ///////}
+            }
+        }else
+            outputError("Invalid user function name, parameter map or body");
+    }else
+        outputError("No user function name, parameter map or body");
+    return _getIntegerValue(0); // indicating failure...
+}/*VALIDATED */
+Mvalue* Mreturn(Mvalue* _value){
+    return _value;
+}/*VALIDATED */
 
 // these internal functions do NOT have a body as M defined functions have...
 bool registerInternalFunctions(Menvironment* const _environment){
@@ -561,7 +608,7 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedStringStringFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
     if(!completedRealRealFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
 
-    if(!completedMapTokenFunction(_getFunction(_environment,"function"),"function",Mdefinefunction))return false;
+    if(!completedStringMapTokenFunction(_getFunction(_environment,"function"),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
     if(!completedValueFunction(_getFunction(_environment,"return"),"return",Mreturn))return false;
 
     return true;

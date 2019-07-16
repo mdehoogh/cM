@@ -97,7 +97,8 @@ void free_map(Mmap* _map){
 void free_userfunction(Muserfunction* _userfunction){
     if(_userfunction){
         ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
-        if(_userfunction->_bodyToken)free_token(_userfunction->_bodyToken);
+        // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
+        assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
         free(_userfunction);
     }
 }/* VALIDATED */
@@ -499,21 +500,24 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
     }
     return NULL;
 }/* VALIDATED */
-Mmap* _getMapTokenMap(char* name1,char* name2){
+Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){
     if(name1&&name2){
-        if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
+        if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
             Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
             Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            if(_mapelement1&&_mapelement2){
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2&&_mapelement3){
                 Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
                 if(_map){
-                    _mapelement1->_variable=_getVariable(name1,VT_MAP,true);
-                    _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
-                    if(_mapelement1->_variable&&_mapelement2->_variable){
+                    _mapelement1->_variable=_getVariable(name1,VT_TEXT,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_MAP,true);
+                    _mapelement3->_variable=_getVariable(name3,VT_TOKEN,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable){
                         _map->_first=_mapelement1;
                         _mapelement1->_next=_mapelement2;
-                        _map->_last=_mapelement2;
-                        _map->numberOfElements=2;
+                        _mapelement2->_next=_mapelement3;
+                        _map->_last=_mapelement3;
+                        _map->numberOfElements=3;
                         return _map;
                     }
                     free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
@@ -522,6 +526,7 @@ Mmap* _getMapTokenMap(char* name1,char* name2){
             // either map element might have been created and we need to release them
             free_mapelement(_mapelement1);
             free_mapelement(_mapelement2);
+            free_mapelement(_mapelement3);
         }
     }
     return NULL;
@@ -1543,28 +1548,3 @@ Mvalue* Mfac(Mvalue* _value){
     */
 }/* VALIDATED */
 
-// MDH@09JUL2019: a function is defined as a parameter map (with defaults) and a body token
-// MDH@10JUL2019: the caller will need to register the function in the function map of the definition environment
-//                here we only need to return the wrapped user function
-Mvalue* Mdefinefunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
-    /*
-    // the user specifies the body as a text (to prevent evaluation during defining the function)
-    // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
-    // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
-    if(_parameterMapValue&&_bodyTokenValue){
-        if(_parameterMapValue->type==VT_MAP&&_bodyTokenValue->type==VT_TOKEN){
-            Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'F');
-            if(_userfunction){
-                assignValue(&_userfunction->_bodyValue,_bodyTokenValue);
-                ///////_userfunction->_parameterMap=_parameterMapValue->value._map;
-            }
-            return _getUserfunctionValue(_userfunction,true);
-        }else
-            outputError("Invalid parameter map or body");
-    }else
-        outputError("No parameter map or body");
-    */
-}
-Mvalue* Mreturn(Mvalue* _value){
-    return _value;
-}

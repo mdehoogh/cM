@@ -8,12 +8,13 @@
 // MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
 /////////////struct Menvironment;
 
-typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS}Mfunctiontype;
+typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS}Mfunctiontype;
 
 typedef union Mfunctionunion{
     NoArgumentFunction noArgumentFunction;
     OneArgumentFunction oneArgumentFunction;
     TwoArgumentFunction twoArgumentFunction;
+    ThreeArgumentFunction threeArgumentFunction;
     Muserfunction* _userfunction; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
 }Mfunctionunion;
 
@@ -118,7 +119,7 @@ bool completedStringStringFunction(Mfunction* const _function,char* functionName
 bool completedRealRealFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
 
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
-bool completedMapTokenFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
-Mvalue* Mdefinefunction(Mvalue* _parameterMap,Mvalue* _body);
+bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction twoArgumentFunction);
+Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
 //                the return function returns its value as result of the function it is executing
 Mvalue* Mreturn(Mvalue* _value);

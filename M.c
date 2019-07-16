@@ -19,6 +19,7 @@
 #include "Menvironment.h"
 
 // used externally in Mexecution.h, Mvalue.h, Menvironment.h
+const char* const DEFINEUSERFUNCTION_NAME="define";
 const char* const MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
@@ -2058,21 +2059,32 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 		case FT_USER:{
 			// TODO create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 
-				break;
 			}
+			break;
 		case FT_INTERNAL_NO_ARGUMENTS:
 			if(amVerbose())output("Calling no-argument function %s.",functionName);
 			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
 			if(amVerbose())output("Calling one-argument function %s.",functionName);
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
-		case FT_INTERNAL_TWO_ARGUMENTS:{
-			if(amVerbose())output("Calling two-argument function %s.",functionName);
-			Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
-			Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
-			return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
-																														,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL));
-		}
+		case FT_INTERNAL_TWO_ARGUMENTS:
+			{
+				if(amVerbose())output("Calling two-argument function %s.",functionName);
+				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
+				return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
+																	  ,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL));
+			}
+		case FT_INTERNAL_THREE_ARGUMENTS:
+			{
+				if(amVerbose())output("Calling three-argument function %s.",functionName);
+				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
+				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
+				return (*_function->functionunion.threeArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
+																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
+																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL));
+			}
 	}
 	return NULL;
 }
