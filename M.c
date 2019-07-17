@@ -3878,6 +3878,20 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	printf("[%d+%c->%d]",pLastCommandToEvaluateToken->type,inputCharacterType,newTokenType);
 	outputTokenColor(pLastCommandToEvaluateToken);
 #endif
+		//MDH@17JUL2019: typically we'd get an error immediately when NOT entering a function call character ( behind a function identifier
+		if(newTokenType==TT_ERROR&&pLastCommandToEvaluateToken->type==TT_FUNCTION){
+			// we should assume that the identifier represents a (new) variable (identifier)
+			char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
+			pLastCommandToEvaluateToken->type=(containsVariable(getEnvironment(),_identifierName)?TT_VARIABLE:TT_NEW_VARIABLE);
+			free(_identifierName);
+			reoutputToken(pLastCommandToEvaluateToken);
+			// I think we should remove ( from the behind cursor text if it was inserted
+			if(endOfInput)if(amMatchingparentheses())if(string_length(behindCursorText)&&string_char(behindCursorText,0)=='(')
+			if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the function argument list opening parenthesis from the feed forward text."); // TODO is there a better way???
+			// ready to redetermine the new token type!!!!
+			newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType);
+		}
+
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType<0||newTokenType==pLastCommandToEvaluateToken->type){
@@ -3936,6 +3950,11 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 					}else
 						newTokenType=TT_BINARY_aErU;
 				}
+			}
+
+			// MDH@17JUL2019: if we want to be able to change an assumed TT_FUNCTION token back to TT_(NEW_)VARIABLE if the new token type is not a function call
+			//                we need to do that BEFORE adding a new token
+			if(newTokenType!=TT_ERROR&&pLastCommandToEvaluateToken->type==TT_FUNCTION&&newTokenType!=TT_FUNCTION_CALL){
 			}
 
 			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken);
