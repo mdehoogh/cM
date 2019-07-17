@@ -8,9 +8,7 @@ void free_token(Mtoken* _token){
         FREE(_token,'T');
     }
 }
-Mtoken* __token(){
-    return (Mtoken*)CALLOC(1,sizeof(Mtoken),'T');
-}
+Mtoken* __token(){return (Mtoken*)CALLOC(1,sizeof(Mtoken),'T');}
 /*
 void free_expression(Mexpression* _expression){
     if(_expression){

@@ -21,7 +21,7 @@
 // used externally in Mexecution.h, Mvalue.h, Menvironment.h
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
-const char* const DEFINEUSERFUNCTION_NAME="define";
+const char* const DEFINEUSERFUNCTION_NAME="function";
 const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
@@ -1182,12 +1182,11 @@ bool initEnvironment(){
 	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
-	_Menvironment=calloc(1,sizeof(Menvironment));
+	_Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
-		Mmap* environmentVariableMap=calloc(1,sizeof(Mmap));
-		Mfunctionmap* environmentFunctionMap=calloc(1,sizeof(Mfunctionmap));
-		if(environmentVariableMap&&environmentFunctionMap){
-			_Menvironment->_variableMap=environmentVariableMap;
+		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
+		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'M');
+		if(environmentFunctionMap){
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
 			// MDH@29MAY2019: we've got (symbol) NULL
 			if(!addVariable(_Menvironment,"NULL",VT_TOKEN,true)||!setValue(_Menvironment,"NULL",NULL_value)){
@@ -2016,7 +2015,7 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate){
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
-	if(amVerbose())output("Composing a list starting with '%s'.\n",string(expressionToken->text));
+	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mvalue* _listValue=_getListValue(VT_UNDEFINED); // replacing: getValueOfExpressionOfType(VT_LIST);
@@ -2028,6 +2027,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	unsigned long long listElementIndex=0;
 	uint32_t firstElementToNotEvaluate=(maximumNumberOfElements==0||numberOfElementsToNotEvaluate>maximumNumberOfElements?0:maximumNumberOfElements-numberOfElementsToNotEvaluate+1);
+	if(amVerbose())output("First element not to evaluate: %u.\n",firstElementToNotEvaluate);
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
 	while((expressionToken=nextEnvironmentExpressionToken())){
@@ -2432,10 +2432,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						//                like 'function' to define a function we know not to evaluate the third argument!!
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
 						uint32_t numberOfElementsToNotEvaluate=0;
-						if(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME))numberOfElementsToNotEvaluate=1;		
+						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
+							if(amVerbose())outputLine("Definition of a user function encountered!");
+							numberOfElementsToNotEvaluate=1;		
+						}
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=nextEnvironmentExpressionToken();
-						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1),numberOfElementsToNotEvaluate);
+						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,function->_parameterMap->numberOfElements,numberOfElementsToNotEvaluate);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
 							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");

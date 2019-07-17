@@ -65,15 +65,23 @@ void free_functionmap(Mfunctionmap* _functionmap){
         free(_functionmap);
     }
 }// VALIDATED
+// END RELEASERS
 
+// Menvironment stuff
 void free_environment(Menvironment* _environment){
     if(_environment){
         free_map(_environment->_variableMap);
         // MDH@10JUL2019: only Menvironment has a function map!!   if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
-        free(_environment);
+        FREE(_environment,'E');
     }
 }/* VALIDATED */
-// END RELEASERS
+Menvironment* __environment(){
+    Menvironment* _environment=CALLOC(1,sizeof(Menvironment),'E');
+    if(!_environment)return NULL;
+    _environment->_variableMap=CALLOC(1,sizeof(Mmap),'M'); // ascertain that the environment contains a variable map
+    if(!_environment->_variableMap){free_environment(_environment);_environment=NULL;}
+    return _environment;
+}/* VALIDATED */
 // keep track of the current execution environment
 static Menvironment* _executionEnvironment=NULL;
 bool pushExecutionEnvironment(Menvironment* _environment){
@@ -91,7 +99,6 @@ bool popExecutionEnvironment(){
     _executionEnvironment=_parentExecutionEnvironment;
     return true;
 }/* VALIDATED */
-Menvironment* __environment(){return CALLOC(1,sizeof(Menvironment),'E');}/* VALIDATED */
 Menvironment* getEnvironment(){return _executionEnvironment;}/* VALIDATED */
 Mtoken* getEnvironmentExpressionToken(){return _executionEnvironment->expressionToken;}/* VALIDATED */
 Mtoken* nextEnvironmentExpressionToken(){
@@ -140,7 +147,7 @@ Mstring* _getVariableNames(const Menvironment* const _environment,const char* co
 Mvariable* getVariable(const Menvironment* const _environment,const char* const name, bool verbose){
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     // input valid        
-    if(!_environment->_variableMap){outputError("No variables in environment");return NULL;}
+    if(!_environment->_variableMap){output("%sEnvironment to find variable '%s' in is empty.\n",ERROR_PREFIX,name);return NULL;}
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=_environment->_variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
