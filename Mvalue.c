@@ -149,7 +149,7 @@ Mvalue* __value(){
     return _value;
 }/* VALIDATED */
 
-const char* VALUETYPENAMES[]={"unknown","integer","real","text","big integer","rational","decimal","list","map"};
+extern const char* const VALUETYPENAMES[];
 
 // can be asked to remove unused values
 // TODO check whether it functions correctly (think so though)
@@ -1342,8 +1342,9 @@ Mvalue* Mceil(Mvalue* _value){
     }
     return NULL;
 }
-Mvalue* Msin(Mvalue*  _value){
+Mvalue* Msin(Mvalue* _value){
     if(_value){
+        if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",VALUETYPENAMES[_value->type],_value->type);}
         if(_value->type==VT_REAL)return _getRealValue(sinl(_value->value._real->ld));
         if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin),true);

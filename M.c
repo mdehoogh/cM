@@ -19,9 +19,11 @@
 #include "Menvironment.h"
 
 // used externally in Mexecution.h, Mvalue.h, Menvironment.h
+//Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
+const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
 const char* const DEFINEUSERFUNCTION_NAME="define";
-const char* const MUTABLEVALUETYPECHARS="utirslm"; // the characters associated with each of the value types
-const char* const IMMUTABLEVALUETYPECHARS="UTIRSLM"; // the characters associated with each of the value types
+const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associated with each of the value types
+const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
 const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
@@ -1100,9 +1102,9 @@ long double getDecimalLongDouble(Mdecimal* _decimal){
 }
 // TODO complete with conversion from big integer and rational
 Mvalue* r(Mvalue* _value){
-	if(amVerbose())outputValue("\nConverting '",_value,"' to a real.");
 	Mvalue* _realValue=NAR_value;
 	if(_value){
+		if(amVerbose()){outputValue("Converting '",_value,"'");output(" of type %s to a real.\n",VALUETYPENAMES[_value->type]," to a real.\n");}
 		switch(_value->type){
 			case VT_INTEGER:_realValue=_getRealValue((long double)_value->value._integer->ll);break;
 			case VT_BIGINTEGER:_realValue=_getRealValue(mp_get_long_double(_value->value._biginteger));break;
@@ -1113,7 +1115,7 @@ Mvalue* r(Mvalue* _value){
 			default:break;
 		}
 	}
-	if(amVerbose())outputValue("\nConverted to '",_realValue,"'.");
+	if(amVerbose())outputValue("Converted to '",_realValue,"'.\n");
 	return _realValue;
 }
 // the type of a value
@@ -1969,6 +1971,11 @@ Note that certain elements have repeating elements (optional) like argument list
 I guess we can use that in the evaluation because these define the separators!!!! so with any list we can define the token types that separate the successive list elements!!!
 but <value><operator><value> here operator is a set of token types that separate the values but the operators should end up in the produced list as they are significant/meaningful
 */
+
+/* MDH@07JUL2019: we need to put the current token of the expression being evaluated in the execution environment, so we can execute a user function call
+                  without loosing the original expression we're evaluating
+Mtoken* expressionToken=NULL; // the current evaluation token
+*/
 /**
  * getValueOfExpression() evaluates an expression, obviously this means that we need to have some sort of understanding of where expression occur in the syntax of the M language
  * @info: some information text on the expression type (used in messages)
@@ -1978,7 +1985,6 @@ but <value><operator><value> here operator is a set of token types that separate
  * @endTokenTypeCount: the number of end tokens
  * returns: the last token processed (which should be one of the end tokens) or NULL if all tokens were processed, and the Mvalue the expression evaluates to
  */
-Mtoken* expressionToken=NULL; // the current evaluation token
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount); // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
 
 /*
@@ -2009,6 +2015,7 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 }
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate){
+	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
 	if(amVerbose())output("Composing a list starting with '%s'.\n",string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
@@ -2022,9 +2029,8 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	unsigned long long listElementIndex=0;
 	uint32_t firstElementToNotEvaluate=(maximumNumberOfElements==0||numberOfElementsToNotEvaluate>maximumNumberOfElements?0:maximumNumberOfElements-numberOfElementsToNotEvaluate+1);
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
-	while(true){
-		expressionToken=expressionToken->next; // now on the first element
-		if(!expressionToken)break;
+	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
+	while((expressionToken=nextEnvironmentExpressionToken())){
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
 		if(amVerbose())output("Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
@@ -2036,7 +2042,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			Mtoken* _firstUnevaluatedToken=_getEvaluatableTokenCopy(expressionToken);
 			Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 			while(unevaluatedToken){
-				expressionToken=expressionToken->next;
+				expressionToken=nextEnvironmentExpressionToken();
 				if(!expressionToken)break; // NOTE shouldn't happen though
 				if(!expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
 				unevaluatedToken->next=_getEvaluatableTokenCopy(expressionToken); // set next to the copy of the expression token
@@ -2046,6 +2052,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		}else{ // evaluate
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
+			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
 		}
 		if(!_listElementValue){if(amVerbose())output("List element missing!\n");continue;} // undefined list elements should NEVER be added to the list
 		if(amVerbose())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
@@ -2070,25 +2077,26 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 }
 
 Mvalue* getValueOfMap(){
+	Mtoken* expressionToken=getEnvironmentExpressionToken(); // MDH@17JUL2019: one of five functions that use and advance the current expression token
 	Mvalue* _mapValue=_getMapValue(VT_UNDEFINED); // MDH@21MAY2019 for the same reason as above: replacing: getValueOfExpressionOfType(VT_MAP);
 	Mmap* _map=_mapValue->value._map; // grab the map to fill
 	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
 	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
 	// NOTE a map can be empty in which case _firstToken will immediately be of type TT_END_OF_MAP
-	while(true){
-		expressionToken=expressionToken->next;
-		if(!expressionToken)break;
+	while((expressionToken=nextEnvironmentExpressionToken())){
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(expressionToken->type==TT_LISTELEMENT)continue; // missing attribute name-value pair
 		// get the next attribute name, value pair
 		// obviously the name should be something that evaluates to a string
 		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'s',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
+		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
 		if(expressionToken->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
-		expressionToken=expressionToken->next; // move to first element after the colon
+		expressionToken=nextEnvironmentExpressionToken(); // move to first element after the colon
 		Mvalue* _attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
+		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		Mstring* attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value 
 		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
 		if(!appendedToMap(_map,string(attributeName),_attributeValueValue))outputValue("\nERROR: Failed to append the value of attribute '",_attributeNameValue,"'."); // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
@@ -2102,31 +2110,83 @@ Mvalue* getValueOfMap(){
 Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _argumentMap){
 	////////Mvalue* _resultValue=NULL;
 	switch(_function->type){
-		case FT_USER:{
-			// TODO create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-
+		case FT_USER:
+			{
+				// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
+				Menvironment* _functionExecutionEnvironment=__environment(); // free asap
+				if(_functionExecutionEnvironment){
+					bool functionExecutionEnvironmentInitialized=true;
+					// 2. make the definition environment the parent of the function execution environment
+					_functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
+					// 3. create the argument map fields as variables in the function execution environment
+					Mmapelement* argumentMapelement=_argumentMap->_first;
+					Mvariable* argumentMapelementVariable;
+					while(functionExecutionEnvironmentInitialized&&argumentMapelement){
+						argumentMapelementVariable=argumentMapelement->_variable;
+						if(!addVariable(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->valuetype,false)){
+							outputError("Failed to add function argument as local variable of a function execution");
+							functionExecutionEnvironmentInitialized=false;
+						}else
+						if(!setValue(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->_value)){
+							outputError("Failed to initialize the argument local variable of a function execution");
+							functionExecutionEnvironmentInitialized=false;
+						}else
+							argumentMapelement=argumentMapelement->_next;
+					}
+					// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
+					if(!addVariable(_functionExecutionEnvironment,"$",VT_UNDEFINED,false)){
+						outputError("Failed to add the result variable to the function execution environment");
+						functionExecutionEnvironmentInitialized=false;
+					}
+					if(functionExecutionEnvironmentInitialized&&pushExecutionEnvironment(_functionExecutionEnvironment)){ // function execution environment now active...
+						// initialize the expression token of the current execution environment to the token that starts the function body (expression)
+						_functionExecutionEnvironment->expressionToken=_function->functionunion._userfunction->_bodyTokenValue->value._token;
+						// evaluate that expression
+						Mvalue* _functionEvaluationValue=getValueOfExpression("function call",'f',(TokenType[]){},0);
+						// before popping the function execution environment, see if the result was set
+						Mvalue* _functionResultValue=getValue(_functionExecutionEnvironment,"$");
+						if(!popExecutionEnvironment())output("BUG: Failed to pop function execution environment.\n");
+						// the function result value (if set) takes precedence over the function evaluation value
+						return (_functionResultValue?_functionResultValue:_functionEvaluationValue);
+					}else{
+						outputError("Failed to setup or activate the function execution environment");
+						free_environment(_functionExecutionEnvironment);
+					}
+				}else
+					outputError("Failed to create function execution environment");
+				return NULL;
 			}
 			break;
 		case FT_INTERNAL_NO_ARGUMENTS:
 			if(amVerbose())output("Calling no-argument function '%s'.\n",functionName);
 			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
-			if(amVerbose())output("Calling one-argument function '%s'.\n",functionName);
+			if(amVerbose()){output("Applying one-argument function '%s'",functionName);outputValue(" to '",_argumentMap->_first->_variable->_value,"'.\n");}
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:
 			{
-				if(amVerbose())output("Calling two-argument function '%s'.\n",functionName);
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
+				if(amVerbose()){
+					output("Applying two-argument function '%s'.\n",functionName);
+					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					outputChar('\n');
+				}
 				return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																	  ,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL));
 			}
 		case FT_INTERNAL_THREE_ARGUMENTS:
 			{
-				if(amVerbose())output("Calling three-argument function '%s'.\n",functionName);
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
+				if(amVerbose()){
+					output("Applying three-argument function '%s'.\n",functionName);
+					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
+				}
 				return (*_function->functionunion.threeArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
 																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL));
@@ -2180,7 +2240,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	// if we do NOT have a name it's a literal
 	if(!_valuereference->_name)return NULL;
 	// if there is no itemid we simply return the 'entire' value of the given variable
-	Mvalue* _value=getValue(_Menvironment,_valuereference->_name); // the value at the top level
+	Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
 	// if we have index/attribute names we have to get the final subvalue
 	if(_valuereference->_itemid){
 		Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
@@ -2303,7 +2363,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				}
 			}
 		}else
-			setValue(_Menvironment,_valuereference->_name,_newValue);
+			setValue(getEnvironment(),_valuereference->_name,_newValue);
 	}
 	return result;
 }
@@ -2329,10 +2389,11 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
  * we need to store the value in a value reference just in case the value is the destination of an assignment, so yes, reference is an apt name
 */
 Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
-
-	if(amVerbose())output("getValueReference() extracting a(n) '%s' value that starts with token '%s' of type '%s'.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	Mtoken* expressionToken=getEnvironmentExpressionToken();
 
 	Mvaluereference* _valueReference=NULL;
+
+	if(amVerbose())output("getValueReference() extracting a(n) '%s' value that starts with token '%s' of type '%s'.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
 	Mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
 		
@@ -2342,14 +2403,14 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			if(!unaryOperators)unaryOperators=__string();
 			string_append_char(unaryOperators,unaryOperatorChar);
 		}
-		expressionToken=expressionToken->next;
+		expressionToken=nextEnvironmentExpressionToken();
 	}
 	if(amVerbose()){if(unaryOperators)output("Unary operators: '%s'.\n",string(unaryOperators));else output("No unary operators!\n");}
 	// ASSERT unary operators extracted
 
 	if(expressionToken){
 		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-		_valueReference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+		_valueReference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'R');
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
@@ -2373,10 +2434,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						uint32_t numberOfElementsToNotEvaluate=0;
 						if(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME))numberOfElementsToNotEvaluate=1;		
 						// 1. get the list of function arguments, which depends on the function!!
-						expressionToken=expressionToken->next;
+						expressionToken=nextEnvironmentExpressionToken();
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,(function?function->_parameterMap->numberOfElements:1),numberOfElementsToNotEvaluate);
+						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
-							if(amVerbose())output("Constructing the function call argument map!\n");
+							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
 							// 2. get the arguments map
 							Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
@@ -2387,8 +2449,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							*/
 							// 3. the result of applying the function to the arguments is the end result
 							assignValue(&_valueReference->_value,getValueOfFunctionCall(function,_significantTokenText,_functionArgumentMap));
+							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
+							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
-							if(amVerbose())outputLine("Freeing the function argument map!");
+							if(amVerbose()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputLine("Freeing the function argument map!");}
 							free_map(_functionArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerbose())outputLine("Function argument map freed!");
 						}else
@@ -2408,8 +2472,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				// a variable can be followed by an index that we should store in the value reference's itemid field
 				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
-					expressionToken=expressionToken->next;
+					///////expressionToken=nextEnvironmentExpressionToken();
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0); // typically allow for any number of indices (although perhaps we should check!!)
+					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->_first){ // a non-empty list
@@ -2440,7 +2505,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
 					Mstring* _realText=_getString(_significantTokenText); // the integer part
-					expressionToken=expressionToken->next; // now pointing to the real fraction part text following the given integer!!!!
+					expressionToken=nextEnvironmentExpressionToken(); // now pointing to the real fraction part text following the given integer!!!!
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
 					Mstring* pRealText=_realText;
 					if(pRealText){
@@ -2509,6 +2574,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			case TT_MAP: // a map literal
 			{	
 				Mvalue* _mapValue=getValueOfMap();
+				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose())outputValue("Map extracted: '",_mapValue,"'.\n");
 				_valueReference=_getValuereference(_mapValue);
 				break;
@@ -2516,6 +2582,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
 			{
 				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0);
+				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose())outputLine("Going to wrap the list extracted!");
 				// well, actually, we need the first element of the list that is returned!!!
 				// use only the first element if the list only has one element, otherwise use the list itself
@@ -2545,11 +2612,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			if(amVerbose())outputLine("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
-		if(expressionToken)expressionToken=expressionToken->next;
+		if(expressionToken)expressionToken=nextEnvironmentExpressionToken();
 
 	}
 
-	if(amVerbose())outputValue("\nValue result: `",_valueReference->_value,"`.");
+	if(amVerbose()){outputValue("Value result: '",_valueReference->_value,"'");output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);}
 	
 	return _valueReference;
 
@@ -3109,13 +3176,13 @@ char* getSignificantTokenText(Mtoken* token){
  * it composes a list of value references to which operators are to be applied
  */
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
+	Mtoken* expressionToken=getEnvironmentExpressionToken();
 	// typically the offset token determines what the expression ends with!!
 	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.   
 	Mvalue* _expressionValue=NULL;
 	/////////_expressionvalue->_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference)); // create a value reference that is to hold a single value reference as result
-
+	
 	if(expressionToken){
-
 		if(amVerbose()){
 			output("getValueOfExpression() interpreting %s expression starting with token '%s' of type '%s'",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			if(endTokenTypeCount){
@@ -3142,12 +3209,15 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			
 			if(_formulaelement){
 				_formulaelement->_operand=getValueReference("operand",endTokenTypes,endTokenTypeCount);
+				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose())outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.\n");
 			}
 
 			// the next token(s) should be a binary operator
 			// NOTE some binary operators are stored in a couple of tokens!!!
-			if(expressionToken)if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)expressionToken=expressionToken->next;
+			if(expressionToken)
+				if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)
+					expressionToken=nextEnvironmentExpressionToken();
 
 			// MDH@16MAY2019: can't end an expression with an operator BRO'
 			if(amVerbose())if(expressionToken)output("Does '%s' of type '%s' end the expression?",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
@@ -3164,17 +3234,17 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
 				while(expressionToken->next&&expressionToken->next->type>2&&expressionToken->next->type<=8){ // OOPS exclude unary operators AND allow for an assignment operator as well
-					expressionToken=expressionToken->next;
+					expressionToken=nextEnvironmentExpressionToken();
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
 				if(expressionToken->next&&expressionToken->next->type==TT_ASSIGNMENT){
-					expressionToken=expressionToken->next;
+					expressionToken=nextEnvironmentExpressionToken();
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
 				if(amVerbose())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
-				_formulaelement->_next=(Mformulaelement*)calloc(1,sizeof(Mformulaelement));
+				_formulaelement->_next=(Mformulaelement*)CALLOC(1,sizeof(Mformulaelement),'f');
 				_formulaelement=_formulaelement->_next;
-				expressionToken=expressionToken->next;
+				expressionToken=nextEnvironmentExpressionToken();
 			}else
 			if(amVerbose())outputLine("No further formula elements!");
 		}
@@ -3205,7 +3275,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			// 'applying' the binary operators left-to-right remembering the intermediate result in _result
 			// NOTE because all formula-elements are freed afterwards (see below) there's no need to so while applying the binary operators
 			while(_formulaelement->_next){ // a binary operator to apply
+				if(amVerbose())output("Binary operator to apply: '%s'.\n",string(_formulaelement->_operator));
 				_result=applyBinaryOperator(string(_formulaelement->_operator),_result,getReferencedValue(_formulaelement->_next->_operand));
+				if(amVerbose())outputValue("Next result: '",_result,"'.\n");
 				_formulaelement=_formulaelement->_next;
 			}
 			if(amVerbose())outputValue("Result: '",_result,"'.\n");
@@ -3454,7 +3526,8 @@ bool evaluateCommand(){
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	Mstring* commandText=_getCommandText(true);
-	expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
+	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
+	getEnvironment()->expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
 	clock_t then=clock();
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	long long elapsed=(clock()-then)/1000;if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
@@ -3950,11 +4023,6 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 					}else
 						newTokenType=TT_BINARY_aErU;
 				}
-			}
-
-			// MDH@17JUL2019: if we want to be able to change an assumed TT_FUNCTION token back to TT_(NEW_)VARIABLE if the new token type is not a function call
-			//                we need to do that BEFORE adding a new token
-			if(newTokenType!=TT_ERROR&&pLastCommandToEvaluateToken->type==TT_FUNCTION&&newTokenType!=TT_FUNCTION_CALL){
 			}
 
 			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken);

@@ -78,8 +78,7 @@ void free_environment(Menvironment* _environment){
 static Menvironment* _executionEnvironment=NULL;
 bool pushExecutionEnvironment(Menvironment* _environment){
     if(!_environment)return false;
-    if(_environment->_parent)return false; // shouldn't have a parent!!!
-    _environment->_parent=_executionEnvironment;
+    if(!_environment->_parent)_environment->_parent=_executionEnvironment; // if without a parent give it the current one
     _executionEnvironment=_environment;
     return true;
 }/* VALIDATED */
@@ -87,12 +86,19 @@ bool popExecutionEnvironment(){
     // NOTE only execution environments that have a parent can be popped!!!
     Menvironment* _parentExecutionEnvironment=(_executionEnvironment?_executionEnvironment->_parent:NULL);
     if(!_parentExecutionEnvironment)return false;
-    _executionEnvironment->_parent=NULL; // clear the parent of the current execution environment
+    _executionEnvironment->_parent=NULL; // clear the parent of the current execution environment, so it won't be freed accidently
     free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     _executionEnvironment=_parentExecutionEnvironment;
     return true;
 }/* VALIDATED */
+Menvironment* __environment(){return CALLOC(1,sizeof(Menvironment),'E');}/* VALIDATED */
 Menvironment* getEnvironment(){return _executionEnvironment;}/* VALIDATED */
+Mtoken* getEnvironmentExpressionToken(){return _executionEnvironment->expressionToken;}/* VALIDATED */
+Mtoken* nextEnvironmentExpressionToken(){
+    if(!_executionEnvironment)return NULL;
+    if(_executionEnvironment->expressionToken)_executionEnvironment->expressionToken=_executionEnvironment->expressionToken->next;
+    return _executionEnvironment->expressionToken;
+}/* VALIDATED */
 
 // read access to the elements defined in an environment
 uint32_t getNumberOfVariables(const Menvironment* const _environment){
@@ -294,7 +300,7 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
         _functionArgumentMap=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
         Mmap* functionParameterMap=_function->_parameterMap;
         if(functionParameterMap){
-            if(amVerbose())output("Matching the function parameters!");
+            if(amVerbose())outputLine("Matching the function parameters!");
             Mmapelement* functionParameterMapelement=functionParameterMap->_first;
             Mlistelement* argumentListelement=_argumentList->_first;
             while(functionParameterMapelement){
@@ -319,7 +325,7 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
                 functionParameterMapelement=functionParameterMapelement->_next;
             }
         }
-        if(amVerbose())output("Argument map created.");
+        if(amVerbose())outputLine("Argument map created.");
     }
     return _functionArgumentMap;
 }/* VALIDATED */
@@ -578,8 +584,11 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
             }
         }else
             outputError("Invalid user function name, parameter map or body");
-    }else
-        outputError("No user function name, parameter map or body");
+    }else{
+        if(!_nameValue)outputError("No name defined of function");
+        if(!_parameterMapValue)outputError("No (formal) parameter map defined for function");
+        if(!_bodyTokenValue)outputError("No body (expression) defined of function");
+    }
     return _getIntegerValue(0); // indicating failure...
 }/*VALIDATED */
 Mvalue* Mreturn(Mvalue* _value){
