@@ -720,12 +720,12 @@ Mstring* _getListText(Mlist* _list){
 	}
 	return result;
 }/* VALIDATED */
-Mstring* _getMapText(Mmap* _map){
+Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings){
 	Mstring* result=__string();
     if(result){
 	    Mstring* p=result;
         if(amDebugging())p=string_append_char(p,'m');
-        p=string_append_char(p,'{');
+        if(showcurlybraces)p=string_append_char(p,'{');
 		//////output("%s",string(p));
 		Mmapelement* _mapelement=_map->_first;
 		while(p&&_mapelement){
@@ -733,18 +733,20 @@ Mstring* _getMapText(Mmap* _map){
 			Mvariable* _mapVariable=_mapelement->_variable;
 			if(_mapVariable){
                 // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
-                p=string_append_char(p,'\'');
+                if(showquotes)p=string_append_char(p,'\'');
                 p=string_append(p,_mapVariable->_name);
-                p=string_append_char(p,'\'');
-                /////output("%s",string(p));
-                p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
-                /////output("%s",string(p));
-                Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
-                /////output("Map element: %s",string(p));
-                // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
-                if(_mapelementValueText){
-                    p=string_append(p,string(_mapelementValueText)); // append 
-                    free_string(_mapelementValueText); // release AFTER copying over
+                if(showquotes)p=string_append_char(p,'\'');
+                if(showmissings||!isUndefined(_mapVariable->_value)){
+                    /////output("%s",string(p));
+                    p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+                    /////output("%s",string(p));
+                    Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
+                    /////output("Map element: %s",string(p));
+                    // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
+                    if(_mapelementValueText){
+                        p=string_append(p,string(_mapelementValueText)); // append 
+                        free_string(_mapelementValueText); // release AFTER copying over
+                    }
                 }
             }
 			_mapelement=_mapelement->_next;
@@ -752,7 +754,7 @@ Mstring* _getMapText(Mmap* _map){
 			////output("%s","next");
 		}
 		//////output("%s(%d)",string(p),string_length(p));
-		p=string_append_char(p,'}');
+		if(showcurlybraces)p=string_append_char(p,'}');
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
 		if(!p){free_string(result);result=NULL;}
@@ -774,9 +776,23 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
             case VT_RATIONAL:valueText=_getRationalText(_value->value._rational);break;
 			case VT_REAL:valueText=_getRealText(_value->value._real);break;
 			case VT_TEXT:valueText=_getStringText(_value->value._text,dequoted);break; // TODO don't dequote the text!!
-			case VT_MAP:valueText=_getMapText(_value->value._map);break;
+			case VT_MAP:valueText=_getMapText(_value->value._map,true,true,true);break;
 			case VT_LIST:valueText=_getListText(_value->value._list);break;
-            case VT_TOKEN:valueText=_stringCopy(_value->value._token->text,0);break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
+            case VT_TOKEN:
+                { // can't just show the single token because we could have following ones
+                    valueText=__string();
+                    if(valueText){
+                        Mstring* p=valueText;
+                        Mtoken* token=_value->value._token;
+                        while(p&&token){
+                            p=string_append(p,string(token->text));
+                            token=token->next;
+                        }
+                        if(!p){free_string(valueText);valueText=NULL;}
+                    }
+                    // replacing: valueText=_stringCopy(_value->value._token->text,0);
+                }
+                break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
 			default:break;
 		}
 	}
@@ -1086,6 +1102,24 @@ bool isNull(Mvalue* _value){
         case VT_MAP:return !_value->value._map;
         case VT_TOKEN:return !_value->value._token;
         default:break;
+    }
+    return true;
+}/* VALIDATED */
+// MDH@18JUL2019: we consider certain non-null values as undefined, this is to fill the gap between non-null values that represent missings
+//                TODO is a map or list undefined when empty???????
+bool isUndefined(Mvalue* _value){
+    // values that are considered NULL are also undefined
+    if(!isNull(_value))
+    switch(_value->type){
+        case VT_INTEGER:return _value->value._integer->ll==M_LL_INVALID;
+        case VT_BIGINTEGER:return false;
+        case VT_DECIMAL:return mpd_isnan(_value->value._decimal); // sames right but no idea how to set/get this
+        case VT_RATIONAL:return false;
+        case VT_REAL:return ldIsNaN(_value->value._real->ld);
+        case VT_TEXT:return false; ////strlen(_value->value._text->_c)==0;
+        case VT_LIST:return false; ////Mlen(_value)==0;
+        case VT_MAP:return false; ////Mlen(_value)==0;
+        case VT_TOKEN:return false; /////string_length(_value->value._token->text)==0;
     }
     return true;
 }/* VALIDATED */
@@ -1474,7 +1508,7 @@ Mvalue* Mnull(Mvalue* _value){
     return _getIntegerValue(isNull(_value)?1:0);
 }/* VALIDATED */
 Mvalue* Mundefined(Mvalue* _value){
-    return _getIntegerValue(!_value?1:0);
+    return _getIntegerValue(isUndefined(_value)?1:0); // MDH@18JUL2019: isUndefined() now comes in handy
 }/* VALIDATED */
 
 // TODO the length of a text is the number of characters in a text????

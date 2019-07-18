@@ -138,7 +138,7 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index); // helper function that c
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 
 Mstring* _getListText(Mlist* _list);
-Mstring* _getMapText(Mmap* _map);
+Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings);
 
 Mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
 
@@ -166,6 +166,8 @@ Mvalue* Mbnot(Mvalue* _value); // binary not a value
 Mvalue* Mnot(Mvalue* _value); // not a value
 
 bool isNull(Mvalue* _value); // expose as well
+bool isUndefined(Mvalue* _value); // expose as well
+
 Mvalue* Mnull(Mvalue* _value); // whether null!!!
 Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
 

@@ -1364,7 +1364,7 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 				// I guess we might show the parameter map (if any)
 				string_append_char(p,'(');
 				if(_function->_parameterMap){
-					Mstring* parameterMapText=_getMapText(_function->_parameterMap);
+					Mstring* parameterMapText=_getMapText(_function->_parameterMap,false,false,false); // do NOT show curly braces, quotes or missing defaults
 					if(parameterMapText){
 						string_append(p,string(parameterMapText));
 						free_string(parameterMapText);
@@ -1386,16 +1386,16 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 	return s;
 }
 void outputFunctions(){
-	Mstring* functionsText=_getFunctionMapText(_Menvironment->_functionMap);
-	output("Functions: %s.\n",string(functionsText));
-	free_string(functionsText);
-}
+	Mstring* _functionsText=_getFunctionMapText(_Menvironment->_functionMap);
+	output("\nFunctions: %s.\n",string(_functionsText));
+	free_string(_functionsText);
+}/* VALIDATED */
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
-	Mstring* variablesText=_getMapText(_Menvironment->_variableMap);
-	output("Variables: %s.\n",string(variablesText));
-	free_string(variablesText);
-}
+	Mstring* _variablesText=_getMapText(_Menvironment->_variableMap,false,false,false);
+	output("\nVariables: %s.\n",string(_variablesText));
+	free_string(_variablesText);
+}/* VALIDATED */
 
 enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input modes: command, control, and shell
 
@@ -2090,18 +2090,24 @@ Mvalue* getValueOfMap(){
 		// obviously the name should be something that evaluates to a string
 		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'s',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
 		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
+		Mstring* _attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value (could be undefined though)
 		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
-		if(expressionToken->type!=TT_MAP_VALUE)continue; // if no value part defined (behind :), skip
-		expressionToken=nextEnvironmentExpressionToken(); // move to first element after the colon
-		Mvalue* _attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
-		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-		Mstring* attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value 
-		if(!attributeName)continue; // unable to parse the attribute name expression value into a string
-		if(!appendedToMap(_map,string(attributeName),_attributeValueValue))outputValue("\nERROR: Failed to append the value of attribute '",_attributeNameValue,"'."); // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
-		free_string(attributeName); // ALWAYS free the value text
+		Mvalue* _attributeValueValue=NULL;
+		if(expressionToken->type==TT_MAP_VALUE){
+			expressionToken=nextEnvironmentExpressionToken(); // move to first element after the colon
+			_attributeValueValue=getValueOfExpression("map attribute value",'v',(TokenType[]){TT_END_OF_MAP,TT_LISTELEMENT},2);
+			expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
+		}
+		if(!_attributeName)continue; // unable to parse the attribute name expression value into a string
+		if(string_length(_attributeName)>0)
+		if(!appendedToMap(_map,string(_attributeName),_attributeValueValue)){
+			output("%s",ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
+		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
+		free_string(_attributeName); // ALWAYS free the name text
 		if(expressionToken->type==TT_END_OF_MAP)break;
+		if(amVerbose())output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
 	return _mapValue;
 }
@@ -2575,7 +2581,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0,0));
 				break;
 			case TT_MAP: // a map literal
-			{	
+			{
 				Mvalue* _mapValue=getValueOfMap();
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose())outputValue("Map extracted: '",_mapValue,"'.\n");
