@@ -45,6 +45,7 @@ typedef struct MfunctionMap{
 
 // an environment is a bag of variables and functions
 typedef struct Menvironment{
+    char* _name; // the name of the environment
     Mmap* _variableMap; // variables are stored by name
     Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
     Mtoken* expressionToken; // MDH@17JUL2019: the current token of the expression being evaluated in this environment
@@ -54,11 +55,13 @@ typedef struct Menvironment{
 Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
 Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
 
-Menvironment* __environment();
+Menvironment* __environment(); // creates a new (empty) environment
 void free_environment(Menvironment* _environment);
 bool pushExecutionEnvironment(Menvironment* _environment);
-bool popExecutionEnvironment();
+void popExecutionEnvironment(); // should never go wrong (a bug is reported if there's no environment to pop though)
 Menvironment* getEnvironment(); // the current environment
+Mstring* _getEnvironmentName(); // for use in prompting
+
 // MDH@17JUL2019: getting and updating the environment expression token
 Mtoken* getEnvironmentExpressionToken();
 Mtoken* nextEnvironmentExpressionToken();

@@ -70,6 +70,7 @@ void free_functionmap(Mfunctionmap* _functionmap){
 // Menvironment stuff
 void free_environment(Menvironment* _environment){
     if(_environment){
+        if(_environment->_name){free(_environment->_name);_environment->_name=NULL;}
         free_map(_environment->_variableMap);
         // MDH@10JUL2019: only Menvironment has a function map!!   if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
         FREE(_environment,'E');
@@ -90,16 +91,30 @@ bool pushExecutionEnvironment(Menvironment* _environment){
     _executionEnvironment=_environment;
     return true;
 }/* VALIDATED */
-bool popExecutionEnvironment(){
+void popExecutionEnvironment(){
+    if(!_executionEnvironment){outputLine("BUG: No environment left to pop!");return;} // nothing to pop
     // NOTE only execution environments that have a parent can be popped!!!
-    Menvironment* _parentExecutionEnvironment=(_executionEnvironment?_executionEnvironment->_parent:NULL);
-    if(!_parentExecutionEnvironment)return false;
+    Menvironment* _parentExecutionEnvironment=_executionEnvironment->_parent;
     _executionEnvironment->_parent=NULL; // clear the parent of the current execution environment, so it won't be freed accidently
     free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     _executionEnvironment=_parentExecutionEnvironment;
-    return true;
 }/* VALIDATED */
 Menvironment* getEnvironment(){return _executionEnvironment;}/* VALIDATED */
+Mstring* _getEnvironmentName(){
+    Mstring* _environmentName=__string();
+    if(_environmentName){
+        Mstring* p=_environmentName;
+        Menvironment* _environment=_executionEnvironment;
+        while(p&&_environment){
+            if(string_length(_environment->_name))p=string_insert_char(p,'.',0);
+            ////////output("Prepending '%s'.\n",_environment->_name);
+            p=string_prepend(p,_environment->_name);
+            _environment=_environment->_parent;
+        }
+        if(!p){free_string(_environmentName);_environmentName=NULL;}
+    }
+    return _environmentName;
+}
 Mtoken* getEnvironmentExpressionToken(){return _executionEnvironment->expressionToken;}/* VALIDATED */
 Mtoken* nextEnvironmentExpressionToken(){
     if(!_executionEnvironment)return NULL;

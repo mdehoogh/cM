@@ -239,6 +239,15 @@ Mstring* string_append(Mstring* const str,const char* pc){
     }
     return str;
 }
+Mstring* string_prepend(Mstring* const str,const char* pc){
+    if(str!=NULL&&pc!=NULL){ // something to append
+        char c;
+        uint32_t index=0;
+        while((c=pc[index++]))if(string_insert_char(str,index-1,c)==NULL)return NULL; // TODO a better way must exist
+        /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
+    }
+    return str;
+}
 
 char* string_remainder(Mstring* const str,uint32_t firstpos){
     if(!str)return NULL;

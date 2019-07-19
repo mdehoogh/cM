@@ -31,7 +31,7 @@ typedef struct Mvalue{
 // MDH@10JUL2019: user functions are stored differently than M functions
 typedef struct Muserfunction{
     //////////struct Mmap* _parameterMap;
-    struct Mlist* _bodyCommandList; // wraps the body commands
+    struct Mlist* _bodyCommandList; // a list of body commands
 }Muserfunction;
 void free_userfunction(Muserfunction* _userfunction);
 

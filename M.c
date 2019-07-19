@@ -1184,6 +1184,7 @@ bool initEnvironment(){
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
 	_Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
+		_Menvironment->_name=_strdup("M"); // TODO why make a dynamic copy???
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'M');
 		if(environmentFunctionMap){
@@ -1426,19 +1427,105 @@ void outputFlags(){
 // MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
 typedef struct FunctionBodyRequest{
 	char* functionName;
-	struct FunctionBodyRequest* _next;
+	struct FunctionBodyRequest *_next,*_prev;
 }FunctionBodyRequest;
+// requests can come out of a single command containing multiple function definitions
 FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
-bool requestBodyOfFunction(char* functionName){
+FunctionBodyRequest* requestBodyOfFunction(char* functionName){
 	FunctionBodyRequest* _functionBodyRequest=(functionName?CALLOC(1,sizeof(FunctionBodyRequest),'B'):NULL);
 	if(_functionBodyRequest){
 		_functionBodyRequest->functionName=functionName;
 		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
 		_lastFunctionBodyRequest=_functionBodyRequest;
 		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
-		return true;
+		return _lastFunctionBodyRequest;
 	}
+	return NULL;
+}
+
+/*
+\brief returns the environment for executing the the function called \p functionName
+\p functionName the name of the function to execute
+obviously when defining the function body there will be no commands to execute
+ */
+Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){
+	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
+	Menvironment* _functionExecutionEnvironment=__environment(); // free asap
+	if(_functionExecutionEnvironment){
+		bool functionExecutionEnvironmentInitialized=true;
+		_functionExecutionEnvironment->_name=_strdup(functionName); // store the name of the function as environment name!!!
+		// 2. make the definition environment the parent of the function execution environment
+		_functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
+		// 3. create the argument map fields as variables in the function execution environment
+		Mmapelement* argumentMapelement=_argumentMap->_first;
+		Mvariable* argumentMapelementVariable;
+		while(functionExecutionEnvironmentInitialized&&argumentMapelement){
+			argumentMapelementVariable=argumentMapelement->_variable;
+			if(!addVariable(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->valuetype,false)){
+				outputError("Failed to add function argument as local variable of a function execution");
+				functionExecutionEnvironmentInitialized=false;
+			}else
+			if(!setValue(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->_value)){
+				outputError("Failed to initialize the argument local variable of a function execution");
+				functionExecutionEnvironmentInitialized=false;
+			}else
+				argumentMapelement=argumentMapelement->_next;
+		}
+		// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
+		if(!addVariable(_functionExecutionEnvironment,"$",VT_UNDEFINED,false)){
+			outputError("Failed to add the result variable to the function execution environment");
+			functionExecutionEnvironmentInitialized=false;
+		}
+		if(functionExecutionEnvironmentInitialized)return _functionExecutionEnvironment;
+		free_environment(_functionExecutionEnvironment);
+	}
+	return NULL;
+}
+
+typedef struct FunctionBodyInput{
+	////////char* functionName;
+	Muserfunction* _function;
+	struct FunctionBodyInput *_prev;
+}FunctionBodyInput;
+FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
+bool setCurrentFunctionBodyInput(FunctionBodyRequest* _functionBodyRequest){
+	if(!_functionBodyRequest)return false;
+	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'I'); // free if not bound
+	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
+	Mfunction* function=getFunction(getEnvironment(),_functionBodyRequest->functionName);
+	if(function&&function->type==FT_USER){		
+		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
+		if(!_functionBodyInputStack)_functionBodyInputStack=_currentFunctionBodyInput;
+		// if we succeed in activating the execution environment of the new function we're good to go
+		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
+		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_functionBodyRequest->functionName,function->_parameterMap);
+		if(_functionExecutionEnvironment){
+			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
+			free_environment(_functionExecutionEnvironment);
+		}
+		outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
+	}else
+		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_functionBodyRequest->functionName);
+	free(_currentFunctionBodyInput);
 	return false;
+}
+bool startFunctionBodyInput(){
+	// move out of the queue into the stack
+	// push on top of the functionBodyInputStack
+	if(!_firstFunctionBodyRequest)return false; // NO function body request to 'execute'
+	if(setCurrentFunctionBodyInput(_firstFunctionBodyRequest))return true;
+	output("%sFailed to start input of the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
+	return false;
+}
+/*
+ \brief will only fail when we fail to start the next one
+ */
+bool endFunctionBodyInput(){
+	// pop the function body request execution environment we just ended
+	popExecutionEnvironment(); 
+	_firstFunctionBodyRequest=_firstFunctionBodyRequest->_next;
+	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
+	return startFunctionBodyInput(); // start the next one
 }
 // MDH@19JUL2019 END
 
@@ -1461,21 +1548,29 @@ void prompt(){
 	resetOutputColor();
 	///////////printf("%d-",commandIndex);
 	char str[11]; // with a maximum of 2,xxx,xxx,xxx 11 positions would suffice
+	promptLength=0;
 	switch(inputMode){
 		case IM_COMMAND:
-			output("M");
-			promptLength=1;
-			// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
-			if(_firstFunctionBodyRequest){
-				char* functionName=_firstFunctionBodyRequest->functionName;
-				output(".%s",functionName);
-				promptLength+=strlen(functionName)+1;
-				sprintf(str,"%lld",1+getNumberOfFunctionCommands(functionName));	// replacing: printf("%lu",(commandCount+1));
-			}else
-				sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-			output("[%s] = ",str);
-			promptLength+=strlen(str)+6;
-			clearScreenFromCursor();
+			{
+				Mstring* _environmentName=_getEnvironmentName(); // free asap
+				if(_environmentName){
+					output(string(_environmentName));
+					promptLength=string_length(_environmentName);
+					free_string(_environmentName);
+				}
+				/* replacing:
+				output("M");
+				promptLength=1;
+				*/
+				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
+				if(_firstFunctionBodyRequest)
+					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getEnvironment()->_name));	// replacing: printf("%lu",(commandCount+1));
+				else
+					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
+				output("[%s] = ",str);
+				promptLength+=strlen(str)+5;
+				clearScreenFromCursor();
+			}
 			break;
 		case IM_CONTROL:
 			// how about showing the flags?????
@@ -1659,14 +1754,22 @@ Mtoken** commands=NULL; // array for storing the pointers to the first token of 
 uint32_t commandBlocks=0;
 bool registerCommand(){
 	if(!pCommandToEvaluate)return false;
-	if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
-		// I have to copy all first token pointers to a new array large enough
-		commandBlocks++;
-		Mtoken** newCommands=realloc(commands,COMMAND_BLOCKSIZE*commandBlocks*sizeof(Mtoken*));
-		if(newCommands==NULL)return false;
-        commands=newCommands;
+	if(!_currentFunctionBodyInput){ // a top-level command
+		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
+			// I have to copy all first token pointers to a new array large enough
+			commandBlocks++;
+			Mtoken** newCommands=realloc(commands,COMMAND_BLOCKSIZE*commandBlocks*sizeof(Mtoken*));
+			if(newCommands==NULL)return false;
+			commands=newCommands;
+		}
+		commands[commandCount++]=pCommandToEvaluate;
+	}else{ // should be added to the function body
+		if(!appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_getValueOfToken(pCommandToEvaluate,false),0)){
+			outputError("Failed to add the command to the body of the function");
+			// TODO what else?
+			return false;
+		}
 	}
-	commands[commandCount++]=pCommandToEvaluate;
 	return true;
 }
 // MDH@21JUN2019: reset() takes care of removing all stored commands
@@ -2033,13 +2136,6 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
 	}
 	return _tokenCopy;
 }
-// TODO move elsewhere
-Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
-	if(!_token)return NULL;
-	Mvalue* _tokenValue=__value();
-	if(_tokenValue){_tokenValue->type=VT_TOKEN;_tokenValue->value._token=_token;}else if(freeonfailure)free_token(_token);
-	return _tokenValue;
-}
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate){
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
@@ -2076,7 +2172,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 				unevaluatedToken->next=_getEvaluatableTokenCopy(expressionToken); // set next to the copy of the expression token
 				unevaluatedToken=unevaluatedToken->next;
 			}
-			_listElementValue=_getTokenValue(_firstUnevaluatedToken,true);
+			_listElementValue=_getValueOfToken(_firstUnevaluatedToken,true);
 		}else{ // evaluate
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
@@ -2146,34 +2242,11 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 	switch(_function->type){
 		case FT_USER:
 			{
+				// TODO replace following by calling getFunctionExecutionEnvironment
 				// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-				Menvironment* _functionExecutionEnvironment=__environment(); // free asap
+				Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(_function,functionName,_argumentMap);
 				if(_functionExecutionEnvironment){
-					bool functionExecutionEnvironmentInitialized=true;
-					// 2. make the definition environment the parent of the function execution environment
-					_functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
-					// 3. create the argument map fields as variables in the function execution environment
-					Mmapelement* argumentMapelement=_argumentMap->_first;
-					Mvariable* argumentMapelementVariable;
-					while(functionExecutionEnvironmentInitialized&&argumentMapelement){
-						argumentMapelementVariable=argumentMapelement->_variable;
-						if(!addVariable(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->valuetype,false)){
-							outputError("Failed to add function argument as local variable of a function execution");
-							functionExecutionEnvironmentInitialized=false;
-						}else
-						if(!setValue(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->_value)){
-							outputError("Failed to initialize the argument local variable of a function execution");
-							functionExecutionEnvironmentInitialized=false;
-						}else
-							argumentMapelement=argumentMapelement->_next;
-					}
-					// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
-					if(!addVariable(_functionExecutionEnvironment,"$",VT_UNDEFINED,false)){
-						outputError("Failed to add the result variable to the function execution environment");
-						functionExecutionEnvironmentInitialized=false;
-					}
-					if(functionExecutionEnvironmentInitialized&&pushExecutionEnvironment(_functionExecutionEnvironment)){ // function execution environment now active...
-						// initialize the expression token of the current execution environment to the token that starts the function body (expression)
+					if(pushExecutionEnvironment(_functionExecutionEnvironment)){
 						// execute ALL the commands in _bodyCommandList
 						Mlist* functionBodyCommandList=_function->functionunion._userfunction->_bodyCommandList;
 						Mvalue* _functionEvaluationValue=NULL;
@@ -2189,15 +2262,15 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 							output("No commands in body of user function '%s' to execute!\n",functionName);
 						// before popping the function execution environment, see if the result was set
 						Mvalue* _functionResultValue=getValue(_functionExecutionEnvironment,"$");
-						if(!popExecutionEnvironment())output("BUG: Failed to pop function execution environment.\n");
+						popExecutionEnvironment();
 						// the function result value (if set) takes precedence over the function evaluation value
 						return (_functionResultValue?_functionResultValue:_functionEvaluationValue);
 					}else{
-						outputError("Failed to setup or activate the function execution environment");
+						output("%sFailed to create the function execution environment of function '%s'.\n",ERROR_PREFIX,functionName);
 						free_environment(_functionExecutionEnvironment);
 					}
 				}else
-					outputError("Failed to create function execution environment");
+					output("%sFailed to create the environment to execute function '%s'.\n",ERROR_PREFIX,functionName);
 				return NULL;
 			}
 			break;

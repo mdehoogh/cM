@@ -47,6 +47,7 @@ Mstring* string_setchar(Mstring* const str,char c,uint32_t pos);
 
 // MDH@26FEB2019: can we append a text as a whole???
 Mstring* string_append(Mstring* const str,const char* pc);
+Mstring* string_prepend(Mstring* const str,const char* pc);
 
 void string_reverse(Mstring* const str);
 

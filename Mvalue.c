@@ -342,6 +342,13 @@ Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){
     if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);
     return _value;
 }/* VALIDATED */
+/* TODO move elsewhere
+Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
+	if(!_token)return NULL;
+	Mvalue* _tokenValue=__value();
+	if(_tokenValue){_tokenValue->type=VT_TOKEN;_tokenValue->value._token=_token;}else if(freeonfailure)free_token(_token);
+	return _tokenValue;
+}*/
 
 // helper function to create a parameter map with a single value
 // the following is a nuisance
