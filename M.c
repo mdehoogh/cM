@@ -1423,6 +1423,25 @@ void outputFlags(){
 	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'s':'S',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
 }
 
+// MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
+typedef struct FunctionBodyRequest{
+	char* functionName;
+	struct FunctionBodyRequest* _next;
+}FunctionBodyRequest;
+FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
+bool requestBodyOfFunction(char* functionName){
+	FunctionBodyRequest* _functionBodyRequest=(functionName?CALLOC(1,sizeof(FunctionBodyRequest),'B'):NULL);
+	if(_functionBodyRequest){
+		_functionBodyRequest->functionName=functionName;
+		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
+		_lastFunctionBodyRequest=_functionBodyRequest;
+		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
+		return true;
+	}
+	return false;
+}
+// MDH@19JUL2019 END
+
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 long long commandCount=0; // the total number of command input
 long long commandIndex=0;
@@ -1444,10 +1463,19 @@ void prompt(){
 	char str[11]; // with a maximum of 2,xxx,xxx,xxx 11 positions would suffice
 	switch(inputMode){
 		case IM_COMMAND:
-			sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-			output("M[%s]%s",str," = ");
+			output("M");
+			promptLength=1;
+			// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
+			if(_firstFunctionBodyRequest){
+				char* functionName=_firstFunctionBodyRequest->functionName;
+				output(".%s",functionName);
+				promptLength+=strlen(functionName)+1;
+				sprintf(str,"%lld",1+getNumberOfFunctionCommands(functionName));	// replacing: printf("%lu",(commandCount+1));
+			}else
+				sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
+			output("[%s] = ",str);
+			promptLength+=strlen(str)+6;
 			clearScreenFromCursor();
-			promptLength=strlen(str)+3+3;
 			break;
 		case IM_CONTROL:
 			// how about showing the flags?????
@@ -2092,7 +2120,7 @@ Mvalue* getValueOfMap(){
 		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		Mstring* _attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value (could be undefined though)
 		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
-		if(expressionToken->type==TT_END_OF_MAP)break;
+		/////////////////////if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
 		Mvalue* _attributeValueValue=NULL;
 		if(expressionToken->type==TT_MAP_VALUE){
@@ -2146,9 +2174,19 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 					}
 					if(functionExecutionEnvironmentInitialized&&pushExecutionEnvironment(_functionExecutionEnvironment)){ // function execution environment now active...
 						// initialize the expression token of the current execution environment to the token that starts the function body (expression)
-						_functionExecutionEnvironment->expressionToken=_function->functionunion._userfunction->_bodyTokenValue->value._token;
-						// evaluate that expression
-						Mvalue* _functionEvaluationValue=getValueOfExpression("function call",'f',(TokenType[]){},0);
+						// execute ALL the commands in _bodyCommandList
+						Mlist* functionBodyCommandList=_function->functionunion._userfunction->_bodyCommandList;
+						Mvalue* _functionEvaluationValue=NULL;
+						if(functionBodyCommandList){
+							Mlistelement* functionBodyCommandListelement=functionBodyCommandList->_first;
+							while(functionBodyCommandListelement){
+								_functionExecutionEnvironment->expressionToken=functionBodyCommandListelement->_value->value._token;
+								// evaluate that expression
+								_functionEvaluationValue=getValueOfExpression("function body command evaluation",'f',(TokenType[]){},0);
+								functionBodyCommandListelement=functionBodyCommandListelement->_next;
+							}
+						}else
+							output("No commands in body of user function '%s' to execute!\n",functionName);
 						// before popping the function execution environment, see if the result was set
 						Mvalue* _functionResultValue=getValue(_functionExecutionEnvironment,"$");
 						if(!popExecutionEnvironment())output("BUG: Failed to pop function execution environment.\n");
@@ -2457,7 +2495,24 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							if(amVerbose())output("Reference count of the function arguments value decremented!");
 							*/
 							// 3. the result of applying the function to the arguments is the end result
-							assignValue(&_valueReference->_value,getValueOfFunctionCall(function,_significantTokenText,_functionArgumentMap));
+							// MDH@19JUL2019: we need to know when a function is being created, so we can ask for the body commands in command mode
+							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionArgumentMap);
+							// if this was a call to the 'define user function' function
+							if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
+								// is the result 1???
+								if(functionCallValue&&functionCallValue->type==VT_INTEGER&&functionCallValue->value._integer->ll){ // function successfully created
+									// let's push the function name on the stack of functions to create
+									// we know the first argument contains the function name
+									char* definedFunctionName=_functionArgumentMap->_first->_variable->_name;
+									Mfunction* definedFunction=getFunction(getEnvironment(),definedFunctionName);
+									// if the function now exists but does not yet have a body, queue the function name on the list of bodies to be set
+									if(definedFunction&&definedFunction->type==FT_USER&&!definedFunction->functionunion._userfunction->_bodyCommandList)
+										requestBodyOfFunction(_functionArgumentMap->_first->_variable->_name);
+									else
+									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
+								}
+							}
+							assignValue(&_valueReference->_value,functionCallValue);
 							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)

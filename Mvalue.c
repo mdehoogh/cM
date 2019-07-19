@@ -98,7 +98,8 @@ void free_userfunction(Muserfunction* _userfunction){
     if(_userfunction){
         ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
         // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
-        assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
+        free_list(_userfunction->_bodyCommandList);
+        // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
         free(_userfunction);
     }
 }/* VALIDATED */
@@ -1120,6 +1121,7 @@ bool isUndefined(Mvalue* _value){
         case VT_LIST:return false; ////Mlen(_value)==0;
         case VT_MAP:return false; ////Mlen(_value)==0;
         case VT_TOKEN:return false; /////string_length(_value->value._token->text)==0;
+        default:break;
     }
     return true;
 }/* VALIDATED */

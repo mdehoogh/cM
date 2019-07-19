@@ -63,6 +63,9 @@ Menvironment* getEnvironment(); // the current environment
 Mtoken* getEnvironmentExpressionToken();
 Mtoken* nextEnvironmentExpressionToken();
 
+unsigned long long getNumberOfFunctionCommands(const char* const functionName);
+bool registerFunctionCommand(const char* const functionName,Mtoken* command);
+
 // MDH@01MAY2019: it's possible to somehow hide the structure pointers within an Menvironment that point to the variables and functions
 //                which basically means that only raw data should go in and out of public functions
 

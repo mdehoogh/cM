@@ -564,19 +564,45 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
     return _value;
 }
 */
+unsigned long long getNumberOfFunctionCommands(const char* const functionName){
+    Mfunction* function=getFunction(getEnvironment(),functionName);
+    return(function&&function->type==FT_USER?function->functionunion._userfunction->_bodyCommandList->numberOfElements:M_LL_INVALID);
+}
+bool registerFunctionCommand(const char* const functionName,Mtoken* command){
+    if(!functionName||!command)return false;
+    Mfunction* function=getFunction(getEnvironment(),functionName);
+    if(function&&function->type==FT_USER){
+        Mvalue* _commandValue=_getValueOfToken(command,false);
+        if(_commandValue){
+            if(!function->functionunion._userfunction->_bodyCommandList)
+                function->functionunion._userfunction->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
+            if(appendedToList(function->functionunion._userfunction->_bodyCommandList,_commandValue,0))return true;
+            output("%sFailed to add command to list of body of '%s'.\n",ERROR_PREFIX,functionName);
+        }else
+            output("%sFailed to wrap a command of function '%s'.\n",ERROR_PREFIX,functionName);
+    }else
+        output("%s'%s' does not represent a user function.\n",ERROR_PREFIX,functionName);
+    return false;
+}
 Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
     // the user specifies the body as a text (to prevent evaluation during defining the function)
     // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
     // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
-    if(_nameValue&&_parameterMapValue&&_bodyTokenValue){
-        if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&_bodyTokenValue->type==VT_TOKEN){
+    if(_nameValue&&_parameterMapValue){
+        if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
             Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'U');
             if(_userfunction){
-                assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
+                Mtext* functionName=_nameValue->value._text;
+                // user function expects a list of commands, so we have to wrap the single token (if any)
+                if(_bodyTokenValue){
+                    _userfunction->_bodyCommandList=_getListOfType(VT_TOKEN);
+                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,_bodyTokenValue,0))
+                        output("%sFailed to store the inline command as body of function definition of '%s'.\n",ERROR_PREFIX,functionName->_c);
+                    // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
+                }
                 //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
                 ///////if(_userfunctionValue){
                     // MDH@17JUL2019: the map needs to be stored with the Mfunction
-                Mtext* functionName=_nameValue->value._text;
                 Mfunction* _function=_getFunction(getEnvironment(),functionName->_c);
                 if(_function){
                     _function->_parameterMap=_parameterMapValue->value._map;
@@ -586,7 +612,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                     return _getIntegerValue(1);
                 }
                 ///////////free_value(_userfunctionValue); // freed
-                output("%sFailed to create function '%s'.",functionName);
+                output("%sFailed to create function '%s'.\n",ERROR_PREFIX,functionName);
                 ///////}
             }
         }else
@@ -594,7 +620,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
     }else{
         if(!_nameValue)outputError("No name defined of function");
         if(!_parameterMapValue)outputError("No (formal) parameter map defined for function");
-        if(!_bodyTokenValue)outputError("No body (expression) defined of function");
+        ////////if(!_bodyTokenValue)outputError("No body (expression) defined of function");
     }
     return _getIntegerValue(0); // indicating failure...
 }/*VALIDATED */
