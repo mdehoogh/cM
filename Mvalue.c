@@ -94,15 +94,7 @@ void free_map(Mmap* _map){
         free(_map);
     }
 }/* VALIDATED */
-void free_userfunction(Muserfunction* _userfunction){
-    if(_userfunction){
-        ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
-        // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
-        free_list(_userfunction->_bodyCommandList);
-        // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
-        free(_userfunction);
-    }
-}/* VALIDATED */
+
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){

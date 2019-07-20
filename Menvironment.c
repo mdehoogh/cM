@@ -65,6 +65,16 @@ void free_functionmap(Mfunctionmap* _functionmap){
         free(_functionmap);
     }
 }// VALIDATED
+// MDH@20JUL2019: might never get called, wel perhaps on internal functions when it goes out of scope???????
+void free_userfunction(Muserfunction* _userfunction){
+    if(_userfunction){
+        ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
+        // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
+        free_list(_userfunction->_bodyCommandList);
+        // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
+        free(_userfunction);
+    }
+}/* VALIDATED */
 // END RELEASERS
 
 // Menvironment stuff
@@ -72,7 +82,12 @@ void free_environment(Menvironment* _environment){
     if(_environment){
         if(_environment->_name){free(_environment->_name);_environment->_name=NULL;}
         free_map(_environment->_variableMap);
-        // MDH@10JUL2019: only Menvironment has a function map!!   if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
+        /* MDH@10JUL2019: only Menvironment has a function map!!   
+           MDH@20JUL2019: NO user functions may also contain a function map, which is referenced in a user function execution environment
+                          and indeed being a referenced they should not be freed (otherwise we would loose these nested functions on
+                          freeing the execution environment)
+        if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
+        */
         FREE(_environment,'E');
     }
 }/* VALIDATED */

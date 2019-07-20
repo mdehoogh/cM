@@ -1432,13 +1432,17 @@ typedef struct FunctionBodyRequest{
 // requests can come out of a single command containing multiple function definitions
 FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
 FunctionBodyRequest* requestBodyOfFunction(char* functionName){
-	FunctionBodyRequest* _functionBodyRequest=(functionName?CALLOC(1,sizeof(FunctionBodyRequest),'B'):NULL);
-	if(_functionBodyRequest){
-		_functionBodyRequest->functionName=functionName;
-		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
-		_lastFunctionBodyRequest=_functionBodyRequest;
-		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
-		return _lastFunctionBodyRequest;
+	if(functionName&&strlen(functionName)){ // a 'valid' function name
+		if(amVerbose())output("The body of function '%s' being requested.\n",functionName);
+		FunctionBodyRequest* _functionBodyRequest=(functionName?CALLOC(1,sizeof(FunctionBodyRequest),'B'):NULL);
+		if(_functionBodyRequest){
+			_functionBodyRequest->functionName=functionName;
+			if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
+			_lastFunctionBodyRequest=_functionBodyRequest;
+			if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
+			return _lastFunctionBodyRequest;
+		}
+		output("%sFailed to register the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
 	}
 	return NULL;
 }
@@ -1454,6 +1458,12 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 	if(_functionExecutionEnvironment){
 		bool functionExecutionEnvironmentInitialized=true;
 		_functionExecutionEnvironment->_name=_strdup(functionName); // store the name of the function as environment name!!!
+		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
+		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
+		//                we do not need to distinguish between the originals and the references (so we never loose the referenced functions
+		//                when an execution environment is freed)
+		_functionExecutionEnvironment->_functionMap=_function->functionunion._userfunction->_functionMap;
+		*/
 		// 2. make the definition environment the parent of the function execution environment
 		_functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
 		// 3. create the argument map fields as variables in the function execution environment
@@ -1522,7 +1532,9 @@ bool startFunctionBodyInput(){
  */
 bool endFunctionBodyInput(){
 	// pop the function body request execution environment we just ended
-	popExecutionEnvironment(); 
+	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
+	_currentFunctionBodyInput->_function->_functionMap=getEnvironment()->_functionMap;
+	popExecutionEnvironment();
 	_firstFunctionBodyRequest=_firstFunctionBodyRequest->_next;
 	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
 	return startFunctionBodyInput(); // start the next one
@@ -1754,7 +1766,7 @@ Mtoken** commands=NULL; // array for storing the pointers to the first token of 
 uint32_t commandBlocks=0;
 bool registerCommand(){
 	if(!pCommandToEvaluate)return false;
-	if(!_currentFunctionBodyInput){ // a top-level command
+	if(!_currentFunctionBodyInput){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			commandBlocks++;
@@ -1764,6 +1776,7 @@ bool registerCommand(){
 		}
 		commands[commandCount++]=pCommandToEvaluate;
 	}else{ // should be added to the function body
+		// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
 		if(!appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_getValueOfToken(pCommandToEvaluate,false),0)){
 			outputError("Failed to add the command to the body of the function");
 			// TODO what else?
@@ -2576,11 +2589,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 								if(functionCallValue&&functionCallValue->type==VT_INTEGER&&functionCallValue->value._integer->ll){ // function successfully created
 									// let's push the function name on the stack of functions to create
 									// we know the first argument contains the function name
-									char* definedFunctionName=_functionArgumentMap->_first->_variable->_name;
+									char* definedFunctionName=_functionArgumentMap->_first->_variable->_value->value._text->_c;
 									Mfunction* definedFunction=getFunction(getEnvironment(),definedFunctionName);
 									// if the function now exists but does not yet have a body, queue the function name on the list of bodies to be set
 									if(definedFunction&&definedFunction->type==FT_USER&&!definedFunction->functionunion._userfunction->_bodyCommandList)
-										requestBodyOfFunction(_functionArgumentMap->_first->_variable->_name);
+										requestBodyOfFunction(definedFunctionName);
 									else
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}
@@ -4809,8 +4822,13 @@ int main(int argc, char **argv){
 		} // end of character input 
 
 		// if eXit input character(s) received...
-		if(inputCharType=='x')break;
-
+		if(inputCharType=='x'){
+			// we should only exit M when not entering a function body
+			if(!_currentFunctionBodyInput)break;
+			// switch back to command mode
+			switchToCommandMode();
+			endFunctionBodyInput();
+		}else
 		// MDH@16APR2019: now if we use n to switch modes as well, we can do that if there's no command
 		if(inputCharType=='n'){
 			if(inputMode==IM_COMMAND){
@@ -4862,20 +4880,26 @@ int main(int argc, char **argv){
 					string_setlength(behindCursorText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					if(!registerCommand()){
-						if(amVerbose())outputLine("Command registered!");
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(!commandIndex){ // a new command being registered!!!
 							freeToken(pCommandToEvaluate);
 							outputError("Failed to register the command! Probable cause: out of memory");
 						}else
 							outputError("Failed to register the command again! Probable cause: out of memory");
+					}else{
+						if(amVerbose())outputLine("Command registered!");
+
 					}
 					// start anew (without a current command to evaluate!!!!)
 					pLastCommandToEvaluateToken=pCommandToEvaluate=NULL; // remove reference to current command
 
-					// remove any values not used anymore...
+					// garbage collection: remove any values not used anymore...
 					size_t removedValueCount=getNumberOfRemovedValues();
 					if(amVerbose())output("Number of removed values: %lu.",removedValueCount);
+
+					// switch to function body input mode when this command contained at least one user function definition
+					// (even when dealing with currently inputting function body commands)
+					if(_firstFunctionBodyRequest)startFunctionBodyInput();
 
 				}else
 				if(behindCursor()==0)

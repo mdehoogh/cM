@@ -7,6 +7,15 @@
 // all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
 // MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
 /////////////struct Menvironment;
+// MDH@10JUL2019: user functions are stored differently than M functions
+// MDH@20JUL2019: moved over from Mvalue but this means that we cannot currently store a function in a value...
+struct Mfunctionmap; // prototype of Mfunctionap
+typedef struct Muserfunction{
+    //////////struct Mmap* _parameterMap;
+    struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
+    struct Mlist* _bodyCommandList; // a list of body commands
+}Muserfunction;
+void free_userfunction(Muserfunction* _userfunction);
 
 typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS}Mfunctiontype;
 

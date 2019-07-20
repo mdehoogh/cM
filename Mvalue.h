@@ -16,7 +16,7 @@ typedef union Mvalueunion{
     Mtext* _text;
     struct Mlist* _list;
     struct Mmap* _map;
-    struct Muserfunction* _userfunction;
+    //////////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
 // a Value is either a number (numeric literal), a string literal, a list of values or a map
@@ -27,13 +27,6 @@ typedef struct Mvalue{
     Mvaluetype type;
     Mvalueunion value;
 }Mvalue;
-
-// MDH@10JUL2019: user functions are stored differently than M functions
-typedef struct Muserfunction{
-    //////////struct Mmap* _parameterMap;
-    struct Mlist* _bodyCommandList; // a list of body commands
-}Muserfunction;
-void free_userfunction(Muserfunction* _userfunction);
 
 // a variable is a named value of a certain value type
 typedef struct Mvariable{
@@ -107,7 +100,7 @@ Mvalue* _getRealValue(long double ld);
 Mvalue* _getTextValue(char* text,bool freeonfailure);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
-Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
+//////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
 Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure);
