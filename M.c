@@ -1775,15 +1775,17 @@ bool registerCommand(){
 			commands=newCommands;
 		}
 		commands[commandCount++]=pCommandToEvaluate;
+		return true;
 	}else{ // should be added to the function body
 		// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
-		if(!appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_getValueOfToken(pCommandToEvaluate,false),0)){
+		Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(pCommandToEvaluate,false);
+		if(_commandToEvaluateTokenValue){
+			if(!_currentFunctionBodyInput->_function->_bodyCommandList)_currentFunctionBodyInput->_function->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
+			if(appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_commandToEvaluateTokenValue,0))return true;
 			outputError("Failed to add the command to the body of the function");
-			// TODO what else?
-			return false;
 		}
 	}
-	return true;
+	return false;
 }
 // MDH@21JUN2019: reset() takes care of removing all stored commands
 void reset(){
@@ -3666,6 +3668,7 @@ bool evaluateCommand(){
 	}
 
 	// 4. can't end with function of function call
+	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call.");return false;}
 	if(pLastCommandToEvaluateToken->type==TT_LIST||pLastCommandToEvaluateToken->type==TT_LISTELEMENT){outputError("Unfinished list.");return false;}
@@ -4058,6 +4061,17 @@ uint32_t getListElementCount(){
 	while(token!=startToken){if(token->expr==startToken&&token->type==TT_LISTELEMENT)listElementCount++;token=token->prev;}
 	return listElementCount;
 }
+void changeFunctionTokenToAVariable(bool endOfInput){
+	char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
+	pLastCommandToEvaluateToken->type=(containsVariable(getEnvironment(),_identifierName)?TT_VARIABLE:TT_NEW_VARIABLE);
+	free(_identifierName);
+	reoutputToken(pLastCommandToEvaluateToken);
+	// I think we should remove ( from the behind cursor text if it was inserted
+	if(endOfInput)if(amMatchingparentheses())
+	if(string_length(behindCursorText)&&string_char(behindCursorText,0)=='(')
+	if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the function argument list opening parenthesis from the feed forward text."); // TODO is there a better way???
+	// ready to redetermine the new token type!!!!
+}
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
 //       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
 //                the endofinput flag is used to indicate whether this is the end of the input
@@ -4104,14 +4118,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		//MDH@17JUL2019: typically we'd get an error immediately when NOT entering a function call character ( behind a function identifier
 		if(newTokenType==TT_ERROR&&pLastCommandToEvaluateToken->type==TT_FUNCTION){
 			// we should assume that the identifier represents a (new) variable (identifier)
-			char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
-			pLastCommandToEvaluateToken->type=(containsVariable(getEnvironment(),_identifierName)?TT_VARIABLE:TT_NEW_VARIABLE);
-			free(_identifierName);
-			reoutputToken(pLastCommandToEvaluateToken);
-			// I think we should remove ( from the behind cursor text if it was inserted
-			if(endOfInput)if(amMatchingparentheses())if(string_length(behindCursorText)&&string_char(behindCursorText,0)=='(')
-			if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the function argument list opening parenthesis from the feed forward text."); // TODO is there a better way???
-			// ready to redetermine the new token type!!!!
+			changeFunctionTokenToAVariable(endOfInput);
 			newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType);
 		}
 
@@ -4832,6 +4839,9 @@ int main(int argc, char **argv){
 		// MDH@16APR2019: now if we use n to switch modes as well, we can do that if there's no command
 		if(inputCharType=='n'){
 			if(inputMode==IM_COMMAND){
+				// MDH@21JUL2019: if the last token appears to be a function identifier change it to a variable
+				//                so we won't end up with refusal of evaluation
+				if(pLastCommandToEvaluateToken->type==TT_FUNCTION)changeFunctionTokenToAVariable(false);
 				inputInfo("%s",""); // so that line will be empty
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore

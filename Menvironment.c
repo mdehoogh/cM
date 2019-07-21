@@ -121,7 +121,7 @@ Mstring* _getEnvironmentName(){
         Mstring* p=_environmentName;
         Menvironment* _environment=_executionEnvironment;
         while(p&&_environment){
-            if(string_length(_environment->_name))p=string_insert_char(p,'.',0);
+            if(string_length(p)>0)p=string_insert_char(p,0,'.');
             ////////output("Prepending '%s'.\n",_environment->_name);
             p=string_prepend(p,_environment->_name);
             _environment=_environment->_parent;
@@ -319,8 +319,10 @@ Mfunction* getFunction(const Menvironment* const _environment,const char* const 
                 functionmapelement=functionmapelement->_next;
             }
         }
+        // might exist in the parent environment
+        if(_environment->_parent)return getFunction(_environment->_parent,functionName);
     }
-    return NULL;    
+    return NULL;
 }/* VALIDATED */
 /*
 Muserfunction* getUserfunction(const Menvironment* const _environment,const char* const userfunctionName){
@@ -596,7 +598,8 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 */
 unsigned long long getNumberOfFunctionCommands(const char* const functionName){
     Mfunction* function=getFunction(getEnvironment(),functionName);
-    return(function&&function->type==FT_USER?function->functionunion._userfunction->_bodyCommandList->numberOfElements:M_LL_INVALID);
+    if(!function||function->type!=FT_USER){if(!function)output("%sFunction '%s' not found.\n",ERROR_PREFIX,functionName);return -1;}
+    return (function->functionunion._userfunction->_bodyCommandList?function->functionunion._userfunction->_bodyCommandList->numberOfElements:0);
 }
 bool registerFunctionCommand(const char* const functionName,Mtoken* command){
     if(!functionName||!command)return false;
