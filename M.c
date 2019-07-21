@@ -4914,7 +4914,7 @@ int main(int argc, char **argv){
 
 					// garbage collection: remove any values not used anymore...
 					size_t removedValueCount=getNumberOfRemovedValues();
-					if(amVerbose())output("Number of removed values: %lu.",removedValueCount);
+					if(amDebugging())output("Number of removed values: %lu.",removedValueCount);
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
