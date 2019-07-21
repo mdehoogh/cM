@@ -2368,7 +2368,10 @@ void free_valuereference(Mvaluereference* _valuereference){
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	// _itemid now represents the entire list of index/attribute name combinations
 	if(!_valuereference)return NULL;
-	if(_valuereference->_value)return _valuereference->_value; // if we have a value return that!!!
+	if(_valuereference->_value){
+		if(amVerbose())outputValue("Returning referenced value: '",_valuereference->_value,"'.\n");
+		return _valuereference->_value; // if we have a value return that!!!
+	}
 	// if we do NOT have a name it's a literal
 	if(!_valuereference->_name)return NULL;
 	// if there is no itemid we simply return the 'entire' value of the given variable
@@ -2434,6 +2437,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
+		if(amVerbose()){output("Setting the value reference of '%s'",_valuereference->_name);outputValue(" to '",_newValue,"'.\n");}
 		if(_valuereference->_itemid){ // the hard part: index/attribute name list assignment!!
 			result=true;
 			Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
@@ -2495,7 +2499,9 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				}
 			}
 		}else
-			setValue(getEnvironment(),_valuereference->_name,_newValue);
+		if(setValue(getEnvironment(),_valuereference->_name,_newValue))
+			assignValue(&_valuereference->_value,_newValue);
+		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
 	}
 	return result;
 }
@@ -3461,8 +3467,12 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result));
 						// replacing:	assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getValue(_Menvironment,_valuereference->_name),_result));
 					}
+					if(amVerbose())outputValue("Result to store in the value reference: '",_result,"'.\n");
 					setReferencedValue(_valuereference,_result);
-					assignValue(&_result,getReferencedValue(_valuereference)); // should we do this???? well, in case the assignment failed!!!
+					if(amVerbose())outputValue("Stored in the value reference: '",_valuereference->_value,"'.\n");
+					Mvalue* referencedValue=getReferencedValue(_valuereference);
+					if(amVerbose())outputValue("Referenced value to use as result: '",referencedValue,"'.\n");
+					assignValue(&_result,referencedValue); // should we do this???? well, in case the assignment failed!!!
 					/* replacing:
 					if(_valuereference->_itemid){
 						// TODO check whether all the items are of the right type!!!
@@ -3480,6 +3490,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
+			if(amVerbose())outputValue("Storing '",_result,"' as expression value.\n");
 			assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula

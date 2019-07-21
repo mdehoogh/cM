@@ -239,7 +239,7 @@ bool setValue(const Menvironment* const _environment,const char* const name,cons
             if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
-                if(amDebugging()){Mstring* _valueText=_getValueText(_value,false);output("Value `%s` assigned to variable `%s`.",string(_valueText),name);free_string(_valueText);}
+                if(amVerbose()){Mstring* _valueText=_getValueText(variable->_value,false);output("Value '%s' with count '%u' assigned to variable '%s'.\n",string(_valueText),variable->_value->count,name);free_string(_valueText);}
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }
