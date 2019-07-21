@@ -2649,7 +2649,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				// MDH@29MAY2019: if we do NOT have an indexed value, retrieve the value...
 				// TODO as a side-effect getReferencedValue() will bind the added value to the value reference (as result) BUT I don't think that is how it should be!!! no the assignment takes care of that
-				if(!_valueReference->_itemid)assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name));
+				if(!_valueReference->_itemid){
+					if(amVerbose())output("Retrieving the value of '%s'.\n",_valueReference->_name);
+					assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
+				}
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				// MDH@20JUN2019: some error in the following part because every now and then we get a segmentation fault!!!!
@@ -2749,7 +2752,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 		}
 		if(_significantTokenText)free(_significantTokenText); // free the (duplicated significant) token text
-		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("Value: `",_valueReference->_value,"`.\n");else output("No result!");}
+		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("Value: `",_valueReference->_value,"`.\n");else output("No result!\n");}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
 			if(amVerbose())output("Applying unary operators: '%s'.\n",string(unaryOperators));
@@ -4408,7 +4411,7 @@ int main(int argc, char **argv){
 		resetOutputColor();
 		exit(1);
 	}
-	if(amVerbose())output("M environment initialized with %llu predefined values.",getNumberOfValues());
+	if(amVerbose())output("M environment initialized with %llu predefined values.\n",getNumberOfValues());
 
 	Mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
 	if(predefinedVariableNames){
