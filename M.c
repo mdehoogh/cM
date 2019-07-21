@@ -2771,7 +2771,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	}
 
-	if(amVerbose()){outputValue("Value result: '",_valueReference->_value,"'");output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);}
+	if(amVerbose()){
+		if(_valueReference->_value){
+			outputValue("Value result: '",_valueReference->_value,"'");
+			output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);
+		}else
+			outputLine("No value result!");
+	}
 	
 	return _valueReference;
 
