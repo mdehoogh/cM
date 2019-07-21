@@ -1292,7 +1292,7 @@ bool initEnvironment(){
 				outputError("Failed to register all unary functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
+			if(!completedValueFunction(_getFunction(_Menvironment,"exists"),"exists",Mexists)||!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
 				outputError("Failed to register the null and undefined function");
 				return false;
 			}
@@ -4844,7 +4844,7 @@ int main(int argc, char **argv){
 			if(inputMode==IM_COMMAND){
 				// MDH@21JUL2019: if the last token appears to be a function identifier change it to a variable
 				//                so we won't end up with refusal of evaluation
-				if(pLastCommandToEvaluateToken->type==TT_FUNCTION)changeFunctionTokenToAVariable(false);
+				if(pLastCommandToEvaluateToken)if(pLastCommandToEvaluateToken->type==TT_FUNCTION)changeFunctionTokenToAVariable(false);
 				inputInfo("%s",""); // so that line will be empty
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore

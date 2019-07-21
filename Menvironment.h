@@ -89,6 +89,7 @@ Mstring* _getVariableNames(const Menvironment* const _environment,const char* co
 Mvariable* getNewVariable(Menvironment* _environment,const char* name);
 Mvariable* getVariable(Menvironment* _environment,const char* name);
 */
+Mvalue* Mexists(Mvalue* _value);
 bool containsVariable(const Menvironment* const _environment,const char* const name);
 Mvaluetype getVariableType(const Menvironment* const _environment,const char* const name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
 Mvaluetype getVariableValueType(const Menvironment* const _environment,const char* const name); // same as getVariableType() if a type is defined for the given variable

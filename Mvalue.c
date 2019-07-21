@@ -219,7 +219,7 @@ bool decrementReferenceCount(Mvalue* _value){
             return true;
         }
         Mstring* _valueText=_getValueText(_value,false);
-        output("BUG: Reference count of '%s' of type '%c' already zero.\n",_valueText,MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
+        output("BUG: Reference count of '%s' of type '%c' already zero.\n",string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
         free_string(_valueText);
     }else
     if(amVerbose())outputLine("No value to decrement the reference count of.");

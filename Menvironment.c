@@ -139,7 +139,9 @@ Mtoken* nextEnvironmentExpressionToken(){
 
 // read access to the elements defined in an environment
 uint32_t getNumberOfVariables(const Menvironment* const _environment){
-    return(_environment&&_environment->_variableMap?_environment->_variableMap->numberOfElements:0);
+    if(!_environment||!_environment->_variableMap)return 0;
+    // MDH@20JUL2019: now returning the sum of the variables in the parent plus those in the environment itself!!
+    return getNumberOfVariables(_environment->_parent)+_environment->_variableMap->numberOfElements;
 }/* VALIDATED */
 
 // the names of the variables may be requested
@@ -175,21 +177,25 @@ Mstring* _getVariableNames(const Menvironment* const _environment,const char* co
 }/* VALIDATED */
 
 Mvariable* getVariable(const Menvironment* const _environment,const char* const name, bool verbose){
-    if(!_environment||!name){outputError("No environment or name specified");return NULL;}
-    // input valid        
-    if(!_environment->_variableMap){output("%sEnvironment to find variable '%s' in is empty.\n",ERROR_PREFIX,name);return NULL;}
+    if(!_environment)return NULL;
+    if(!name){outputError("No variable name specified");return NULL;}
+    // input valid
+    if(!_environment->_variableMap){if(verbose)output("%sEnvironment to find variable '%s' in is empty.\n",ERROR_PREFIX,name);return NULL;}
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=_environment->_variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
     while(_variableMapelement&&(!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))_variableMapelement=_variableMapelement->_next;
-    if(!_variableMapelement){
-        ///////if(amVerbose())output("Not found!\n");
-        return NULL;
-    }
-    return _variableMapelement->_variable;
+    // MDH@20JUL2019: if not defined locally, perhaps in parent
+    return(_variableMapelement?_variableMapelement->_variable:getVariable(_environment->_parent,name,verbose));
 }/* VALIDATED */
 bool containsVariable(const Menvironment* const _environment,const char* const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
-
+// use Mexists to determine if a variable exists passed in as text, we might decide to return the name of the environment it exists in
+Mvalue* Mexists(Mvalue* _value){
+    if(_value&&_value->type==VT_TEXT){
+        return _getIntegerValue(getVariable(getEnvironment(),_value->value._text->_c,false)?1:0);
+    }
+    return NULL; // input invalid
+}
 // write access
 // helper function to create a new variable with a given name and of a given type
 
