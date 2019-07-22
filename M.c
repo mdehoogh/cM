@@ -1494,7 +1494,8 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 typedef struct FunctionBodyInput{
 	////////char* functionName;
 	Muserfunction* _function;
-	struct FunctionBodyInput *_prev;
+	struct FunctionBodyInput* _prev;
+	struct FunctionBodyRequest* _request;
 }FunctionBodyInput;
 FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
 bool setCurrentFunctionBodyInput(FunctionBodyRequest* _functionBodyRequest){
@@ -1502,7 +1503,9 @@ bool setCurrentFunctionBodyInput(FunctionBodyRequest* _functionBodyRequest){
 	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'I'); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getEnvironment(),_functionBodyRequest->functionName);
-	if(function&&function->type==FT_USER){		
+	if(function&&function->type==FT_USER){
+		// it's better to put the next request in, so after finishing with this request we can do the following if any
+		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
 		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
 		if(!_functionBodyInputStack)_functionBodyInputStack=_currentFunctionBodyInput;
 		// if we succeed in activating the execution environment of the new function we're good to go
@@ -1521,10 +1524,15 @@ bool setCurrentFunctionBodyInput(FunctionBodyRequest* _functionBodyRequest){
 bool startFunctionBodyInput(){
 	// move out of the queue into the stack
 	// push on top of the functionBodyInputStack
-	if(!_firstFunctionBodyRequest)return false; // NO function body request to 'execute'
-	if(setCurrentFunctionBodyInput(_firstFunctionBodyRequest))return true;
-	output("%sFailed to start input of the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
-	return false;
+	if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
+	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next;
+	free(_firstFunctionBodyRequest); // no need for this anymore!!!
+	if(!setCurrentFunctionBodyInput(_firstFunctionBodyRequest)){ // failed to honour the request
+		output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
+		_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
+	}else // we have a pointer to the request save in the function body input structure
+		_firstFunctionBodyRequest=NULL; // request will be honoured, do prevent starting the next request until done with the function body input
+	return(_firstFunctionBodyRequest==NULL); // success if no first function body request anymore
 }
 /*
  \brief will only fail when we fail to start the next one
@@ -1534,7 +1542,10 @@ bool endFunctionBodyInput(){
 	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
 	_currentFunctionBodyInput->_function->_functionMap=getEnvironment()->_functionMap;
 	popExecutionEnvironment();
-	_firstFunctionBodyRequest=_firstFunctionBodyRequest->_next;
+	// the new first function body request is the successor of the previous one
+	// TODO shouldn't we free it?
+
+	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request;
 	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
 	return startFunctionBodyInput(); // start the next one
 }
@@ -4942,7 +4953,7 @@ int main(int argc, char **argv){
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
-					if(_firstFunctionBodyRequest)startFunctionBodyInput();
+					if(_firstFunctionBodyRequest)while(!startFunctionBodyInput());
 
 				}else
 				if(behindCursor()==0)
