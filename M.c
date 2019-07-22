@@ -2240,7 +2240,8 @@ Mvalue* getValueOfMap(){
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		}
 		if(!_attributeName)continue; // unable to parse the attribute name expression value into a string
-		if(string_length(_attributeName)>0)
+		// MDH@22JUL2019: let's allow empty attribute name as well (why not!)
+		////////if(string_length(_attributeName)>0)
 		if(!appendedToMap(_map,string(_attributeName),_attributeValueValue)){
 			output("%s",ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
 		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
