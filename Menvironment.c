@@ -81,6 +81,7 @@ void free_userfunction(Muserfunction* _userfunction){
 void free_environment(Menvironment* _environment){
     if(_environment){
         if(_environment->_name){free(_environment->_name);_environment->_name=NULL;}
+        _environment->_execution=NULL;
         free_map(_environment->_variableMap);
         /* MDH@10JUL2019: only Menvironment has a function map!!   
            MDH@20JUL2019: NO user functions may also contain a function map, which is referenced in a user function execution environment
@@ -108,6 +109,7 @@ void outputEnvironmentName(){
 bool pushExecutionEnvironment(Menvironment* _environment){
     if(!_environment)return false;
     if(!_environment->_parent)_environment->_parent=_executionEnvironment; // if without a parent give it the current one
+    _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
     _executionEnvironment=_environment;
     if(amVerbose())outputEnvironmentName();
     return true;
@@ -115,10 +117,10 @@ bool pushExecutionEnvironment(Menvironment* _environment){
 void popExecutionEnvironment(){
     if(!_executionEnvironment){outputLine("BUG: No environment left to pop!");return;} // nothing to pop
     // NOTE only execution environments that have a parent can be popped!!!
-    Menvironment* _parentExecutionEnvironment=_executionEnvironment->_parent;
-    _executionEnvironment->_parent=NULL; // clear the parent of the current execution environment, so it won't be freed accidently
+    Menvironment* _previousExecutionEnvironment=_executionEnvironment->_execution;
+    if(!_previousExecutionEnvironment){outputLine("BUG: Can't pop top-most environment!");return;}
     free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
-    _executionEnvironment=_parentExecutionEnvironment;
+    _executionEnvironment=_previousExecutionEnvironment;
     if(amVerbose())outputEnvironmentName();
 }/* VALIDATED */
 Menvironment* getEnvironment(){return _executionEnvironment;}/* VALIDATED */

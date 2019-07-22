@@ -58,7 +58,8 @@ typedef struct Menvironment{
     Mmap* _variableMap; // variables are stored by name
     Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
     Mtoken* expressionToken; // MDH@17JUL2019: the current token of the expression being evaluated in this environment
-    struct Menvironment* _parent;
+    struct Menvironment* _parent; // typically the definition environment
+    struct Menvironment* _execution; // the environment that was executing before this one was popped!!
 }Menvironment;
 
 Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
