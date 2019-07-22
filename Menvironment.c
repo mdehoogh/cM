@@ -100,10 +100,16 @@ Menvironment* __environment(){
 }/* VALIDATED */
 // keep track of the current execution environment
 static Menvironment* _executionEnvironment=NULL;
+void outputEnvironmentName(){
+    Mstring* _environmentName=_getEnvironmentName();
+    output("Current execution environment: '%s'.\n",string(_environmentName));
+    free_string(_environmentName);
+}
 bool pushExecutionEnvironment(Menvironment* _environment){
     if(!_environment)return false;
     if(!_environment->_parent)_environment->_parent=_executionEnvironment; // if without a parent give it the current one
     _executionEnvironment=_environment;
+    if(amVerbose())outputEnvironmentName();
     return true;
 }/* VALIDATED */
 void popExecutionEnvironment(){
@@ -113,6 +119,7 @@ void popExecutionEnvironment(){
     _executionEnvironment->_parent=NULL; // clear the parent of the current execution environment, so it won't be freed accidently
     free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     _executionEnvironment=_parentExecutionEnvironment;
+    if(amVerbose())outputEnvironmentName();
 }/* VALIDATED */
 Menvironment* getEnvironment(){return _executionEnvironment;}/* VALIDATED */
 Mstring* _getEnvironmentName(){
