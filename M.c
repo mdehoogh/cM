@@ -1317,11 +1317,9 @@ bool initEnvironment(){
 
 		}
 	}
-	if(!pushExecutionEnvironment(_Menvironment)){
-		outputError("Failed to register the M environment as execution environment");
-		return false;
-	}
-	return true;
+	if(pushExecutionEnvironment(_Menvironment))return true;
+	outputError("Failed to activate the M environment");
+	return false;
 }
 
 // user interaction stuff
@@ -1387,13 +1385,13 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 	return s;
 }
 void outputFunctions(){
-	Mstring* _functionsText=_getFunctionMapText(_Menvironment->_functionMap);
+	Mstring* _functionsText=_getFunctionMapText(getEnvironment()->_functionMap);
 	output("\nFunctions: %s.\n",string(_functionsText));
 	free_string(_functionsText);
 }/* VALIDATED */
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
-	Mstring* _variablesText=_getMapText(_Menvironment->_variableMap,false,false,false);
+	Mstring* _variablesText=_getMapText(getEnvironment()->_variableMap,false,false,false);
 	output("\nVariables: %s.\n",string(_variablesText));
 	free_string(_variablesText);
 }/* VALIDATED */
@@ -1471,6 +1469,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		Mvariable* argumentMapelementVariable;
 		while(functionExecutionEnvironmentInitialized&&argumentMapelement){
 			argumentMapelementVariable=argumentMapelement->_variable;
+			// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
 			if(!addVariable(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->valuetype,false)){
 				outputError("Failed to add function argument as local variable of a function execution");
 				functionExecutionEnvironmentInitialized=false;
@@ -2229,7 +2228,8 @@ Mvalue* getValueOfMap(){
 		// obviously the name should be something that evaluates to a string
 		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'s',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
 		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-		Mstring* _attributeName=_getValueText(_attributeNameValue,false); // parse the attribute name value (could be undefined though)
+		// MDH@22JUL2019: it's better to dequote the name here because otherwise the name of the attribute would be in quotes (and it is clear to be text)
+		Mstring* _attributeName=_getValueText(_attributeNameValue,true); // parse the attribute name value (could be undefined though)
 		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
 		/////////////////////if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
@@ -2444,7 +2444,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 			// let's get the first index/attribute name
 			Mlistelement* indexorattributenameListelement=_itemidlist->_first;
 			if(indexorattributenameListelement){ // we've got one, so not an empty index/attribute name list!!
-				Mvalue* _value=getValue(_Menvironment,_valuereference->_name); // we'll be needing the value at the top level
+				Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // we'll be needing the value at the top level
 				// we need to find the last index or attribute name
 				Mvalue* indexorattributenameListelementValue;
 				while(indexorattributenameListelement->_next){
@@ -2564,8 +2564,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			case TT_FUNCTION:
 				{
 					if(amVerbose())output("Call of function '%s'.\n",_significantTokenText);
-					Mfunction* function=getFunction(_Menvironment,_significantTokenText); // get the function associated with the name of the function
-					if(function){		
+					Mfunction* function=getFunction(getEnvironment(),_significantTokenText); // get the function associated with the name of the function
+					if(function){
 						// MDH@17JUL2019: we know the function and when the name is one of the special functions
 						//                like 'function' to define a function we know not to evaluate the third argument!!
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
@@ -2621,7 +2621,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
 				// we have to create the variable first (TODO should we wait until actually assigning???)
-				if(!addVariable(_Menvironment,_significantTokenText,VT_UNDEFINED,false))break; // NO retrieves the undefined value subsequently!!
+				if(!addVariable(getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
+					output("%sFailed to add variable '%s.'\n",ERROR_PREFIX,_significantTokenText);
+					break; // NO retrieves the undefined value subsequently!!
+				}
 			case TT_VARIABLE: // a value reference
 				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerbose())output("Variable name: '%s'.\n",_valueReference->_name);
@@ -3986,7 +3989,7 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){
 		result=true;
 		// is it a function (now)?
-		if(getFunction(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // yes, it is
+		if(getFunction(getEnvironment(),string(pLastCommandToEvaluateToken->text))){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
 			if(amMatchingparentheses())if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
@@ -3999,7 +4002,7 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
 		result=true;
 		// is it (still) a function?
-		if(!getFunction(_Menvironment,string(pLastCommandToEvaluateToken->text))){ // no, it ain't
+		if(!getFunction(getEnvironment(),string(pLastCommandToEvaluateToken->text))){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
 			pLastCommandToEvaluateToken->type=TT_VARIABLE;
 			reoutputToken(pLastCommandToEvaluateToken);
@@ -4013,14 +4016,14 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 		char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
 		// check whether the variable exists or not
 		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
-			if(!containsVariable(_Menvironment,_identifierName)){ // apparently does NOT exist
+			if(!containsVariable(getEnvironment(),_identifierName)){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else
 		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
-			if(containsVariable(_Menvironment,_identifierName)){ // now an existing variable
+			if(containsVariable(getEnvironment(),_identifierName)){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
@@ -4430,7 +4433,7 @@ int main(int argc, char **argv){
 	}
 	if(amVerbose())output("M environment initialized with %llu predefined values.\n",getNumberOfValues());
 
-	Mstring* predefinedVariableNames=_getVariableNames(_Menvironment,", ");
+	Mstring* predefinedVariableNames=_getVariableNames(getEnvironment(),", ");
 	if(predefinedVariableNames){
 		output("Predefined variables: %s.\n",string(predefinedVariableNames));
 		free_string(predefinedVariableNames); // no get rid of it!!!
