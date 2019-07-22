@@ -130,7 +130,11 @@ Mstring* _getEnvironmentName(){
     }
     return _environmentName;
 }
-Mtoken* getEnvironmentExpressionToken(){return _executionEnvironment->expressionToken;}/* VALIDATED */
+Mtoken* getEnvironmentExpressionToken(){
+    // MDH@22JUL2019: let's allow breaking here
+    if(kbhit())return NULL;
+    return _executionEnvironment->expressionToken;
+}/* VALIDATED */
 Mtoken* nextEnvironmentExpressionToken(){
     if(!_executionEnvironment)return NULL;
     if(_executionEnvironment->expressionToken)_executionEnvironment->expressionToken=_executionEnvironment->expressionToken->next;

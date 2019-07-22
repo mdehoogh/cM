@@ -1697,6 +1697,7 @@ void inputInfo(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
 		toStartOfPreviousLine();resetOutputColor(); // get the default output color!!
 		// NOTE we have to call vprintf here NOT printf!!!
+		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
 		toStartOfNextLine();toCursorPosition();
 	}
@@ -2269,15 +2270,19 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 						if(functionBodyCommandList){
 							Mlistelement* functionBodyCommandListelement=functionBodyCommandList->_first;
 							while(functionBodyCommandListelement){
-								_functionExecutionEnvironment->expressionToken=functionBodyCommandListelement->_value->value._token;
+								// MDH@22JUL2019: ALWAYS skip the initial dummy TT_EXPRESSION token of any command!!
+								_functionExecutionEnvironment->expressionToken=functionBodyCommandListelement->_value->value._token->next;
 								// evaluate that expression
 								_functionEvaluationValue=getValueOfExpression("function body command evaluation",'f',(TokenType[]){},0);
+								if(amVerbose())outputValue("Function evaluation value so far: '",_functionEvaluationValue,"'.\n");
 								functionBodyCommandListelement=functionBodyCommandListelement->_next;
 							}
 						}else
 							output("No commands in body of user function '%s' to execute!\n",functionName);
 						// before popping the function execution environment, see if the result was set
+						if(amVerbose())output("Extracting the result of the execution of function '%s'.\n",functionName);
 						Mvalue* _functionResultValue=getValue(_functionExecutionEnvironment,"$");
+						if(amVerbose())output("Exiting the environment of executing function '%s'.\n",functionName);
 						popExecutionEnvironment();
 						// the function result value (if set) takes precedence over the function evaluation value
 						return (_functionResultValue?_functionResultValue:_functionEvaluationValue);
@@ -3347,10 +3352,11 @@ char* getSignificantTokenText(Mtoken* token){
  * it composes a list of value references to which operators are to be applied
  */
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
+	Mvalue* _expressionValue=NULL;
+
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
 	// typically the offset token determines what the expression ends with!!
 	// e.g. ( ends with , or )    [ ends with ]     { ends with }    etc.   
-	Mvalue* _expressionValue=NULL;
 	/////////_expressionvalue->_valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference)); // create a value reference that is to hold a single value reference as result
 	
 	if(expressionToken){
@@ -3391,13 +3397,16 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					expressionToken=nextEnvironmentExpressionToken();
 
 			// MDH@16MAY2019: can't end an expression with an operator BRO'
-			if(amVerbose())if(expressionToken)output("Does '%s' of type '%s' end the expression?",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-			endTokenTypeIndex=endTokenTypeCount;
-			while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
-			if(endTokenTypeIndex){if(amVerbose())output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);break;}
-			if(amVerbose())if(expressionToken)outputLine(" NO");
-
 			if(expressionToken){
+				if(amVerbose())output("Does '%s' of type '%s' end the expression?",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+				endTokenTypeIndex=endTokenTypeCount;
+				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
+				if(endTokenTypeIndex){
+					if(amVerbose())output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
+					break;
+				}
+				if(amVerbose())outputLine(" NO");
+
 				if(amVerbose())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
 				_formulaelement->_operator=_stringCopy(expressionToken->text,expressionToken->significantCharacterCount); // replacing: _stringCopy(expressionToken->text);
@@ -3494,7 +3503,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
-			if(amVerbose())outputValue("Storing '",_result,"' as expression value.\n");
+			if(amVerbose()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
 			assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
@@ -3508,9 +3517,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_nextformulaelement;
 			}
 		}else
-		if(amVerbose())outputLine("No result to store.");
+		if(amVerbose())output("No result of expression '%s' to store.",info);
 	}
-	if(amVerbose())outputValue("Expression value: '",_expressionValue,"'.\n");
+	if(amVerbose()){output("Value of expression '%s' evaluation",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 /**

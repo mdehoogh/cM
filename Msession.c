@@ -49,6 +49,20 @@ void enableRawmode(){
 ///////char inputChar='\0'; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
 // currently inputCharRead() blocks until a character can be read (and put in inputChar)
 bool inputCharRead(char* inputChar){enableRawmode();return(read(STDIN_FILENO,inputChar,1)==1);}
+int kbhit(){
+    struct timeval tv={0L,0L};
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(0, &fds);
+    return select(1,&fds,NULL,NULL,&tv);
+}
+int getch(){
+	// ASSERT assume in one-character-at-a-time-mode!!!
+    int r;unsigned char c;
+    if ((r=read(STDIN_FILENO,&c,sizeof(c)))<0)return r;
+    return c;
+}
+
 //////char getInputChar(){return inputChar;}
 
 // interfacing with the console
