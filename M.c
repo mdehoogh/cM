@@ -1765,11 +1765,11 @@ Mtoken* _getToken(Mtoken* prevToken){
 			else
 			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&prevToken!=pCommandToEvaluate))
 				pNewToken->expr=prevToken;
-			
+			/*
 			if(amVerbose()){
 				if(pNewToken->expr)inputInfo("Matching: %s",string(pNewToken->expr->text));else inputInfo("%s","-");
 			}
-			
+			*/
 			///////if(amVerbose()){if(pNewToken->expr)inputInfo("Pointing to %s of type %s.",string(pNewToken->expr->text),TOKENTYPE_STRING[pNewToken->expr->type]);else inputInfo("Nothing to point to.");}
 			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
