@@ -1425,14 +1425,22 @@ void outputFlags(){
 // MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
 typedef struct FunctionBodyRequest{
 	char* functionName;
-	struct FunctionBodyRequest *_next,*_prev;
+	struct FunctionBodyRequest *_next;
 }FunctionBodyRequest;
 // requests can come out of a single command containing multiple function definitions
+// _firstFunctionBodyRequest represents the first one to execute
 FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
 FunctionBodyRequest* requestBodyOfFunction(char* functionName){
 	if(functionName&&strlen(functionName)){ // a 'valid' function name
+		// technically it should not have been requested already (or exist)
+		FunctionBodyRequest* _functionBodyRequest=_firstFunctionBodyRequest;
+		while(_functionBodyRequest&&!strcmp(functionName,_functionBodyRequest->functionName))_functionBodyRequest=_functionBodyRequest->_next;
+		if(_functionBodyRequest){
+			output("%sBody of function '%s' already requested.\n",ERROR_PREFIX,functionName);
+			return NULL;
+		}
 		if(amVerbose())output("The body of function '%s' being requested.\n",functionName);
-		FunctionBodyRequest* _functionBodyRequest=(functionName?CALLOC(1,sizeof(FunctionBodyRequest),'B'):NULL);
+		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'B');
 		if(_functionBodyRequest){
 			_functionBodyRequest->functionName=functionName;
 			if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
@@ -1498,56 +1506,61 @@ typedef struct FunctionBodyInput{
 	struct FunctionBodyRequest* _request;
 }FunctionBodyInput;
 FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
-bool setCurrentFunctionBodyInput(FunctionBodyRequest* _functionBodyRequest){
-	if(!_functionBodyRequest)return false;
+bool createFunctionBodyInput(const FunctionBodyRequest* const _firstFunctionBodyRequest){
+	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
+	///////////if(!_firstFunctionBodyRequest)return false;
 	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'I'); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
-	Mfunction* function=getFunction(getEnvironment(),_functionBodyRequest->functionName);
+	Mfunction* function=getFunction(getEnvironment(),_firstFunctionBodyRequest->functionName);
 	if(function&&function->type==FT_USER){
 		// it's better to put the next request in, so after finishing with this request we can do the following if any
-		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
+		_currentFunctionBodyInput->_request=_firstFunctionBodyRequest->_next; // remember the request that initiated this body input
 		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
 		if(!_functionBodyInputStack)_functionBodyInputStack=_currentFunctionBodyInput;
 		// if we succeed in activating the execution environment of the new function we're good to go
 		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
-		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_functionBodyRequest->functionName,function->_parameterMap);
+		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_firstFunctionBodyRequest->functionName,function->_parameterMap);
 		if(_functionExecutionEnvironment){
 			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
 			free_environment(_functionExecutionEnvironment);
 		}
 		outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
-		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_functionBodyRequest->functionName);
+		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
 	free(_currentFunctionBodyInput);
 	return false;
 }
 bool startFunctionBodyInput(){
+	// ASSERT only call with _firstFunctionBodyRequest not NULL
 	// move out of the queue into the stack
 	// push on top of the functionBodyInputStack
-	if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
-	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next;
-	free(_firstFunctionBodyRequest); // no need for this anymore!!!
-	if(!setCurrentFunctionBodyInput(_firstFunctionBodyRequest)){ // failed to honour the request
-		output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
-		_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
-	}else // we have a pointer to the request save in the function body input structure
-		_firstFunctionBodyRequest=NULL; // request will be honoured, do prevent starting the next request until done with the function body input
-	return(_firstFunctionBodyRequest==NULL); // success if no first function body request anymore
+	/////////if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
+	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next; // remember the function body request to do next
+	char* functionName=_firstFunctionBodyRequest->functionName;
+	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
+	free(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request
+	if(functionBodyInputCreated)return true; // succeeded, so done
+	// failed, so do the next one
+	_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
+	output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,functionName);
+	// if we still have a first function body request start that one, otherwise 
+	return(_firstFunctionBodyRequest?startFunctionBodyInput():true);
 }
 /*
  \brief will only fail when we fail to start the next one
  */
 bool endFunctionBodyInput(){
+	// ASSERT do NOT call with _currentFunctionBodyInput equal to NULL
 	// pop the function body request execution environment we just ended
 	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
 	_currentFunctionBodyInput->_function->_functionMap=getEnvironment()->_functionMap;
 	popExecutionEnvironment();
 	// the new first function body request is the successor of the previous one
 	// TODO shouldn't we free it?
-
-	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request;
+	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request; // the next function body request as stored in the _request field
+	free(_currentFunctionBodyInput);_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
 	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
-	return startFunctionBodyInput(); // start the next one
+	return startFunctionBodyInput(); // will NULL _firstFunctionBodyInput to ascertain not to get called in the main user input loop
 }
 // MDH@19JUL2019 END
 
@@ -1585,7 +1598,7 @@ void prompt(){
 				promptLength=1;
 				*/
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
-				if(_firstFunctionBodyRequest)
+				if(_currentFunctionBodyInput)
 					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getEnvironment()->_name));	// replacing: printf("%lu",(commandCount+1));
 				else
 					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
@@ -4173,7 +4186,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again */
 			if(newTokenType==pLastCommandToEvaluateToken->type&&pLastCommandToEvaluateToken->significantCharacterCount>0)
 			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
-			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT){
+			// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
+			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->type!=TT_END_OF_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_END_OF_MAP&&pLastCommandToEvaluateToken->type!=TT_END_OF_LIST){
 				newTokenType=TT_ERROR;
 				if(amVerbose())inputError("Token already finished!");
 			}
@@ -4191,7 +4205,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 
 		}else
 		if(newTokenType!=pLastCommandToEvaluateToken->type||pLastCommandToEvaluateToken->type==TT_EXPRESSION||pLastCommandToEvaluateToken->significantCharacterCount>0){
-
+			///////////if(amVerbose())outputLine("!");/////inputInfo("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
 			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
@@ -4298,7 +4312,10 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	
 			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
 			if(pLastCommandToEvaluateToken->significantCharacterCount==0){
-				if(isOneCharacterTokenType(newTokenType))pLastCommandToEvaluateToken->significantCharacterCount=1;
+				if(isOneCharacterTokenType(newTokenType)){
+					pLastCommandToEvaluateToken->significantCharacterCount=1;
+					if(amVerbose())inputInfo("'%s' of type %u considered to be a one character token.",string(pLastCommandToEvaluateToken->text),newTokenType);
+				}
 				/* replacing:
 				if(pLastCommandToEvaluateToken->type!=TT_ERROR&&pLastCommandToEvaluateToken->type!=TT_COMMENT&&pLastCommandToEvaluateToken->type!=TT_DQSTRING&&pLastCommandToEvaluateToken->type!=TT_SQSTRING)
 					if(inputCharacterType=='('||inputCharacterType=='['||inputCharacterType=='{'||inputCharacterType==','||inputCharacterType==';'||inputCharacterType==':'||inputCharacterType=='?')
@@ -4875,10 +4892,10 @@ int main(int argc, char **argv){
 		// if eXit input character(s) received...
 		if(inputCharType=='x'){
 			// we should only exit M when not entering a function body
-			if(!_currentFunctionBodyInput)break;
+			if(!_currentFunctionBodyInput)break; // break out of user input loop
 			// switch back to command mode
-			switchToCommandMode();
 			endFunctionBodyInput();
+			switchToCommandMode();
 		}else
 		// MDH@16APR2019: now if we use n to switch modes as well, we can do that if there's no command
 		if(inputCharType=='n'){
@@ -4953,7 +4970,8 @@ int main(int argc, char **argv){
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
-					if(_firstFunctionBodyRequest)while(!startFunctionBodyInput());
+					if(_firstFunctionBodyRequest&&!startFunctionBodyInput())
+						outputError("Failed to honour the request(s) for the body of function(s)");
 
 				}else
 				if(behindCursor()==0)

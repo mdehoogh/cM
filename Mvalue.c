@@ -98,7 +98,7 @@ void free_map(Mmap* _map){
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
-        if(amVerbose())output("Value of type %u to free.",_value->type);
+        if(amVerbose())output("Value of type %u to free.\n",_value->type);
         // I do not need to free the value itself, only the pointers inside it
         switch(_value->type){
             case VT_UNDEFINED:break;
@@ -113,10 +113,10 @@ void free_value(Mvalue* _value){
             case VT_MAP:if(_value->value._map)free_map(_value->value._map);break;
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
-        if(amVerbose())output("Type-specific value freed.");
+        if(amVerbose())output("Type-specific value freed.\n");
         free(_value);
     }else
-        output("BUG: No value to free!");
+        output("BUG: No value to free!\n");
 }/* VALIDATED */
 
 // manage a list of created values
