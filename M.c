@@ -1436,7 +1436,7 @@ FunctionBodyRequest* requestBodyOfFunction(char* functionName){
 	if(functionName&&strlen(functionName)){ // a 'valid' function name
 		// technically it should not have been requested already (or exist)
 		FunctionBodyRequest* _functionBodyRequest=_firstFunctionBodyRequest;
-		while(_functionBodyRequest&&!strcmp(functionName,_functionBodyRequest->functionName))_functionBodyRequest=_functionBodyRequest->_next;
+		while(_functionBodyRequest&&strcmp(functionName,_functionBodyRequest->functionName))_functionBodyRequest=_functionBodyRequest->_next;
 		if(_functionBodyRequest){
 			output("%sBody of function '%s' already requested.\n",ERROR_PREFIX,functionName);
 			return NULL;
