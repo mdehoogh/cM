@@ -1160,7 +1160,7 @@ Mvalue* Msum(Mvalue* _value){
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
-Mtoken* _getToken(Mtoken* prevToken);
+Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType);
 
 bool initEnvironment(){
 
@@ -1170,7 +1170,9 @@ bool initEnvironment(){
 
 	NAR_value=_getRealValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
-	NULL_value=_getValueOfToken(_getToken(NULL),true);NULL_value->value._token->text=__string("NULL");NULL_value->value._token->type=TT_SQSTRING; // any string type would do!!!
+
+	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
+	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputError("BUG: Failed to create NULL value!");
 
 	// either set the DP_value to 0 (failed to get a decimal context somehow)
 	/* MDH@20JUN2019: no need for DP_value anymore (as setdp() return _decimalContext->prec now): 
@@ -1741,7 +1743,7 @@ void outputStatus(char inputChar,char inputCharType){
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 }
 
-Mtoken* _getToken(Mtoken* prevToken){
+Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 	Mtoken* pNewToken=__token();
 	if(pNewToken){
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
@@ -1759,12 +1761,20 @@ Mtoken* _getToken(Mtoken* prevToken){
 			//                BUT the first (dummy) expression token should be included though!!!
 			// TODO having to test an expression for starting with ( is a bit of a nuisance (so we won't accidently do that on the initial expression token and any comma token!!!)
 			// MDH@27MAY2019: set expr NOTE the first token behind the (start of) expression token, should keep pointing to NULL
-			pNewToken->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token			
-			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP)
-				pNewToken->expr=prevToken->expr->expr;
-			else
+			// MDH@23JUL2019: we're going to change this a little bit because we want } ) ] to point to what the expr of prevToken points to
+			//                and NOT wait for the next token
+			//                typically a new token points to the same expr that the predecessor points to
+			//                but we want 
+			// take special care when the new token ends a list, map or function call
 			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&prevToken!=pCommandToEvaluate))
 				pNewToken->expr=prevToken;
+			else
+				pNewToken->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token
+			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP){
+				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
+				//                TODO this is checked afterwards, so perhaps we should do that here?????
+				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
+			}
 			/*
 			if(amVerbose()){
 				if(pNewToken->expr)inputInfo("Matching: %s",string(pNewToken->expr->text));else inputInfo("%s","-");
@@ -1776,11 +1786,17 @@ Mtoken* _getToken(Mtoken* prevToken){
 		}
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
 		pNewToken->text=__string();
+		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
+		if(!pNewToken->text){
+			inputError("%sFailed to initialize the new token.",ERROR_PREFIX);
+			pNewToken->type=TT_ERROR; 
+		}
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->next=NULL;
 		*/
 	}
+	if(!pNewToken)inputError("Failed to create a new token.");else pNewToken->type=newTokenType;
 	return pNewToken;
 }
 
@@ -3712,6 +3728,13 @@ bool evaluateCommand(){
 	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
 	//////////// already noticed while entering the expression!!!!: if(!pLastCommandToEvaluateToken->expr){outputError("Too many parentheses!");return false;}
 	if(pLastCommandToEvaluateToken->expr){
+		// MDH@23JUL2019: we can now be very strict
+		//                the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
+		if(pLastCommandToEvaluateToken->expr->type!=TT_EXPRESSION||(string_length(pLastCommandToEvaluateToken->expr->text)&&string_char(pLastCommandToEvaluateToken->expr->text,0)!=' ')){
+			outputError("Incomplete command");
+			return false;
+		}
+		/* replacing:
 		// this is allowed if this token ends something that points to NULL
 		if((pLastCommandToEvaluateToken->type!=TT_END_OF_LIST&&pLastCommandToEvaluateToken->type!=TT_END_OF_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_END_OF_MAP)||pLastCommandToEvaluateToken->expr->expr){
 			switch(pLastCommandToEvaluateToken->expr->expr->type){
@@ -3722,16 +3745,17 @@ bool evaluateCommand(){
 			}
 			return false;
 		}
+		*/
 	}
 
 	// 4. can't end with function of function call
 	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
-	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command.");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call.");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_LIST||pLastCommandToEvaluateToken->type==TT_LISTELEMENT){outputError("Unfinished list.");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_DQSTRING||pLastCommandToEvaluateToken->type==TT_SQSTRING){outputError("Unfinished string literal.");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_EXPRESSION){outputError("Unfinished expression.");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_MAP||pLastCommandToEvaluateToken->type==TT_MAP_VALUE){outputError("Unfinished map.");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_LIST||pLastCommandToEvaluateToken->type==TT_LISTELEMENT){outputError("Unfinished list");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_DQSTRING||pLastCommandToEvaluateToken->type==TT_SQSTRING){outputError("Unfinished string literal");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_EXPRESSION){outputError("Unfinished expression");return false;}
+	if(pLastCommandToEvaluateToken->type==TT_MAP||pLastCommandToEvaluateToken->type==TT_MAP_VALUE){outputError("Unfinished map");return false;}
 
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
@@ -3927,7 +3951,8 @@ bool commandUp(){
 void newCommand(){
 	// MDH@24APR2019 obsolete: commandLength()=string_length(behindCursorText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
-	pLastCommandToEvaluateToken=pCommandToEvaluate=_getToken(NULL);
+	pLastCommandToEvaluateToken=pCommandToEvaluate=_getToken(NULL,TT_EXPRESSION);
+	if(!pCommandToEvaluate){outputError("Failed to create a new command");return;}
 	// MDH@27MAY2019: NO let's just keep expr NULL!!!
 	pCommandToEvaluate->expr=NULL; // TODO do I need this???? YES, because we used _getToken()! PERHAPS NOT as prevToken is NULL???????
 }
@@ -3941,8 +3966,8 @@ void copyCommand(){
 	// the essence is that pLastCommandToEvaluateToken points to the last token in pCommandToEvaluate
 	// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to _getToken() failing to create a new token
 	while(_tokenToCopy){
-		pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken);
-		pLastCommandToEvaluateToken->type=_tokenToCopy->type;
+		pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,_tokenToCopy->type);
+		///////// moved to _getToken(): pLastCommandToEvaluateToken->type=_tokenToCopy->type;
 		/* TODO check whether the following is correct!!! guess not!!
 		if(pLastCommandToEvaluateToken->type==TT_END_OF_FUNCTION_CALL||pLastCommandToEvaluateToken->type==TT_END_OF_LIST||pLastCommandToEvaluateToken->type==TT_END_OF_MAP){
 			if(_tokenToCopy->expr)
@@ -4240,14 +4265,16 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				}
 			}
 
-			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken);
+			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
+			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,newTokenType);
 /*
 #ifdef __DEBUG__
 			printf("@%p=%p?:%s",pCommandToEvaluate,pLastCommandToEvaluateToken,string(pCommandToEvaluate->text));
 #endif
 */
+			/* MDH@23JUL2019 TODO check what we still need of the following!!!!: replacing:
 			// ending a function call, list or map is only allowed with expr defined
-			if(newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_LISTELEMENT||newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_MAP){
+			if(pLastCommandToEvaluateToken->type==TT_END_OF_FUNCTION_CALL||pLastCommandToEvaluateToken->type==TT_LISTELEMENT||pLastCommandToEvaluateToken->type==TT_END_OF_LIST||pLastCommandToEvaluateToken->type==TT_END_OF_MAP){
 				if(pLastCommandToEvaluateToken->expr){ // i.e. pointing to some token that should be of the right type!!!
 					// check whether the match is correct
 					switch(newTokenType){
@@ -4255,7 +4282,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							if(pLastCommandToEvaluateToken->expr->type!=TT_FUNCTION_CALL&&pLastCommandToEvaluateToken->expr->type!=TT_EXPRESSION){
 								/////inputError("%s","No function call or expression to end here!");
 								inputError("End of function call/expression character does not match '%s' of type '%s'!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
-								newTokenType=TT_ERROR;
+								pLastCommandToEvaluateToken->type=TT_ERROR;
 							}
 							break;
 						case TT_LISTELEMENT:
@@ -4264,7 +4291,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 								// so if it's a function call it might be allowed
 								if(pLastCommandToEvaluateToken->expr->type!=TT_FUNCTION_CALL){
 									inputError("First expression token '%s' of type '%s' does not start a list or map!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
-									newTokenType=TT_ERROR;
+									pLastCommandToEvaluateToken->type=TT_ERROR;
 								}else{
 									// the token in front of the function call token should denote a function
 									char* functionName=string(pLastCommandToEvaluateToken->expr->prev->text);
@@ -4278,7 +4305,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 											inputError("Function '%s' does not allow for more than %u argument(s).",functionName,listElementCount);
 										else
 											inputError("Cannot tell whether function '%s' allows for more than %u argument(s).",functionName,listElementCount);
-										newTokenType=TT_ERROR;
+										pLastCommandToEvaluateToken->type=TT_ERROR;
 									}
 								}
 							}
@@ -4286,14 +4313,14 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 						case TT_END_OF_LIST:
 							if(pLastCommandToEvaluateToken->expr->type!=TT_LIST){
 								inputError("First token '%s' of type '%s' does not start a list!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
-								newTokenType=TT_ERROR;
+								pLastCommandToEvaluateToken->type=TT_ERROR;
 							}
 							break;
 						case TT_END_OF_MAP:
 							if(pLastCommandToEvaluateToken->expr->type!=TT_MAP){
 								inputError("First expression token '%s' of type '%s' does not start a map!",string(pLastCommandToEvaluateToken->expr->text),TOKENTYPE_STRING[pLastCommandToEvaluateToken->expr->type]);
 								//inputError("No map to end here!");
-								newTokenType=TT_ERROR;
+								pLastCommandToEvaluateToken->type=TT_ERROR;
 							}
 							break;
 					}
@@ -4302,19 +4329,20 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 					///////////////////pLastCommandToEvaluateToken->expr=pLastCommandToEvaluateToken->expr->expr;
 				}else{
 					inputError("%s","Can't end a (function argument) list or map here!");
-					newTokenType=TT_ERROR;
+					pLastCommandToEvaluateToken->type=TT_ERROR;
 				}
 			}
-
+			// taken over in _getToken()
 			pLastCommandToEvaluateToken->type=newTokenType;
-			
+			*/
+
 			// MDH@27MAY2019: a lot of tokens are one-character tokens
 	
 			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
 			if(pLastCommandToEvaluateToken->significantCharacterCount==0){
-				if(isOneCharacterTokenType(newTokenType)){
+				if(isOneCharacterTokenType(pLastCommandToEvaluateToken->type)){
 					pLastCommandToEvaluateToken->significantCharacterCount=1;
-					if(amVerbose())inputInfo("'%s' of type %u considered to be a one character token.",string(pLastCommandToEvaluateToken->text),newTokenType);
+					if(amVerbose())inputInfo("'%s' of type %u considered to be a one character token.",string(pLastCommandToEvaluateToken->text),pLastCommandToEvaluateToken->type);
 				}
 				/* replacing:
 				if(pLastCommandToEvaluateToken->type!=TT_ERROR&&pLastCommandToEvaluateToken->type!=TT_COMMENT&&pLastCommandToEvaluateToken->type!=TT_DQSTRING&&pLastCommandToEvaluateToken->type!=TT_SQSTRING)
