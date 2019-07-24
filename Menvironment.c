@@ -676,8 +676,20 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
     }
     return _getIntegerValue(0); // indicating failure...
 }/*VALIDATED */
+
 Mvalue* Mreturn(Mvalue* _value){
-    return _value;
+    // sets the value of the function execution result variable to _value
+    // if you call return with NO value, the current value of $ will be used (or the value of the last executed function body command)
+    if(!setValue(getEnvironment(),"$",_value)){
+        outputError("Failed to set the function execution result variable");
+        return NULL;
+    }
+    // setting the exit flag variable will get the function execution aborted
+    if(!setValue(getEnvironment(),"!",_getIntegerValue(1))){
+        outputError("Failed to set the function execution exit flag variable");
+        return NULL;
+    }
+    return _value; // echo the input value
 }/*VALIDATED */
 
 // these internal functions do NOT have a body as M defined functions have...

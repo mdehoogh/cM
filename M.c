@@ -1495,6 +1495,11 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 			outputError("Failed to add the result variable to the function execution environment");
 			functionExecutionEnvironmentInitialized=false;
 		}
+		// also add the function exit flag variable (with name ! which cannot be set in the code because it is an invalid name)
+		if(!addVariable(_functionExecutionEnvironment,"!",VT_UNDEFINED,false)){
+			outputError("Failed to add the exit flag variable to the function execution environment");
+			functionExecutionEnvironmentInitialized=false;
+		}
 		if(functionExecutionEnvironmentInitialized)return _functionExecutionEnvironment;
 		free_environment(_functionExecutionEnvironment);
 	}
@@ -2315,6 +2320,8 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 								// evaluate that expression
 								_functionEvaluationValue=getValueOfExpression("function body command evaluation",'f',(TokenType[]){},0);
 								if(amVerbose())outputValue("Function evaluation value so far: '",_functionEvaluationValue,"'.\n");
+								// MDH@24JUL2019: check the function exit flag variable if it is set we're done
+								if(getValue(_functionExecutionEnvironment,"!"))break; // the exit variable is set (by the return statement!!!!)
 								functionBodyCommandListelement=functionBodyCommandListelement->_next;
 							}
 						}else
