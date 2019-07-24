@@ -2311,28 +2311,29 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 					if(pushExecutionEnvironment(_functionExecutionEnvironment)){
 						// execute ALL the commands in _bodyCommandList
 						Mlist* functionBodyCommandList=_function->functionunion._userfunction->_bodyCommandList;
-						Mvalue* _functionEvaluationValue=NULL;
+						Mvalue *functionEvaluationValue=NULL,*functionBodyCommandValue=NULL;
 						if(functionBodyCommandList){
 							Mlistelement* functionBodyCommandListelement=functionBodyCommandList->_first;
 							while(functionBodyCommandListelement){
 								// MDH@22JUL2019: ALWAYS skip the initial dummy TT_EXPRESSION token of any command!!
 								_functionExecutionEnvironment->expressionToken=functionBodyCommandListelement->_value->value._token->next;
-								// evaluate that expression
-								_functionEvaluationValue=getValueOfExpression("function body command evaluation",'f',(TokenType[]){},0);
+								// evaluate the body command and remember the result
+								functionBodyCommandValue=getValueOfExpression("function body command evaluation",'f',(TokenType[]){},0);
 								if(amVerbose())outputValue("Function evaluation value so far: '",_functionEvaluationValue,"'.\n");
 								// MDH@24JUL2019: check the function exit flag variable if it is set we're done
 								if(getValue(_functionExecutionEnvironment,"!"))break; // the exit variable is set (by the return statement!!!!)
+								functionEvaluationValue=functionBodyCommandValue; // store command evaluation result as function result
 								functionBodyCommandListelement=functionBodyCommandListelement->_next;
 							}
 						}else
 							output("No commands in body of user function '%s' to execute!\n",functionName);
 						// before popping the function execution environment, see if the result was set
 						if(amVerbose())output("Extracting the result of the execution of function '%s'.\n",functionName);
-						Mvalue* _functionResultValue=getValue(_functionExecutionEnvironment,"$");
+						Mvalue* functionResultValue=getValue(_functionExecutionEnvironment,"$");
 						if(amVerbose())output("Exiting the environment of executing function '%s'.\n",functionName);
 						popExecutionEnvironment();
 						// the function result value (if set) takes precedence over the function evaluation value
-						return (_functionResultValue?_functionResultValue:_functionEvaluationValue);
+						return (functionResultValue?functionResultValue:functionEvaluationValue);
 					}else{
 						output("%sFailed to create the function execution environment of function '%s'.\n",ERROR_PREFIX,functionName);
 						free_environment(_functionExecutionEnvironment);
