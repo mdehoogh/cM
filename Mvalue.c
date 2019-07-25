@@ -531,6 +531,100 @@ Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){
     }
     return NULL;
 }/* VALIDATED */
+Mmap* _getTokenTokenMap(char* name1,char* name2){
+    if(name1&&name2){
+        if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_TOKEN,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _map->_last=_mapelement2;
+                        _map->numberOfElements=2;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1);
+            free_mapelement(_mapelement2);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
+Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){
+    if(name1&&name2&&name3){
+        if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2&&_mapelement3){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_UNDEFINED,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
+                    _mapelement3->_variable=_getVariable(name3,VT_TOKEN,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
+                        _map->_last=_mapelement3;
+                        _map->numberOfElements=3;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1);
+            free_mapelement(_mapelement2);
+            free_mapelement(_mapelement3);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
+Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4){
+    if(name1&&name2&&name3&&name4){
+        if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
+            strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name3,name4)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_TOKEN,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
+                    _mapelement3->_variable=_getVariable(name3,VT_TOKEN,true);
+                    _mapelement4->_variable=_getVariable(name4,VT_TOKEN,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
+                        _mapelement3->_next=_mapelement4;
+                        _map->_last=_mapelement4;
+                        _map->numberOfElements=4;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1);
+            free_mapelement(_mapelement2);
+            free_mapelement(_mapelement3);
+            free_mapelement(_mapelement4);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
 // end helper functions 
 
 // LIST STUFF

@@ -603,6 +603,45 @@ bool completedStringMapTokenFunction(Mfunction* const _function,const char* cons
     }
     return false;
 }/* VALIDATED */
+bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=_getTokenTokenMap("while condition","while body");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register two token argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=_getValueTokenTokenMap("if condition","then clause","else clause");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register three token argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_FOUR_ARGUMENTS;
+        _function->functionunion.fourArgumentFunction=fourArgumentFunction;
+        _function->_parameterMap=_getTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register four token argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 
 // MDH@09JUL2019: a function is defined as a parameter map (with defaults) and a body token
 // MDH@10JUL2019: the caller will need to register the function in the function map of the definition environment
@@ -636,6 +675,7 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){
         output("%s'%s' does not represent a user function.\n",ERROR_PREFIX,functionName);
     return false;
 }
+
 Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
     // the user specifies the body as a text (to prevent evaluation during defining the function)
     // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
@@ -680,7 +720,9 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 Mvalue* Mreturn(Mvalue* _value){
     // sets the value of the function execution result variable to _value
     // if you call return with NO value, the current value of $ will be used (or the value of the last executed function body command)
-    if(!setValue(getEnvironment(),"$",_value)){
+    // do NOT replace the value of "$" if _value is NULL (which should indicate a return without argument), this means you cannot undo the result value
+    // perhaps with $=NULL though
+    if(_value!=NULL&&!setValue(getEnvironment(),"$",_value)){
         outputError("Failed to set the function execution result variable");
         return NULL;
     }

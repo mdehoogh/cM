@@ -17,13 +17,14 @@ typedef struct Muserfunction{
 }Muserfunction;
 void free_userfunction(Muserfunction* _userfunction);
 
-typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS}Mfunctiontype;
+typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS}Mfunctiontype;
 
 typedef union Mfunctionunion{
     NoArgumentFunction noArgumentFunction;
     OneArgumentFunction oneArgumentFunction;
     TwoArgumentFunction twoArgumentFunction;
     ThreeArgumentFunction threeArgumentFunction;
+    FourArgumentFunction fourArgumentFunction;
     Muserfunction* _userfunction; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
 }Mfunctionunion;
 
@@ -141,8 +142,14 @@ bool completedListFunction(Mfunction* const _function,char* functionName,OneArgu
 bool completedStringStringFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
 bool completedRealRealFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
 
+bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
-bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction twoArgumentFunction);
+bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+
+bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
+
 Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
 //                the return function returns its value as result of the function it is executing
 Mvalue* Mreturn(Mvalue* _value);

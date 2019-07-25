@@ -21,6 +21,9 @@
 // used externally in Mexecution.h, Mvalue.h, Menvironment.h
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
+const char* const IFFUNCTION_NAME="if";
+const char* const WHILEFUNCTION_NAME="while";
+const char* const FORFUNCTION_NAME="for";
 const char* const DEFINEUSERFUNCTION_NAME="function";
 const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
@@ -1160,7 +1163,11 @@ Mvalue* Msum(Mvalue* _value){
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
+// some prototypes we need in initEnvironment()
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType);
+Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue);
+Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue);
+Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _forbodyTokenValue);
 
 bool initEnvironment(){
 
@@ -1256,6 +1263,11 @@ bool initEnvironment(){
 			}
 			*/
 			_Menvironment->_functionMap=environmentFunctionMap;
+			// register if, while and for special functions
+		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
+		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
+		    if(!completedTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
+
 			if(!registerInternalFunctions(_Menvironment)){
 				outputError("Failed to register all internal functions");
 				return false;
@@ -2196,6 +2208,83 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
 	}
 	return _tokenCopy;
 }
+
+Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue){
+	Mvalue* _result=NULL;
+	if(isValueZero(_conditionTokenValue)){
+		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
+			getEnvironment()->expressionToken=_elseTokenValue->value._token;
+			_result=getValueOfExpression("else clause",'e',NULL,0);
+		}
+	}else{
+		if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
+			getEnvironment()->expressionToken=_thenTokenValue->value._token;
+			_result=getValueOfExpression("then clause",'t',NULL,0);
+		}
+	}
+    return _result;
+}
+Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue){
+	Mvalue* _result=NULL;
+	if(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN&&_whilebodyTokenValue&&_whilebodyTokenValue->type==VT_TOKEN){
+		while(true){
+			// evaluate the condition
+			getEnvironment()->expressionToken=_conditionTokenValue->value._token;
+			Mvalue* _conditionValue=getValueOfExpression("while condition",'w',NULL,0);
+			if(isValueZero(_conditionValue))break; // condition evaluates to zero
+			// evaluate the body
+			getEnvironment()->expressionToken=_whilebodyTokenValue->value._token;
+			_result=getValueOfExpression("while loop",'l',NULL,0);
+		}
+	}
+	return _result;
+}
+Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _forbodyTokenValue){
+	Mvalue* _result=NULL;
+	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
+		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
+		(!_incrementTokenValue||_incrementTokenValue->type==VT_TOKEN)&&
+		(_forbodyTokenValue&&_forbodyTokenValue->type==VT_TOKEN)){
+		Menvironment* _forEnvironment=__environment();
+		if(_forEnvironment){
+			if(pushExecutionEnvironment(_forEnvironment)){
+				// we can add $ as implicit loop counter
+				if(addVariable(_forEnvironment,"$",VT_INTEGER,false)&&setValue(_forEnvironment,"$",_getIntegerValue(0))){
+					
+					// evaluate the initialization inside the for environment once
+					if(_initializationTokenValue){
+						getEnvironment()->expressionToken=_initializationTokenValue->value._token;
+						getValueOfExpression("for initialization",'i',NULL,0); // return value NOT imported
+					}
+					while(true){
+						// evaluate the condition
+						getEnvironment()->expressionToken=_conditionTokenValue->value._token;
+						Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
+						if(isValueZero(_conditionValue))break; // condition evaluates to zero
+						if(_forbodyTokenValue){
+							// evaluate the for body
+							getEnvironment()->expressionToken=_forbodyTokenValue->value._token;
+							_result=getValueOfExpression("for loop",'l',NULL,0);
+						}
+						// increment the implicit loop counter variable
+						setValue(_forEnvironment,"$",_getIntegerValue(getValue(_forEnvironment,"$")->value._integer->ll+1));
+						if(_incrementTokenValue){
+							// evaluate the increment
+							getEnvironment()->expressionToken=_incrementTokenValue->value._token;
+							getValueOfExpression("for increment",'i',NULL,0);
+						}
+					}
+				}else
+					outputError("Failed to add the for loop automatic increment variable");
+				popExecutionEnvironment(); // pop the execution environment
+			}else
+				outputError("Failed to activate the for execution environment");
+		}else
+			outputError("Failed to create the for execution environment");
+	}
+	return _result;
+}
+
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate){
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
@@ -2319,10 +2408,10 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 								_functionExecutionEnvironment->expressionToken=functionBodyCommandListelement->_value->value._token->next;
 								// evaluate the body command and remember the result
 								functionBodyCommandValue=getValueOfExpression("function body command evaluation",'f',(TokenType[]){},0);
-								if(amVerbose())outputValue("Function evaluation value so far: '",_functionEvaluationValue,"'.\n");
 								// MDH@24JUL2019: check the function exit flag variable if it is set we're done
 								if(getValue(_functionExecutionEnvironment,"!"))break; // the exit variable is set (by the return statement!!!!)
 								functionEvaluationValue=functionBodyCommandValue; // store command evaluation result as function result
+								if(amVerbose())outputValue("Function evaluation value so far: '",functionEvaluationValue,"'.\n");
 								functionBodyCommandListelement=functionBodyCommandListelement->_next;
 							}
 						}else
@@ -2623,10 +2712,20 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						// MDH@17JUL2019: we know the function and when the name is one of the special functions
 						//                like 'function' to define a function we know not to evaluate the third argument!!
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
+						// MDH@25JUL2019: adding if, while and for functions
 						uint32_t numberOfElementsToNotEvaluate=0;
 						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
 							if(amVerbose())outputLine("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=1;		
+						}else
+						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)){
+							numberOfElementsToNotEvaluate=2;
+						}else
+						if(!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
+							numberOfElementsToNotEvaluate=1;
+						}else
+						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){
+							numberOfElementsToNotEvaluate=3;
 						}
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=nextEnvironmentExpressionToken();

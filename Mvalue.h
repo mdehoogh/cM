@@ -140,6 +140,9 @@ long long getValueInteger(const Mvalue* const _value);
 void outputValue(const char* const prefix,const Mvalue* _value,const char* const postfix);
 
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3);
+Mmap* _getTokenTokenMap(char* name1,char* name2);
+Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
+Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
@@ -205,3 +208,4 @@ typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
 typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
 typedef Mvalue* (*ThreeArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value);
+typedef Mvalue* (*FourArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value);
