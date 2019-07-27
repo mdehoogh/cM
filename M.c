@@ -2248,32 +2248,38 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 		Menvironment* _forEnvironment=__environment();
 		if(_forEnvironment){
 			if(pushExecutionEnvironment(_forEnvironment)){
-				// we can add $ as implicit loop counter
-				if(addVariable(_forEnvironment,"$",VT_INTEGER,false)&&setValue(_forEnvironment,"$",_getIntegerValue(0))){
-					
+				// I suppose we can use $ as internal result, and _ as internal loop counter
+				if(addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0))){
 					// evaluate the initialization inside the for environment once
 					if(_initializationTokenValue){
-						getEnvironment()->expressionToken=_initializationTokenValue->value._token;
+						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
 						getValueOfExpression("for initialization",'i',NULL,0); // return value NOT imported
 					}
+					Mvalue* _forBodyValue=NULL;
 					while(true){
 						// evaluate the condition
-						getEnvironment()->expressionToken=_conditionTokenValue->value._token;
+						_forEnvironment->expressionToken=_conditionTokenValue->value._token;
 						Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
 						if(isValueZero(_conditionValue))break; // condition evaluates to zero
+						// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
+						setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
 						if(_forbodyTokenValue){
 							// evaluate the for body
-							getEnvironment()->expressionToken=_forbodyTokenValue->value._token;
-							_result=getValueOfExpression("for loop",'l',NULL,0);
+							_forEnvironment->expressionToken=_forbodyTokenValue->value._token;
+							_forBodyValue=getValueOfExpression("for loop",'l',NULL,0);
+							if(amVerbose()){
+								outputValue("Result of iteration #",getValue(_forEnvironment,'_'),": ");
+								outputValue("'",_forBodyValue,"'.\n");
+							}
 						}
-						// increment the implicit loop counter variable
-						setValue(_forEnvironment,"$",_getIntegerValue(getValue(_forEnvironment,"$")->value._integer->ll+1));
 						if(_incrementTokenValue){
 							// evaluate the increment
-							getEnvironment()->expressionToken=_incrementTokenValue->value._token;
+							_forEnvironment->expressionToken=_incrementTokenValue->value._token;
 							getValueOfExpression("for increment",'i',NULL,0);
 						}
 					}
+					_result=getValue(_forEnvironment,"$"); // get the result
+					if(!_result)_result=getValue(_forEnvironment,"_"); // just return the value of the counter
 				}else
 					outputError("Failed to add the for loop automatic increment variable");
 				popExecutionEnvironment(); // pop the execution environment
@@ -2718,13 +2724,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							if(amVerbose())outputLine("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=1;		
 						}else
-						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)){
+						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)||!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
 							numberOfElementsToNotEvaluate=2;
 						}else
-						if(!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
-							numberOfElementsToNotEvaluate=1;
-						}else
-						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){
+						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
 							numberOfElementsToNotEvaluate=3;
 						}
 						// 1. get the list of function arguments, which depends on the function!!
