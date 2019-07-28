@@ -2260,7 +2260,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 					// evaluate the initialization inside the for environment once
 					if(_initializationTokenValue){
 						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
-						Mvalue* initializationValue=getValueOfExpression("for initialization",'i',NULL,0); // return value NOT imported
+						Mvalue* initializationValue=getValueOfExpression("for initialization",'i',(TokenType[]){},0); // return value NOT imported
 						// any map is used to initialize as local variables (just like we did in defining functions)
 						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
 						// although perhaps we should exclude using $ and _ well especially _
@@ -2285,7 +2285,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							if(_forbodyTokenValue){
 								// evaluate the for body
 								_forEnvironment->expressionToken=_forbodyTokenValue->value._token;
-								_forBodyValue=getValueOfExpression("for loop",'l',NULL,0);
+								_forBodyValue=getValueOfExpression("for loop",'l',(TokenType[]){},0);
 								if(amVerbose()){
 									outputValue("For loop body in iteration #",getValue(_forEnvironment,'_'),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
@@ -2294,7 +2294,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							if(_incrementTokenValue){
 								// evaluate the increment
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
-								_forIncrementValue=getValueOfExpression("for increment",'i',NULL,0);
+								_forIncrementValue=getValueOfExpression("for increment",'i',(TokenType[]){},0);
 								if(amVerbose()){
 									outputValue("For loop increment in iteration #",getValue(_forEnvironment,'_'),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
@@ -2302,18 +2302,16 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							}
 						}
 						_result=getValue(_forEnvironment,"$"); // get the result
-						if(!_result)_result=getValue(_forEnvironment,"_"); // just return the value of the counter
+						if(!_result)_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
 				}else{
 					outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
 				}
-			}
-			if(!forEnvironmentInitialized){
-				outputError("Failed to initialize the for loop execution environment");
-				free_environment(_forEnvironment); // have to free the environment myself
-			}
+			}else
+				output("Failed to add or initialize the for loop result and counter local variables $ and _.\n",ERROR_PREFIX);
+			if(!forEnvironmentInitialized)free_environment(_forEnvironment); // have to free the environment myself
 		}else
 			outputError("Failed to create the for execution environment");
 	}
@@ -2825,6 +2823,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
 				// we have to create the variable first (TODO should we wait until actually assigning???)
+				// NOTE in certain situations tokenizing occurs outside the evaluation environment so it could be marked as new where it will not be when evaluated
+				//      therefore I've adapted addVariable() so it won't return false when the variable already exists
 				if(!addVariable(getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getEnvironmentName();
 					output("%sFailed to add variable '%s' to environment '%s'.\n",ERROR_PREFIX,_significantTokenText,string(_environmentName));
