@@ -2252,6 +2252,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 		(_forbodyTokenValue&&_forbodyTokenValue->type==VT_TOKEN)){
 		Menvironment* _forEnvironment=__environment();
 		if(_forEnvironment){
+			_forEnvironment->_name=_strdup("for loop");
 			// better wait with pushing until _forEnvironment is initialized appropriately
 			bool forEnvironmentInitialized=addVariable(_forEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0));
 			if(forEnvironmentInitialized){
@@ -2260,16 +2261,16 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 					if(_initializationTokenValue){
 						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
 						Mvalue* initializationValue=getValueOfExpression("for initialization",'i',NULL,0); // return value NOT imported
-							// any map is used to initialize as local variables (just like we did in defining functions)
-							// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
-							// although perhaps we should exclude using $ and _ well especially _
+						// any map is used to initialize as local variables (just like we did in defining functions)
+						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
+						// although perhaps we should exclude using $ and _ well especially _
 						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,initializationValue->value._map)){
 							outputError("Failed to initialize the for loop local variables");
 							forEnvironmentInitialized=false;
 						}
 					}
 					if(forEnvironmentInitialized){
-						Mvalue* _forBodyValue=NULL;
+						Mvalue *_forBodyValue=NULL,*_forIncrementValue=NULL;
 						while(true){
 							// evaluate the condition
 							_forEnvironment->expressionToken=_conditionTokenValue->value._token;
@@ -2277,19 +2278,27 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							if(isValueZero(_conditionValue))break; // condition evaluates to zero
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
 							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
+							if(amVerbose()){
+								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
+								outputValue(" evaluates to '",_conditionValue,"'.\n");
+							}
 							if(_forbodyTokenValue){
 								// evaluate the for body
 								_forEnvironment->expressionToken=_forbodyTokenValue->value._token;
 								_forBodyValue=getValueOfExpression("for loop",'l',NULL,0);
 								if(amVerbose()){
-									outputValue("Result of iteration #",getValue(_forEnvironment,'_'),": ");
-									outputValue("'",_forBodyValue,"'.\n");
+									outputValue("For loop body in iteration #",getValue(_forEnvironment,'_'),NULL);
+									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
 							}
 							if(_incrementTokenValue){
 								// evaluate the increment
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
-								getValueOfExpression("for increment",'i',NULL,0);
+								_forIncrementValue=getValueOfExpression("for increment",'i',NULL,0);
+								if(amVerbose()){
+									outputValue("For loop increment in iteration #",getValue(_forEnvironment,'_'),NULL);
+									outputValue(" evaluates to '",_forBodyValue,"'.\n");
+								}
 							}
 						}
 						_result=getValue(_forEnvironment,"$"); // get the result
@@ -2817,7 +2826,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			case TT_NEW_VARIABLE: // a non-existing value reference
 				// we have to create the variable first (TODO should we wait until actually assigning???)
 				if(!addVariable(getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
-					output("%sFailed to add variable '%s.'\n",ERROR_PREFIX,_significantTokenText);
+					Mstring* _environmentName=_getEnvironmentName();
+					output("%sFailed to add variable '%s' to environment '%s'.\n",ERROR_PREFIX,_significantTokenText,string(_environmentName));
+					free_string(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!
 				}
 			case TT_VARIABLE: // a value reference
@@ -3708,7 +3719,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		}else
 		if(amVerbose())output("No result of expression '%s' to store.",info);
 	}
-	if(amVerbose()){output("Value of expression '%s' evaluation",info);outputValue(": '",_expressionValue,"'.\n");}
+	if(amVerbose()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 /**

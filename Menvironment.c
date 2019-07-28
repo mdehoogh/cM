@@ -236,9 +236,13 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
                 free_variable(_variable);
                 outputErrorAndText("Failed to link variable ",name);
             }else
-                outputErrorAndText("%sFailed to create variable ",name);
+                outputErrorAndText("Failed to create variable ",name);
+        }else{
+            output("WARNING: Won't add existing variable '%s'.\n",name);
+            return true;
         }
-    }
+    }else
+        outputError("No environment or variable name specified");
     return false;
 }/* VALIDATED */
 
