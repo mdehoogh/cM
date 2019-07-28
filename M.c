@@ -1467,6 +1467,26 @@ FunctionBodyRequest* requestBodyOfFunction(char* functionName){
 	return NULL;
 }
 
+bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap* _variableMap){
+	bool executionEnvironmentInitialized=true;
+	Mmapelement* variableMapelement=_variableMap->_first;
+	Mvariable* variableMapelementVariable;
+	while(executionEnvironmentInitialized&&variableMapelement){
+		variableMapelementVariable=variableMapelement->_variable;
+		if(!strlen(variableMapelementVariable->_name))continue; // no use to create a variable with no name
+		// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
+		if(!addVariable(_executionEnvironment,variableMapelementVariable->_name,variableMapelementVariable->valuetype,false)){
+			output("%sFailed to add variable '%s' as local variable.\n",ERROR_PREFIX,variableMapelementVariable->_name);
+			executionEnvironmentInitialized=false;
+		}else
+		if(!setValue(_executionEnvironment,variableMapelementVariable->_name,variableMapelementVariable->_value)){
+			output("%sFailed to initialize local variable '%s'.\n",ERROR_PREFIX,variableMapelementVariable->_name);
+			executionEnvironmentInitialized=false;
+		}else
+			variableMapelement=variableMapelement->_next;
+	}
+	return executionEnvironmentInitialized;
+}
 /*
 \brief returns the environment for executing the the function called \p functionName
 \p functionName the name of the function to execute
@@ -1476,7 +1496,6 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 	Menvironment* _functionExecutionEnvironment=__environment(); // free asap
 	if(_functionExecutionEnvironment){
-		bool functionExecutionEnvironmentInitialized=true;
 		_functionExecutionEnvironment->_name=_strdup(functionName); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
@@ -1487,35 +1506,21 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		// 2. make the definition environment the parent of the function execution environment
 		_functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
 		// 3. create the argument map fields as variables in the function execution environment
-		Mmapelement* argumentMapelement=_argumentMap->_first;
-		Mvariable* argumentMapelementVariable;
-		while(functionExecutionEnvironmentInitialized&&argumentMapelement){
-			argumentMapelementVariable=argumentMapelement->_variable;
-			// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
-			if(!addVariable(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->valuetype,false)){
-				outputError("Failed to add function argument as local variable of a function execution");
-				functionExecutionEnvironmentInitialized=false;
-			}else
-			if(!setValue(_functionExecutionEnvironment,argumentMapelementVariable->_name,argumentMapelementVariable->_value)){
-				outputError("Failed to initialize the argument local variable of a function execution");
-				functionExecutionEnvironmentInitialized=false;
-			}else
-				argumentMapelement=argumentMapelement->_next;
-		}
+		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,_argumentMap);
+		if(functionExecutionEnvironmentInitialized){
 		// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
-		if(!addVariable(_functionExecutionEnvironment,"$",VT_UNDEFINED,false)){
-			outputError("Failed to add the result variable to the function execution environment");
-			functionExecutionEnvironmentInitialized=false;
+			if(!addVariable(_functionExecutionEnvironment,"$",VT_UNDEFINED,false)){
+				outputError("Failed to add the result variable to the function execution environment");
+				functionExecutionEnvironmentInitialized=false;
+			}else // also add the function exit flag variable (with name ! which cannot be set in the code because it is an invalid name)
+			if(!addVariable(_functionExecutionEnvironment,"!",VT_UNDEFINED,false)){
+				outputError("Failed to add the exit flag variable to the function execution environment");
+				functionExecutionEnvironmentInitialized=false;
+			}
 		}
-		// also add the function exit flag variable (with name ! which cannot be set in the code because it is an invalid name)
-		if(!addVariable(_functionExecutionEnvironment,"!",VT_UNDEFINED,false)){
-			outputError("Failed to add the exit flag variable to the function execution environment");
-			functionExecutionEnvironmentInitialized=false;
-		}
-		if(functionExecutionEnvironmentInitialized)return _functionExecutionEnvironment;
-		free_environment(_functionExecutionEnvironment);
+		if(!functionExecutionEnvironmentInitialized){free_environment(_functionExecutionEnvironment);_functionExecutionEnvironment=NULL;}
 	}
-	return NULL;
+	return _functionExecutionEnvironment;
 }
 
 typedef struct FunctionBodyInput{
@@ -2247,44 +2252,59 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 		(_forbodyTokenValue&&_forbodyTokenValue->type==VT_TOKEN)){
 		Menvironment* _forEnvironment=__environment();
 		if(_forEnvironment){
-			if(pushExecutionEnvironment(_forEnvironment)){
-				// I suppose we can use $ as internal result, and _ as internal loop counter
-				if(addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0))){
+			// better wait with pushing until _forEnvironment is initialized appropriately
+			bool forEnvironmentInitialized=addVariable(_forEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0));
+			if(forEnvironmentInitialized){
+				if(pushExecutionEnvironment(_forEnvironment)){
 					// evaluate the initialization inside the for environment once
 					if(_initializationTokenValue){
 						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
-						getValueOfExpression("for initialization",'i',NULL,0); // return value NOT imported
+						Mvalue* initializationValue=getValueOfExpression("for initialization",'i',NULL,0); // return value NOT imported
+							// any map is used to initialize as local variables (just like we did in defining functions)
+							// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
+							// although perhaps we should exclude using $ and _ well especially _
+						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,initializationValue->value._map)){
+							outputError("Failed to initialize the for loop local variables");
+							forEnvironmentInitialized=false;
+						}
 					}
-					Mvalue* _forBodyValue=NULL;
-					while(true){
-						// evaluate the condition
-						_forEnvironment->expressionToken=_conditionTokenValue->value._token;
-						Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
-						if(isValueZero(_conditionValue))break; // condition evaluates to zero
-						// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
-						setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
-						if(_forbodyTokenValue){
-							// evaluate the for body
-							_forEnvironment->expressionToken=_forbodyTokenValue->value._token;
-							_forBodyValue=getValueOfExpression("for loop",'l',NULL,0);
-							if(amVerbose()){
-								outputValue("Result of iteration #",getValue(_forEnvironment,'_'),": ");
-								outputValue("'",_forBodyValue,"'.\n");
+					if(forEnvironmentInitialized){
+						Mvalue* _forBodyValue=NULL;
+						while(true){
+							// evaluate the condition
+							_forEnvironment->expressionToken=_conditionTokenValue->value._token;
+							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
+							if(isValueZero(_conditionValue))break; // condition evaluates to zero
+							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
+							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
+							if(_forbodyTokenValue){
+								// evaluate the for body
+								_forEnvironment->expressionToken=_forbodyTokenValue->value._token;
+								_forBodyValue=getValueOfExpression("for loop",'l',NULL,0);
+								if(amVerbose()){
+									outputValue("Result of iteration #",getValue(_forEnvironment,'_'),": ");
+									outputValue("'",_forBodyValue,"'.\n");
+								}
+							}
+							if(_incrementTokenValue){
+								// evaluate the increment
+								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
+								getValueOfExpression("for increment",'i',NULL,0);
 							}
 						}
-						if(_incrementTokenValue){
-							// evaluate the increment
-							_forEnvironment->expressionToken=_incrementTokenValue->value._token;
-							getValueOfExpression("for increment",'i',NULL,0);
-						}
+						_result=getValue(_forEnvironment,"$"); // get the result
+						if(!_result)_result=getValue(_forEnvironment,"_"); // just return the value of the counter
 					}
-					_result=getValue(_forEnvironment,"$"); // get the result
-					if(!_result)_result=getValue(_forEnvironment,"_"); // just return the value of the counter
-				}else
-					outputError("Failed to add the for loop automatic increment variable");
-				popExecutionEnvironment(); // pop the execution environment
-			}else
-				outputError("Failed to activate the for execution environment");
+					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
+				}else{
+					outputError("Failed to activate the for loop execution environment");
+					forEnvironmentInitialized=false;
+				}
+			}
+			if(!forEnvironmentInitialized){
+				outputError("Failed to initialize the for loop execution environment");
+				free_environment(_forEnvironment); // have to free the environment myself
+			}
 		}else
 			outputError("Failed to create the for execution environment");
 	}
@@ -2472,6 +2492,25 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
 																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL));
 			}
+		case FT_INTERNAL_FOUR_ARGUMENTS:
+			{
+				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
+				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
+				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement?_thirdArgumentmapelement->_next:NULL);
+				if(amVerbose()){
+					output("Applying four-argument function '%s'.\n",functionName);
+					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
+					if(_fourthArgumentmapelement)outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
+				}
+				return (*_function->functionunion.fourArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
+																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
+																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL)
+																		,(_fourthArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL));
+			}
+
 	}
 	return NULL;
 }
@@ -2728,7 +2767,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							numberOfElementsToNotEvaluate=2;
 						}else
 						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
-							numberOfElementsToNotEvaluate=3;
+							numberOfElementsToNotEvaluate=4;
 						}
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=nextEnvironmentExpressionToken();
