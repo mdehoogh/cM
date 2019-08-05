@@ -568,6 +568,20 @@ bool completedListFunction(Mfunction* const _function,char* functionName,OneArgu
     }
     return false;
 }/* VALIDATED */
+bool completedTokenListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_ONE_ARGUMENT;
+        _function->functionunion.oneArgumentFunction=oneArgumentFunction;
+        // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
+        _function->_parameterMap=_getListMap("l",_getListValue(VT_TOKEN));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered token list function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register single token list argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 bool completedStringStringFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;

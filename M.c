@@ -24,6 +24,7 @@ const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
+const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const DEFINEUSERFUNCTION_NAME="function";
 const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
@@ -1167,6 +1168,7 @@ Menvironment* _Menvironment; // this is the root (M) environment
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType);
 Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue);
 Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue);
+Mvalue* Mdofunction(Mvalue* _doTokenValue);
 Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _forbodyTokenValue);
 
 bool initEnvironment(){
@@ -1267,6 +1269,8 @@ bool initEnvironment(){
 		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
 		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
 		    if(!completedTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
+			// MDH@05AUG2019: the do function has a single token to process
+		    if(!completedTokenListFunction(_getFunction(_Menvironment,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
 
 			if(!registerInternalFunctions(_Menvironment)){
 				outputError("Failed to register all internal functions");
@@ -1941,6 +1945,8 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 // ! ~ and + start a unary operator when a value is expected
 // MDH@15APR2019: still to determine what to do with @ and ` (the latter for system commands????)
 //                inserting macro's should also be possible somehow...
+// MDH@05AUG2019: it's a pity that I need to allow a , behind a new variable in order to allow that when a do function call executes code after initializing these variables that are not yet recognized as created
+//                we can solve this by remembering ALL variables when they are created in every expression that is tokenized, this would be possible by creating a tokenizing environment where we remember all created variables in in the tokenizing process
 /*
  "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
@@ -1954,7 +1960,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (     ,         {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,"C" ,"`@;! DS%()&*+-,.>?:   []{}" }, /* NEW_VARIABLE (variable that does not exist yet) */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
@@ -2244,6 +2250,48 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 	}
 	return _result;
 }
+// MDH@05AUG2019: the do function allows for executing a single command in its own environment, so all variables created are local
+//                the problem is that we want to allow the user to enter a list of token things i.e. an infinite list of arguments instead of having to wrap the single argument in a list itself
+//                this is solvable if we convert the list of arguments to a single Mvalue wrapping the entire list of arguments before calling Mdofunction
+Mvalue* Mdofunction(Mvalue* _doTokenValue){
+	Mvalue* _result=NULL;
+	if(_doTokenValue&&_doTokenValue->type==VT_LIST){
+		Mlist* doList=_doTokenValue->value._list;
+		if(doList&&doList->_first){ // something to do
+			Menvironment* _doEnvironment=__environment();
+			if(_doEnvironment){
+				_doEnvironment->_name=_strdup("do");
+				// let's add variable $ as result variable and ! as exit flag variable
+				bool doEnvironmentInitialized=addVariable(_doEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_doEnvironment,"!",VT_INTEGER,false)&&setValue(_doEnvironment,"!",_getIntegerValue(0));
+				if(doEnvironmentInitialized){
+					if(pushExecutionEnvironment(_doEnvironment)){
+						Mlistelement* tokenValueListelement=doList->_first;
+						Mvalue *tokenExpressionValue,*expressionValue=NULL;
+						while(tokenValueListelement){
+							tokenExpressionValue=tokenValueListelement->_value;
+							if(tokenExpressionValue&&tokenExpressionValue->type==VT_TOKEN){ // some token to interpret
+								_doEnvironment->expressionToken=tokenExpressionValue->value._token;
+								if(_doEnvironment->expressionToken){
+									expressionValue=getValueOfExpression("do",'d',(TokenType[]){},0); // evaluate the expression
+									if(!isValueZero(getValue(_doEnvironment,"!")))break; // if the exit flag was set, exit
+								}
+							}
+							// move over to the next expression to evaluate...
+							tokenValueListelement=tokenValueListelement->_next;
+						}
+						Mvalue* doResultValue=getValue(_doEnvironment,"$");
+						_result=(doResultValue?doResultValue:expressionValue);
+						popExecutionEnvironment(); // pop the do environment we successfully pushed
+					}
+				}else{
+					outputError("Failed to create the do environment");
+					free_environment(_doEnvironment);
+				}
+			}
+		}
+	}
+	return _result;
+}
 Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _forbodyTokenValue){
 	Mvalue* _result=NULL;
 	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
@@ -2287,7 +2335,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								_forEnvironment->expressionToken=_forbodyTokenValue->value._token;
 								_forBodyValue=getValueOfExpression("for loop",'l',(TokenType[]){},0);
 								if(amVerbose()){
-									outputValue("For loop body in iteration #",getValue(_forEnvironment,'_'),NULL);
+									outputValue("For loop body in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
 							}
@@ -2296,7 +2344,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
 								_forIncrementValue=getValueOfExpression("for increment",'i',(TokenType[]){},0);
 								if(amVerbose()){
-									outputValue("For loop increment in iteration #",getValue(_forEnvironment,'_'),NULL);
+									outputValue("For loop increment in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
 							}
@@ -2765,7 +2813,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						//                like 'function' to define a function we know not to evaluate the third argument!!
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
 						// MDH@25JUL2019: adding if, while and for functions
-						uint32_t numberOfElementsToNotEvaluate=0;
+						unsigned long long numberOfFunctionParameters=function->_parameterMap->numberOfElements,numberOfElementsToNotEvaluate=0;
 						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
 							if(amVerbose())outputLine("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=1;		
@@ -2775,15 +2823,35 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						}else
 						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
 							numberOfElementsToNotEvaluate=4;
+						}else
+						if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){ // all arguments to the do function should not be evaluated beforehand
+							numberOfElementsToNotEvaluate=LLONG_MAX; // all elements should NOT be evaluated
+							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
+							numberOfFunctionParameters=LLONG_MAX; // replacing 1 with the actual number of parameters we allow for the function
 						}
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=nextEnvironmentExpressionToken();
-						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,function->_parameterMap->numberOfElements,numberOfElementsToNotEvaluate);
+						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
 							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
+							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
+							Mlist* functionCallArgumentList=NULL;
+							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
+								functionCallArgumentList=_getListOfType(VT_UNDEFINED); // creating a list
+								if(functionCallArgumentList&&!appendedToList(functionCallArgumentList,_functionArgumentsValue,0)){
+									outputError("Failed to create the to do expression list");
+									free_list(functionCallArgumentList);
+									functionCallArgumentList=NULL; // so nothing will get done!!
+								}
+								// TODO what should we do with functionCallArgumentList (which we created) once we're done with it??????
+								// DONE see below where it's freed as soon as we created the function call argument map, in the process decrement the reference count of all the argument list elements (Mvalues)
+							}else
+								functionCallArgumentList=_functionArgumentsValue->value._list; // use the wrapped list
 							// 2. get the arguments map
-							Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentsValue->value._list); // assuming to have a list returned by getListExpressionValue()
+							Mmap* _functionCallArgumentMap=_getFunctionArgumentMap(function,functionCallArgumentList); // assuming to have a list returned by getListExpressionValue()
+							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
+							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))free_list(functionCallArgumentList);
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
 							/*
 							if(amVerbose())output("Decrementing the reference count of the function arguments value!");
@@ -2792,14 +2860,14 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							*/
 							// 3. the result of applying the function to the arguments is the end result
 							// MDH@19JUL2019: we need to know when a function is being created, so we can ask for the body commands in command mode
-							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionArgumentMap);
+							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
 							// if this was a call to the 'define user function' function
 							if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
 								// is the result 1???
 								if(functionCallValue&&functionCallValue->type==VT_INTEGER&&functionCallValue->value._integer->ll){ // function successfully created
 									// let's push the function name on the stack of functions to create
 									// we know the first argument contains the function name
-									char* definedFunctionName=_functionArgumentMap->_first->_variable->_value->value._text->_c;
+									char* definedFunctionName=_functionCallArgumentMap->_first->_variable->_value->value._text->_c;
 									Mfunction* definedFunction=getFunction(getEnvironment(),definedFunctionName);
 									// if the function now exists but does not yet have a body, queue the function name on the list of bodies to be set
 									if(definedFunction&&definedFunction->type==FT_USER&&!definedFunction->functionunion._userfunction->_bodyCommandList)
@@ -2813,7 +2881,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
 							if(amVerbose()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputLine("Freeing the function argument map!");}
-							free_map(_functionArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
+							free_map(_functionCallArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerbose())outputLine("Function argument map freed!");
 						}else
 							outputError("No function arguments");

@@ -1207,7 +1207,7 @@ bool isUndefined(Mvalue* _value){
     switch(_value->type){
         case VT_INTEGER:return _value->value._integer->ll==M_LL_INVALID;
         case VT_BIGINTEGER:return false;
-        case VT_DECIMAL:return mpd_isnan(_value->value._decimal); // sames right but no idea how to set/get this
+        case VT_DECIMAL:return mpd_isnan((mpd_t*)_value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
         case VT_RATIONAL:return false;
         case VT_REAL:return ldIsNaN(_value->value._real->ld);
         case VT_TEXT:return false; ////strlen(_value->value._text->_c)==0;

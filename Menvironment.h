@@ -138,6 +138,7 @@ bool completedValueFunction(Mfunction* const _function,char* functionName,OneArg
 bool completedIntegerFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
 bool completedRealFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
 bool completedListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
+bool completedTokenListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
 
 bool completedStringStringFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
 bool completedRealRealFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
