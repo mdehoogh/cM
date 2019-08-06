@@ -1343,13 +1343,11 @@ bool initEnvironment(){
 // user interaction stuff
 #include "Msession.h"
 
-/* sometimes we want to preformat text
-char* getFormattedText(char* fmt,uint8_t maxlength,...){
-	char str[maxlength+1];
-	va_list args;va_start(args,fmt);sprintf(str,fmt,args);va_end(args);
+char* _getFormattedText(char* fmt,uint8_t maxlength,...){
+	char* str=malloc(maxlength+1); // get enough room on the heap
+	if(str){va_list args;va_start(args,fmt);sprintf(str,fmt,args);va_end(args);}
 	return str;
 }
-*/
 
 /* source: https://stackoverflow.com/questions/16839658/printf-width-specifier-to-maintain-precision-of-floating-point-value
 #ifdef DBL_DECIMAL_DIG
@@ -1977,6 +1975,102 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *   .>?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
+
+// MDH@06AUG2019: I have to keep track of variable initializations in the current command so that I know when a variable is new or not
+//                analysis: variables used in a command typically refer to variables created in previous commands
+//                i.e. to variables kept in the current execution environment
+//                but we want to allow for local variables like the counter in a for loop or local to a group of commands as now possible in a do() function call
+//                and probably also in a user function call
+//                so technically calls to the predefined functions called for, do and function can have arguments in which local variables are defined
+//                these local variables should be considered to exist for the duration of the call i.e. in all following arguments of the call when being entered, so these variables do not need to be 'global'
+//                in case of for the first argument contains the local variable initializations, we can do the same in the do function call, in function its the second argument (where the first argument represents the name of the function)
+//                this means that we need to know in which argument of any for, do or function call when it is being entered, of course with function we could create a function by assigning it to a variable name instead of defining the function name as first argument
+//                in which case the first argument would be come the argument with the local variables, which would be more convenient!!!!
+typedef struct Minitialization{
+	char* _variableName;
+	int64_t argument; // keep track of the argument this value is initialized at the beginning and decremented/incremented whenever necessary this argument needs to be zero
+	struct Minitialization *_prev;
+}Minitialization;
+Minitialization *_lastInitialization=NULL; // stack of initializations
+void free_initialization(Minitialization* _initialization){if(_initialization){if(_initialization->_variableName)free(_initialization->_variableName);FREE(_initialization,'I');}}
+bool pushInitialization(char* variableName){
+	Minitialization* _initialization=(variableName&&strlen(variableName)?CALLOC(1,sizeof(Minitialization),'I'):NULL);
+	if(_initialization){
+		_initialization->_variableName=_strdup(variableName);
+		if(_initialization->_variableName){
+			_initialization->_prev=_lastInitialization;
+			// typically we copy the argument count over from the previous initialization but if this initialization is an end of a function call, we have to copy the argument 
+			Minitialization* _argumentCountInitialization=_lastInitialization;
+			if(*variableName==')'){ // this 'initialization' ends the current function call
+				bool startOfFunctionCallInitialization;
+				while(_argumentCountInitialization){
+					startOfFunctionCallInitialization=(*(_argumentCountInitialization->_variableName)=='(');
+					_argumentCountInitialization=_argumentCountInitialization->_prev;
+					if(startOfFunctionCallInitialization)break;
+				}
+			}
+			_initialization->argument=(_argumentCountInitialization?_argumentCountInitialization->argument:-1);
+			_lastInitialization=_initialization;
+		}else{
+			FREE(_initialization,'I');
+			_initialization=NULL;
+		} // no need to call free_initialization as no variable to free
+		/// do this in the caller!!!! inputError("Failed to remember initialization '%s'.",_variableName);
+	}
+	return(_initialization!=NULL);
+}
+bool popInitialization(){
+	if(_lastInitialization){
+		Minitialization* _initialization=_lastInitialization->_prev;
+		free_initialization(_lastInitialization);
+		_lastInitialization=_initialization;
+		return true;
+	}
+	return false;
+}
+bool initializable(){return(!_lastInitialization||_lastInitialization->argument==0);} // we need to be in the right argument to be initializable, MUST be called BEFORE calling pushInitialization() when a variable name is pushed!!!
+void showInitializations(){
+	// we have to compose a text first, then call inputInfo()
+	Mstring* _initializationsText=__string();
+	if(_initializationsText){
+		Mstring* p=_initializationsText;
+		Minitialization* _initialization=_lastInitialization;
+		while(p&&_initialization){
+			char* _initializationText=_getFormattedText(" %s:%lld",80/*strlen(_initialization->_variableName)+12*/,_initialization->_variableName,_initialization->argument);
+			if(_initializationText){
+				p=string_prepend(p,_initializationText);
+				free(_initializationText);
+			}
+			_initialization=_initialization->_prev;
+		}
+		if(p)inputInfo("Initializations:%s.",string(_initializationsText));else inputError("Failed to show the initializations.");
+		free_string(_initializationsText);
+	}
+}
+void removeInitializations(){while(popInitialization());} // keep popping until failure
+void determineCommandInitializations(){
+	// TODO this is going to be quite hard...
+
+}
+bool initialized(char* variableName){
+	// it's a little harder than just looking for a matching _variableName in the initializations as we can have subinitializations in do() and for() function calls which we will need to skip
+	// as such we will need to count the level of initializations
+	Minitialization* _initialization=_lastInitialization;
+	unsigned long long level=0;
+	char firstVariableNameCharacter;
+	while(_initialization){
+		firstVariableNameCharacter=*(_initialization->_variableName);
+		switch(firstVariableNameCharacter){
+			case '(':level--;break; // end of sublevel
+			case ')':level++;break; // start of sublevel
+			case ',':break; // a previous argument
+			default:if(level==0&&!strcmp(_initialization->_variableName,variableName))return true;
+		}
+		_initialization=_initialization->_prev;
+	}
+	return(_initialization!=NULL);
+}
+// MDH@06AUG2019 END
 
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
 // if we put the error info in the error token
@@ -4132,6 +4226,8 @@ void setCommandToEvaluate(Mtoken* pCommand){
 	pLastCommandToEvaluateToken=pCommandToEvaluate=pCommand;
 	writeCommand();
 	writeBehindCursorText(false);
+	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
+	determineCommandInitializations();
 }
 /**
  * setCommandIndex() accepts @newCommandIndex between 0 and commandCount at most
@@ -4181,6 +4277,7 @@ void newCommand(){
 	resetOutputColor(); // TODO do we need this here?????
 	pLastCommandToEvaluateToken=pCommandToEvaluate=_getToken(NULL,TT_EXPRESSION);
 	if(!pCommandToEvaluate){outputError("Failed to create a new command");return;}
+	removeInitializations(); // MDH@06AUG2019: ready for new initializations at the start of a new command
 	// MDH@27MAY2019: NO let's just keep expr NULL!!!
 	pCommandToEvaluate->expr=NULL; // TODO do I need this???? YES, because we used _getToken()! PERHAPS NOT as prevToken is NULL???????
 }
@@ -4386,6 +4483,7 @@ void changeFunctionTokenToAVariable(bool endOfInput){
 //       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
 //                the endofinput flag is used to indicate whether this is the end of the input
 bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput){
+	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
 	//                1. we haven't got one 2. we have got a registered command which hasn't changed yet (in which case commandIndex will still be positive)
 	if(!pCommandToEvaluate) // no current command
@@ -4570,7 +4668,57 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			if(pLastCommandToEvaluateToken->significantCharacterCount==0){
 				if(isOneCharacterTokenType(pLastCommandToEvaluateToken->type)){
 					pLastCommandToEvaluateToken->significantCharacterCount=1;
-					if(amVerbose())inputInfo("'%s' of type %u considered to be a one character token.",string(pLastCommandToEvaluateToken->text),pLastCommandToEvaluateToken->type);
+					////////bool initializationsChanged=false;
+					// MDH@06AUG2019: these are also the tokens we need to recognize for keeping track of the initialized variables (and the level)
+					switch(pLastCommandToEvaluateToken->type){
+						case TT_ASSIGNMENT:
+							if(pLastCommandToEvaluateToken->prev->type==TT_NEW_VARIABLE)if(initializable()){
+								char* newVariableName=string(pLastCommandToEvaluateToken->prev->text);
+								if(pushInitialization(newVariableName)){
+									initializationsChanged=true;
+									if(amVerbose())inputInfo("New variable '%s' initialization registered.",newVariableName);
+								}else
+									inputError("Failed to register the initialization of new variable '%s'.",newVariableName);
+							}
+							break;
+						case TT_FUNCTION_CALL:
+							if(pLastCommandToEvaluateToken->prev->type==TT_FUNCTION){
+								char* functionName=string(pLastCommandToEvaluateToken->prev->text);
+								// we do not need to store the function name itself, just the argument that will contain the local variable initializations
+								if(pushInitialization("(")){
+									_lastInitialization->argument=((!strcmp(functionName,DOFUNCTION_NAME)||!strcmp(functionName,FORFUNCTION_NAME)?0:(!strcmp(functionName,DEFINEUSERFUNCTION_NAME)?1:-1)));
+									initializationsChanged=true;
+									if(amVerbose())inputInfo("Function '%s' registered.",functionName);
+								}else
+									inputError("Failed to register function call '%s'.",functionName);
+							}else
+								inputError("No function in front of function call.");
+							break;
+						case TT_END_OF_FUNCTION_CALL:
+							if(pushInitialization(")")){ // will set the argument count appropriately...
+								if(amVerbose())inputInfo("End of function call registered.");
+								initializationsChanged=true;
+							}else
+								inputError("Failed to register the end of a function call.");
+							break;
+						case TT_LISTELEMENT:
+							if(pLastCommandToEvaluateToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
+								// not any comma is a function call argument separator!!!
+								if(pushInitialization(",")){
+									_lastInitialization->argument--; // decrement the argument count (once it is zero any initialization is local to the function call)
+									if(amVerbose())inputInfo("End of function argument with count set to %lld.",_lastInitialization->argument);
+									initializationsChanged=true;
+								}else
+									inputError("Failed to register a next function call argument!");
+							}
+							break;
+					}
+					if(amDebugging()){
+						if(!initializationsChanged)
+							inputInfo("Token with text '%c' of type %s considered to be a one character token.",inputChar,TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]);
+						else 
+						if(!amVerbose())showInitializations();
+					}
 				}
 				/* replacing:
 				if(pLastCommandToEvaluateToken->type!=TT_ERROR&&pLastCommandToEvaluateToken->type!=TT_COMMENT&&pLastCommandToEvaluateToken->type!=TT_DQSTRING&&pLastCommandToEvaluateToken->type!=TT_SQSTRING)
@@ -4627,7 +4775,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		}
 		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength());
-		outputStatus(inputChar,inputCharacterType);
+		if(!initializationsChanged)outputStatus(inputChar,inputCharacterType);
 	}
 
 	return true;
@@ -5004,7 +5152,7 @@ int main(int argc, char **argv){
 						switchToControlMode("Failed to create a new command!");
 					*/
 				}
-				outputStatus(inputChar,inputCharType);
+				///////////// MDH@06AUG2019 NOT AGAIN: outputStatus(inputChar,inputCharType);
 			}else
 			if(inputMode==IM_CONTROL){ // inputChar received in control mode
 				outputChar(inputChar); // nice to see the character we typed...
