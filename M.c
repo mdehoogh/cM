@@ -2012,9 +2012,9 @@ bool pushInitialization(char* variableName){
 			_initialization->argument=(_argumentCountInitialization?_argumentCountInitialization->argument:-1);
 			_lastInitialization=_initialization;
 		}else{
-			FREE(_initialization,'I');
+			FREE(_initialization,'I'); // no need to call free_initialization as no variable to free
 			_initialization=NULL;
-		} // no need to call free_initialization as no variable to free
+		}
 		/// do this in the caller!!!! inputError("Failed to remember initialization '%s'.",_variableName);
 	}
 	return(_initialization!=NULL);
