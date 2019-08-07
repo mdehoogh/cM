@@ -1807,6 +1807,36 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			///////if(amVerbose()){if(pNewToken->expr)inputInfo("Pointing to %s of type %s.",string(pNewToken->expr->text),TOKENTYPE_STRING[pNewToken->expr->type]);else inputInfo("Nothing to point to.");}
 			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=pCommandToEvaluate; // TODO will this help???
 			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
+			// MDH@07AUG2019: a token 'inherits' the prevIdentifier and argument of its previous token, to be adapted if necessary depending on what it is
+			//                of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
+			//                how about function identifiers? they are special in that they change the argument value
+			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?)
+				pNewToken->prevIdentifier=prevToken;
+				// what should now be the argument value? this depends on the name of the function
+				char* _functionName=_stringstart(prevToken->text,prevToken->significantCharacterCount); // free asap
+				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
+				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
+				free(_functionName);
+				// every , that ends a function call argument should decrement the argument value
+			}else{ // not a function identifier			
+				pNewToken->argument=prevToken->argument;
+				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE){ // not a variable identifier
+					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);	
+					pNewToken->prevIdentifier=prevToken->prevIdentifier;
+					// should we change the argument??????
+					if(newTokenType==TT_LISTELEMENT){ // ha ha, can't use pNewToken->type here as not assigned yet!!!
+						///////inputInfo("List element!");	
+						// careful now, is this a comma that ends a function call argument??????
+						// let's inspect the expr field which should point to start parenthesis
+						if(pNewToken->expr&&pNewToken->expr->type==TT_FUNCTION_CALL){
+							pNewToken->argument=pNewToken->argument-1;
+							inputInfo("New function call argument!");
+						}else
+							inputInfo("Not a new function call argument!");
+					}
+				}else // behind a variable identifier
+					pNewToken->prevIdentifier=prevToken;
+			}
 		}
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
 		pNewToken->text=__string();
@@ -4365,15 +4395,42 @@ void setCommand(Mtoken* pNewCommand){
 	}
 }
 */
+bool existsInCommand(char* identifierName){
+	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
+	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
+	size_t l=strlen(identifierName);
+	Mtoken* identifier=pLastCommandToEvaluateToken->prevIdentifier;
+	char *match,*commandIdentifierName;
+	bool found=false;
+	while(identifier){
+		// if a function identifier, no need to check!!
+		if(identifier->type!=TT_FUNCTION){
+			// do NOT check the name if identifier is a local variable to a do or for or function function call and we're not in that function call
+			if(identifier->argument!=1||identifier->expr==pLastCommandToEvaluateToken->expr){
+				commandIdentifierName=string(identifier->text); // I have to do this to get the closing '\0' placed!!!
+				if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
+					// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
+					match=strstr(commandIdentifierName,identifierName);
+					if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){found=true;break;} // TODO will blank always be the only possible whitespace character????? 
+				}
+			}
+		}
+		// get the next identifier
+		identifier=identifier->prevIdentifier;
+	}
+	if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
+	return found;
+}
 
 // MDH@30APR2019: if the current token is a variable/function check whether it still is
 //                call whenever the current token changes (in removePreviousTokenCharacter() and commandCharacterAccepted())
 bool tokenCheckedForBeingAFunction(bool endOfInput){
-	bool result=false;
-	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){
-		result=true;
-		// is it a function (now)?
-		if(getFunction(getEnvironment(),string(pLastCommandToEvaluateToken->text))){ // yes, it is
+	// only identifiers should be checked...
+	if(pLastCommandToEvaluateToken->type!=TT_VARIABLE&&pLastCommandToEvaluateToken->type!=TT_NEW_VARIABLE&&pLastCommandToEvaluateToken->type!=TT_FUNCTION)return false;
+	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
+	char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
+	if(pLastCommandToEvaluateToken->type!=TT_FUNCTION){ // is it a function (now)?
+		if(getFunction(getEnvironment(),_identifierName)){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
 			if(amMatchingparentheses())if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
@@ -4382,11 +4439,8 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 			// insert an opening parenthesis for the function call
 			if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='(')string_insert_char(behindCursorText,0,'(');
 		}
-	}else
-	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
-		result=true;
-		// is it (still) a function?
-		if(!getFunction(getEnvironment(),string(pLastCommandToEvaluateToken->text))){ // no, it ain't
+	}else{ // is it (still) a function?
+		if(!getFunction(getEnvironment(),_identifierName)){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
 			pLastCommandToEvaluateToken->type=TT_VARIABLE;
 			reoutputToken(pLastCommandToEvaluateToken);
@@ -4395,27 +4449,25 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 			if(endOfInput)if(amMatchingparentheses())if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
 		}
 	}
-	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
-	if(result){ // a variable or function
-		char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
-		// check whether the variable exists or not
-		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
-			if(!containsVariable(getEnvironment(),_identifierName)){ // apparently does NOT exist
-				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
-				reoutputToken(pLastCommandToEvaluateToken);
-				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
-			}
-		}else
-		if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
-			if(containsVariable(getEnvironment(),_identifierName)){ // now an existing variable
-				pLastCommandToEvaluateToken->type=TT_VARIABLE;
-				reoutputToken(pLastCommandToEvaluateToken);
-				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
-			}
+	// check whether the variable exists or not
+	// MDH@07AUG2019: this variable could exist in this command, which we should check
+	bool variableExists=existsInCommand(_identifierName)||containsVariable(getEnvironment(),_identifierName);
+	if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
+		if(!variableExists){ // apparently does NOT exist
+			pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
+			reoutputToken(pLastCommandToEvaluateToken);
+			if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 		}
-		free(_identifierName); // freed
+	}else
+	if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
+		if(variableExists){ // now an existing variable
+			pLastCommandToEvaluateToken->type=TT_VARIABLE;
+			reoutputToken(pLastCommandToEvaluateToken);
+			if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+		}
 	}
-	return result;
+	free(_identifierName); // freed
+	return true;
 }
 
 // in response to backspace the previous token character is to be removed
@@ -4443,12 +4495,15 @@ void outputTokenInfo(){
 	Mtoken* token=pCommandToEvaluate;
 	uint16_t tokenIndex=0;
 	output("%s:\n","Tokens");
-	output("%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","TYPE","TEXT","EXPR");
+	output("%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","ARG","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%lld\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,TOKENTYPE_STRING[token->type],string(token->text));
 		if(token->expr){
-			output("%s\t%u\t%s\t%s\t%-24s`%s`\n","part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type],string(token->expr->text));
+			output("%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
+		}
+		if(token->prevIdentifier){
+			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
 		}
 		token=token->next;
 	}
@@ -4468,9 +4523,10 @@ uint32_t getListElementCount(){
 	while(token!=startToken){if(token->expr==startToken&&token->type==TT_LISTELEMENT)listElementCount++;token=token->prev;}
 	return listElementCount;
 }
+// TODO we could call the following function from tokenCheckedForBeingAFunction
 void changeFunctionTokenToAVariable(bool endOfInput){
 	char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
-	pLastCommandToEvaluateToken->type=(containsVariable(getEnvironment(),_identifierName)?TT_VARIABLE:TT_NEW_VARIABLE);
+	pLastCommandToEvaluateToken->type=(existsInCommand(_identifierName)||containsVariable(getEnvironment(),_identifierName)?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	reoutputToken(pLastCommandToEvaluateToken);
 	// I think we should remove ( from the behind cursor text if it was inserted
@@ -4750,6 +4806,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	}
 
 	// MDH@24APR2019 obsolete: cursorPosition()++; // increment the current cursor position
+	// MDH@07AUG2019: after a character is input by the user (or some other source) the identifier type will be checked...
+	//                BUT 
 	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput); // MDH@28MAY2019: ALWAYS check for being a function!!!!
 
 	if(endOfInput){

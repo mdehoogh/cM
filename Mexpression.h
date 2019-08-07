@@ -146,6 +146,9 @@ typedef struct Mtoken{
 	struct Mtoken* expr; // the expression this token is part of
 	struct Mtoken* prev; // we need this during user input
 	struct Mtoken* next;
+    // MDH@07AUG2019: we will be pointing to the identifier in front of it, allowing us to determine whether a new identifier is an existing or new variable (no need to free this reference ever)
+    struct Mtoken* prevIdentifier;
+    long long argument; // the argument level (0 for local variables, all other values for non-local variables)
 }Mtoken;
 
 Mtoken* __token();
