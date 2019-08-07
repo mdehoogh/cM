@@ -1819,23 +1819,28 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				free(_functionName);
 				// every , that ends a function call argument should decrement the argument value
 			}else{ // not a function identifier			
-				pNewToken->argument=prevToken->argument;
-				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE){ // not a variable identifier
+				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE&&prevToken->type!=TT_END_OF_FUNCTION_CALL) // not behind a variable identifier or end of function call
 					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);	
 					pNewToken->prevIdentifier=prevToken->prevIdentifier;
-					// should we change the argument??????
-					if(newTokenType==TT_LISTELEMENT){ // ha ha, can't use pNewToken->type here as not assigned yet!!!
-						///////inputInfo("List element!");	
-						// careful now, is this a comma that ends a function call argument??????
-						// let's inspect the expr field which should point to start parenthesis
-						if(pNewToken->expr&&pNewToken->expr->type==TT_FUNCTION_CALL){
-							pNewToken->argument=pNewToken->argument-1;
-							inputInfo("New function call argument!");
-						}else
-							inputInfo("Not a new function call argument!");
-					}
-				}else // behind a variable identifier
+				else // behind a variable identifier or end of function call
 					pNewToken->prevIdentifier=prevToken;
+				// what to do with the argument if a function call ends???????
+				// the function name of the function call should contain the right argument value TODO check this!!!!!!!!
+				if(prevToken->type==TT_END_OF_FUNCTION_CALL)
+					pNewToken->argument=prevToken->expr->prev->argument;
+				else
+					pNewToken->argument=prevToken->argument;
+				// should we change the argument??????
+				if(newTokenType==TT_LISTELEMENT){ // ha ha, can't use pNewToken->type here as not assigned yet!!!
+					///////inputInfo("List element!");	
+					// careful now, is this a comma that ends a function call argument??????
+					// let's inspect the expr field which should point to start parenthesis
+					if(pNewToken->expr&&pNewToken->expr->type==TT_FUNCTION_CALL){
+						pNewToken->argument=pNewToken->argument-1;
+						inputInfo("New function call argument!");
+					}else
+						inputInfo("Not a new function call argument!");
+				}
 			}
 		}
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
@@ -4395,6 +4400,9 @@ void setCommand(Mtoken* pNewCommand){
 	}
 }
 */
+bool isLocalVariable(){
+
+}
 bool existsInCommand(char* identifierName){
 	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
 	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
@@ -4402,17 +4410,20 @@ bool existsInCommand(char* identifierName){
 	Mtoken* identifier=pLastCommandToEvaluateToken->prevIdentifier;
 	char *match,*commandIdentifierName;
 	bool found=false;
-	while(identifier){
+	while(!found&&identifier){
 		// if a function identifier, no need to check!!
-		if(identifier->type!=TT_FUNCTION){
-			// do NOT check the name if identifier is a local variable to a do or for or function function call and we're not in that function call
-			if(identifier->argument!=1||identifier->expr==pLastCommandToEvaluateToken->expr){
-				commandIdentifierName=string(identifier->text); // I have to do this to get the closing '\0' placed!!!
-				if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
-					// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
-					match=strstr(commandIdentifierName,identifierName);
-					if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){found=true;break;} // TODO will blank always be the only possible whitespace character????? 
-				}
+		if(identifier->type!=TT_FUNCTION){ // could match
+			commandIdentifierName=string(identifier->text); // I have to do this to get the closing '\0' placed!!!
+			if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
+				// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
+				match=strstr(commandIdentifierName,identifierName);
+				if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){ // the name matches
+					if(identifier->argument==1){ // the identifier is defined in the declaration part of a function call (which is present in `do`, `for` and `function` function calls)
+						// there must be a matching function call token, but unfortunately there could be other function calls in between, which means that we also need to register end of function calls!!
+
+					}else
+						found=true;
+				} // TODO will blank always be the only possible whitespace character????? 
 			}
 		}
 		// get the next identifier
