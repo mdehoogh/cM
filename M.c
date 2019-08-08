@@ -1770,6 +1770,7 @@ void outputStatus(char inputChar,char inputCharType){
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 	Mtoken* pNewToken=__token();
 	if(pNewToken){
+		if(amDebugging())inputInfo("E1");
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
 		if(prevToken){
 			// finish the previous token
@@ -1777,6 +1778,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			if(!prevToken->significantCharacterCount)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
 			// initialize the new token
 			pNewToken->prev=prevToken; // set the predecessor
+			if(amDebugging())inputInfo("E2");
 			// MDH@27MAY2019: let's by default copy prevToken-expr over
 
 			// MDH@18MAY2019: if a , starts an expression we won't be pointing to the opening parenthesis!!!
@@ -1810,6 +1812,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			// MDH@07AUG2019: a token 'inherits' the prevIdentifier and argument of its previous token, to be adapted if necessary depending on what it is
 			//                of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
 			//                how about function identifiers? they are special in that they change the argument value
+			if(amDebugging())inputInfo("E3");
 			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?)
 				pNewToken->prevIdentifier=prevToken;
 				// what should now be the argument value? this depends on the name of the function
@@ -1818,31 +1821,41 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
 				free(_functionName);
 				// every , that ends a function call argument should decrement the argument value
-			}else{ // not a function identifier			
+			}else{ // not a function identifier	
+				if(amDebugging())inputInfo("E4");		
 				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE&&prevToken->type!=TT_END_OF_FUNCTION_CALL) // not behind a variable identifier or end of function call
 					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);	
 					pNewToken->prevIdentifier=prevToken->prevIdentifier;
 				else // behind a variable identifier or end of function call
 					pNewToken->prevIdentifier=prevToken;
+				if(amDebugging())inputInfo("E5");
 				// what to do with the argument if a function call ends???????
 				// the function name of the function call should contain the right argument value TODO check this!!!!!!!!
-				if(prevToken->type==TT_END_OF_FUNCTION_CALL)
+				// BUG FIX aha end of function call does not always end a function call, but an expression (a single opening parenthesis without a function name in front of it), so explicitly checking for that!!!
+				if(prevToken->type==TT_END_OF_FUNCTION_CALL&&prevToken->expr&&prevToken->expr->type==TT_FUNCTION_CALL)
 					pNewToken->argument=prevToken->expr->prev->argument;
 				else
 					pNewToken->argument=prevToken->argument;
+				if(amDebugging())inputInfo("E6");
 				// should we change the argument??????
 				if(newTokenType==TT_LISTELEMENT){ // ha ha, can't use pNewToken->type here as not assigned yet!!!
 					///////inputInfo("List element!");	
 					// careful now, is this a comma that ends a function call argument??????
 					// let's inspect the expr field which should point to start parenthesis
+					// BUT we should only subtract from argument when this is a `do`, `for` or `function` call
 					if(pNewToken->expr&&pNewToken->expr->type==TT_FUNCTION_CALL){
-						pNewToken->argument=pNewToken->argument-1;
-						inputInfo("New function call argument!");
+						if(pNewToken->expr->argument>0){
+							pNewToken->argument=pNewToken->argument-1;
+							inputInfo("New function call argument!");
+						}else
+							inputInfo("Non-local variable function call argument");
 					}else
 						inputInfo("Not a new function call argument!");
 				}
+				if(amDebugging())inputInfo("E7");
 			}
 		}
+		if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
 		pNewToken->text=__string();
 		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
@@ -1850,6 +1863,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			inputError("%sFailed to initialize the new token.",ERROR_PREFIX);
 			pNewToken->type=TT_ERROR; 
 		}
+		if(amDebugging())inputInfo("E9");
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->next=NULL;
@@ -3022,7 +3036,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// we have to create the variable first (TODO should we wait until actually assigning???)
 				// NOTE in certain situations tokenizing occurs outside the evaluation environment so it could be marked as new where it will not be when evaluated
 				//      therefore I've adapted addVariable() so it won't return false when the variable already exists
-				if(!addVariable(getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
+				// MDH@08AUG2019: any variable that's marked as new should be added to the top-level environment if it does not exist there
+				//                we can make that happen by passing in NULL for getEnvironment() in which case it should check getEnvironment() only (and not all the parents as well)
+				if(!addVariable(NULL/*getEnvironment()*/,_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getEnvironmentName();
 					output("%sFailed to add variable '%s' to environment '%s'.\n",ERROR_PREFIX,_significantTokenText,string(_environmentName));
 					free_string(_environmentName);
@@ -4400,27 +4416,41 @@ void setCommand(Mtoken* pNewCommand){
 	}
 }
 */
-bool isLocalVariable(){
-
+// every non-function call token can be inside a call to a special function that can have local variables
+Mtoken* getSpecialFunctionCallToken(const Mtoken* const token){
+	Mtoken* container=(token?token->expr:NULL);
+	// NOTE if the type is not a function call (like a list or map) or its argument is 0 or below it is not a special function
+	while(container&&(container->type!=TT_FUNCTION_CALL||container->argument<=0))container=container->expr;
+	return container;
 }
-bool existsInCommand(char* identifierName){
+// an identifier with a certain name in a certain special function call (to which it might be local)
+bool existsInCommand(char* identifierName,const Mtoken* const specialFunctionCallToken){
 	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
 	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
+	bool found=false;
 	size_t l=strlen(identifierName);
 	Mtoken* identifier=pLastCommandToEvaluateToken->prevIdentifier;
 	char *match,*commandIdentifierName;
-	bool found=false;
 	while(!found&&identifier){
-		// if a function identifier, no need to check!!
-		if(identifier->type!=TT_FUNCTION){ // could match
+		// if a function call or end of function call identifier, no need to check!!
+		if(identifier->type!=TT_FUNCTION&&identifier->type!=TT_END_OF_FUNCTION_CALL){
 			commandIdentifierName=string(identifier->text); // I have to do this to get the closing '\0' placed!!!
 			if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
 				// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
 				match=strstr(commandIdentifierName,identifierName);
-				if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){ // the name matches
-					if(identifier->argument==1){ // the identifier is defined in the declaration part of a function call (which is present in `do`, `for` and `function` function calls)
-						// there must be a matching function call token, but unfortunately there could be other function calls in between, which means that we also need to register end of function calls!!
-
+				if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){ // the names match
+					if(identifier->argument==1){ // the identifier is local to one of the special function calls (which is present in `do`, `for` and `function` function calls)
+						// we can't tell for sure that this local identifier is in the same special function call unless `expr` field matches imagine the situation where multiple do's are in the same command following each other
+						// the local variables in the first are not local to the second do call it's all about scope meaning we have to mark the end of a scope as well so we know which identifiers to skip i.e. those identifiers local to another special function call
+						// so if we stored `( f g , h ) ( x, g` the second g is not in the first call and therefore does not exist in the command, so in going back you have to keep track of the level which should be the same as level of the caller
+						// the special function call associated with the two identifiers must match!!
+						// BUT a local variable of a special function call could be used in which the special function call of the identifier is nested within (like a do inside a do) in which case we should keep going up
+						// so: identifier is local to its own special function call but the presented identifier might not i.e. it might be defined in a outer special function call
+						if(specialFunctionCallToken){ // the given identifier exists inside a special function call therefore it might be the local identifier with the same name!!
+							Mtoken *localIdentifierSpecialFunctionCallToken=getSpecialFunctionCallToken(identifier),*needleSpecialFunctionCallToken=specialFunctionCallToken; // which MUST exist i.e. will NOT be NULL
+							while(needleSpecialFunctionCallToken&&needleSpecialFunctionCallToken!=localIdentifierSpecialFunctionCallToken)needleSpecialFunctionCallToken=getSpecialFunctionCallToken(needleSpecialFunctionCallToken);
+							if(needleSpecialFunctionCallToken)found=true;
+						}
 					}else
 						found=true;
 				} // TODO will blank always be the only possible whitespace character????? 
@@ -4462,19 +4492,22 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 	}
 	// check whether the variable exists or not
 	// MDH@07AUG2019: this variable could exist in this command, which we should check
-	bool variableExists=existsInCommand(_identifierName)||containsVariable(getEnvironment(),_identifierName);
-	if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // a (new) variable
-		if(!variableExists){ // apparently does NOT exist
-			pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
-			reoutputToken(pLastCommandToEvaluateToken);
-			if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
-		}
-	}else
-	if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // a new variable
-		if(variableExists){ // now an existing variable
-			pLastCommandToEvaluateToken->type=TT_VARIABLE;
-			reoutputToken(pLastCommandToEvaluateToken);
-			if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
+		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
+		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
+		bool variableExists=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,getSpecialFunctionCallToken(pLastCommandToEvaluateToken))||containsVariable(getEnvironment(),_identifierName)));
+		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
+			if(!variableExists){ // apparently does NOT exist
+				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
+				reoutputToken(pLastCommandToEvaluateToken);
+				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
+			}
+		}else{ // a new variable
+			if(variableExists){ // now an existing variable
+				pLastCommandToEvaluateToken->type=TT_VARIABLE;
+				reoutputToken(pLastCommandToEvaluateToken);
+				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+			}
 		}
 	}
 	free(_identifierName); // freed
@@ -4516,6 +4549,12 @@ void outputTokenInfo(){
 		if(token->prevIdentifier){
 			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
 		}
+		if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
+			Mtoken* specialFunctionCallToken=getSpecialFunctionCallToken(token);
+			if(specialFunctionCallToken){
+				output("%s\t%u\n"," local to",specialFunctionCallToken->offset);
+			}
+		}
 		token=token->next;
 	}
 }
@@ -4537,7 +4576,8 @@ uint32_t getListElementCount(){
 // TODO we could call the following function from tokenCheckedForBeingAFunction
 void changeFunctionTokenToAVariable(bool endOfInput){
 	char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
-	pLastCommandToEvaluateToken->type=(existsInCommand(_identifierName)||containsVariable(getEnvironment(),_identifierName)?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
+	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
+	pLastCommandToEvaluateToken->type=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,getSpecialFunctionCallToken(pLastCommandToEvaluateToken))||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	reoutputToken(pLastCommandToEvaluateToken);
 	// I think we should remove ( from the behind cursor text if it was inserted
@@ -4562,7 +4602,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	if(pLastCommandToEvaluateToken==NULL)return false;
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	clearInfo(); // TODO make a separate function to do this???
-
+	if(amDebugging())inputInfo("A");
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
 	if(inputCharType=='C'){
 		pLastCommandToEvaluateToken->type^=0x70; // toggling bit 7
@@ -4590,13 +4630,14 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	printf("[%d+%c->%d]",pLastCommandToEvaluateToken->type,inputCharacterType,newTokenType);
 	outputTokenColor(pLastCommandToEvaluateToken);
 #endif
+		if(amDebugging())inputInfo("B");
 		//MDH@17JUL2019: typically we'd get an error immediately when NOT entering a function call character ( behind a function identifier
 		if(newTokenType==TT_ERROR&&pLastCommandToEvaluateToken->type==TT_FUNCTION){
 			// we should assume that the identifier represents a (new) variable (identifier)
 			changeFunctionTokenToAVariable(endOfInput);
 			newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType);
 		}
-
+		if(amDebugging())inputInfo("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType<0||newTokenType==pLastCommandToEvaluateToken->type){
@@ -4616,6 +4657,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				if(amVerbose())inputError("A shortcut operator assignment cannot change into an equality.");
 			}
 		}
+		if(amDebugging())inputInfo("D");
 		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
 		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
 		//                this way it will always be there!!
@@ -4657,9 +4699,10 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 						newTokenType=TT_BINARY_aErU;
 				}
 			}
-
+			if(amDebugging())inputInfo("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,newTokenType);
+			if(amDebugging())inputInfo("F");
 /*
 #ifdef __DEBUG__
 			printf("@%p=%p?:%s",pCommandToEvaluate,pLastCommandToEvaluateToken,string(pCommandToEvaluate->text));
@@ -4795,16 +4838,19 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			}
 			// TODO should we write the associated colors here?????
 			outputTokenColor(pLastCommandToEvaluateToken);
+			if(amDebugging())inputInfo("H");
 		}
 	}else // a functional whitespace character, ends a current token!!
 	if(pLastCommandToEvaluateToken->significantCharacterCount==0&&pLastCommandToEvaluateToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
 		pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
 
+	if(amDebugging())inputInfo("I");
 	// append the typed character at cursorPosition() minus current token offset in pLastCommandToEvaluateToken->text
 	string_append_char(pLastCommandToEvaluateToken->text,inputChar);
 
 	if(newTokenType<0)pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
 
+	if(amDebugging())inputInfo("J");
 #ifdef __DEBUG__
 	printf("[%s]",string(pLastCommandToEvaluateToken->text));
 #endif
@@ -4820,10 +4866,11 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	// MDH@07AUG2019: after a character is input by the user (or some other source) the identifier type will be checked...
 	//                BUT 
 	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput); // MDH@28MAY2019: ALWAYS check for being a function!!!!
-
+	if(amDebugging())inputInfo("K");
 	if(endOfInput){
 		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
 		if(notCheckedForBeingAFunction){
+			if(amDebugging())inputInfo("L");
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
@@ -4841,12 +4888,15 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				}else
 					string_insert_char(behindCursorText,0,'=');
 			}
+			if(amDebugging())inputInfo("M");
 		}
 		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
+		if(amDebugging())inputInfo("N");
 		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength());
 		if(!initializationsChanged)outputStatus(inputChar,inputCharacterType);
+		if(amDebugging())inputInfo("O");
 	}
-
+	if(amDebugging())inputInfo("P");
 	return true;
 }
 

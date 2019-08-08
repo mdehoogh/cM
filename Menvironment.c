@@ -189,17 +189,24 @@ Mstring* _getVariableNames(const Menvironment* const _environment,const char* co
     return _variableNames;
 }/* VALIDATED */
 
+// MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
 Mvariable* getVariable(const Menvironment* const _environment,const char* const name, bool verbose){
-    if(!_environment)return NULL;
     if(!name){outputError("No variable name specified");return NULL;}
+    if(verbose)output("Looking for variable '%s'.\n",name);
     // input valid
-    if(!_environment->_variableMap){if(verbose)output("%sEnvironment to find variable '%s' in is empty.\n",ERROR_PREFIX,name);return NULL;}
+    Mmap* variableMap=(_environment?_environment->_variableMap:(_executionEnvironment?_executionEnvironment->_variableMap:NULL));
+    if(!variableMap){if(verbose)output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
-    Mmapelement* _variableMapelement=_environment->_variableMap->_first;
+    Mmapelement* _variableMapelement=variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
     while(_variableMapelement&&(!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))_variableMapelement=_variableMapelement->_next;
-    // MDH@20JUL2019: if not defined locally, perhaps in parent
-    return(_variableMapelement?_variableMapelement->_variable:getVariable(_environment->_parent,name,verbose));
+    // MDH@20JUL2019: if found return
+    if(_variableMapelement){
+        if(verbose)output("Variable '%s' found in environment '%s'.\n",name,(_environment?_environment:_executionEnvironment)->_name);
+        return _variableMapelement->_variable;
+    }
+    // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
+    return (_environment&&_environment->_parent?getVariable(_environment->_parent,name,verbose):NULL);
 }/* VALIDATED */
 bool containsVariable(const Menvironment* const _environment,const char* const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
 // use Mexists to determine if a variable exists passed in as text, we might decide to return the name of the environment it exists in
@@ -213,25 +220,35 @@ Mvalue* Mexists(Mvalue* _value){
 // helper function to create a new variable with a given name and of a given type
 
 // addVariable returns the value map element that was created (if successful)
+// MDH@09AUG2019: we allow checking the current environment only when _environment is NULL
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
-    if(_environment&&name){ // input valid
-        _variable=getVariable(_environment,name,false);
+    if(name){ // input valid
+        _variable=getVariable(_environment,name,amVerbose());
         if(!_variable){ // non-existing...
+            if(amVerbose())output("Variable '%s' to be created.\n",name);
             _variable=_getVariable(name,valuetype,immutable); // creates the variable, free when not bound
-            //////printf("\nVariable created!");
+            if(amVerbose())output("Variable '%s' created.\n",name);
             if(_variable){
-                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'V');
-                if(_variableMapelement){
-                    // store the references
-                    _variableMapelement->_next=NULL;
-                    _variableMapelement->_variable=_variable;
-                    Mmapelement* _lastVariableMapelement=_environment->_variableMap->_last;
-                    if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else _environment->_variableMap->_first=_variableMapelement;
-                    _environment->_variableMap->_last=_variableMapelement;
-                    _environment->_variableMap->numberOfElements++;
-                    return true;
-                }
+                // get a reference to the environment to which variable map we should be appending...
+                Menvironment* environment=(_environment?_environment:_executionEnvironment);
+                if(environment){
+                    if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
+                    Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'V');
+                    if(_variableMapelement){
+                        // store the references
+                        _variableMapelement->_next=NULL;
+                        _variableMapelement->_variable=_variable;
+                        Mmapelement* _lastVariableMapelement=environment->_variableMap->_last;
+                        if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else environment->_variableMap->_first=_variableMapelement;
+                        environment->_variableMap->_last=_variableMapelement;
+                        environment->_variableMap->numberOfElements++;
+                        if(amVerbose())output("Variable '%s' added to environment '%s'.\n",environment->_name);
+                        return true;
+                    }
+                    outputErrorAndText("Failed to create a new map element for variable ",name);
+                }else
+                    outputErrorAndText("No environment to add the newly created variable to",name);
                 // ASSERT failed to link the variable to the variable map!!
                 free_variable(_variable);
                 outputErrorAndText("Failed to link variable ",name);
@@ -242,13 +259,13 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
             return true;
         }
     }else
-        outputError("No environment or variable name specified");
+        outputError("No variable name specified");
     return false;
 }/* VALIDATED */
 
 bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
-    if(!_environment||!name){outputError("Cannot set the value: no environment or name");return false;}
+    if(!name){outputError("Cannot set the value: no variable name");return false;}
     Mvariable* variable=getVariable(_environment,name,false);
     if(variable){
         if(!variable->_value||!variable->immutable){
@@ -264,7 +281,7 @@ bool setValue(const Menvironment* const _environment,const char* const name,cons
         }else
             output("%sCannot set the value of variable `%s`: it is not mutable!\n",ERROR_PREFIX,name);
     }else
-        output("%sCannot set the value of variable `%s`:it is unknown.\n",ERROR_PREFIX,name);
+        output("%sCannot set the value of variable `%s`: it is unknown.\n",ERROR_PREFIX,name);
     return false;
 }/* VALIDATED */
 
@@ -284,7 +301,7 @@ long long appendToListVariable(const Menvironment* const _environment,const char
         }else
             output("%sCannot append the value to variable '%s': it does not contain a list!\n",ERROR_PREFIX,name);
     }else
-        output("%sCannot set the value of variable '%s':it is unknown.\n",ERROR_PREFIX,name);
+        output("%sCannot set the value of variable '%s': it is unknown.\n",ERROR_PREFIX,name);
     return 0;
 }/* VALIDATED */
 
