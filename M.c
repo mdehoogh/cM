@@ -1796,6 +1796,19 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				pNewToken->expr=prevToken;
 			else
 				pNewToken->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token
+			
+			// MDH@09AUG2019: before we actually kill the expr in the end of function call we update the envid
+			// if ending a special function call, we should zero the last set octet, but determining whether that is the case is not as easy as it seems
+			// I suppose the argument of the expr field of the new token will tell us if it is a special function call (because the argument field would then be positive)
+			if(newTokenType==TT_END_OF_FUNCTION_CALL&&pNewToken->expr&&pNewToken->expr->type==TT_FUNCTION_CALL&&pNewToken->expr->argument>0){
+				//////////inputInfo("*** End of special function call! ***");
+				// we have to decrement the octet that should be incremented
+				// it would be nicer to make the octet we loose 0 in the process because in that case we do not need to do that when we nest again
+				uint64_t ander=15,incrementoctet=0;while(incrementoctet!=(prevToken->envid&15)){ander=(ander<<4)+15;incrementoctet++;}
+				pNewToken->envid=(((prevToken->envid>>4)<<4)+incrementoctet-1)&ander;
+			}else
+				pNewToken->envid=prevToken->envid; // MDH@09AUG2019: take over the environment id!!
+
 			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP){
 				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
 				//                TODO this is checked afterwards, so perhaps we should do that here?????
@@ -1813,12 +1826,24 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			//                of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
 			//                how about function identifiers? they are special in that they change the argument value
 			if(amDebugging())inputInfo("E3");
-			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?)
+			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?) TODO shouldn't we test whether the new token type is TT_FUNCTION_CALL instead??????
 				pNewToken->prevIdentifier=prevToken;
 				// what should now be the argument value? this depends on the name of the function
 				char* _functionName=_stringstart(prevToken->text,prevToken->significantCharacterCount); // free asap
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
 				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
+				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
+				if(pNewToken->argument){ // a special function call
+					uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16,ander=255; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
+					if(incrementoctet<15&&(prevToken->envid)>>((incrementoctet+1)<<2)<15){ // checking the octet to increment as well because it should not be 15 (or we would get overflow!!)
+						while(incrementoctet>0){addendum<<=4;incrementoctet--;}
+						// we have to increment the addendum by 1 because we also need to increment the octet that should be incremented when a nested special function call is encountered!!
+						pNewToken->envid=(prevToken->envid+addendum+1); // ander will take care of removing what's too the left
+					}else{ // can't increment
+						pNewToken->type=TT_ERROR;
+						inputError("Cannot exceed the maximum number of 15 (nested) special function calls");
+					}
+				}
 				free(_functionName);
 				// every , that ends a function call argument should decrement the argument value
 			}else{ // not a function identifier	
@@ -3038,12 +3063,15 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				//      therefore I've adapted addVariable() so it won't return false when the variable already exists
 				// MDH@08AUG2019: any variable that's marked as new should be added to the top-level environment if it does not exist there
 				//                we can make that happen by passing in NULL for getEnvironment() in which case it should check getEnvironment() only (and not all the parents as well)
-				if(!addVariable(NULL/*getEnvironment()*/,_significantTokenText,VT_UNDEFINED,false)){
+				// MDH@09AUG2019: I suppose only explicit local variables (in special function calls) should not be checked to exist in parent environments, but otherwise they should
+				//                we could give a warning if this variable is defined inside a special function call and is not a local variable
+				if(!addVariable(expressionToken->argument==1?NULL:getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getEnvironmentName();
-					output("%sFailed to add variable '%s' to environment '%s'.\n",ERROR_PREFIX,_significantTokenText,string(_environmentName));
+					output("%sFailed to add%s variable '%s' to environment '%s'.\n",ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					free_string(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!
 				}
+				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
 				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerbose())output("Variable name: '%s'.\n",_valueReference->_name);
@@ -4539,10 +4567,10 @@ void outputTokenInfo(){
 	Mtoken* token=pCommandToEvaluate;
 	uint16_t tokenIndex=0;
 	output("%s:\n","Tokens");
-	output("%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","ARG","TYPE","TEXT");
+	output("%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","ARG","ENVID","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%lld\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%lld\t%x/%x\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
 		if(token->expr){
 			output("%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
 		}

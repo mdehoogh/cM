@@ -243,7 +243,7 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
                         if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else environment->_variableMap->_first=_variableMapelement;
                         environment->_variableMap->_last=_variableMapelement;
                         environment->_variableMap->numberOfElements++;
-                        if(amVerbose())output("Variable '%s' added to environment '%s'.\n",environment->_name);
+                        if(amVerbose())output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
                         return true;
                     }
                     outputErrorAndText("Failed to create a new map element for variable ",name);

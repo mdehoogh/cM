@@ -1,17 +1,16 @@
 #!/bin/bash
 
-# force running as sudo check
-if [[ ! "$EUID" = 0 ]]; then
-    echo "Please sudo run me!"
-    exit 1
-fi
-
 # the actual stuff
 # remove M so if we fail we'd know it
 rm -f M
 
 # if libmpdec.a is not present, we should create it
 if [[ ! -f ./libmpdec.a && ! -d ./libmpdec.a ]]; then
+    # force running as sudo check
+    if [[ ! "$EUID" = 0 ]]; then
+        echo "Please sudo run me (in order to be able to create the decimal library)!"
+        exit 1
+    fi
     echo "Creating mpdecimal library..."
     if [ -d mpdecimal-2.4.2 ]; then
         # mpdecimal.h won't exist in libmpdec there until we run ./configure
@@ -58,6 +57,11 @@ fi
 
 # if libtommath.a is not present, we should create it
 if [[ ! -f ./libtommath.a && ! -d ./libtommath.a ]]; then
+    # force running as sudo check
+    if [[ ! "$EUID" = 0 ]]; then
+        echo "Please sudo run me (in order to be able to create the big integer library)!"
+        exit 1
+    fi
     echo "Creating tommath big integer library..."
     if [ -d libtommath ]; then
         # ascertain to hold tommath.h
@@ -107,8 +111,10 @@ echo "Compiling M..."
 
 # don't run M here, instead check whether it is there!!!
 if [ -f M ]; then
-    # ascertain to be able to run it
-    sudo chmod 755 M
+    # ascertain to be able to run it (when being sudo run)
+    if [[ "$EUID" = 0 ]]; then
+        chmod 755 M
+    fi
     echo "M has been created, run it with ./M!"
     echo "Command-line flags (specify behind a hyphen) include D (debug), s (verbose), A (assist)"
 else
