@@ -34,6 +34,8 @@ const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for app
 
 const long long M_DP=20; // the default decimal precision
 
+const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
+
 // I guess we could allow the user to specify another eps value through the QEPS command line argument!!!
 
 void writeTimestamp(FILE* _file){
@@ -1804,8 +1806,9 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				//////////inputInfo("*** End of special function call! ***");
 				// we have to decrement the octet that should be incremented
 				// it would be nicer to make the octet we loose 0 in the process because in that case we do not need to do that when we nest again
-				uint64_t ander=15,incrementoctet=0;while(incrementoctet!=(prevToken->envid&15)){ander=(ander<<4)+15;incrementoctet++;}
-				pNewToken->envid=(((prevToken->envid>>4)<<4)+incrementoctet-1)&ander;
+				// the number of bits per level determines value to increment ander with and shift (at this moment the maximum depth is at most 15 i.e. 4 bits are always used to keep track of the current level)
+				uint64_t ander=0,incrementoctet=0;while(incrementoctet!=(prevToken->envid&15)){ander=(ander<<M_BITS_PER_ENV_LEVEL)+((1<<M_BITS_PER_ENV_LEVEL)-1);incrementoctet++;}
+				pNewToken->envid=(((prevToken->envid>>4)<<4)+incrementoctet-1)&((ander<<4)+15); // shifting ander by 4 additional bits and adding 15 to maintain the level value (increment octet)
 			}else
 				pNewToken->envid=prevToken->envid; // MDH@09AUG2019: take over the environment id!!
 
@@ -1834,9 +1837,10 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
 				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
 				if(pNewToken->argument){ // a special function call
-					uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16,ander=255; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
-					if(incrementoctet<15&&(prevToken->envid)>>((incrementoctet+1)<<2)<15){ // checking the octet to increment as well because it should not be 15 (or we would get overflow!!)
-						while(incrementoctet>0){addendum<<=4;incrementoctet--;}
+					uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
+					// the maximum value of incrementoctet (the environment depth) is 60/M_BITS_PER_ENV_LEVEL
+					if((incrementoctet*M_BITS_PER_ENV_LEVEL)<60&&(prevToken->envid)>>((incrementoctet+1)*M_BITS_PER_ENV_LEVEL)<(2<<M_BITS_PER_ENV_LEVEL)-1){ // checking the octet to increment as well because it should not be 15 (or we would get overflow!!)
+						while(incrementoctet>0){addendum<<=M_BITS_PER_ENV_LEVEL;incrementoctet--;}
 						// we have to increment the addendum by 1 because we also need to increment the octet that should be incremented when a nested special function call is encountered!!
 						pNewToken->envid=(prevToken->envid+addendum+1); // ander will take care of removing what's too the left
 					}else{ // can't increment
@@ -4444,6 +4448,7 @@ void setCommand(Mtoken* pNewCommand){
 	}
 }
 */
+/* MDH@11AUG2019: no longer required now that all environments get a unique id in tokenization
 // every non-function call token can be inside a call to a special function that can have local variables
 Mtoken* getSpecialFunctionCallToken(const Mtoken* const token){
 	Mtoken* container=(token?token->expr:NULL);
@@ -4451,41 +4456,62 @@ Mtoken* getSpecialFunctionCallToken(const Mtoken* const token){
 	while(container&&(container->type!=TT_FUNCTION_CALL||container->argument<=0))container=container->expr;
 	return container;
 }
+*/
 // an identifier with a certain name in a certain special function call (to which it might be local)
-bool existsInCommand(char* identifierName,const Mtoken* const specialFunctionCallToken){
+// instead of requiring a specialFunctionCallToken it suffices to know the environment id
+bool existsInCommand(char* identifierName,uint64_t identifierEnvironmentId){ // replacing: const Mtoken* const specialFunctionCallToken){
 	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
 	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
 	bool found=false;
 	size_t l=strlen(identifierName);
-	Mtoken* identifier=pLastCommandToEvaluateToken->prevIdentifier;
+	Mtoken* commandIdentifier=pLastCommandToEvaluateToken->prevIdentifier;
 	char *match,*commandIdentifierName;
-	while(!found&&identifier){
+	uint64_t commandIdentifierEnvironmentId,commandIdentifierEnvironmentLevels,ander=(1<<M_BITS_PER_ENV_LEVEL)-1;
+	while(!found&&commandIdentifier){
 		// if a function call or end of function call identifier, no need to check!!
-		if(identifier->type!=TT_FUNCTION&&identifier->type!=TT_END_OF_FUNCTION_CALL){
-			commandIdentifierName=string(identifier->text); // I have to do this to get the closing '\0' placed!!!
+		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){
+			commandIdentifierName=string(commandIdentifier->text); // I have to do this to get the closing '\0' placed!!!
 			if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
 				// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
 				match=strstr(commandIdentifierName,identifierName);
 				if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){ // the names match
-					if(identifier->argument==1){ // the identifier is local to one of the special function calls (which is present in `do`, `for` and `function` function calls)
+					if(commandIdentifier->argument==1){ // the identifier is local to one of the special function calls (which is present in `do`, `for` and `function` function calls)
 						// we can't tell for sure that this local identifier is in the same special function call unless `expr` field matches imagine the situation where multiple do's are in the same command following each other
 						// the local variables in the first are not local to the second do call it's all about scope meaning we have to mark the end of a scope as well so we know which identifiers to skip i.e. those identifiers local to another special function call
 						// so if we stored `( f g , h ) ( x, g` the second g is not in the first call and therefore does not exist in the command, so in going back you have to keep track of the level which should be the same as level of the caller
 						// the special function call associated with the two identifiers must match!!
 						// BUT a local variable of a special function call could be used in which the special function call of the identifier is nested within (like a do inside a do) in which case we should keep going up
 						// so: identifier is local to its own special function call but the presented identifier might not i.e. it might be defined in a outer special function call
+						if(identifierEnvironmentId){ // defined inside a subenvironment
+							commandIdentifierEnvironmentId=commandIdentifier->envid;
+							commandIdentifierEnvironmentLevels=(commandIdentifierEnvironmentId&15);
+							// it's all about environmentid subclassing the environment id of identifier
+							// i.e. environment id level should be at least the identifier's environment id
+							if(commandIdentifierEnvironmentLevels<=(identifierEnvironmentId&15)){ // the registered identifier is defined at a level equal to or above that of the identifier
+								commandIdentifierEnvironmentId>>=4;identifierEnvironmentId>>=4; // shift out the number of levels
+								// all environment ids of the local identifier (commandIdentifier) should match those in identifierEnvironmentId
+								while(commandIdentifierEnvironmentLevels>0&&((commandIdentifierEnvironmentId&ander)==(identifierEnvironmentId&ander))){
+									commandIdentifierEnvironmentLevels--;
+									commandIdentifierEnvironmentId>>=M_BITS_PER_ENV_LEVEL;
+									identifierEnvironmentId>>=M_BITS_PER_ENV_LEVEL;
+								}
+								if(commandIdentifierEnvironmentId==0)found=true;
+							}
+						}
+						/* replacing:
 						if(specialFunctionCallToken){ // the given identifier exists inside a special function call therefore it might be the local identifier with the same name!!
 							Mtoken *localIdentifierSpecialFunctionCallToken=getSpecialFunctionCallToken(identifier),*needleSpecialFunctionCallToken=specialFunctionCallToken; // which MUST exist i.e. will NOT be NULL
 							while(needleSpecialFunctionCallToken&&needleSpecialFunctionCallToken!=localIdentifierSpecialFunctionCallToken)needleSpecialFunctionCallToken=getSpecialFunctionCallToken(needleSpecialFunctionCallToken);
 							if(needleSpecialFunctionCallToken)found=true;
 						}
+						*/
 					}else
 						found=true;
 				} // TODO will blank always be the only possible whitespace character????? 
 			}
 		}
 		// get the next identifier
-		identifier=identifier->prevIdentifier;
+		commandIdentifier=commandIdentifier->prevIdentifier;
 	}
 	if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
 	return found;
@@ -4523,7 +4549,7 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
-		bool variableExists=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,getSpecialFunctionCallToken(pLastCommandToEvaluateToken))||containsVariable(getEnvironment(),_identifierName)));
+		bool variableExists=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,pLastCommandToEvaluateToken->envid/*replacing:getSpecialFunctionCallToken(pLastCommandToEvaluateToken)*/)||containsVariable(getEnvironment(),_identifierName)));
 		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(!variableExists){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
@@ -4567,22 +4593,24 @@ void outputTokenInfo(){
 	Mtoken* token=pCommandToEvaluate;
 	uint16_t tokenIndex=0;
 	output("%s:\n","Tokens");
-	output("%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","ARG","ENVID","TYPE","TEXT");
+	output("%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%lld\t%x/%x\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%lld\t%x/%x\t\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
 		if(token->expr){
 			output("%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
 		}
 		if(token->prevIdentifier){
 			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
 		}
+		/* removing:
 		if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
 			Mtoken* specialFunctionCallToken=getSpecialFunctionCallToken(token);
 			if(specialFunctionCallToken){
 				output("%s\t%u\n"," local to",specialFunctionCallToken->offset);
 			}
 		}
+		*/
 		token=token->next;
 	}
 }
@@ -4605,7 +4633,7 @@ uint32_t getListElementCount(){
 void changeFunctionTokenToAVariable(bool endOfInput){
 	char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
-	pLastCommandToEvaluateToken->type=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,getSpecialFunctionCallToken(pLastCommandToEvaluateToken))||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
+	pLastCommandToEvaluateToken->type=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,pLastCommandToEvaluateToken->envid/* replacing:getSpecialFunctionCallToken(pLastCommandToEvaluateToken)*/)||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	reoutputToken(pLastCommandToEvaluateToken);
 	// I think we should remove ( from the behind cursor text if it was inserted
