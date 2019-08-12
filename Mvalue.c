@@ -862,7 +862,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     //////outputChar('.');
 	if(_value){
         ////////outputChar('+');
-		////////printf("\nTYPE: %d",_value->type);
+		//////output("TYPE: %d\n",_value->type);
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
             case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????

@@ -345,8 +345,11 @@ Mvalue* setdp(Mvalue* _value){
 ////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
 
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
+	if(!_decimal1||!_decimal2)return NULL;
+	if(!_decimalContext){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(_decimalContext,0,0);
-	mpd_add(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext);
+	///////outputLine("Adding two decimals.");
+	if(_result)mpd_add(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext);else outputError("Failed to create the sum decimal");
 	return _result;
 }
 
@@ -1052,6 +1055,11 @@ Mrational* _getValueRational(Mvalue* _value){
 	}
 	return _rational;
 }
+// MDH@11AUG2019: why wasn't this here before???
+Mrational* getValueRational(Mvalue* _value){
+	if(_value&&_value->type==VT_RATIONAL)return _value->value._rational;
+	return _getValueRational(_value);
+}
 
 Mdecimal* _getValueDecimal(Mvalue* _value){
 	Mdecimal* _decimal=NULL;
@@ -1418,7 +1426,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Wrap|Use history command - Options: Reset|eXit|Functions|History|Shell|Variables.","Shell mode: enter a system command to execute."};
+char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Use history command|Verbose|Wrap - Options: Reset|eXit|Functions|History|Shell.","Shell mode: enter a system command to execute."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -1433,11 +1441,11 @@ void restoreCursor(){printf("\0338");}
 */
 
 void displayFlags(){
-	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'s':'S',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
+	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
 }
 
 void outputFlags(){
-	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'s':'S',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
+	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
 }
 
 // MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
@@ -1834,7 +1842,8 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				// what should now be the argument value? this depends on the name of the function
 				char* _functionName=_stringstart(prevToken->text,prevToken->significantCharacterCount); // free asap
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
-				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
+				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
+				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;else pNewToken->argument=-2;
 				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
 				if(pNewToken->argument){ // a special function call
 					uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
@@ -2036,7 +2045,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LEN."  ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,"C" ,"`@;! DS%()&*+-,.>?:   []{}" }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`@;! DS%()&*+- .>?:   [ { " }, /* NEW_VARIABLE (variable that does not exist yet) */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
@@ -2054,6 +2063,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
+/* MDH@11AUG2019: NOT doing the following anymore, instead we store the identifier information in the tokens themselves
 // MDH@06AUG2019: I have to keep track of variable initializations in the current command so that I know when a variable is new or not
 //                analysis: variables used in a command typically refer to variables created in previous commands
 //                i.e. to variables kept in the current execution environment
@@ -2114,7 +2124,7 @@ void showInitializations(){
 		Mstring* p=_initializationsText;
 		Minitialization* _initialization=_lastInitialization;
 		while(p&&_initialization){
-			char* _initializationText=_getFormattedText(" %s:%lld",80/*strlen(_initialization->_variableName)+12*/,_initialization->_variableName,_initialization->argument);
+			char* _initializationText=_getFormattedText(" %s:%lld",80,_initialization->_variableName,_initialization->argument);
 			if(_initializationText){
 				p=string_prepend(p,_initializationText);
 				free(_initializationText);
@@ -2149,7 +2159,7 @@ bool initialized(char* variableName){
 	return(_initialization!=NULL);
 }
 // MDH@06AUG2019 END
-
+*/
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
 // if we put the error info in the error token
 
@@ -2379,13 +2389,14 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
 	Mtoken* _tokenCopy=(_token?__token():NULL);
 	if(_tokenCopy){
 		if(amVerbose()){
-			output("Copying token of type '%s' with text '%s'.\n",TOKENTYPE_STRING[_token->type],string(_token->text));
-			if(_token->expr)output("\tpointing to token of type '%s' with text '%s'.\n",TOKENTYPE_STRING[_token->expr->type],string(_token->expr->text));
+			output("Copying token '%s' of type '%s'.\n",string(_token->text),TOKENTYPE_STRING[_token->type]);
+			if(_token->expr)output("\tpointing to token '%s' of type '%s'.\n",string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]);
 		}
 		_tokenCopy->type=_token->type;
 		_tokenCopy->significantCharacterCount=_token->significantCharacterCount;
 		if(_token->text)_tokenCopy->text=_stringCopy(_token->text,0);
 		_tokenCopy->expr=_token->expr; // TODO do I need to do this??? this is also an issue because if we start comparing expr (on evaluation)
+		_tokenCopy->argument=_token->argument; // MDH@11AUG2019: we need the argument as well bro' TODO how about the envid?????
 		// we're NOT copying _next, _prev, _offset
 		//////_tokenCopy->prev=NULL;_tokenCopy->next=NULL;_tokenCopy->offset=0;
 	}
@@ -2566,15 +2577,23 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			// however this would require passing the bool argument along to every function getValueOfExpression calls
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
 			Mtoken* _firstUnevaluatedToken=_getEvaluatableTokenCopy(expressionToken);
-			Mtoken* unevaluatedToken=_firstUnevaluatedToken;
-			while(unevaluatedToken){
-				expressionToken=nextEnvironmentExpressionToken();
-				if(!expressionToken)break; // NOTE shouldn't happen though
-				if(!expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
-				unevaluatedToken->next=_getEvaluatableTokenCopy(expressionToken); // set next to the copy of the expression token
-				unevaluatedToken=unevaluatedToken->next;
+			if(_firstUnevaluatedToken){
+				if(amVerbose())
+				output("Evaluating special function call argument tokens:");
+				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
+				while(unevaluatedToken){
+					if(amVerbose())
+					output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
+					expressionToken=nextEnvironmentExpressionToken();
+					if(!expressionToken)break; // NOTE shouldn't happen though
+					if(!expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
+					unevaluatedToken->next=_getEvaluatableTokenCopy(expressionToken); // set next to the copy of the expression token
+					unevaluatedToken=unevaluatedToken->next;
+				}
+				if(amVerbose())
+				outputChar('\n');
+				_listElementValue=_getValueOfToken(_firstUnevaluatedToken,true);
 			}
-			_listElementValue=_getValueOfToken(_firstUnevaluatedToken,true);
 		}else{ // evaluate
 		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
@@ -2855,6 +2874,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 		if(amVerbose()){output("Setting the value reference of '%s'",_valuereference->_name);outputValue(" to '",_newValue,"'.\n");}
 		if(_valuereference->_itemid){ // the hard part: index/attribute name list assignment!!
 			result=true;
+			if(amVerbose())outputLine("Element to set.");
 			Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
 			// let's get the first index/attribute name
 			Mlistelement* indexorattributenameListelement=_itemidlist->_first;
@@ -2914,8 +2934,11 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				}
 			}
 		}else
-		if(setValue(getEnvironment(),_valuereference->_name,_newValue))
+		if(setValue(getEnvironment(),_valuereference->_name,_newValue)){
+			// NOTE even if the value itself is NULL, its address is never NULL
 			assignValue(&_valuereference->_value,_newValue);
+			outputLine("Value set!");
+		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
 	}
 	return result;
@@ -3069,6 +3092,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				//                we can make that happen by passing in NULL for getEnvironment() in which case it should check getEnvironment() only (and not all the parents as well)
 				// MDH@09AUG2019: I suppose only explicit local variables (in special function calls) should not be checked to exist in parent environments, but otherwise they should
 				//                we could give a warning if this variable is defined inside a special function call and is not a local variable
+				////////if(amVerbose())
+				output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
 				if(!addVariable(expressionToken->argument==1?NULL:getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getEnvironmentName();
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
@@ -3349,6 +3374,7 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 */
 // rational number addition
 // generic addition
+Mdecimal* getValueDecimal(Mvalue* _value);
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	// if either is NULL return the other
 	if(!_value1||isValueZero(_value1))return _value2;
@@ -3359,15 +3385,18 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
 	// if either is a rational, compute the sum rational
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-		Mrational *_rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
+		/////outputLine("Adding two rationals.");
 		Mrational* _sumRational=_qadd(_rational1,_rational2);
+		/////outputLine("Rationals added!");
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
+		outputLine("Rational copies released.");
 		if(!_sumRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_sumRational,true);
 	}
 	// if either is a decimal, compute the sum decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=_getValueDecimal(_value1),*_decimal2=_getValueDecimal(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		Mdecimal* _sumDecimal=_dadd(_decimal1,_decimal2);
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_sumDecimal)return NULL; // failed to create the sum for whatever reason
@@ -3414,7 +3443,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||isValueZero(_value1))return Mneg(_value2);if(!_value2||isValueZero(_value1))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-		Mrational *_rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
 		Mrational* _differenceRational=_qsubtract(_rational1,_rational2);
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
@@ -3433,7 +3462,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-		Mrational *_rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2);
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
 		Mrational* _multiplicationRational=_qmultiply(_rational1,_rational2);
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		if(!_multiplicationRational)return NULL; // failed to create the sum for whatever reason
@@ -3598,7 +3627,7 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	}
 	// if one of them is a rational do a rational division
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-		Mrational *_rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2);
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
 		Mrational* _divisionRational=_qdivide(_rational1,_rational2);
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		return _getRationalValue(_divisionRational,true);
@@ -3880,6 +3909,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			if(amVerbose())outputValue("First formula value: '",formula->_operand->_value,"'.\n");
 
 			// skip all assignments
+			// MDH@11AUG2019: how about creating ALL new variables IMMEDIATELY BEFORE evaluating the right-hand-side therefore allowing the use of these new variables in the right-hand-side in formulas as we have accepted??????
+			//                the main advantage being that you can use it directly even in the same expression, so as such it won't harm and it has benefits e.g. you can use a local variable immediately
 			uint16_t numberOfAssignments=0;
 			Mformulaelement* _lastAssignmentFormulaelement=NULL;
 			_formulaelement=formula;
@@ -3888,6 +3919,16 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(string_char(_formulaelement->_operator,0)=='<'||string_char(_formulaelement->_operator,0)=='>'||string_char(_formulaelement->_operator,0)=='!')break; // break on <=, >= and !=
 				if(string_length(_formulaelement->_operator)>1&&string_char(_formulaelement->_operator,0)=='=')break; // break on ==
 				if(_lastAssignmentFormulaelement)_formulaelement->_prev=_lastAssignmentFormulaelement; // MDH@21MAY2019: in order to be able to traverse back!!!
+				// MDH@11AUG2019: should we force existence?????? I don't think so because creation is done when the value reference is actually created, but I need to make certain that this is the case!!!!
+				/*
+				if(!addVariable(expressionToken->argument==1?NULL:getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
+					Mstring* _environmentName=_getEnvironmentName();
+					output("%sFailed to add%s variable '%s' to environment '%s'.\n",ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
+					free_string(_environmentName);
+					break; // NO retrieves the undefined value subsequently!!
+				}
+				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
+				*/
 				_lastAssignmentFormulaelement=_formulaelement;
 				numberOfAssignments++;
 				_formulaelement=_formulaelement->_next;
@@ -4264,6 +4305,7 @@ char switchToControlMode(char* message){
 		resetOutputColor();
 		if(message!=NULL)outputLine(message);
 		inputMode=IM_CONTROL;
+		outputVariables(); // immediately show the list of available variables (so we can then use v for verbose flag, AND s is available for Shell again!!!!)
 	}
 	///////////outputFlags(); // show the user the current flags!!
 	return 'o'; // to make the loop know to quit
@@ -4310,7 +4352,7 @@ void setCommandToEvaluate(Mtoken* pCommand){
 	writeCommand();
 	writeBehindCursorText(false);
 	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
-	determineCommandInitializations();
+	////////// removing: determineCommandInitializations();
 }
 /**
  * setCommandIndex() accepts @newCommandIndex between 0 and commandCount at most
@@ -4360,7 +4402,7 @@ void newCommand(){
 	resetOutputColor(); // TODO do we need this here?????
 	pLastCommandToEvaluateToken=pCommandToEvaluate=_getToken(NULL,TT_EXPRESSION);
 	if(!pCommandToEvaluate){outputError("Failed to create a new command");return;}
-	removeInitializations(); // MDH@06AUG2019: ready for new initializations at the start of a new command
+	////////// removing: removeInitializations(); // MDH@06AUG2019: ready for new initializations at the start of a new command
 	// MDH@27MAY2019: NO let's just keep expr NULL!!!
 	pCommandToEvaluate->expr=NULL; // TODO do I need this???? YES, because we used _getToken()! PERHAPS NOT as prevToken is NULL???????
 }
@@ -4469,7 +4511,7 @@ bool existsInCommand(char* identifierName,uint64_t identifierEnvironmentId){ // 
 	uint64_t commandIdentifierEnvironmentId,commandIdentifierEnvironmentLevels,ander=(1<<M_BITS_PER_ENV_LEVEL)-1;
 	while(!found&&commandIdentifier){
 		// if a function call or end of function call identifier, no need to check!!
-		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){
+		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){ // a (new) variable
 			commandIdentifierName=string(commandIdentifier->text); // I have to do this to get the closing '\0' placed!!!
 			if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
 				// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
@@ -4589,14 +4631,32 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 		inputError("%s","Failed to remove the last entered character.");
 }
 
-void outputTokenInfo(){
+void outputCommandInfo(){
+	if(!pCommandToEvaluate)return;
+	// MDH@12AUG2019: identifiers first
+	Mtoken* identifierToken=pLastCommandToEvaluateToken->prevIdentifier;
+	if(identifierToken){
+		output("%s","Identifiers:");
+		while(1){
+			//if(identifierToken==TT_VARIABLE||identifierToken==TT_NEW_VARIABLE){
+				// all identier tokens with argument equal to 1 should be considered new, if not it is a bug
+				if(identifierToken->argument==1&&identifierToken->type!=TT_NEW_VARIABLE)setColor(getErrorColor());else outputTokenColor(identifierToken);
+				output(" %s",string(identifierToken->text));
+				resetOutputColor();
+				output("(%u)",identifierToken->offset);
+			//}
+			identifierToken=identifierToken->prevIdentifier;
+			if(!identifierToken)break;
+		}
+		outputChar('\n');
+	}
+	// tokens
 	Mtoken* token=pCommandToEvaluate;
 	uint16_t tokenIndex=0;
-	output("%s:\n","Tokens");
-	output("%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
+	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%lld\t%x/%x\t\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
 		if(token->expr){
 			output("%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
 		}
@@ -4838,6 +4898,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 					// MDH@06AUG2019: these are also the tokens we need to recognize for keeping track of the initialized variables (and the level)
 					switch(pLastCommandToEvaluateToken->type){
 						case TT_ASSIGNMENT:
+							if(pLastCommandToEvaluateToken->argument==1)pLastCommandToEvaluateToken->argument=-1; // indicating that whatever comes next, should not be considered local variables, i.e. should NOT be marked 'automatically' as new variables because they should exist!!!
+							/* replacing:
 							if(pLastCommandToEvaluateToken->prev->type==TT_NEW_VARIABLE)if(initializable()){
 								char* newVariableName=string(pLastCommandToEvaluateToken->prev->text);
 								if(pushInitialization(newVariableName)){
@@ -4846,9 +4908,11 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 								}else
 									inputError("Failed to register the initialization of new variable '%s'.",newVariableName);
 							}
+							*/
 							break;
 						case TT_FUNCTION_CALL:
 							if(pLastCommandToEvaluateToken->prev->type==TT_FUNCTION){
+								/* replacing:
 								char* functionName=string(pLastCommandToEvaluateToken->prev->text);
 								// we do not need to store the function name itself, just the argument that will contain the local variable initializations
 								if(pushInitialization("(")){
@@ -4857,18 +4921,24 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 									if(amVerbose())inputInfo("Function '%s' registered.",functionName);
 								}else
 									inputError("Failed to register function call '%s'.",functionName);
+								*/
 							}else
 								inputError("No function in front of function call.");
 							break;
 						case TT_END_OF_FUNCTION_CALL:
+							if(pLastCommandToEvaluateToken->argument==-1)pLastCommandToEvaluateToken->argument=1;
+							/* replacing:
 							if(pushInitialization(")")){ // will set the argument count appropriately...
 								if(amVerbose())inputInfo("End of function call registered.");
 								initializationsChanged=true;
 							}else
 								inputError("Failed to register the end of a function call.");
+							*/
 							break;
 						case TT_LISTELEMENT:
 							if(pLastCommandToEvaluateToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
+								if(pLastCommandToEvaluateToken->argument==-1)pLastCommandToEvaluateToken->argument=1;
+								/* replacing:
 								// not any comma is a function call argument separator!!!
 								if(pushInitialization(",")){
 									_lastInitialization->argument--; // decrement the argument count (once it is zero any initialization is local to the function call)
@@ -4876,15 +4946,18 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 									initializationsChanged=true;
 								}else
 									inputError("Failed to register a next function call argument!");
+								*/
 							}
 							break;
 					}
+					/* removing:
 					if(amDebugging()){
 						if(!initializationsChanged)
 							inputInfo("Token with text '%c' of type %s considered to be a one character token.",inputChar,TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]);
 						else 
 						if(!amVerbose())showInitializations();
 					}
+					*/
 				}
 				/* replacing:
 				if(pLastCommandToEvaluateToken->type!=TT_ERROR&&pLastCommandToEvaluateToken->type!=TT_COMMENT&&pLastCommandToEvaluateToken->type!=TT_DQSTRING&&pLastCommandToEvaluateToken->type!=TT_SQSTRING)
@@ -5013,8 +5086,8 @@ int main(int argc, char **argv){
 			if(argv[arg][0]=='-'){ // a flag (or flags)
 				int i=0;
 				while(argv[arg][++i]){
-					if(argv[arg][i]=='s')setVerbose(true);else
-					if(argv[arg][i]=='S')setVerbose(false);else
+					if(argv[arg][i]=='v')setVerbose(false);else
+					if(argv[arg][i]=='V')setVerbose(true);else
 					if(argv[arg][i]=='d')setDebugging(false);else
 					if(argv[arg][i]=='D')setDebugging(true);else
 					if(argv[arg][i]=='a')setAssisting(false);else
@@ -5337,11 +5410,11 @@ int main(int argc, char **argv){
 					if(inputChar=='a'||inputChar=='A'){setAssisting(inputChar=='A');inputCharType='n';break;}
 					if(inputChar=='d'||inputChar=='D'){setDebugging(inputChar=='D');inputCharType='n';break;}
 					if(inputChar=='m'||inputChar=='M'){setMatchingparentheses(inputChar='M');inputCharType='n';break;}
-					if(inputChar=='s'||inputChar=='S'){setVerbose(inputChar=='s');inputCharType='n';break;} // 'amVerbose()' is implemented using 'silent' flag!!!
+					if(inputChar=='v'||inputChar=='V'){setVerbose(inputChar=='V');inputCharType='n';break;}
 					if(inputChar=='u'||inputChar=='U'){setAcceptinghistorycommand(inputChar='U');inputCharType='n';break;}
 					if(inputChar>='0'&&inputChar<='9'){setColorscheme(inputChar-'0');inputCharType='n';break;}
 					if(inputChar=='w'||inputChar=='W'){setWrapping(inputChar=='W');inputCharType='n';break;}
-					if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
+					////////////if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
 					if(inputChar=='f'||inputChar=='F'){outputFunctions();inputCharType='n';break;}
 					if(inputChar=='r'||inputChar=='R'){reset();inputCharType='n';break;}
 					// options
@@ -5506,7 +5579,7 @@ int main(int argc, char **argv){
 
 				// if we succeeded in evaluating a command we should register it
 				if(pCommandToEvaluate){ // technically something to evaluate
-					if(amVerbose())outputTokenInfo();
+					if(amVerbose())outputCommandInfo();
 					size_t mark=allocationmark();
 					if(amVerbose())output("Mark: %zu.\n",mark);
 					bool commandEvaluated=evaluateCommand();

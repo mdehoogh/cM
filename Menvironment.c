@@ -195,7 +195,7 @@ Mvariable* getVariable(const Menvironment* const _environment,const char* const 
     if(verbose)output("Looking for variable '%s'.\n",name);
     // input valid
     Mmap* variableMap=(_environment?_environment->_variableMap:(_executionEnvironment?_executionEnvironment->_variableMap:NULL));
-    if(!variableMap){if(verbose)output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
+    if(!variableMap){output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
@@ -224,7 +224,7 @@ Mvalue* Mexists(Mvalue* _value){
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
     if(name){ // input valid
-        _variable=getVariable(_environment,name,amVerbose());
+        _variable=getVariable(_environment,name,false);
         if(!_variable){ // non-existing...
             if(amVerbose())output("Variable '%s' to be created.\n",name);
             _variable=_getVariable(name,valuetype,immutable); // creates the variable, free when not bound
@@ -266,14 +266,22 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
 bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name){outputError("Cannot set the value: no variable name");return false;}
-    Mvariable* variable=getVariable(_environment,name,false);
+    Mvariable* variable=getVariable(_environment,name,amVerbose());
     if(variable){
         if(!variable->_value||!variable->immutable){
+            if(amVerbose())output("Variable '%s' to set.\n",variable->_name);
             // _value needs to be of the right type
             if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
-                if(amVerbose()){Mstring* _valueText=_getValueText(variable->_value,false);output("Value '%s' with count '%u' assigned to variable '%s'.\n",string(_valueText),variable->_value->count,name);free_string(_valueText);}
+                if(amVerbose()){
+                    Mstring* _valueText=_getValueText(variable->_value,false);
+                    if(_valueText){
+                        output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
+                        free_string(_valueText);
+                    }else
+                        outputLine("No value text!");
+                }
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }

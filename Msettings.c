@@ -29,23 +29,23 @@ bool amAcceptinghistorycommand(){return acceptinghistorycommand;}
 // flags used in (interactive) session mode
 void setAssisting(bool newAssisting){
     assisting=newAssisting;
-    if(verbose)output("\n%s",(assisting?"Will assist!":"Will not assist!"));
+    if(verbose)output("%s\n",(assisting?"Will assist!":"Will not assist!"));
 }
 void setDebugging(bool newDebugging){
     debugging=newDebugging;
-    if(verbose)output("\n%s",(debugging?"Will debug!":"Will not debug!"));
+    if(verbose)output("%s\n",(debugging?"Will debug!":"Will not debug!"));
 }
 void setMatchingparentheses(bool newMatchingparentheses){
     matchingparentheses=newMatchingparentheses;
-    if(verbose)output("\n%s",(matchingparentheses?"Will match parentheses!":"Will not match parentheses!"));
+    if(verbose)output("%s\n",(matchingparentheses?"Will match parentheses!":"Will not match parentheses!"));
 }
 void setVerbose(bool newVerbose){
-    if(verbose)output("\n%s",(newVerbose?"Will not be silent!":"Will be silent!"));
+    if(verbose)output("%s\n",(newVerbose?"Will be verbose!":"Will not be verbose!"));
     verbose=newVerbose;
 }
 void setAcceptinghistorycommand(bool newAcceptinghistorycommand){
     acceptinghistorycommand=newAcceptinghistorycommand;
-    if(verbose)output("\n%s",(acceptinghistorycommand?"Will use history command immediately!":"Will use history command as auto-completion!"));
+    if(verbose)output("%s\nx",(acceptinghistorycommand?"Will use history command immediately!":"Will use history command as auto-completion!"));
 }
 
 // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)

@@ -209,10 +209,14 @@ mpd_t* __mpd(mpd_context_t* mpd_context,int64_t value){
     // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
     mpd_t* mpd=mpd_qnew(); // replacing: mpd_context mpd_context?mpd_context:_decimalContext);
     // NOTE it is essential to initialize the stored value even when 0 as we would otherwise get errors on mpd_to_sci calls
-    if(mpd)
+    if(mpd){
         mpd_set_i64(mpd,value,(mpd_context?mpd_context:_decimalContext));
-    else
-        outputError("Failed to create an mpdecimal");
+        if(mpd->len==0){
+            output("%sFailed to create decimal with value " PRId64 ".\n",ERROR_PREFIX,value);
+            free_mpd(mpd);mpd=NULL;
+        }
+    }else
+        outputError("Failed to create a decimal");
     /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
     return mpd;
 }/* VALIDATED */
@@ -1491,9 +1495,14 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){
     return _biginteger;
 }/* VALIDATED */
 
-
 bool isDecimalZero(Mdecimal* _decimal){
-    return(_decimal&&mpd_iszero((mpd_t*)_decimal)==0); // TODO apparently 0 means true, something else means false
+    if(!_decimal)return false;
+    Mstring* _decimalText=_getDecimalText(_decimal,true); // free asap
+    ///////output("Is decimal '%s' zero?",string(_decimalText));
+    free_string(_decimalText); // freed
+    bool result=(_decimal->mpd?mpd_iszero(_decimal->mpd)==MP_YES:false); // TODO apparently 0 means true, something else means false
+    //////output(" %s.\n",(result?"YES":"NO"));
+    return result;
 }/* VALIDATED */
 
 /*
