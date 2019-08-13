@@ -349,7 +349,60 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimalContext){outputError("No decimal context!");return NULL;}
 	Mdecimal* _result=__decimal(_decimalContext,0,0);
 	///////outputLine("Adding two decimals.");
-	if(_result)mpd_add(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext);else outputError("Failed to create the sum decimal");
+	if(_result){
+		uint32_t status=0;
+		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
+		if(status>0){free_decimal(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
+	}else
+		outputError("Failed to create the sum decimal");
+	return _result;
+}
+Mdecimal* _ddivide(Mdecimal* _decimal1,Mdecimal* _decimal2){
+	if(!_decimal1||!_decimal2)return NULL;
+	if(!_decimalContext){outputError("No decimal context!");return NULL;}
+	Mdecimal* _result=__decimal(_decimalContext,0,0);
+	///////outputLine("Dividing two decimals.");
+	if(_result){
+		uint32_t status=0;
+		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
+		if(status>0){
+			free_decimal(_result);_result=NULL;
+			outputError("Failed to compute the quotient of two decimals");
+		}
+	}else 
+		outputError("Failed to create the quotient decimal");
+	return _result;
+}
+Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
+	if(!_decimal1||!_decimal2)return NULL;
+	if(!_decimalContext){outputError("No decimal context!");return NULL;}
+	Mdecimal* _result=__decimal(_decimalContext,0,0);
+	///////outputLine("Multiplying two decimals.");
+	if(_result){
+		uint32_t status=0;
+		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
+		if(status>0){
+			free_decimal(_result);_result=NULL;
+			outputError("Failed to compute the product of two decimals");
+		}
+	}else
+		outputError("Failed to create the product decimal");
+	return _result;
+}
+Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
+	if(!_decimal1||!_decimal2)return NULL;
+	if(!_decimalContext){outputError("No decimal context!");return NULL;}
+	Mdecimal* _result=__decimal(_decimalContext,0,0);
+	///////outputLine("Multiplying two decimals.");
+	if(_result){
+		uint32_t status=0;
+		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
+		if(status>0){
+			free_decimal(_result);_result=NULL;
+			outputError("Failed to compute the difference of two decimals");
+		}
+	}else
+		outputError("Failed to create the difference decimal");
 	return _result;
 }
 
@@ -1426,7 +1479,7 @@ enum INPUTMODE_ENUM {IM_COMMAND,IM_CONTROL,IM_SHELL}; // the possible input mode
 
 enum INPUTMODE_ENUM inputMode=IM_COMMAND; // whether or not in command mode
 
-char* promptinfo[]={"Command mode: cancel the input text with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Use history command|Verbose|Wrap - Options: Reset|eXit|Functions|History|Shell.","Shell mode: enter a system command to execute."};
+char* promptinfo[]={"Command mode: clear the command with Ctrl-C.","Control mode: Flags: Assist|color scheme (0 or 1)|Debug|Match parentheses|Use history command|Verbose|Wrap - Options: Reset|eXit|Functions|History|Shell.","Shell mode: enter a system command to execute."};
 /**
 call prompt() when ready to receive a new command
  */
@@ -1881,14 +1934,23 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 					// careful now, is this a comma that ends a function call argument??????
 					// let's inspect the expr field which should point to start parenthesis
 					// BUT we should only subtract from argument when this is a `do`, `for` or `function` call
-					if(pNewToken->expr&&pNewToken->expr->type==TT_FUNCTION_CALL){
-						if(pNewToken->expr->argument>0){
-							pNewToken->argument=pNewToken->argument-1;
-							inputInfo("New function call argument!");
+					if(pNewToken->expr){
+						if(pNewToken->expr->type==TT_FUNCTION_CALL){
+							if(pNewToken->expr->argument>0){
+								pNewToken->argument=pNewToken->argument-1;
+								if(amDebugging())inputInfo("New function call argument!");
+							}else
+							if(amDebugging())
+								inputInfo("Non-local variable function call argument");
 						}else
-							inputInfo("Non-local variable function call argument");
-					}else
-						inputInfo("Not a new function call argument!");
+						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP){
+							newTokenType=TT_ERROR;
+							inputError("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[pNewToken->expr->type]);
+						}
+					}else{ // a comma should always match either a map or list or expression start
+						newTokenType=TT_ERROR;
+						inputError("Comma not allowed outside map, list or function call!");
+					}
 				}
 				if(amDebugging())inputInfo("E7");
 			}
@@ -2051,8 +2113,8 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
 {""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
 {""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{";"   ,""    ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{";"   ,""    ,"" ,"+"    ,""     ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@ ! DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
 {";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
@@ -3449,6 +3511,14 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_differenceRational,true);
 	}
+	// if either is a decimal, compute the difference decimal
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal* _differenceDecimal=_dsub(_decimal1,_decimal2);
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(!_differenceDecimal)return NULL; // failed to create the sum for whatever reason
+		return _getDecimalValue(_differenceDecimal,true);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
@@ -3467,6 +3537,14 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		if(!_multiplicationRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_multiplicationRational,true);
+	}
+	// if either is a decimal, compute the product decimal
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal* _productDecimal=_dmul(_decimal1,_decimal2);
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(!_productDecimal)return NULL; // failed to create the sum for whatever reason
+		return _getDecimalValue(_productDecimal,true);
 	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
@@ -3571,7 +3649,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
 		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
 		// if the epower exponent is zero _value1 is the result
-		if(isValueZero(_value2))return _value1;
+		// see above: if(isValueZero(_value2))return _value1;
 		if(_value2->type==VT_INTEGER){ // an integer exponent
 			long long exponentOf10=_value2->value._integer->ll;
 			// if the power value is 0, _value1 is the result
@@ -3631,6 +3709,14 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 		Mrational* _divisionRational=_qdivide(_rational1,_rational2);
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		return _getRationalValue(_divisionRational,true);
+	}
+	// if either is a decimal, compute the quotient decimal
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal* _divideDecimal=_ddivide(_decimal1,_decimal2);
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(!_divideDecimal)return NULL; // failed to create the sum for whatever reason
+		return _getDecimalValue(_divideDecimal,true);
 	}
 	// always real divide
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
@@ -3872,11 +3958,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			// MDH@16MAY2019: can't end an expression with an operator BRO'
 			if(expressionToken){
-				if(amVerbose())output("Does '%s' of type '%s' end the expression?",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+				if(amVerbose())output("Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				endTokenTypeIndex=endTokenTypeCount;
 				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
 				if(endTokenTypeIndex){
-					if(amVerbose())output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
+					if(amVerbose())outputLine("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
 					break;
 				}
 				if(amVerbose())outputLine(" NO");
@@ -4154,14 +4240,14 @@ bool evaluateCommand(){
 
 	// 3. any command always has two significant tokens TODO could compare pCommandToEvaluate with pLastCommandToEvaluateToken which should be different!!!
 	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
-	if(pCommandToEvaluate==pLastCommandToEvaluateToken->expr){outputError("Empty command.");clearCommand();return false;}
+	if(pCommandToEvaluate==pLastCommandToEvaluateToken->expr){outputError("Empty command");clearCommand();return false;}
 
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
-	if(pLastCommandToEvaluateToken->type==TT_ERROR){outputError("Can't evaluate erroneous command.");removeToken();unfinishToken();return false;}
+	if(pLastCommandToEvaluateToken->type==TT_ERROR){outputError("Can't evaluate erroneous command");removeToken();unfinishToken();return false;}
 
 	// 3. if the last token is an operator of sorts the command is incomplete
-	if(pLastCommandToEvaluateToken->type<=8){outputError("Value behind operator at end of command missing.");return false;}
+	if(pLastCommandToEvaluateToken->type<=8){outputError("Value behind operator at end of command missing");return false;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
 	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
@@ -4561,7 +4647,7 @@ bool existsInCommand(char* identifierName,uint64_t identifierEnvironmentId){ // 
 
 // MDH@30APR2019: if the current token is a variable/function check whether it still is
 //                call whenever the current token changes (in removePreviousTokenCharacter() and commandCharacterAccepted())
-bool tokenCheckedForBeingAFunction(bool endOfInput){
+bool tokenCheckedForBeingAFunction(bool endOfInput,bool aSuggestedCharacter){
 	// only identifiers should be checked...
 	if(pLastCommandToEvaluateToken->type!=TT_VARIABLE&&pLastCommandToEvaluateToken->type!=TT_NEW_VARIABLE&&pLastCommandToEvaluateToken->type!=TT_FUNCTION)return false;
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
@@ -4596,13 +4682,14 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 			if(!variableExists){ // apparently does NOT exist
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
-				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
+				// suggested characters should make = show (probably already present in the behind cursor text)
+				if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else{ // a new variable
 			if(variableExists){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
-				if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+				if(endOfInput)if(amMatchingparentheses())if(string_length(behindCursorText)&&string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			}
 		}
 	}
@@ -4610,23 +4697,71 @@ bool tokenCheckedForBeingAFunction(bool endOfInput){
 	return true;
 }
 
+// MDH@14AUG2019: cancelCommand() takes care of removing everything in the current command
+void cancelCommand(){ // in response to Ctrl-C or backspace on the first character
+	backToPrompt();
+	clearScreenFromCursor(); // inserting doing this otherwise (in the case of backspace) we would apparently still see the behind cursor text
+	clearCommand();
+	string_setlength(behindCursorText,0); // by removing the behind cursor text, we ascertain that when the Enter key is pressed, we will switch to control mode, as otherwise we wouldn't, on the other hand, if pCommandToEvaluate is NULL we should always switch to control mode (even if)
+	// it's a good idea to inform the user that the command was cleared
+	if(amVerbose())
+	inputInfo("Command cleared!");
+}
+void updateOnTokenCharacterRemoved(char removedCharacter){
+	// adapt screen
+	clearScreenFromCursor(); // will clear what's behind the cursor
+	// MDH@14AUG2019: shouldn't we ALWAYS write the behind cursor text, because I think we should, and if we want do not want to see it we should delete it beforehand!!!!! which is much preferred over not showing it when it is still there!!!!!
+	// MDH@24APR2019 obsolete: commandLength()--; // decrement the total command length
+	if(cursorPosition()){ // still something left of the command (that we might check for being a function or not)
+		// on screen as well please
+		// before writing the behind cursor text we're going to check whether the current token still is a function or variable
+		tokenCheckedForBeingAFunction(true,false); // MDH@14AUG2019: no, not a suggested character (as called on the backspace user action)
+		// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
+		//// MDH@14AUG2019 moving to execute always: writeBehindCursorText(false);
+		// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
+	}/* removedTokenCharacter() calls removeToken which will NULL the pCommandToEvaluate and pLastCommandToEvaluateToken when the first command character is removed, in which case we do not need:
+		else clearCommand();*/
+	// MDH@14AUG2019: how about removing any matching character?????
+	if(string_length(behindCursorText)){
+		if(amMatchingparentheses()){
+			// TODO are there any other characters that we might need to remove
+			// NOTE assuming the character removed is ALWAYS present in INPUTCHARACTERTYPES so we can find its associated input type!!!!!
+			//////////if(amVerbose()){inputInfo("Adapting the suggested text.");}
+			char characterToRemove='\0';	
+			switch(INPUTCHARACTERTYPES[removedCharacter]){
+				case '[':characterToRemove=']';break;
+				case '{':characterToRemove='}';break;
+				case '(':characterToRemove=')';break;
+				case '!':characterToRemove='=';break;
+				case 'D':case 'S':characterToRemove=removedCharacter;break;
+			}
+			// if what can be removed matches the first character of the suggested text, remove it
+			if(!characterToRemove&&string_char(behindCursorText,0)==characterToRemove){
+				if(!string_removed_char(behindCursorText,0)){
+					inputError("Failed to remove the first matching character of the suggested text");
+				}
+			}
+		}
+		if(string_length(behindCursorText)){
+			//////////if(amVerbose())inputInfo("Writing suggested text.");
+			writeBehindCursorText(false);
+		}
+	}
+}
 // in response to backspace the previous token character is to be removed
 void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 	char removedCharacter=removedTokenCharacter(1);
 	if(removedCharacter){
-		// adapt screen
-		moveCursorLeft(1); // will decrement cursorPosition() // MDH@24APR2019: NOT anymore...
-		clearScreenFromCursor(); // will clear what's behind the cursor
-		// MDH@24APR2019 obsolete: commandLength()--; // decrement the total command length
-		if(cursorPosition()){ // still something left of the command (that we might check for being a function or not)
-			// on screen as well please
-			// before writing the behind cursor text we're going to check whether the current token still is a function or variable
-			tokenCheckedForBeingAFunction(true);
-			// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in behindCursorText that's what we should now write
-			writeBehindCursorText(false);
-			// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
-		}/* removedTokenCharacter() calls removeToken which will NULL the pCommandToEvaluate and pLastCommandToEvaluateToken when the first command character is removed, in which case we do not need:
-			else clearCommand();*/
+		moveCursorLeft(1); // TODO check if this is necessary also when cancelling the command
+		if(amVerbose()){inputInfo("Character '%c' removed.",removedCharacter);}
+		// if no text is left in the command we cancel the command (as a service to the user who wouldn't understand that Enter wouldn't switch to Control mode on an otherwise empty command!!!)
+		if(pLastCommandToEvaluateToken==pCommandToEvaluate&&string_length(pCommandToEvaluate->text)==0){
+			cancelCommand();
+			/* replacing:
+			if(string_length(behindCursorText))inputInfo("Use Ctrl-C to clear the text suggestion as well.");else cancelCommand();
+			*/
+		}else
+			updateOnTokenCharacterRemoved(removedCharacter);
 	}else // MDH@03MAY2019: can't switch to control mode here (so we just report the error!!!)
 		inputError("%s","Failed to remove the last entered character.");
 }
@@ -4678,7 +4813,7 @@ void outputCommandInfo(){
 bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
 bool isOneCharacterTokenType(uint8_t tokenType){
 	// TODO how about TT_EXPRESSION -> NO because a TT_EXPRESSION token is always considered ended, i.e. significantCharacterCount is not an issue in determining whether a new token starts there
-	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL);
+	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
 }
 
 // MDH@09JUL2019: count the number of list elements in front of the current token
@@ -4705,7 +4840,8 @@ void changeFunctionTokenToAVariable(bool endOfInput){
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
 //       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
 //                the endofinput flag is used to indicate whether this is the end of the input
-bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput){
+//                the suggestedCharacter flag tells commandCharacterAccepted() that the input character came from behindCursorText (the feed forward), so it will in that case not alter behindCursorText (by removing the same character that was entered)
+bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
 	//                1. we haven't got one 2. we have got a registered command which hasn't changed yet (in which case commandIndex will still be positive)
@@ -4757,14 +4893,18 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType<0||newTokenType==pLastCommandToEvaluateToken->type){
-			/* MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
-			MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again */
-			if(newTokenType==pLastCommandToEvaluateToken->type&&pLastCommandToEvaluateToken->significantCharacterCount>0)
-			// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
-			// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
-			if(pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->type!=TT_END_OF_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_END_OF_MAP&&pLastCommandToEvaluateToken->type!=TT_END_OF_LIST){
-				newTokenType=TT_ERROR;
-				if(amVerbose())inputError("Token already finished!");
+			/* 
+			   MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
+			   MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
+			   MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
+			*/
+			if(newTokenType==pLastCommandToEvaluateToken->type&&pLastCommandToEvaluateToken->significantCharacterCount>0){
+				// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
+				// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
+				if(pLastCommandToEvaluateToken->type!=TT_LIST&&pLastCommandToEvaluateToken->type!=TT_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->type!=TT_END_OF_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_END_OF_MAP&&pLastCommandToEvaluateToken->type!=TT_END_OF_LIST){
+					newTokenType=TT_ERROR;
+					if(amVerbose())inputError("Token already finished!");
+				}
 			}
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
@@ -4936,7 +5076,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							*/
 							break;
 						case TT_LISTELEMENT:
-							if(pLastCommandToEvaluateToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
+							if(pLastCommandToEvaluateToken->expr&&pLastCommandToEvaluateToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
 								if(pLastCommandToEvaluateToken->argument==-1)pLastCommandToEvaluateToken->argument=1;
 								/* replacing:
 								// not any comma is a function call argument separator!!!
@@ -4994,7 +5134,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	// MDH@24APR2019 obsolete: cursorPosition()++; // increment the current cursor position
 	// MDH@07AUG2019: after a character is input by the user (or some other source) the identifier type will be checked...
 	//                BUT 
-	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput); // MDH@28MAY2019: ALWAYS check for being a function!!!!
+	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput,aSuggestedCharacter); // MDH@28MAY2019: ALWAYS check for being a function!!!!
 	if(amDebugging())inputInfo("K");
 	if(endOfInput){
 		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
@@ -5003,19 +5143,34 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
-				if(pLastCommandToEvaluateToken->type!=TT_BINARY_aErU){
-					if(amMatchingparentheses()){
-						if(!string_length(behindCursorText)) // MDH@28MAY2019: if there's nothing behind the cursor yes we do append closing stuff
-						switch(inputCharacterType){
-							case '[':string_insert_char(behindCursorText,0,']');break;
-							case '{':string_insert_char(behindCursorText,0,'}');break;
-							case '(':string_insert_char(behindCursorText,0,')');break;
-							case '"':string_insert_char(behindCursorText,0,'"');break;
-							case '\'':string_insert_char(behindCursorText,0,'\'');break;
+				if(!aSuggestedCharacter){ // MDH@14AUG2019: using this flag here means no changes to the suggested text are done, when this character was consumed from the suggested text
+					if(pLastCommandToEvaluateToken->type!=TT_BINARY_aErU){
+						// MDH@14AUG2019: whether or not to insert a feed-forward matching parenthesis is open for debate
+						//                this is a bit of an issue because string literal start and ends is the same, and how do we know if a string is started or ended????? solution: test the type
+						if(amMatchingparentheses()){
+							// MDH@14AUG2019: I think we should always insert the character we need to close the bracket no matter what
+							//                NOTE we're using inputCharType here, not inputChar but as you may notice in removeCharacter there it's not using the input character type, I suppose we should
+							//                with strings is important only to insert the same character when the inserted character started the string
+							// removing: if(!string_length(behindCursorText)) // MDH@28MAY2019: if there's nothing behind the cursor yes we do append closing stuff
+							switch(inputCharacterType){
+								case '[':string_insert_char(behindCursorText,0,']');break;
+								case '{':string_insert_char(behindCursorText,0,'}');break;
+								case '(':string_insert_char(behindCursorText,0,')');break;
+								case 'D':if(pLastCommandToEvaluateToken->type==TT_DQSTRING&&string_length(pLastCommandToEvaluateToken->text)==1)string_insert_char(behindCursorText,0,inputChar);break;
+								case 'S':if(pLastCommandToEvaluateToken->type==TT_SQSTRING&&string_length(pLastCommandToEvaluateToken->text)==1)string_insert_char(behindCursorText,0,inputChar);break;
+								// MDH@14AUG2019: if the user typed the same character as is currently behind the cursor let's remove that character
+								//                but only when the character entered is NOT consumed because in that case it was already removed (and shouldn't be removed again if there's another such a character which can happen a lot with matching parentheses)
+								default:
+									if(!aSuggestedCharacter)
+									if(string_length(behindCursorText)&&string_char(behindCursorText,0)==inputChar){
+										if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the matching first feed forward character");
+									}
+									break;
+							}
 						}
-					}
-				}else
-					string_insert_char(behindCursorText,0,'=');
+					}else
+						string_insert_char(behindCursorText,0,'=');
+				}
 			}
 			if(amDebugging())inputInfo("M");
 		}
@@ -5251,13 +5406,12 @@ int main(int argc, char **argv){
 					else // nothing to remove
 						beep();
 				}else
-				if(inputCharType=='c'){ // cancel command (Ctrl-D)
+				if(inputCharType=='c'){ // cancel command (Ctrl-C)
 					// replacing: if(pCommandToEvaluate!=NULL){clearCommand();break;}beep(); 
-					if(pCommandToEvaluate!=NULL){
-						backToPrompt();
-						clearCommand();
+					if(pCommandToEvaluate!=NULL)
+						cancelCommand();
 						/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
-					}else
+					else
 						beep();
 				}else
 				if(inputCharType=='t'){ // Tab character
@@ -5273,8 +5427,9 @@ int main(int argc, char **argv){
 								break;
 							}
 							// MDH@24APR2019 obsolete: commandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
-							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],bc==0)){
-								inputCharType=switchToControlMode("Failed to accept the suggested character.");
+							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
+							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],bc==0,true)){
+								inputCharType=switchToControlMode("Failed to accept an suggested character.");
 								break;
 							}
 						}
@@ -5294,7 +5449,7 @@ int main(int argc, char **argv){
 												if(string_removed_char(behindCursorText,0))
 													writeBehindCursorText(true);
 												else
-													inputCharType=switchToControlMode("Failed to remove the first character of the auto-completion text.");	
+													inputCharType=switchToControlMode("Failed to remove the first character of the suggested text.");	
 											}else // nothing under the cursor to delete
 												beep();
 										}
@@ -5338,8 +5493,9 @@ int main(int argc, char **argv){
 										////////////bool success=false;
 										char newInputChar=string_removed_char(behindCursorText,0);
 										if(newInputChar){
+											// MDH@14AUG2019: commandCharacterAccepted() will remove the same character if matching parenthesis that was consumed just now unless we tell commandCharacterAccepted not to do that, so we add an additional argument
 											// MDH@24APR2019: commandLength()--;
-											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true))
+											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true,true))
 												inputCharType=switchToControlMode("Suggested character extracted, but not accepted.");
 										}else
 											inputCharType=switchToControlMode("Suggested character not extracted!");
@@ -5370,7 +5526,10 @@ int main(int argc, char **argv){
 											if(!string_length(pLastCommandToEvaluateToken->text)){
 												// we can check the offset to see if this is the first token, but pLastCommandToEvaluateToken->prev is a little more secure
 												pLastCommandToEvaluateToken=freeToken(pLastCommandToEvaluateToken);
-												if(!pLastCommandToEvaluateToken)pCommandToEvaluate=NULL; // if no last command token anymore, we apparently released the first command token
+												if(!pLastCommandToEvaluateToken){
+													pCommandToEvaluate=NULL;
+													inputInfo("Command cleared."); // MDH@14AUG2019: good idea to inform the user that now there's no command anymore
+												} // if no last command token anymore, we apparently released the first command token
 											}
 											writeBehindCursorText(false);
 										}else
@@ -5385,7 +5544,7 @@ int main(int argc, char **argv){
 				}else{
 					// MDH@21APR2019: creating a command if need be is delegated to commandCharacterAccepted() which we know
 					//                we always need a command (being edited)
-					if(!commandCharacterAccepted(inputChar,inputCharType,true))
+					if(!commandCharacterAccepted(inputChar,inputCharType,true,false))
 						inputCharType=switchToControlMode(pCommandToEvaluate?"Failed to accept the character.":"Failed to create a new command");
 					/*
 					// we need to have a token (to append the input character to) which initializes to pCommandToEvaluate
@@ -5611,8 +5770,8 @@ int main(int argc, char **argv){
 							outputError("Failed to register the command again! Probable cause: out of memory");
 					}else{
 						if(amVerbose())outputLine("Command registered!");
-
 					}
+
 					// start anew (without a current command to evaluate!!!!)
 					pLastCommandToEvaluateToken=pCommandToEvaluate=NULL; // remove reference to current command
 
@@ -5623,11 +5782,13 @@ int main(int argc, char **argv){
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
 					if(_firstFunctionBodyRequest&&!startFunctionBodyInput())
-						outputError("Failed to honour the request(s) for the body of function(s)");
+						outputError("Failed to start requesting the body of a new function");
 
-				}else
-				if(behindCursor()==0)
-					switchToControlMode(NULL);
+				}else{
+					// MDH@14AUG2019: if a user presses Enter when there's no command but still behindCursorText it looses behindCursorText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)
+					//                NOTE that I might consider keeping behindCursorText, so it will be redisplayed when the user returns to the command mode
+					switchToControlMode(NULL); // replacing: if(behindCursor()==0)switchToControlMode(NULL);else outputError("Still suggested text");
+				}
 			}else
 			if(inputMode==IM_SHELL){
 				if(string_length(shellCommand))
