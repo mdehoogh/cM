@@ -157,7 +157,7 @@ void free_biginteger(Mbiginteger* _biginteger);
 Mbiginteger* __biginteger();
 Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger);
 Mbiginteger* _getBiginteger(int64_t l);
-Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger);
+// see Mbiginteger.c/h for the replacement by _getNegatedBiginteger: Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger);
 Mbiginteger* getBigintegerLLMin();
 Mbiginteger* getBigintegerLLMax();
 bool isBigintegerZero(Mbiginteger* _biginteger);

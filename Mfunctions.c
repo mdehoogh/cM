@@ -1,6 +1,6 @@
 #include "Msettings.h"
 #include "Moutput.h"
-
+#include "Msession.h"
 #include "Mfunctions.h"
 
 extern const char* VALUETYPENAMES;
@@ -250,13 +250,6 @@ Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){
 }
 // end math functions
 
-Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){
-    if(!_biginteger)return NULL;
-    mp_int* _bineg=__biginteger();
-    if(_bineg&&mp_neg(_biginteger,_bineg)!=MP_OKAY){free_biginteger(_bineg);_bineg=NULL;outputError("Failed to negate a big integer");}
-    return _bineg;
-}
-
 Mvalue* Mneg(Mvalue* _value){ // negate a value
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
@@ -268,14 +261,16 @@ Mvalue* Mneg(Mvalue* _value){ // negate a value
             // this is done by negating the numerator but if the numerator equals NULL we should use -1
             Mrational* rational=_value->value._rational;
             if(rational){
-                outputValue("Negating rational '",_value,"'.\n");
+                /////////outputValue("Negating rational '",_value,"'.\n");
                 Mbiginteger* _biNumerator=(rational->num?_getNegatedBiginteger(rational->num):_getBiginteger(-1));
                 if(_biNumerator){
+                    ////////outputBiginteger("Negated numerator '",_biNumerator,"' computed!\n");
                     Mbiginteger* _biDenominator=(rational->den?_getBigintegerCopy(rational->den):NULL);
+                    ////////outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
                     if(_biDenominator||!rational->den)return _getRationalValue(_getRational(_biNumerator,_biDenominator,(!rational->delta||ldIsNaN(rational->delta->ld)?M_LD_NAN:-rational->delta->ld),false,true),true);
+                    outputError("Failed to copy the numerator of the rational to negate");
                     if(_biDenominator)free_biginteger(_biDenominator);
                     free_biginteger(_biNumerator);
-                    outputError("Failed to copy the numerator of the rational to negate");
                 }else
                     outputError("Failed to negate the numerator of a rational");
             }

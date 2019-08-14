@@ -159,7 +159,18 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 	Mbiginteger *_num=_Imul(_rational1->num,_rational2->den),*_den=_Imul(_rational2->num,_rational1->den);
 	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
 	// pure rationals are easy
-	if(delta1undefined&&delta2undefined)return _getRational(_num,_den,M_LD_NAN,true,true);
+	if(delta1undefined&&delta2undefined){
+		Mbiginteger *_negnum=NULL,*_negden=NULL; // won't be constructed if _den is not negative
+		Mrational* _rational=NULL;
+		// if the denominator is now negative we have to toggle the sign of both numerator and denominator
+		if(_den&&mp_isneg(_den)==MP_YES){_negnum=_getNegatedBiginteger(_num);_negden=_getNegatedBiginteger(_den);}
+		if(_negnum&&_negden){
+			_rational=_getRational(_negnum,_negden,M_LD_NAN,true,true);
+			free_biginteger(_num);free_biginteger(_den);
+		}else
+			_rational=_getRational(_num,_den,M_LD_NAN,true,true);
+		return _rational;
+	}
 	// if we assume the delta's to be very small (as they will be), the parts containing squares to be too small to care about 
 	if(delta1undefined){
 		// second denominator term is -(b*d*delta2)**2 which for reasonably small b and d (both denominators) will be negligable
@@ -295,7 +306,7 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 }
 Mrational* _qneg(Mrational* _rational){
 	// normalizes the negated rational if not currently normalized, otherwise it will not normalize it
-	Mrational* _rationalNeg=(_rational?_getRational(_getBigintegerNeg(_rational->num),_getBigintegerCopy(_rational->den),realneg(_rational->delta),!_rational->normalized,true):NULL);
+	Mrational* _rationalNeg=(_rational?_getRational(_getNegatedBiginteger(_rational->num),_getBigintegerCopy(_rational->den),realneg(_rational->delta),!_rational->normalized,true):NULL);
 	if(_rationalNeg)if(_rational->normalized)_rationalNeg->normalized=true; // if original assumed normalized, so is the negated value
 	return _rationalNeg;
 }

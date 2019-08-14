@@ -171,11 +171,13 @@ Mbiginteger* _getBiginteger(int64_t ll){
     if(biginteger)mp_set_i64((mp_int*)biginteger,ll); // even if l equals 0 set it TODO check is that necessary???
     return biginteger;
 }/* VALIDATED */
+/* replaced by _getNegatedBiginteger in Mbiginteger.c/h
 Mbiginteger* _getBigintegerNeg(Mbiginteger* biginteger){
     Mbiginteger* bigintegerNeg=__biginteger(); // the result we will be returning
     if(bigintegerNeg&&mp_neg(biginteger,bigintegerNeg)!=MP_OKAY){free_biginteger(bigintegerNeg);bigintegerNeg=NULL;}
     return bigintegerNeg;
-}/* VALIDATED */
+}// VALIDATED 
+*/
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
 Mbiginteger* _getBigintegerCopy(Mbiginteger* biginteger){
     if(!biginteger)return NULL;
@@ -988,18 +990,25 @@ long long getInteger(Mvalue* _value){
 
 // BigInteger stuff
 Mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
-    // determine the required size
-    int arepsize;
-    if(!_biginteger||mp_radix_size(_biginteger,10,&arepsize)!=MP_OKAY){if(amVerbose())outputError("Couldn't determine the size of a big integer");return NULL;}
-    if(arepsize>0xFFFFFFFF){output("%sCan't store more than %u characters in a string.",ERROR_PREFIX,0xFFFFFFFF);return NULL;}
     Mstring* _bigintegerText=__string();
     if(_bigintegerText){
-        Mstring* _p=_bigintegerText;
-        _p=string_setlength(_p,arepsize);
-        if(_p&&mp_toradix(_biginteger,_p->chars,10)==MP_OKAY)string_synclength(_p);else _p=NULL;
-        if(!_p){outputError("Failed to stringify a big integer");free_string(_bigintegerText);_bigintegerText=NULL;}
+        if(_biginteger){
+            // determine the required size
+            int arepsize=0;
+            if(amVerbose())outputLine("Determining a big integer text representation.");
+            if(mp_radix_size(_biginteger,10,&arepsize)==MP_OKAY){
+                ////////output("Representation size: %d.\n",arepsize);
+                if(arepsize<=0xFFFFFFFF){
+                    string_setlength(_bigintegerText,arepsize);
+                    if(mp_toradix(_biginteger,_bigintegerText->chars,10)==MP_OKAY)string_synclength(_bigintegerText);
+                }else
+                    output("%sCan't store more than %u characters in a string.\n",ERROR_PREFIX,0xFFFFFFFF);
+            }else
+                outputError("Couldn't determine the size of a big integer");
+        }else
+            outputError("No big integer to represent");
     }else
-        output("%sFailed to create a text to hold the %d characters of a big integer.\n",ERROR_PREFIX,arepsize);
+        output("%sFailed to create a text for storing the representation of a big integer.\n",ERROR_PREFIX);
     return _bigintegerText;
 }/* VALIDATED */
 
