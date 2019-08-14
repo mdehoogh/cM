@@ -14,7 +14,7 @@
 #include "Menvironment.h"
 
 // externally (in M.c) defined constants
-const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
+extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* const ERROR_PREFIX;

@@ -1,7 +1,7 @@
 /**
  * MDH@24JUN2019: everything that deals with execution of functions (in their own execution environment)
  */
-#include "Mvalue.h"
+#include "Mfunctions.h"
 
  // functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
 // all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
@@ -62,9 +62,6 @@ typedef struct Menvironment{
     struct Menvironment* _parent; // typically the definition environment
     struct Menvironment* _execution; // the environment that was executing before this one was popped!!
 }Menvironment;
-
-Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
-Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
 
 Menvironment* __environment(); // creates a new (empty) environment
 void free_environment(Menvironment* _environment);

@@ -156,40 +156,8 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map);
 bool isValueZero(Mvalue* _value);
 bool isValueOne(Mvalue* _value);
  
-// unary functions
-Mvalue* Mneg(Mvalue* _value); // negate a value
-Mvalue* Mbnot(Mvalue* _value); // binary not a value
-Mvalue* Mnot(Mvalue* _value); // not a value
-
 bool isNull(Mvalue* _value); // expose as well
 bool isUndefined(Mvalue* _value); // expose as well
-
-Mvalue* Mnull(Mvalue* _value); // whether null!!!
-Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
-
-Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
-Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
-Mvalue* Mfacd(Mvalue* _value); // faculty (for an integer)
-Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)
-
-Mvalue* Mbi(Mvalue* _value); // convert to a big integer
-
-// math unary functions
-Mvalue* Mfloor(Mvalue* _value);
-Mvalue* Mtrunc(Mvalue* _value);
-Mvalue* Mround(Mvalue* _value);
-Mvalue* Mceil(Mvalue* _value);
-Mvalue* Msin(Mvalue* _value);
-Mvalue* Mcos(Mvalue* _value);
-Mvalue* Mtan(Mvalue* _value);
-Mvalue* Msinh(Mvalue* _value);
-Mvalue* Mcosh(Mvalue* _value);
-Mvalue* Mtanh(Mvalue* _value);
-Mvalue* Mexp(Mvalue* _value);
-Mvalue* Mlog(Mvalue* _value);
-Mvalue* Mlog10(Mvalue* _value);
-Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue);
-Mvalue* Msqrt(Mvalue* _value);
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);
@@ -209,3 +177,11 @@ typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
 typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
 typedef Mvalue* (*ThreeArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value);
 typedef Mvalue* (*FourArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value);
+
+Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
+Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
+
+// some conversion functions that might be moved to some more specialized 'module'
+Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero); // TODO probably to be moved to Mrational.h/c
+Mbiginteger* _getRoundedRationalInteger(Mrational* _rational);
+

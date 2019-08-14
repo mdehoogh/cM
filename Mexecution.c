@@ -291,6 +291,7 @@ void free_bigintegerListelement(MbigintegerListelement* _bile){
     if(_bile->_next)free_bigintegerListelement(_bile->_next);
     if(_bile->_biginteger)free_biginteger(_bile->_biginteger);
 }/* VALIDATED */
+
 Mdecimal* _getRationalDecimal(const Mrational* const _rational){
     if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     // _decimalText is a local variable that when set should be freed before returning!!!
@@ -1504,19 +1505,6 @@ bool isDecimalZero(Mdecimal* _decimal){
     //////output(" %s.\n",(result?"YES":"NO"));
     return result;
 }/* VALIDATED */
-
-/*
-// big integer arithmetic
-Mvalue* Mbi(Mvalue* _value){
-    if(_value&&_value->type==VT_INTEGER){
-        z_t bi;
-        zinit(bi); // TODO do I need this??????
-        zseti(bi,_value->value._integer->ll);
-        Mvalue* _biValue=_getBigIntegerValue(bi);
-    }
-    return NULL;
-}
-*/
 
 // when only interested in the end result, calling _getLongDoubleRational is the way to go
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){

@@ -18,7 +18,7 @@
 // Menvironment includes Mvalue includes Mexecution includes ...
 #include "Menvironment.h"
 
-// used externally in Mexecution.h, Mvalue.h, Menvironment.h
+// used externally in Mexecution.h, Mvalue.h, Mfunctions.h, Menvironment.h
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
 const char* const IFFUNCTION_NAME="if";
@@ -29,10 +29,14 @@ const char* const DEFINEUSERFUNCTION_NAME="function";
 const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
+
 const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
 const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
 
 const long long M_DP=20; // the default decimal precision
+
+const long double M_LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
+const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
 const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
 
@@ -83,15 +87,12 @@ bool initVariable(Menvironment* _Menvironment,char* name,double d){
 */
 // there will be a root (M) environment
 
-const long double LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
-
 // PI all little more accurate (we could make a PI100 from these numbers)
 // source: https://blog.wolfram.com/2011/06/30/all-rational-approximations-of-pi-are-useless/
 // wolfram has a Rationalize function to compute rational approximations to a certain accuracy (see https://reference.wolfram.com/language/ref/Rationalize.html)
 /////const char* M_QNUM_PI100="394372834342725903069943709807632345074473102456264";
 /////const char* M_QDEN_PI100="125532772013612015195543173729505082616186012726141";
 
-const long double LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
 
 Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	// ASSERT do NOT call with either a or b NULL
@@ -351,8 +352,8 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	///////outputLine("Adding two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
-		if(status>0){free_decimal(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
+		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		if(status&0xEFBF){free_decimal(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
 	}else
 		outputError("Failed to create the sum decimal");
 	return _result;
@@ -364,8 +365,8 @@ Mdecimal* _ddivide(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	///////outputLine("Dividing two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
-		if(status>0){
+		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		if(status&0xEFBF){
 			free_decimal(_result);_result=NULL;
 			outputError("Failed to compute the quotient of two decimals");
 		}
@@ -380,8 +381,8 @@ Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	///////outputLine("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
-		if(status>0){
+		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		if(status&0xEFBF){
 			free_decimal(_result);_result=NULL;
 			outputError("Failed to compute the product of two decimals");
 		}
@@ -396,8 +397,8 @@ Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	///////outputLine("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,status);
-		if(status>0){
+		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		if(status&0xEFBF){
 			free_decimal(_result);_result=NULL;
 			outputError("Failed to compute the difference of two decimals");
 		}
@@ -1114,30 +1115,6 @@ Mrational* getValueRational(Mvalue* _value){
 	return _getValueRational(_value);
 }
 
-Mdecimal* _getValueDecimal(Mvalue* _value){
-	Mdecimal* _decimal=NULL;
-	if(_value){
-		if(_value->type!=VT_LIST&&_value->type!=VT_MAP){
-			switch(_value->type){
-				case VT_DECIMAL:_decimal=_getDecimalCopy(_value->value._decimal);break;
-				case VT_INTEGER:_decimal=_getDecimal(__mpd(_decimalContext,_value->value._integer->ll),0,true);break;
-				case VT_RATIONAL:
-					{ // a rational text representation still contains the numerator/denominator pair, so can't be parsed into a decimal
-						// TODO we need to find the decimal approximation with precision equal to the default decimal precision
-					}
-					break;
-				default:
-					{ // TODO: use _getTextDecimal instead!!!
-						Mstring* _valueText=_getValueText(_value,true);
-						if(_valueText){mpd_set_string(_decimal->mpd,string(_valueText),_decimalContext);free_string(_valueText);}
-					}
-					break;
-			}
-		}
-	}
-	return _decimal;
-}
-
 // TODO how many iterations would we accept at most?????
 Mvalue* Q(Mvalue* _value){
 	if(!_value)return NULL;
@@ -1281,7 +1258,7 @@ bool initEnvironment(){
 				////////return false;
 			}*/
 			// create and add PI and E constants!!!
-			Mvalue* PI_value=_getRealValue(LD_PI);
+			Mvalue* PI_value=_getRealValue(M_LD_PI);
 			if(!PI_value){
 				outputLine("ERROR: Failed to create PI.");
 				return false;
@@ -1296,7 +1273,7 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to initialize PI.");
 				return false;
 			}
-			Mvalue* E_value=_getRealValue(LD_E);
+			Mvalue* E_value=_getRealValue(M_LD_E);
 			if(!E_value){
 				///////free_value(E_value);
 				outputLine("ERROR: Failed to create E.");
@@ -1833,7 +1810,7 @@ void outputStatus(char inputChar,char inputCharType){
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 	Mtoken* pNewToken=__token();
 	if(pNewToken){
-		if(amDebugging())inputInfo("E1");
+		/////if(amDebugging())inputInfo("E1");
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
 		if(prevToken){
 			// finish the previous token
@@ -1841,7 +1818,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			if(!prevToken->significantCharacterCount)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
 			// initialize the new token
 			pNewToken->prev=prevToken; // set the predecessor
-			if(amDebugging())inputInfo("E2");
+			/////if(amDebugging())inputInfo("E2");
 			// MDH@27MAY2019: let's by default copy prevToken-expr over
 
 			// MDH@18MAY2019: if a , starts an expression we won't be pointing to the opening parenthesis!!!
@@ -1889,7 +1866,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			// MDH@07AUG2019: a token 'inherits' the prevIdentifier and argument of its previous token, to be adapted if necessary depending on what it is
 			//                of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
 			//                how about function identifiers? they are special in that they change the argument value
-			if(amDebugging())inputInfo("E3");
+			/////if(amDebugging())inputInfo("E3");
 			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?) TODO shouldn't we test whether the new token type is TT_FUNCTION_CALL instead??????
 				pNewToken->prevIdentifier=prevToken;
 				// what should now be the argument value? this depends on the name of the function
@@ -1913,13 +1890,13 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				free(_functionName);
 				// every , that ends a function call argument should decrement the argument value
 			}else{ // not a function identifier	
-				if(amDebugging())inputInfo("E4");		
+				/////if(amDebugging())inputInfo("E4");		
 				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE&&prevToken->type!=TT_END_OF_FUNCTION_CALL) // not behind a variable identifier or end of function call
 					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);	
 					pNewToken->prevIdentifier=prevToken->prevIdentifier;
 				else // behind a variable identifier or end of function call
 					pNewToken->prevIdentifier=prevToken;
-				if(amDebugging())inputInfo("E5");
+				/////if(amDebugging())inputInfo("E5");
 				// what to do with the argument if a function call ends???????
 				// the function name of the function call should contain the right argument value TODO check this!!!!!!!!
 				// BUG FIX aha end of function call does not always end a function call, but an expression (a single opening parenthesis without a function name in front of it), so explicitly checking for that!!!
@@ -1927,7 +1904,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 					pNewToken->argument=prevToken->expr->prev->argument;
 				else
 					pNewToken->argument=prevToken->argument;
-				if(amDebugging())inputInfo("E6");
+				/////if(amDebugging())inputInfo("E6");
 				// should we change the argument??????
 				if(newTokenType==TT_LISTELEMENT){ // ha ha, can't use pNewToken->type here as not assigned yet!!!
 					///////inputInfo("List element!");	
@@ -1952,10 +1929,10 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 						inputError("Comma not allowed outside map, list or function call!");
 					}
 				}
-				if(amDebugging())inputInfo("E7");
+				/////if(amDebugging())inputInfo("E7");
 			}
 		}
-		if(amDebugging())inputInfo("E8");
+		/////if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
 		pNewToken->text=__string();
 		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
@@ -1963,7 +1940,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			inputError("%sFailed to initialize the new token.",ERROR_PREFIX);
 			pNewToken->type=TT_ERROR; 
 		}
-		if(amDebugging())inputInfo("E9");
+		/////if(amDebugging())inputInfo("E9");
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
 		pNewToken->next=NULL;
@@ -3606,11 +3583,6 @@ long double getRealValuePower(Mvalue* _baseValue,long double power){
 	return M_LD_NAN; // uncomputable
 }
 
-Mdecimal* getValueDecimal(Mvalue* _value){
-	// ASSERT typically _value should contain a numeric (non-real) value
-	if(_value&&_value->type==VT_DECIMAL)return _value->value._decimal;
-	return _getValueDecimal(_value); // will always create a new one...
-}
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1))return _value1;
@@ -3641,10 +3613,15 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 }
 
 long double getReal(Mreal* _real){return(_real?_real->ld:M_LD_NAN);}
+// MDH@15AUG2019: given that epower means base times 10 to the power of exponent, it makes sense to actually compute epower as mul(base,power(10,exponent)) where for 10 we use a single integer
 Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
+	// we can still use the shortcuts
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueZero(_value2))return _value1; // NOTE if the power is zero, the multiplication factor will be 1
+	return multiply(_value1,power(_getIntegerValue(10),_value2)); // TODO check whether _getIntegerValue(10) actually gets freed by the 'gc'
+	/* replacing:
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
+
 	// if both values are numeric (somehow) we can do the computation
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
 		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
@@ -3688,6 +3665,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 		return multiply(_value1,power(_getIntegerValue(10),_value2)); // temp. value like the power result and _getIntegerValue(10) will be garbage collected if not bound somewhere!!!
 		// replacing: return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld))));
 	}
+	*/
 	return NULL;
 }
 
@@ -4854,7 +4832,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	if(pLastCommandToEvaluateToken==NULL)return false;
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	clearInfo(); // TODO make a separate function to do this???
-	if(amDebugging())inputInfo("A");
+	/////if(amDebugging())inputInfo("A");
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
 	if(inputCharType=='C'){
 		pLastCommandToEvaluateToken->type^=0x70; // toggling bit 7
@@ -4882,14 +4860,14 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	printf("[%d+%c->%d]",pLastCommandToEvaluateToken->type,inputCharacterType,newTokenType);
 	outputTokenColor(pLastCommandToEvaluateToken);
 #endif
-		if(amDebugging())inputInfo("B");
+		/////if(amDebugging())inputInfo("B");
 		//MDH@17JUL2019: typically we'd get an error immediately when NOT entering a function call character ( behind a function identifier
 		if(newTokenType==TT_ERROR&&pLastCommandToEvaluateToken->type==TT_FUNCTION){
 			// we should assume that the identifier represents a (new) variable (identifier)
 			changeFunctionTokenToAVariable(endOfInput);
 			newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType);
 		}
-		if(amDebugging())inputInfo("C");
+		/////if(amDebugging())inputInfo("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType<0||newTokenType==pLastCommandToEvaluateToken->type){
@@ -4913,7 +4891,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				if(amVerbose())inputError("A shortcut operator assignment cannot change into an equality.");
 			}
 		}
-		if(amDebugging())inputInfo("D");
+		/////if(amDebugging())inputInfo("D");
 		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
 		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
 		//                this way it will always be there!!
@@ -4955,10 +4933,10 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 						newTokenType=TT_BINARY_aErU;
 				}
 			}
-			if(amDebugging())inputInfo("E");
+			/////if(amDebugging())inputInfo("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,newTokenType);
-			if(amDebugging())inputInfo("F");
+			/////if(amDebugging())inputInfo("F");
 /*
 #ifdef __DEBUG__
 			printf("@%p=%p?:%s",pCommandToEvaluate,pLastCommandToEvaluateToken,string(pCommandToEvaluate->text));
@@ -5107,19 +5085,19 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			}
 			// TODO should we write the associated colors here?????
 			outputTokenColor(pLastCommandToEvaluateToken);
-			if(amDebugging())inputInfo("H");
+			/////if(amDebugging())inputInfo("H");
 		}
 	}else // a functional whitespace character, ends a current token!!
 	if(pLastCommandToEvaluateToken->significantCharacterCount==0&&pLastCommandToEvaluateToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
 		pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
 
-	if(amDebugging())inputInfo("I");
+	/////if(amDebugging())inputInfo("I");
 	// append the typed character at cursorPosition() minus current token offset in pLastCommandToEvaluateToken->text
 	string_append_char(pLastCommandToEvaluateToken->text,inputChar);
 
 	if(newTokenType<0)pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
 
-	if(amDebugging())inputInfo("J");
+	/////if(amDebugging())inputInfo("J");
 #ifdef __DEBUG__
 	printf("[%s]",string(pLastCommandToEvaluateToken->text));
 #endif
@@ -5135,11 +5113,11 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	// MDH@07AUG2019: after a character is input by the user (or some other source) the identifier type will be checked...
 	//                BUT 
 	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput,aSuggestedCharacter); // MDH@28MAY2019: ALWAYS check for being a function!!!!
-	if(amDebugging())inputInfo("K");
+	/////if(amDebugging())inputInfo("K");
 	if(endOfInput){
 		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
 		if(notCheckedForBeingAFunction){
-			if(amDebugging())inputInfo("L");
+			/////if(amDebugging())inputInfo("L");
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
@@ -5172,15 +5150,15 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 						string_insert_char(behindCursorText,0,'=');
 				}
 			}
-			if(amDebugging())inputInfo("M");
+			/////if(amDebugging())inputInfo("M");
 		}
 		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
-		if(amDebugging())inputInfo("N");
+		/////if(amDebugging())inputInfo("N");
 		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength());
 		if(!initializationsChanged)outputStatus(inputChar,inputCharacterType);
-		if(amDebugging())inputInfo("O");
+		/////if(amDebugging())inputInfo("O");
 	}
-	if(amDebugging())inputInfo("P");
+	/////if(amDebugging())inputInfo("P");
 	return true;
 }
 
