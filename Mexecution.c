@@ -171,13 +171,14 @@ Mbiginteger* _getBiginteger(int64_t ll){
     if(biginteger)mp_set_i64((mp_int*)biginteger,ll); // even if l equals 0 set it TODO check is that necessary???
     return biginteger;
 }/* VALIDATED */
-/* replaced by _getNegatedBiginteger in Mbiginteger.c/h
-Mbiginteger* _getBigintegerNeg(Mbiginteger* biginteger){
-    Mbiginteger* bigintegerNeg=__biginteger(); // the result we will be returning
-    if(bigintegerNeg&&mp_neg(biginteger,bigintegerNeg)!=MP_OKAY){free_biginteger(bigintegerNeg);bigintegerNeg=NULL;}
-    return bigintegerNeg;
-}// VALIDATED 
-*/
+
+// replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
+Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger){
+    Mbiginteger* _bigintegerNeg=(_biginteger?__biginteger():NULL); // the result we will be returning
+    if(_bigintegerNeg&&mp_neg(_biginteger,_bigintegerNeg)!=MP_OKAY){free_biginteger(_bigintegerNeg);_bigintegerNeg=NULL;}
+    return _bigintegerNeg;
+}// VALIDATED
+
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
 Mbiginteger* _getBigintegerCopy(Mbiginteger* biginteger){
     if(!biginteger)return NULL;
@@ -989,18 +990,25 @@ long long getInteger(Mvalue* _value){
 */
 
 // BigInteger stuff
-Mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
+Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
     Mstring* _bigintegerText=__string();
+    ////outputChar('A');
     if(_bigintegerText){
+        ///outputChar('B');
         if(_biginteger){
             // determine the required size
             int arepsize=0;
-            if(amVerbose())outputLine("Determining a big integer text representation.");
+            ///outputChar('C');
+            ///////if(amVerbose())outputLine("Determining a big integer text representation.");
             if(mp_radix_size(_biginteger,10,&arepsize)==MP_OKAY){
+                ///outputChar('D');
                 ////////output("Representation size: %d.\n",arepsize);
                 if(arepsize<=0xFFFFFFFF){
+                    ///outputChar('E');
                     string_setlength(_bigintegerText,arepsize);
+                    ///outputChar('F');
                     if(mp_toradix(_biginteger,_bigintegerText->chars,10)==MP_OKAY)string_synclength(_bigintegerText);
+                    ///outputChar('G');
                 }else
                     output("%sCan't store more than %u characters in a string.\n",ERROR_PREFIX,0xFFFFFFFF);
             }else
@@ -1009,6 +1017,7 @@ Mstring* _getBigintegerText(const Mbiginteger* const _biginteger){
             outputError("No big integer to represent");
     }else
         output("%sFailed to create a text for storing the representation of a big integer.\n",ERROR_PREFIX);
+    ///outputChar('H');
     return _bigintegerText;
 }/* VALIDATED */
 
@@ -1095,9 +1104,34 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
             // force using a nonnullnumerator, if NULL was provided (typically when inverting a rational)
             Mbiginteger* _nonnullnumerator=(_numerator?_numerator:_getBiginteger(1));
             if(_nonnullnumerator){
-                _rational->num=_nonnullnumerator; // could be NULL now when it's the inverse of another rational
-                _rational->den=_denominator;
-                if(amVerbose())outputRational("Rational initialized: ",_rational,".\n");
+                // MDH@15AUG2019: we prefer the numerator to be negative instead of the denominator
+                Mbiginteger *_negatedNumerator=NULL,*_negatedDenominator=NULL;
+                // NOTE if there's no denominator the denominator equals 1 and therefore it is not negative
+                if(_denominator&&mp_isneg(_denominator)==MP_YES){ // the given denominator is negative
+                    if(amVerbose())outputLine("Moving the sign from the denominator to the numerator of the rational.");
+                    // we have to get negated versions of both the numerator and the denominator
+                    // if we succeed in doing so we use those otherwise we stick to using the current ones
+                    _negatedNumerator=_getBigintegerNeg(_nonnullnumerator);
+                    _negatedDenominator=_getBigintegerNeg(_denominator);
+                    // if both are defined, we should use these otherwise we should use neither
+                }
+                if(_negatedNumerator&&_negatedDenominator){ // succeeded in negating the numerator and denominator
+                    if(amVerbose())outputLine("Using the negated numerator and denominator.");
+                    _rational->num=_negatedNumerator;
+                    _rational->den=_negatedDenominator;
+                    // NOTE that we do NOT free _numerator explicitly but if _numerator is not null, _nonnullnumerator will be equal to it and we're freeing the right thing, if _numerator is NULL we're freeing the created _getBiginteger(1) which is also the right thing to do
+                    //      I have to NULL both _numerator and _denominator here because if I don't an attempt to free them again when e.g. normalization fails could be catastrophic
+                    //      alternatively I could simply toggle freeonfailure PREFERRED APPROACH
+                    // NOTE even if freeonfailure is already false, we are returning a rational that does NOT use the presented numerator and denominator in which case we should free the numerator and denominator because the caller won't
+                    //      if freeonfailure is true we should of course prevent freeing below (which won't happen though)
+                    freeonfailure=false;
+                    free_biginteger(_nonnullnumerator);free_biginteger(_denominator);
+                }else{
+                    _rational->num=_nonnullnumerator; // could be NULL now when it's the inverse of another rational
+                    _rational->den=_denominator;
+                    // if using the original numerator and denominator we still have to free any negated version we created
+                    free_biginteger(_negatedNumerator);free_biginteger(_negatedDenominator);
+                }
                 // NOTE _nonnullnumerator and _denominator NOW bound, so no need to free them anymore
                 /* STORING 1 AS DENOMINATOR ISN'T WRONG per se 
                 if(_denominator&&mp_cmp(_denominator,getBigintegerOne())==MP_EQ){
@@ -1111,7 +1145,8 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
                     if(amVerbose())outputRational("Rational before normalization: ",_rational,".\n");
                     normalizeRational(_rational); // normalize the rational if we are supposed to
                     if(_denominator&&!_rational->normalized)outputError("Failed to normalize a rational");else if(amVerbose())outputRational("Rational after normalization: ",_rational,".\n");
-                }
+                }else
+                if(amVerbose())outputRational("Rational initialized: ",_rational,".\n");
                 ///////// AS LONG AS WE FREE THE RATIONAL IN THE ELSE PART NO NEED TO DO: return _rational; // return whether normalized or not
             }else{ // either _numerator NULL or _getBiginteger(1) NULL, in the last case nothing created that needs to be freed (except for _rational)
                 free_rational(_rational);_rational=NULL;
@@ -1363,30 +1398,45 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){
     }
 	return _stringText;
 }/* VALIDATED */
+
+// TODO good idea to always return something (if we can), as in _getBigintegerText()
 Mstring* _getRationalText(const Mrational* const _rational){
     Mstring*  _rationalText=NULL;
+    ///outputChar('a');
     if(_rational){
+        ///outputChar('b');
         _rationalText=__string();
+        ///outputChar('c');
         if(_rationalText){
+            ///outputChar('d');
             Mstring* _p=_rationalText;
             _p=string_append_char(_p,'(');
+            ///outputChar('e');
             Mstring* _numeratorBigintegerText=_getBigintegerText(_rational->num);
+            ///outputChar('f');
             if(_numeratorBigintegerText){_p=string_append(_p,string(_numeratorBigintegerText));free_string(_numeratorBigintegerText);}
+            ///outputChar('g');
             if(_rational->den){
                 _p=string_append_char(_p,'/');
                 Mstring* _denominatorBigintegerText=_getBigintegerText(_rational->den);
                 if(_denominatorBigintegerText){_p=string_append(_p,string(_denominatorBigintegerText));free_string(_denominatorBigintegerText);}
             }
+            ///outputChar('k');
             _p=string_append_char(_p,')');
+            ///outputChar('l');
             // if a delta is known, append that as well!!!
             if(_rational->delta){
                 // always show a sign
                 if(_rational->delta>=0)string_append_char(_p,'+');
                 _p=appendld(_p,_rational->delta->ld);
             }
+            ///outputChar('n');
             if(!_p){free_string(_rationalText);_rationalText=NULL;} // if something went wrong, return NULL and free _rationalText
+            ///outputChar('o');
         }
-    }
+    }else
+        if(amVerbose())outputLine("No rational to determine the text representation of.");
+    outputChar('p');
     return _rationalText;
 }/* VALIDATED */
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
@@ -1544,7 +1594,7 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
                 pmin1=p;qmin1=q;
             }
             // construct the last rational (i.e. the result) from p and q
-            Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
+            Mbiginteger *_numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
             if(_numerator&&_denominator) // we've got both of them
                 if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)
                     _rational=_getRational(_numerator,_denominator,delta,true,false); // NOTE there should always be a delta!!!!

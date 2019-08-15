@@ -160,6 +160,7 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
 	// pure rationals are easy
 	if(delta1undefined&&delta2undefined){
+		/* _getRational() will now itself take care of negating the numerator and denominator if the denominator is negative
 		Mbiginteger *_negnum=NULL,*_negden=NULL; // won't be constructed if _den is not negative
 		Mrational* _rational=NULL;
 		// if the denominator is now negative we have to toggle the sign of both numerator and denominator
@@ -170,6 +171,8 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 		}else
 			_rational=_getRational(_num,_den,M_LD_NAN,true,true);
 		return _rational;
+		*/
+	    return _getRational(_num,_den,M_LD_NAN,true,true);
 	}
 	// if we assume the delta's to be very small (as they will be), the parts containing squares to be too small to care about 
 	if(delta1undefined){
@@ -3689,6 +3692,9 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
 		Mbiginteger* _numerator=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _denominator=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		// if the denominator is negative, both the numerator and denominator should be negated (should this be part of the normalization procedure?), theoretically storing the sign separate from the big integers in a rational could also be the way to go
+		// so when the sign of the two big integers is different, the rational is negative, otherwise it is positive and _getRational would store the absolute values of the big integer
+		// if _getRational would take care of negating the numerator and denominator it would have to free the passed in big integers (if so requested)
 		Mrational* _rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind
 		return _getRationalValue(_rational,true); // when failing to bind _rational to a value, free it as well
 	}
