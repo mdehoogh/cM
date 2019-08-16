@@ -240,6 +240,12 @@ void free_decimal(Mdecimal* decimal){
     }else
     if(amVerbose())output("No decimal to free.\n");
 }/* VALIDATED */
+
+/**
+ * \brief returns an uninitialized but cleared decimal (i.e. without an initialized mpd pointer)
+ */
+Mdecimal* __adecimal(){return (Mdecimal*)CALLOC(1,sizeof(Mdecimal),'D');} /* VALIDATED */
+
 /**
  * \brief returns a decimal initialized to \p value with the precision specified by \p mpd_context and number of repeating digits equal to \p repeating
  * \param mpd_context the decimal context to use

@@ -178,6 +178,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
 mpd_t* __mpd(mpd_context_t* mpd_context,int64_t value);
 void free_mpd(mpd_t* mpd);
 void free_decimal(Mdecimal* decimal);
+Mdecimal* __adecimal(); // returning a completely blank decimal (e.g. to be used with mpd_copy_negate otherwise we'd have the old pointer hanging around with an allocated decimal that won't get freed anywhere ever)
 Mdecimal* __decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating);
 Mdecimal* _getDecimal(mpd_t* mpd,uint64_t repeating,bool freeonfailure);
 Mdecimal* _getDecimalCopy(Mdecimal* decimal);

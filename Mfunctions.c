@@ -9,6 +9,7 @@ extern const long double M_LD_NAN;
 extern const long double M_LD_PI;
 
 extern mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
+
 void outputDecimalStatus(uint32_t status){
 	if(status>0){
 		outputLine("Decimal computations error report.");
@@ -83,16 +84,102 @@ Mvalue* Mceil(Mvalue* _value){
     }
     return NULL;
 }
+
 Mvalue* Msin(Mvalue* _value){
     if(_value){
-        if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",VALUETYPENAMES[_value->type],_value->type);}
+        if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
         if(_value->type==VT_REAL)return _getRealValue(sinl(_value->value._real->ld));
         if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin),true);
+        if(_value->type==VT_DECIMAL){
+            uint32_t status=0;
+            Mdecimal* _sineDecimal=__decimal(_decimalContext,0,0);
+            // let's create ALL the decimals we're going to need for intermediate results
+            Mdecimal *_qDecimal=__decimal(_decimalContext,0,0),*_twoDecimal=__decimal(_decimalContext,2,0),*_squareDividedByPiDecimal=__decimal(_decimalContext,0,0);
+            Mdecimal *_2nplus1Decimal=__decimal(_decimalContext,1,0),*_dividedByPiDecimal=__decimal(_decimalContext,0,0); // the denominator starts equal to 1 (which we can 'reuse' in computing the first numerator (1-(x/pi)^2))
+            Mdecimal *_numeratorDecimal=__decimal(_decimalContext,0,0),*_denominatorDecimal=__decimal(_decimalContext,1,0),*_multiplierDecimal=__decimal(_decimalContext,0,0);
+            Mdecimal *_piDecimal=pi_decimal(NULL);
+            if(_sineDecimal&&_qDecimal&&_twoDecimal&&_squareDividedByPiDecimal&&_numeratorDecimal&&_denominatorDecimal&&_multiplierDecimal&&_2nplus1Decimal&&_dividedByPiDecimal&&_piDecimal){
+                if(amVerbose())outputLine("Ready to compute the sine of a decimal.");
+                // to use the product formula I found on internet at matrixlab-examples.com I need to compute (x/pi)^2, I suppose I need to subtract 2*pi until the result is between -pi and pi
+                // so if we divide the input by pi we get a value that should be between -1 and 1, so we have to divide it by pi and use the remainder
+                Mdecimal* _decimal=_value->value._decimal;
+                // determine if _decimal is negative, if it is we negate it
+                int neg=mpd_isnegative(_decimal);
+                Mdecimal* _negatedDecimal=(neg?__adecimal():_decimal);if(!_negatedDecimal)status=1;else if(neg)mpd_qcopy_negate(_negatedDecimal->mpd,_decimal->mpd,&status);
+                if((status&0xEFBF)==0){
+                    if(amVerbose())outputLine("Determining the normalized decimal to use as argument of the sine approximation.");
+                    // NOTE the remainder is the starting value of the sine approximation
+                    mpd_qdivmod(_qDecimal->mpd,_sineDecimal->mpd,_negatedDecimal->mpd,_piDecimal->mpd,_decimalContext,&status);
+                    if((status&0xEFBF)==0){
+                        if(!isDecimalZero(_sineDecimal)){ // non-zero input
+                            if(amVerbose())outputDecimal("Number of integer multiples of pi: '",_qDecimal,"'.\n");
+                            // if the result of the integer division by pi is odd we have to negate the result as well
+                            int odd=mpd_isodd(_qDecimal->mpd);
+                            if(amVerbose())outputDecimal("Ready to approximate the sine of non-zero decimal '",_sineDecimal,"'.\n");
+                            // by dividing the initial value by pi we get z/pi which we need to square to get the c part of (1-c)/1 which is the first product multiplier
+                            mpd_qdiv(_dividedByPiDecimal->mpd,_sineDecimal->mpd,_piDecimal->mpd,_decimalContext,&status);
+                            if((status&0xEFBF)==0){
+                                if(amVerbose())outputDecimal("Divided by pi: '",_dividedByPiDecimal,"'.\n");
+                                // we know the sign of the sine will be positive for angles in (0,PI), so we can safely make the result negative if dealing with a negative input value
+                                // the initial value of the sine decimal is the product of _negatedDecimal and the square of _dividedByPiRemainderDecimal
+                                mpd_qmul(_squareDividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_decimalContext,&status);
+                                if((status&0xEFBF)==0){
+                                    /////////if(amVerbose())outputLine("Product multiplier numerator subcomputed.");
+                                    mpd_qsub(_numeratorDecimal->mpd,_denominatorDecimal->mpd,_squareDividedByPiDecimal->mpd,_decimalContext,&status);
+                                    if((status&0xEFBF)==0){
+                                        if(amVerbose())outputDecimal("Multiplier: '",_numeratorDecimal,"' -> ");
+                                        // next we multiply the initial value of the product by the numerator alone (because the denominator is still equal to 1)               
+                                        mpd_qmul(_sineDecimal->mpd,_sineDecimal->mpd,_numeratorDecimal->mpd,_decimalContext,&status);
+                                        ///////////////if(amVerbose())outputDecimal("Second approximation to the sine: '",_sineDecimal,"'.\n");
+                                        int64_t count=M_LL_MAX;
+                                        while((status&0xEFBF)==0){
+                                            if(--count==0){outputLine("Maximum number of iterations exceeded!");break;}
+                                            if(amVerbose())outputDecimal("Sine approximation: '",_sineDecimal,"'.\n");
+                                            mpd_qadd(_2nplus1Decimal->mpd,_2nplus1Decimal->mpd,_twoDecimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break; // add 2 to 2n+1 to get 2(n+1)+1 so becoming 3, 5, 7, ....
+                                            // add _2nplus1Decimal to the numerator and denominator
+                                            mpd_qadd(_numeratorDecimal->mpd,_numeratorDecimal->mpd,_2nplus1Decimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break;
+                                            if(amVerbose())outputDecimal("Numerator: '",_numeratorDecimal,"'. ");
+                                            mpd_qadd(_denominatorDecimal->mpd,_denominatorDecimal->mpd,_2nplus1Decimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break;
+                                            if(amVerbose())outputDecimal("Denominatator: '",_denominatorDecimal,"'. ");
+                                            // if the numerator equals the denominator we're actually done because that means that the multiplier will from now on equal 1
+                                            if(mpd_qcmp(_numeratorDecimal->mpd,_denominatorDecimal->mpd,&status)==0)break;if((status&0xEFBF)!=0)break;
+                                            mpd_qdiv(_multiplierDecimal->mpd,_numeratorDecimal->mpd,_denominatorDecimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break;
+                                            if(amVerbose())outputDecimal("Multiplier: '",_multiplierDecimal,"' -> ");
+                                            if(isDecimalOne(_multiplierDecimal))break; // we've reached the end within the given precision
+                                            // multiply _sineDecimal with the multiplier
+                                            mpd_qmul(_sineDecimal->mpd,_sineDecimal->mpd,_multiplierDecimal->mpd,_decimalContext,&status);
+                                        }
+                                        if((status&0xEFBF)!=0){free_decimal(_sineDecimal);_sineDecimal=NULL;}
+                                    }
+                                }
+                                // we need to negate the result if neg and odd are different
+                                if(_sineDecimal)if(neg^odd)mpd_set_negative(_sineDecimal->mpd);
+                            }
+                        }
+                    }
+                }
+                if(neg)free_decimal(_negatedDecimal); // the negatedDecimal we created should be released
+                // alternatively we can get the sign first because sin(x)=-sin(-x), so if x is negative, we determine -x and determine the remainder of x/pi which will be in (0,1) as we want it to ()
+            }else
+                outputError("Failed to create at least one of the help decimal in computing the sine of a decimal");
+            // free all help decimals
+            free_decimal(_piDecimal);
+            free_decimal(_2nplus1Decimal);
+            free_decimal(_multiplierDecimal);
+            free_decimal(_denominatorDecimal);
+            free_decimal(_numeratorDecimal);
+            free_decimal(_dividedByPiDecimal); // might still be around
+            free_decimal(_squareDividedByPiDecimal);
+            free_decimal(_twoDecimal);
+            free_decimal(_qDecimal);
+            if(_sineDecimal)return _getDecimalValue(_sineDecimal,true);
+        }
     }
     return NULL;
-}/* VALIDATED */
+}/* NOT VALIDATED */
+
 Mvalue* Mcos(Mvalue*  _value){
     if(_value){
         if(_value->type==VT_REAL)return _getRealValue(cosl(_value->value._real->ld));
