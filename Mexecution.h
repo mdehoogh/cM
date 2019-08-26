@@ -77,7 +77,8 @@ typedef struct Mtext{
 // MDH@17JUN2019: if we want to know when a decimal contains repeating fractions we should be able to remember how many decimals repeat themselves
 typedef struct Mdecimal{
     mpd_t* mpd; // ok, for now use a pointer
-    uint64_t repeating; // the number of decimals that repeat themselves at the end
+    mpd_ssize_t repeating; // the number of decimals that repeat themselves at the end
+    mpd_ssize_t prec; // MDH@25AUG2019: the precision used for creating this decimal (thus allowing to automatically set the decimal precision to use in computations)
 }Mdecimal;
 
 bool isLittleEndian();
@@ -179,7 +180,7 @@ mpd_t* __mpd(mpd_context_t* mpd_context,int64_t value);
 void free_mpd(mpd_t* mpd);
 void free_decimal(Mdecimal* decimal);
 Mdecimal* __adecimal(); // returning a completely blank decimal (e.g. to be used with mpd_copy_negate otherwise we'd have the old pointer hanging around with an allocated decimal that won't get freed anywhere ever)
-Mdecimal* __decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating);
+Mdecimal* __decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating); // pass in NULL for mpd_context to use the application-wide decimal context!!
 Mdecimal* _getDecimal(mpd_t* mpd,uint64_t repeating,bool freeonfailure);
 Mdecimal* _getDecimalCopy(Mdecimal* decimal);
 bool isDecimalZero(Mdecimal* decimal);

@@ -106,7 +106,7 @@ Mvalue* Msin(Mvalue* _value){
                 // so if we divide the input by pi we get a value that should be between -1 and 1, so we have to divide it by pi and use the remainder
                 Mdecimal* _decimal=_value->value._decimal;
                 // determine if _decimal is negative, if it is we negate it
-                int neg=mpd_isnegative(_decimal);
+                int neg=mpd_isnegative(_decimal->mpd);
                 Mdecimal* _negatedDecimal=(neg?__adecimal():_decimal);if(!_negatedDecimal)status=1;else if(neg)mpd_qcopy_negate(_negatedDecimal->mpd,_decimal->mpd,&status);
                 if((status&0xEFBF)==0){
                     if(amVerbose())outputLine("Determining the normalized decimal to use as argument of the sine approximation.");

@@ -1,5 +1,9 @@
 #include "Mdecimal.h"
 
+#include "Msettings.h"
+#include "Moutput.h"
+#include "Msession.h"
+
 extern mpd_context_t* const _decimalContext;
 extern long double const M_LD_NAN;
 extern const char* const ERROR_PREFIX;
@@ -43,6 +47,27 @@ Mdecimal* _getValueDecimal(Mvalue* _value){
 Mdecimal* getValueDecimal(Mvalue* _value){
 	return(_value?(_value->type==VT_DECIMAL?_value->value._decimal:_getValueDecimal(_value)):NULL);
 }
+
+// decimalerrorstatus() filter out the rounding and inexact 'errors'
+void report_mpd_status(mpd_context_t* mpd_context){
+	uint32_t mpd_status=mpd_getstatus(mpd_context);
+	if(mpd_status>0){
+		outputLine("Decimal computations error report.");
+		if(mpd_status&MPD_IEEE_Invalid_operation)outputLine("\tIEEE Invalid operation error.");
+		if(mpd_status&MPD_Clamped)outputLine("\tClamped error.");
+		if(mpd_status&MPD_Division_by_zero)outputLine("\tDivision by zero error.");
+		if(mpd_status&MPD_Fpu_error)outputLine("\tFPU error.");
+		if(mpd_status&MPD_Inexact)outputLine("\tInexact error.");
+		if(mpd_status&MPD_Not_implemented)outputLine("\tNot implemented error.");
+		if(mpd_status&MPD_Overflow)outputLine("\tOverflow error.");
+		if(mpd_status&MPD_Rounded)outputLine("\tRounding error.");
+		if(mpd_status&MPD_Subnormal)outputLine("\tSubnormal error.");
+		if(mpd_status&MPD_Underflow)outputLine("\tUnderflow error.");
+	}else
+		outputLine("No decimal context errors.");
+}
+
+bool mpd_error(mpd_context_t* mpd_context){return(mpd_getstatus(mpd_context)&0xEFBF)!=0;}
 
 Mdecimal* pi_decimal(mpd_context_t* mpd_context){
 

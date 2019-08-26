@@ -130,15 +130,15 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList);
 Mfunction* _getFunction(Menvironment* const _environment,const char* const functionName); // creates the function if it does not exist yet
 
-bool completedFunction(Mfunction* const _function,char* functionName,NoArgumentFunction noArgumentFunction);
-bool completedValueFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
-bool completedIntegerFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
-bool completedRealFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
-bool completedListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
-bool completedTokenListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction);
+bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction);
+bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedIntegerFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedRealFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 
-bool completedStringStringFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedRealRealFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedRealRealFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 
 bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 

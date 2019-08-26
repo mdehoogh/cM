@@ -421,23 +421,6 @@ Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	return _result;
 }
 
-void report_mpd_status(mpd_context_t* mpd_context){
-	uint32_t mpd_status=mpd_getstatus(mpd_context);
-	if(mpd_status>0){
-		outputLine("Decimal computations error report.");
-		if(mpd_status&MPD_IEEE_Invalid_operation)outputLine("\tIEEE Invalid operation error.");
-		if(mpd_status&MPD_Clamped)outputLine("\tClamped error.");
-		if(mpd_status&MPD_Division_by_zero)outputLine("\tDivision by zero error.");
-		if(mpd_status&MPD_Fpu_error)outputLine("\tFPU error.");
-		if(mpd_status&MPD_Inexact)outputLine("\tInexact error.");
-		if(mpd_status&MPD_Not_implemented)outputLine("\tNot implemented error.");
-		if(mpd_status&MPD_Overflow)outputLine("\tOverflow error.");
-		if(mpd_status&MPD_Rounded)outputLine("\tRounding error.");
-		if(mpd_status&MPD_Subnormal)outputLine("\tSubnormal error.");
-		if(mpd_status&MPD_Underflow)outputLine("\tUnderflow error.");
-	}else
-		outputLine("No decimal context errors.");
-}
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
 
 /*
@@ -608,9 +591,6 @@ Mvalue* pi_q(Mvalue* _value){
 	}
 	return NULL;
 }
-
-// decimalerrorstatus() filter out the rounding and inexact 'errors'
-bool mpd_error(mpd_context_t* mpd_context){return(mpd_getstatus(mpd_context)&0xEFBF)!=0;}
 
 // we can also use decimals to approximate pi to a certain precision (=decimal digits)
 /* Python test program for approximating pi!!!!
@@ -1242,13 +1222,13 @@ bool initEnvironment(){
 
 // user interaction stuff
 #include "Msession.h"
-
-char* _getFormattedText(char* fmt,uint8_t maxlength,...){
+/*
+char* _getFormattedText(uint8_t maxlength,char* fmt,...){
 	char* str=malloc(maxlength+1); // get enough room on the heap
 	if(str){va_list args;va_start(args,fmt);sprintf(str,fmt,args);va_end(args);}
 	return str;
 }
-
+*/
 /* source: https://stackoverflow.com/questions/16839658/printf-width-specifier-to-maintain-precision-of-floating-point-value
 #ifdef DBL_DECIMAL_DIG
   #define OP_DBL_Digs (LDBL_DECIMAL_DIG)
@@ -2023,7 +2003,7 @@ void showInitializations(){
 		Mstring* p=_initializationsText;
 		Minitialization* _initialization=_lastInitialization;
 		while(p&&_initialization){
-			char* _initializationText=_getFormattedText(" %s:%lld",80,_initialization->_variableName,_initialization->argument);
+			char* _initializationText=_getFormattedText(80," %s:%lld",_initialization->_variableName,_initialization->argument);
 			if(_initializationText){
 				p=string_prepend(p,_initializationText);
 				free(_initializationText);

@@ -528,7 +528,7 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
     return NULL;
 }/* VALIDATED */
 
-bool completedFunction(Mfunction* const _function,char* functionName,NoArgumentFunction noArgumentFunction){
+bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_NO_ARGUMENTS;
         _function->functionunion.noArgumentFunction=noArgumentFunction;
@@ -538,7 +538,7 @@ bool completedFunction(Mfunction* const _function,char* functionName,NoArgumentF
     }
     return false;
 }/* VALIDATED */
-bool completedValueFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
+bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
@@ -552,7 +552,7 @@ bool completedValueFunction(Mfunction* const _function,char* functionName,OneArg
     }
     return false;
 }/* VALIDATED */
-bool completedRealFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
+bool completedRealFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
@@ -565,7 +565,7 @@ bool completedRealFunction(Mfunction* const _function,char* functionName,OneArgu
     }
     return false;
 }/* VALIDATED */
-bool completedIntegerFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
+bool completedIntegerFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
@@ -579,7 +579,7 @@ bool completedIntegerFunction(Mfunction* const _function,char* functionName,OneA
     }
     return false;
 }/* VALIDATED */
-bool completedListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
+bool completedListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
@@ -593,7 +593,7 @@ bool completedListFunction(Mfunction* const _function,char* functionName,OneArgu
     }
     return false;
 }/* VALIDATED */
-bool completedTokenListFunction(Mfunction* const _function,char* functionName,OneArgumentFunction oneArgumentFunction){
+bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
@@ -607,7 +607,7 @@ bool completedTokenListFunction(Mfunction* const _function,char* functionName,On
     }
     return false;
 }/* VALIDATED */
-bool completedStringStringFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction){
+bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
@@ -620,7 +620,7 @@ bool completedStringStringFunction(Mfunction* const _function,char* functionName
     }
     return false;
 }/* VALIDATED */
-bool completedRealRealFunction(Mfunction* const _function,char* functionName,TwoArgumentFunction twoArgumentFunction){
+bool completedRealRealFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;

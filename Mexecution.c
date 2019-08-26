@@ -201,7 +201,7 @@ bool isBigintegerOne(Mbiginteger* biginteger){return(biginteger?mp_cmp((mp_int*)
 // END BIG INTEGER STUFF
 
 // DECIMAL STUFF
-extern mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
+// MDH@25AUG2019: now requiring mpd_context to not be NULL
 // MDH@17JUN2019: convenient to expose _get_mpd (e.g. for use in approximating pi with a decimal)
 /**
  * \brief returns an mpd_t instance (from the mpdecimal libray) with the precision given by \p mpd_context equal to \p value
@@ -209,25 +209,30 @@ extern mpd_context_t* _decimalContext; // M.c takes care of creating the applica
  * \return on success the mpd_t instance equal to \p value, NULL otherwise
  */
 mpd_t* __mpd(mpd_context_t* mpd_context,int64_t value){
+    mpd_t* _mpd=NULL;
     // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
-    mpd_t* mpd=mpd_qnew(); // replacing: mpd_context mpd_context?mpd_context:_decimalContext);
-    // NOTE it is essential to initialize the stored value even when 0 as we would otherwise get errors on mpd_to_sci calls
-    if(mpd){
-        mpd_set_i64(mpd,value,(mpd_context?mpd_context:_decimalContext));
-        if(mpd->len==0){
-            output("%sFailed to create decimal with value " PRId64 ".\n",ERROR_PREFIX,value);
-            free_mpd(mpd);mpd=NULL;
-        }
+    if(mpd_context){
+        _mpd=mpd_qnew();
+        // NOTE it is essential to initialize the stored value even when 0 as we would otherwise get errors on mpd_to_sci calls
+        if(_mpd){
+            mpd_set_i64(_mpd,value,mpd_context);
+            if(_mpd->len==0){
+                output("%sFailed to create decimal with value " PRId64 ".\n",ERROR_PREFIX,value);
+                free_mpd(_mpd);
+                _mpd=NULL;
+            }
+        }else
+            outputError("Failed to create a decimal data instance");
     }else
-        outputError("Failed to create a decimal");
-    /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
-    return mpd;
+        outputError("No context to store the decimal data in");
+     /////////outputDecimal("Decimal '",(Mdecimal*)_mpd,"' created!");
+    return _mpd;
 }/* VALIDATED */
 /**
  * \brief frees \p mpd, calling mpd_del()
  * \param mpd the mpdecimal instance to free
  */
-void free_mpd(mpd_t* mpd){if(mpd)mpd_del(mpd);}/* VALIDATED */
+void free_mpd(mpd_t* _mpd){if(_mpd)mpd_del(_mpd);}/* VALIDATED */
 
 /**
  * \brief frees \p decimal, delegating to free_mpd() for freeing the contained mpdecimal instance
@@ -246,6 +251,7 @@ void free_decimal(Mdecimal* decimal){
  */
 Mdecimal* __adecimal(){return (Mdecimal*)CALLOC(1,sizeof(Mdecimal),'D');} /* VALIDATED */
 
+extern mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context which is used as the default in __decimal
 /**
  * \brief returns a decimal initialized to \p value with the precision specified by \p mpd_context and number of repeating digits equal to \p repeating
  * \param mpd_context the decimal context to use
@@ -253,22 +259,35 @@ Mdecimal* __adecimal(){return (Mdecimal*)CALLOC(1,sizeof(Mdecimal),'D');} /* VAL
  * \param repeating the number of repeating decimal digits at the end
  */
 Mdecimal* __decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating){
-    Mdecimal* decimal=(Mdecimal*)MALLOC(sizeof(Mdecimal),'D');
-    if(decimal){
-        decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
-        if(!decimal->mpd){outputError("Failed to create a decimal");FREE(decimal,'D');decimal=NULL;}else decimal->repeating=repeating;
-    }
-    return decimal;
+    Mdecimal* _decimal=NULL;
+    if(!mpd_context)mpd_context=_decimalContext; // use the application-wide decimal context if no context is defined
+    if(mpd_context){
+        _decimal=__adecimal(); // get an uninitialized decimal
+        if(_decimal){
+            _decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
+            if(_decimal->mpd){
+                _decimal->repeating=repeating;
+                _decimal->prec=mpd_context->prec;
+            }else{
+                FREE(_decimal,'D');
+                _decimal=NULL;
+            }
+        }else
+            outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
+    }else
+        outputError("No context to create decimal in");
+    return _decimal;
 }/* VALIDATED */
 /**
  * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
  */
 Mdecimal* _getDecimal(mpd_t* mpd,uint64_t repeating,bool freeonfailure){
     if(!mpd)return NULL; // can do this as won't have to free mpd anyway
-    Mdecimal* decimal=__decimal(NULL,0,repeating); // always using the default decimal context
+    Mdecimal* decimal=__decimal(_decimalContext,0,repeating); // always using the default decimal context
     if(decimal)decimal->mpd=mpd;else if(freeonfailure)free_mpd(mpd);
     return decimal;
 }/* VALIDATED */
+
 /**
  * \brief returns a decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
  */
@@ -405,9 +424,10 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
     return _decimal;
 }/* VALIDATED */
 
+// MDH@25AUG2019: I'd see that decimalOne should be an Mdecimal? we can leave it the way it is for now but instead require the context passed to __mpd to be non-NULL!! i.e. __mpd does no longer default to _decimalContext
 static mpd_t* decimalOne=NULL;
 // getDecimalOne() return a decimal but this is a decimal that should never be freed
-const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(NULL,1);return decimalOne;}/* VALIDATED */
+const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(_decimalContext,1);return decimalOne;}/* VALIDATED */
 bool isDecimalOne(Mdecimal* _decimal){
     // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
     return (_decimal->repeating&&mpd_cmp(_decimal->mpd,getDecimalOne(),_decimalContext)==MP_EQ);
