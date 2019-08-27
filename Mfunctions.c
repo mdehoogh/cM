@@ -8,7 +8,7 @@ extern const char* const ERROR_PREFIX;
 extern const long double M_LD_NAN;
 extern const long double M_LD_PI;
 
-extern mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
+extern const mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
 
 void outputDecimalStatus(uint32_t status){
 	if(status>0){
@@ -93,6 +93,8 @@ Mvalue* Msin(Mvalue* _value){
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin),true);
         if(_value->type==VT_DECIMAL){
+            Mdecimal* _sineDecimal=_dsine(NULL,_value->value._decimal); // match the precision as used by the argument
+            /* replacing what was way to slow:
             uint32_t status=0;
             Mdecimal* _sineDecimal=__decimal(_decimalContext,0,0);
             // let's create ALL the decimals we're going to need for intermediate results
@@ -174,6 +176,7 @@ Mvalue* Msin(Mvalue* _value){
             free_decimal(_squareDividedByPiDecimal);
             free_decimal(_twoDecimal);
             free_decimal(_qDecimal);
+            */
             if(_sineDecimal)return _getDecimalValue(_sineDecimal,true);
         }
     }

@@ -2,7 +2,7 @@
  * MDH@24JUN2019: Mvalue stuff wrapping raw data structures defined in Mexecution
  */
 // additional data structures from
-#include "Mbiginteger.h"
+#include "Mdecimal.h"
 
 struct Mlist;
 struct Mmap;
@@ -184,4 +184,7 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
 // some conversion functions that might be moved to some more specialized 'module'
 Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero); // TODO probably to be moved to Mrational.h/c
 Mbiginteger* _getRoundedRationalInteger(Mrational* _rational);
+
+Mdecimal* _getValueDecimal(Mvalue* _value);
+Mdecimal* getValueDecimal(Mvalue* _value);
 

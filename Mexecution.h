@@ -174,18 +174,6 @@ const Mbiginteger* getBigintegerOne();
 const Mbiginteger* getBigintegerTwo();
 const Mbiginteger* getBigintegerThree();
 
-// DECIMAL STUFF
-mpd_context_t* get_mpd_context(mpd_ssize_t decimal_precision);
-mpd_t* __mpd(mpd_context_t* mpd_context,int64_t value);
-void free_mpd(mpd_t* mpd);
-void free_decimal(Mdecimal* decimal);
-Mdecimal* __adecimal(); // returning a completely blank decimal (e.g. to be used with mpd_copy_negate otherwise we'd have the old pointer hanging around with an allocated decimal that won't get freed anywhere ever)
-Mdecimal* __decimal(mpd_context_t* mpd_context,int64_t value,uint64_t repeating); // pass in NULL for mpd_context to use the application-wide decimal context!!
-Mdecimal* _getDecimal(mpd_t* mpd,uint64_t repeating,bool freeonfailure);
-Mdecimal* _getDecimalCopy(Mdecimal* decimal);
-bool isDecimalZero(Mdecimal* decimal);
-bool isDecimalOne(Mdecimal* _decimal);
-
 // RATIONAL STUFF
 // the following two methods will use M_LD_Q_EPS as default cut-off value
 Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
@@ -201,8 +189,6 @@ bool isRationalOne(Mrational* _rational);
 void normalizeRational(Mrational* _rational);
 Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure);
 Mrational* _getInverseRational(const Mrational* const _rational);
-
-Mdecimal* _getRationalDecimal(const Mrational* const _rational); // converts a rational to a decimal
 
 // some helper functions (TODO or should we use this on Mreal values?????)
 bool ldIsZero(long double ld);
