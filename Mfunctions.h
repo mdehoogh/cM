@@ -27,6 +27,7 @@ Mvalue* Msinh(Mvalue* _value);
 Mvalue* Mcosh(Mvalue* _value);
 Mvalue* Mtanh(Mvalue* _value);
 Mvalue* Mexp(Mvalue* _value);
+Mvalue* Mdexp(Mvalue* _value); // internal approximation by series expansion
 Mvalue* Mlog(Mvalue* _value);
 Mvalue* Mlog10(Mvalue* _value);
 Mvalue* Msqrt(Mvalue* _value);

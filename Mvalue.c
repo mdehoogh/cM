@@ -16,7 +16,7 @@ extern const char* const ERROR_PREFIX;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const long double LD_PI; // for Mfacd()
-extern const mpd_context_t* _decimalContext; // the application-wide (default) decimal context
+extern const Mdecimalcontext* M_DECIMALCONTEXT; // the application-wide (default) decimal context
 
 void free_variable(Mvariable* _variable){
     if(_variable){
@@ -1167,7 +1167,7 @@ Mdecimal* _getValueDecimal(Mvalue* _value){
 		if(_value->type!=VT_LIST&&_value->type!=VT_MAP){
 			switch(_value->type){
 				case VT_DECIMAL:_decimal=_getDecimalCopy(_value->value._decimal);break;
-				case VT_INTEGER:_decimal=_getDecimal(__mpd(_decimalContext,_value->value._integer->ll),0,true);break;
+				case VT_INTEGER:_decimal=__decimal(M_DECIMALCONTEXT->mpd_context,_value->value._integer->ll,0);break; // MDH@29AUG2019: replacing a call to _getDecimal()
                 case VT_BIGINTEGER:
                     {
                         // NOTE we need to make a copy of the big integer because otherwise free_rational() below would free the big integer wrapped inside the value, which would be a terrible mistake
@@ -1183,10 +1183,10 @@ Mdecimal* _getValueDecimal(Mvalue* _value){
 					break;
 				default:
 					{ // TODO: use _getTextDecimal instead!!!
-                        _decimal=__decimal(_decimalContext,0,0);
+                        _decimal=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
                         if(_decimal){
 						    Mstring* _valueText=_getValueText(_value,true);
-						    if(_valueText){mpd_set_string(_decimal->mpd,string(_valueText),_decimalContext);free_string(_valueText);}
+						    if(_valueText){mpd_set_string(_decimal->mpd,string(_valueText),M_DECIMALCONTEXT->mpd_context);free_string(_valueText);}
                         }
 					}
 					break;

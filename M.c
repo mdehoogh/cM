@@ -33,7 +33,7 @@ const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defin
 const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
 const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
 
-const long long M_DP=20; // the default decimal precision
+long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
 
 const long double M_LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
 const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
@@ -328,11 +328,11 @@ Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
 				  if we were to keep using DP_value we should have called assignValue() to assign the value and not DP_value=_getIntegerValue() (see initEnvironment())
 Mvalue* DP_value=NULL; 
 */
-mpd_context_t* _decimalContext=NULL; // the application-wide decimal context
+Mdecimalcontext* M_DECIMALCONTEXT=NULL; // the application-wide decimal context
 long long getDP(){
-	if(!_decimalContext)_decimalContext=get_mpd_context(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
+	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=_getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
-	long long dp=(_decimalContext?_decimalContext->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
+	long long dp=(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
 	if(dp==M_LL_INVALID)outputLine("BUG: No default decimal context active!");
 	return dp;
 }
@@ -345,11 +345,12 @@ Mvalue* setdp(Mvalue* _value){
 		if(decimalprecision!=M_LL_INVALID){ // if not the default!!!
 			if(decimalprecision>=6){
 				// if I fail to create the associated decimal context, no go
-				mpd_context_t* _newDecimalContext=get_mpd_context(decimalprecision);
-				if(_newDecimalContext)
-					_decimalContext=_newDecimalContext;
+				Mdecimalcontext* _newDecimalContext=_getDecimalcontext(decimalprecision);
+				if(_newDecimalContext){
+					M_DECIMALCONTEXT=_newDecimalContext;
+					M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
 					////DP_value->value._integer->ll=_decimalContext->prec;
-				else
+				}else
 					output("%sActive decimal context not replaced: failed to create a decimal context with precision %llu.\n",ERROR_PREFIX,decimalprecision);
 			}else
 				output("%sRequested decimal precision (%llu) not activated: it should at least be 6.\n",ERROR_PREFIX,decimalprecision);
@@ -357,16 +358,20 @@ Mvalue* setdp(Mvalue* _value){
 	}
 	return _getIntegerValue(olddecimalprecision);
 }
-////////mpd_context_t* getDecimalContext(){if(_decimalContext)_decimalContext=get_mpd_context(getDP());return _decimalContext;}
+
+// convenience method to obtain the wrapped mpd_context pointer
+mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context:NULL);}
 
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	if(!_decimalContext){outputError("No decimal context!");return NULL;}
-	Mdecimal* _result=__decimal(_decimalContext,0,0);
+	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	Mdecimal* _result=__decimal(mpd_context,0,0);
 	///////outputLine("Adding two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){free_decimal(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
 	}else
 		outputError("Failed to create the sum decimal");
@@ -374,12 +379,14 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _ddivide(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	if(!_decimalContext){outputError("No decimal context!");return NULL;}
-	Mdecimal* _result=__decimal(_decimalContext,0,0);
+	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	Mdecimal* _result=__decimal(mpd_context,0,0);
 	///////outputLine("Dividing two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			free_decimal(_result);_result=NULL;
 			outputError("Failed to compute the quotient of two decimals");
@@ -390,12 +397,14 @@ Mdecimal* _ddivide(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	if(!_decimalContext){outputError("No decimal context!");return NULL;}
-	Mdecimal* _result=__decimal(_decimalContext,0,0);
+	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	Mdecimal* _result=__decimal(mpd_context,0,0);
 	///////outputLine("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			free_decimal(_result);_result=NULL;
 			outputError("Failed to compute the product of two decimals");
@@ -406,12 +415,14 @@ Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
-	if(!_decimalContext){outputError("No decimal context!");return NULL;}
-	Mdecimal* _result=__decimal(_decimalContext,0,0);
+	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
+	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+	if(!mpd_context){outputError("No decimal context!");return NULL;}
+	Mdecimal* _result=__decimal(mpd_context,0,0);
 	///////outputLine("Multiplying two decimals.");
 	if(_result){
 		uint32_t status=0;
-		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,_decimalContext,&status);
+		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
 			free_decimal(_result);_result=NULL;
 			outputError("Failed to compute the difference of two decimals");
@@ -620,10 +631,8 @@ for i in range(10000):
 Mvalue* pi_d(Mvalue* _value){
 	// _value should be a positive integer defining the required precision
 	if(amVerbose())output("Computing pi using decimals.\n");
-	long long decimalprecision=M_LL_INVALID;if(_value&&_value->type==VT_INTEGER)decimalprecision=_value->value._integer->ll;
-	mpd_context_t* mpd_context=(decimalprecision>0?get_mpd_context(decimalprecision):NULL);
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
-	return _getDecimalValue(pi_decimal(mpd_context),true);
+	return _getDecimalValue(pi_decimal(_value&&_value->type==VT_INTEGER?_getDecimalcontext(_value->value._integer->ll):NULL),true);
 }
 
 // how about storing all results here?????? instead of in the root environment????
@@ -3042,10 +3051,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						if(amDebugging())output("Real part string length: %u.\n",l);
 						if(getDP()<l)output("WARNING: More decimals present in literal than expected. Rounding may occur.\n");
 						if(amDebugging())outputLine("Decimal precision checked!");
-						Mdecimal* _decimal=__decimal(_decimalContext,0,0);
+						Mdecimal* _decimal=__decimal(get_default_mpd_context(),0,0);
 						if(amDebugging())outputLine("Decimal created!");
 						if(_decimal){
-							mpd_set_string(_decimal->mpd,string(pRealText),_decimalContext);
+							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
 							if(amDebugging())outputLine("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
 								assignValue(&_valueReference->_value,_getDecimalValue(_decimal,true));
@@ -3376,7 +3385,7 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){
 		case VT_BIGINTEGER: return _getBigintegerValue(_getBiginteger(1),true);
 		case VT_REAL: return _getRealValue(1.0);
 		case VT_RATIONAL: return _getRationalValue(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),true);
-		case VT_DECIMAL: return _getDecimalValue(_getDecimal(__mpd(_decimalContext,1),0,true),true);
+		case VT_DECIMAL: return _getDecimalValue(_getDecimal(__mpd(get_default_mpd_context(),1),M_DP,0,true),true);
 		default:break;
 	}
 	return NULL;
@@ -3441,9 +3450,9 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
 		Mdecimal* _baseDecimal=getValueDecimal(_value1);
 		Mdecimal* _exponentDecimal=getValueDecimal(_value2);
-		Mdecimal* _powerDecimal=__decimal(_decimalContext,0,0);
+		Mdecimal* _powerDecimal=__decimal(get_default_mpd_context(),0,0);
 		if(_powerDecimal){
-			mpd_pow(_powerDecimal->mpd,_baseDecimal->mpd,_exponentDecimal->mpd,_decimalContext);
+			mpd_pow(_powerDecimal->mpd,_baseDecimal->mpd,_exponentDecimal->mpd,get_default_mpd_context());
 			// TODO are we converting back?
 		}
 		if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal);if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal);

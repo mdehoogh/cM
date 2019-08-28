@@ -795,6 +795,7 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedRealFunction(_getFunction(_environment,"round"),"round",Mround))return false;
     if(!completedRealFunction(_getFunction(_environment,"ceil"),"ceil",Mceil))return false;
     if(!completedRealFunction(_getFunction(_environment,"exp"),"exp",Mexp))return false;
+    if(!completedRealFunction(_getFunction(_environment,"dexp"),"dexp",Mdexp))return false;
 
     if(!completedStringStringFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
     if(!completedRealRealFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;

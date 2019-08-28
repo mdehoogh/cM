@@ -6,16 +6,84 @@
 #include "Msession.h"
 
 extern long double const M_LD_NAN;
-extern const char* const ERROR_PREFIX;
-extern /*const*/ mpd_context_t* _decimalContext;
+extern const char* const ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
+extern /*const*/ Mdecimalcontext* M_DECIMALCONTEXT;
+
+mpd_t* get_mpd_copy(const mpd_context_t* mpd_context,mpd_t* mpd){
+	if(!mpd)return NULL;
+	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
+	mpd_t* _mpd=__mpd(mpd_context,0);
+	if(_mpd){uint32_t status=0;mpd_qcopy(_mpd,mpd,&status);if((status&0xEFBF)!=0){free_mpd(_mpd);_mpd=NULL;}}
+	return _mpd;
+}
+
+mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){
+	mpd_context_t* _mpd_context=(mpd_context_t*)calloc(1,sizeof(mpd_context_t));
+	if(_mpd_context){
+		if(amVerbose())output("New context with precision %lld created.\n",decimalprecision);
+		// initialize the new context to the default context (specification)
+		mpd_init(_mpd_context,decimalprecision);
+		if(amVerbose())output("Context with precision %u initialized.\n",mpd_getprec(_mpd_context));
+	}else
+		outputError("Failed to create a new context");
+	return _mpd_context;
+}
+
+void free_decimalcontext(Mdecimalcontext* _decimalcontext){
+	if(_decimalcontext->mpd_context)FREE(_decimalcontext->mpd_context,'c');
+	if(_decimalcontext->pi)free_mpd(_decimalcontext->pi);
+	if(_decimalcontext->e)free_mpd(_decimalcontext->e);
+	FREE(_decimalcontext,'C');
+}
+
+// if we want to keep a list of all decimal contexts, we need to be able to iterate over all decimal contexts to see if it is already there
+// create a single Mdecimalcontextelement
+typedef struct MdecimalcontextElement{
+	Mdecimalcontext* _decimalcontext;
+	struct MdecimalcontextElement* _next;
+}MdecimalcontextElement;
+void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement){
+	if(!_decimalcontextElement)return;
+	if(_decimalcontextElement->_next)free_decimalcontextElement(_decimalcontextElement->_next); // free whatever it is pointing to
+	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext); // free whatever decimal context it is referring to
+	FREE(_decimalcontextElement,'C');
+}
+static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;
+// to get the unique decimal context with the requested precision
+Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){
+	// do we already have it?
+	if(prec<6)return NULL; // prec needs to be at least 6
+	MdecimalcontextElement *decimalcontextElement=_firstDecimalcontextElement;
+	while(decimalcontextElement&&decimalcontextElement->_decimalcontext->mpd_context->prec!=prec)decimalcontextElement=decimalcontextElement->_next;
+	if(!decimalcontextElement){ // not existing
+		decimalcontextElement=CALLOC(1,sizeof(MdecimalcontextElement),'C');
+		if(decimalcontextElement){
+			decimalcontextElement->_decimalcontext=CALLOC(1,sizeof(Mdecimalcontext),'c');
+			if(decimalcontextElement->_decimalcontext){
+				decimalcontextElement->_decimalcontext->mpd_context=__mpd_context(prec);
+				if(decimalcontextElement->_decimalcontext->mpd_context){
+					if(_lastDecimalcontextElement)_lastDecimalcontextElement->_next=decimalcontextElement;
+					_lastDecimalcontextElement=decimalcontextElement;
+					if(!_firstDecimalcontextElement)_firstDecimalcontextElement=_lastDecimalcontextElement;
+				}else{
+					free_decimalcontextElement(decimalcontextElement);decimalcontextElement=NULL;
+				}
+			}else{
+				free_decimalcontextElement(decimalcontextElement);decimalcontextElement=NULL;
+			}
+		}else
+			output("%sFailed to create the decimal context with precision " PRIu64 ".\n",ERROR_PREFIX,prec);
+	}
+	return(decimalcontextElement?decimalcontextElement->_decimalcontext:NULL);
+}
 
 // MDH@25AUG2019: I'd see that decimalOne should be an Mdecimal? we can leave it the way it is for now but instead require the context passed to __mpd to be non-NULL!! i.e. __mpd does no longer default to _decimalContext
 static mpd_t* decimalOne=NULL;
 // getDecimalOne() return a decimal but this is a decimal that should never be freed
-const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(_decimalContext,1);return decimalOne;}/* VALIDATED */
+const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);return decimalOne;}/* VALIDATED */
 bool isDecimalOne(Mdecimal* _decimal){
     // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
-    return (_decimal->repeating&&mpd_cmp(_decimal->mpd,getDecimalOne(),_decimalContext)==MP_EQ);
+    return (_decimal->repeating&&mpd_cmp(_decimal->mpd,getDecimalOne(),M_DECIMALCONTEXT->mpd_context)==MP_EQ);
 }/* VALIDATED */
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
@@ -27,7 +95,7 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
             Mstring* _p=_decimalText;
             // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
             // NOTE if _decimal->repeating always use fixed-point notation
-            char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),_decimalContext);
+            char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT);
             ///////////output("Decimal rep: '%s'.\n",_decimalRep);
             if(_decimalChars){
                 _p=string_append(_p,_decimalChars);
@@ -50,15 +118,21 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
  * \return a copy of \p _decimal on success, or NULL otherwise
  */
 Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
-    if(!_decimal)return NULL;
-    Mdecimal* _decimalCopy=__decimal(_decimalContext,0,_decimal->repeating);
+	Mdecimalcontext* decimalcontext=(_decimal?_getDecimalcontext(_decimal->prec):NULL);
+    if(!decimalcontext)return NULL;
+	mpd_t* _mpd=get_mpd_copy(decimalcontext,_decimal->mpd); // make a copy
+	return(_mpd?_getDecimal(_mpd,_decimal->prec,_decimal->repeating,true):NULL); // if failing to wrap the mpd copy free it
+	/* replacing:
+	// TODO use get_mpd_copy() to copy the mpd in _decimal to speed things up, and use the
+    Mdecimal* _decimalCopy=__decimal(M_DECIMALCONTEXT->mpd_context,0,_decimal->repeating);
     if(_decimalCopy){
-        _decimalCopy->mpd=NULL; // TODO check if __decimal uses calloc or malloc
-        mpd_copy(_decimalCopy->mpd,_decimal->mpd,_decimalContext); // copy attempt
+        _decimalCopy->mpd=NULL; // TODO check if __decimal uses calloc or malloc (BTW this does not seem to be such a good idea as mpd_copy would fail)
+        mpd_copy(_decimalCopy->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context); // copy attempt
         if(!_decimalCopy->mpd){free_decimal(_decimalCopy);_decimalCopy=NULL;} // on failure, release the decimal
     }else
         outputError("Failed to copy a decimal");
     return _decimalCopy;
+	*/
 }/* VALIDATED */
 
 // CONVERSION FROM OTHER M TYPES
@@ -96,7 +170,7 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
                 Mlistelement* _remainderListelement=NULL;
                 */
                 uint64_t remainderIndex,remainderCount=0; // where we found a match
-                long long decimalsLeft=_decimalContext->prec+2; // stop as soon as we have sufficient decimals
+                long long decimalsLeft=M_DECIMALCONTEXT->mpd_context->prec+2; // stop as soon as we have sufficient decimals
                 if(amVerbose())output("Number of decimals to determine: %llu.\n",decimalsLeft);
                 Mstring* _digitText; // for storing the dividend digit character
                 MbigintegerListelement* _remainderListelement=NULL;
@@ -200,20 +274,22 @@ bool mpd_error(const mpd_context_t* const mpd_context){return(mpd_getstatus(mpd_
 // BASE STUFF
 // are we keeping a map of mpd contexts????
 // trap handler (how to set it????)
-void MMdecimalraphandler(mpd_context_t* mpd_context){
+/* replacing:
+void Mdecimalraphandler(mpd_context_t* mpd_context){
 }
+
 size_t mpd_context_count=0;
 
 const size_t MAXIMUM_NUMBER_OF_CONTEXTS=2; // quick fix to ascertain to use the same context over and over again
 
 mpd_context_t** mpd_contexts=NULL; // keep track of all decimal contexts
-/**
- * \brief returns the multiple-precision decimal context with the \p decimalprecision requested
- * \param decimalprecision the number of decimal digits a decimal should (minimally) hold
- * \return NULL on failing to obtain such a decimal context, otherwise that decimal context
- * if the number of stored decimal context equals the maximum number of contexts, the last context will be reused
- * if creating a new context succeeded it will be returned even when failing to remember the decimal context
- */
+//
+// * \brief returns the multiple-precision decimal context with the \p decimalprecision requested
+// * \param decimalprecision the number of decimal digits a decimal should (minimally) hold
+// * \return NULL on failing to obtain such a decimal context, otherwise that decimal context
+// * if the number of stored decimal context equals the maximum number of contexts, the last context will be reused
+// * if creating a new context succeeded it will be returned even when failing to remember the decimal context
+//
 mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
     mpd_context_t* mpd_context=NULL; // the context we will be returning
     if(amVerbose())output("Retrieving the decimal context with precision %lld.\n",decimalprecision);
@@ -251,7 +327,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
     // reset the status, so we can use the context as if it were new
     if(mpd_context)mpd_qsetstatus(mpd_context,0); // using the setter is preferred over ->status=0 assignment
     return mpd_context;
-}/* VALIDATED */
+}// VALIDATED */
 
 // MDH@25AUG2019: now requiring mpd_context to not be NULL
 // MDH@17JUN2019: convenient to expose _get_mpd (e.g. for use in approximating pi with a decimal)
@@ -262,7 +338,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
  */
 mpd_t* __mpd(const mpd_context_t* mpd_context,int64_t value){
     mpd_t* _mpd=NULL;
-	if(!mpd_context)mpd_context=_decimalContext;
+	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
     // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
     if(mpd_context){
         _mpd=mpd_qnew();
@@ -312,7 +388,7 @@ Mdecimal* __adecimal(){return (Mdecimal*)CALLOC(1,sizeof(Mdecimal),'D');} /* VAL
  */
 Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repeating){
     Mdecimal* _decimal=NULL;
-    if(!mpd_context)mpd_context=_decimalContext; // use the application-wide decimal context if no context is defined
+    if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context; // use the application-wide decimal context if no context is defined
     if(mpd_context){
         _decimal=__adecimal(); // get an uninitialized decimal
         if(_decimal){
@@ -331,14 +407,15 @@ Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repe
     return _decimal;
 }/* VALIDATED */
 
+// MDH@29AUG2019: as mpd_t does not itself store the precision with which the decimal was created AND an Mdecimal* does store the precision I've added the prec parameter
 /**
  * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
  */
-Mdecimal* _getDecimal(mpd_t* mpd,uint64_t repeating,bool freeonfailure){
+Mdecimal* _getDecimal(mpd_t* mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){
     if(!mpd)return NULL; // can do this as won't have to free mpd anyway
-    Mdecimal* decimal=__decimal(_decimalContext,0,repeating); // always using the default decimal context
-    if(decimal)decimal->mpd=mpd;else if(freeonfailure)free_mpd(mpd);
-    return decimal;
+    Mdecimal* _decimal=__adecimal(); // always using the default decimal context
+    if(_decimal){_decimal->mpd=mpd;_decimal->prec=prec;}else if(freeonfailure)free_mpd(mpd);
+    return _decimal;
 }/* VALIDATED */
 
 /**
@@ -353,7 +430,7 @@ Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
         // the rounding at the end of course could prove to be problematic
         decimal=__decimal(NULL,0,repeating);
         if(decimal){
-            mpd_set_string(decimal->mpd,decimalText,_decimalContext); // NOTE here we have to pass in the default decimal context
+            mpd_set_string(decimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context); // NOTE here we have to pass in the default decimal context
             if(!decimal->mpd){free_decimal(decimal);decimal=NULL;} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
         }
         if(!decimal)output("%sFailed to create a decimal from '%s'.\n",ERROR_PREFIX,decimalText);
@@ -364,85 +441,39 @@ Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
 
 // END BASE STUFF
 
-
-Mdecimal* pi_decimal(const mpd_context_t* mpd_context){
+Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 
 	// if decimalContext equals NULL use the global decimal context, in _decimalContext
-	if(!mpd_context)mpd_context=_decimalContext;
+	if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 
-	mpd_ssize_t decimalprecision=(mpd_context?mpd_context->prec:0);
+	mpd_context_t* mpd_context=decimalcontext->mpd_context;
+
+	mpd_ssize_t decimalprecision=mpd_context->prec;
 	if(decimalprecision<=0){outputError("Cannot approximate pi: no decimal context available");return NULL;}
 
-	/* replacing:
-	if(!mpd_context){if(decimalprecision>0)outputError("Failed to obtain the requested decimal context");else outputError("No (default) decimal context available");return NULL;}
-	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
-	*/
-	if(amVerbose())output("Computing pi to %lld decimals.\n",decimalprecision);
+	Mdecimal* _decimal=NULL; // the result
 
-	// initialize the variables we need for the iterations
+	// if pi already exists in the given decimal context return it, but we need to wrap a copy in the decimal
+	if(!decimalcontext->pi){
+
+		if(amVerbose())output("Computing pi to %lld decimals.\n",decimalprecision);
+
+		// initialize the variables we need for the iterations
 #ifdef __ADEBUG__
-	Mdecimal *lasts=__decimal(mpd_context,0,0),*t=__decimal(mpd_context,3,0),*s=__decimal(mpd_context,3,0),*n=__decimal(mpd_context,1,0),*na=__decimal(mpd_context,0,0),*d=__decimal(mpd_context,0,0),*da=__decimal(mpd_context,24,0);
-	// some constant decimals we need
-	Mdecimal *d8=__decimal(mpd_context,8,0),*d32=__decimal(mpd_context,32,0);
+		Mdecimal *lasts=__decimal(mpd_context,0,0),*t=__decimal(mpd_context,3,0),*s=__decimal(mpd_context,3,0),*n=__decimal(mpd_context,1,0),*na=__decimal(mpd_context,0,0),*d=__decimal(mpd_context,0,0),*da=__decimal(mpd_context,24,0);
+		// some constant decimals we need
+		Mdecimal *d8=__decimal(mpd_context,8,0),*d32=__decimal(mpd_context,32,0);
 #else
-	mpd_t *lasts=__mpd(mpd_context,0),*t=__mpd(mpd_context,3),*s=__mpd(mpd_context,3),*n=__mpd(mpd_context,1),*na=__mpd(mpd_context,0),*d=__mpd(mpd_context,0),*da=__mpd(mpd_context,24);
-	// some constant decimals we need
-	mpd_t *d8=__mpd(mpd_context,8),*d32=__mpd(mpd_context,32);
+		mpd_t *lasts=__mpd(mpd_context,0),*t=__mpd(mpd_context,3),*s=__mpd(mpd_context,3),*n=__mpd(mpd_context,1),*na=__mpd(mpd_context,0),*d=__mpd(mpd_context,0),*da=__mpd(mpd_context,24);
+		// some constant decimals we need
+		mpd_t *d8=__mpd(mpd_context,8),*d32=__mpd(mpd_context,32);
 #endif
-	if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
-	if(amVerbose())output("Initial decimals created!\n");
-	unsigned long long iter=0;
-	if(amVerbose()){
-		output("Iteration %u:",iter);
-#ifdef __ADEBUG__
-		char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
-		char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
-		char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
-		char* _n=mpd_to_sci(n->mpd,0);output(" n=%s",_n);free(_n);
-		char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
-		char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
-		char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
-#else
-		char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
-		char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
-		char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
-		char* _n=mpd_to_sci(n,0);output(" n=%s",_n);free(_n);
-		char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
-		char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
-		char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
-#endif
-		outputChar('\n');
-	}
-	int cmp;
-	mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
-	while(!mpd_error(mpd_context)){
-		iter++;
-#ifdef __ADEBUG__
-		//if(amVerbose())output("Iteration: %lld: ",iter);
-		cmp=mpd_cmp(lasts->mpd,s->mpd,mpd_context); // lasts == s ?
-		//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
-		if(!cmp){if(amVerbose())output("Done!\n");break;}
-		//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
-		if(cmp==INT_MAX){output("Something went wrong!\n");break;}
-		//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
-		mpd_copy(lasts->mpd,s->mpd,mpd_context); // lasts = s
-		//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
-		mpd_add(n->mpd,n->mpd,na->mpd,mpd_context);
-		//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
-		mpd_add(na->mpd,na->mpd,d8->mpd,mpd_context); // increment n by na and na by 8
-		//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
-		mpd_add(d->mpd,d->mpd,da->mpd,mpd_context);
-		//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
-		mpd_add(da->mpd,da->mpd,d32->mpd,mpd_context); // increment d by da and da by 32
-		//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
-		mpd_mul(t->mpd,t->mpd,n->mpd,mpd_context);
-		//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
-		mpd_div(t->mpd,t->mpd,d->mpd,mpd_context); // multiply t by n and divide t by d
-		//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
-		mpd_add(s->mpd,s->mpd,t->mpd,mpd_context); // add t to s
-		//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+		if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
+		if(amVerbose())output("Initial decimals created!\n");
+		unsigned long long iter=0;
 		if(amVerbose()){
 			output("Iteration %u:",iter);
+#ifdef __ADEBUG__
 			char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
 			char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
 			char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
@@ -450,208 +481,336 @@ Mdecimal* pi_decimal(const mpd_context_t* mpd_context){
 			char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
 			char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
 			char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
+#else
+			char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
+			char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
+			char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
+			char* _n=mpd_to_sci(n,0);output(" n=%s",_n);free(_n);
+			char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
+			char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
+			char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
+#endif
 			outputChar('\n');
 		}
+		int cmp;
+		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
+		while(!mpd_error(mpd_context)){
+			iter++;
+#ifdef __ADEBUG__
+			//if(amVerbose())output("Iteration: %lld: ",iter);
+			cmp=mpd_cmp(lasts->mpd,s->mpd,mpd_context); // lasts == s ?
+			//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
+			if(!cmp){if(amVerbose())output("Done!\n");break;}
+			//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
+			if(cmp==INT_MAX){output("Something went wrong!\n");break;}
+			//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
+			mpd_copy(lasts->mpd,s->mpd,mpd_context); // lasts = s
+			//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
+			mpd_add(n->mpd,n->mpd,na->mpd,mpd_context);
+			//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
+			mpd_add(na->mpd,na->mpd,d8->mpd,mpd_context); // increment n by na and na by 8
+			//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
+			mpd_add(d->mpd,d->mpd,da->mpd,mpd_context);
+			//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
+			mpd_add(da->mpd,da->mpd,d32->mpd,mpd_context); // increment d by da and da by 32
+			//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
+			mpd_mul(t->mpd,t->mpd,n->mpd,mpd_context);
+			//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
+			mpd_div(t->mpd,t->mpd,d->mpd,mpd_context); // multiply t by n and divide t by d
+			//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
+			mpd_add(s->mpd,s->mpd,t->mpd,mpd_context); // add t to s
+			//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+			if(amVerbose()){
+				output("Iteration %u:",iter);
+				char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
+				char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
+				char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
+				char* _n=mpd_to_sci(n->mpd,0);output(" n=%s",_n);free(_n);
+				char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
+				char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
+				char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
+				outputChar('\n');
+			}
 #else
-		//if(amVerbose())output("Iteration: %lld: ",iter);
-		cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
-		//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
-		if(!cmp){if(amVerbose())output("Done!\n");break;}
-		//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
-		if(cmp==INT_MAX){output("Something went wrong!\n");break;}
-		//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
-		mpd_copy(lasts,s,mpd_context); // lasts = s
-		//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
-		mpd_add(n,n,na,mpd_context);
-		//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
-		mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
-		//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
-		mpd_add(d,d,da,mpd_context);
-		//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
-		mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
-		//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
-		mpd_mul(t,t,n,mpd_context);
-		//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
-		mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
-		//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
-		mpd_add(s,s,t,mpd_context); // add t to s
-		//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+			//if(amVerbose())output("Iteration: %lld: ",iter);
+			cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
+			//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
+			if(!cmp){if(amVerbose())output("Done!\n");break;}
+			//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
+			if(cmp==INT_MAX){output("Something went wrong!\n");break;}
+			//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
+			mpd_copy(lasts,s,mpd_context); // lasts = s
+			//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
+			mpd_add(n,n,na,mpd_context);
+			//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
+			mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
+			//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
+			mpd_add(d,d,da,mpd_context);
+			//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
+			mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
+			//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
+			mpd_mul(t,t,n,mpd_context);
+			//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
+			mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
+			//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
+			mpd_add(s,s,t,mpd_context); // add t to s
+			//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+			if(amVerbose()){
+				output("Iteration %u:",iter);
+				//char* _lasts=mpd_to_sci(lasts,0);if(_lasts){output(" lasts=%s");free(_lasts);}else output(" ?");
+				char* _t=mpd_to_sci(t,0);if(_t){output(" t=%s",_t);free(_t);}else output(" ?");
+				char* _s=mpd_to_sci(s,0);if(_s){output(" s=%s",_s);free(_s);}else output(" ?");
+				char* _n=mpd_to_sci(n,0);if(_n){output(" n=%s",_n);free(_n);}else output(" ?");
+				char* _na=mpd_to_sci(na,0);if(_na){output(" na=%s",_na);free(_na);}else output(" ?");
+				char* _d=mpd_to_sci(d,0);if(_d){output(" d=%s",_d);free(_d);}else output(" ?");
+				char* _da=mpd_to_sci(da,0);if(_da){output(" da=%s",_da);free(_da);}else output(" ?");
+				outputChar('\n');
+			}
+#endif
+		}
+		if(mpd_context)mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+		// get rid of all the decimals we used
+#ifdef __ADEBUG__
+		free_decimal(lasts);free_decimal(t);free_decimal(n);free_decimal(na);free_decimal(d);free_decimal(da);
+		free_decimal(d8);free_decimal(d32);
+#else
+		mpd_del(lasts);mpd_del(t);mpd_del(n);mpd_del(na);mpd_del(d);mpd_del(da);
+		mpd_del(d8);mpd_del(d32);
+#endif
+		if(mpd_context){
+			if(mpd_error(mpd_context)){ // something went wrong
+				if(amVerbose())output("%sComputation of pi with precision %lld error status: %u.\n",ERROR_PREFIX,decimalprecision,mpd_getstatus(mpd_context));
+				report_mpd_status(mpd_context);
+				return NULL;
+			}
+		}
+		// success
+#ifdef __ADEBUG__
+		mpd_finalize(s->mpd,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
+#else
+		mpd_finalize(s,mpd_context); // to round to the requested precision
+#endif
 		if(amVerbose()){
-			output("Iteration %u:",iter);
-			//char* _lasts=mpd_to_sci(lasts,0);if(_lasts){output(" lasts=%s");free(_lasts);}else output(" ?");
-			char* _t=mpd_to_sci(t,0);if(_t){output(" t=%s",_t);free(_t);}else output(" ?");
-			char* _s=mpd_to_sci(s,0);if(_s){output(" s=%s",_s);free(_s);}else output(" ?");
-			char* _n=mpd_to_sci(n,0);if(_n){output(" n=%s",_n);free(_n);}else output(" ?");
-			char* _na=mpd_to_sci(na,0);if(_na){output(" na=%s",_na);free(_na);}else output(" ?");
-			char* _d=mpd_to_sci(d,0);if(_d){output(" d=%s",_d);free(_d);}else output(" ?");
-			char* _da=mpd_to_sci(da,0);if(_da){output(" da=%s",_da);free(_da);}else output(" ?");
-			outputChar('\n');
+#ifdef __ADEBUG__
+			char* _s=mpd_to_sci(s->mpd,0);
+#else
+			char* _s=mpd_to_sci(s,0);
+#endif
+			if(_s){output("Final approximation of pi (rounded to %llu decimals): %s.\n",decimalprecision,_s);free(_s);}
 		}
-#endif
+
+		_decimal=_getDecimal(s,decimalprecision,0,true);
+
+		// store a copy of s in decimalcontext->pi
+		decimalcontext->pi=get_mpd_copy(mpd_context,s);
+
+		if(!decimalcontext->pi)
+		outputError("Failed to store the decimal approximation of pi in the decimal context");
+		else
+		if(amVerbose())
+		outputLine("NOTE: Decimal approximation to pi stored in the decimal context.");
+
+	}else{ // decimalcontext->pi exists
+
+		if(amVerbose())outputLine("NOTE: Returning the decimal approximation of pi stored in the decimal context.");
+		// a copy to return
+		_decimal=_getDecimal(get_mpd_copy(mpd_context,decimalcontext->pi),decimalprecision,0,true);
+
 	}
-	if(mpd_context)mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
-	// get rid of all the decimals we used
-#ifdef __ADEBUG__
-	free_decimal(lasts);free_decimal(t);free_decimal(n);free_decimal(na);free_decimal(d);free_decimal(da);
-	free_decimal(d8);free_decimal(d32);
-#else
-	mpd_del(lasts);mpd_del(t);mpd_del(n);mpd_del(na);mpd_del(d);mpd_del(da);
-	mpd_del(d8);mpd_del(d32);
-#endif
-	if(mpd_context){
-		if(mpd_error(mpd_context)){ // something went wrong
-			if(amVerbose())output("%sComputation of pi with precision %lld error status: %u.\n",ERROR_PREFIX,decimalprecision,mpd_getstatus(mpd_context));
-			report_mpd_status(mpd_context);
-			return NULL;
-		}
-	}
-	// success
-#ifdef __ADEBUG__
-	mpd_finalize(s->mpd,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
-#else
-	mpd_finalize(s,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
-#endif
-	if(amVerbose()){
-#ifdef __ADEBUG__
-		char* _s=mpd_to_sci(s->mpd,0);
-#else
-		char* _s=mpd_to_sci(s,0);
-#endif
-		if(_s){output("Final approximation of pi (rounded to %llu decimals): %s.\n",decimalprecision,_s);free(_s);}
-	}
-	// wrap the mpd_t in a decimal
-#ifdef __ADEBUG__
-	return _getDecimalValue(s,true);
-#else
-	return _getDecimal(s,0,true);
-#endif
+	
+	return _decimal; // freeonfailure=true means if we do not manage to wrap _pi in a decimal free it
+
+	/* replacing:
+	if(!mpd_context){if(decimalprecision>0)outputError("Failed to obtain the requested decimal context");else outputError("No (default) decimal context available");return NULL;}
+	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
+	*/
 
 }
 
+// internal helper functions that compute the sine and cosine of any decimal smaller than 1 (typically in [0,pi/4))
+mpd_t* _dsincos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence requires x to be below 1
+	mpd_t* _sincos=NULL;
+	uint32_t status=0;
+	// the sine of x equals the som of an infinite number of terms multiplied by x
+	// each element of the sequence has an index, say n, but let's start with n=0
+	// each term then equals (x^4n)/(4n+1)!)*(1-(x^2)/(4n+2)*(4n+3)))
+	// so n=0: (x^0/1!)*(1-x^2/2*3), n=1: 
+	//////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)+2); // increment the precision by 2
+	Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+	mpd_t *_x2=__mpd(mpd_context,0),*_x4=__mpd(mpd_context,0),*_1minus=__mpd(mpd_context,0),*_sub=__mpd(mpd_context,0),*_prevsincos=__mpd(mpd_context,0),*_prodacc=__mpd(mpd_context,0),*_prevprodacc=__mpd(mpd_context,0); // parts that need to be initialized
+	mpd_t *_prod=__mpd(mpd_context,1),*_multnum=__mpd(mpd_context,1),*_mult=__mpd(mpd_context,1),*_1=__mpd(mpd_context,1);
+	// helpers of which the value differs whether a sine or cosine approximation is requested (den is 3! for the sine, and 2! for the cosine)
+	mpd_t *_den=__mpd(mpd_context,(sin?6:2)),*_4n=__mpd(mpd_context,(sin?3:2)),*_multden=__mpd(mpd_context,(sin?6:2)); // initialized helper decimals
+	_sincos=__mpd(mpd_context,0);
+	if(_sincos&&_prevsincos&&_x2&&_x4&&_multnum&&_multden&&_mult&&_den&&_4n&&_prod&&_1minus&&_sub&&_1&&_prodacc&&_prevprodacc){
+		mpd_qmul(_x2,x,x,mpd_context,&status);
+		mpd_qmul(_x4,_x2,_x2,mpd_context,&status);
+		unsigned long long iterations=0; // let's start with at most 100 iterations
+		while((status&0xEFBF)==0){
+			iterations++;
+			// compute _sub
+			mpd_qdiv(_sub,_x2,_den,mpd_context,&status); // first time this would  be x^2/6
+			// compute _1minus
+			mpd_qsub(_1minus,_1,_sub,mpd_context,&status);
+			// compute _prod as the product of _mult and _1minus
+			mpd_qmul(_prod,_mult,_1minus,mpd_context,&status); // first time this would be 1 * x^2/6
+			if(mpd_iszero(_prod))break; // if the product is now zero we're definitely done
+			// increment sine with the new product
+			if(mpd_iszero(_prevprodacc)){ // accuracy not yet reached
+				// add _prod to _prevsine to become the new sine
+				mpd_qadd(_sincos,_prevsincos,_prod,mpd_context,&status);
+				if(mpd_qcmp(_prevsincos,_sincos,&status)==0) // _sine and _prevsine technically the same (in the given decimal context)
+					mpd_qcopy(_prevprodacc,_prod,&status); // store the non-zero _prod in _prevprodacc, from now on we will keep doing that
+				else // new sine differs from previous sine: required accuracy not yet reached
+					mpd_qcopy(_prevsincos,_sincos,&status); // update _prevsine
+				if(_intermediateResult){
+					output("Iteration %llu: ",iterations);
+					mpd_qcopy(_intermediateResult->mpd,_prod,&status);
+					outputDecimal("Increment: '",_intermediateResult,"' -> ");
+					if(sin)mpd_qmul(_intermediateResult->mpd,_sincos,x,mpd_context,&status);else mpd_qcopy(_intermediateResult->mpd,_sincos,&status);
+					outputDecimal((sin?"Sine: ":"Cosine: '"),_intermediateResult,"'.\n");
+				}
+			}else{ // accuracy reached, but still some iterations left
+				mpd_qadd(_prodacc,_prevprodacc,_prod,mpd_context,&status);
+				if(_intermediateResult){
+					output("Iteration %llu: ",iterations);
+					mpd_qcopy(_intermediateResult->mpd,_prodacc,&status);
+					outputDecimal("Incremental remainder: '",_intermediateResult,"'.\n");
+				}
+				if(mpd_qcmp(_prodacc,_prevprodacc,&status)==0)break;
+				mpd_qcopy(_prodacc,_prevprodacc,&status); // copy the change accumulative remainder
+			}
+			// update the helpers _den, _sub, _multnum, _multden, _mult, _4n
+			mpd_qmul(_multnum,_multnum,_x4,mpd_context,&status); // updating _multnum is easy as we only need to multiply it by x^4
+			// NOTE _4n starts equal to 3 (as _den starts as 3!), and the faculty stored in _multden needs to be updated 4 times
+			// so, we have to increment _4n four times and use each of these 4 values to update _multden to become the new faculty value to use
+			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n)
+			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+1)
+			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+			// after two increments to _4n _multden is what we want it to be for computing the 
+			// _multnum and _multden updated, so we can now update _mult
+			mpd_qdiv(_mult,_multnum,_multden,mpd_context,&status);
+			
+			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+2)
+			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+			mpd_qcopy(_den,_4n,&status); // initialize _den to _4n
+			
+			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+3)
+			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+			mpd_qmul(_den,_den,_4n,mpd_context,&status); // _den now equal to (4n+2)*(4n+3) as we need it to be
+
+			// with _den computed we can now update _sub 
+			mpd_qdiv(_sub,_x4,_den,mpd_context,&status);
+			// and ready to 
+		}
+	}else
+		outputError("Failed to create helper decimals in computing the sine of a decimal");
+	if(_intermediateResult)free_decimal(_intermediateResult);
+	// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
+	if(!mpd_iszero(_prevprodacc)){
+		mpd_qadd(_sincos,_sincos,_prevprodacc,mpd_context,&status);
+	}
+	free_mpd(_prevprodacc);
+	free_mpd(_prodacc);
+	free_mpd(_prevsincos);
+	free_mpd(_x2);
+	free_mpd(_x4);
+	free_mpd(_4n);
+	free_mpd(_1);
+	free_mpd(_sub);
+	free_mpd(_1minus);
+	free_mpd(_multnum);
+	free_mpd(_multden);
+	free_mpd(_mult);
+	free_mpd(_den);
+	free_mpd(_prod);
+	// finally multiply by x if the sine was requested!!!
+	if((status&0xEFBF)==0)if(sin)mpd_qmul(_sincos,_sincos,x,mpd_context,&status);
+	////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)-2); // decrement the precision by 2
+	if((status&0xEFBF)!=0){free_mpd(_sincos);_sincos=NULL;}////////else mpd_finalize(_sine,decimalContext);
+	return _sincos;
+}
+
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
-Mdecimal* _dsine(const mpd_context_t* decimalContext,Mdecimal* x){
-	mpd_t* _sine=NULL;
+Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
 		// use the same decimal context as used by x
-		if(!decimalContext)decimalContext=get_mpd_context(x->prec);
-		if(decimalContext){
-			uint32_t status=0;
-			// the sine of x equals the som of an infinite number of terms multiplied by x
-			// each element of the sequence has an index, say n, but let's start with n=0
-			// each term then equals (x^4n)/(4n+1)!)*(1-(x^2)/(4n+2)*(4n+3)))
-			// so n=0: (x^0/1!)*(1-x^2/2*3), n=1: 
-			//////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)+2); // increment the precision by 2
-			Mdecimal* _intermediateResult=(amVerbose()?__decimal(decimalContext,0,0):NULL);
-			mpd_t *_x2=__mpd(decimalContext,0),*_x4=__mpd(decimalContext,0),*_1minus=__mpd(decimalContext,0),*_sub=__mpd(decimalContext,0),*_prevsine=__mpd(decimalContext,0),*_prodacc=__mpd(decimalContext,0),*_prevprodacc=__mpd(decimalContext,0); // parts that need to be initialized
-			mpd_t *_prod=__mpd(decimalContext,1),*_multden=__mpd(decimalContext,6),*_multnum=__mpd(decimalContext,1),*_mult=__mpd(decimalContext,1),*_den=__mpd(decimalContext,6),*_4n=__mpd(decimalContext,3),*_1=__mpd(decimalContext,1); // initialized helper decimals
-			_sine=__mpd(decimalContext,0);
-			if(_sine&&_prevsine&&_x2&&_x4&&_multnum&&_multden&&_mult&&_den&&_4n&&_prod&&_1minus&&_sub&&_1&&_prodacc&&_prevprodacc){
-				mpd_qmul(_x2,x->mpd,x->mpd,decimalContext,&status);
-				mpd_qmul(_x4,_x2,_x2,decimalContext,&status);
-				unsigned long long iterations=0; // let's start with at most 100 iterations
-				while((status&0xEFBF)==0){
-					iterations++;
-					// compute _sub
-					mpd_qdiv(_sub,_x2,_den,decimalContext,&status); // first time this would  be x^2/6
-					// compute _1minus
-					mpd_qsub(_1minus,_1,_sub,decimalContext,&status);
-					// compute _prod as the product of _mult and _1minus
-					mpd_qmul(_prod,_mult,_1minus,decimalContext,&status); // first time this would be 1 * x^2/6
-					if(mpd_iszero(_prod))break; // if the product is now zero we're definitely done
-					// increment sine with the new product
-					if(mpd_iszero(_prevprodacc)){ // accuracy not yet reached
-						// add _prod to _prevsine to become the new sine
-						mpd_qadd(_sine,_prevsine,_prod,decimalContext,&status);
-						if(mpd_qcmp(_prevsine,_sine,&status)==0) // _sine and _prevsine technically the same (in the given decimal context)
-							mpd_qcopy(_prevprodacc,_prod,&status); // store the non-zero _prod in _prevprodacc, from now on we will keep doing that
-						else // new sine differs from previous sine: required accuracy not yet reached
-							mpd_qcopy(_prevsine,_sine,&status); // update _prevsine
-						if(_intermediateResult){
-							output("Iteration %llu: ",iterations);
-							mpd_qcopy(_intermediateResult->mpd,_prod,&status);
-							outputDecimal("Increment: '",_intermediateResult,"' -> ");
-							mpd_qmul(_intermediateResult->mpd,_sine,x->mpd,decimalContext,&status);
-							outputDecimal("Sine: '",_intermediateResult,"'.\n");
-						}
-					}else{ // accuracy reached, but still some iterations left
-						mpd_qadd(_prodacc,_prevprodacc,_prod,decimalContext,&status);
-						if(_intermediateResult){
-							output("Iteration %llu: ",iterations);
-							mpd_qcopy(_intermediateResult->mpd,_prodacc,&status);
-							outputDecimal("Incremental remainder: '",_intermediateResult,"'.\n");
-						}
-						if(mpd_qcmp(_prodacc,_prevprodacc,&status)==0)break;
-						mpd_qcopy(_prodacc,_prevprodacc,&status); // copy the change accumulative remainder
-					}
-					// update the helpers _den, _sub, _multnum, _multden, _mult, _4n
-					mpd_qmul(_multnum,_multnum,_x4,decimalContext,&status); // updating _multnum is easy as we only need to multiply it by x^4
-					// NOTE _4n starts equal to 3 (as _den starts as 3!), and the faculty stored in _multden needs to be updated 4 times
-					// so, we have to increment _4n four times and use each of these 4 values to update _multden to become the new faculty value to use
-					mpd_qadd_uint(_4n,_4n,1,decimalContext,&status); // now equal to (4n)
-					mpd_qmul(_multden,_multden,_4n,decimalContext,&status);
-					mpd_qadd_uint(_4n,_4n,1,decimalContext,&status); // now equal to (4n+1)
-					mpd_qmul(_multden,_multden,_4n,decimalContext,&status);
-					// after two increments to _4n _multden is what we want it to be for computing the 
-					// _multnum and _multden updated, so we can now update _mult
-					mpd_qdiv(_mult,_multnum,_multden,decimalContext,&status);
-					
-					mpd_qadd_uint(_4n,_4n,1,decimalContext,&status); // now equal to (4n+2)
-					mpd_qmul(_multden,_multden,_4n,decimalContext,&status);
-					mpd_qcopy(_den,_4n,&status); // initialize _den to _4n
-					
-					mpd_qadd_uint(_4n,_4n,1,decimalContext,&status); // now equal to (4n+3)
-					mpd_qmul(_multden,_multden,_4n,decimalContext,&status);
-					mpd_qmul(_den,_den,_4n,decimalContext,&status); // _den now equal to (4n+2)*(4n+3) as we need it to be
-
-					// with _den computed we can now update _sub 
-					mpd_qdiv(_sub,_x4,_den,decimalContext,&status);
-					// and ready to 
-				}
-			}else
-				outputError("Failed to create helper decimals in computing the sine of a decimal");
-			if(_intermediateResult)free_decimal(_intermediateResult);
-			// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
-			if(!mpd_iszero(_prevprodacc)){
-				mpd_qadd(_sine,_sine,_prevprodacc,decimalContext,&status);
-			}
-			free_mpd(_prevprodacc);
-			free_mpd(_prodacc);
-			free_mpd(_prevsine);
-			free_mpd(_x2);
-			free_mpd(_x4);
-			free_mpd(_4n);
-			free_mpd(_1);
-			free_mpd(_sub);
-			free_mpd(_1minus);
-			free_mpd(_multnum);
-			free_mpd(_multden);
-			free_mpd(_mult);
-			free_mpd(_den);
-			free_mpd(_prod);
-			// finally multiply by x
-			if((status&0xEFBF)==0){
-				mpd_qmul(_sine,_sine,x->mpd,decimalContext,&status);
-			}
-			////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)-2); // decrement the precision by 2
-			if((status&0xEFBF)!=0){free_mpd(_sine);_sine=NULL;}////////else mpd_finalize(_sine,decimalContext);
+		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		if(mpd_context){
+			// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
+			mpd_t* _sine=_dsincos(mpd_context,x->mpd,true);
+			return(_sine?_getDecimal(_sine,mpd_context->prec,0,true):NULL);
 		}else
 			outputError("No context to compute the sine of a decimal in");
 	}else
 		outputError("No decimal to compute the sine of");
-	return(_sine?_getDecimal(_sine,0,true):NULL);
+	return NULL;
 }
 
-Mdecimal* _dcosine(const mpd_context_t* decimalContext,Mdecimal* x){
-	mpd_t* _cosine=NULL;
+Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
 		// use the same decimal context as used by x
-		if(!decimalContext)decimalContext=get_mpd_context(x->prec);
-		if(decimalContext){
-
-		}else
-			outputError("No context to compute the cosine of a decimal in");
+		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		if(mpd_context){
+			mpd_t* _cosine=_dsincos(mpd_context,x->mpd,false);
+			return(_cosine?_getDecimal(_cosine,mpd_context->prec,0,true):NULL);
+		}
+		outputError("No context to compute the cosine of a decimal in");
 	}else
 		outputError("No decimal to compute the cosine of");
-	return(_cosine?_getDecimal(_cosine,0,true):NULL);
+	return NULL;
+}
+
+Mdecimal* _dexp(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+	if(x){
+		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+		if(mpd_context){
+			mpd_t* _exp=__mpd(mpd_context,1);
+			if(!mpd_iszero(x->mpd)){
+				if(_exp){
+					Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+					mpd_t *_num=get_mpd_copy(mpd_context,x->mpd),*_den=__mpd(mpd_context,1),*_add=get_mpd_copy(mpd_context,x->mpd),*_i=__mpd(mpd_context,1),*_prevexp=get_mpd_copy(mpd_context,_exp); // a copy of what we need to use
+					if(_num&&_den&&_add&&_i&&_prevexp){
+						uint32_t status=0;
+						unsigned long long iteration=0;
+						while((status&0xEFBF)==0){
+							mpd_qadd(_exp,_prevexp,_add,mpd_context,&status);
+							if(_intermediateResult){
+								iteration++;
+								output("Iteration #%llu: ",iteration);
+								mpd_qcopy(_intermediateResult->mpd,_exp,&status);
+								outputDecimal("Exp: '",_intermediateResult,"'\n.");
+							}
+							// are we done????
+							if(mpd_cmp(_exp,_prevexp,mpd_context)==0){if(amVerbose())outputDecimal("Done approximating exp(",x,").\n");break;}
+							mpd_qcopy(_prevexp,_exp,&status);
+							// update the helpers
+							mpd_qadd_u32(_i,_i,1,mpd_context,&status);
+							mpd_qmul(_den,_den,_i,mpd_context,&status);
+							mpd_qmul(_num,_num,x->mpd,mpd_context,&status);
+							mpd_qdiv(_add,_num,_den,mpd_context,&status);
+						}
+						if((status&0xEFBF)!=0){outputError("Something went wrong in executing dexp()");free_mpd(_exp);_exp=NULL;}
+					}else
+						outputError("Failed to create all dexp() execution helper decimals");
+					if(_intermediateResult)free_decimal(_intermediateResult);
+					free_mpd(_prevexp);
+					free_mpd(_i);
+					free_mpd(_num);
+					free_mpd(_den);
+					free_mpd(_add);
+				}else
+					outputError("Failed to initialize the result of dexp()");
+			}else
+			if(amVerbose())outputLine("Zero argument to exp() approximation.");
+			if(_exp)return _getDecimal(_exp,mpd_context->prec,0,true);
+		}else
+			outputError("No decimal context available for use in dexp().");
+	}
+	return NULL;
 }
 

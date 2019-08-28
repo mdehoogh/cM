@@ -8,7 +8,7 @@ extern const char* const ERROR_PREFIX;
 extern const long double M_LD_NAN;
 extern const long double M_LD_PI;
 
-extern const mpd_context_t* _decimalContext; // M.c takes care of creating the application-wide decimal context
+extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
 
 void outputDecimalStatus(uint32_t status){
 	if(status>0){
@@ -189,6 +189,10 @@ Mvalue* Mcos(Mvalue*  _value){
         if(_value->type==VT_INTEGER)return _getRealValue(cos(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcos),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcos),true);
+        if(_value->type==VT_DECIMAL){
+            Mdecimal* _cosineDecimal=_dcosine(NULL,_value->value._decimal); // match the precision as used by the argument
+            if(_cosineDecimal)return _getDecimalValue(_cosineDecimal,true);
+        }
     }
     return NULL;
 }/* VALIDATED */
@@ -237,16 +241,33 @@ Mvalue* Mexp(Mvalue* _value){
         // use decimal conversion
         Mdecimal* _decimal=getValueDecimal(_value);
         if(_decimal){
-            Mdecimal* _result=__decimal(_decimalContext,0,0);
+            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
             if(_result){
                 uint32_t status=0;
-                mpd_qexp(_result->mpd,_decimal->mpd,_decimalContext,&status);
+                mpd_qexp(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
                     free_decimal(_result);_result=NULL;
                     outputError("Failed to apply the exp function to a decimal");
                     outputDecimalStatus(status);
                 }
             }
+            if(_value->type!=VT_DECIMAL)free_decimal(_decimal);
+            return _getDecimalValue(_result,true);
+        }
+    }
+    return NULL;
+}
+// internal approximation by series expansion
+Mvalue* Mdexp(Mvalue* _value){
+    if(_value){
+        if(_value->type==VT_REAL)return _getRealValue(expl(_value->value._real->ld));
+        if(_value->type==VT_INTEGER)return _getRealValue(exp(_value->value._integer->ll));
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),true);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),true);
+        // use decimal conversion
+        Mdecimal* _decimal=getValueDecimal(_value);
+        if(_decimal){
+            Mdecimal* _result=_dexp(NULL,_decimal);
             if(_value->type!=VT_DECIMAL)free_decimal(_decimal);
             return _getDecimalValue(_result,true);
         }
@@ -261,10 +282,10 @@ Mvalue* Mlog(Mvalue* _value){
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog),true);
         Mdecimal* _decimal=getValueDecimal(_value);
         if(_decimal){
-            Mdecimal* _result=__decimal(_decimalContext,0,0);
+            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
             if(_result){
                 uint32_t status=0;
-                mpd_qln(_result->mpd,_decimal->mpd,_decimalContext,&status);
+                mpd_qln(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
                     free_decimal(_result);_result=NULL;
                     outputError("Failed to compute the natural logarithm of a decimal");
@@ -285,10 +306,10 @@ Mvalue* Mlog10(Mvalue* _value){
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10),true);
         Mdecimal* _decimal=getValueDecimal(_value);
         if(_decimal){
-            Mdecimal* _result=__decimal(_decimalContext,0,0);
+            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
             if(_result){
                 uint32_t status=0;
-                mpd_qlog10(_result->mpd,_decimal->mpd,_decimalContext,&status);
+                mpd_qlog10(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
                     free_decimal(_result);_result=NULL;
                     outputError("Failed to compute the base 10 logarithm of a decimal");
@@ -313,10 +334,10 @@ Mvalue* Msqrt(Mvalue* _value){
         // we've got a function in Mdecimal.h/c to explicitly convert a value (if possible) to a decimal (if the value wraps a decimal that is returned (instead of a new copy of this wrapped decimal) and that decimal should NOT be freed (see below))
         Mdecimal* _decimal=getValueDecimal(_value);
         if(_decimal){
-            Mdecimal* _result=__decimal(_decimalContext,0,0);
+            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
             if(_result){
                 uint32_t status=0;
-                mpd_qsqrt(_result->mpd,_decimal->mpd,_decimalContext,&status);
+                mpd_qsqrt(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
                     free_decimal(_result);_result=NULL;
                     outputError("Failed to compute the square root of a decimal");
@@ -368,7 +389,7 @@ Mvalue* Mneg(Mvalue* _value){ // negate a value
         if(_value->type==VT_DECIMAL){
             Mdecimal* decimal=_value->value._decimal;
             if(decimal){
-                Mdecimal* _negDecimal=__decimal(_decimalContext,0,0);
+                Mdecimal* _negDecimal=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
                 if(_negDecimal){
                     uint32_t status=0;
                     mpd_qcopy_negate(_negDecimal->mpd,decimal->mpd,&status);
