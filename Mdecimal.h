@@ -1,7 +1,7 @@
 #include "Mbiginteger.h"
 
 // mpd_context_t primitives
-void report_mpd_status(const mpd_context_t* const mpd_context);
+void report_mpd_status(uint32_t mpd_status);
 
 bool mpd_error(const mpd_context_t* const mpd_context);
 
@@ -17,7 +17,8 @@ void free_mpd(mpd_t* mpd);
 //                given the application-wide decimal precision stored in _decimalContext that is used to store decimals, I suppose this would be the decimal context of decimal literals
 typedef struct Mdecimalcontext{
     mpd_context_t* mpd_context;
-    mpd_t *pi,*e; // storing pi and e
+    mpd_t* e; // storing e
+    mpd_t *pi,*pidiv2,*pimul2,*pidiv4; // storing pi, 2*pi, pi/2 and pi/4
 }Mdecimalcontext;
 // MDH@29AUG2019: create a decimal context with __decimalcontext passing in the required precision
 Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision

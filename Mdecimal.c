@@ -32,6 +32,9 @@ mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){
 void free_decimalcontext(Mdecimalcontext* _decimalcontext){
 	if(_decimalcontext->mpd_context)FREE(_decimalcontext->mpd_context,'c');
 	if(_decimalcontext->pi)free_mpd(_decimalcontext->pi);
+	if(_decimalcontext->pimul2)free_mpd(_decimalcontext->pimul2);
+	if(_decimalcontext->pidiv2)free_mpd(_decimalcontext->pidiv2);
+	if(_decimalcontext->pidiv4)free_mpd(_decimalcontext->pidiv4);
 	if(_decimalcontext->e)free_mpd(_decimalcontext->e);
 	FREE(_decimalcontext,'C');
 }
@@ -95,7 +98,7 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
             Mstring* _p=_decimalText;
             // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
             // NOTE if _decimal->repeating always use fixed-point notation
-            char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT);
+            char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT->mpd_context);
             ///////////output("Decimal rep: '%s'.\n",_decimalRep);
             if(_decimalChars){
                 _p=string_append(_p,_decimalChars);
@@ -120,7 +123,7 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
 Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
 	Mdecimalcontext* decimalcontext=(_decimal?_getDecimalcontext(_decimal->prec):NULL);
     if(!decimalcontext)return NULL;
-	mpd_t* _mpd=get_mpd_copy(decimalcontext,_decimal->mpd); // make a copy
+	mpd_t* _mpd=get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd); // make a copy
 	return(_mpd?_getDecimal(_mpd,_decimal->prec,_decimal->repeating,true):NULL); // if failing to wrap the mpd copy free it
 	/* replacing:
 	// TODO use get_mpd_copy() to copy the mpd in _decimal to speed things up, and use the
@@ -251,22 +254,22 @@ Mdecimal* _getRationalDecimal(const Mrational* const _rational){
 }/* VALIDATED */
 
 // decimalerrorstatus() filter out the rounding and inexact 'errors'
-void report_mpd_status(const mpd_context_t* const mpd_context){
-	uint32_t mpd_status=mpd_getstatus(mpd_context);
+void report_mpd_status(uint32_t mpd_status){
 	if(mpd_status>0){
-		outputLine("Decimal computations error report.");
-		if(mpd_status&MPD_IEEE_Invalid_operation)outputLine("\tIEEE Invalid operation error.");
-		if(mpd_status&MPD_Clamped)outputLine("\tClamped error.");
-		if(mpd_status&MPD_Division_by_zero)outputLine("\tDivision by zero error.");
-		if(mpd_status&MPD_Fpu_error)outputLine("\tFPU error.");
-		if(mpd_status&MPD_Inexact)outputLine("\tInexact error.");
-		if(mpd_status&MPD_Not_implemented)outputLine("\tNot implemented error.");
-		if(mpd_status&MPD_Overflow)outputLine("\tOverflow error.");
-		if(mpd_status&MPD_Rounded)outputLine("\tRounding error.");
-		if(mpd_status&MPD_Subnormal)outputLine("\tSubnormal error.");
-		if(mpd_status&MPD_Underflow)outputLine("\tUnderflow error.");
+		output("Decimal computations errors:");
+		if(mpd_status&MPD_IEEE_Invalid_operation)output(" IEEE Invalid operation error");
+		if(mpd_status&MPD_Clamped)output(" Clamped error");
+		if(mpd_status&MPD_Division_by_zero)output(" Division by zero error");
+		if(mpd_status&MPD_Fpu_error)output(" FPU error");
+		if(mpd_status&MPD_Inexact)output(" Inexact error");
+		if(mpd_status&MPD_Not_implemented)output(" Unknown error");
+		if(mpd_status&MPD_Overflow)output(" Overflow error");
+		if(mpd_status&MPD_Rounded)output(" Rounding error");
+		if(mpd_status&MPD_Subnormal)output(" Subnormal error");
+		if(mpd_status&MPD_Underflow)output(" Underflow error");
+		output("\n");
 	}else
-		outputLine("No decimal context errors.");
+		outputLine("No decimal context status.");
 }
 
 bool mpd_error(const mpd_context_t* const mpd_context){return(mpd_getstatus(mpd_context)&0xEFBF)!=0;}
@@ -579,8 +582,8 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 #endif
 		if(mpd_context){
 			if(mpd_error(mpd_context)){ // something went wrong
-				if(amVerbose())output("%sComputation of pi with precision %lld error status: %u.\n",ERROR_PREFIX,decimalprecision,mpd_getstatus(mpd_context));
-				report_mpd_status(mpd_context);
+				if(amVerbose())output("%sFailed to compute pi with precision %lld (see next line for details).\n",decimalprecision);
+				report_mpd_status(mpd_getstatus(mpd_context));
 				return NULL;
 			}
 		}
@@ -601,8 +604,23 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 
 		_decimal=_getDecimal(s,decimalprecision,0,true);
 
-		// store a copy of s in decimalcontext->pi
-		decimalcontext->pi=get_mpd_copy(mpd_context,s);
+		// store pi, pi/2 and pi/4 in the decimal context (all or none)
+		mpd_t *_pi=get_mpd_copy(mpd_context,s);
+		if(_pi){
+			uint32_t status=0;
+			mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
+			if(_pidiv2&&_pidiv4&&_pimul2){
+				mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
+				mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
+				mpd_qmul_u32(_pimul2,_pi,2,mpd_context,&status);
+			}else // _pi not bound in decimalcontext, so free
+				status=1;
+			if((status&0xEFBF)==0){
+				decimalcontext->pi=_pi;decimalcontext->pidiv2=_pidiv2;decimalcontext->pidiv4=_pidiv4;decimalcontext->pimul2=_pimul2;
+			}else{
+				free_mpd(_pimul2);free_mpd(_pi);free_mpd(_pidiv2);free_mpd(_pidiv4);
+			}
+		}
 
 		if(!decimalcontext->pi)
 		outputError("Failed to store the decimal approximation of pi in the decimal context");
@@ -630,105 +648,108 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 // internal helper functions that compute the sine and cosine of any decimal smaller than 1 (typically in [0,pi/4))
 mpd_t* _dsincos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence requires x to be below 1
 	mpd_t* _sincos=NULL;
-	uint32_t status=0;
-	// the sine of x equals the som of an infinite number of terms multiplied by x
-	// each element of the sequence has an index, say n, but let's start with n=0
-	// each term then equals (x^4n)/(4n+1)!)*(1-(x^2)/(4n+2)*(4n+3)))
-	// so n=0: (x^0/1!)*(1-x^2/2*3), n=1: 
-	//////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)+2); // increment the precision by 2
-	Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
-	mpd_t *_x2=__mpd(mpd_context,0),*_x4=__mpd(mpd_context,0),*_1minus=__mpd(mpd_context,0),*_sub=__mpd(mpd_context,0),*_prevsincos=__mpd(mpd_context,0),*_prodacc=__mpd(mpd_context,0),*_prevprodacc=__mpd(mpd_context,0); // parts that need to be initialized
-	mpd_t *_prod=__mpd(mpd_context,1),*_multnum=__mpd(mpd_context,1),*_mult=__mpd(mpd_context,1),*_1=__mpd(mpd_context,1);
-	// helpers of which the value differs whether a sine or cosine approximation is requested (den is 3! for the sine, and 2! for the cosine)
-	mpd_t *_den=__mpd(mpd_context,(sin?6:2)),*_4n=__mpd(mpd_context,(sin?3:2)),*_multden=__mpd(mpd_context,(sin?6:2)); // initialized helper decimals
-	_sincos=__mpd(mpd_context,0);
-	if(_sincos&&_prevsincos&&_x2&&_x4&&_multnum&&_multden&&_mult&&_den&&_4n&&_prod&&_1minus&&_sub&&_1&&_prodacc&&_prevprodacc){
-		mpd_qmul(_x2,x,x,mpd_context,&status);
-		mpd_qmul(_x4,_x2,_x2,mpd_context,&status);
-		unsigned long long iterations=0; // let's start with at most 100 iterations
-		while((status&0xEFBF)==0){
-			iterations++;
-			// compute _sub
-			mpd_qdiv(_sub,_x2,_den,mpd_context,&status); // first time this would  be x^2/6
-			// compute _1minus
-			mpd_qsub(_1minus,_1,_sub,mpd_context,&status);
-			// compute _prod as the product of _mult and _1minus
-			mpd_qmul(_prod,_mult,_1minus,mpd_context,&status); // first time this would be 1 * x^2/6
-			if(mpd_iszero(_prod))break; // if the product is now zero we're definitely done
-			// increment sine with the new product
-			if(mpd_iszero(_prevprodacc)){ // accuracy not yet reached
-				// add _prod to _prevsine to become the new sine
-				mpd_qadd(_sincos,_prevsincos,_prod,mpd_context,&status);
-				if(mpd_qcmp(_prevsincos,_sincos,&status)==0) // _sine and _prevsine technically the same (in the given decimal context)
-					mpd_qcopy(_prevprodacc,_prod,&status); // store the non-zero _prod in _prevprodacc, from now on we will keep doing that
-				else // new sine differs from previous sine: required accuracy not yet reached
-					mpd_qcopy(_prevsincos,_sincos,&status); // update _prevsine
-				if(_intermediateResult){
-					output("Iteration %llu: ",iterations);
-					mpd_qcopy(_intermediateResult->mpd,_prod,&status);
-					outputDecimal("Increment: '",_intermediateResult,"' -> ");
-					if(sin)mpd_qmul(_intermediateResult->mpd,_sincos,x,mpd_context,&status);else mpd_qcopy(_intermediateResult->mpd,_sincos,&status);
-					outputDecimal((sin?"Sine: ":"Cosine: '"),_intermediateResult,"'.\n");
+	if(mpd_context&&x){
+		if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){output("Computing the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}}
+		uint32_t status=0;
+		// the sine of x equals the som of an infinite number of terms multiplied by x
+		// each element of the sequence has an index, say n, but let's start with n=0
+		// each term then equals (x^4n)/(4n+1)!)*(1-(x^2)/(4n+2)*(4n+3)))
+		// so n=0: (x^0/1!)*(1-x^2/2*3), n=1: 
+		//////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)+2); // increment the precision by 2
+		Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+		mpd_t *_x2=__mpd(mpd_context,0),*_x4=__mpd(mpd_context,0),*_1minus=__mpd(mpd_context,0),*_sub=__mpd(mpd_context,0),*_prevsincos=__mpd(mpd_context,0),*_prodacc=__mpd(mpd_context,0),*_prevprodacc=__mpd(mpd_context,0); // parts that need to be initialized
+		mpd_t *_prod=__mpd(mpd_context,1),*_multnum=__mpd(mpd_context,1),*_mult=__mpd(mpd_context,1),*_1=__mpd(mpd_context,1);
+		// helpers of which the value differs whether a sine or cosine approximation is requested (den is 3! for the sine, and 2! for the cosine)
+		mpd_t *_den=__mpd(mpd_context,(sin?6:2)),*_4n=__mpd(mpd_context,(sin?3:2)),*_multden=__mpd(mpd_context,(sin?6:2)); // initialized helper decimals
+		_sincos=__mpd(mpd_context,0);
+		if(_sincos&&_prevsincos&&_x2&&_x4&&_multnum&&_multden&&_mult&&_den&&_4n&&_prod&&_1minus&&_sub&&_1&&_prodacc&&_prevprodacc){
+			mpd_qmul(_x2,x,x,mpd_context,&status);
+			mpd_qmul(_x4,_x2,_x2,mpd_context,&status);
+			unsigned long long iterations=0; // let's start with at most 100 iterations
+			while((status&0xEFBF)==0){
+				iterations++;
+				// compute _sub
+				mpd_qdiv(_sub,_x2,_den,mpd_context,&status); // first time this would  be x^2/6
+				// compute _1minus
+				mpd_qsub(_1minus,_1,_sub,mpd_context,&status);
+				// compute _prod as the product of _mult and _1minus
+				mpd_qmul(_prod,_mult,_1minus,mpd_context,&status); // first time this would be 1 * x^2/6
+				if(mpd_iszero(_prod))break; // if the product is now zero we're definitely done
+				// increment sine with the new product
+				if(mpd_iszero(_prevprodacc)){ // accuracy not yet reached
+					// add _prod to _prevsine to become the new sine
+					mpd_qadd(_sincos,_prevsincos,_prod,mpd_context,&status);
+					if(mpd_qcmp(_prevsincos,_sincos,&status)==0) // _sine and _prevsine technically the same (in the given decimal context)
+						mpd_qcopy(_prevprodacc,_prod,&status); // store the non-zero _prod in _prevprodacc, from now on we will keep doing that
+					else // new sine differs from previous sine: required accuracy not yet reached
+						mpd_qcopy(_prevsincos,_sincos,&status); // update _prevsine
+					if(_intermediateResult){
+						output("Iteration %llu: ",iterations);
+						mpd_qcopy(_intermediateResult->mpd,_prod,&status);
+						outputDecimal("Increment: '",_intermediateResult,"' -> ");
+						if(sin)mpd_qmul(_intermediateResult->mpd,_sincos,x,mpd_context,&status);else mpd_qcopy(_intermediateResult->mpd,_sincos,&status);
+						outputDecimal((sin?"Sine: ":"Cosine: '"),_intermediateResult,"'.\n");
+					}
+				}else{ // accuracy reached, but still some iterations left
+					mpd_qadd(_prodacc,_prevprodacc,_prod,mpd_context,&status);
+					if(_intermediateResult){
+						output("Iteration %llu: ",iterations);
+						mpd_qcopy(_intermediateResult->mpd,_prodacc,&status);
+						outputDecimal("Incremental remainder: '",_intermediateResult,"'.\n");
+					}
+					if(mpd_qcmp(_prodacc,_prevprodacc,&status)==0)break;
+					mpd_qcopy(_prodacc,_prevprodacc,&status); // copy the change accumulative remainder
 				}
-			}else{ // accuracy reached, but still some iterations left
-				mpd_qadd(_prodacc,_prevprodacc,_prod,mpd_context,&status);
-				if(_intermediateResult){
-					output("Iteration %llu: ",iterations);
-					mpd_qcopy(_intermediateResult->mpd,_prodacc,&status);
-					outputDecimal("Incremental remainder: '",_intermediateResult,"'.\n");
-				}
-				if(mpd_qcmp(_prodacc,_prevprodacc,&status)==0)break;
-				mpd_qcopy(_prodacc,_prevprodacc,&status); // copy the change accumulative remainder
-			}
-			// update the helpers _den, _sub, _multnum, _multden, _mult, _4n
-			mpd_qmul(_multnum,_multnum,_x4,mpd_context,&status); // updating _multnum is easy as we only need to multiply it by x^4
-			// NOTE _4n starts equal to 3 (as _den starts as 3!), and the faculty stored in _multden needs to be updated 4 times
-			// so, we have to increment _4n four times and use each of these 4 values to update _multden to become the new faculty value to use
-			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n)
-			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
-			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+1)
-			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
-			// after two increments to _4n _multden is what we want it to be for computing the 
-			// _multnum and _multden updated, so we can now update _mult
-			mpd_qdiv(_mult,_multnum,_multden,mpd_context,&status);
-			
-			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+2)
-			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
-			mpd_qcopy(_den,_4n,&status); // initialize _den to _4n
-			
-			mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+3)
-			mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
-			mpd_qmul(_den,_den,_4n,mpd_context,&status); // _den now equal to (4n+2)*(4n+3) as we need it to be
+				// update the helpers _den, _sub, _multnum, _multden, _mult, _4n
+				mpd_qmul(_multnum,_multnum,_x4,mpd_context,&status); // updating _multnum is easy as we only need to multiply it by x^4
+				// NOTE _4n starts equal to 3 (as _den starts as 3!), and the faculty stored in _multden needs to be updated 4 times
+				// so, we have to increment _4n four times and use each of these 4 values to update _multden to become the new faculty value to use
+				mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n)
+				mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+				mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+1)
+				mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+				// after two increments to _4n _multden is what we want it to be for computing the 
+				// _multnum and _multden updated, so we can now update _mult
+				mpd_qdiv(_mult,_multnum,_multden,mpd_context,&status);
+				
+				mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+2)
+				mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+				mpd_qcopy(_den,_4n,&status); // initialize _den to _4n
+				
+				mpd_qadd_uint(_4n,_4n,1,mpd_context,&status); // now equal to (4n+3)
+				mpd_qmul(_multden,_multden,_4n,mpd_context,&status);
+				mpd_qmul(_den,_den,_4n,mpd_context,&status); // _den now equal to (4n+2)*(4n+3) as we need it to be
 
-			// with _den computed we can now update _sub 
-			mpd_qdiv(_sub,_x4,_den,mpd_context,&status);
-			// and ready to 
+				// with _den computed we can now update _sub 
+				mpd_qdiv(_sub,_x4,_den,mpd_context,&status);
+				// and ready to 
+			}
+		}else
+			outputError("Failed to create helper decimals in computing the sine of a decimal");
+		if(_intermediateResult)free_decimal(_intermediateResult);
+		// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
+		if(!mpd_iszero(_prevprodacc)){
+			mpd_qadd(_sincos,_sincos,_prevprodacc,mpd_context,&status);
 		}
-	}else
-		outputError("Failed to create helper decimals in computing the sine of a decimal");
-	if(_intermediateResult)free_decimal(_intermediateResult);
-	// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
-	if(!mpd_iszero(_prevprodacc)){
-		mpd_qadd(_sincos,_sincos,_prevprodacc,mpd_context,&status);
+		free_mpd(_prevprodacc);
+		free_mpd(_prodacc);
+		free_mpd(_prevsincos);
+		free_mpd(_x2);
+		free_mpd(_x4);
+		free_mpd(_4n);
+		free_mpd(_1);
+		free_mpd(_sub);
+		free_mpd(_1minus);
+		free_mpd(_multnum);
+		free_mpd(_multden);
+		free_mpd(_mult);
+		free_mpd(_den);
+		free_mpd(_prod);
+		// finally multiply by x if the sine was requested!!!
+		if((status&0xEFBF)==0)if(sin)mpd_qmul(_sincos,_sincos,x,mpd_context,&status);
+		////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)-2); // decrement the precision by 2
+		if((status&0xEFBF)!=0){free_mpd(_sincos);_sincos=NULL;}////////else mpd_finalize(_sine,decimalContext);
 	}
-	free_mpd(_prevprodacc);
-	free_mpd(_prodacc);
-	free_mpd(_prevsincos);
-	free_mpd(_x2);
-	free_mpd(_x4);
-	free_mpd(_4n);
-	free_mpd(_1);
-	free_mpd(_sub);
-	free_mpd(_1minus);
-	free_mpd(_multnum);
-	free_mpd(_multden);
-	free_mpd(_mult);
-	free_mpd(_den);
-	free_mpd(_prod);
-	// finally multiply by x if the sine was requested!!!
-	if((status&0xEFBF)==0)if(sin)mpd_qmul(_sincos,_sincos,x,mpd_context,&status);
-	////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)-2); // decrement the precision by 2
-	if((status&0xEFBF)!=0){free_mpd(_sincos);_sincos=NULL;}////////else mpd_finalize(_sine,decimalContext);
 	return _sincos;
 }
 
@@ -737,13 +758,63 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
 		// use the same decimal context as used by x
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
-		if(mpd_context){
-			// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
-			mpd_t* _sine=_dsincos(mpd_context,x->mpd,true);
-			return(_sine?_getDecimal(_sine,mpd_context->prec,0,true):NULL);
-		}else
-			outputError("No context to compute the sine of a decimal in");
+		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		if(decimalcontext){
+			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			if(!decimalcontext->pi)free_decimal(pi_decimal(decimalcontext)); // compute and immediately free the returned copy
+			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
+			if(mpd_context){
+				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				uint32_t status=0;
+				mpd_t* _absx=NULL;
+				if(mpd_isnegative(x->mpd)){
+					_absx=__mpd(mpd_context,0);
+					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
+					if(!_absx){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
+				}
+				mpd_t* _sine=NULL;
+				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
+				mpd_t *_xmod=__mpd(mpd_context,0),*_xdiv=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
+				if(_xdiv&&_xmod&&_xquadrant){
+					// normalize x to the range [0,2*pi)
+					mpd_qdivmod(_xdiv,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
+					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
+					// determine the quadrant by dividing the normalized x by pi/2
+					mpd_qdivmod(_xquadrant,_xmod,_xmod,decimalcontext->pidiv2,mpd_context,&status);
+					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					if(amVerbose()){outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if((status&0xEFBF)!=0){
+						outputError("Failed to compute the sine of a decimal");
+						report_mpd_status(status);
+					}else{
+						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
+						mpd_t* _xcos=NULL;
+						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){ // the remainder (in [0,pi/2) is above pi/4
+							sin=false;
+							_xcos=__mpd(mpd_context,0);
+							if(_xcos)mpd_qsub(_xcos,decimalcontext->pidiv2,_xmod,mpd_context,&status);
+						}
+						if((status&0xEFBF)!=0){
+							outputError("Failed to compute the sine of a decimal");
+							report_mpd_status(status);
+						}else{
+							_sine=_dsincos(mpd_context,(sin?_xmod:_xcos),sin);
+							if(_sine){
+								if((_absx!=NULL)^((xquadrant==2||xquadrant==3)))mpd_set_negative(_sine); // negate the _sine
+							}else
+								outputError("Failed to compute the sine of the normalized decimal");
+						}
+						// free whatever we created...
+						if(_xcos)free_mpd(_xcos);
+					}
+				}else
+					outputError("Failed to create helper decimals for computing the sine of a decimal");
+				free_mpd(_xmod);free_mpd(_xdiv);free_mpd(_xquadrant);
+				if(_absx)free_mpd(_absx);
+				return(_sine?_getDecimal(_sine,mpd_context->prec,0,true):NULL);				
+			}
+		}
+		outputError("No decimal context to compute the sine of a decimal in");
 	}else
 		outputError("No decimal to compute the sine of");
 	return NULL;
@@ -753,12 +824,63 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
 		// use the same decimal context as used by x
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
-		if(mpd_context){
-			mpd_t* _cosine=_dsincos(mpd_context,x->mpd,false);
-			return(_cosine?_getDecimal(_cosine,mpd_context->prec,0,true):NULL);
+		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		if(decimalcontext){
+			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			if(!decimalcontext->pi)free_decimal(pi_decimal(decimalcontext)); // compute and immediately free the returned copy
+			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
+			if(mpd_context){
+				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,1),mpd_context->prec,0,true);
+				uint32_t status=0;
+				mpd_t* _absx=NULL;
+				if(mpd_isnegative(x->mpd)){
+					_absx=__mpd(mpd_context,0);
+					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
+					if(!_absx){outputError("Failed to negate the decimal to compute the cosine of");return NULL;}
+				}
+				mpd_t* _cosine=NULL;
+				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
+				mpd_t *_xmod=__mpd(mpd_context,0),*_xdiv=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
+				if(_xdiv&&_xmod&&_xquadrant){
+					// normalize x to the range [0,2*pi)
+					mpd_qdivmod(_xdiv,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
+					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized cosine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
+					// determine the quadrant by dividing the normalized x by pi/2
+					mpd_qdivmod(_xquadrant,_xmod,_xmod,decimalcontext->pidiv2,mpd_context,&status);
+					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					if(amVerbose()){outputDecimal("Quadrant of cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if((status&0xEFBF)!=0){
+						outputError("Failed to compute the cosine of a decimal");
+						report_mpd_status(status);
+					}else{
+						bool cos=true; // whether to compute the sine or cosine (of the transformed angle)
+						mpd_t* _xsin=NULL;
+						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){  // the remainder (in [0,pi/2) is above pi/4
+							cos=false;
+							_xsin=__mpd(mpd_context,0);
+							if(_xsin)mpd_qsub(_xsin,decimalcontext->pidiv2,_xmod,mpd_context,&status);
+						}
+						if((status&0xEFBF)!=0){
+							outputError("Failed to compute the sine of a decimal");
+							report_mpd_status(status);
+						}else{
+							_cosine=_dsincos(mpd_context,(cos?_xmod:_xsin),!cos);
+							if(_cosine){
+								if((_absx!=NULL)^((xquadrant==1||xquadrant==2)))mpd_set_negative(_cosine); // negate the _cosine in quadrant 1 and 2 (from pi/2 to 3*pi/2)
+							}else
+								outputError("Failed to compute the cosine of the normalized decimal");
+						}
+						// free whatever we created...
+						if(_xsin)free_mpd(_xsin);
+					}
+				}else
+					outputError("Failed to create helper decimals for computing the cosine of a decimal");
+				free_mpd(_xmod);free_mpd(_xdiv);free_mpd(_xquadrant);
+				if(_absx)free_mpd(_absx);
+				return(_cosine?_getDecimal(_cosine,mpd_context->prec,0,true):NULL);				
+			}
 		}
-		outputError("No context to compute the cosine of a decimal in");
+		outputError("No decimal context to compute the cosine of a decimal in");
 	}else
 		outputError("No decimal to compute the cosine of");
 	return NULL;
@@ -767,7 +889,8 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 Mdecimal* _dexp(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		mpd_context_t* mpd_context=decimalcontext->mpd_context;
 		if(mpd_context){
 			mpd_t* _exp=__mpd(mpd_context,1);
 			if(!mpd_iszero(x->mpd)){
