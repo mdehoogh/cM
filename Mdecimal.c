@@ -612,7 +612,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 			if(_pidiv2&&_pidiv4&&_pimul2){
 				mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
 				mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
-				mpd_qmul_u32(_pimul2,_pi,2,mpd_context,&status);
+				mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
 			}else // _pi not bound in decimalcontext, so free
 				status=1;
 			if((status&0xEFBF)==0){
@@ -890,16 +890,17 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
+					if(amVerbose())outputLine("Computing the sine of a negative decimal.");
 				}
 				mpd_t* _sine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
-				mpd_t *_xmod=__mpd(mpd_context,0),*_xdiv=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
-				if(_xdiv&&_xmod&&_xquadrant){
+				mpd_t *_xmod=__mpd(mpd_context,0),*_xtemp=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
+				if(_xtemp&&_xmod&&_xquadrant){
 					// normalize x to the range [0,2*pi)
-					mpd_qdivmod(_xdiv,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
+					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
 					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
 					// determine the quadrant by dividing the normalized x by pi/2
-					mpd_qdivmod(_xquadrant,_xmod,_xmod,decimalcontext->pidiv2,mpd_context,&status);
+					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
 					if(amVerbose()){outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
@@ -907,7 +908,21 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 						report_mpd_status(status);
 					}else{
 						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
-						mpd_t* _xcos=NULL;
+						mpd_t* _xsin=NULL;
+						if(xquadrant!=0){
+							sin=false;
+							_xsin=__mpd(mpd_context,0);
+							if(_xsin){
+								if(xquadrant==1)
+									mpd_qsub(_xsin,decimalcontext->pi,_xmod,mpd_context,&status);
+								else
+								if(xquadrant==2)
+									mpd_qsub(_xsin,_xmod,decimalcontext->pi,mpd_context,&status);
+								else
+									mpd_qsub(_xsin,decimalcontext->pimul2,_xmod,mpd_context,&status);
+							}else
+								status=0xFFFFFFFF;
+						}
 						/*
 						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){ // the remainder (in [0,pi/2) is above pi/4
 							sin=false;
@@ -917,28 +932,33 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 						*/
 						if((status&0xEFBF)!=0){
 							outputError("Failed to compute the sine of a decimal");
-							report_mpd_status(status);
+							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
-							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(sin?_xmod:_xcos));
+							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(sin?_xmod:_xsin));
 							if(_sinandcos){
-								_sine=(sin?_sinandcos->sin:_sinandcos->cos);
-								if(sin)_sinandcos->sin=NULL;else _sinandcos->cos=NULL; // so it won't get free when we free _sinandcos
+								_sine=_sinandcos->sin; // we will negate if if need be below!!!
+								_sinandcos->sin=NULL;
 								free_mpd_sincos(_sinandcos);
 							}
 							/* replacing:
 							_sine=_dsincos(mpd_context,(sin?_xmod:_xcos),sin);
 							*/
 							if(_sine){
-								if((_absx!=NULL)^((xquadrant==2||xquadrant==3)))mpd_set_negative(_sine); // negate the _sine
+								if((_absx!=NULL)!=(xquadrant==2||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
+									if(amVerbose())outputLine("Negating the computed sine!");
+									mpd_set_negative(_sine); // negate the _sine
+								}else
+								if(amVerbose())
+									outputLine("Not negating the sine!");
 							}else
 								outputError("Failed to compute the sine of the normalized decimal");
 						}
 						// free whatever we created...
-						if(_xcos)free_mpd(_xcos);
+						if(_xsin)free_mpd(_xsin);
 					}
 				}else
 					outputError("Failed to create helper decimals for computing the sine of a decimal");
-				free_mpd(_xmod);free_mpd(_xdiv);free_mpd(_xquadrant);
+				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx)free_mpd(_absx);
 				return(_sine?_getDecimal(_sine,mpd_context->prec,0,true):NULL);				
 			}
@@ -966,16 +986,17 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the cosine of");return NULL;}
+					if(amVerbose())outputLine("Computing the cosine of a negative decimal.");
 				}
 				mpd_t* _cosine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
-				mpd_t *_xmod=__mpd(mpd_context,0),*_xdiv=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
-				if(_xdiv&&_xmod&&_xquadrant){
+				mpd_t *_xmod=__mpd(mpd_context,0),*_xtemp=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
+				if(_xtemp&&_xmod&&_xquadrant){
 					// normalize x to the range [0,2*pi)
-					mpd_qdivmod(_xdiv,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
+					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
 					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized cosine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
 					// determine the quadrant by dividing the normalized x by pi/2
-					mpd_qdivmod(_xquadrant,_xmod,_xmod,decimalcontext->pidiv2,mpd_context,&status);
+					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
 					if(amVerbose()){outputDecimal("Quadrant of cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
@@ -983,7 +1004,21 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 						report_mpd_status(status);
 					}else{
 						bool cos=true; // whether to compute the sine or cosine (of the transformed angle)
-						mpd_t* _xsin=NULL;
+						mpd_t* _xcos=NULL;
+						if(xquadrant!=0){
+							cos=false;
+							_xcos=__mpd(mpd_context,0);
+							if(_xcos){
+								if(xquadrant==1)
+									mpd_qsub(_xcos,decimalcontext->pi,_xmod,mpd_context,&status);
+								else
+								if(xquadrant==2)
+									mpd_qsub(_xcos,_xmod,decimalcontext->pi,mpd_context,&status);
+								else
+									mpd_qsub(_xcos,decimalcontext->pimul2,_xmod,mpd_context,&status);
+							}else
+								status=0xFFFFFFFF;
+						}
 						/*
 						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){  // the remainder (in [0,pi/2) is above pi/4
 							cos=false;
@@ -992,27 +1027,27 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 						}
 						*/
 						if((status&0xEFBF)!=0){
-							outputError("Failed to compute the sine of a decimal");
+							outputError("Failed to compute the cosine of a decimal");
 							report_mpd_status(status);
 						}else{
-							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(cos?_xmod:_xsin));
+							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(cos?_xmod:_xcos));
 							if(_sinandcos){
-								_cosine=(cos?_sinandcos->cos:_sinandcos->sin);
-								if(cos)_sinandcos->cos=NULL;else _sinandcos->sin=NULL; // so it won't get free when we free _sinandcos
+								_cosine=_sinandcos->cos;
+								_sinandcos->cos=NULL; // so it won't get free when we free _sinandcos
 								free_mpd_sincos(_sinandcos);
 							}
 							// replacing: _cosine=_dsincos(mpd_context,(cos?_xmod:_xsin),!cos);
 							if(_cosine){
-								if((_absx!=NULL)^((xquadrant==1||xquadrant==2)))mpd_set_negative(_cosine); // negate the _cosine in quadrant 1 and 2 (from pi/2 to 3*pi/2)
+								if((_absx!=NULL)!=(xquadrant==1||xquadrant==2))mpd_set_negative(_cosine); // negate the _cosine in quadrant 1 and 2 (from pi/2 to 3*pi/2)
 							}else
 								outputError("Failed to compute the cosine of the normalized decimal");
 						}
 						// free whatever we created...
-						if(_xsin)free_mpd(_xsin);
+						if(_xcos)free_mpd(_xcos);
 					}
 				}else
 					outputError("Failed to create helper decimals for computing the cosine of a decimal");
-				free_mpd(_xmod);free_mpd(_xdiv);free_mpd(_xquadrant);
+				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx)free_mpd(_absx);
 				return(_cosine?_getDecimal(_cosine,mpd_context->prec,0,true):NULL);				
 			}
