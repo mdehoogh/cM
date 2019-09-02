@@ -646,8 +646,127 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 }
 
 // internal helper functions that compute the sine and cosine of any decimal smaller than 1 (typically in [0,pi/4))
-mpd_t* _dsincos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence requires x to be below 1
-	mpd_t* _sincos=NULL;
+typedef struct mpd_sincos_t{
+	mpd_t* sin;
+	mpd_t* cos;
+}mpd_sincos_t;
+void free_mpd_sincos(mpd_sincos_t* _mpd_sincos){
+	free_mpd(_mpd_sincos->sin);
+	free_mpd(_mpd_sincos->cos);
+	FREE(_mpd_sincos,'T');
+}
+/**
+ * \brief returns a pair of mpd_t* instances containing the sine and cosine of \p x respectively guaranteeing their sum of squares equals 1
+ * \p x the decimal to compute the sine/cosine of
+ */
+mpd_sincos_t* _dsinandcos(mpd_context_t* mpd_context,mpd_t* x){
+	// the initial value of the sine is x, and of the cosine is 1
+	mpd_sincos_t* _mpd_sinandcos=NULL;
+	if(mpd_context&&x){
+		_mpd_sinandcos=CALLOC(1,sizeof(mpd_sincos_t),'T');
+		if(_mpd_sinandcos){
+			// initialize the sine and cosine to x and 1 respectively i.e. the first term of the infinite series expansion
+			_mpd_sinandcos->sin=get_mpd_copy(mpd_context,x);
+			_mpd_sinandcos->cos=__mpd(mpd_context,1);
+			if(_mpd_sinandcos->sin&&_mpd_sinandcos->cos){
+				if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){outputDecimal("Computing the sine and cosine of '",_decimal,"'.\n");free_decimal(_decimal);}}
+				// we have the numerator and denominator of the term to add
+				uint32_t status=0;
+				mpd_t *_num=get_mpd_copy(mpd_context,x),*_den=__mpd(mpd_context,1),*_n=__mpd(mpd_context,1),*_term=__mpd(mpd_context,0);
+				mpd_t *_newsine=__mpd(mpd_context,0),*_newcosine=__mpd(mpd_context,0); // starting value doesn't matter will get copied to start with anyway
+				if(_n&&_num&&_den&&_term&&_newsine&&_newcosine){
+					Mdecimal *_intermediateSine=(amVerbose()?__decimal(mpd_context,0,0):NULL),*_intermediateCosine=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+					// every other term should be negated
+					bool negate=true;
+					uint64_t iteration=0;
+					while((status&0xEFBF)==0){
+						iteration++;
+						if(_intermediateSine||_intermediateCosine)output("Iteration #%" PRIu64 ": ",iteration);
+						mpd_qadd_u32(_n,_n,1,mpd_context,&status); // make _n equal to iteration
+						mpd_qmul(_den,_den,_n,mpd_context,&status);
+						// cosine first
+						mpd_qmul(_num,_num,x,mpd_context,&status);
+						mpd_qdiv(_term,_num,_den,mpd_context,&status);
+						if(negate)
+							mpd_qsub(_newcosine,_mpd_sinandcos->cos,_term,mpd_context,&status);
+						else
+							mpd_qadd(_newcosine,_mpd_sinandcos->cos,_term,mpd_context,&status);
+						if(_intermediateCosine){
+							mpd_qcopy(_intermediateCosine->mpd,_term,&status);
+							output(" Cosine: %s ",(negate?"minus":"plus"));
+							outputDecimal("'",_intermediateCosine,"' -> ");
+							mpd_qcopy(_intermediateCosine->mpd,_newcosine,&status);
+							outputDecimal("'",_intermediateCosine,"'");
+						}
+						// and now the sine
+						mpd_qadd_u32(_n,_n,1,mpd_context,&status); // make _n equal to iteration
+						mpd_qmul(_den,_den,_n,mpd_context,&status);
+						mpd_qmul(_num,_num,x,mpd_context,&status);
+						mpd_qdiv(_term,_num,_den,mpd_context,&status);
+						if(negate)
+							mpd_qsub(_newsine,_mpd_sinandcos->sin,_term,mpd_context,&status);
+						else
+							mpd_qadd(_newsine,_mpd_sinandcos->sin,_term,mpd_context,&status);
+						if(_intermediateSine){
+							mpd_qcopy(_intermediateSine->mpd,_term,&status);
+							output(" Sine: %s ",(negate?"minus":"plus"));
+							outputDecimal("'",_intermediateSine,"' -> ");
+							mpd_qcopy(_intermediateSine->mpd,_newsine,&status);
+							outputDecimal("'",_intermediateSine,"'");
+						}
+						negate=!negate;
+						if(_intermediateSine||_intermediateCosine)output(".\n");
+						// now we can test whether or not were done, which we are when neither cosine nor sine changed
+						// BUT only break on a positive term not on a negative term!!!
+						///////if(negate)
+						if(mpd_qcmp(_mpd_sinandcos->cos,_newcosine,&status)==0&&mpd_qcmp(_mpd_sinandcos->sin,_newsine,&status)==0)break;
+						// copy the new sine and cosine over
+						mpd_qcopy(_mpd_sinandcos->cos,_newcosine,&status);
+						mpd_qcopy(_mpd_sinandcos->sin,_newsine,&status);
+					}
+					if(_intermediateSine)free_decimal(_intermediateSine);
+					if(_intermediateCosine)free_decimal(_intermediateCosine);
+				}else{
+					status=1;
+					outputError("Failed to create the internal helper decimals in computing the sine and cosine of a decimal");
+				}
+				free_mpd(_newsine);free_mpd(_newcosine);
+				free_mpd(_n);free_mpd(_num);free_mpd(_den);free_mpd(_term);
+				if((status&0xEFBF)==0){
+					// final step: divide the sine and cosine with square root of their sum of squares
+					mpd_t *_sumofsquares=NULL,*_sinesquared=__mpd(mpd_context,0),*_cosinesquared=__mpd(mpd_context,0),*_one=__mpd(mpd_context,1);
+					if(_one&&_sinesquared&&_cosinesquared){
+						_sumofsquares=__mpd(mpd_context,0);
+						if(_sumofsquares){
+							mpd_qmul(_cosinesquared,_mpd_sinandcos->cos,_mpd_sinandcos->cos,mpd_context,&status);
+							mpd_qmul(_sinesquared,_mpd_sinandcos->sin,_mpd_sinandcos->sin,mpd_context,&status);
+							mpd_qadd(_sumofsquares,_cosinesquared,_sinesquared,mpd_context,&status); // add the squares
+							if(mpd_qcmp(_sumofsquares,_one,&status)!=0){ // sum of squares does not equal 1
+								mpd_qsqrt(_sumofsquares,_sumofsquares,mpd_context,&status);
+								if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_sumofsquares),mpd_context->prec,0,true);if(_decimal){outputDecimal("Sum of sine squared and cosine squared: '",_decimal,"'.\n");free_decimal(_decimal);}}
+								mpd_qdiv(_mpd_sinandcos->sin,_mpd_sinandcos->sin,_sumofsquares,mpd_context,&status);
+								mpd_qdiv(_mpd_sinandcos->cos,_mpd_sinandcos->cos,_sumofsquares,mpd_context,&status);
+								if((status&0xEFBF)!=0){free_mpd(_sumofsquares);_sumofsquares=NULL;}
+							}
+						}
+					}else
+						outputError("Failed to correct the sine and cosine of a decimal");
+					// if we've got them, free them
+					free_mpd(_one);free_mpd(_sinesquared);free_mpd(_cosinesquared);
+					//	mpd_finalize(_mpd_sinandcos->sin,mpd_context);mpd_finalize(_mpd_sinandcos->cos,mpd_context);
+					if(_sumofsquares){free_mpd(_sumofsquares);return _mpd_sinandcos;}
+				}
+			}
+			free_mpd_sincos(_mpd_sinandcos);
+		}else
+			outputError("Failed to initialize the object storing the sine and cosine of a decimal");
+	}else
+		outputError("Failed to create the object to store the sine and cosine of a decimal in");
+	return NULL;
+}
+
+mpd_t* _dsinorcos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence requires x to be below 1
+	mpd_t* _sinorcos=NULL;
 	if(mpd_context&&x){
 		if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){output("Computing the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}}
 		uint32_t status=0;
@@ -661,8 +780,8 @@ mpd_t* _dsincos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence re
 		mpd_t *_prod=__mpd(mpd_context,1),*_multnum=__mpd(mpd_context,1),*_mult=__mpd(mpd_context,1),*_1=__mpd(mpd_context,1);
 		// helpers of which the value differs whether a sine or cosine approximation is requested (den is 3! for the sine, and 2! for the cosine)
 		mpd_t *_den=__mpd(mpd_context,(sin?6:2)),*_4n=__mpd(mpd_context,(sin?3:2)),*_multden=__mpd(mpd_context,(sin?6:2)); // initialized helper decimals
-		_sincos=__mpd(mpd_context,0);
-		if(_sincos&&_prevsincos&&_x2&&_x4&&_multnum&&_multden&&_mult&&_den&&_4n&&_prod&&_1minus&&_sub&&_1&&_prodacc&&_prevprodacc){
+		_sinorcos=__mpd(mpd_context,0);
+		if(_sinorcos&&_prevsincos&&_x2&&_x4&&_multnum&&_multden&&_mult&&_den&&_4n&&_prod&&_1minus&&_sub&&_1&&_prodacc&&_prevprodacc){
 			mpd_qmul(_x2,x,x,mpd_context,&status);
 			mpd_qmul(_x4,_x2,_x2,mpd_context,&status);
 			unsigned long long iterations=0; // let's start with at most 100 iterations
@@ -678,16 +797,16 @@ mpd_t* _dsincos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence re
 				// increment sine with the new product
 				if(mpd_iszero(_prevprodacc)){ // accuracy not yet reached
 					// add _prod to _prevsine to become the new sine
-					mpd_qadd(_sincos,_prevsincos,_prod,mpd_context,&status);
-					if(mpd_qcmp(_prevsincos,_sincos,&status)==0) // _sine and _prevsine technically the same (in the given decimal context)
+					mpd_qadd(_sinorcos,_prevsincos,_prod,mpd_context,&status);
+					if(mpd_qcmp(_prevsincos,_sinorcos,&status)==0) // _sine and _prevsine technically the same (in the given decimal context)
 						mpd_qcopy(_prevprodacc,_prod,&status); // store the non-zero _prod in _prevprodacc, from now on we will keep doing that
 					else // new sine differs from previous sine: required accuracy not yet reached
-						mpd_qcopy(_prevsincos,_sincos,&status); // update _prevsine
+						mpd_qcopy(_prevsincos,_sinorcos,&status); // update _prevsine
 					if(_intermediateResult){
 						output("Iteration %llu: ",iterations);
 						mpd_qcopy(_intermediateResult->mpd,_prod,&status);
 						outputDecimal("Increment: '",_intermediateResult,"' -> ");
-						if(sin)mpd_qmul(_intermediateResult->mpd,_sincos,x,mpd_context,&status);else mpd_qcopy(_intermediateResult->mpd,_sincos,&status);
+						if(sin)mpd_qmul(_intermediateResult->mpd,_sinorcos,x,mpd_context,&status);else mpd_qcopy(_intermediateResult->mpd,_sinorcos,&status);
 						outputDecimal((sin?"Sine: ":"Cosine: '"),_intermediateResult,"'.\n");
 					}
 				}else{ // accuracy reached, but still some iterations left
@@ -729,7 +848,7 @@ mpd_t* _dsincos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence re
 		if(_intermediateResult)free_decimal(_intermediateResult);
 		// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
 		if(!mpd_iszero(_prevprodacc)){
-			mpd_qadd(_sincos,_sincos,_prevprodacc,mpd_context,&status);
+			mpd_qadd(_sinorcos,_sinorcos,_prevprodacc,mpd_context,&status);
 		}
 		free_mpd(_prevprodacc);
 		free_mpd(_prodacc);
@@ -746,11 +865,11 @@ mpd_t* _dsincos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence re
 		free_mpd(_den);
 		free_mpd(_prod);
 		// finally multiply by x if the sine was requested!!!
-		if((status&0xEFBF)==0)if(sin)mpd_qmul(_sincos,_sincos,x,mpd_context,&status);
+		if((status&0xEFBF)==0)if(sin)mpd_qmul(_sinorcos,_sinorcos,x,mpd_context,&status);
 		////////mpd_qsetprec(decimalContext,mpd_getprec(decimalContext)-2); // decrement the precision by 2
-		if((status&0xEFBF)!=0){free_mpd(_sincos);_sincos=NULL;}////////else mpd_finalize(_sine,decimalContext);
+		if((status&0xEFBF)!=0){free_mpd(_sinorcos);_sinorcos=NULL;}////////else mpd_finalize(_sine,decimalContext);
 	}
-	return _sincos;
+	return _sinorcos;
 }
 
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
@@ -789,16 +908,26 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 					}else{
 						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
 						mpd_t* _xcos=NULL;
+						/*
 						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){ // the remainder (in [0,pi/2) is above pi/4
 							sin=false;
 							_xcos=__mpd(mpd_context,0);
 							if(_xcos)mpd_qsub(_xcos,decimalcontext->pidiv2,_xmod,mpd_context,&status);
 						}
+						*/
 						if((status&0xEFBF)!=0){
 							outputError("Failed to compute the sine of a decimal");
 							report_mpd_status(status);
 						}else{
+							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(sin?_xmod:_xcos));
+							if(_sinandcos){
+								_sine=(sin?_sinandcos->sin:_sinandcos->cos);
+								if(sin)_sinandcos->sin=NULL;else _sinandcos->cos=NULL; // so it won't get free when we free _sinandcos
+								free_mpd_sincos(_sinandcos);
+							}
+							/* replacing:
 							_sine=_dsincos(mpd_context,(sin?_xmod:_xcos),sin);
+							*/
 							if(_sine){
 								if((_absx!=NULL)^((xquadrant==2||xquadrant==3)))mpd_set_negative(_sine); // negate the _sine
 							}else
@@ -855,16 +984,24 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 					}else{
 						bool cos=true; // whether to compute the sine or cosine (of the transformed angle)
 						mpd_t* _xsin=NULL;
+						/*
 						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){  // the remainder (in [0,pi/2) is above pi/4
 							cos=false;
 							_xsin=__mpd(mpd_context,0);
 							if(_xsin)mpd_qsub(_xsin,decimalcontext->pidiv2,_xmod,mpd_context,&status);
 						}
+						*/
 						if((status&0xEFBF)!=0){
 							outputError("Failed to compute the sine of a decimal");
 							report_mpd_status(status);
 						}else{
-							_cosine=_dsincos(mpd_context,(cos?_xmod:_xsin),!cos);
+							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(cos?_xmod:_xsin));
+							if(_sinandcos){
+								_cosine=(cos?_sinandcos->cos:_sinandcos->sin);
+								if(cos)_sinandcos->cos=NULL;else _sinandcos->sin=NULL; // so it won't get free when we free _sinandcos
+								free_mpd_sincos(_sinandcos);
+							}
+							// replacing: _cosine=_dsincos(mpd_context,(cos?_xmod:_xsin),!cos);
 							if(_cosine){
 								if((_absx!=NULL)^((xquadrant==1||xquadrant==2)))mpd_set_negative(_cosine); // negate the _cosine in quadrant 1 and 2 (from pi/2 to 3*pi/2)
 							}else
