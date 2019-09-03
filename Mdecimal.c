@@ -1054,7 +1054,7 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 						// free whatever we created...
 						if(_xcos)free_mpd(_xcos);
 					}
-				}else
+				}else=
 					outputError("Failed to create helper decimals for computing the cosine of a decimal");
 				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx)free_mpd(_absx);
