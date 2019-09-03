@@ -2093,6 +2093,12 @@ bool continuesOperator(Mtoken* pLastCommandToEvaluateToken,char inputChar){
 	}
 }
 */
+bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
+bool isOneCharacterTokenType(uint8_t tokenType){
+	// TODO how about TT_EXPRESSION -> NO because a TT_EXPRESSION token is always considered ended, i.e. significantCharacterCount is not an issue in determining whether a new token starts there
+	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
+}
+
 // keep track of the state of entering a command
 void removeToken(){		
 	// ASSERT pLastCommandToEvaluateToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
@@ -2101,43 +2107,49 @@ void removeToken(){
 	if(pLastCommandToEvaluateToken)pLastCommandToEvaluateToken->next=NULL;else pCommandToEvaluate=NULL;
 }
 void unfinishToken(){
-	// for all non-unary token that we are in now that is finished, unfinish it!!
+	// MDH@03SEP2019: adjusted so that not only the unary operators are left finished but all one character token types (which are the only tokens that are immediately finished once a single character is entered!!)
+	//                NOTE unfinishing of the current token is done so that the token can be continued, so technically we should unfinish all tokens that can be continued after a character is removed from them
+	// for all non-unary token that we are in now that is finished, unfinish 
+	// TODO there are other one-character tokens
 	if(pLastCommandToEvaluateToken)
-		if(pLastCommandToEvaluateToken->type!=TT_UNARY) // not a unary operator (of length 1) we ended up in
+		if(!isOneCharacterTokenType(pLastCommandToEvaluateToken->type)) // not a unary operator (of length 1) we ended up in
 			if(string_length(pLastCommandToEvaluateToken->text)==pLastCommandToEvaluateToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
 				pLastCommandToEvaluateToken->significantCharacterCount=0;
 }
 char removedTokenCharacter(uint16_t behindCursor){
 #ifdef __DEBUG__
-		printf("%d",behindCursor);
+	printf("%d",behindCursor);
 #endif
-	uint16_t tokenCharacterPosition;
-	// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
-	while(true){
-		if(pLastCommandToEvaluateToken==NULL)return '\0';
-		tokenCharacterPosition=string_length(pLastCommandToEvaluateToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-pLastCommandToEvaluateToken->offset;
+	// MDH@03SEP2019: 
+	char tokenCharacterRemoved='\0';
+	if(pCommandToEvaluate){ // should ALWAYS be the case
+		uint16_t tokenCharacterPosition;
+		// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
+		while(pLastCommandToEvaluateToken){
+			tokenCharacterPosition=string_length(pLastCommandToEvaluateToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-pLastCommandToEvaluateToken->offset;
 #ifdef __DEBUG__
-		printf("%d",tokenCharacterPosition);
+			printf("%d",tokenCharacterPosition);
 #endif
-		if(tokenCharacterPosition>=behindCursor)break;
+			if(tokenCharacterPosition>=behindCursor)break;
 #ifdef __DEBUG__
-		outputChar('.');
+			outputChar('.');
 #endif		
-		pLastCommandToEvaluateToken=pLastCommandToEvaluateToken->prev;
-	}
+			pLastCommandToEvaluateToken=pLastCommandToEvaluateToken->prev;
+		}
 #ifdef __DEBUG__
-		printf("%d",tokenCharacterPosition-behindCursor);
+			printf("%d",tokenCharacterPosition-behindCursor);
 #endif	
-	// if failing to remove the character serious error
-	char c=string_removed_char(pLastCommandToEvaluateToken->text,tokenCharacterPosition-behindCursor);
+		if(pLastCommandToEvaluateToken)tokenCharacterRemoved=string_removed_char(pLastCommandToEvaluateToken->text,tokenCharacterPosition-behindCursor);
 #ifdef __DEBUG__
-		outputChar(c);
-#endif		
-	if(c){
-		if(string_empty(pLastCommandToEvaluateToken->text))removeToken(); // text now empty, remove the token entirely...
-		unfinishToken();
-	}
-	return c;
+			outputChar(c);
+#endif	
+		if(tokenCharacterRemoved){
+			if(string_empty(pLastCommandToEvaluateToken->text))removeToken(); // text now empty, remove the token entirely...
+			unfinishToken();
+		}
+	}else
+		inputInfo("BUG: No command to remove characters from!");
+	return tokenCharacterRemoved;
 }
 
 // HERE THE EVALUATION OF EXPRESSIONS TAKE PLACE
@@ -4276,6 +4288,7 @@ void setCommandToEvaluate(Mtoken* pCommand){
  */
 void setCommandIndex(uint32_t newCommandIndex){
 	commandIndex=newCommandIndex;
+	////if(amVerbose())inputInfo("Command index %lld.",commandIndex);
 	// it's easier to go to the beginning of the line although we could be on the line below!!!!
 	// replacing: 
 	backToPrompt();
@@ -4283,14 +4296,17 @@ void setCommandIndex(uint32_t newCommandIndex){
 	// MDH@24APR2019 obsolete: commandLength()=cursorPosition()=0; // do we need this????
 	string_setlength(behindCursorText,0); // clear the behind cursor text (in any situation)
 	if(commandIndex){
+		pLastCommandToEvaluateToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
+		if(amVerbose())inputInfo("Showing command #%lld.",commandCount-commandIndex+1);
 		Mtoken* token=commands[commandCount-commandIndex];
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
+		// TODO this construction (with a return in the middle is a bit unclear)
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
+			inputInfo("Showing registered command #%u.",commandCount-commandIndex+1);
 			setCommandToEvaluate(token);
-			inputInfo("Showing registered command #%u.",(commandCount-commandIndex+1));
 			return;
 		}
-		// the previous command will be used as behind cursor text!!
+		// the previous command will be used as behind cursor text, and not immediately as command
 		while(token){
 			///////outputText("(%s)",tokenText);
 			string_append(behindCursorText,string(token->text));
@@ -4298,7 +4314,7 @@ void setCommandIndex(uint32_t newCommandIndex){
 		}
 	}
 	setCommandToEvaluate(NULL);
-	clearInfo();
+	clearInfo(); // TODO do we need this when showing a previous command as behind cursor text??????
 	/////////////printf("(%d)",commandLength());
 }
 bool commandDown(){
@@ -4529,6 +4545,7 @@ bool tokenCheckedForBeingAFunction(bool endOfInput,bool aSuggestedCharacter){
 
 // MDH@14AUG2019: cancelCommand() takes care of removing everything in the current command
 void cancelCommand(){ // in response to Ctrl-C or backspace on the first character
+	if(amVerbose())inputInfo("Cancelling the command.");
 	backToPrompt();
 	clearScreenFromCursor(); // inserting doing this otherwise (in the case of backspace) we would apparently still see the behind cursor text
 	clearCommand();
@@ -4580,18 +4597,28 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 }
 // in response to backspace the previous token character is to be removed
 void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
+	if(commandIndex){commandIndex=0;copyCommand();} // MDH@03SEP2019 BUG FIX: I have to do this if scrolling through the list of previous commands!!!
 	char removedCharacter=removedTokenCharacter(1);
 	if(removedCharacter){
 		moveCursorLeft(1); // TODO check if this is necessary also when cancelling the command
 		if(amVerbose()){inputInfo("Character '%c' removed.",removedCharacter);}
 		// if no text is left in the command we cancel the command (as a service to the user who wouldn't understand that Enter wouldn't switch to Control mode on an otherwise empty command!!!)
-		if(pLastCommandToEvaluateToken==pCommandToEvaluate&&string_length(pCommandToEvaluate->text)==0){
-			cancelCommand();
-			/* replacing:
-			if(string_length(behindCursorText))inputInfo("Use Ctrl-C to clear the text suggestion as well.");else cancelCommand();
-			*/
+		if(pCommandToEvaluate){ // we still have a command being evaluated (NOTE that removedTokenCharacter() can actually set pCommandToEvaluate to NULL)
+			if(pLastCommandToEvaluateToken==pCommandToEvaluate&&string_length(pCommandToEvaluate->text)==0){
+				if(amDebugging()){inputInfo("%s","Cancelling the command.");}
+				cancelCommand();
+				if(amDebugging()){inputInfo("%s","Command cancelled.");}
+				/* replacing:
+				if(string_length(behindCursorText))inputInfo("Use Ctrl-C to clear the text suggestion as well.");else cancelCommand();
+				*/
+			}else{
+				if(amDebugging()){inputInfo("%s","Updating.");}
+				updateOnTokenCharacterRemoved(removedCharacter);
+				if(amDebugging()){inputInfo("%s","Updated.");}
+			}
 		}else
-			updateOnTokenCharacterRemoved(removedCharacter);
+		if(amVerbose())
+			inputInfo("Command cleared.");
 	}else // MDH@03MAY2019: can't switch to control mode here (so we just report the error!!!)
 		inputError("%s","Failed to remove the last entered character.");
 }
@@ -4638,12 +4665,6 @@ void outputCommandInfo(){
 		*/
 		token=token->next;
 	}
-}
-
-bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
-bool isOneCharacterTokenType(uint8_t tokenType){
-	// TODO how about TT_EXPRESSION -> NO because a TT_EXPRESSION token is always considered ended, i.e. significantCharacterCount is not an issue in determining whether a new token starts there
-	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
 }
 
 // MDH@09JUL2019: count the number of list elements in front of the current token
@@ -5217,10 +5238,11 @@ int main(int argc, char **argv){
 #ifdef __DEBUG__
 				outputChar(inputCharType);
 #endif
+				// MDH@03SEP2019: any input character that somehow changes the command needs to ascertain that no previous command is being used (i.e. when commandIndex is not zero)
 				//////////outputStatus(inputChar,inputCharType);
 				if(inputCharType=='d'){ // MDH@18APR2019: delete now always deletes the first character in the behind cursor text
 					/////debugWrite("DELETE");
-					if(string_length(behindCursorText)){
+					if(string_length(behindCursorText)){ // something to delete
 						if(string_removed_char(behindCursorText,0)){ // success!!!
 							writeBehindCursorText(true);
 						}else
@@ -5238,13 +5260,18 @@ int main(int argc, char **argv){
 				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-C)
 					// replacing: if(pCommandToEvaluate!=NULL){clearCommand();break;}beep(); 
-					if(pCommandToEvaluate!=NULL)
-						cancelCommand();
+					if(pCommandToEvaluate){
 						/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
-					else
+						// MDH@03SEP2019: what to do when Ctrl-C is called on a previous command????? i.e. when pCommandToEvaluate points to a previous command, I'd say that we should return to the current command
+						if(commandIndex)
+							setCommandIndex(0);
+						else
+							cancelCommand();
+					} else
 						beep();
 				}else
 				if(inputCharType=='t'){ // Tab character
+					// MDH@03SEP2019: here commandCharacterAccepted() will take care of copying the command if commandIndex is not (yet) zero
 					// if there's a preview (well, code completion by way of a behindCursorText)
 					uint16_t bc=behindCursor();
 					if(bc){
@@ -5259,7 +5286,7 @@ int main(int argc, char **argv){
 							// MDH@24APR2019 obsolete: commandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],bc==0,true)){
-								inputCharType=switchToControlMode("Failed to accept an suggested character.");
+								inputCharType=switchToControlMode("Failed to accept a suggested character.");
 								break;
 							}
 						}
@@ -5335,7 +5362,8 @@ int main(int argc, char **argv){
 								if(inputChar==68){ // left arrow
 									if(cursorPosition()){
 										// TODO apparently pCommandToEvaluate will still be NULL when we're scrolling through the list of previous commands...
-										if(commandIndex)copyCommand(); // will also set commandLength()!!!
+										// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyCommand() itself does not seem to do that!!!)
+										if(commandIndex){commandIndex=0;copyCommand();} // will also set commandLength()!!!
 										// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into behindCursorText
 										bool success=false;
 										char c=removedTokenCharacter(1);

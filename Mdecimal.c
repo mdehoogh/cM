@@ -571,14 +571,44 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 			}
 #endif
 		}
-		if(mpd_context)mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+
+		if(mpd_context){
+			// store pi, pi/2 and pi/4 in the decimal context (all or none) BEFORE readjusting the precision i.e. if no error occurred
+			if(!mpd_error(mpd_context)){
+				mpd_t *_pi=get_mpd_copy(mpd_context,s);
+				if(_pi){
+					uint32_t status=0;
+					mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
+					if(_pidiv2&&_pidiv4&&_pimul2){
+						mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
+						mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
+						mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
+					}else // _pi not bound in decimalcontext, so free
+						status=1;
+					if((status&0xEFBF)==0){
+						decimalcontext->pi=_pi;decimalcontext->pidiv2=_pidiv2;decimalcontext->pidiv4=_pidiv4;decimalcontext->pimul2=_pimul2;
+					}else{
+						free_mpd(_pimul2);free_mpd(_pi);free_mpd(_pidiv2);free_mpd(_pidiv4);
+					}
+				}
+
+				if(!decimalcontext->pi)
+				outputError("Failed to store the decimal approximation of pi in the decimal context");
+				else
+				if(amVerbose())
+				outputLine("NOTE: Decimal approximation to pi stored in the decimal context.");
+			}
+			mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+			// TODO should I mpd_finalize the pi values stored? or for now leave them unrounded?????????
+		}
+
 		// get rid of all the decimals we used
 #ifdef __ADEBUG__
 		free_decimal(lasts);free_decimal(t);free_decimal(n);free_decimal(na);free_decimal(d);free_decimal(da);
 		free_decimal(d8);free_decimal(d32);
 #else
-		mpd_del(lasts);mpd_del(t);mpd_del(n);mpd_del(na);mpd_del(d);mpd_del(da);
-		mpd_del(d8);mpd_del(d32);
+		free_mpd(lasts);free_mpd(t);free_mpd(n);free_mpd(na);free_mpd(d);free_mpd(da);
+		free_mpd(d8);free_mpd(d32);
 #endif
 		if(mpd_context){
 			if(mpd_error(mpd_context)){ // something went wrong
@@ -604,29 +634,6 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 
 		_decimal=_getDecimal(s,decimalprecision,0,true);
 
-		// store pi, pi/2 and pi/4 in the decimal context (all or none)
-		mpd_t *_pi=get_mpd_copy(mpd_context,s);
-		if(_pi){
-			uint32_t status=0;
-			mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
-			if(_pidiv2&&_pidiv4&&_pimul2){
-				mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
-				mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
-				mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
-			}else // _pi not bound in decimalcontext, so free
-				status=1;
-			if((status&0xEFBF)==0){
-				decimalcontext->pi=_pi;decimalcontext->pidiv2=_pidiv2;decimalcontext->pidiv4=_pidiv4;decimalcontext->pimul2=_pimul2;
-			}else{
-				free_mpd(_pimul2);free_mpd(_pi);free_mpd(_pidiv2);free_mpd(_pidiv4);
-			}
-		}
-
-		if(!decimalcontext->pi)
-		outputError("Failed to store the decimal approximation of pi in the decimal context");
-		else
-		if(amVerbose())
-		outputLine("NOTE: Decimal approximation to pi stored in the decimal context.");
 
 	}else{ // decimalcontext->pi exists
 
@@ -981,6 +988,7 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 			if(mpd_context){
 				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,1),mpd_context->prec,0,true);
 				uint32_t status=0;
+				// with the cosine we can forget about the sign i.e. cos(-x)=cos(x), which means we can simply ignore the sign
 				mpd_t* _absx=NULL;
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
@@ -1038,7 +1046,8 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 							}
 							// replacing: _cosine=_dsincos(mpd_context,(cos?_xmod:_xsin),!cos);
 							if(_cosine){
-								if((_absx!=NULL)!=(xquadrant==1||xquadrant==2))mpd_set_negative(_cosine); // negate the _cosine in quadrant 1 and 2 (from pi/2 to 3*pi/2)
+								// whether _absx is NULL or not doesn't matter as cos(-x)=cos(x)
+								if(xquadrant==1||xquadrant==2)mpd_set_negative(_cosine); // negate the _cosine in quadrant 1 and 2 (from pi/2 to 3*pi/2)
 							}else
 								outputError("Failed to compute the cosine of the normalized decimal");
 						}
