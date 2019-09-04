@@ -653,6 +653,8 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 }
 
 // internal helper functions that compute the sine and cosine of any decimal smaller than 1 (typically in [0,pi/4))
+
+// MDH@04SEP2019: if I combine two successive terms like I did below in _dsinorcos we'd always be adding positive numbers (never subtracting), and we'd be approaching from below...
 /**
  * \brief computes the square root of the approximation to the square of the sine/cosine of \p x
  * \p x the argument (in radians)
@@ -667,21 +669,39 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool si
 		uint32_t status=0;
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
 		Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+		
 		// ok denominator is multiplied by 2 to start with (so dividing by 2 immediately)
-		mpd_t *_4x2=__mpd(mpd_context,0),*_num=__mpd(mpd_context,1),*_den=__mpd(mpd_context,4),*_2n=__mpd(mpd_context,2),*_term=__mpd(mpd_context,2),*_1=__mpd(mpd_context,1);
+		mpd_t*_1=__mpd(mpd_context,1);
+		mpd_t *_4x2=__mpd(mpd_context,0),*_16x4=__mpd(mpd_context,0);
+		mpd_t *_num=__mpd(mpd_context,1),*_2times2kfac=__mpd(mpd_context,4);
+		mpd_t *_2k=__mpd(mpd_context,2),*_term=__mpd(mpd_context,2);
+		
+		mpd_t *_den2=__mpd(mpd_context,12),*_term2=__mpd(mpd_context,0);
+		
+		// each term equals: _num/_den*(1-_4x2/_den2), with _num=(_4x2)*_2n
+
 		mpd_t *_prevsinorcossquared=__mpd(mpd_context,0); // replacing:__mpd(mpd_context,(sin?0:1)); // we're actually computing twice the square to start with so we start with 2 for the cosine (we'll divide by 2 down below!!)
 		_sinorcossquared=__mpd(mpd_context,0); // any value will do
-		if(_sinorcossquared&&_prevsinorcossquared&&_4x2&&_num&&_den&&_term&&_2n&&_1){
+		if(_sinorcossquared&&_prevsinorcossquared&&_16x4,_4x2&&_num&&_2times2kfac&&_term&&_2k&&_1){
 			mpd_qmul(_4x2,x,x,mpd_context,&status); // compute x^2
 			mpd_qmul_uint(_4x2,_4x2,4,mpd_context,&status); // multiply by 4 to get (2*x)^2=4*x^2
+			mpd_qmul(_16x4,_4x2,_4x2,mpd_context,&status); // square _4x2 to get _16x4 which we need to update _num with
 			unsigned long long iterations=0; // let's start with at most 100 iterations
-			bool sign=true; // the sine is computed in all cases
+			/////////bool sign=true; // the sine is computed in all cases
 			mpd_qcopy(_sinorcossquared,_prevsinorcossquared,&status); // initialize _sinorcossquared to the initial value of the previous value
 			while((status&0xEFBF)==0){
 				iterations++;
 				if(_intermediateResult)output("Iteration %llu: ",iterations);
 				mpd_qmul(_num,_num,_4x2,mpd_context,&status); // update numerator (started at 1)
-				mpd_qdiv(_term,_num,_den,mpd_context,&status); // compute the quotient of _num and _den as the new term to add or subtract
+				mpd_qdiv(_term,_num,_2times2kfac,mpd_context,&status); // compute the quotient of _num and _den as the new term which multiplied by _term2 is the new term to add
+				
+				// if we compute the difference of two successive terms we get the following				
+				mpd_qdiv(_term2,_4x2,_den2,mpd_context,&status);
+				mpd_qsub(_term2,_1,_term2,mpd_context,&status); // _term2 has to be multiplied with _term
+				mpd_qmul(_term,_term,_term2,mpd_context,&status);
+				mpd_qadd(_sinorcossquared,_prevsinorcossquared,_term,mpd_context,&status); // update _sinorcossquared by adding _term
+				if(mpd_qcmp(_sinorcossquared,_prevsinorcossquared,&status)==0)break; // no change anymore
+				/* replacing:
 				if(sign){
 					sign=false; // toggle sign
 					mpd_qadd(_sinorcossquared,_prevsinorcossquared,_term,mpd_context,&status);
@@ -692,6 +712,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool si
 					if(_intermediateResult)output(" Subtract ");
 				}
 				if(!sign)if(mpd_qcmp(_sinorcossquared,_prevsinorcossquared,&status)==0)break; // no change anymore
+				*/
 				mpd_qcopy(_prevsinorcossquared,_sinorcossquared,&status); // update _prevsinorcossquared...
 				if(_intermediateResult){
 					mpd_qcopy(_intermediateResult->mpd,_term,&status);
@@ -701,10 +722,13 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool si
 					outputDecimal(" squared '",_intermediateResult,"'.\n");
 				}
 				// updating the denominator (started as 2)
-				mpd_qadd_u32(_2n,_2n,1,mpd_context,&status); // _2n now 3, 5, 7, ...
-				mpd_qmul(_den,_den,_2n,mpd_context,&status); // multiply
-				mpd_qadd_u32(_2n,_2n,1,mpd_context,&status); // _2n now 4, 6, 8, ...
-				mpd_qmul(_den,_den,_2n,mpd_context,&status); // multiply
+				mpd_qmul(_2times2kfac,_2times2kfac,_den2,mpd_context,&status); // multiply with what we just used in the second denominator
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // _2k now 3, 5, 7, ...
+				mpd_qmul(_2times2kfac,_2times2kfac,_2k,mpd_context,&status); // multiply
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // _2k now 4, 6, 8, ...
+				mpd_qmul(_2times2kfac,_2times2kfac,_2k,mpd_context,&status); // multiply
+				// update _den2
+				mpd_qcopy(_den2,_2k,&status);mpd_qadd_u32(_2k,_2k,1,mpd_context,&status);mpd_qmul(_den2,_den2,_2k,mpd_context,&status);
 			}
 		}else{
 			status=0xFFFFFFFF;
