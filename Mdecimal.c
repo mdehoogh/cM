@@ -586,7 +586,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 						mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
 						mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
 					}else // _pi not bound in decimalcontext, so free
-						status=1;
+						status=0xFFFFFFFF;
 					if((status&0xEFBF)==0){
 						decimalcontext->pi=_pi;decimalcontext->pidiv2=_pidiv2;decimalcontext->pidiv4=_pidiv4;decimalcontext->pimul2=_pimul2;
 					}else{
