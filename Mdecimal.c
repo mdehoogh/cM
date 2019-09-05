@@ -578,6 +578,8 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 				mpd_t *_pi=get_mpd_copy(mpd_context,s);
 				if(_pi){
 					uint32_t status=0;
+					// MDH@05AUG2019: it's relatively simple to compute the sin/cosine of angles like 15, 30, 45, 60, 75 so we can start with storing multiples of pi/12 which of course include all we need!!!
+					//                how about storing the sine and cosines of these values along with these predefined angles?????
 					mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
 					if(_pidiv2&&_pidiv4&&_pimul2){
 						mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
@@ -618,18 +620,20 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 			}
 		}
 		// success
+/* MDH@05AUG2019: if we turn finalization off, the first pi returned is the same as the pi returned as stored with the decimal context, so we will get the same result, which is preferred!!!)
 #ifdef __ADEBUG__
 		mpd_finalize(s->mpd,mpd_context?mpd_context:_decimalContext); // to round to the requested precision
 #else
 		mpd_finalize(s,mpd_context); // to round to the requested precision
 #endif
+*/
 		if(amVerbose()){
 #ifdef __ADEBUG__
 			char* _s=mpd_to_sci(s->mpd,0);
 #else
 			char* _s=mpd_to_sci(s,0);
 #endif
-			if(_s){output("Final approximation of pi (rounded to %llu decimals): %s.\n",decimalprecision,_s);free(_s);}
+			if(_s){output("Final approximation of pi ( NOT rounded to %llu decimals but with two additional decimals): %s.\n",decimalprecision,_s);free(_s);}
 		}
 
 		_decimal=_getDecimal(s,decimalprecision,0,true);
@@ -652,13 +656,122 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 
 }
 
-// internal helper functions that compute the sine and cosine of any decimal smaller than 1 (typically in [0,pi/4))
+// MDH@04SEP2019: if I combine two successive terms like I did below in _dsinorcos we'd always be adding positive numbers (never subtracting), and we'd be approaching from below...
 /**
  * \brief computes the square root of the approximation to the square of the sine/cosine of \p x
  * \p x the argument (in radians)
  * \p sin true to return the square root of the sine squared, or the square root of the cosine squared
  * because the same terms are used to compute the sine and the cosine it is guaranteed that sin^2+cos^2=1 (as long as mpd_sqrt is correctly square rooting of course)
  */
+mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool sin){
+	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
+	mpd_t* _sinsquared=NULL;
+	if(mpd_context&&x){
+		if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){output("Computing the square of the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}}
+		uint32_t status=0;
+		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
+		Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+		
+		// ok denominator is multiplied by 2 to start with (so dividing by 2 immediately)
+		mpd_t*_1=__mpd(mpd_context,1); // fixed
+
+		// helpers that are computed once before the iterations and remain constant from there one
+		mpd_t *_4x2=__mpd(mpd_context,0),*_16x4=__mpd(mpd_context,0);
+
+		// updated in each iteration can start with any value except that _num has to be initialized to _4x2 before the iterations
+		mpd_t *_num=__mpd(mpd_context,0),*_term=__mpd(mpd_context,0),*_den2=__mpd(mpd_context,0),*_term2=__mpd(mpd_context,0);
+
+		// helper decimals updated in the iterations that need to be initialized precisely here as they are directly used in the first computation!!!
+		mpd_t *_2times2kfac=__mpd(mpd_context,4),*_2k=__mpd(mpd_context,2),*_prevsinsquared=__mpd(mpd_context,0);
+		
+		// each term equals: (_num/_2times2kfac)*_term2=(1-_4x2/_den2), with _num=(_4x2)**k en _den2=(2k+1)*(2k+2) for k=1,3,5,7,...		
+		_sinsquared=__mpd(mpd_context,0); // any value will do
+
+		if(_sinsquared&&_prevsinsquared&&_1&&_16x4&&_4x2&&_num&&_2times2kfac&&_term&&_2k&&_den2&&_term2){
+			mpd_qmul(_4x2,x,x,mpd_context,&status); // compute x^2
+			mpd_qmul_uint(_4x2,_4x2,4,mpd_context,&status); // multiply by 4 to get (2*x)^2=4*x^2
+			mpd_qmul(_16x4,_4x2,_4x2,mpd_context,&status); // square _4x2 to get _16x4 which we need to update _num with
+			mpd_qcopy(_num,_4x2,&status); // the initial value of _num is _4x2 (i.e. for k=1)
+			unsigned long long iterations=0; // let's start with at most 100 iterations
+			/////////bool sign=true; // the sine is computed in all cases
+			mpd_qcopy(_sinsquared,_prevsinsquared,&status); // initialize _sinsquared to the initial value of the previous value
+			while((status&0xEFBF)==0){
+				// _num, _2times2kfac and _2k should now be as what they are supposed to be (see end of the iteration), the first time _num=_4x2, _2times2kfac=2.2!=4 and _2k is 2*1=2 of course
+				iterations++;
+				if(_intermediateResult)output("Iteration %llu: ",iterations);
+				mpd_qdiv(_term,_num,_2times2kfac,mpd_context,&status); // compute the quotient of _num and _den as the new term which multiplied by _term2 is the new term to add
+				// starting at 2*iterations increment _2k to become 2*k+1
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // 2 to 3, 6 to 7, 10 to 11, i.e. 2k to (2k+1)
+				mpd_qcopy(_den2,_2k,&status); // set _den to _2k (=2*k+1)
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // increment _2k to 2*k+2
+				mpd_qmul(_den2,_den2,_2k,mpd_context,&status); // make _den2 equal to (2*k+1)*(2*k+2)
+
+				// if we compute the difference of two successive terms we get the following				
+				mpd_qdiv(_term2,_4x2,_den2,mpd_context,&status); // divide _4x2 by _den2 to get the thingie to subtract from 1
+				mpd_qsub(_term2,_1,_term2,mpd_context,&status); // subtract _term2 from 1 to get the new _term2
+				mpd_qmul(_term,_term,_term2,mpd_context,&status); // multiply _term by _term2 to get the new _term
+				mpd_qadd(_sinsquared,_prevsinsquared,_term,mpd_context,&status); // update _sinorcossquared by adding _term
+				if(mpd_qcmp(_sinsquared,_prevsinsquared,&status)==0)break; // after adding _term no apparent change, so I guess we're done
+				/* replacing:
+				if(sign){
+					sign=false; // toggle sign
+					mpd_qadd(_sinorcossquared,_prevsinorcossquared,_term,mpd_context,&status);
+					if(_intermediateResult)output(" Add ");
+				}else{
+					sign=true; // toggle sign
+					mpd_qsub(_sinorcossquared,_prevsinorcossquared,_term,mpd_context,&status);
+					if(_intermediateResult)output(" Subtract ");
+				}
+				if(!sign)if(mpd_qcmp(_sinorcossquared,_prevsinorcossquared,&status)==0)break; // no change anymore
+				*/
+				mpd_qcopy(_prevsinsquared,_sinsquared,&status); // update _prevsinorcossquared...
+				if(_intermediateResult){
+					mpd_qcopy(_intermediateResult->mpd,_term,&status);
+					outputDecimal(" increment: '",_intermediateResult,"' -> ");
+					mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);
+					output("%s",(sin?"Sine":"One minus cosine")); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
+					outputDecimal(" squared '",_intermediateResult,"'.\n");
+				}
+
+				// update _num (incrementing k by 2 each iteration), the numerator of the term in front of the subtraction (_term2)
+				mpd_qmul(_num,_num,_16x4,mpd_context,&status); // update numerator (started at _4x2)
+
+				// updating the denominator _2times2kfac (and _2k in the process to become 2*k+4
+				mpd_qmul(_2times2kfac,_2times2kfac,_den2,mpd_context,&status); // now halfway from computing 2.(2k+4)! from (what it was) 2.(2k)! as _den2 equals (2k+1)*(2k+2)
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // _2k now (2*k+3)
+				mpd_qmul(_2times2kfac,_2times2kfac,_2k,mpd_context,&status); // multiply
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // _2k now (2*k+4) which is 2*(k+2) which is the next _2k to use
+				mpd_qmul(_2times2kfac,_2times2kfac,_2k,mpd_context,&status); // multiply to get 2.(2k+4)!
+			}
+		}else{
+			status=0xFFFFFFFF;
+			outputError("Failed to create helper decimals in computing the sine of a decimal");
+		}
+		if((status&0xEFBF)==0){ // so far, so good
+			// if we need to return the cosine, compute 1 - 
+			if(!sin)mpd_qsub(_sinsquared,_1,_sinsquared,mpd_context,&status);
+			if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Squared result: '",_intermediateResult,"'.\n");}
+			// take the square root
+			mpd_qsqrt(_sinsquared,_sinsquared,mpd_context,&status);
+			if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Result: '",_intermediateResult,"'.\n");}
+		}
+		// free all (10) helper decimals
+		free_mpd(_den2);free_mpd(_term2);free_mpd(_2times2kfac);free_mpd(_num);free_mpd(_2k);free_mpd(_4x2);free_mpd(_1);free_mpd(_term);free_mpd(_16x4);
+		free_mpd(_prevsinsquared);
+		// return the precision so we can return a rounded result (TODO should we do that??????)
+		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2 as soon as all computations are done
+		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);else output("%sNo %ssine result to finalize.\n",ERROR_PREFIX,(sin?"":"co"));
+		if((status&0xEFBF)!=0){
+			output("%sSome error trying to compute the %ssine of a decimal.\n",ERROR_PREFIX,(sin?"":"co"));
+			free_mpd(_sinsquared);_sinsquared=NULL;
+		}else
+		if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");}
+		if(_intermediateResult)free_decimal(_intermediateResult); // free verbose intermediate result decimal
+	}
+	////////if(!_sinsquared)outputError("Sine result vanished!");
+	return _sinsquared;
+}
+/* replacing (one term at a time):
 mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool sin){
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinorcossquared=NULL;
@@ -725,7 +838,7 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool si
 	}
 	return _sinorcossquared;
 }
-
+*/
 typedef struct mpd_sincos_t{
 	mpd_t* sin;
 	mpd_t* cos;
