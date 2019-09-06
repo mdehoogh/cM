@@ -1362,14 +1362,15 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 									Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_relativeAngle->_delta_angle),mpd_context->prec,0,true);
 									if(_decimal){outputDecimal("Relative angle: '",_decimal,"'.\n");free_decimal(_decimal);}
 								//}
-							}
+							}else
+								outputError("Failed to compute the relative angle");
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
 							_sine=_dsinsquared(mpd_context,(sin?_xmod:_xsin));
 							if(_sine)mpd_qsqrt(_sine,_sine,mpd_context,&status); // BEFORE returning to the original precision!!!
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // reset precision (TODO not thread-safe if we would be running multiple versions using the same mpd_context!!!!)
 							if(_sine)mpd_qfinalize(_sine,mpd_context,&status);else status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
 							// some extra work as we've received the sine squared
-							if((status&0xEFBF)!=0){outputError("Failed to compute the cosine from the sine square approximation");free_mpd(_sine);_sine=NULL;}else 
+							if((status&0xEFBF)!=0){outputError("Failed to compute the cosine from the sine square approximation");free_mpd(_sine);_sine=NULL;}
 							/* replacing:
 
 							_sine=_dsquarerootofsinorcossquared(mpd_context,(sin?_xmod:_xsin),true);
