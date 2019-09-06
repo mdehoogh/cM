@@ -11,6 +11,11 @@ mpd_t* __mpd(const mpd_context_t* mpd_context,int64_t value);
 // mpd_t primitives
 void free_mpd(mpd_t* mpd);
 
+// MDH@06SSEP2019: we also want to store predefined sine/cosines to speed up the computation and consistency of sine/cosines
+typedef struct Msincoselement{
+    mpd_t *_input,*_sine,*_cosine;
+    struct Msincoselement* _next;
+}Msincoselement;
 // MDH@29AUG2019: we want to store the computed value of pi and e in the decimal context as well unless we store pi and e with a postfix like PI$<prec> and E$<prec> in the current environment?????
 //                the point here is that of reuse, we do not want to have to compute pi again and again for each decimal context
 //                currently we store the precision with the decimal this way we can use the same precision on functions that use that argument
@@ -19,6 +24,7 @@ typedef struct Mdecimalcontext{
     mpd_context_t* mpd_context;
     mpd_t* e; // storing e
     mpd_t *pi,*pidiv2,*pimul2,*pidiv4; // storing pi, 2*pi, pi/2 and pi/4
+    Msincoselement* _firstSincoselement; // for storing the predefined sine/cosines
 }Mdecimalcontext;
 // MDH@29AUG2019: create a decimal context with __decimalcontext passing in the required precision
 Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision

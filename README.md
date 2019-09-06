@@ -26,3 +26,4 @@ no series expansion is ever necessary. This is all fine with a single precision.
 precision as with my decimals, you can keep halving until you're below the accuracy of the decimal precision. Of course, you can't substitute zero at that point, you'll end up with zero as result. I'm gonna think a little more 
 about this problem.
 
+(to be continued)

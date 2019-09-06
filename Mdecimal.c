@@ -589,6 +589,69 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 						status=0xFFFFFFFF;
 					if((status&0xEFBF)==0){
 						decimalcontext->pi=_pi;decimalcontext->pidiv2=_pidiv2;decimalcontext->pidiv4=_pidiv4;decimalcontext->pimul2=_pimul2;
+						// ok, we're going to store some predefined sine/cosines
+						// in particular all multiples of pi/12 below pi, NOTE that the sine/cosine of 0 does not need to be stored as that can't help us speed up sine/cosine computation
+						// we start with pi/12 and then up to 6*pi/12, so we'd have in total 6 predefined sine/cosines
+						mpd_t *_pidiv12=get_mpd_copy(mpd_context,_pi),*_sqrt2div2=__mpd(mpd_context,2),*_sqrt3div2=__mpd(mpd_context,3);
+						// some values only need to be computed once but are used twice in the table, by precomputing them a reference is stored in the table so we won't have to free them
+						// we can use _sin90 when we need 1 in computations
+						Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+						mpd_t *_sin15=__mpd(mpd_context,0),*_cos15=__mpd(mpd_context,0),*_sin30=__mpd(mpd_context,0),*_cos30=__mpd(mpd_context,0),*_sin45=__mpd(mpd_context,0),*_sin90=__mpd(mpd_context,1),*_cos90=__mpd(mpd_context,0);
+						if(_pidiv12&&_sqrt2div2&&_sqrt3div2&&_sin15&&_cos15&&_sin30&&_cos30&&_sin45&&_sin90&&_cos90){
+							uint32_t mult=0;
+							mpd_qdiv_u32(_pidiv12,_pidiv12,12,mpd_context,&status);
+							// compute the square root terms we need (i.e. sqrt(2)/2 and sqrt(3)/2)
+							mpd_qsqrt(_sqrt2div2,_sqrt2div2,mpd_context,&status);mpd_qdiv_u32(_sqrt2div2,_sqrt2div2,2,mpd_context,&status);
+							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sqrt2div2,&status);outputDecimal("Decimal 2 square root (",_intermediateResult,") computed successfully.\n");}
+							mpd_qsqrt(_sqrt3div2,_sqrt3div2,mpd_context,&status);mpd_qdiv_u32(_sqrt3div2,_sqrt3div2,2,mpd_context,&status);
+							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sqrt3div2,&status);outputDecimal("Decimal 3 square root (",_intermediateResult,") computed successfully.\n");}
+							// and all distinct sine and cosine values that go into the table
+							mpd_qsub(_sin15,_sin90,_sqrt3div2,mpd_context,&status);mpd_qsqrt(_sin15,_sin15,mpd_context,&status);mpd_qmul(_sin15,_sin15,_sqrt2div2,mpd_context,&status);
+							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sin15,&status);outputDecimal("Sin(15deg)===Cos(75deg) (",_intermediateResult,") computed successfully.\n");}
+							mpd_qadd(_cos15,_sin90,_sqrt3div2,mpd_context,&status);mpd_qsqrt(_cos15,_cos15,mpd_context,&status);mpd_qmul(_cos15,_cos15,_sqrt2div2,mpd_context,&status);
+							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_cos15,&status);outputDecimal("Cos(15deg)===Sin(75deg) (",_intermediateResult,") computed successfully.\n");}
+							mpd_qdiv_u32(_sin30,_sin90,2,mpd_context,&status); // to get 0.5
+							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sin30,&status);outputDecimal("Sin(30deg)===Cos(60deg) (",_intermediateResult,") computed successfully.\n");}
+							mpd_qcopy(_cos30,_sqrt3div2,&status);
+							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_cos30,&status);outputDecimal("Cos(30deg)===Sin(60deg) (",_intermediateResult,") set successfully to half the square root of 3.\n");}
+							mpd_qcopy(_sin45,_sqrt2div2,&status);
+							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sin45,&status);outputDecimal("Sin(45deg)===Cos(45deg) (",_intermediateResult,") set successfully to half the square root of 2.\n");}
+							// done computing the constant values being used
+							while((status&0xEFBF)==0){
+								Msincoselement* _sincoselement=(Msincoselement*)calloc(1,sizeof(Msincoselement));
+								if(!_sincoselement){outputError("Failed to create the object to store the sine and cosine of a predefined angle");break;} // too bad
+								mpd_t *_angle=__mpd(mpd_context,0);
+								if(!_angle)break; // too bad as well
+								mpd_qmul_u32(_angle,_pidiv12,mult+1,mpd_context,&status);
+								if((status&0xEFBF)!=0){free_mpd(_angle);outputError("Failed to initialize the angle of a predefined sine and cosine");break;}
+								// we've got all values so nothing can go wrong
+								_sincoselement->_input=_angle; // store the angle
+								switch(mult){
+									case 0:_sincoselement->_sine=_cos90;_sincoselement->_cosine=_sin90;break; // 0 degrees
+									case 1:_sincoselement->_sine=_sin15;_sincoselement->_cosine=_cos15;break; // pi/12=15 degrees
+									case 2:_sincoselement->_sine=_sin30;_sincoselement->_cosine=_cos30;break; // pi/6=30 degrees
+									case 3:_sincoselement->_sine=_sin45;_sincoselement->_cosine=_sin45;break; // pi/4=45 degrees
+									case 4:_sincoselement->_sine=_cos30;_sincoselement->_cosine=_sin30;break; // pi/3=60 degrees
+									case 5:_sincoselement->_sine=_cos15;_sincoselement->_cosine=_sin15;break; // 5*pi/12=75 degrees
+									case 6:_sincoselement->_sine=_sin90;_sincoselement->_cosine=_cos90;break; // pi/2=90 degrees
+								}
+								// remember
+								_sincoselement->_next=decimalcontext->_firstSincoselement;
+								decimalcontext->_firstSincoselement=_sincoselement;
+								mult++;
+								if(mult==7)break;
+							}
+							if(mult<7)output("%sFailed to create %u out of 7 predefined (co)sines.\n",ERROR_PREFIX,6-mult);
+							free_mpd(_pidiv12);free_mpd(_sqrt2div2);free_mpd(_sqrt3div2);
+						}else
+							status=0xFFFFFFFF;
+						if((status&0xEFBF)!=0){
+							if(status!=0xFFFFFFFF){
+								outputError("Failed to store predefined (co)sines in the decimal context");
+								report_mpd_status(status);
+							}else
+								outputError("Failed to make preparations for storing predefined sine/cosines in the decimal context!");
+						}
 					}else{
 						free_mpd(_pimul2);free_mpd(_pi);free_mpd(_pidiv2);free_mpd(_pidiv4);
 					}
@@ -654,6 +717,126 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 	if(decimalprecision<0)decimalprecision=_decimalContext->prec;
 	*/
 
+}
+
+// MDH@06SEP2019: if we turn the following into the computation of the sinequared itself, the caller itself can do the square rooting and or turning over to computing the cosine
+//                NOTE this implementation is almost the same as that of _dsquarerootofsinorcossquared() except that it does not do the conversion to a cosine and square rooting
+//                NOTE this has the disadvantage that sin squared is approximated with two additional decimals but conversion and square rooting will take place AFTER returning to the original precision
+//                DONE we solve that by taking changing the precision to the _dsine/_dcosine functions
+mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t* x){
+	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
+	mpd_t* _sinsquared=NULL;
+	if(mpd_context&&x){
+		if(amVerbose()){
+			Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);
+			if(_decimal){output("Computing the square of the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}
+		}
+		uint32_t status=0;
+		/////////// REMOVED: mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2 decimal digits
+		Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+		
+		// ok denominator is multiplied by 2 to start with (so dividing by 2 immediately)
+		mpd_t*_1=__mpd(mpd_context,1); // fixed
+
+		// helpers that are computed once before the iterations and remain constant from there one
+		mpd_t *_4x2=__mpd(mpd_context,0),*_16x4=__mpd(mpd_context,0);
+
+		// updated in each iteration can start with any value except that _num has to be initialized to _4x2 before the iterations
+		mpd_t *_num=__mpd(mpd_context,0),*_term=__mpd(mpd_context,0),*_den2=__mpd(mpd_context,0),*_term2=__mpd(mpd_context,0);
+
+		// helper decimals updated in the iterations that need to be initialized precisely here as they are directly used in the first computation!!!
+		mpd_t *_2times2kfac=__mpd(mpd_context,4),*_2k=__mpd(mpd_context,2),*_prevsinsquared=__mpd(mpd_context,0);
+		
+		// each term equals: (_num/_2times2kfac)*_term2=(1-_4x2/_den2), with _num=(_4x2)**k en _den2=(2k+1)*(2k+2) for k=1,3,5,7,...		
+		_sinsquared=__mpd(mpd_context,0); // any value will do
+
+		if(_sinsquared&&_prevsinsquared&&_1&&_16x4&&_4x2&&_num&&_2times2kfac&&_term&&_2k&&_den2&&_term2){
+			mpd_qmul(_4x2,x,x,mpd_context,&status); // compute x^2
+			mpd_qmul_uint(_4x2,_4x2,4,mpd_context,&status); // multiply by 4 to get (2*x)^2=4*x^2
+			mpd_qmul(_16x4,_4x2,_4x2,mpd_context,&status); // square _4x2 to get _16x4 which we need to update _num with
+			mpd_qcopy(_num,_4x2,&status); // the initial value of _num is _4x2 (i.e. for k=1)
+			unsigned long long iterations=0; // let's start with at most 100 iterations
+			/////////bool sign=true; // the sine is computed in all cases
+			mpd_qcopy(_sinsquared,_prevsinsquared,&status); // initialize _sinsquared to the initial value of the previous value
+			while((status&0xEFBF)==0){
+				// _num, _2times2kfac and _2k should now be as what they are supposed to be (see end of the iteration), the first time _num=_4x2, _2times2kfac=2.2!=4 and _2k is 2*1=2 of course
+				iterations++;
+				if(_intermediateResult)output("Iteration %llu: ",iterations);
+				mpd_qdiv(_term,_num,_2times2kfac,mpd_context,&status); // compute the quotient of _num and _den as the new term which multiplied by _term2 is the new term to add
+				// starting at 2*iterations increment _2k to become 2*k+1
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // 2 to 3, 6 to 7, 10 to 11, i.e. 2k to (2k+1)
+				mpd_qcopy(_den2,_2k,&status); // set _den to _2k (=2*k+1)
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // increment _2k to 2*k+2
+				mpd_qmul(_den2,_den2,_2k,mpd_context,&status); // make _den2 equal to (2*k+1)*(2*k+2)
+
+				// if we compute the difference of two successive terms we get the following				
+				mpd_qdiv(_term2,_4x2,_den2,mpd_context,&status); // divide _4x2 by _den2 to get the thingie to subtract from 1
+				mpd_qsub(_term2,_1,_term2,mpd_context,&status); // subtract _term2 from 1 to get the new _term2
+				mpd_qmul(_term,_term,_term2,mpd_context,&status); // multiply _term by _term2 to get the new _term
+				mpd_qadd(_sinsquared,_prevsinsquared,_term,mpd_context,&status); // update _sinorcossquared by adding _term
+				if(mpd_qcmp(_sinsquared,_prevsinsquared,&status)==0)break; // after adding _term no apparent change, so I guess we're done
+				/* replacing:
+				if(sign){
+					sign=false; // toggle sign
+					mpd_qadd(_sinorcossquared,_prevsinorcossquared,_term,mpd_context,&status);
+					if(_intermediateResult)output(" Add ");
+				}else{
+					sign=true; // toggle sign
+					mpd_qsub(_sinorcossquared,_prevsinorcossquared,_term,mpd_context,&status);
+					if(_intermediateResult)output(" Subtract ");
+				}
+				if(!sign)if(mpd_qcmp(_sinorcossquared,_prevsinorcossquared,&status)==0)break; // no change anymore
+				*/
+				mpd_qcopy(_prevsinsquared,_sinsquared,&status); // update _prevsinorcossquared...
+				if(_intermediateResult){
+					mpd_qcopy(_intermediateResult->mpd,_term,&status);
+					outputDecimal(" increment: '",_intermediateResult,"' -> ");
+					mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);
+					output("%s",(sin?"Sine":"One minus cosine")); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
+					outputDecimal(" squared '",_intermediateResult,"'.\n");
+				}
+
+				// update _num (incrementing k by 2 each iteration), the numerator of the term in front of the subtraction (_term2)
+				mpd_qmul(_num,_num,_16x4,mpd_context,&status); // update numerator (started at _4x2)
+
+				// updating the denominator _2times2kfac (and _2k in the process to become 2*k+4
+				mpd_qmul(_2times2kfac,_2times2kfac,_den2,mpd_context,&status); // now halfway from computing 2.(2k+4)! from (what it was) 2.(2k)! as _den2 equals (2k+1)*(2k+2)
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // _2k now (2*k+3)
+				mpd_qmul(_2times2kfac,_2times2kfac,_2k,mpd_context,&status); // multiply
+				mpd_qadd_u32(_2k,_2k,1,mpd_context,&status); // _2k now (2*k+4) which is 2*(k+2) which is the next _2k to use
+				mpd_qmul(_2times2kfac,_2times2kfac,_2k,mpd_context,&status); // multiply to get 2.(2k+4)!
+			}
+		}else{
+			status=0xFFFFFFFF;
+			outputError("Failed to create helper decimals in computing the sine of a decimal");
+		}
+		/* NO CONVERSION TO THE COSINE SQUARED AND SQUARE ROOTING
+		if((status&0xEFBF)==0){ // so far, so good
+			// if we need to return the cosine, compute 1 - 
+			if(!sin)mpd_qsub(_sinsquared,_1,_sinsquared,mpd_context,&status);
+			if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Squared result: '",_intermediateResult,"'.\n");}
+			// take the square root
+			mpd_qsqrt(_sinsquared,_sinsquared,mpd_context,&status);
+			if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Result: '",_intermediateResult,"'.\n");}
+		}
+		*/
+		// free all (10) helper decimals
+		free_mpd(_den2);free_mpd(_term2);free_mpd(_2times2kfac);free_mpd(_num);free_mpd(_2k);free_mpd(_4x2);free_mpd(_1);free_mpd(_term);free_mpd(_16x4);
+		free_mpd(_prevsinsquared);
+		/* REMOVED decrementing the precision to use in computation again!!!
+		// return the precision so we can return a rounded result (TODO should we do that??????)
+		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2 as soon as all computations are done
+		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);else output("%sNo %ssine result to finalize.\n",ERROR_PREFIX,(sin?"":"co"));
+		*/
+		if((status&0xEFBF)!=0){
+			output("%sSome error trying to compute the %ssine of a decimal.\n",ERROR_PREFIX,(sin?"":"co"));
+			free_mpd(_sinsquared);_sinsquared=NULL;
+		}else
+		if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");}
+		if(_intermediateResult)free_decimal(_intermediateResult); // free verbose intermediate result decimal
+	}
+	////////if(!_sinsquared)outputError("Sine result vanished!");
+	return _sinsquared;
 }
 
 // MDH@04SEP2019: if I combine two successive terms like I did below in _dsinorcos we'd always be adding positive numbers (never subtracting), and we'd be approaching from below...
@@ -1065,6 +1248,50 @@ mpd_t* _dsinorcos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence 
 	return _sinorcos;
 }
 
+// MDH@06AUG2019: if we want to be able to determine the nearest stored predefined sine/cosine angle
+typedef struct mpd_relative_angle{
+	Msincoselement* sincoselement;
+	mpd_t* _delta_angle;
+}mpd_relative_angle_t;
+
+void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle){
+	free_mpd(_mpd_relative_angle->_delta_angle);
+	FREE(_mpd_relative_angle,'A');
+}
+mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* angle){
+	// ASSERT angle must be in [0,pi/2] that way there will always be two surrounding predefined angles
+	Msincoselement *sincoselement=decimalcontext->_firstSincoselement,*nextsincoselement;
+	mpd_t *_deltaAngle1=__mpd(decimalcontext->mpd_context,0),*_deltaAngle2=__mpd(decimalcontext->mpd_context,0);
+	if(_deltaAngle1&&_deltaAngle2){
+		uint32_t status=0;
+		mpd_relative_angle_t* _relativeAngle=CALLOC(1,sizeof(mpd_relative_angle_t),'A');
+		while(sincoselement){
+			nextsincoselement=sincoselement->_next;
+			mpd_qsub(_deltaAngle2,angle,nextsincoselement->_input,decimalcontext->mpd_context,&status);
+			if(!mpd_isnegative(_deltaAngle2)){ // angle not below the lower angle so we found the bounding angle interval
+				mpd_qsub(_deltaAngle1,sincoselement->_input,angle,decimalcontext->mpd_context,&status);
+				if(mpd_qcmp(_deltaAngle1,_deltaAngle2,&status)<0){ // deltaAngle1 is smaller than deltaAngle2 and wins
+					free_mpd(_deltaAngle2);
+					_relativeAngle->_delta_angle=_deltaAngle1;
+					mpd_set_negative(_relativeAngle->_delta_angle); // because angle is smaller we need to return a negative delta angle
+				}else{
+					free_mpd(_deltaAngle1);
+					sincoselement=nextsincoselement;
+					_relativeAngle->_delta_angle=_deltaAngle2;
+				}
+				break;
+			}
+			sincoselement=nextsincoselement;
+		}
+		if(sincoselement){
+			_relativeAngle->sincoselement=sincoselement;
+			return _relativeAngle;
+		}
+	}
+	free_mpd(_deltaAngle1);free_mpd(_deltaAngle2);
+	return NULL;
+}
+
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
 Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
@@ -1127,7 +1354,26 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 							outputError("Failed to compute the sine of a decimal");
 							if(status!=0xFFFFFFFF)report_mpd_status(status);
 						}else{
+							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
+							// looking up should return the nearest sincos element in the table
+							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x);
+							if(_relativeAngle){
+								//if(amVerbose()){
+									Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_relativeAngle->_delta_angle),mpd_context->prec,0,true);
+									if(_decimal){outputDecimal("Relative angle: '",_decimal,"'.\n");free_decimal(_decimal);}
+								//}
+							}
+							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
+							_sine=_dsinsquared(mpd_context,(sin?_xmod:_xsin));
+							if(_sine)mpd_qsqrt(_sine,_sine,mpd_context,&status); // BEFORE returning to the original precision!!!
+							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // reset precision (TODO not thread-safe if we would be running multiple versions using the same mpd_context!!!!)
+							if(_sine)mpd_qfinalize(_sine,mpd_context,&status);else status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
+							// some extra work as we've received the sine squared
+							if((status&0xEFBF)!=0){outputError("Failed to compute the cosine from the sine square approximation");free_mpd(_sine);_sine=NULL;}else 
+							/* replacing:
+
 							_sine=_dsquarerootofsinorcossquared(mpd_context,(sin?_xmod:_xsin),true);
+							*/
 							/* replacing what worked just fine:
 							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(sin?_xmod:_xsin));
 							if(_sinandcos){
@@ -1227,7 +1473,25 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 							outputError("Failed to compute the cosine of a decimal");
 							report_mpd_status(status);
 						}else{
+							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
+							_cosine=_dsinsquared(mpd_context,(cos?_xmod:_xcos));
+							// some extra work as we've received the sine squared
+							if(_cosine){
+								mpd_qsub_u32(_cosine,_cosine,1,mpd_context,&status); // subtract 1 (assuming the value we received does never exceed 1 so the resulting value should be negative!!!)
+								if(!mpd_ispositive(_cosine)){ // negated cosine should be 0 or negative
+									mpd_set_positive(_cosine); // toggle the sign
+									mpd_qsqrt(_cosine,_cosine,mpd_context,&status);
+								}else{
+									status=0xFFFFFFFF;
+									output("BUG: Invalid squared sine computed.\n"); // TODO do something better with bugs!!!
+								}
+							}
+							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // approximate with two additional digits
+							if(_cosine)mpd_qfinalize(_cosine,mpd_context,&status); // round to the 'original' precision
+							if((status&0xEFBF)!=0){outputError("Failed to compute the cosine from the sine square approximation");free_mpd(_cosine);_cosine=NULL;}
+							/* replacing:
 							_cosine=_dsquarerootofsinorcossquared(mpd_context,(cos?_xmod:_xcos),false);
+							*/
 							/* replacing what worked just fine
 							mpd_sincos_t* _sinandcos=_dsinandcos(mpd_context,(cos?_xmod:_xcos));
 							if(_sinandcos){
