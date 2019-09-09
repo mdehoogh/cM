@@ -371,11 +371,11 @@ void free_mpd(mpd_t* _mpd){if(_mpd)mpd_del(_mpd);}/* VALIDATED */
  */
 void free_decimal(Mdecimal* decimal){
     if(decimal){
-        if(amVerbose())output("Freeing decimal.\n");
-        if(decimal->mpd)free_mpd(decimal->mpd);else outputError("No data in decimal to free");
+        ////////if(amVerbose())output("Freeing decimal.\n");
+        if(decimal->mpd)free_mpd(decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
         FREE(decimal,'D');
     }else
-    if(amVerbose())outputError("No decimal to free");
+    	outputError("No decimal to free");
 }/* VALIDATED */
 
 /**
@@ -444,6 +444,7 @@ Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
 
 // END BASE STUFF
 
+mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t* x);
 Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 
 	// if decimalContext equals NULL use the global decimal context, in _decimalContext
@@ -602,31 +603,37 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 							mpd_qdiv_u32(_pidiv12,_pidiv12,12,mpd_context,&status);
 							// compute the square root terms we need (i.e. sqrt(2)/2 and sqrt(3)/2)
 							mpd_qsqrt(_sqrt2div2,_sqrt2div2,mpd_context,&status);mpd_qdiv_u32(_sqrt2div2,_sqrt2div2,2,mpd_context,&status);
-							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sqrt2div2,&status);outputDecimal("Decimal 2 square root (",_intermediateResult,") computed successfully.\n");}
+							if((status&0xEFBF)==0)if(_intermediateResult){_intermediateResult->mpd=_sqrt2div2;outputDecimal("Decimal 2 square root (",_intermediateResult,") computed successfully.\n");}
 							mpd_qsqrt(_sqrt3div2,_sqrt3div2,mpd_context,&status);mpd_qdiv_u32(_sqrt3div2,_sqrt3div2,2,mpd_context,&status);
-							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sqrt3div2,&status);outputDecimal("Decimal 3 square root (",_intermediateResult,") computed successfully.\n");}
+							if((status&0xEFBF)==0)if(_intermediateResult){_intermediateResult->mpd=_sqrt3div2;outputDecimal("Decimal 3 square root (",_intermediateResult,") computed successfully.\n");}
 							// and all distinct sine and cosine values that go into the table
 							mpd_qsub(_sin15,_sin90,_sqrt3div2,mpd_context,&status);mpd_qsqrt(_sin15,_sin15,mpd_context,&status);mpd_qmul(_sin15,_sin15,_sqrt2div2,mpd_context,&status);
-							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sin15,&status);outputDecimal("Sin(15deg)===Cos(75deg) (",_intermediateResult,") computed successfully.\n");}
+							if((status&0xEFBF)==0)if(_intermediateResult){_intermediateResult->mpd=_sin15;outputDecimal("Sin(15deg)===Cos(75deg) (",_intermediateResult,") computed successfully.\n");}
 							mpd_qadd(_cos15,_sin90,_sqrt3div2,mpd_context,&status);mpd_qsqrt(_cos15,_cos15,mpd_context,&status);mpd_qmul(_cos15,_cos15,_sqrt2div2,mpd_context,&status);
-							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_cos15,&status);outputDecimal("Cos(15deg)===Sin(75deg) (",_intermediateResult,") computed successfully.\n");}
+							if((status&0xEFBF)==0)if(_intermediateResult){_intermediateResult->mpd=_cos15;outputDecimal("Cos(15deg)===Sin(75deg) (",_intermediateResult,") computed successfully.\n");}
 							mpd_qdiv_u32(_sin30,_sin90,2,mpd_context,&status); // to get 0.5
-							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sin30,&status);outputDecimal("Sin(30deg)===Cos(60deg) (",_intermediateResult,") computed successfully.\n");}
+							if((status&0xEFBF)==0)if(_intermediateResult){_intermediateResult->mpd=_sin30;outputDecimal("Sin(30deg)===Cos(60deg) (",_intermediateResult,") computed successfully.\n");}
 							mpd_qcopy(_cos30,_sqrt3div2,&status);
-							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_cos30,&status);outputDecimal("Cos(30deg)===Sin(60deg) (",_intermediateResult,") set successfully to half the square root of 3.\n");}
+							if((status&0xEFBF)==0)if(_intermediateResult){_intermediateResult->mpd=_cos30;outputDecimal("Cos(30deg)===Sin(60deg) (",_intermediateResult,") set successfully to half the square root of 3.\n");}
 							mpd_qcopy(_sin45,_sqrt2div2,&status);
-							if((status&0xEFBF)==0)if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sin45,&status);outputDecimal("Sin(45deg)===Cos(45deg) (",_intermediateResult,") set successfully to half the square root of 2.\n");}
+							if((status&0xEFBF)==0)if(_intermediateResult){_intermediateResult->mpd=_sin45;outputDecimal("Sin(45deg)===Cos(45deg) (",_intermediateResult,") set successfully to half the square root of 2.\n");}
 							// done computing the constant values being used
 							while((status&0xEFBF)==0){
 								Msincoselement* _sincoselement=(Msincoselement*)calloc(1,sizeof(Msincoselement));
 								if(!_sincoselement){outputError("Failed to create the object to store the sine and cosine of a predefined angle");break;} // too bad
 								mpd_t *_angle=__mpd(mpd_context,0);
 								if(!_angle)break; // too bad as well
-								mpd_qmul_u32(_angle,_pidiv12,mult+1,mpd_context,&status);
+								mpd_qmul_u32(_angle,_pidiv12,mult,mpd_context,&status);
 								if((status&0xEFBF)!=0){free_mpd(_angle);outputError("Failed to initialize the angle of a predefined sine and cosine");break;}
 								// we've got all values so nothing can go wrong
-								_sincoselement->_input=_angle; // store the angle
-								switch(mult){
+								_sincoselement->_angle=_angle; // store the angle
+								_sincoselement->mult=mult;
+								if(_intermediateResult){
+									output("Sine and cosine of predefined angle #%" PRIu32,_sincoselement->mult);
+									_intermediateResult->mpd=_sincoselement->_angle;
+									outputDecimal(" (",_intermediateResult,"):");
+								}
+								switch(_sincoselement->mult){
 									case 0:_sincoselement->_sine=_cos90;_sincoselement->_cosine=_sin90;break; // 0 degrees
 									case 1:_sincoselement->_sine=_sin15;_sincoselement->_cosine=_cos15;break; // pi/12=15 degrees
 									case 2:_sincoselement->_sine=_sin30;_sincoselement->_cosine=_cos30;break; // pi/6=30 degrees
@@ -635,6 +642,10 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 									case 5:_sincoselement->_sine=_cos15;_sincoselement->_cosine=_sin15;break; // 5*pi/12=75 degrees
 									case 6:_sincoselement->_sine=_sin90;_sincoselement->_cosine=_cos90;break; // pi/2=90 degrees
 								}
+								if(_intermediateResult){
+									_intermediateResult->mpd=_sincoselement->_sine;outputDecimal(" '",_intermediateResult,"'");
+									_intermediateResult->mpd=_sincoselement->_cosine;outputDecimal(", '",_intermediateResult,"'.\n");
+								}
 								// remember
 								_sincoselement->_next=decimalcontext->_firstSincoselement;
 								decimalcontext->_firstSincoselement=_sincoselement;
@@ -642,9 +653,59 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 								if(mult==7)break;
 							}
 							if(mult<7)output("%sFailed to create %u out of 7 predefined (co)sines.\n",ERROR_PREFIX,6-mult);
-							free_mpd(_pidiv12);free_mpd(_sqrt2div2);free_mpd(_sqrt3div2);
+							free_mpd(_sqrt2div2);free_mpd(_sqrt3div2);
+							// how about computing the CORDIC sines and cosines?????????
+							uint32_t iteration=0;
+							// NOTE we can use _sin15 and _cos15 as starting point to adapt the approximations (yes, but _sin15 and _cos15 themselves cannot be consumed as they are used in predefined angle (co)sines)
+							mpd_t* _cordicsine=get_mpd_copy(mpd_context,_sin90),*_cordiccosine=get_mpd_copy(mpd_context,_cos90),*_cordictangent=__mpd(mpd_context,0),*_cordicangle=get_mpd_copy(mpd_context,_pidiv2);
+							if(!_cordicsine||!_cordiccosine||!_cordicangle||!_cordictangent)status=0xFFFFFFFF;
+							Msincoselement* _lastCordicElement=NULL;
+							while((status&0xEFBF)==0){
+								iteration++;
+								if(iteration==mpd_context->prec*10){outputLine("Computation of CORDIC angles aborted");break;}
+								mpd_qdiv_u32(_cordicangle,_cordicangle,2,mpd_context,&status); // divide the angle by 2
+								// we need the cosine to compute the sine of half the angle
+								// initially this cosine will equal _cos15 and we will use _cos15 to compute the new sine
+								mpd_qcopy(_cordicsine,_cordiccosine,&status);
+								mpd_qsub_u32(_cordicsine,_cordicsine,1,mpd_context,&status);mpd_set_positive(_cordicsine);mpd_qdiv_u32(_cordicsine,_cordicsine,2,mpd_context,&status);mpd_qsqrt(_cordicsine,_cordicsine,mpd_context,&status);
+								// _sin15 now represents the sine of half the angle using the cosine of the double angle
+								// now we adapt _cos15 to become the cosine of half the angle that we need for the next computation
+								mpd_qadd_u32(_cordiccosine,_cordiccosine,1,mpd_context,&status);mpd_qdiv_u32(_cordiccosine,_cordiccosine,2,mpd_context,&status);mpd_qsqrt(_cordiccosine,_cordiccosine,mpd_context,&status);
+								mpd_t* _sinsquared=_dsinsquared(mpd_context,_cordicangle); // compute the sine squared
+								if(!_sinsquared)break;
+								mpd_qsqrt(_sinsquared,_sinsquared,mpd_context,&status); // get the sine
+								if(mpd_qcmp(_cordicsine,_cordicangle,&status)==0){ // if the sine matches the angle we're done
+									free_mpd(_sinsquared);
+									_intermediateResult->mpd=_cordicangle;
+									outputDecimal("Angle at which the sine equals the angle: '",_intermediateResult,"'.");
+									break;
+								}
+								if(_intermediateResult){
+									output("CORDIC angle iteration #%" PRIu32 ":",iteration);
+									_intermediateResult->mpd=_cordicangle;
+									outputDecimal("Sine approximation of '",_intermediateResult,"': ");
+									_intermediateResult->mpd=_sinsquared;
+									outputDecimal(NULL,_intermediateResult,"'");
+									_intermediateResult->mpd=_cordicsine; // the 'true' value of the sine of half the previous CORDIC angle!!!
+									outputDecimal(" should equal: '",_intermediateResult,"'");
+									mpd_qdiv(_cordictangent,_cordicsine,_cordiccosine,mpd_context,&status);
+									_intermediateResult->mpd=_cordictangent;
+									outputDecimal(" with tangens: '",_intermediateResult,"'.\n");
+									if(mpd_iszero(_cordictangent)){free_mpd(_sinsquared);break;}
+								}
+								free_mpd(_sinsquared);
+								Msincoselement* _cordicElement=calloc(1,sizeof(Msincoselement));
+								if(!_cordicElement)break;
+								_cordicElement->_angle=get_mpd_copy(mpd_context,_cordicangle);
+								_cordicElement->_cosine=get_mpd_copy(mpd_context,_cordiccosine);
+								_cordicElement->_sine=get_mpd_copy(mpd_context,_cordicsine);
+								if(_lastCordicElement)_lastCordicElement->_next=_cordicElement;else decimalcontext->_firstCordicelement=_cordicElement;
+								_lastCordicElement=_cordicElement; // remember the last cordic element!!!!
+							}
+							free_mpd(_cordicangle);free_mpd(_cordiccosine);free_mpd(_cordicsine);free_mpd(_cordictangent);
 						}else
 							status=0xFFFFFFFF;
+						if(_intermediateResult){_intermediateResult->mpd=NULL;free_decimal(_intermediateResult);} // OOPS you gotta do this
 						if((status&0xEFBF)!=0){
 							if(status!=0xFFFFFFFF){
 								outputError("Failed to store predefined (co)sines in the decimal context");
@@ -1251,7 +1312,8 @@ mpd_t* _dsinorcos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence 
 // MDH@06AUG2019: if we want to be able to determine the nearest stored predefined sine/cosine angle
 typedef struct mpd_relative_angle{
 	Msincoselement* sincoselement;
-	mpd_t* _delta_angle;
+	mpd_t* _delta_angle; // the (positive) difference with the given sincoselement angle
+	bool negative; // whether or not a negative relative angle
 }mpd_relative_angle_t;
 
 void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle){
@@ -1260,36 +1322,131 @@ void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle){
 }
 mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* angle){
 	// ASSERT angle must be in [0,pi/2] that way there will always be two surrounding predefined angles
-	Msincoselement *sincoselement=decimalcontext->_firstSincoselement,*nextsincoselement;
-	mpd_t *_deltaAngle1=__mpd(decimalcontext->mpd_context,0),*_deltaAngle2=__mpd(decimalcontext->mpd_context,0);
-	if(_deltaAngle1&&_deltaAngle2){
-		uint32_t status=0;
-		mpd_relative_angle_t* _relativeAngle=CALLOC(1,sizeof(mpd_relative_angle_t),'A');
-		while(sincoselement){
-			nextsincoselement=sincoselement->_next;
-			mpd_qsub(_deltaAngle2,angle,nextsincoselement->_input,decimalcontext->mpd_context,&status);
-			if(!mpd_isnegative(_deltaAngle2)){ // angle not below the lower angle so we found the bounding angle interval
-				mpd_qsub(_deltaAngle1,sincoselement->_input,angle,decimalcontext->mpd_context,&status);
-				if(mpd_qcmp(_deltaAngle1,_deltaAngle2,&status)<0){ // deltaAngle1 is smaller than deltaAngle2 and wins
-					free_mpd(_deltaAngle2);
-					_relativeAngle->_delta_angle=_deltaAngle1;
-					mpd_set_negative(_relativeAngle->_delta_angle); // because angle is smaller we need to return a negative delta angle
-				}else{
-					free_mpd(_deltaAngle1);
-					sincoselement=nextsincoselement;
-					_relativeAngle->_delta_angle=_deltaAngle2;
-				}
-				break;
-			}
-			sincoselement=nextsincoselement;
+	if(decimalcontext&&angle){
+		Mdecimal* _intermediateResult=(amVerbose()?__decimal(decimalcontext->mpd_context,0,0):NULL);
+		if(_intermediateResult){
+			_intermediateResult->mpd=angle;
+			outputDecimal("Computing the relative angle of '",_intermediateResult,"'.\n");
 		}
-		if(sincoselement){
-			_relativeAngle->sincoselement=sincoselement;
-			return _relativeAngle;
-		}
+		mpd_t *_deltaAngle1=__mpd(decimalcontext->mpd_context,0),*_deltaAngle2=__mpd(decimalcontext->mpd_context,0);
+		if(_deltaAngle1&&_deltaAngle2){
+			mpd_relative_angle_t* _relativeAngle=CALLOC(1,sizeof(mpd_relative_angle_t),'A');
+			if(_relativeAngle){
+				uint32_t status=0;
+				Msincoselement *sincoselement=decimalcontext->_firstSincoselement;
+				if(sincoselement){
+					Msincoselement *nextsincoselement=NULL;
+					while(sincoselement){
+						nextsincoselement=sincoselement->_next;
+						if(nextsincoselement!=NULL){
+							if(_intermediateResult){
+								_intermediateResult->mpd=nextsincoselement->_angle;
+								outputDecimal("Checking whether the angle lies between ",_intermediateResult," and ");
+								_intermediateResult->mpd=sincoselement->_angle;
+								outputDecimal(NULL,_intermediateResult,".\n");
+							}
+							mpd_qsub(_deltaAngle2,angle,nextsincoselement->_angle,decimalcontext->mpd_context,&status);
+							if(!mpd_isnegative(_deltaAngle2)){ // angle not below the lower angle so we found the bounding angle interval
+								mpd_qsub(_deltaAngle1,sincoselement->_angle,angle,decimalcontext->mpd_context,&status);
+								if(mpd_qcmp(_deltaAngle1,_deltaAngle2,&status)<0){ // deltaAngle1 is smaller than deltaAngle2 and wins
+									free_mpd(_deltaAngle2);
+									_relativeAngle->_delta_angle=_deltaAngle1;
+									_relativeAngle->negative=true; // because angle is smaller we need to return a negative delta angle
+								}else{
+									free_mpd(_deltaAngle1);
+									sincoselement=nextsincoselement;
+									_relativeAngle->_delta_angle=_deltaAngle2;
+									_relativeAngle->negative=false; // because angle is smaller we need to return a negative delta angle
+								}
+								break;
+							}
+						}
+						sincoselement=nextsincoselement;
+					}
+					if(sincoselement){
+						_relativeAngle->sincoselement=sincoselement;
+						return _relativeAngle;
+					}
+				}else
+					outputError("No predefined angles");
+			}else
+				outputError("Failed to initialize the relative angle");
+		}else
+			outputError("Failed to prepare for computing the relative angle");
+		if(_intermediateResult){_intermediateResult->mpd=NULL;free_decimal(_intermediateResult);}
+		free_mpd(_deltaAngle1);free_mpd(_deltaAngle2);
 	}
-	free_mpd(_deltaAngle1);free_mpd(_deltaAngle2);
 	return NULL;
+}
+
+// MDH@11SEP2019: with CORDIC predefined sine and cosines we can approximate the sine/cosine of an angle under pi/2 by determining the CORDIC angles that sum up to the angle we want
+//                how can we make this function recursive????
+mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
+	// I guess an iterative procedure is better than a recursive procedure, because in a recursive procedure we have to keep passing the mpd_context...
+	// this means I can't get down but then the problem is that I can't do the rotations until I find all the constituent angles
+	// yes of course how many CORDIC angles do we have??????
+	// we can't start with the smallest we have to start with 45 degrees, then 22.5 degrees etc.
+	// if we have many of these angles we can use a big integer to store the booleans that determine whether or not to perform a rotation
+	mpd_context_t* mpd_context=decimalcontext->mpd_context;
+	Mdecimal* _intermediateResult=__decimal(mpd_context,0,0);
+	Mbiginteger *_applyRotationFlags=__biginteger(),*_rotationFlag=_getBiginteger(1);
+	Msincoselement* _cordicElement=decimalcontext->_firstCordicelement;
+	uint32_t status=0;
+	mpd_t* _xcopy=get_mpd_copy(mpd_context,x);
+	// as long as the remaining angle isn't zero keep going
+	// I guess I could do the rotation immediately?????
+	uint32_t count=0;
+	int comp;
+	while(!mpd_iszero(_xcopy)&&_cordicElement){
+		count++;
+		comp=mpd_qcmp(_cordicElement->_angle,_xcopy,&status);
+		if(_intermediateResult){
+			output("Result of comparing ");
+			_intermediateResult->mpd=_cordicElement->_angle;
+			outputDecimal(NULL,_intermediateResult," with ");
+			_intermediateResult->mpd=_xcopy;
+			outputDecimal(NULL,_intermediateResult,":");
+			output("%d.\n",comp);
+		}
+		if(comp<=0){
+			if(mp_add(_applyRotationFlags,_rotationFlag,_applyRotationFlags)!=MP_OKAY)status=0xFFFFFFFF;else mpd_qsub(_xcopy,_xcopy,_cordicElement->_angle,decimalcontext->mpd_context,&status);
+		}
+		if(mp_mul_2(_rotationFlag,_rotationFlag)!=MP_OKAY)status=0xFFFFFFFF;else outputBiginteger("Rotation flag: ",_rotationFlag,".\n");
+		_cordicElement=_cordicElement->_next;
+		if((status&0xEFBF)!=0)break;
+	}
+	free_mpd(_xcopy);
+	output("CORDIC rotation flags after checking %" PRIu32 " CORDIC angles",count);
+	outputBiginteger(": ",_applyRotationFlags,".\n");
+	// ok, rotation flags set, ready to perform the rotations based on the rotation flags if at least one is set
+	mpd_t *_t1=__mpd(mpd_context,0),*_t2=__mpd(mpd_context,0),*_t3=__mpd(mpd_context,0),*_t4=__mpd(mpd_context,0);
+	mpd_t *_resultsine=__mpd(decimalcontext->mpd_context,0),*_resultcosine=__mpd(decimalcontext->mpd_context,1); // starting at 0 degrees!!
+	_cordicElement=decimalcontext->_firstCordicelement;
+	while(mp_iszero(_applyRotationFlags)==MP_NO){ // as long as there are rotations to perform
+		if(mp_isodd(_applyRotationFlags)==MP_YES){ // an angle to be applied
+			// sin(a+b)=sin(a)cos(b)+cos(a)sin(b)=_t1+_t2
+			// cos(a+b)=cos(a)cos(b)-sin(a)sin(b)=_t3+_t4
+			if(_intermediateResult){
+				_intermediateResult->mpd=_cordicElement->_angle;
+				outputDecimal("Rotating by '",_intermediateResult,"' with ");
+				_intermediateResult->mpd=_cordicElement->_sine;
+				outputDecimal("sine: ",_intermediateResult," and ");
+				_intermediateResult->mpd=_cordicElement->_cosine;
+				outputDecimal("cosine: ",_intermediateResult,".\n");
+			}
+			mpd_qmul(_t1,_resultsine,_cordicElement->_cosine,mpd_context,&status);
+			mpd_qmul(_t2,_resultcosine,_cordicElement->_sine,mpd_context,&status);
+			mpd_qmul(_t3,_resultcosine,_cordicElement->_cosine,mpd_context,&status);
+			mpd_qmul(_t4,_resultsine,_cordicElement->_sine,mpd_context,&status);
+			mpd_qadd(_resultsine,_t1,_t2,mpd_context,&status);
+			mpd_qadd(_resultcosine,_t3,_t4,mpd_context,&status);
+		}
+		if(mp_div_2(_applyRotationFlags,_applyRotationFlags)!=MP_OKAY)status=0xFFFFFFFF; // divide by 2 i.e. shift right
+		_cordicElement=_cordicElement->_next;
+		if((status&0xEFBF)!=0)break;
+	}
+	if(_intermediateResult){_intermediateResult->mpd=NULL;free_mpd(_intermediateResult);}
+	return _resultsine;
 }
 
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
@@ -1356,12 +1513,80 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 						}else{
 							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
 							// looking up should return the nearest sincos element in the table
-							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x);
+							mpd_t* _CORDICsine=_getCORDICsine(decimalcontext,x->mpd);
+							if(_CORDICsine){
+								Mdecimal* _decimal=__decimal(mpd_context,0,0);
+								if(_decimal){
+									_decimal->mpd=_CORDICsine;
+									outputDecimal("CORDIC sine: '",_decimal,"'.\n");
+									_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+									free_decimal(_decimal);
+								}else
+									outputError("Failed to create a decimal for showing the CORDIC sine");
+							}
+							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x->mpd);
 							if(_relativeAngle){
-								//if(amVerbose()){
-									Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_relativeAngle->_delta_angle),mpd_context->prec,0,true);
-									if(_decimal){outputDecimal("Relative angle: '",_decimal,"'.\n");free_decimal(_decimal);}
-								//}
+								if(amVerbose()){
+									output("Relative angle: ");
+									Mdecimal* _decimal=__decimal(mpd_context,0,0);
+									if(_decimal){
+										_decimal->mpd=_relativeAngle->sincoselement->_angle;
+										outputDecimal(NULL,_decimal,NULL);
+										outputChar(_relativeAngle->negative?'-':'+');
+										_decimal->mpd=_relativeAngle->_delta_angle;
+										outputDecimal(NULL,_decimal,NULL);
+										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+										free_decimal(_decimal);
+									}else
+										outputChar('?');
+									outputLine(".");
+								}
+								// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
+								// which consists of two terms that need to be added or subtracted
+								mpd_t *_term1=get_mpd_copy(mpd_context,_relativeAngle->sincoselement->_sine),*_term2=get_mpd_copy(mpd_context,_relativeAngle->sincoselement->_cosine);
+								if(_term1&&_term2){
+									Mdecimal* _decimal=__decimal(mpd_context,0,0);
+									if(_decimal){
+										output("Predefined angle #%" PRIu32 ":",_relativeAngle->sincoselement->mult);
+										_decimal->mpd=_relativeAngle->sincoselement->_angle;outputDecimal("'",_decimal,"'");
+										_decimal->mpd=_term1;outputDecimal(" with cosine '",_decimal,"'");
+										_decimal->mpd=_term2;outputDecimal(" and sine '",_decimal,"'.\n");
+									}
+									// we still need the sine and cosine of the delta angle
+									// BUT in order to be able to compare the results we should I guess use the _dsinsquared 
+									mpd_t *_deltasin=__mpd(mpd_context,0),*_deltacos=__mpd(mpd_context,0);
+									if(_deltasin&&_deltacos){
+										mpd_t* _deltasinsquared=_dsinsquared(mpd_context,_relativeAngle->_delta_angle);
+										if(_deltasinsquared){
+											mpd_qsqrt(_deltasin,_deltasinsquared,mpd_context,&status);
+											mpd_qsub_u32(_deltasinsquared,_deltasinsquared,1,mpd_context,&status);mpd_set_positive(_deltasinsquared);
+											mpd_qsqrt(_deltacos,_deltasinsquared,mpd_context,&status);
+											// ready to 'rotate'
+											mpd_qmul(_term1,_term1,_deltacos,mpd_context,&status);
+											mpd_qmul(_term2,_term2,_deltasin,mpd_context,&status);
+											if(_decimal){_decimal->mpd=_term1;outputDecimal("First term: '",_decimal,"'.");_decimal->mpd=_term2;outputDecimal(" Second term: '",_decimal,"'.\n");_decimal->mpd=NULL;}
+											if(_relativeAngle->negative)mpd_qsub(_term1,_term1,_term2,mpd_context,&status);else mpd_qadd(_term1,_term1,_term2,mpd_context,&status);
+											if(_decimal){_decimal->mpd=_term1;outputDecimal("Relative angle sine: ",_decimal,".\n");}
+										}
+										free_mpd(_deltasinsquared);
+									}
+									free_mpd(_deltasin);free_mpd(_deltacos);
+									/* replacing:
+									mpd_sincos_t* _deltasinandcos=_dsinandcos(mpd_context,_relativeAngle->_delta_angle);
+									if(_deltasinandcos){
+										mpd_qmul(_term1,_term1,_deltasinandcos->cos,mpd_context,&status);
+										mpd_qmul(_term2,_term2,_deltasinandcos->sin,mpd_context,&status);
+										if(_decimal){_decimal->mpd=_term1;outputDecimal("First term: '",_decimal,"'.");_decimal->mpd=_term2;outputDecimal(" Second term: '",_decimal,"'.\n");_decimal->mpd=NULL;}
+										if(_relativeAngle->negative)mpd_qsub(_term1,_term1,_term2,mpd_context,&status);else mpd_qadd(_term1,_term1,_term2,mpd_context,&status);
+										if(_decimal){_decimal->mpd=_term1;outputDecimal("Relative angle sine: ",_decimal,".\n");}
+										free_mpd_sincos(_deltasinandcos);
+									}else
+										outputError("Failed to compute the sine and cosine of the relative angle");
+									*/
+									if(_decimal){_decimal->mpd=NULL;free_decimal(_decimal);}
+								}
+								free_mpd(_term1);free_mpd(_term2);
+
 							}else
 								outputError("Failed to compute the relative angle");
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
