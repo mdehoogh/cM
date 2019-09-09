@@ -1439,7 +1439,7 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 			mpd_qmul(_t3,_resultcosine,_cordicElement->_cosine,mpd_context,&status);
 			mpd_qmul(_t4,_resultsine,_cordicElement->_sine,mpd_context,&status);
 			mpd_qadd(_resultsine,_t1,_t2,mpd_context,&status);
-			mpd_qadd(_resultcosine,_t3,_t4,mpd_context,&status);
+			mpd_qsub(_resultcosine,_t3,_t4,mpd_context,&status);
 		}
 		if(mp_div_2(_applyRotationFlags,_applyRotationFlags)!=MP_OKAY)status=0xFFFFFFFF; // divide by 2 i.e. shift right
 		_cordicElement=_cordicElement->_next;
