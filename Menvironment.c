@@ -782,7 +782,9 @@ bool registerInternalFunctions(Menvironment* const _environment){
     // variable functions
     // math functions
     if(!completedRealFunction(_getFunction(_environment,"cos"),"cos",Mcos))return false;
+    if(!completedRealFunction(_getFunction(_environment,"cordiccos"),"cordiccos",Mcordiccos))return false;
     if(!completedRealFunction(_getFunction(_environment,"sin"),"sin",Msin))return false;
+    if(!completedRealFunction(_getFunction(_environment,"cordicsin"),"cordicsin",Mcordicsin))return false;
     if(!completedRealFunction(_getFunction(_environment,"tan"),"tan",Mtan))return false;
     if(!completedRealFunction(_getFunction(_environment,"cosh"),"cosh",Mcosh))return false;
     if(!completedRealFunction(_getFunction(_environment,"sinh"),"sinh",Msinh))return false;

@@ -36,7 +36,7 @@ Mdecimal* __adecimal(); // returning a completely blank decimal (e.g. to be used
 Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repeating); // pass in NULL for mpd_context to use the application-wide decimal context!!
 // TODO if we call _getDecimal with mpd we won't know the precision of the decimal (as that is not contained in an mpd_t instance), therefore we need to change _getDecimal somehow!!!
 // DONE I've added the prec parameter because mpd_t itself does not store the precision used to compute this decimal
-Mdecimal* _getDecimal(mpd_t* mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure);
+Mdecimal* _getDecimal(const mpd_t* const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure);
 
 Mdecimal* _getDecimalCopy(Mdecimal* decimal);
 
@@ -48,7 +48,10 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext);
 
 // ONE ARGUMENT MATH FUNCTIONS
 Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
+Mdecimal* _dcordicsine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
 Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
+Mdecimal* _dcordiccosine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
+
 Mdecimal* _dexp(const Mdecimalcontext* decimalcontext,Mdecimal* x);
 
 // CONVERSION

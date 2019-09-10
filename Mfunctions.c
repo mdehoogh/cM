@@ -182,6 +182,38 @@ Mvalue* Msin(Mvalue* _value){
     }
     return NULL;
 }/* NOT VALIDATED */
+Mvalue* Mcordicsin(Mvalue* _value){
+    if(_value){
+        if(amVerbose()){outputValue("Applying cordicsin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
+        /* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
+        if(_value->type==VT_REAL)return _getRealValue(sinl(_value->value._real->ld));
+        if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
+        */
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin),true);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin),true);
+        if(_value->type==VT_DECIMAL){
+            Mdecimal* _cordicsineDecimal=_dcordicsine(NULL,_value->value._decimal); // match the precision as used by the argument
+            if(_cordicsineDecimal)return _getDecimalValue(_cordicsineDecimal,true);
+        }
+    }
+    return NULL;
+}/* NOT VALIDATED */
+Mvalue* Mcordiccos(Mvalue* _value){
+    if(_value){
+        if(amVerbose()){outputValue("Applying cordiccos() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
+        /* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
+        if(_value->type==VT_REAL)return _getRealValue(sinl(_value->value._real->ld));
+        if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
+        */
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin),true);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin),true);
+        if(_value->type==VT_DECIMAL){
+            Mdecimal* _cordiccosineDecimal=_dcordiccosine(NULL,_value->value._decimal); // match the precision as used by the argument
+            if(_cordiccosineDecimal)return _getDecimalValue(_cordiccosineDecimal,true);
+        }
+    }
+    return NULL;
+}/* NOT VALIDATED */
 
 Mvalue* Mcos(Mvalue*  _value){
     if(_value){

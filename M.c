@@ -2971,6 +2971,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}
 							}
+							//////outputValue("Function call value '",functionCallValue,"'.\n");
 							assignValue(&_valueReference->_value,functionCallValue);
 							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
@@ -5352,7 +5353,7 @@ int main(int argc, char **argv){
 										if(newInputChar){
 											// MDH@14AUG2019: commandCharacterAccepted() will remove the same character if matching parenthesis that was consumed just now unless we tell commandCharacterAccepted not to do that, so we add an additional argument
 											// MDH@24APR2019: commandLength()--;
-											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true,true))
+											if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true,false))
 												inputCharType=switchToControlMode("Suggested character extracted, but not accepted.");
 										}else
 											inputCharType=switchToControlMode("Suggested character not extracted!");

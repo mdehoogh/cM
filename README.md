@@ -13,7 +13,7 @@ That's mainly due to the fact that I wanted to be able to use big integers, then
 For big integers I use the (sources of the) tommath library, and for decimals (the sources of) the mpdecimal library (as used in Python 3), the rationals I do myself.
 
 Right now I'm working on implementing sine and cosine functions to work with decimals, as somehow mpdecimal doesn't do that (although it does square root much appreciated thanks), that's kinda fun.
-Interestingly, given the sine and cosine identity relationship, you might not need to have to use series at all to compute them.
+Interestingly, given the sine and cosine identity relationship, you might not need to have to use series at all to compute them (or other fancy approximation formulas).
 The interesting equalities are the sin(a+b), and the sin(a/2). Now, knowing the sine and cosine of 45 degrees and 30 degrees I suppose you can compute the sine and cosine of any angle (under 90 degrees which is all we need btw).
 
 With 45 you can get 22.5 etc. etc. etc. as small as you'd want them to be. Obviously, with any given angle you just have to find the sequence of pluses and minuses of these elementary angles that you know the sine and cosines of,

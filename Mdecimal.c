@@ -91,10 +91,10 @@ bool isDecimalOne(Mdecimal* _decimal){
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
 Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
-    Mstring* _decimalText=NULL;
-    if(_decimal){
-        _decimalText=__string();
-        if(_decimalText){
+    Mstring* _decimalText=__string();
+    if(_decimalText){
+		if(_decimal&&_decimal->mpd){
+			/////////outputChar('D');
             Mstring* _p=_decimalText;
             // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
             // NOTE if _decimal->repeating always use fixed-point notation
@@ -110,8 +110,9 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
             }else
                 _p=NULL;
             if(!_p){free_string(_decimalText);_decimalText=NULL;}
-        }
-    }
+        }else
+			string_append_char(_decimalText,'?');
+    }else outputChar('?');
     return _decimalText;
 }/* VALIDATED */
 
@@ -414,10 +415,15 @@ Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repe
 /**
  * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
  */
-Mdecimal* _getDecimal(mpd_t* mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){
-    if(!mpd)return NULL; // can do this as won't have to free mpd anyway
+Mdecimal* _getDecimal(const mpd_t* const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){
+    if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
     Mdecimal* _decimal=__adecimal(); // always using the default decimal context
-    if(_decimal){_decimal->mpd=mpd;_decimal->prec=prec;}else if(freeonfailure)free_mpd(mpd);
+    if(_decimal){
+		////////output("Wrapping decimal with precision %u.\n",prec);
+		_decimal->mpd=_mpd;_decimal->prec=prec;_decimal->repeating=repeating;
+		////////output("Decimal with precision %u wrapped.\n",prec);
+	}else
+	if(freeonfailure)free_mpd(_mpd);
     return _decimal;
 }/* VALIDATED */
 
@@ -657,12 +663,12 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 							// how about computing the CORDIC sines and cosines?????????
 							uint32_t iteration=0;
 							// NOTE we can use _sin15 and _cos15 as starting point to adapt the approximations (yes, but _sin15 and _cos15 themselves cannot be consumed as they are used in predefined angle (co)sines)
-							mpd_t* _cordicsine=get_mpd_copy(mpd_context,_sin90),*_cordiccosine=get_mpd_copy(mpd_context,_cos90),*_cordictangent=__mpd(mpd_context,0),*_cordicangle=get_mpd_copy(mpd_context,_pidiv2);
+							mpd_t *_cordicsine=get_mpd_copy(mpd_context,_sin90),*_cordiccosine=get_mpd_copy(mpd_context,_cos90),*_cordictangent=__mpd(mpd_context,0),*_cordicangle=get_mpd_copy(mpd_context,_pidiv2);
 							if(!_cordicsine||!_cordiccosine||!_cordicangle||!_cordictangent)status=0xFFFFFFFF;
 							Msincoselement* _lastCordicElement=NULL;
 							while((status&0xEFBF)==0){
 								iteration++;
-								if(iteration==mpd_context->prec*10){outputLine("Computation of CORDIC angles aborted");break;}
+								if(iteration==mpd_context->prec*10){outputLine("Computation of CORDIC angles stopped when exceeding the maximum number of iterations.");break;}
 								mpd_qdiv_u32(_cordicangle,_cordicangle,2,mpd_context,&status); // divide the angle by 2
 								// we need the cosine to compute the sine of half the angle
 								// initially this cosine will equal _cos15 and we will use _cos15 to compute the new sine
@@ -674,12 +680,17 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 								mpd_t* _sinsquared=_dsinsquared(mpd_context,_cordicangle); // compute the sine squared
 								if(!_sinsquared)break;
 								mpd_qsqrt(_sinsquared,_sinsquared,mpd_context,&status); // get the sine
+								// NOTE apparently breaking on the CORDIC sine to match the CORDIC angle is not happening, so let's not check on that!!!!
+								/*
 								if(mpd_qcmp(_cordicsine,_cordicangle,&status)==0){ // if the sine matches the angle we're done
 									free_mpd(_sinsquared);
-									_intermediateResult->mpd=_cordicangle;
-									outputDecimal("Angle at which the sine equals the angle: '",_intermediateResult,"'.");
+									if(_intermediateResult){
+										_intermediateResult->mpd=_cordicangle;
+										outputDecimal("Angle at which the sine equals the angle: '",_intermediateResult,"'.");
+									}
 									break;
 								}
+								*/
 								if(_intermediateResult){
 									output("CORDIC angle iteration #%" PRIu32 ":",iteration);
 									_intermediateResult->mpd=_cordicangle;
@@ -688,14 +699,18 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 									outputDecimal(NULL,_intermediateResult,"'");
 									_intermediateResult->mpd=_cordicsine; // the 'true' value of the sine of half the previous CORDIC angle!!!
 									outputDecimal(" should equal: '",_intermediateResult,"'");
-									mpd_qdiv(_cordictangent,_cordicsine,_cordiccosine,mpd_context,&status);
+								}
+								mpd_qdiv(_cordictangent,_cordicsine,_cordiccosine,mpd_context,&status);
+								if(_intermediateResult){
 									_intermediateResult->mpd=_cordictangent;
 									outputDecimal(" with tangens: '",_intermediateResult,"'.\n");
-									if(mpd_iszero(_cordictangent)){free_mpd(_sinsquared);break;}
+									// a ha _intermediateResult will break on a tangent that is zero, whereas otherwise it will not break!!!!
 								}
 								free_mpd(_sinsquared);
+								// done if the CORDIC tangens equals zero!!!!
+								if(mpd_iszero(_cordictangent))break;
 								Msincoselement* _cordicElement=calloc(1,sizeof(Msincoselement));
-								if(!_cordicElement)break;
+								if(!_cordicElement){outputError("Failed to create a CORDIC element.");break;}
 								_cordicElement->_angle=get_mpd_copy(mpd_context,_cordicangle);
 								_cordicElement->_cosine=get_mpd_copy(mpd_context,_cordiccosine);
 								_cordicElement->_sine=get_mpd_copy(mpd_context,_cordicsine);
@@ -1379,6 +1394,272 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* a
 	return NULL;
 }
 
+// MDH@12SEP2019: instead of first determining the rotations to do, and then doing them, we can immediately perform the rotation
+mpd_t* _getCORDICsinorcos(Mdecimalcontext* decimalcontext,mpd_t* x,bool sin){
+	// I guess an iterative procedure is better than a recursive procedure, because in a recursive procedure we have to keep passing the mpd_context...
+	// this means I can't get down but then the problem is that I can't do the rotations until I find all the constituent angles
+	// yes of course how many CORDIC angles do we have??????
+	// we can't start with the smallest we have to start with 45 degrees, then 22.5 degrees etc.
+	// if we have many of these angles we can use a big integer to store the booleans that determine whether or not to perform a rotation
+	mpd_context_t* mpd_context=decimalcontext->mpd_context;
+	Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+	uint32_t status=0;
+	mpd_t* _xcopy=get_mpd_copy(mpd_context,x);
+	// as long as the remaining angle isn't zero keep going
+	// I guess I could do the rotation immediately?????
+	uint32_t count=0;
+	int comp;
+	// the decimals we need for actually keeping track of the intermediate rotation results
+	mpd_t *_t1=__mpd(mpd_context,0),*_t2=__mpd(mpd_context,0),*_t3=__mpd(mpd_context,0),*_t4=__mpd(mpd_context,0);
+	mpd_t *_resultcosine=__mpd(mpd_context,1),*_resultsine=__mpd(mpd_context,0); // starting at 0 degrees!!
+	Msincoselement* _cordicElement=decimalcontext->_firstCordicelement;
+	while(_xcopy&&!mpd_iszero(_xcopy)&&_cordicElement){
+		count++;
+		comp=mpd_qcmp(_cordicElement->_angle,_xcopy,&status);
+		if(_intermediateResult){
+			output("Result of comparing ");
+			_intermediateResult->mpd=_cordicElement->_angle;
+			outputDecimal(NULL,_intermediateResult," with ");
+			_intermediateResult->mpd=_xcopy;
+			outputDecimal(NULL,_intermediateResult,":");
+			output("%d.\n",comp);
+		}
+		if(comp<=0){ // we have to do a rotation by the CORDIC angle
+			mpd_qsub(_xcopy,_xcopy,_cordicElement->_angle,mpd_context,&status); // subtract the CORDIC angle from the angle left to rotate to
+			// sin(a+b)=sin(a)cos(b)+cos(a)sin(b)=_t1+_t2
+			// cos(a+b)=cos(a)cos(b)-sin(a)sin(b)=_t3+_t4
+			mpd_qmul(_t1,_resultsine,_cordicElement->_cosine,mpd_context,&status);
+			mpd_qmul(_t2,_resultcosine,_cordicElement->_sine,mpd_context,&status);
+			mpd_qmul(_t3,_resultcosine,_cordicElement->_cosine,mpd_context,&status);
+			mpd_qmul(_t4,_resultsine,_cordicElement->_sine,mpd_context,&status);
+			mpd_qadd(_resultsine,_t1,_t2,mpd_context,&status);
+			mpd_qsub(_resultcosine,_t3,_t4,mpd_context,&status);
+			if(_intermediateResult){
+				_intermediateResult->mpd=_cordicElement->_angle;
+				outputDecimal("Rotating by CORDIC angle '",_intermediateResult,"' with ");
+				_intermediateResult->mpd=_cordicElement->_sine;
+				outputDecimal("sine ",_intermediateResult," and ");
+				_intermediateResult->mpd=_cordicElement->_cosine;
+				outputDecimal("cosine ",_intermediateResult,NULL);
+				_intermediateResult->mpd=_resultsine;
+				outputDecimal(" giving result sine: ",_intermediateResult,".\n");
+			}
+		}
+		_cordicElement=_cordicElement->_next;
+		if((status&0xEFBF)!=0){free_mpd(_resultsine);_resultsine=NULL;break;}
+	}
+	free_mpd(_xcopy);
+	free_mpd(_t1);free_mpd(_t2);free_mpd(_t3);free_mpd(_t4);if(sin)free_mpd(_resultcosine);else free_mpd(_resultsine); // OOPS forgotten below
+	if(_intermediateResult){_intermediateResult->mpd=NULL;free_decimal(_intermediateResult);}
+	return(sin?_resultsine:_resultcosine);
+}
+// for testing it's a good idea to be able to ask for the CORDIC sine
+Mdecimal* _dcordicsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+	if(x){
+		// use the same decimal context as used by x
+		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		if(decimalcontext){
+			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			if(!decimalcontext->pi)free_decimal(pi_decimal(decimalcontext)); // compute and immediately free the returned copy
+			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
+			if(mpd_context){
+				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				uint32_t status=0;
+				mpd_t* _absx=NULL;
+				if(mpd_isnegative(x->mpd)){
+					_absx=__mpd(mpd_context,0);
+					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
+					if(!_absx){outputError("Failed to negate the decimal to compute the CORDIC sine of");return NULL;}
+					if(amVerbose())outputLine("Computing the CORDIC sine of a negative decimal.");
+				}
+				mpd_t* _CORDICsine=NULL;
+				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
+				mpd_t *_xmod=__mpd(mpd_context,0),*_xtemp=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
+				if(_xtemp&&_xmod&&_xquadrant){
+					// normalize x to the range [0,2*pi)
+					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
+					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized CORDIC sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
+					// determine the quadrant by dividing the normalized x by pi/2
+					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
+					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					if(amVerbose()){outputDecimal("Quadrant of CORDIC sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if((status&0xEFBF)!=0){
+						outputError("Failed to compute the CORDIC sine of a decimal");
+						report_mpd_status(status);
+					}else{
+						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
+						mpd_t* _xsin=NULL;
+						if(xquadrant!=0){
+							sin=false;
+							_xsin=__mpd(mpd_context,0);
+							if(_xsin){
+								if(xquadrant==1)
+									mpd_qsub(_xsin,decimalcontext->pi,_xmod,mpd_context,&status);
+								else
+								if(xquadrant==2)
+									mpd_qsub(_xsin,_xmod,decimalcontext->pi,mpd_context,&status);
+								else
+									mpd_qsub(_xsin,decimalcontext->pimul2,_xmod,mpd_context,&status);
+							}else
+								status=0xFFFFFFFF;
+						}
+						/*
+						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){ // the remainder (in [0,pi/2) is above pi/4
+							sin=false;
+							_xcos=__mpd(mpd_context,0);
+							if(_xcos)mpd_qsub(_xcos,decimalcontext->pidiv2,_xmod,mpd_context,&status);
+						}
+						*/
+						if((status&0xEFBF)!=0){
+							outputError("Failed to compute the CORDIC sine of a decimal");
+							if(status!=0xFFFFFFFF)report_mpd_status(status);
+						}else{
+							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
+							// looking up should return the nearest sincos element in the table
+							_CORDICsine=_getCORDICsinorcos(decimalcontext,(sin?_xmod:_xsin),true);
+							///*
+							if(_CORDICsine){
+								if((_absx!=NULL)!=(xquadrant==2||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
+									if(amVerbose())outputLine("Negating the computed CORDIC sine!");
+									mpd_set_negative(_CORDICsine); // negate the _sine
+								}else
+								if(amVerbose())outputLine("Not negating the CORDIC sine!");
+								if(amVerbose()){
+									Mdecimal* _decimal=__decimal(mpd_context,0,0);
+									if(_decimal){
+										_decimal->mpd=_CORDICsine;
+										outputDecimal("CORDIC sine: '",_decimal,"'.\n");
+										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+										free_decimal(_decimal);
+									}else
+										outputError("Failed to create a decimal for showing the CORDIC sine");
+								}
+							}else
+								outputError("Failed to compute the CORDIC sine of the normalized decimal");
+						}
+						// free whatever we created...
+						if(_xsin)free_mpd(_xsin);
+					}
+				}else
+					outputError("Failed to create helper decimals for computing the CORDIC sine of a decimal");
+				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
+				if(_absx)free_mpd(_absx);
+				if(_CORDICsine){
+					////////output("Returning the CORDIC decimal.\n");
+					return _getDecimal(_CORDICsine,mpd_context->prec,0,true);
+				}
+			}
+		}
+		outputError("No decimal context to compute the CORDIC sine of a decimal in");
+	}else
+		outputError("No decimal to compute the CORDIC sine of");
+	return NULL;
+}
+Mdecimal* _dcordiccosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+	if(x){
+		// use the same decimal context as used by x
+		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		if(decimalcontext){
+			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			if(!decimalcontext->pi)free_decimal(pi_decimal(decimalcontext)); // compute and immediately free the returned copy
+			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
+			if(mpd_context){
+				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				uint32_t status=0;
+				mpd_t* _absx=NULL;
+				if(mpd_isnegative(x->mpd)){
+					_absx=__mpd(mpd_context,0);
+					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
+					if(!_absx){outputError("Failed to negate the decimal to compute the CORDIC cosine of");return NULL;}
+					if(amVerbose())outputLine("Computing the CORDIC cosine of a negative decimal.");
+				}
+				mpd_t* _CORDICcosine=NULL;
+				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
+				mpd_t *_xmod=__mpd(mpd_context,0),*_xtemp=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
+				if(_xtemp&&_xmod&&_xquadrant){
+					// normalize x to the range [0,2*pi)
+					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
+					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized CORDIC cosine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
+					// determine the quadrant by dividing the normalized x by pi/2
+					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
+					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					if(amVerbose()){outputDecimal("Quadrant of CORDIC cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if((status&0xEFBF)!=0){
+						outputError("Failed to compute the CORDIC cosine of a decimal");
+						report_mpd_status(status);
+					}else{
+						bool cos=true; // whether to compute the sine or cosine (of the transformed angle)
+						mpd_t* _xcos=NULL;
+						if(xquadrant!=0){
+							cos=false;
+							_xcos=__mpd(mpd_context,0);
+							if(_xcos){
+								if(xquadrant==1)
+									mpd_qsub(_xcos,decimalcontext->pi,_xmod,mpd_context,&status);
+								else
+								if(xquadrant==2)
+									mpd_qsub(_xcos,_xmod,decimalcontext->pi,mpd_context,&status);
+								else
+									mpd_qsub(_xcos,decimalcontext->pimul2,_xmod,mpd_context,&status);
+							}else
+								status=0xFFFFFFFF;
+						}
+						/*
+						if(mpd_qcmp(_xmod,decimalcontext->pidiv4,&status)>0){ // the remainder (in [0,pi/2) is above pi/4
+							sin=false;
+							_xcos=__mpd(mpd_context,0);
+							if(_xcos)mpd_qsub(_xcos,decimalcontext->pidiv2,_xmod,mpd_context,&status);
+						}
+						*/
+						if((status&0xEFBF)!=0){
+							outputError("Failed to compute the CORDIC cosine of a decimal");
+							if(status!=0xFFFFFFFF)report_mpd_status(status);
+						}else{
+							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
+							// looking up should return the nearest sincos element in the table
+							_CORDICcosine=_getCORDICsinorcos(decimalcontext,(cos?_xmod:_xcos),false);
+							///*
+							if(_CORDICcosine){
+								if(xquadrant==1||xquadrant==2){
+									if(amVerbose())outputLine("Negating the computed CORDIC cosine!");
+									mpd_set_negative(_CORDICcosine); // negate the _sine
+								}else
+								if(amVerbose())outputLine("Not negating the CORDIC cosine!");
+								if(amVerbose()){
+									Mdecimal* _decimal=__decimal(mpd_context,0,0);
+									if(_decimal){
+										_decimal->mpd=_CORDICcosine;
+										outputDecimal("CORDIC cosine: '",_decimal,"'.\n");
+										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+										free_decimal(_decimal);
+									}else
+										outputError("Failed to create a decimal for showing the CORDIC cosine");
+								}
+							}else
+								outputError("Failed to compute the CORDIC cosine of the normalized decimal");
+						}
+						// free whatever we created...
+						if(_xcos)free_mpd(_xcos);
+					}
+				}else
+					outputError("Failed to create helper decimals for computing the CORDIC cosine of a decimal");
+				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
+				if(_absx)free_mpd(_absx);
+				if(_CORDICcosine){
+					////////output("Returning the CORDIC decimal.\n");
+					return _getDecimal(_CORDICcosine,mpd_context->prec,0,true);
+				}
+			}
+		}
+		outputError("No decimal context to compute the CORDIC cosine of a decimal in");
+	}else
+		outputError("No decimal to compute the CORDIC cosine of");
+	return NULL;
+}
+
+/* replacing:
 // MDH@11SEP2019: with CORDIC predefined sine and cosines we can approximate the sine/cosine of an angle under pi/2 by determining the CORDIC angles that sum up to the angle we want
 //                how can we make this function recursive????
 mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
@@ -1448,7 +1729,7 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 	if(_intermediateResult){_intermediateResult->mpd=NULL;free_mpd(_intermediateResult);}
 	return _resultsine;
 }
-
+*/
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
 Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
@@ -1513,16 +1794,17 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 						}else{
 							// if we want to use sine/cosine formulas using the predefined sine/cosine table we have to find the smallest difference with any of the predefined angles
 							// looking up should return the nearest sincos element in the table
-							mpd_t* _CORDICsine=_getCORDICsine(decimalcontext,x->mpd);
+							mpd_t* _CORDICsine=_getCORDICsinorcos(decimalcontext,x->mpd,true);
 							if(_CORDICsine){
-								Mdecimal* _decimal=__decimal(mpd_context,0,0);
+								Mdecimal* _decimal=(amVerbose()?__decimal(mpd_context,0,0):NULL);
 								if(_decimal){
 									_decimal->mpd=_CORDICsine;
 									outputDecimal("CORDIC sine: '",_decimal,"'.\n");
 									_decimal->mpd=NULL; // so it won't get freed by free_decimal()
 									free_decimal(_decimal);
 								}else
-									outputError("Failed to create a decimal for showing the CORDIC sine");
+								if(amVerbose())outputError("Failed to create a decimal for showing the CORDIC sine");
+								free_mpd(_CORDICsine);
 							}
 							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x->mpd);
 							if(_relativeAngle){
@@ -1545,7 +1827,7 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 								// which consists of two terms that need to be added or subtracted
 								mpd_t *_term1=get_mpd_copy(mpd_context,_relativeAngle->sincoselement->_sine),*_term2=get_mpd_copy(mpd_context,_relativeAngle->sincoselement->_cosine);
 								if(_term1&&_term2){
-									Mdecimal* _decimal=__decimal(mpd_context,0,0);
+									Mdecimal* _decimal=(amVerbose()?__decimal(mpd_context,0,0):NULL);
 									if(_decimal){
 										output("Predefined angle #%" PRIu32 ":",_relativeAngle->sincoselement->mult);
 										_decimal->mpd=_relativeAngle->sincoselement->_angle;outputDecimal("'",_decimal,"'");
@@ -1586,7 +1868,7 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 									if(_decimal){_decimal->mpd=NULL;free_decimal(_decimal);}
 								}
 								free_mpd(_term1);free_mpd(_term2);
-
+								free_mpd_relative_angle(_relativeAngle);
 							}else
 								outputError("Failed to compute the relative angle");
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits

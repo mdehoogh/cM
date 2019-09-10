@@ -246,8 +246,9 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 }// VALIDATED 
 */
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
-    if(!_decimal)return NULL;
+    if(!_decimal){outputLine("No decimal to wrap.");return NULL;}
     Mvalue* _decimalValue=__value();
+    //////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
     if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
     return _decimalValue;
 }/* VALIDATED */
@@ -860,10 +861,10 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
 Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
 	Mstring* valueText=NULL;
-    //////outputChar('.');
+    ////outputChar('.');
 	if(_value){
-        ////////outputChar('+');
-		//////output("TYPE: %d\n",_value->type);
+        ////outputChar('+');
+		////output("TYPE: %d\n",_value->type);
 		switch(_value->type){
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
             case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????
@@ -892,7 +893,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 		}
 	}
     if(valueText)if(amAssisting())valueText=appendll(string_append_char(valueText,'#'),_value->count); // show the reference count as well
-    ////////outputChar('.');
+    /////outputChar('.');
     return(valueText?valueText:_getUndefinedValueText());
     /* replacing:
     if(valueText)return valueText;
