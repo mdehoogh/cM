@@ -596,13 +596,96 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 						status=0xFFFFFFFF;
 					if((status&0xEFBF)==0){
 						decimalcontext->pi=_pi;decimalcontext->pidiv2=_pidiv2;decimalcontext->pidiv4=_pidiv4;decimalcontext->pimul2=_pimul2;
+
+						// MDH@11SEP2019: so far I've used 15, 30, 45, 60, 75 and 90 as relative angles of which the sine/cosine is known or exactly computable (although depending on the sqrt decimal function)
+						//                but we used halving of the angle and the formulas for that to compute the CORDIC angles
+						//                NOTE that doubling the angle does not require taking square roots
+						//                what I want to do is precompute a number of equidistant (co)sines, if we start at a certain granularity
+						//                for the sine 30 degrees has a unique sine (1/2), for the cosine that's 60 degrees, obviously we can compute the cosines from the sine and back
+						//                halving these 'exact' sine angles will require square rooting a number of times unless we store the squares?????
+						//                some analysis told me that if we keep halving x times we end up with x constituent binary angles that can be binary encoded as: 1000000, 01000000, 00100000, 00010000, ..., 00000001
+						//                for any multiple of the smallest angle you'd get x bits and you will need to perform y-1 rotations using the original known sines where y is the number of set bits
+						//                this means you can store a fixed number of sines easily in a table with 2^x entries, so we get mpd_t[257] predefinedsines for storing all sines we'll be needing from 0 degrees in predefinedsines[0]
+						//                and sine of pi/2 in predefinedsines[256], any angle you get divide by 256 to get the entry to use in the predefined table!!!
 						// ok, we're going to store some predefined sine/cosines
 						// in particular all multiples of pi/12 below pi, NOTE that the sine/cosine of 0 does not need to be stored as that can't help us speed up sine/cosine computation
 						// we start with pi/12 and then up to 6*pi/12, so we'd have in total 6 predefined sine/cosines
+
 						mpd_t *_pidiv12=get_mpd_copy(mpd_context,_pi),*_sqrt2div2=__mpd(mpd_context,2),*_sqrt3div2=__mpd(mpd_context,3);
 						// some values only need to be computed once but are used twice in the table, by precomputing them a reference is stored in the table so we won't have to free them
 						// we can use _sin90 when we need 1 in computations
 						Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+						
+						// MDH@11SEP2019: computing the predefined sines means starting with the sine of 90 degrees 
+						mpd_t *_0=__mpd(mpd_context,0),*_1=__mpd(mpd_context,1),*_predefined=__mpd(mpd_context,0),*_rotationsine=__mpd(mpd_context,0),*_rotationcosine=__mpd(mpd_context,0),*_t1=__mpd(mpd_context,0),*_t2=__mpd(mpd_context,0),*_t3=__mpd(mpd_context,0),*_t4=__mpd(mpd_context,0);
+						decimalcontext->predefinedsinedeltaangle=__mpd(mpd_context,0);
+						if(decimalcontext->predefinedsinedeltaangle&&_0&&_1&&_predefined&&_rotationsine&&_rotationcosine&&_t1&&_t2&&_t3&&_t4){
+							if(_intermediateResult)outputLine("Precomputing 257 equidistant sines in [0,pi/2].");
+							for(int index=256;index>=0;index--)decimalcontext->predefinedsines[index]=__mpd(mpd_context,0); // create all 257 predefined sines instances...
+							// initialize the first and last sine
+							mpd_qcopy(decimalcontext->predefinedsines[256],_1,&status);mpd_qcopy(decimalcontext->predefinedsines[0],_0,&status);
+							if(_intermediateResult)outputLine("Predefined sine of 0 and pi/2 radians set.");
+							// now we can half index and use the predefined sine and cosine to compute the new sine and cosine
+							int16_t index=256;
+							// store pi/512 or (pi/2)/256 in the predefinedsinedeltaangle!!!
+							mpd_qdiv_u32(decimalcontext->predefinedsinedeltaangle,decimalcontext->pidiv2,256,mpd_context,&status);
+							while(1){
+								// copy the cosine of the predefined angle at position index
+								mpd_qcopy(_predefined,decimalcontext->predefinedsines[256-index],&status);
+								// subtract 1 and switch the sign from negative to positive
+								mpd_qsub_i32(_predefined,_predefined,1,mpd_context,&status);mpd_set_positive(_predefined);
+								// divide by 2
+								mpd_qdiv_i32(_predefined,_predefined,2,mpd_context,&status);
+								// _predefined now equals the square of the sine we want to store
+								index>>=1; // half the index
+								if(!index)break;
+								mpd_qsqrt(decimalcontext->predefinedsines[index],_predefined,mpd_context,&status); // take the square root of the square of the sine (thus the sine) and store it in the table
+								if(_intermediateResult){output("Constituent predefined sine #%" PRIu16 ":",index);_intermediateResult->mpd=decimalcontext->predefinedsines[index];outputDecimal(" ",_intermediateResult,".\n");}
+								// let's compute the cosine as well, well actually the sine of (pi-(index)/256)/2 to store at the other side of the table (64->192, 32->234, etc), that will be used as cosine of the angle pi/2-x
+								if(index!=128){
+									mpd_qsub_i32(_predefined,_predefined,1,mpd_context,&status);mpd_set_positive(_predefined);
+									mpd_qsqrt(decimalcontext->predefinedsines[256-index],_predefined,mpd_context,&status); // take the square root of the square of the cosine (thus the cosine) and store it in the table
+									if(_intermediateResult){output("Constituent predefined sine #%" PRIu16 ":",256-index);_intermediateResult->mpd=decimalcontext->predefinedsines[256-index];outputDecimal(" ",_intermediateResult,".\n");}
+								}
+							}
+							if(_intermediateResult)outputLine("Constituent predefined sines computed!");
+							// now we know all the initial predefined sines and cosines that we may now use to compute all sines in between
+							uint16_t rotationindex,inbetweenindex=128,skipindex=64;
+							// from 127 through 3 that's all we need to do
+							while(--inbetweenindex>2){
+								if(inbetweenindex==skipindex){skipindex>>=1;continue;} // skip 64, 32, 16, 8 and 4
+								if(_intermediateResult)output("Computing predefined sine #%" PRIu16 " using rotation of applicable constituent predefined sines.\n",inbetweenindex);
+								// wait a minute, we know that the bit that corresponds with skipindex is set, so we can initialize the rotation to these angles
+								mpd_qcopy(_rotationsine,decimalcontext->predefinedsines[skipindex],&status);
+								mpd_qcopy(_rotationcosine,decimalcontext->predefinedsines[256-skipindex],&status);
+								rotationindex=(skipindex>>1);
+								while(rotationindex!=0){
+									if((inbetweenindex&rotationindex)!=0){ // bit at rotationindex is set, so we should rotate by the associated sine and cosine
+										mpd_qmul(_t1,_rotationsine,decimalcontext->predefinedsines[256-rotationindex],mpd_context,&status);
+										mpd_qmul(_t2,_rotationcosine,decimalcontext->predefinedsines[rotationindex],mpd_context,&status);
+										mpd_qmul(_t3,_rotationcosine,decimalcontext->predefinedsines[256-rotationindex],mpd_context,&status);
+										mpd_qmul(_t4,_rotationsine,decimalcontext->predefinedsines[rotationindex],mpd_context,&status);
+										mpd_qadd(_rotationsine,_t1,_t2,mpd_context,&status);
+										mpd_qsub(_rotationcosine,_t3,_t4,mpd_context,&status);
+									}
+									rotationindex>>=1;
+								}
+								// and store the sine and cosine
+								mpd_qcopy(decimalcontext->predefinedsines[inbetweenindex],_rotationsine,&status);
+								// the cosine is the sine of pi/2 - x
+								mpd_qcopy(decimalcontext->predefinedsines[256-inbetweenindex],_rotationcosine,&status);
+							}
+							if(_intermediateResult){
+								outputLine("Predefined sines:");
+								for(int index=0;index<=256;index++){
+									output("#%d",index);
+									_intermediateResult->mpd=decimalcontext->predefinedsines[index];
+									outputDecimal(": ",_intermediateResult,".\n");
+								}
+							}
+						}
+						free_mpd(_rotationsine);free_mpd(_rotationcosine);free_mpd(_0);free_mpd(_1);free_mpd(_predefined);free_mpd(_t1);free_mpd(_t2);free_mpd(_t3);free_mpd(_t4);
+
 						mpd_t *_sin15=__mpd(mpd_context,0),*_cos15=__mpd(mpd_context,0),*_sin30=__mpd(mpd_context,0),*_cos30=__mpd(mpd_context,0),*_sin45=__mpd(mpd_context,0),*_sin90=__mpd(mpd_context,1),*_cos90=__mpd(mpd_context,0);
 						if(_pidiv12&&_sqrt2div2&&_sqrt3div2&&_sin15&&_cos15&&_sin30&&_cos30&&_sin45&&_sin90&&_cos90){
 							uint32_t mult=0;
@@ -694,9 +777,9 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 								if(_intermediateResult){
 									output("CORDIC angle iteration #%" PRIu32 ":",iteration);
 									_intermediateResult->mpd=_cordicangle;
-									outputDecimal("Sine approximation of '",_intermediateResult,"': ");
+									outputDecimal("Power series approximation of the sine of angle ",_intermediateResult,": ");
 									_intermediateResult->mpd=_sinsquared;
-									outputDecimal(NULL,_intermediateResult,"'");
+									outputDecimal(NULL,_intermediateResult,NULL);
 									_intermediateResult->mpd=_cordicsine; // the 'true' value of the sine of half the previous CORDIC angle!!!
 									outputDecimal(" should equal: '",_intermediateResult,"'");
 								}
@@ -805,7 +888,7 @@ mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t* x){
 	if(mpd_context&&x){
 		if(amVerbose()){
 			Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);
-			if(_decimal){output("Computing the square of the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}
+			if(_decimal){output("Computing the square of the sine");outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}
 		}
 		uint32_t status=0;
 		/////////// REMOVED: mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2 decimal digits
@@ -868,7 +951,7 @@ mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t* x){
 					mpd_qcopy(_intermediateResult->mpd,_term,&status);
 					outputDecimal(" increment: '",_intermediateResult,"' -> ");
 					mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);
-					output("%s",(sin?"Sine":"One minus cosine")); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
+					output("%s","Sine"); // if we want the cosine we indicate that we're computing One minus the cosine squared!!!!
 					outputDecimal(" squared '",_intermediateResult,"'.\n");
 				}
 
@@ -905,7 +988,7 @@ mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t* x){
 		if((status&0xEFBF)==0)mpd_qfinalize(_sinsquared,mpd_context,&status);else output("%sNo %ssine result to finalize.\n",ERROR_PREFIX,(sin?"":"co"));
 		*/
 		if((status&0xEFBF)!=0){
-			output("%sSome error trying to compute the %ssine of a decimal.\n",ERROR_PREFIX,(sin?"":"co"));
+			output("%sSome error trying to compute the sine of a decimal.\n",ERROR_PREFIX);
 			free_mpd(_sinsquared);_sinsquared=NULL;
 		}else
 		if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");}
@@ -1332,9 +1415,72 @@ typedef struct mpd_relative_angle{
 }mpd_relative_angle_t;
 
 void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle){
+	free_mpd_sincos(_mpd_relative_angle->sincoselement); // MDH@11SEP2019: now we do need to free the Msincoselement*
 	free_mpd(_mpd_relative_angle->_delta_angle);
 	FREE(_mpd_relative_angle,'A');
 }
+
+// MDH@11SEP2019: we can do much faster and better now we have the predefinedsines in Mdecimalcontext's
+mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* angle){
+	if(angle&&decimalcontext&&decimalcontext->predefinedsinedeltaangle){
+		Mdecimal* _intermediateResult=(amVerbose()?__decimal(decimalcontext->mpd_context,0,0):NULL);
+		if(_intermediateResult){
+			_intermediateResult->mpd=angle;
+			outputDecimal("Computing the relative angle of '",_intermediateResult,"' to the nearest predefined angles for which sines were computed.\n");
+		}
+		mpd_relative_angle_t* _relativeAngle=CALLOC(1,sizeof(mpd_relative_angle_t),'A');
+		if(_relativeAngle){
+			mpd_t *_deltaAngle=__mpd(decimalcontext->mpd_context,0),*_predefinedAngleIndex=__mpd(decimalcontext->mpd_context,0);
+			if(_deltaAngle&&_predefinedAngleIndex){
+				uint32_t status=0;
+				mpd_qdivmod(_predefinedAngleIndex,_deltaAngle,angle,decimalcontext->predefinedsinedeltaangle,decimalcontext->mpd_context,&status);
+				uint32_t predefinedAngleIndex=mpd_qget_u32(_predefinedAngleIndex,&status);
+				if(predefinedAngleIndex<=256){
+					if(_intermediateResult)output("Predefined angle index %" PRIu32 ".\n",predefinedAngleIndex);
+					_relativeAngle->negative=false;
+					_relativeAngle->_delta_angle=__mpd(decimalcontext->mpd_context,0);
+					if(_relativeAngle->_delta_angle){
+						mpd_qcopy(_relativeAngle->_delta_angle,_deltaAngle,&status); // remember the remaining angle (which is positive!!!)
+						// now we do have to construct the Msincoselement!
+						_relativeAngle->sincoselement=(Msincoselement*)calloc(1,sizeof(Msincoselement));
+						if(_relativeAngle->sincoselement){
+							_relativeAngle->sincoselement->_sine=__mpd(decimalcontext->mpd_context,0);
+							_relativeAngle->sincoselement->_cosine=__mpd(decimalcontext->mpd_context,0);
+							_relativeAngle->sincoselement->_angle=__mpd(decimalcontext->mpd_context,0);
+							if(_relativeAngle->sincoselement->_sine&&_relativeAngle->sincoselement->_cosine&&_relativeAngle->sincoselement->_angle){
+								mpd_qmul(_relativeAngle->sincoselement->_angle,_predefinedAngleIndex,decimalcontext->predefinedsinedeltaangle,decimalcontext->mpd_context,&status);
+								mpd_qcopy(_relativeAngle->sincoselement->_sine,decimalcontext->predefinedsines[predefinedAngleIndex],&status);
+								mpd_qcopy(_relativeAngle->sincoselement->_cosine,decimalcontext->predefinedsines[256-predefinedAngleIndex],&status); // we know where to find the cosine of the predefined angle
+							}else{
+								free_mpd_sincos(_relativeAngle->sincoselement);
+								_relativeAngle->sincoselement=NULL;
+								status=0xFFFFFFFF;
+							}
+						}else{
+							status=0xFFFFFFFF;
+							outputError("Failed to create the relative angle offset sine/cosine data element");
+						}
+					}else{
+						status=0xFFFFFFFF;
+						outputError("Failed to create the relative angle remainder.");
+					}
+				}else{
+					status=0xFFFFFFFF;
+					outputError("Predefined sines index invalid");
+				}
+				if((status&0xEFBF)!=0){free_mpd_relative_angle(_relativeAngle);_relativeAngle=NULL;}
+			}else 
+				outputError("Failed to create a relative angle offset and remainder.");
+			free_mpd(_deltaAngle);free_mpd(_predefinedAngleIndex);
+		}else
+			outputError("Failed to create a relative angle.");
+		if(_intermediateResult){_intermediateResult->mpd=NULL;free_decimal(_intermediateResult);}
+		return _relativeAngle;
+	}else
+		outputError("No angle, decimal context or decimal context predefined sines step angle defined.");
+	return NULL;
+}
+// preferable over:
 mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* angle){
 	// ASSERT angle must be in [0,pi/2] that way there will always be two surrounding predefined angles
 	if(decimalcontext&&angle){
@@ -1806,6 +1952,7 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 								if(amVerbose())outputError("Failed to create a decimal for showing the CORDIC sine");
 								free_mpd(_CORDICsine);
 							}
+							// 
 							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x->mpd);
 							if(_relativeAngle){
 								if(amVerbose()){
@@ -1871,6 +2018,62 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 								free_mpd_relative_angle(_relativeAngle);
 							}else
 								outputError("Failed to compute the relative angle");
+
+							// MDH@11SEP2019: the following is preferred because we have precomputed 257 equidistant angle sines between 0 and pi/2
+							mpd_relative_angle_t* _predefinedSinesRelativeAngle=_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd);
+							if(_predefinedSinesRelativeAngle){
+								if(amVerbose()){
+									output("Predefined sines relative angle: ");
+									Mdecimal* _decimal=__decimal(mpd_context,0,0);
+									if(_decimal){
+										_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;
+										outputDecimal(NULL,_decimal,NULL);
+										outputChar(_predefinedSinesRelativeAngle->negative?'-':'+');
+										_decimal->mpd=_predefinedSinesRelativeAngle->_delta_angle;
+										outputDecimal(NULL,_decimal,NULL);
+										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
+										free_decimal(_decimal);
+									}else
+										outputChar('?');
+									outputLine(".");
+								}
+								// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
+								// which consists of two terms that need to be added or subtracted
+								mpd_t *_term1=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_sine),*_term2=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_cosine);
+								if(_term1&&_term2){
+									Mdecimal* _decimal=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+									if(_decimal){
+										output("Predefined sines angle #%" PRIu32 ":",_predefinedSinesRelativeAngle->sincoselement->mult);
+										_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;outputDecimal("'",_decimal,"'");
+										_decimal->mpd=_term1;outputDecimal(" with cosine '",_decimal,"'");
+										_decimal->mpd=_term2;outputDecimal(" and sine '",_decimal,"'.\n");
+									}
+									// we still need the sine and cosine of the delta angle
+									// BUT in order to be able to compare the results we should I guess use the _dsinsquared 
+									mpd_t *_deltasin=__mpd(mpd_context,0),*_deltacos=__mpd(mpd_context,0);
+									if(_deltasin&&_deltacos){
+										mpd_t* _deltasinsquared=_dsinsquared(mpd_context,_predefinedSinesRelativeAngle->_delta_angle);
+										if(_deltasinsquared){
+											mpd_qsqrt(_deltasin,_deltasinsquared,mpd_context,&status);
+											mpd_qsub_u32(_deltasinsquared,_deltasinsquared,1,mpd_context,&status);mpd_set_positive(_deltasinsquared);
+											mpd_qsqrt(_deltacos,_deltasinsquared,mpd_context,&status);
+											// ready to 'rotate'
+											mpd_qmul(_term1,_term1,_deltacos,mpd_context,&status);
+											mpd_qmul(_term2,_term2,_deltasin,mpd_context,&status);
+											if(_decimal){_decimal->mpd=_term1;outputDecimal("First term: '",_decimal,"'.");_decimal->mpd=_term2;outputDecimal(" Second term: '",_decimal,"'.\n");_decimal->mpd=NULL;}
+											if(_predefinedSinesRelativeAngle->negative)mpd_qsub(_term1,_term1,_term2,mpd_context,&status);else mpd_qadd(_term1,_term1,_term2,mpd_context,&status);
+											if(_decimal){_decimal->mpd=_term1;outputDecimal("Predefined sines relative angle sine: ",_decimal,".\n");}
+										}
+										free_mpd(_deltasinsquared);
+									}
+									free_mpd(_deltasin);free_mpd(_deltacos);
+									if(_decimal){_decimal->mpd=NULL;free_decimal(_decimal);}
+								}
+								free_mpd(_term1);free_mpd(_term2);
+								free_mpd_relative_angle(_predefinedSinesRelativeAngle);
+							}else
+								outputError("Failed to compute the predefined sines relative angle");
+
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
 							_sine=_dsinsquared(mpd_context,(sin?_xmod:_xsin));
 							if(_sine)mpd_qsqrt(_sine,_sine,mpd_context,&status); // BEFORE returning to the original precision!!!

@@ -24,7 +24,9 @@ typedef struct Msincoselement{
 typedef struct Mdecimalcontext{
     mpd_context_t* mpd_context;
     mpd_t* e; // storing e
-    mpd_t *pi,*pidiv2,*pimul2,*pidiv4; // storing pi, 2*pi, pi/2 and pi/4
+    mpd_t *pi,*pidiv2,*pimul2,*pidiv4; // storing pi, 2*pi, pi/2 and pi/4 and pi/512 which is the distance between two successive angles in the table of predefined sines
+    mpd_t* predefinedsinedeltaangle; // MDH@11SEP2019: the difference between successive angles in the predefined sines table
+    mpd_t* predefinedsines[257]; // MDH@11SEP2019: where we're going to store all predefined 257 sines (starting at 0 and up until pi/512)
     Msincoselement* _firstSincoselement; // for storing the predefined sine/cosines
     Msincoselement* _firstCordicelement; // for storing the CORDIC sine/cosines
 }Mdecimalcontext;
