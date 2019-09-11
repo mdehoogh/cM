@@ -1952,7 +1952,7 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 								if(amVerbose())outputError("Failed to create a decimal for showing the CORDIC sine");
 								free_mpd(_CORDICsine);
 							}
-							// 
+							/*
 							mpd_relative_angle_t* _relativeAngle=_getRelativeAngle(decimalcontext,x->mpd);
 							if(_relativeAngle){
 								if(amVerbose()){
@@ -2000,25 +2000,13 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 										free_mpd(_deltasinsquared);
 									}
 									free_mpd(_deltasin);free_mpd(_deltacos);
-									/* replacing:
-									mpd_sincos_t* _deltasinandcos=_dsinandcos(mpd_context,_relativeAngle->_delta_angle);
-									if(_deltasinandcos){
-										mpd_qmul(_term1,_term1,_deltasinandcos->cos,mpd_context,&status);
-										mpd_qmul(_term2,_term2,_deltasinandcos->sin,mpd_context,&status);
-										if(_decimal){_decimal->mpd=_term1;outputDecimal("First term: '",_decimal,"'.");_decimal->mpd=_term2;outputDecimal(" Second term: '",_decimal,"'.\n");_decimal->mpd=NULL;}
-										if(_relativeAngle->negative)mpd_qsub(_term1,_term1,_term2,mpd_context,&status);else mpd_qadd(_term1,_term1,_term2,mpd_context,&status);
-										if(_decimal){_decimal->mpd=_term1;outputDecimal("Relative angle sine: ",_decimal,".\n");}
-										free_mpd_sincos(_deltasinandcos);
-									}else
-										outputError("Failed to compute the sine and cosine of the relative angle");
-									*/
 									if(_decimal){_decimal->mpd=NULL;free_decimal(_decimal);}
 								}
 								free_mpd(_term1);free_mpd(_term2);
 								free_mpd_relative_angle(_relativeAngle);
 							}else
 								outputError("Failed to compute the relative angle");
-
+							*/
 							// MDH@11SEP2019: the following is preferred because we have precomputed 257 equidistant angle sines between 0 and pi/2
 							mpd_relative_angle_t* _predefinedSinesRelativeAngle=_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd);
 							if(_predefinedSinesRelativeAngle){
