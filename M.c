@@ -134,12 +134,6 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 
 // RATIONAL STUFF
 // long double helper functions for use with the delta of rationals
-long double realsum(Mreal* _real1,Mreal* _real2){
-	if(!_real1&&!_real2)return M_LD_NAN; // both undefined
-	if(!_real1||ldIsZero(_real1->ld)||ldIsNaN(_real1->ld))return _real2->ld;
-	if(!_real2||ldIsZero(_real1->ld)||ldIsNaN(_real1->ld))return _real1->ld;
-	return _real1->ld+_real2->ld;
-}
 bool realIsUndefined(Mreal* _real){return(!_real||ldIsNaN(_real->ld));}
 long double realneg(Mreal* _real){return (realIsUndefined(_real)?M_LD_NAN:-_real->ld);}
 
@@ -209,6 +203,18 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 	return _rational;
 }
 */
+// MDH@17SEP2019: _qsum used to be _qadd but we now have a _qadd in Mrational.c which will check for errors in performing the big integer multiplications, so is better
+Mrational* _qsum(Mrational* _rational1,Mrational* _rational2){
+	Mrational* _rational=__rational(); // we need a rational to hold the sum
+	if(_rational){
+		outputLine("Adding two rationals.");
+		mp_err status=_qadd(_rational,_rational1,_rational2);
+		output("Two rationals added (status=%i).\n",status);
+		if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;outputError("Failed to add two rationals");}else outputLine("Two rationals added successfully."); // addition failed somehow...
+	}
+	return _rational;
+}
+/* replacing:
 Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	Mrational* _rational=NULL;
 	if(_rational1&&_rational2){
@@ -218,95 +224,9 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 			_rational=_getRational(_Iadd(_num1,_num2,false),_Imul(_rational1->den,_rational2->den),realsum(_rational1->delta,_rational2->delta),true,true); // free the numerator and denominator
 		if(_num1)free_biginteger(_num1);if(_num2)free_biginteger(_num2);
 	}
-	/* replacing:
-	
-	// OOPS here we have a problem, we should not use big integers contained in the given rationals itself
-	//      but then these new big integer should be freed if we can't bind them
-
-	// ASSERT _rational1 and _rational2 should not be NULL
-	Mbiginteger *_den1=_getBigintegerCopy(_rational1->den),*_den2=_getBigintegerCopy(_rational2->den); // get the denominators
-	Mbiginteger *_num1=_getBigintegerCopy(_rational1->num),*_num2=_getBigintegerCopy(_rational2->num); // get the numerators
-	
-	long double deltasum=(_rational1->delta&&_rational2->delta?_rational1->delta->ld+_rational2->delta->ld:(_rational1->delta?_rational1->delta->ld:(_rational2->delta?_rational2->delta->ld:M_LD_NAN))); // MDH@05JUN2019: compute the sum of the deltas
-	
-	// we can speed it up if certain elements are integer (because the denominator is NULL)
-	// DONE problem to solve: the intermediate results should be freed if the rational could not be created!!
-	// TODO we can speed up these shortcuts (see how we handled creation errors at the bottom!!!)
-	if(!_den1&&!_den2){
-		if(amVerbose())output("Both denominators in adding two rationals undefined!");
-		Mbiginteger* _num=_Iadd(_num1,_num2,false);free_biginteger(_num1);free_biginteger(_num2); // don't need these anymore
-		Mrational* _rational=_getRational(_num,NULL,deltasum,false,true);
-		return _rational; // if both denominators are undefined (i.e. 1), return the sum of the numerators
-	}
-	if(!_den1){
-		if(amVerbose())output("First denominator in adding two rationals undefined!");
-		Mbiginteger* _mult=(_num1?_Imultiply(_num1,_den2,false):_den2);free_biginteger(_num1); // _num1 no longer needed
-		Mbiginteger* _num=(_mult?_Iadd(_num2,_mult,false):NULL);free_biginteger(_num2); // _num2 no longer needed
-		if(_num1)free_biginteger(_mult); // _mult no longer needed i.e. when it is not equal to _den2
-		Mrational* _rational=NULL;
-		if(_num){
-			//////outputBiginteger("\nNew numerator: ",_num,".");
-			_rational=_getRational(_num,_den2,deltasum,true,true); // free _num and _den2 if not bound to _rational
-			//////outputRational("\nSum rational: ",_rational,".");
-		}else
-			free_biginteger(_den2);
-		return _rational;
-	}
-	if(!_den2){
-		if(amVerbose())output("Second denominator in adding two rationals undefined!");
-		Mbiginteger* _mult=(_num1?_Imultiply(_num2,_den1,false):_den1);free_biginteger(_num2);
-		Mbiginteger* _num=(_mult?_Iadd(_num1,_mult,false):NULL);free_biginteger(_num1);
-		if(_num1)free_biginteger(_mult);
-		Mrational* _rational=NULL;
-		if(_num){
-			//////outputBiginteger("\nNew numerator: ",_num,".");
-			_rational=_getRational(_num,_den1,deltasum,true,true);
-			/////outputRational("\nSum rational: ",_rational,".");
-		}else 
-			free_biginteger(_den1);
-		return _rational;
-	}
-	// if the denominators are equal it's also easier
-	if(mp_cmp(_den1,_den2)==MP_EQ){
-		free_biginteger(_den2); // won't need it anymore
-		Mbiginteger* _num=_Iadd(_num1,_num2,false);free_biginteger(_num1);free_biginteger(_num2);
-		Mrational* _rational=NULL;
-		if(_num){
-			//////outputBiginteger("\nNew numerator: ",_num,".");
-			_rational=_getRational(_num,_den1,deltasum,true,true);
-			//////outputRational("\nSum rational: ",_rational,".");
-		}else
-			free_biginteger(_den1);
-		return _rational;
-	}
-
-	if(amVerbose()){outputRational("\nAdding true rationals ",_rational1,NULL);outputRational(" and ",_rational2,".");}
-
-	// true rational addition (as _den1 and _den2 are defined, i.e. unequal to 1)
-	// TODO we can speed this up as well using ternary operators
-	Mbiginteger* _den=_Imultiply(_den1,_den2,false);
-	Mbiginteger* _mul1=(_den?_Imultiply(_num1,_den2,false):NULL);
-	Mbiginteger* _mul2=(_den&&_mul1?_Imultiply(_num2,_den1,false):NULL);
-	// free the original copies
-	free_biginteger(_num1);free_biginteger(_num2);
-	free_biginteger(_den1);free_biginteger(_den2);
-	
-	if(amVerbose()){outputBiginteger("\n\tNumerator part 1: ",_mul1,NULL);outputBiginteger(" - part 2: ",_mul2,".");}
-	Mbiginteger* _num=(_mul1&&_mul2?_Iadd(_mul1,_mul2,false):NULL);
-	free_biginteger(_mul1);free_biginteger(_mul2); // always free the intermediate results (even if we failed to add them)
-
-	//////outputBiginteger("\nSum denominator: ",_den,".");
-	if(_num){
-		/////outputBiginteger("\nSum numerator: ",_num,".");
-		_rational=_getRational(_num,_den,deltasum,true,true);
-		/////outputRational("\n\tSum rational: ",_rational,".");
-	}else{
-		free_biginteger(_num);free_biginteger(_den);
-	}
-	*/
 	return _rational;
-
 }
+*/
 Mrational* _qneg(Mrational* _rational){
 	// normalizes the negated rational if not currently normalized, otherwise it will not normalize it
 	Mrational* _rationalNeg=(_rational?_getRational(_getNegatedBiginteger(_rational->num),_getBigintegerCopy(_rational->den),realneg(_rational->delta),!_rational->normalized,true):NULL);
@@ -316,7 +236,7 @@ Mrational* _qneg(Mrational* _rational){
 Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
 	if(!_rational1||!_rational2)return NULL;
 	Mrational* _rational2Neg=_qneg(_rational2); // get the negated rational2
-	Mrational* _rational=_qadd(_rational1,_rational2Neg);
+	Mrational* _rational=_qsum(_rational1,_rational2Neg);
 	free_rational(_rational2Neg); // free the negated rational2
 	return _rational;
 }
@@ -492,7 +412,7 @@ Mvalue* pi_ql(Mvalue* _value){
 								outputRational("Sum so far: ",_rational,NULL);
 								outputRational(", addendum: ",_addendumRational,".\n");
 							}
-							Mrational* _newRational=_qadd(_rational,_addendumRational);
+							Mrational* _newRational=_qsum(_rational,_addendumRational);
 							if(!_newRational){
 								// we have to free the addendum numerator and denominator
 								output("%sFailed to add this addendum at step %u in approximating pi.\n",ERROR_PREFIX,iter);
@@ -586,7 +506,7 @@ Mvalue* pi_q(Mvalue* _value){
 						output("%s",ERROR_PREFIX);outputRational("Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").\n");
 						free_rational(_rational);_rational=NULL;
 					}else
-						_result=_qadd(_rational,_inverseDenominatorRational);
+						_result=_qsum(_rational,_inverseDenominatorRational);
 					free_rational(_denominatorRational);
 					if(_result){
 						_rational=_result;
@@ -3288,7 +3208,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
 		/////outputLine("Adding two rationals.");
-		Mrational* _sumRational=_qadd(_rational1,_rational2);
+		Mrational* _sumRational=_qsum(_rational1,_rational2);
 		/////outputLine("Rationals added!");
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
 		outputLine("Rational copies released.");

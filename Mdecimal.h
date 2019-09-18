@@ -41,6 +41,7 @@ Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repe
 Mdecimal* _getDecimal(const mpd_t* const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure);
 
 Mdecimal* _getDecimalCopy(Mdecimal* decimal);
+Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2);
 
 bool isDecimalZero(Mdecimal* decimal);
 bool isDecimalOne(Mdecimal* _decimal);
@@ -48,11 +49,15 @@ bool isDecimalOne(Mdecimal* _decimal);
 // compute an decimal approximation to pi which we can then store in the given decimal context unless it's already in there of course
 Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext);
 
+mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t const * const x);
+
 // ONE ARGUMENT MATH FUNCTIONS
 Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
 Mdecimal* _dcordicsine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
 Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
 Mdecimal* _dcordiccosine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
+
+Mdecimal* _dtangent(Mdecimalcontext* decimalcontext,Mdecimal const * const x);
 
 Mdecimal* _dexp(const Mdecimalcontext* decimalcontext,Mdecimal* x);
 

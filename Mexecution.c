@@ -808,6 +808,7 @@ void normalizeRational(Mrational* rational){
 Mrational* __rational(){
     Mrational* _rational=(Mrational*)CALLOC(1,sizeof(Mrational),'R');
     if(!_rational)outputError("Failed to create a rational");
+    if(_rational->num||_rational->den||_rational->delta)outputLine("BUG: New rational numerator and/or denominator and/or delta not considered undefined.");
     return _rational;
 }/* VALIDATED */
 Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure){

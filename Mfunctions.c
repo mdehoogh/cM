@@ -92,6 +92,10 @@ Mvalue* Msin(Mvalue* _value){
         if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin),true);
+        if(_value->type==VT_RATIONAL){
+            Mrational* _sineRational=_qsinorcos(_value->value._rational,true);
+            return _getRationalValue(_sineRational,true);
+        }
         if(_value->type==VT_DECIMAL){
             Mdecimal* _sineDecimal=_dsine(NULL,_value->value._decimal); // match the precision as used by the argument
             /* replacing what was way to slow:
@@ -221,6 +225,10 @@ Mvalue* Mcos(Mvalue*  _value){
         if(_value->type==VT_INTEGER)return _getRealValue(cos(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcos),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcos),true);
+        if(_value->type==VT_RATIONAL){
+            Mrational* _cosineRational=_qsinorcos(_value->value._rational,false);
+            return _getRationalValue(_cosineRational,true);
+        }
         if(_value->type==VT_DECIMAL){
             Mdecimal* _cosineDecimal=_dcosine(NULL,_value->value._decimal); // match the precision as used by the argument
             if(_cosineDecimal)return _getDecimalValue(_cosineDecimal,true);
@@ -230,10 +238,21 @@ Mvalue* Mcos(Mvalue*  _value){
 }/* VALIDATED */
 Mvalue* Mtan(Mvalue*  _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(tanl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(tan(_value->value._integer->ll));
+        // composite application
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtan),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtan),true);
+        // scalar arguments
+        if(_value->type==VT_REAL)return _getRealValue(tanl(_value->value._real->ld));
+        if(_value->type==VT_INTEGER)return _getRealValue(tan(_value->value._integer->ll));
+        if(_value->type==VT_DECIMAL)return _getRationalValue(_dtangent(NULL,_value->value._decimal),true);
+        if(_value->type==VT_RATIONAL){
+            Mrational* _sineRational=_qsinorcos(_value->value._rational,true);
+            Mrational* _cosineRational=_qsinorcos(_value->value._rational,false);
+            Mrational* _tanRational=_getRationalQuotient(_sineRational,_cosineRational);
+            free_rational(_sineRational);
+            free_rational(_cosineRational);
+            return _getRationalValue(_tanRational,true);
+        }
     }
     return NULL;
 }/* VALIDATED */

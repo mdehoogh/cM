@@ -183,6 +183,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/);
 // used by:
 Mrational* _getDecimalRational(Mdecimal* _decimal);
 
+Mrational* __rational();
 void free_rational(Mrational* _rational);
 bool isRationalZero(Mrational* _rational);
 bool isRationalOne(Mrational* _rational);

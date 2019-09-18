@@ -427,6 +427,19 @@ Mdecimal* _getDecimal(const mpd_t* const _mpd,mpd_ssize_t prec,uint64_t repeatin
     return _decimal;
 }/* VALIDATED */
 
+Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2){
+	if(!d1||!d2)return NULL;
+	// the decimal with the highest decimal context determines the context to use
+	// TODO should this double the precision???????
+	mpd_ssize_t precision=MAX(d1->prec,d2->prec);
+	mpd_context_t* mpd_context=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+	// compute the quotient
+	Mdecimal* _decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qdiv(_decimal,d1,d2,mpd_context,&status);
+	// on failure free the decimal
+	if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;}
+	return _decimal;
+}
+
 /**
  * \brief returns a decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
  */
@@ -450,7 +463,6 @@ Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
 
 // END BASE STUFF
 
-mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t* x);
 Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 
 	// if decimalContext equals NULL use the global decimal context, in _decimalContext
@@ -882,7 +894,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 //                NOTE this implementation is almost the same as that of _dsquarerootofsinorcossquared() except that it does not do the conversion to a cosine and square rooting
 //                NOTE this has the disadvantage that sin squared is approximated with two additional decimals but conversion and square rooting will take place AFTER returning to the original precision
 //                DONE we solve that by taking changing the precision to the _dsine/_dcosine functions
-mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t* x){
+mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t const * const x){
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinsquared=NULL;
 	if(mpd_context&&x){
@@ -1876,6 +1888,7 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 	return _resultsine;
 }
 */
+
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
 Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	if(x){
@@ -2219,6 +2232,114 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 		outputError("No decimal context to compute the cosine of a decimal in");
 	}else
 		outputError("No decimal to compute the cosine of");
+	return NULL;
+}
+
+// MDH@17SEP2019: computing the tangens uses _dsinsquared just like _dsine and _dcosine do
+Mdecimal* _dtangent(Mdecimalcontext* decimalcontext,Mdecimal const * const x){
+	if(x){
+		// use the same decimal context as used by x
+		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
+		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
+		if(decimalcontext){
+			// we need pi in the given precision (now stored in any Mdecimalcontext)
+			if(!decimalcontext->pi)free_decimal(pi_decimal(decimalcontext)); // compute and immediately free the returned copy
+			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
+			if(mpd_context){
+				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				uint32_t status=0;
+				mpd_t* _absx=NULL;
+				if(mpd_isnegative(x->mpd)){
+					_absx=__mpd(mpd_context,0);
+					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
+					if(!_absx){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
+					if(amVerbose())outputLine("Computing the sine of a negative decimal.");
+				}
+				mpd_t* _tan=NULL; // the end result
+				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
+				mpd_t *_xmod=__mpd(mpd_context,0),*_xtemp=__mpd(mpd_context,0),*_xquadrant=__mpd(mpd_context,0);
+				if(_xtemp&&_xmod&&_xquadrant){
+					// normalize x to the range [0,2*pi)
+					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
+					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
+					// determine the quadrant by dividing the normalized x by pi/2
+					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
+					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					if(amVerbose()){outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if((status&0xEFBF)!=0){
+						outputError("Failed to compute the sine of a decimal");
+						report_mpd_status(status);
+					}else{
+						bool sin=true; // whether to compute the sine or cosine (of the transformed angle)
+						mpd_t* _xsin=NULL;
+						if(xquadrant!=0){
+							sin=false;
+							_xsin=__mpd(mpd_context,0);
+							if(_xsin){
+								if(xquadrant==1)
+									mpd_qsub(_xsin,decimalcontext->pi,_xmod,mpd_context,&status);
+								else
+								if(xquadrant==2)
+									mpd_qsub(_xsin,_xmod,decimalcontext->pi,mpd_context,&status);
+								else
+									mpd_qsub(_xsin,decimalcontext->pimul2,_xmod,mpd_context,&status);
+							}else
+								status=0xFFFFFFFF;
+						}
+						if((status&0xEFBF)!=0){
+							outputError("Failed to compute the sine of a decimal");
+							if(status!=0xFFFFFFFF)report_mpd_status(status);
+						}else{
+
+							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // approximate with two additional digits
+
+							_tan=__mpd(mpd_context,1); // if we set _tan to 1 we can use it BEFORE actually setting it to the result!!!
+							if(_tan){
+								mpd_t* _sinsquared=_dsinsquared(mpd_context,(sin?_xmod:_xsin));
+								if(_sinsquared){
+									// the tangent is the squareroot of (_sine/1-sine)=1/(1-_sine)-1
+									// the last part allows us to re-use _sine
+									mpd_qsub_i32(_sinsquared,_sinsquared,1,mpd_context,&status);mpd_set_positive(_sinsquared); // denominator 1-sine
+									mpd_qdiv(_sinsquared,_tan,_sinsquared,mpd_context,&status);
+									mpd_qsub_i32(_sinsquared,_sinsquared,1,mpd_context,&status);
+									mpd_qsqrt(_tan,_sinsquared,mpd_context,&status);
+									free_mpd(_sinsquared);
+								}else
+									outputError("Failed to compute the squared-sine of a decimal.");
+							}else
+								outputError("Failed to create the decimal for storing the tangent.");
+							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // reset precision (TODO not thread-safe if we would be running multiple versions using the same mpd_context!!!!)
+							if(_tan){
+								if(amVerbose()){Mdecimal* _decimal=__decimal(mpd_context,0,0);if(_decimal){_decimal->mpd=_tan;outputDecimal("Tangent: ",_decimal,"'.\n");_decimal->mpd=NULL;free_decimal(_decimal);}}
+								mpd_qfinalize(_tan,mpd_context,&status);
+							}else 
+								status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
+							// some extra work as we've received the sine squared
+							if((status&0xEFBF)!=0){outputError("Failed to compute the tangent from the sine square approximation");free_mpd(_tan);_tan=NULL;}
+
+							if(_tan){
+								if((_absx!=NULL)!=(xquadrant==1||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
+									if(amVerbose())outputLine("Negating the computed tangent!");
+									mpd_set_negative(_tan); // negate the _sine
+								}else
+								if(amVerbose())
+									outputLine("Not negating the tangent!");
+							}else
+								outputError("Failed to compute the tangent of the normalized decimal");
+						}
+						// free whatever we created...
+						if(_xsin)free_mpd(_xsin);
+					}
+				}else
+					outputError("Failed to create helper decimals for computing the tangent of a decimal");
+				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
+				if(_absx)free_mpd(_absx);
+				return(_tan?_getDecimal(_tan,mpd_context->prec,0,true):NULL);				
+			}
+		}
+		outputError("No decimal context to compute the sine of a decimal in");
+	}else
+		outputError("No decimal to compute the sine of");
 	return NULL;
 }
 

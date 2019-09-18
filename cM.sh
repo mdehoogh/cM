@@ -107,7 +107,7 @@ else
 fi
 
 echo "Compiling M..."
-gcc -Wincompatible-pointer-types -Wdangling-else -Wincompatible-pointer-types-discards-qualifiers -L . -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c -o M 
+gcc -Wincompatible-pointer-types -Wdangling-else -Wincompatible-pointer-types-discards-qualifiers -L . -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mdecimal.c Mrational.c Mvalue.c Mfunctions.c Menvironment.c M.c -o M 
 
 # don't run M here, instead check whether it is there!!!
 if [ -f M ]; then
