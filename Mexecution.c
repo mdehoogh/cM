@@ -1207,6 +1207,7 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
     return _rational;
 }/* VALIDATED */
 // MDH@07JUN2019: converting a rational to a double
+// MDH@19SEP2019: TODO the conversion of the numerator or denominator big integer might fail if the big integer is too large, therefore actually performing the division of the big integers seems a better approach 
 long double getRationalLongDouble(const Mrational* const _rational){
     if(_rational){
         // as you can see up we're storing the delta in our rationals as well, so if we want to get ld back out of it the formula is: (numerator+delta)/denominator
@@ -1214,14 +1215,15 @@ long double getRationalLongDouble(const Mrational* const _rational){
         // it's easiest to turn the numerator big integer into a long double and add delta to it, and divide by the long double stored in the denominator
         // TODO find a better way to do this
         long double ldNumerator=mp_get_long_double(_rational->num); // NOTE also shortcuts when _rational->num equals 0 but we have to add the delta, so we have to do it this way
-        if(amVerbose())output("Rational numerator converted to real '%.*Lf'.",LDBL_DIG,ldNumerator);
+        if(amVerbose())output("Rational numerator converted to real '%.*Lf'.\n",LDBL_DIG,ldNumerator);
         if(!ldIsNaN(ldNumerator)&&!ldIsInf(ldNumerator)){ // TODO checking with ldIsInf probably NOT needed although the big integer might be too big!!!
-            // add delta (which could be zero though) NOTE ld should not be NaN or Infinity though
-            if(_rational->delta)ldNumerator+=_rational->delta->ld;
-            if(!_rational->den)return ldNumerator; // if no denominator (i.e. 1) nothing to divide by!!
-            // a denominator which is not equal to 1
+            // if we do NOT have a denominator (i.e. the denominator equals one we only need to add the delta (if any))
+            if(!_rational->den){if(_rational->delta)ldNumerator+=_rational->delta->ld;return ldNumerator;}
+            // ASSERT a denominator is present
             long double ldDenominator=mp_get_long_double(_rational->den);
-            if(amVerbose())output("Rational denominator converted to real '%.*Lf'.",LDBL_DIG,ldDenominator);
+            if(_rational->delta)ldNumerator+=(ldDenominator*_rational->delta->ld); // add the denominator multiplied by the delta to the numerator
+            // a denominator which is not equal to 1
+            if(amVerbose())output("Rational denominator converted to real '%.*Lf'.\n",LDBL_DIG,ldDenominator);
             if(!ldIsNaN(ldDenominator)&&!ldIsInf(ldDenominator))return ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok
             if(amVerbose())outputError("Failed to convert a rational denominator to a real");
         }
