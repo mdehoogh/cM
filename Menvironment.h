@@ -43,7 +43,7 @@ typedef struct Mfunctionmapelement{
     struct Mfunctionmapelement* _next;
 }Mfunctionmapelement;
 
-typedef struct MfunctionMap{
+typedef struct Mfunctionmap{
     uint32_t numberOfFunctions;  // keeping track of the total number of functions...
     Mfunctionmapelement* _first;
     Mfunctionmapelement* _last;

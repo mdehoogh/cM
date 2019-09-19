@@ -137,6 +137,7 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 bool realIsUndefined(Mreal* _real){return(!_real||ldIsNaN(_real->ld));}
 long double realneg(Mreal* _real){return (realIsUndefined(_real)?M_LD_NAN:-_real->ld);}
 
+/* MDH@19SEP2019: replaced by appropriate versions in Mrational.h/c
 // operators applied to rationals
 Mrational* _qmultiply(Mrational* _rational1,Mrational* _rational2){
 	if(!_rational1||!_rational2)return NULL;
@@ -154,18 +155,6 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
 	// pure rationals are easy
 	if(delta1undefined&&delta2undefined){
-		/* _getRational() will now itself take care of negating the numerator and denominator if the denominator is negative
-		Mbiginteger *_negnum=NULL,*_negden=NULL; // won't be constructed if _den is not negative
-		Mrational* _rational=NULL;
-		// if the denominator is now negative we have to toggle the sign of both numerator and denominator
-		if(_den&&mp_isneg(_den)==MP_YES){_negnum=_getNegatedBiginteger(_num);_negden=_getNegatedBiginteger(_den);}
-		if(_negnum&&_negden){
-			_rational=_getRational(_negnum,_negden,M_LD_NAN,true,true);
-			free_biginteger(_num);free_biginteger(_den);
-		}else
-			_rational=_getRational(_num,_den,M_LD_NAN,true,true);
-		return _rational;
-		*/
 	    return _getRational(_num,_den,M_LD_NAN,true,true);
 	}
 	// if we assume the delta's to be very small (as they will be), the parts containing squares to be too small to care about 
@@ -179,6 +168,7 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 	// neither undefined
 	return NULL;
 }
+*/
 /* replacing:
 Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 	// if either of them has a delta (i.e. is not pure), convert to double reals first
@@ -202,7 +192,7 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 	}
 	return _rational;
 }
-*/
+
 // MDH@17SEP2019: _qsum used to be _qadd but we now have a _qadd in Mrational.c which will check for errors in performing the big integer multiplications, so is better
 Mrational* _qsum(Mrational* _rational1,Mrational* _rational2){
 	Mrational* _rational=__rational(); // we need a rational to hold the sum
@@ -214,6 +204,7 @@ Mrational* _qsum(Mrational* _rational1,Mrational* _rational2){
 	}
 	return _rational;
 }
+*/
 /* replacing:
 Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	Mrational* _rational=NULL;
@@ -227,6 +218,8 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 	return _rational;
 }
 */
+
+/* MDH@19SEP2019: replaced by _getRationalDifference in Mrational.h/c
 Mrational* _qneg(Mrational* _rational){
 	// normalizes the negated rational if not currently normalized, otherwise it will not normalize it
 	Mrational* _rationalNeg=(_rational?_getRational(_getNegatedBiginteger(_rational->num),_getBigintegerCopy(_rational->den),realneg(_rational->delta),!_rational->normalized,true):NULL);
@@ -240,6 +233,7 @@ Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
 	free_rational(_rational2Neg); // free the negated rational2
 	return _rational;
 }
+*/
 // end rational stuff
 
 // decimal stuff
@@ -282,6 +276,7 @@ Mvalue* setdp(Mvalue* _value){
 // convenience method to obtain the wrapped mpd_context pointer
 mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context:NULL);}
 
+/* replaced by methods in Mdecimal.h/c
 Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
@@ -297,7 +292,7 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 		outputError("Failed to create the sum decimal");
 	return _result;
 }
-Mdecimal* _ddivide(Mdecimal* _decimal1,Mdecimal* _decimal2){
+Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(!_decimal1||!_decimal2)return NULL;
 	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX(_decimal1->prec,_decimal2->prec));
 	mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
@@ -351,6 +346,7 @@ Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 		outputError("Failed to create the difference decimal");
 	return _result;
 }
+*/
 
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
 
@@ -412,7 +408,7 @@ Mvalue* pi_ql(Mvalue* _value){
 								outputRational("Sum so far: ",_rational,NULL);
 								outputRational(", addendum: ",_addendumRational,".\n");
 							}
-							Mrational* _newRational=_qsum(_rational,_addendumRational);
+							Mrational* _newRational=_getRationalSum(_rational,_addendumRational); // _qsum replaced by _getRationalSum in Mrational.h/c
 							if(!_newRational){
 								// we have to free the addendum numerator and denominator
 								output("%sFailed to add this addendum at step %u in approximating pi.\n",ERROR_PREFIX,iter);
@@ -506,7 +502,7 @@ Mvalue* pi_q(Mvalue* _value){
 						output("%s",ERROR_PREFIX);outputRational("Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").\n");
 						free_rational(_rational);_rational=NULL;
 					}else
-						_result=_qsum(_rational,_inverseDenominatorRational);
+						_result=_getRationalSum(_rational,_inverseDenominatorRational); // _qsum() replaced by _getRationalSum in Mrational.h/c
 					free_rational(_denominatorRational);
 					if(_result){
 						_rational=_result;
@@ -3208,7 +3204,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
 		/////outputLine("Adding two rationals.");
-		Mrational* _sumRational=_qsum(_rational1,_rational2);
+		Mrational* _sumRational=_getRationalSum(_rational1,_rational2); // _qsum replaced by _getRationalSum that takes the deltas into account as well
 		/////outputLine("Rationals added!");
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
 		outputLine("Rational copies released.");
@@ -3218,7 +3214,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	// if either is a decimal, compute the sum decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		Mdecimal* _sumDecimal=_dadd(_decimal1,_decimal2);
+		Mdecimal* _sumDecimal=_getDecimalSum(_decimal1,_decimal2); // _dadd replaced by _getDecimalSum that takes the repeating decimal digits into account as well
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_sumDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_sumDecimal,true);
@@ -3260,12 +3256,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	}
 	return NULL;
 }
+
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||isValueZero(_value1))return Mneg(_value2);if(!_value2||isValueZero(_value1))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
-		Mrational* _differenceRational=_qsubtract(_rational1,_rational2);
+		Mrational* _differenceRational=_getRationalDifference(_rational1,_rational2); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_differenceRational,true);
@@ -3273,7 +3270,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	// if either is a decimal, compute the difference decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		Mdecimal* _differenceDecimal=_dsub(_decimal1,_decimal2);
+		Mdecimal* _differenceDecimal=_getDecimalDifference(_decimal1,_decimal2); // _dsub replaced by _getDecimalDifference which takes repeating decimal digits into account as well
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_differenceDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_differenceDecimal,true);
@@ -3292,7 +3289,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		Mrational* _multiplicationRational=_qmultiply(_rational1,_rational2);
+		Mrational* _multiplicationRational=_getRationalProduct(_rational1,_rational2); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		if(!_multiplicationRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_multiplicationRational,true);
@@ -3300,7 +3297,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	// if either is a decimal, compute the product decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		Mdecimal* _productDecimal=_dmul(_decimal1,_decimal2);
+		Mdecimal* _productDecimal=_getDecimalProduct(_decimal1,_decimal2); // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_productDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_productDecimal,true);
@@ -3469,14 +3466,14 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	// if one of them is a rational do a rational division
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		Mrational* _divisionRational=_qdivide(_rational1,_rational2);
+		Mrational* _divisionRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		return _getRationalValue(_divisionRational,true);
 	}
 	// if either is a decimal, compute the quotient decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		Mdecimal* _divideDecimal=_ddivide(_decimal1,_decimal2);
+		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_divideDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_divideDecimal,true);

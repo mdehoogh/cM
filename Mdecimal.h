@@ -1,4 +1,4 @@
-#include "Mbiginteger.h"
+#include "Mrational.h"
 
 // mpd_context_t primitives
 void report_mpd_status(uint32_t mpd_status);
@@ -17,6 +17,7 @@ typedef struct Msincoselement{
     uint32_t mult;
     struct Msincoselement* _next;
 }Msincoselement;
+
 // MDH@29AUG2019: we want to store the computed value of pi and e in the decimal context as well unless we store pi and e with a postfix like PI$<prec> and E$<prec> in the current environment?????
 //                the point here is that of reuse, we do not want to have to compute pi again and again for each decimal context
 //                currently we store the precision with the decimal this way we can use the same precision on functions that use that argument
@@ -30,40 +31,47 @@ typedef struct Mdecimalcontext{
     Msincoselement* _firstSincoselement; // for storing the predefined sine/cosines
     Msincoselement* _firstCordicelement; // for storing the CORDIC sine/cosines
 }Mdecimalcontext;
+
 // MDH@29AUG2019: create a decimal context with __decimalcontext passing in the required precision
 Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision
 
 void free_decimal(Mdecimal* decimal);
+
 Mdecimal* __adecimal(); // returning a completely blank decimal (e.g. to be used with mpd_copy_negate otherwise we'd have the old pointer hanging around with an allocated decimal that won't get freed anywhere ever)
-Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repeating); // pass in NULL for mpd_context to use the application-wide decimal context!!
+Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating); // pass in NULL for mpd_context to use the application-wide decimal context!!
 // TODO if we call _getDecimal with mpd we won't know the precision of the decimal (as that is not contained in an mpd_t instance), therefore we need to change _getDecimal somehow!!!
 // DONE I've added the prec parameter because mpd_t itself does not store the precision used to compute this decimal
-Mdecimal* _getDecimal(const mpd_t* const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure);
+Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure);
 
-Mdecimal* _getDecimalCopy(Mdecimal* decimal);
+Mdecimal* _getDecimalCopy(Mdecimal const * const decimal);
+
+Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2);
+Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const d2);
+Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2);
 Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2);
 
-bool isDecimalZero(Mdecimal* decimal);
-bool isDecimalOne(Mdecimal* _decimal);
+bool isDecimalZero(Mdecimal const * const decimal);
+bool isDecimalOne(Mdecimal const * const _decimal);
 
 // compute an decimal approximation to pi which we can then store in the given decimal context unless it's already in there of course
 Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext);
 
-mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t const * const x);
+mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const x);
 
 // ONE ARGUMENT MATH FUNCTIONS
-Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
-Mdecimal* _dcordicsine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
-Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
-Mdecimal* _dcordiccosine(const Mdecimalcontext* decimalcontext,Mdecimal* x);
+Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
+Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
+Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
+Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
 
-Mdecimal* _dtangent(Mdecimalcontext* decimalcontext,Mdecimal const * const x);
+Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
 
-Mdecimal* _dexp(const Mdecimalcontext* decimalcontext,Mdecimal* x);
+Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
 
 // CONVERSION
-Mdecimal* _getRationalDecimal(const Mrational* const _rational); // converts a rational to a decimal
+Mdecimal* _getRationalDecimal(Mrational const * const _rational); // converts a rational to a decimal
+Mrational* _getDecimalRational(Mdecimal const * const decimal); // converts a decimal back to a rational
 
-Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating);
+Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating);
 
-Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
+Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);

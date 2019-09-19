@@ -7,9 +7,9 @@
 
 extern long double const M_LD_NAN;
 extern const char* const ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
-extern /*const*/ Mdecimalcontext* M_DECIMALCONTEXT;
+extern /*const*/ Mdecimalcontext* M_DECIMALCONTEXT; // ASSERT should not be NULL whenever M is up and running
 
-mpd_t* get_mpd_copy(const mpd_context_t* mpd_context,mpd_t* mpd){
+mpd_t* get_mpd_copy(mpd_context_t const * mpd_context,mpd_t* mpd){
 	if(!mpd)return NULL;
 	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
 	mpd_t* _mpd=__mpd(mpd_context,0);
@@ -84,13 +84,13 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){
 static mpd_t* decimalOne=NULL;
 // getDecimalOne() return a decimal but this is a decimal that should never be freed
 const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);return decimalOne;}/* VALIDATED */
-bool isDecimalOne(Mdecimal* _decimal){
+bool isDecimalOne(Mdecimal const * const _decimal){
     // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
     return (_decimal->repeating&&mpd_cmp(_decimal->mpd,getDecimalOne(),M_DECIMALCONTEXT->mpd_context)==MP_EQ);
 }/* VALIDATED */
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
-Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
+Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
     Mstring* _decimalText=__string();
     if(_decimalText){
 		if(_decimal&&_decimal->mpd){
@@ -121,7 +121,7 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint){
  * \param _decimal the decimal to copy
  * \return a copy of \p _decimal on success, or NULL otherwise
  */
-Mdecimal* _getDecimalCopy(Mdecimal* _decimal){
+Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){
 	Mdecimalcontext* decimalcontext=(_decimal?_getDecimalcontext(_decimal->prec):NULL);
     if(!decimalcontext)return NULL;
 	mpd_t* _mpd=get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd); // make a copy
@@ -150,7 +150,107 @@ void free_bigintegerListelement(MbigintegerListelement* _bile){
     if(_bile->_next)free_bigintegerListelement(_bile->_next);
     if(_bile->_biginteger)free_biginteger(_bile->_biginteger);
 }/* VALIDATED */
-Mdecimal* _getRationalDecimal(const Mrational* const _rational){
+
+// MDH@17JUN2019: convert a decimal (back) to a rational
+Mrational* _getDecimalRational(Mdecimal const * const decimal){
+    Mrational* _rational=NULL;
+    if(decimal){
+        // get the decimal text in fixed point format if it is not repeating, otherwise we always get in in fixed point but then without the closing ]
+        Mstring* _decimalText=_getDecimalText(decimal,decimal->repeating>0); // replacing: mpd_to_sci(_decimal->mpd,0);
+        if(_decimalText){
+            char* decimalText=string(_decimalText); // a pointer to the chars array in _decimalString, so you can't free _decimalText until being finished with decimalText
+            if(amVerbose())output("Decimal text to parse to rational: '%s'.\n",decimalText);
+            if(decimal->repeating){
+                // we have _decimal->repeating characters at the end of _decimalText that are repeated
+                // having a decimal part (behind decimal period) is obligatory
+                char* periodText=strchr(decimalText,'.');
+                if(periodText){
+                    ////////output("Period text: '%s'.\n",periodText);
+                    bool neg=false;if(decimalText[0]=='-'){decimalText++;neg=true;} // 'cut off' and remember the sign
+                    // 1. determine the start of the repeating digits (which is marked by [)
+                    char* repeatingText=strchr(decimalText,'['); // replacing: _decimalText+(strlen(_decimalText)-_decimal->repeating); // using pointer arithmetic
+                    *repeatingText='\0'; // we don't need the [ for parsing
+                    repeatingText++;
+                    ////////output("Repeating text: '%s'.\n",repeatingText);
+                    // 2. extract the big integer representing the repeating digits (which will be the third part of the numerator)
+                    // locally used dynamic variables
+                    Mbiginteger *_num3=__biginteger(),*_bi10=_getBiginteger(10),*_den2=_getBiginteger(10),*_den1=_getBiginteger(1);
+                    ////////output("Temporary dynamic variables created.\n");
+                    if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(_num3,repeatingText,10)==MP_OKAY){
+                        if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
+                        for(int i=decimal->repeating;i>1;i--)if(mp_mul(_den2,_bi10,_den2)!=MP_OKAY){outputError("Failed to multiply the second rational denominator part by 10");free_biginteger(_den2);_den2=NULL;break;}
+                        if(_den2&&mp_decr(_den2)==MP_OKAY){ // _den2 computed (as 9999....9)
+                            // let's determine the denominator
+                            mp_int* _den=NULL;
+                            int numberOfNonRepeatingDecimalDigits=(int)(repeatingText-periodText-2); // compute the number of non repeating decimals
+                            ///////////////////mp_int* _den1=_getBiginteger(1);
+                            if(numberOfNonRepeatingDecimalDigits>0){
+                                while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(_den1,_bi10,_den1)!=MP_OKAY){outputError("Failed to multiply the first rational denominator part by 10");free_biginteger(_den1);_den1=NULL;}
+                                if(_den1){
+                                    _den=__biginteger();
+                                    if(mp_mul(_den1,_den2,_den)!=MP_OKAY){free_biginteger(_den);_den=NULL;}else if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
+                                }
+                            }else
+                                _den=_getBigintegerCopy(_den2);
+                            if(_den){ // denominator computed successfully, either to be bound or freed in this block
+                                *periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
+                                periodText++; // point periodText to the first digit behind the decimal period
+                                if(amVerbose())output("Behind period text: '%s'.\n",periodText);
+                                
+                                // the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
+                                Mbiginteger* _num=_getBigintegerCopy(_num3); // initialize _num to the repeating digits integer
+                                // add the fixed part of the decimal digits (treated as integer)
+                                if(_num&&strlen(periodText)){ // something between the period and the repeating digits
+                                    Mbiginteger* _num2=__biginteger(); // _num2 is freed below, so that's good
+                                    if(mp_read_radix(_num2,periodText,10)!=MP_OKAY||mp_mul(_num2,_den2,_num2)!=MP_OKAY||mp_add(_num,_num2,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}
+                                    else 
+                                    if(amVerbose())outputBiginteger("Non-repeating digits numerator part: '",_num2,"'.\n");
+                                    free_biginteger(_num2);
+                                }
+                                if(_num){ // so far so good
+                                    // _num to be bound or freed in this block!!!
+                                    // add the part in front of the period multiplied by _den1 but it could be zero of course
+                                    Mbiginteger* _num1=__biginteger(); // _mul1 freed below (which is reachable)
+                                    if(mp_read_radix(_num1,decimalText,10)==MP_OKAY){
+                                        // of course the integer part could well be zero!!!!
+                                        if(!isBigintegerZero(_num1)){
+                                            if(mp_mul(_num1,_den,_num1)!=MP_OKAY||mp_add(_num,_num1,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}else if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
+                                        }
+                                    }else{free_biginteger(_num);_num=NULL;}
+                                    free_biginteger(_num1);    
+                                }
+                                // negate the numerator if the decimal is negative
+                                if(_num&&neg&&mp_neg(_num,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}
+                                if(_num)_rational=_getRational(_num,_den,M_LD_NAN,true,false);
+                                // if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
+                                if(!_rational){free_biginteger(_den);free_biginteger(_num);}
+                            }
+                        }else
+                            outputError("Failed to compute the second denominator multiplier");
+                    }else
+                        outputError("Failed to construct the integer containing the repeating digits");
+                    free_biginteger(_num3);
+                    free_biginteger(_bi10);
+                    free_biginteger(_den2);
+                    free_biginteger(_den1);
+                }else{
+                    if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
+                    Mbiginteger* _num=__biginteger();
+                    if(_num){
+                        if(mp_read_radix(_num,decimalText,10)==MP_OKAY)_rational=_getRational(_num,NULL,M_LD_NAN,false,false);
+                        if(!_rational)free_biginteger(_num); // if no rational _num is unbound and must be freed
+                    }
+                }
+            }else // we can go through the text????
+                _rational=_getDecimalTextRational(decimalText);
+            free_string(_decimalText); // OOPS use free_string() not free()!
+        }else
+            outputError("Failed to convert the decimal to text");
+    }
+    return _rational;
+}/* VALIDATED */
+
+Mdecimal* _getRationalDecimal(Mrational const * const _rational){
     if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     // _decimalText is a local variable that when set should be freed before returning!!!
     Mstring* _decimalText=NULL;
@@ -273,7 +373,7 @@ void report_mpd_status(uint32_t mpd_status){
 		outputLine("No decimal context status.");
 }
 
-bool mpd_error(const mpd_context_t* const mpd_context){return(mpd_getstatus(mpd_context)&0xEFBF)!=0;}
+bool mpd_error(mpd_context_t const * const mpd_context){return(mpd_getstatus(mpd_context)&0xEFBF)!=0;}
 
 // BASE STUFF
 // are we keeping a map of mpd contexts????
@@ -340,7 +440,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
  * \param value the (initial) value of the returned mpd_t instance
  * \return on success the mpd_t instance equal to \p value, NULL otherwise
  */
-mpd_t* __mpd(const mpd_context_t* mpd_context,int64_t value){
+mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){
     mpd_t* _mpd=NULL;
 	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
     // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
@@ -390,7 +490,7 @@ Mdecimal* __adecimal(){return (Mdecimal*)CALLOC(1,sizeof(Mdecimal),'D');} /* VAL
  * \param value the initial (integer) value of the decimal
  * \param repeating the number of repeating decimal digits at the end
  */
-Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repeating){
+Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating){
     Mdecimal* _decimal=NULL;
     if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context; // use the application-wide decimal context if no context is defined
     if(mpd_context){
@@ -415,7 +515,7 @@ Mdecimal* __decimal(const mpd_context_t* mpd_context,int64_t value,uint64_t repe
 /**
  * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
  */
-Mdecimal* _getDecimal(const mpd_t* const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){
+Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){
     if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
     Mdecimal* _decimal=__adecimal(); // always using the default decimal context
     if(_decimal){
@@ -427,23 +527,190 @@ Mdecimal* _getDecimal(const mpd_t* const _mpd,mpd_ssize_t prec,uint64_t repeatin
     return _decimal;
 }/* VALIDATED */
 
+/**
+ * \brief adds two pure decimals
+ */
+Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		// the decimal with the highest decimal context determines the context to use
+		// TODO should this double the precision???????
+		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
+		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		if(mpd_context){
+			// compute the sum
+			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qadd(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			// on failure free the decimal
+			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the sum of two decimals");}
+		}
+	}
+	return _decimal;
+}
+//MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
+//               which will make it a little harder to compute the decimal sum
+//               how about returning to the associated rational multiply and convert back to a decimal???????
+Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		if(d1->repeating+d2->repeating>0){ // not both pure decimals
+			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			if(_r1&&_r2){
+				Mrational* _r=_getRationalSum(_r1,_r2); // compute the sum of two rationals
+				if(_r){
+					_decimal=_getRationalDecimal(_r);
+					free_rational(_r);
+				}else
+					outputError("Failed to compute the sum of two rationals");
+			}else
+				outputError("Failed to convert a decimal to a rational");
+			free_rational(_r1);
+			free_rational(_r2);
+		}else // pure decimals
+			_decimal=_dadd(d1,d2); // just add
+	}
+	return _decimal;
+}
+
+/**
+ * \brief subtracts two pure decimals
+ */
+Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		// the decimal with the highest decimal context determines the context to use
+		// TODO should this double the precision???????
+		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
+		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		if(mpd_context){
+			// compute the sum
+			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qsub(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			// on failure free the decimal
+			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the difference of two decimals");}
+		}
+	}
+	return _decimal;
+}
+//MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
+//               which will make it a little harder to compute the decimal sum
+//               how about returning to the associated rational multiply and convert back to a decimal???????
+Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const d2){
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		if(d1->repeating+d2->repeating>0){ // not both pure decimals
+			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			if(_r1&&_r2){
+				Mrational* _r=_getRationalDifference(_r1,_r2); // compute the product of two rationals
+				if(_r){
+					_decimal=_getRationalDecimal(_r);
+					free_rational(_r);
+				}else
+					outputError("Failed to compute the difference of two rationals");
+			}else
+				outputError("Failed to convert a decimal to a rational");
+			free_rational(_r1);
+			free_rational(_r2);
+		}else // pure decimals
+			_decimal=_dsub(d1,d2); // just subtract
+	}
+	return _decimal;
+}
+
+/**
+ * \brief computes the quotient of two pure decimals
+ */
+Mdecimal* _ddiv(Mdecimal const * const d1,Mdecimal const * const d2){
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		// the decimal with the highest decimal context determines the context to use
+		// TODO should this double the precision???????
+		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
+		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		if(mpd_context){
+			// compute the quotient
+			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qdiv(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			// on failure free the decimal
+			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the quotient of two decimals");}
+		}
+	}
+	return _decimal;
+}
+/**
+ * \brief computes the quotient of any two decimals (including repeating ones)
+ */
 Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2){
-	if(!d1||!d2)return NULL;
-	// the decimal with the highest decimal context determines the context to use
-	// TODO should this double the precision???????
-	mpd_ssize_t precision=MAX(d1->prec,d2->prec);
-	mpd_context_t* mpd_context=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
-	// compute the quotient
-	Mdecimal* _decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qdiv(_decimal,d1,d2,mpd_context,&status);
-	// on failure free the decimal
-	if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;}
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		if(d1->repeating+d2->repeating>0){ // not both pure decimals
+			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			if(_r1&&_r2){
+				Mrational* _r=_getRationalQuotient(_r1,_r2); // compute the quotient of two rationals
+				if(_r){
+					_decimal=_getRationalDecimal(_r);
+					free_rational(_r);
+				}else
+					outputError("Failed to compute the quotient of two rationals");
+			}else
+				outputError("Failed to convert a decimal to a rational");
+			free_rational(_r1);
+			free_rational(_r2);
+		}else // pure decimals
+			_decimal=_ddiv(d1,d2); // just multiply
+	}
+	return _decimal;
+}
+
+/**
+ * \brief computes the product of two pure decimals
+ */
+Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		// the decimal with the highest decimal context determines the context to use
+		// TODO should this double the precision???????
+		mpd_ssize_t precision=MAX(d1->prec,d2->prec);
+		Mdecimalcontext* decimalcontext=(precision>=6?_getDecimalcontext(precision):M_DECIMALCONTEXT);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		if(mpd_context){
+			// compute the quotient
+			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qmul(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			// on failure free the decimal
+			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the quotient of two decimals");}
+		}
+	}
+	return _decimal;
+}
+//MDH@19SEP2019: if we multiply two decimals we need to take the repeating digits into account (which we didn't do so far)
+//               which will make it a little harder to compute the decimal product
+//               how about returning to the associated rational multiply and convert back to a decimal???????
+Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2){
+	Mdecimal* _decimal=NULL;
+	if(d1&&d2){
+		if(d1->repeating+d2->repeating>0){ // not both pure decimals
+			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			if(_r1&&_r2){
+				Mrational* _r=_getRationalProduct(_r1,_r2); // compute the product of two rationals
+				if(_r){
+					_decimal=_getRationalDecimal(_r);
+					free_rational(_r);
+				}else
+					outputError("Failed to compute the product of two rationals");
+			}else
+				outputError("Failed to convert a decimal to a rational");
+			free_rational(_r1);
+			free_rational(_r2);
+		}else // pure decimals
+			_decimal=_dmul(d1,d2); // just multiply
+	}
 	return _decimal;
 }
 
 /**
  * \brief returns a decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
  */
-Mdecimal* _getTextDecimal(const char* const decimalText,uint64_t repeating){
+Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){
     if(!decimalText)return NULL;
     Mdecimal* decimal=NULL;
     if(strlen(decimalText)){
@@ -894,7 +1161,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 //                NOTE this implementation is almost the same as that of _dsquarerootofsinorcossquared() except that it does not do the conversion to a cosine and square rooting
 //                NOTE this has the disadvantage that sin squared is approximated with two additional decimals but conversion and square rooting will take place AFTER returning to the original precision
 //                DONE we solve that by taking changing the precision to the _dsine/_dcosine functions
-mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t const * const x){
+mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const x){
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinsquared=NULL;
 	if(mpd_context&&x){
@@ -1017,7 +1284,7 @@ mpd_t* _dsinsquared(mpd_context_t* mpd_context,mpd_t const * const x){
  * \p sin true to return the square root of the sine squared, or the square root of the cosine squared
  * because the same terms are used to compute the sine and the cosine it is guaranteed that sin^2+cos^2=1 (as long as mpd_sqrt is correctly square rooting of course)
  */
-mpd_t* _dsquarerootofsinorcossquared(mpd_context_t* mpd_context,mpd_t* x,bool sin){
+mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd_t const * const x,bool sin){
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinsquared=NULL;
 	if(mpd_context&&x){
@@ -1206,7 +1473,7 @@ void free_mpd_sincos(mpd_sincos_t* _mpd_sincos){
  * \brief returns a pair of mpd_t* instances containing the sine and cosine of \p x respectively guaranteeing their sum of squares equals 1
  * \p x the decimal to compute the sine/cosine of
  */
-mpd_sincos_t* _dsinandcos(mpd_context_t* mpd_context,mpd_t* x){
+mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * const x){
 	// the initial value of the sine is x, and of the cosine is 1
 	mpd_sincos_t* _mpd_sinandcos=NULL;
 	if(mpd_context&&x){
@@ -1312,7 +1579,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t* mpd_context,mpd_t* x){
 	return NULL;
 }
 
-mpd_t* _dsinorcos(mpd_context_t* mpd_context,mpd_t* x,bool sin){ // convergence requires x to be below 1
+mpd_t* _dsinorcos(mpd_context_t const * const mpd_context,mpd_t const * const x,bool sin){ // convergence requires x to be below 1
 	mpd_t* _sinorcos=NULL;
 	if(mpd_context&&x){
 		if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){output("Computing the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}}
@@ -1426,14 +1693,22 @@ typedef struct mpd_relative_angle{
 	bool negative; // whether or not a negative relative angle
 }mpd_relative_angle_t;
 
+void free_sincoselement(Msincoselement* _sincoselement){
+    if(_sincoselement){
+		if(_sincoselement->_next)free_sincoselement(_sincoselement->_next); // unlikely though
+        free_mpd(_sincoselement->_angle);free_mpd(_sincoselement->_sine);free_mpd(_sincoselement->_cosine);
+        free(_sincoselement);
+    }
+}
+
 void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle){
-	free_mpd_sincos(_mpd_relative_angle->sincoselement); // MDH@11SEP2019: now we do need to free the Msincoselement*
+	free_sincoselement(_mpd_relative_angle->sincoselement); // MDH@11SEP2019: now we do need to free the Msincoselement*
 	free_mpd(_mpd_relative_angle->_delta_angle);
 	FREE(_mpd_relative_angle,'A');
 }
 
 // MDH@11SEP2019: we can do much faster and better now we have the predefinedsines in Mdecimalcontext's
-mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* angle){
+mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * const decimalcontext,mpd_t const * const angle){
 	if(angle&&decimalcontext&&decimalcontext->predefinedsinedeltaangle){
 		Mdecimal* _intermediateResult=(amVerbose()?__decimal(decimalcontext->mpd_context,0,0):NULL);
 		if(_intermediateResult){
@@ -1464,7 +1739,7 @@ mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext* decimalc
 								mpd_qcopy(_relativeAngle->sincoselement->_sine,decimalcontext->predefinedsines[predefinedAngleIndex],&status);
 								mpd_qcopy(_relativeAngle->sincoselement->_cosine,decimalcontext->predefinedsines[256-predefinedAngleIndex],&status); // we know where to find the cosine of the predefined angle
 							}else{
-								free_mpd_sincos(_relativeAngle->sincoselement);
+								free_sincoselement(_relativeAngle->sincoselement);
 								_relativeAngle->sincoselement=NULL;
 								status=0xFFFFFFFF;
 							}
@@ -1493,7 +1768,7 @@ mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext* decimalc
 	return NULL;
 }
 // preferable over:
-mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* angle){
+mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext const * const decimalcontext,mpd_t const * const angle){
 	// ASSERT angle must be in [0,pi/2] that way there will always be two surrounding predefined angles
 	if(decimalcontext&&angle){
 		Mdecimal* _intermediateResult=(amVerbose()?__decimal(decimalcontext->mpd_context,0,0):NULL);
@@ -1553,7 +1828,7 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext* decimalcontext,mpd_t* a
 }
 
 // MDH@12SEP2019: instead of first determining the rotations to do, and then doing them, we can immediately perform the rotation
-mpd_t* _getCORDICsinorcos(Mdecimalcontext* decimalcontext,mpd_t* x,bool sin){
+mpd_t* _getCORDICsinorcos(Mdecimalcontext const * const decimalcontext,mpd_t const * const x,bool sin){
 	// I guess an iterative procedure is better than a recursive procedure, because in a recursive procedure we have to keep passing the mpd_context...
 	// this means I can't get down but then the problem is that I can't do the rotations until I find all the constituent angles
 	// yes of course how many CORDIC angles do we have??????
@@ -1612,7 +1887,7 @@ mpd_t* _getCORDICsinorcos(Mdecimalcontext* decimalcontext,mpd_t* x,bool sin){
 	return(sin?_resultsine:_resultcosine);
 }
 // for testing it's a good idea to be able to ask for the CORDIC sine
-Mdecimal* _dcordicsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){
 	if(x){
 		// use the same decimal context as used by x
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
@@ -1714,7 +1989,7 @@ Mdecimal* _dcordicsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 		outputError("No decimal to compute the CORDIC sine of");
 	return NULL;
 }
-Mdecimal* _dcordiccosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){
 	if(x){
 		// use the same decimal context as used by x
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
@@ -1890,7 +2165,7 @@ mpd_t* _getCORDICsine(Mdecimalcontext* decimalcontext,mpd_t* x){
 */
 
 // MDH@26AUG2019: implementing computing the sine with a certain accuracy using Taylor series
-Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){
 	if(x){
 		// use the same decimal context as used by x
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
@@ -2123,7 +2398,7 @@ Mdecimal* _dsine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 	return NULL;
 }
 
-Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){
 	if(x){
 		// use the same decimal context as used by x
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
@@ -2236,7 +2511,7 @@ Mdecimal* _dcosine(const Mdecimalcontext* decimalcontext,Mdecimal* x){
 }
 
 // MDH@17SEP2019: computing the tangens uses _dsinsquared just like _dsine and _dcosine do
-Mdecimal* _dtangent(Mdecimalcontext* decimalcontext,Mdecimal const * const x){
+Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){
 	if(x){
 		// use the same decimal context as used by x
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
@@ -2337,13 +2612,13 @@ Mdecimal* _dtangent(Mdecimalcontext* decimalcontext,Mdecimal const * const x){
 				return(_tan?_getDecimal(_tan,mpd_context->prec,0,true):NULL);				
 			}
 		}
-		outputError("No decimal context to compute the sine of a decimal in");
+		outputError("No decimal context to compute the tangent of a decimal");
 	}else
-		outputError("No decimal to compute the sine of");
+		outputError("No decimal to compute the tangent of");
 	return NULL;
 }
 
-Mdecimal* _dexp(const Mdecimalcontext* decimalcontext,Mdecimal* x){
+Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x){
 	if(x){
 		if(!decimalcontext)decimalcontext=_getDecimalcontext(x->prec);
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;

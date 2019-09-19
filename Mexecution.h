@@ -180,8 +180,7 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a
 long double getRationalLongDouble(const Mrational* const _rational);
 
 Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/); 
-// used by:
-Mrational* _getDecimalRational(Mdecimal* _decimal);
+// used by (now moved over to Mdecimal.h/c): Mrational* _getDecimalRational(Mdecimal* _decimal);
 
 Mrational* __rational();
 void free_rational(Mrational* _rational);
@@ -189,7 +188,7 @@ bool isRationalZero(Mrational* _rational);
 bool isRationalOne(Mrational* _rational);
 void normalizeRational(Mrational* _rational);
 Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure);
-Mrational* _getInverseRational(const Mrational* const _rational);
+Mrational* _getInverseRational(Mrational const * const _rational);
 
 // some helper functions (TODO or should we use this on Mreal values?????)
 bool ldIsZero(long double ld);

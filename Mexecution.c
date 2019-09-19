@@ -252,105 +252,6 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 }/* VALIDATED */
 
 /////////mp_int* __mp_int(){return (mp_int*)MALLOC(sizeof(mp_int),'I');}
-// MDH@17JUN2019: convert a decimal (back) to a rational
-Mrational* _getDecimalRational(Mdecimal* decimal){
-    Mrational* rational=NULL;
-    if(decimal){
-        // get the decimal text in fixed point format if it is not repeating, otherwise we always get in in fixed point but then without the closing ]
-        Mstring* _decimalText=_getDecimalText(decimal,decimal->repeating>0); // replacing: mpd_to_sci(_decimal->mpd,0);
-        if(_decimalText){
-            char* decimalText=string(_decimalText); // a pointer to the chars array in _decimalString, so you can't free _decimalText until being finished with decimalText
-            if(amVerbose())output("Decimal text to parse to rational: '%s'.\n",decimalText);
-            if(decimal->repeating){
-                // we have _decimal->repeating characters at the end of _decimalText that are repeated
-                // having a decimal part (behind decimal period) is obligatory
-                char* periodText=strchr(decimalText,'.');
-                if(periodText){
-                    ////////output("Period text: '%s'.\n",periodText);
-                    bool neg=false;if(decimalText[0]=='-'){decimalText++;neg=true;} // 'cut off' and remember the sign
-                    // 1. determine the start of the repeating digits (which is marked by [)
-                    char* repeatingText=strchr(decimalText,'['); // replacing: _decimalText+(strlen(_decimalText)-_decimal->repeating); // using pointer arithmetic
-                    *repeatingText='\0'; // we don't need the [ for parsing
-                    repeatingText++;
-                    ////////output("Repeating text: '%s'.\n",repeatingText);
-                    // 2. extract the big integer representing the repeating digits (which will be the third part of the numerator)
-                    // locally used dynamic variables
-                    Mbiginteger *_num3=__biginteger(),*_bi10=_getBiginteger(10),*_den2=_getBiginteger(10),*_den1=_getBiginteger(1);
-                    ////////output("Temporary dynamic variables created.\n");
-                    if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(_num3,repeatingText,10)==MP_OKAY){
-                        if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
-                        for(int i=decimal->repeating;i>1;i--)if(mp_mul(_den2,_bi10,_den2)!=MP_OKAY){outputError("Failed to multiply the second rational denominator part by 10");free_biginteger(_den2);_den2=NULL;break;}
-                        if(_den2&&mp_decr(_den2)==MP_OKAY){ // _den2 computed (as 9999....9)
-                            // let's determine the denominator
-                            mp_int* _den=NULL;
-                            int numberOfNonRepeatingDecimalDigits=(int)(repeatingText-periodText-2); // compute the number of non repeating decimals
-                            ///////////////////mp_int* _den1=_getBiginteger(1);
-                            if(numberOfNonRepeatingDecimalDigits>0){
-                                while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(_den1,_bi10,_den1)!=MP_OKAY){outputError("Failed to multiply the first rational denominator part by 10");free_biginteger(_den1);_den1=NULL;}
-                                if(_den1){
-                                    _den=__biginteger();
-                                    if(mp_mul(_den1,_den2,_den)!=MP_OKAY){free_biginteger(_den);_den=NULL;}else if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
-                                }
-                            }else
-                                _den=_getBigintegerCopy(_den2);
-                            if(_den){ // denominator computed successfully, either to be bound or freed in this block
-                                *periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
-                                periodText++; // point periodText to the first digit behind the decimal period
-                                if(amVerbose())output("Behind period text: '%s'.\n",periodText);
-                                
-                                // the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
-                                Mbiginteger* _num=_getBigintegerCopy(_num3); // initialize _num to the repeating digits integer
-                                // add the fixed part of the decimal digits (treated as integer)
-                                if(_num&&strlen(periodText)){ // something between the period and the repeating digits
-                                    Mbiginteger* _num2=__biginteger(); // _num2 is freed below, so that's good
-                                    if(mp_read_radix(_num2,periodText,10)!=MP_OKAY||mp_mul(_num2,_den2,_num2)!=MP_OKAY||mp_add(_num,_num2,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}
-                                    else 
-                                    if(amVerbose())outputBiginteger("Non-repeating digits numerator part: '",_num2,"'.\n");
-                                    free_biginteger(_num2);
-                                }
-                                if(_num){ // so far so good
-                                    // _num to be bound or freed in this block!!!
-                                    // add the part in front of the period multiplied by _den1 but it could be zero of course
-                                    Mbiginteger* _num1=__biginteger(); // _mul1 freed below (which is reachable)
-                                    if(mp_read_radix(_num1,decimalText,10)==MP_OKAY){
-                                        // of course the integer part could well be zero!!!!
-                                        if(!isBigintegerZero(_num1)){
-                                            if(mp_mul(_num1,_den,_num1)!=MP_OKAY||mp_add(_num,_num1,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}else if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
-                                        }
-                                    }else{free_biginteger(_num);_num=NULL;}
-                                    free_biginteger(_num1);    
-                                }
-                                // negate the numerator if the decimal is negative
-                                if(_num&&neg&&mp_neg(_num,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}
-                                if(_num)rational=_getRational(_num,_den,M_LD_NAN,true,false);
-                                // if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
-                                if(!rational){free_biginteger(_den);free_biginteger(_num);}
-                            }
-                        }else
-                            outputError("Failed to compute the second denominator multiplier");
-                    }else
-                        outputError("Failed to construct the integer containing the repeating digits");
-                    free_biginteger(_num3);
-                    free_biginteger(_bi10);
-                    free_biginteger(_den2);
-                    free_biginteger(_den1);
-                }else{
-                    if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
-                    Mbiginteger* _num=__biginteger();
-                    if(_num){
-                        if(mp_read_radix(_num,decimalText,10)==MP_OKAY)rational=_getRational(_num,NULL,M_LD_NAN,false,false);
-                        if(!rational)free_biginteger(_num); // if no rational _num is unbound and must be freed
-                    }
-                }
-            }else // we can go through the text????
-                rational=_getDecimalTextRational(decimalText);
-            free_string(_decimalText); // OOPS use free_string() not free()!
-        }else
-            outputError("Failed to convert the decimal to text");
-    }
-    return rational;
-}/* VALIDATED */
-
 // long double to rational or representation
 typedef struct {
     uint64_t mantisse;
@@ -890,8 +791,9 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
     if(!_rational)if(freeonfailure){free_biginteger(_numerator);free_biginteger(_denominator);}
     return _rational;
 }/* VALIDATED */
+
 // _getInverseRational() will take care of releasing the newly created rational parts when failing to wrap them in a rational
-Mrational* _getInverseRational(const Mrational* const _rational){
+Mrational* _getInverseRational(Mrational const * const _rational){
     if(!_rational){outputError("No rational to invert");return NULL;}
     Mrational* _inverseRational=NULL;
     // for now only allow inverting pure rationals!!!

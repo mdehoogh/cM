@@ -244,7 +244,7 @@ Mvalue* Mtan(Mvalue*  _value){
         // scalar arguments
         if(_value->type==VT_REAL)return _getRealValue(tanl(_value->value._real->ld));
         if(_value->type==VT_INTEGER)return _getRealValue(tan(_value->value._integer->ll));
-        if(_value->type==VT_DECIMAL)return _getRationalValue(_dtangent(NULL,_value->value._decimal),true);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue(_dtangent(NULL,_value->value._decimal),true);
         if(_value->type==VT_RATIONAL){
             Mrational* _sineRational=_qsinorcos(_value->value._rational,true);
             Mrational* _cosineRational=_qsinorcos(_value->value._rational,false);
