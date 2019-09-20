@@ -1395,18 +1395,157 @@ bool endFunctionBodyInput(){
 }
 // MDH@19JUL2019 END
 
+Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
+
+Mstring* behindCursorText=NULL; // MDH@27FEB2019: we keep track of the characters behind the cursor
+// MDH@20SEP2019: we used to keep track of the behind cursor text, in a single Mstring instance, but because we also want to be able to add variable completion we keep a sequence of char* 
+//                each feed forward char* is associated with a single token, and if that token is removed so should the associated feed forward
+// we can keep using behindCursorText but instead we need to compose it each time it is requested
+// call free_behindcursortext whenever the behind cursor text changes
+typedef struct Mfeedforwardtext{
+	Mtoken* token;
+	char* _text;
+	struct Mfeedforwardtext *_next;
+	bool inactive; // keep track of whether or not active... (a feed forward text can become inactive when the associated token itself is still around but the text was moved to the command with a left or right arrow key)
+}Mfeedforwardtext;
+Mfeedforwardtext *_firstFeedforwardtext=NULL,*_firstActiveFeedforwardtext=NULL;
+Mstring* getBehindCursorText(){
+	// if behindCursorText is undefined, we have to compose it, so only when it changes do we need to reconstruct it
+	if(!behindCursorText){
+		behindCursorText=__string();
+		if(behindCursorText){
+			Mfeedforwardtext* _feedforwardtext=_firstFeedforwardtext;
+			while(_feedforwardtext){if(!_feedforwardtext->inactive&&!string_append(behindCursorText,_feedforwardtext->_text))break;_feedforwardtext=_feedforwardtext->_next;}
+		}
+	}
+	return behindCursorText;
+}
+void free_behindcursortext(){if(!behindCursorText)return;free_string(behindCursorText);behindCursorText=NULL;}
+void free_feedforwardtext(Mfeedforwardtext* _feedforwardtext){
+	if(!_feedforwardtext)return;
+	if(_feedforwardtext->_next)free_feedforwardtext(_feedforwardtext->_next);
+	if(_feedforwardtext->_text)free(_feedforwardtext->_text);
+	FREE(_feedforwardtext,'F');
+}
+void deleteFeedforwardText(){
+	free_behindcursortext(); // we need to do this because every time the entire feed forward text is freed,
+	free_feedforwardtext(_firstFeedforwardtext);
+	_firstFeedforwardtext=NULL; // OOPS pretty essential!!!!
+}
+// every time feed forward text is to be added, it is prepended to the list of feed forward texts setting the token pointer to pLastCommandToEvaluateToken
+void addFeedforwardTextOfToken(Mtoken* token,char* text){
+	if(!text)return;
+	Mfeedforwardtext* _feedforwardtext=CALLOC(1,sizeof(Mfeedforwardtext),'F');
+	if(_feedforwardtext){
+		_feedforwardtext->_text=_strdup(text);
+		if(_feedforwardtext->_text){ // success
+			_feedforwardtext->token=token;
+			_feedforwardtext->_next=_firstFeedforwardtext;
+			_firstFeedforwardtext=_feedforwardtext;
+			free_behindcursortext(); // get rid of the current behind cursor text
+		}else // failure, too bad TODO deal with this memory issue
+			FREE(_feedforwardtext,'F');
+	}
+}
+// call setLastTokenFeedforwardText with text not empty, to remove call remove
+void setLastTokenFeedforwardText(char* text){
+	if(!text)return;
+	// find the last token's feed forward text (if any)
+	Mfeedforwardtext* _feedforwardtext=_firstFeedforwardtext;while(_feedforwardtext&&_feedforwardtext->token!=pLastCommandToEvaluateToken)_feedforwardtext=_feedforwardtext->_next;
+	if(_feedforwardtext){
+		free_behindcursortext();
+		// relink the rest of the feed forward text chain to skip this feed forward text
+		// if we have a previous feed forward text make if point to the successor of the feed forward text we are now removing, otherwise we get a new first feed forward text
+		if(_feedforwardtext->_text){free(_feedforwardtext->_text);_feedforwardtext->_text=NULL;}
+		_feedforwardtext->_text=_strdup(text);
+	}else // not yet present
+		addFeedforwardTextOfToken(pLastCommandToEvaluateToken,text);
+}
+void removeFeedforwardTextOfToken(Mtoken* token){
+	Mfeedforwardtext *_previousFeedforwardtext=NULL,*_feedforwardtext=_firstFeedforwardtext;
+	while(_feedforwardtext&&_feedforwardtext->token!=token){_previousFeedforwardtext=_feedforwardtext;_feedforwardtext=_feedforwardtext->_next;}
+	if(!_feedforwardtext)return; // the token apparently does not have feed forward text
+	// relink the rest of the feed forward text chain to skip this feed forward text
+	// if we have a previous feed forward text make if point to the successor of the feed forward text we are now removing, otherwise we get a new first feed forward text
+	if(_previousFeedforwardtext)_previousFeedforwardtext->_next=_feedforwardtext->_next;else _firstFeedforwardtext=_feedforwardtext->_next;
+	free_behindcursortext(); // the feed forward text changed so needs to be reconstructed whenever it is to be shown
+	_feedforwardtext->_next=NULL; // we need to do this to prevent free_feedforwardtext() to also free all successors
+	free_feedforwardtext(_feedforwardtext);
+}
+void removeFirstFeedforwardCharacterFromLastTokenWhenMatching(char inputChar){
+	// find the last token's feed forward text (if any)
+	Mfeedforwardtext* _feedforwardtext=_firstFeedforwardtext;while(_feedforwardtext&&_feedforwardtext->token!=pLastCommandToEvaluateToken)_feedforwardtext=_feedforwardtext->_next;
+	if(!_feedforwardtext)return;
+	char* p=_feedforwardtext->_text;
+	if(!p)return; // if the pointer to the text is undefined, we don't have it
+	// NOTE no need to test the length because inputChar typically will not equal '\0'
+	if(*p!=inputChar)return; // if the character pointed to by the pointer does not match the input character nothing to do
+	// we'll be cutting off the first character!!
+	free_behindcursortext();
+	char* _leftover=strdup(p+1); // make a dynamic copy starting at the second character!
+	free(p);
+	_feedforwardtext->_text=_leftover;
+}
+char firstFeedforwardCharacterRemoved(){
+	char result='\0'; // assume nothing removed...
+	if(_firstFeedforwardtext){
+		char* p=_firstFeedforwardtext->_text;
+		size_t l=(p?strlen(p):-1);
+		if(l>0){ // at least one character in there
+			free_behindcursortext();
+			result=*p; // the removed character is what p points to
+			l--; // remember how many characters will be left
+			char* _leftover=strdup(++p); // copy remainder dynamically
+			free(_firstFeedforwardtext->_text); // free the previous text pointer memory (otherwise it'll keep hanging around)
+			_firstFeedforwardtext->_text=_leftover; // point to the new remainder
+		}
+		// when no text (left), delete the first feed forward text
+		if(l<=0){Mfeedforwardtext* _feedforwardtext=_firstFeedforwardtext->_next;_firstFeedforwardtext->_next=NULL;free_feedforwardtext(_firstFeedforwardtext);_firstFeedforwardtext=_feedforwardtext;}
+	}
+	return result;
+}
+// a character can be 'anonymously' prepended to the feed forward text
+bool feedforwardCharacterPrepended(char c){
+	bool result=false;
+	if(c){
+		// we need to have a feed forward text that is anonymous
+		Mfeedforwardtext* _feedforwardtext=NULL;
+		if(!_firstFeedforwardtext||_firstFeedforwardtext->token) // there is no first feed forward text, or it is not anonymous
+			_feedforwardtext=CALLOC(1,sizeof(Mfeedforwardtext),'F');
+		else // we have a first feed forward text that is anonymous
+			_feedforwardtext=_firstFeedforwardtext;
+		if(_feedforwardtext){
+			Mstring* _string=__string(); // free asap
+			if(_string){
+				string_append_char(_string,c);
+				if(_feedforwardtext->_text){
+					string_append(_string,_feedforwardtext->_text);
+					free(_feedforwardtext->_text); // get rid of the memory with the original text
+					_feedforwardtext->_text=NULL; // just in case (of what?)
+				}
+				_feedforwardtext->_text=strdup(string(_string));
+				// free the memory occupied by the vessel
+				free_string(_string);
+				// if our feed forward text is not the current first fft make it so
+				if(_feedforwardtext!=_firstFeedforwardtext){_feedforwardtext->_next=_firstFeedforwardtext;_firstFeedforwardtext=_feedforwardtext;}
+				result=true;
+				free_behindcursortext();
+			}
+		}
+	}
+	return result;
+}
+
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 long long commandCount=0; // the total number of command input
 long long commandIndex=0;
 
-Mstring* behindCursorText=NULL; // MDH@27FEB2019: we keep track of the characters behind the cursor
 Mstring* shellCommand=NULL;
 Mtoken* pCommandToEvaluate=NULL;
-Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
 
 // keeping track of both the cursor position and the total command length
 uint16_t cursorPosition(){return(inputMode==IM_COMMAND?(pLastCommandToEvaluateToken?pLastCommandToEvaluateToken->offset+string_length(pLastCommandToEvaluateToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));}
-uint16_t behindCursor(){return string_length(behindCursorText);}
+uint16_t behindCursor(){return string_length(getBehindCursorText());} // MDH@20SEP2019: behindCursorText replaced by getBehindCursorText(), this is done everywhere!!!!!
 uint16_t commandLength(){return cursorPosition()+behindCursor();}
 
 uint8_t promptLength=0;
@@ -1566,7 +1705,7 @@ void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartO
 
 void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),commandLength());
-	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
+	debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(getBehindCursorText()));
 	if(amDebugging())
 		inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
@@ -2017,6 +2156,8 @@ bool isOneCharacterTokenType(uint8_t tokenType){
 
 // keep track of the state of entering a command
 void removeToken(){		
+	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
+	removeFeedforwardTextOfToken(pLastCommandToEvaluateToken);
 	// ASSERT pLastCommandToEvaluateToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
 	// NOTE if we call freeToken() to free this token all forwardly connected tokens are also freed, so pPrevToken->next should become NULL
 	pLastCommandToEvaluateToken=freeToken(pLastCommandToEvaluateToken); // pLastCommandToEvaluateToken now equals its own previous token!!
@@ -4144,13 +4285,18 @@ void writeRestOfCommand(){ // writes rest of command assuming pLastCommandToEval
 	}
 }
 */
-
+void setInputMode(enum INPUTMODE_ENUM newInputMode){
+	inputMode=newInputMode;
+	free_behindcursortext();
+	// in command mode the behind cursor text is determined JIT, whereas it is actively used in the other modes!!!
+	if(inputMode!=IM_COMMAND)behindCursorText=__string();
+}
 char switchToControlMode(char* message){
 	if(inputMode!=IM_CONTROL){
 		if(inputMode==IM_COMMAND)clearCommand();
 		resetOutputColor();
 		if(message!=NULL)outputLine(message);
-		inputMode=IM_CONTROL;
+		setInputMode(IM_CONTROL);
 		outputVariables(); // immediately show the list of available variables (so we can then use v for verbose flag, AND s is available for Shell again!!!!)
 	}
 	///////////outputFlags(); // show the user the current flags!!
@@ -4159,7 +4305,7 @@ char switchToControlMode(char* message){
 }
 
 void writeBehindCursorText(bool clearAfterBehindCursorText){
-	uint16_t l=string_length(behindCursorText);
+	uint16_t l=string_length(getBehindCursorText()); // MDH@20SEP2019: calling getBehindCursorText() once ascertains that the behind cursor text will be updated to the actual value
 	if(l||clearAfterBehindCursorText){
 		debugWrite("Behind cursor text to write: '%s'.",string(behindCursorText));
 		resetOutputColor();
@@ -4212,7 +4358,8 @@ void setCommandIndex(uint32_t newCommandIndex){
 	backToPrompt();
 	clearScreenFromCursor();
 	// MDH@24APR2019 obsolete: commandLength()=cursorPosition()=0; // do we need this????
-	string_setlength(behindCursorText,0); // clear the behind cursor text (in any situation)
+	// clear the behind cursor text (in any situation)
+	deleteFeedforwardText(); // MDH@20SEP2019 replacing: string_setlength(behindCursorText,0); 
 	if(commandIndex){
 		pLastCommandToEvaluateToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
 		if(amVerbose())inputInfo("Showing command #%lld.",commandCount-commandIndex+1);
@@ -4225,10 +4372,20 @@ void setCommandIndex(uint32_t newCommandIndex){
 			return;
 		}
 		// the previous command will be used as behind cursor text, and not immediately as command
-		while(token){
-			///////outputText("(%s)",tokenText);
-			string_append(behindCursorText,string(token->text));
-			token=token->next;
+		// MDH@20SEP2019
+		// this is a bit of a nuisance as there will be no associated tokens for the entire behind cursor text
+		// theoretically this means we could store the entire behind cursor text in a single feed forward text
+		// we can abuse behindCursorText, by using it to compose it, and afterwards use it to create a single feed forward text instance
+		Mstring* _commandFeedforward=__string(); // free asap
+		if(_commandFeedforward){
+			while(token){
+				///////outputText("(%s)",tokenText);
+				if(!string_append(_commandFeedforward,string(token->text)))break;
+				token=token->next;
+			}
+			// because the last token is NULL, we can use setLastTokenFeedforwardText to register _commandFeedforward used as the entire feed forward text
+			setLastTokenFeedforwardText(string(_commandFeedforward));
+			free_string(_commandFeedforward); // get rid of the feed forward text we constructed
 		}
 	}
 	setCommandToEvaluate(NULL);
@@ -4419,12 +4576,18 @@ bool tokenCheckedForBeingAFunction(bool endOfInput,bool aSuggestedCharacter){
 	if(pLastCommandToEvaluateToken->type!=TT_FUNCTION){ // is it a function (now)?
 		if(getFunction(getEnvironment(),_identifierName)){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
+			// MDH@20SEP2019: I suppose we need to ascertain that an opening parenthesis is associated with the token now, and no longer anything else
+			/* MDH@20SEP2019: removing:
 			if(amMatchingparentheses())if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+			*/
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
 			pLastCommandToEvaluateToken->type=TT_FUNCTION;
 			reoutputToken(pLastCommandToEvaluateToken);
 			// insert an opening parenthesis for the function call
+			if(endOfInput&&amMatchingparentheses())setLastTokenFeedforwardText("(");else removeFeedforwardTextOfToken(pLastCommandToEvaluateToken); // MDH@20SEP2019: either force the feedforward text to match an opening parenthesis or nothing TODO does endOfInput matter?????
+			/* MDH@20SEP2019 replacing:
 			if(endOfInput)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='(')string_insert_char(behindCursorText,0,'(');
+			*/
 		}
 	}else{ // is it (still) a function?
 		if(!getFunction(getEnvironment(),_identifierName)){ // no, it ain't
@@ -4433,7 +4596,10 @@ bool tokenCheckedForBeingAFunction(bool endOfInput,bool aSuggestedCharacter){
 			reoutputToken(pLastCommandToEvaluateToken);
 			//////////outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
+			removeFeedforwardTextOfToken(pLastCommandToEvaluateToken); // MDH@20SEP2019: I suppose when TT_VARIABLE changes to TT_NEW_VARIABLE later on, an equal sign might be added!!!
+			/* MDH@20SEP2019 replacing:
 			if(endOfInput)if(amMatchingparentheses())if(behindCursor())if(string_char(behindCursorText,0)=='(')string_removed_char(behindCursorText,0);
+			*/
 		}
 	}
 	// check whether the variable exists or not
@@ -4447,13 +4613,13 @@ bool tokenCheckedForBeingAFunction(bool endOfInput,bool aSuggestedCharacter){
 				pLastCommandToEvaluateToken->type=TT_NEW_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
 				// suggested characters should make = show (probably already present in the behind cursor text)
-				if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
+				setLastTokenFeedforwardText("="); // MDH@20SEP2019 replacing: if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(behindCursorText,0)!='=')string_insert_char(behindCursorText,0,'=');
 			}
 		}else{ // a new variable
 			if(variableExists){ // now an existing variable
 				pLastCommandToEvaluateToken->type=TT_VARIABLE;
 				reoutputToken(pLastCommandToEvaluateToken);
-				if(endOfInput)if(amMatchingparentheses())if(string_length(behindCursorText)&&string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
+				removeFeedforwardTextOfToken(pLastCommandToEvaluateToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(behindCursorText)&&string_char(behindCursorText,0)=='=')string_removed_char(behindCursorText,0);
 			}
 		}
 	}
@@ -4467,7 +4633,8 @@ void cancelCommand(){ // in response to Ctrl-C or backspace on the first charact
 	backToPrompt();
 	clearScreenFromCursor(); // inserting doing this otherwise (in the case of backspace) we would apparently still see the behind cursor text
 	clearCommand();
-	string_setlength(behindCursorText,0); // by removing the behind cursor text, we ascertain that when the Enter key is pressed, we will switch to control mode, as otherwise we wouldn't, on the other hand, if pCommandToEvaluate is NULL we should always switch to control mode (even if)
+	// by removing the behind cursor text, we ascertain that when the Enter key is pressed, we will switch to control mode, as otherwise we wouldn't, on the other hand, if pCommandToEvaluate is NULL we should always switch to control mode (even if)
+	deleteFeedforwardText(); // MDH@20SEP2019 replacing: string_setlength(behindCursorText,0); 
 	// it's a good idea to inform the user that the command was cleared
 	if(amVerbose())
 	inputInfo("Command cleared!");
@@ -4486,8 +4653,14 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 		// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
 	}/* removedTokenCharacter() calls removeToken which will NULL the pCommandToEvaluate and pLastCommandToEvaluateToken when the first command character is removed, in which case we do not need:
 		else clearCommand();*/
+	
+	// MDH@20SEP2019: the following is about removing the feed forward characters that were added when a certain token started but as you can see 
+	//                it is all about feed forward associated with the start of a token, so removing the associated feed forward can also be done at the moment the token is actually removed
+	//                so for now we remove the following block and simply write the behind cursor text
+	writeBehindCursorText(false);
+	/* replacing:
 	// MDH@14AUG2019: how about removing any matching character?????
-	if(string_length(behindCursorText)){
+	if(string_length(getBehindCursorText())){ // MDH@20SEP2019: will reconstruct behindCursorText if need be
 		if(amMatchingparentheses()){
 			// TODO are there any other characters that we might need to remove
 			// NOTE assuming the character removed is ALWAYS present in INPUTCHARACTERTYPES so we can find its associated input type!!!!!
@@ -4512,6 +4685,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 			writeBehindCursorText(false);
 		}
 	}
+	*/
 }
 // in response to backspace the previous token character is to be removed
 void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
@@ -4600,10 +4774,15 @@ void changeFunctionTokenToAVariable(bool endOfInput){
 	pLastCommandToEvaluateToken->type=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,pLastCommandToEvaluateToken->envid/* replacing:getSpecialFunctionCallToken(pLastCommandToEvaluateToken)*/)||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	reoutputToken(pLastCommandToEvaluateToken);
+	// MDH@20SEP2019: this function is called when a function name changes into a variable name (because the user did not enter ( behind a function name)
+	//                and it makes sense to simply remove the associated feed forward of the token
+	removeFeedforwardTextOfToken(pLastCommandToEvaluateToken);
+	/* replacing:
 	// I think we should remove ( from the behind cursor text if it was inserted
 	if(endOfInput)if(amMatchingparentheses())
 	if(string_length(behindCursorText)&&string_char(behindCursorText,0)=='(')
 	if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the function argument list opening parenthesis from the feed forward text."); // TODO is there a better way???
+	*/
 	// ready to redetermine the new token type!!!!
 }
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
@@ -4912,6 +5091,10 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			// MDH@16APR2019: we can check for an unfinished binary operator in which case we should show = behind 
 			// MDH@15APR2019: it seems like a good idea to adapt the behind cursor text if we entered the start character of a list (element), map or expression opening parenthesis
 			if(pLastCommandToEvaluateToken->type!=TT_ERROR){ // MDH@29APR2019: don't add closing bracket to autocompletion text when in error!!!
+				// MDH@20SEP2019: typically the token type should determine what the feed forward text of the token should be
+				//                so it is less optimal to explicitly check for certain input characters instead of simply looking at the type of token that started!!!
+				//                even so, knowing that each of the input characters that insert a feed forward character actually started a new token and there's at that point no token feed forward yet
+				//                it's easiest to simply set the feed forward text of the last token
 				if(!aSuggestedCharacter){ // MDH@14AUG2019: using this flag here means no changes to the suggested text are done, when this character was consumed from the suggested text
 					if(pLastCommandToEvaluateToken->type!=TT_BINARY_aErU){
 						// MDH@14AUG2019: whether or not to insert a feed-forward matching parenthesis is open for debate
@@ -4922,23 +5105,38 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							//                with strings is important only to insert the same character when the inserted character started the string
 							// removing: if(!string_length(behindCursorText)) // MDH@28MAY2019: if there's nothing behind the cursor yes we do append closing stuff
 							switch(inputCharacterType){
-								case '[':string_insert_char(behindCursorText,0,']');break;
-								case '{':string_insert_char(behindCursorText,0,'}');break;
-								case '(':string_insert_char(behindCursorText,0,')');break;
-								case 'D':if(pLastCommandToEvaluateToken->type==TT_DQSTRING&&string_length(pLastCommandToEvaluateToken->text)==1)string_insert_char(behindCursorText,0,inputChar);break;
-								case 'S':if(pLastCommandToEvaluateToken->type==TT_SQSTRING&&string_length(pLastCommandToEvaluateToken->text)==1)string_insert_char(behindCursorText,0,inputChar);break;
+								case '[':
+									setLastTokenFeedforwardText("]"); // MDH@20SEP2019 replacing: string_insert_char(behindCursorText,0,']');
+									break;
+								case '{':
+									setLastTokenFeedforwardText("}"); // MDH@20SEP2019 replacing: string_insert_char(behindCursorText,0,'}');
+									break;
+								case '(':
+									setLastTokenFeedforwardText(")"); // MDH@20SEP2019 replacing: string_insert_char(behindCursorText,0,')');
+									break;
+								case 'D':
+									if(pLastCommandToEvaluateToken->type==TT_DQSTRING&&string_length(pLastCommandToEvaluateToken->text)==1)
+									setLastTokenFeedforwardText(string(pLastCommandToEvaluateToken->text)); // MDH@20SEP2019 replacing: string_insert_char(behindCursorText,0,inputChar);
+									break;
+								case 'S':
+									if(pLastCommandToEvaluateToken->type==TT_SQSTRING&&string_length(pLastCommandToEvaluateToken->text)==1)
+									setLastTokenFeedforwardText(string(pLastCommandToEvaluateToken->text)); // MDH@20SEP2019 replacing: string_insert_char(behindCursorText,0,inputChar);
+									break;
 								// MDH@14AUG2019: if the user typed the same character as is currently behind the cursor let's remove that character
 								//                but only when the character entered is NOT consumed because in that case it was already removed (and shouldn't be removed again if there's another such a character which can happen a lot with matching parentheses)
 								default:
-									if(!aSuggestedCharacter)
+									// MDH@20SEP2019: it is well possible that the user will type the first character of the feed forward associated with the token in which case I suppose that character should be removed from the feed forward text
+									removeFirstFeedforwardCharacterFromLastTokenWhenMatching(inputChar);
+									/* replacing:
 									if(string_length(behindCursorText)&&string_char(behindCursorText,0)==inputChar){
 										if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the matching first feed forward character");
 									}
+									*/
 									break;
 							}
 						}
 					}else
-						string_insert_char(behindCursorText,0,'=');
+						setLastTokenFeedforwardText("="); // MDH@20SEP2019 replacing: string_insert_char(behindCursorText,0,'=');
 				}
 			}
 			/////if(amDebugging())inputInfo("M");
@@ -4970,15 +5168,16 @@ char switchToShellMode(char* message){
 	clearCommand();
 	resetOutputColor();
 	if(message!=NULL)output("%s",message);
-	inputMode=IM_SHELL;
+	setInputMode(IM_SHELL);
 	clearShellCommand();
 	return 's';
 	//output("%s\n $ ","Enter your shell command, and press the Return button to execute.");
 }
 void switchToCommandMode(){
 	if(inputMode==IM_COMMAND)return;
-	inputMode=IM_COMMAND;
-	string_setlength(behindCursorText,0); // ascertain to not have autocompletion text
+	setInputMode(IM_COMMAND);
+	// ascertain to not have autocompletion text
+	deleteFeedforwardText(); // MDH@20SEP2019 replacing: string_setlength(behindCursorText,0); 
 }
 
 int main(int argc, char **argv){
@@ -5057,7 +5256,7 @@ int main(int argc, char **argv){
 	
 	// initialize commands and input mode
 	shellCommand=__string(); // MDH@12APR2019: allow executing shell commands (calling system())
-	behindCursorText=__string(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
+	// MDH@20SEP2019 removing: behindCursorText=__string(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
 	pCommandToEvaluate=NULL; // the current command (token)
 
 	///// writeCommand() will take care of this!!!! commandLength()=0; // keep track of the total command length...
@@ -5093,7 +5292,7 @@ int main(int argc, char **argv){
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
 			// MDH@24APR2019: pCommandToEvaluate could be non-null if we failed to evaluate it (e.g. when being imcomplete), and we allow a retry
 			//                NOTE registered commands should always be successfully evaluated, so do NOT get rid of any pending command!!!!
-			if(pCommandToEvaluate){writeCommand();writeBehindCursorText(false);}else string_setlength(behindCursorText,0);
+			if(pCommandToEvaluate){writeCommand();writeBehindCursorText(false);}else deleteFeedforwardText(); // MDH@20SEP2019 replacing: string_setlength(behindCursorText,0);
 			/////////////// if(pCommandToEvaluate)clearCommand(); // TODO do we need this????
 			/* replacing:
 			if(pCommandToEvaluate==NULL)if(!string_setlength(behindCursorText,0))output("??"); // TODO should we be loosing behindCursorText here????
@@ -5160,12 +5359,13 @@ int main(int argc, char **argv){
 				//////////outputStatus(inputChar,inputCharType);
 				if(inputCharType=='d'){ // MDH@18APR2019: delete now always deletes the first character in the behind cursor text
 					/////debugWrite("DELETE");
-					if(string_length(behindCursorText)){ // something to delete
-						if(string_removed_char(behindCursorText,0)){ // success!!!
+					// MDH@20SEP2019: equivalent to removing ANY first character in the first feed forward text (if any)
+					if(_firstFeedforwardtext){ // replacing: string_length(behindCursorText)){ // something to delete
+						if(firstFeedforwardCharacterRemoved()) // replacing: string_removed_char(behindCursorText,0)){ // success!!!
 							writeBehindCursorText(true);
-						}else
-							inputCharType=switchToControlMode("Failed to remove the first character in the auto-complete text.");	
-					}else
+						else
+							inputCharType=switchToControlMode("Failed to remove the first character in the auto-complete text.");
+					}else // no first feed forward text (and character)!
 						beep();
 				}else
 				if(inputCharType=='b'){ // backspace
@@ -5191,8 +5391,22 @@ int main(int argc, char **argv){
 				if(inputCharType=='t'){ // Tab character
 					// MDH@03SEP2019: here commandCharacterAccepted() will take care of copying the command if commandIndex is not (yet) zero
 					// if there's a preview (well, code completion by way of a behindCursorText)
+					// MDH@20SEP2019: I suppose we can simply get the characters from the (constructed) behindCursorText
+					//                but that would cause problems in case something goes wrong
+					if(_firstFeedforwardtext){
+						char newInputChar;
+						while((newInputChar=firstFeedforwardCharacterRemoved())){
+							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],!_firstFeedforwardtext,true)){
+								beep();
+								inputCharType=switchToControlMode("Failed to accept a suggested character.");
+								break;
+							}
+						}
+					}else
+						beep();
+					/* replacing:
 					uint16_t bc=behindCursor();
-					if(bc){
+					if(bc>0){
 						// normally all will be Ok, and we can (post)decrement bc until it's zero
 						while(bc--){
 							char newInputChar=string_removed_char(behindCursorText,0);
@@ -5210,6 +5424,7 @@ int main(int argc, char **argv){
 						}
 					}else
 						beep();
+					*/
 				}else
 				if(inputCharType=='m'){ // Esc character...
 					if(inputCharRead(&inputChar)){
@@ -5220,8 +5435,8 @@ int main(int argc, char **argv){
 								if(inputChar==51){
 									if(inputCharRead(&inputChar)){//inputChar=getInputChar();
 										if(inputChar==126){ // delete
-											if(string_length(behindCursorText)){
-												if(string_removed_char(behindCursorText,0))
+											if(_firstFeedforwardtext){ // MDH@20SEP2019 replacing: string_length(behindCursorText)){
+												if(firstFeedforwardCharacterRemoved()) // MDH@20SEP2019 replacing: string_removed_char(behindCursorText,0))
 													writeBehindCursorText(true);
 												else
 													inputCharType=switchToControlMode("Failed to remove the first character of the suggested text.");	
@@ -5283,13 +5498,17 @@ int main(int argc, char **argv){
 										// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyCommand() itself does not seem to do that!!!)
 										if(commandIndex){commandIndex=0;copyCommand();} // will also set commandLength()!!!
 										// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into behindCursorText
+										// MDH@20SEP2019: we do NOT want the character removed to disappear when the token it came from disappears, therefore the addition to the feed forward text should be anonymous
 										bool success=false;
 										char c=removedTokenCharacter(1);
 										if(c){ // removing the character behind the cursor succeeded
 											debugWrite("Character '%c' removed.",c);
+											if(!feedforwardCharacterPrepended(c))inputError("Failed to turn the removed character into a suggested character."); 
+											/* MDH@20SEP2019 replacing: 
 											// prefix it to behindCursorText
-											string_insert_char(behindCursorText,0,c);
+											string_insert_char(behindCursorText,0,c); 
 											debugWrite("Behind cursor text: '%s'.",string(behindCursorText));
+											*/
 											success=true;
 										}
 										if(success){
@@ -5535,7 +5754,7 @@ int main(int argc, char **argv){
 						continue;
 					}
 					if(amVerbose())outputLine("Command evaluated!");
-					string_setlength(behindCursorText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
+					deleteFeedforwardText(); // MDH@20SEP2019 replacing: string_setlength(behindCursorText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					if(!registerCommand()){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
