@@ -4321,6 +4321,38 @@ void writeBehindCursorText(bool clearAfterBehindCursorText){
 	}
 }
 
+// MDH@20SEP2019: whenever a token changes the associated feed forward text might change, so it makes sense to update the feed forward text accordingly
+//                assuming that the given type is correct (e.g. an identifier of which has been determined whether it is a function or variable name)
+void updateLastTokenFeedforwardText(){
+	if(!pLastCommandToEvaluateToken)return;
+	char* tokenFeedforwardText=""; // I guess we can do this
+	switch(pLastCommandToEvaluateToken->type){
+		case TT_ASSIGNMENT:break;
+		case TT_BINARY_AeRu:case TT_BINARY_Aeru:case TT_BINARY_aERu:break;
+		case TT_BINARY_aErU:if(amMatchingparentheses())tokenFeedforwardText="=";break;
+		case TT_BINARY_aeru:break;
+		case TT_COMMENT:break;
+		case TT_DQSTRING:if(amMatchingparentheses())tokenFeedforwardText=string_char(pLastCommandToEvaluateToken->text,0);break;
+		case TT_END_OF_DQSTRING:case TT_END_OF_FUNCTION_CALL:case TT_END_OF_LIST:case TT_END_OF_MAP:case TT_END_OF_SQSTRING:break;
+		case TT_ERROR:break;
+		case TT_EXPRESSION:break;
+		case TT_FUNCTION:if(amMatchingparentheses())tokenFeedforwardText="(";break;
+		case TT_FUNCTION_CALL:if(amMatchingparentheses())tokenFeedforwardText=")";break;
+		case TT_INTEGER:break;
+		case TT_LIST:if(amMatchingparentheses())tokenFeedforwardText="]";break;
+		case TT_LISTELEMENT:break;
+		case TT_MAP:if(amMatchingparentheses())tokenFeedforwardText="}";break;
+		case TT_MAP_VALUE:break;
+		case TT_NEW_VARIABLE:if(amMatchingparentheses())tokenFeedforwardText="=";break;
+		case TT_REAL:break;
+		case TT_SQSTRING:if(amMatchingparentheses())tokenFeedforwardText=string_char(pLastCommandToEvaluateToken->text,0);break;
+		case TT_TERNARY_aeru:break;
+		case TT_UNARY:break;
+		case TT_VARIABLE:break;
+	}
+	setLastTokenFeedforwardText(tokenFeedforwardText);
+}
+
 void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
@@ -5085,6 +5117,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput,aSuggestedCharacter); // MDH@28MAY2019: ALWAYS check for being a function!!!!
 	/////if(amDebugging())inputInfo("K");
 	if(endOfInput){
+		/* MDH@20SEP2019: because I created updateLastTokenFeedforwardText which should take care of adding the right token feed forward I do not need to do the following
 		// MDH@29APR2019: I'd like to detect when a variable becomes a function or vice versa
 		if(notCheckedForBeingAFunction){
 			/////if(amDebugging())inputInfo("L");
@@ -5127,11 +5160,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 								default:
 									// MDH@20SEP2019: it is well possible that the user will type the first character of the feed forward associated with the token in which case I suppose that character should be removed from the feed forward text
 									removeFirstFeedforwardCharacterFromLastTokenWhenMatching(inputChar);
-									/* replacing:
-									if(string_length(behindCursorText)&&string_char(behindCursorText,0)==inputChar){
-										if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the matching first feed forward character");
-									}
-									*/
+									// replacing: if(string_length(behindCursorText)&&string_char(behindCursorText,0)==inputChar)if(!string_removed_char(behindCursorText,0))inputError("Failed to remove the matching first feed forward character");
 									break;
 							}
 						}
@@ -5141,6 +5170,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			}
 			/////if(amDebugging())inputInfo("M");
 		}
+		*/
+		updateLastTokenFeedforwardText(); // it makes sense to update the current token feed forward text just before actually showing it
 		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amDebugging())inputInfo("N");
 		debugWrite("Command length after writing behind cursor text: %" PRIu16 ".",commandLength());
@@ -5526,6 +5557,7 @@ int main(int argc, char **argv){
 													inputInfo("Command cleared."); // MDH@14AUG2019: good idea to inform the user that now there's no command anymore
 												} // if no last command token anymore, we apparently released the first command token
 											}
+											if(tokenCheckedForBeingAFunction(true,false))updateLastTokenFeedforwardText();
 											writeBehindCursorText(false);
 										}else
 											inputCharType=switchToControlMode("Failed to move the cursor left.");
