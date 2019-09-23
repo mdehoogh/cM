@@ -190,7 +190,7 @@ Mstring* _getVariableNames(const Menvironment* const _environment,const char* co
 }/* VALIDATED */
 
 // MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
-Mvariable* getVariable(const Menvironment* const _environment,const char* const name, bool verbose){
+Mvariable* getVariable(Menvironment const * const _environment,char const * const name, bool verbose){
     if(!name){outputError("No variable name specified");return NULL;}
     if(verbose)output("Looking for variable '%s'.\n",name);
     // input valid
@@ -208,7 +208,7 @@ Mvariable* getVariable(const Menvironment* const _environment,const char* const 
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (_environment&&_environment->_parent?getVariable(_environment->_parent,name,verbose):NULL);
 }/* VALIDATED */
-bool containsVariable(const Menvironment* const _environment,const char* const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
+bool containsVariable(Menvironment const * const _environment,char const * const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
 // use Mexists to determine if a variable exists passed in as text, we might decide to return the name of the environment it exists in
 Mvalue* Mexists(Mvalue* _value){
     if(_value&&_value->type==VT_TEXT){
@@ -216,6 +216,65 @@ Mvalue* Mexists(Mvalue* _value){
     }
     return NULL; // input invalid
 }
+
+// MDH@23SEP2019: if we want to show the user how to complete the name of a variable, we can return those characters that may follow \p name to be part of a variable
+//                NOTE if name is already the name of a variable we do not consider that variable
+/**
+ * \brief returns pointer to first non-matching character different in \p s1 and \p s2
+ */
+size_t getNumberOfMatchingCharacters(char const * s1,char const * s2){
+    // testing *s1 and *s2 as well because we want to stop when we bump into the '\0' character and NOT counting that character
+    size_t result=0;if(s1&&s2){while(*s1&&*s2&&*s1==*s2){result++;s1++;s2++;}}return result;
+}
+char* _getCompletion(char const * const name){
+    char* completion=NULL;
+    size_t completionlength=0; // the number of characters to be copied of completion (which will point to the first character in the completion string)
+    int l=(name?strlen(name):0);
+    bool nocompletion=(l==0);
+    if(!nocompletion){
+        Menvironment* _environment=_executionEnvironment;
+        while(_environment){
+            Mmap* variableMap=_environment->_variableMap;
+            if(variableMap){
+                Mmapelement* variableMapelement=variableMap->_first;
+                size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,vnl;
+                char *variablename,*namecompletion;
+                // as long as variable is defined, and the variable's name is not equal to the given name, continue
+                // NOTE all variables that match should have the same characters behind the name part in order to be considered a valid completion
+                while(variableMapelement){
+                    if(variableMapelement->_variable){
+                        variablename=variableMapelement->_variable->_name;
+                        vnl=(variablename?strlen(variablename):0);
+                        if(vnl>l){ // the variable name is larger then name is
+                            numberOfMatchingCharacters=getNumberOfMatchingCharacters(name,variablename);
+                            // wait a minute, we cannot have more than l matching characters
+                            if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
+                                if(completion){
+                                    numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(variablename+l,completion);
+                                    if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
+                                    if(completionlength==0){ // too bad
+                                        nocompletion=true;
+                                        break;
+                                    }
+                                }else{
+                                    completion=variablename+l; // point to the first character after name
+                                    completionlength=vnl-l; // use all following characters
+                                }
+                            }
+                        }
+                    }
+                    variableMapelement=variableMapelement->_next;
+                }
+                if(nocompletion)break; // OOPS apparently contradictory continuations
+            }
+            // TODO check the function names as well!!!!
+            // and check the parent as well
+            _environment=_environment->_parent;
+        }
+    }
+    return(nocompletion?NULL:strndup(completion,completionlength));
+}
+
 // write access
 // helper function to create a new variable with a given name and of a given type
 

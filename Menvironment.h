@@ -74,16 +74,16 @@ Mstring* _getEnvironmentName(); // for use in prompting
 Mtoken* getEnvironmentExpressionToken();
 Mtoken* nextEnvironmentExpressionToken();
 
-unsigned long long getNumberOfFunctionCommands(const char* const functionName);
-bool registerFunctionCommand(const char* const functionName,Mtoken* command);
+unsigned long long getNumberOfFunctionCommands(char const * const functionName);
+bool registerFunctionCommand(char const * const functionName,Mtoken* command);
 
 // MDH@01MAY2019: it's possible to somehow hide the structure pointers within an Menvironment that point to the variables and functions
 //                which basically means that only raw data should go in and out of public functions
 
 // function prototypes
 // read access
-uint32_t getNumberOfVariables(const Menvironment* const _environment);
-Mstring* _getVariableNames(const Menvironment* const _environment,const char* const sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
+uint32_t getNumberOfVariables(Menvironment const * const _environment);
+Mstring* _getVariableNames(Menvironment const * const _environment,char const * const sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
 /* replacing:
 Mvariable* getNewVariable(Menvironment* _environment,const char* name);
 Mvariable* getVariable(Menvironment* _environment,const char* name);
@@ -93,13 +93,15 @@ bool containsVariable(const Menvironment* const _environment,const char* const n
 Mvaluetype getVariableType(const Menvironment* const _environment,const char* const name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
 Mvaluetype getVariableValueType(const Menvironment* const _environment,const char* const name); // same as getVariableType() if a type is defined for the given variable
 
+char* _getCompletion(const char* const name);
+
 // write access
-bool setVariableType(const Menvironment* const _environment,const char* const name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type
+bool setVariableType(Menvironment const * const _environment,char const * const name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type
 // create a value of a certain value type initialized with either value NULL (atomic values) or an empty list or map (VT_LIST,VT_MAP)
 // NOTE when using VT_UNDEFINED, the value remains NULL but any value can be stored in it subsequently
-bool createVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype);
+bool createVariable(Menvironment * const _environment,char const * const name,Mvaluetype valuetype);
 
-long long appendToListVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
+long long appendToListVariable(Menvironment const * const _environment,char const * const name,Mvalue const * const _value);
 
 /*
 Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* _indexValue);

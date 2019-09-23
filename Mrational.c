@@ -199,6 +199,8 @@ long double ldquotient(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld
 long double realquotient(Mreal* r1,Mreal* r2){return(r1&&r2?ldquotient(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
 Mreal* _realquotient(Mreal* r1,Mreal* r2){return(r1||r2?_getReal(realquotient(r1,r2)):NULL);} // either undefined, product undefined
 
+bool realIsUndefined(Mreal* _real){return(!_real||ldIsNaN(_real->ld));}
+
 mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
     ///////Mreal* _delta=NULL;
