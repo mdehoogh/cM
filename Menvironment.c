@@ -226,53 +226,124 @@ size_t getNumberOfMatchingCharacters(char const * s1,char const * s2){
     // testing *s1 and *s2 as well because we want to stop when we bump into the '\0' character and NOT counting that character
     size_t result=0;if(s1&&s2){while(*s1&&*s2&&*s1==*s2){result++;s1++;s2++;}}return result;
 }
-char* _getCompletion(char const * const name){
-    char* completion=NULL;
-    size_t completionlength=0; // the number of characters to be copied of completion (which will point to the first character in the completion string)
-    int l=(name?strlen(name):0);
-    bool nocompletion=(l==0);
-    if(!nocompletion){
-        Menvironment* _environment=_executionEnvironment;
-        while(_environment){
-            Mmap* variableMap=_environment->_variableMap;
-            if(variableMap){
-                Mmapelement* variableMapelement=variableMap->_first;
-                size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,vnl;
-                char *variablename,*namecompletion;
-                // as long as variable is defined, and the variable's name is not equal to the given name, continue
-                // NOTE all variables that match should have the same characters behind the name part in order to be considered a valid completion
-                while(variableMapelement){
-                    if(variableMapelement->_variable){
-                        variablename=variableMapelement->_variable->_name;
-                        vnl=(variablename?strlen(variablename):0);
-                        if(vnl>l){ // the variable name is larger then name is
-                            numberOfMatchingCharacters=getNumberOfMatchingCharacters(name,variablename);
-                            // wait a minute, we cannot have more than l matching characters
-                            if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
-                                if(completion){
-                                    numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(variablename+l,completion);
-                                    if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
-                                    if(completionlength==0){ // too bad
-                                        nocompletion=true;
-                                        break;
+// MDH@24SEP2019: because I decided to return either a completion text, or all characters available to obtain an existing variable/function, I return an Mstring* not a char* anymore with the first character either 1 or 2
+Mstring* _getCompletion(char const * const name){
+    Mstring* _completion=__string(); // this result will start with '\0' indicating that there is no completion or characters from available variables/functions
+    if(_completion){
+        size_t completionlength=0; // the number of characters to be copied of completion (which will point to the first character in the completion string)
+        int l=(name?strlen(name):0);
+        if(l>0){
+            unsigned char completiontype=1; // the completion type (either 1 or 2)
+            string_append_char(_completion,completiontype);
+            if(_completion){ // completion type appended!!!
+                // check all active environments
+                char* completion=NULL; // the current completion string
+                Menvironment* _environment=_executionEnvironment;
+                while(_environment){
+                    // check variables
+                    Mmap* variableMap=_environment->_variableMap;
+                    if(variableMap){
+                        size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,vnl;
+                        char *variablename;
+                        // as long as variable is defined, and the variable's name is not equal to the given name, continue
+                        // NOTE all variables that match should have the same characters behind the name part in order to be considered a valid completion
+                        Mmapelement* variableMapelement=variableMap->_first;
+                        while(variableMapelement){
+                            if(variableMapelement->_variable){
+                                variablename=variableMapelement->_variable->_name;
+                                vnl=(variablename?strlen(variablename):0);
+                                if(vnl>l){ // the variable name is larger then name is
+                                    numberOfMatchingCharacters=getNumberOfMatchingCharacters(name,variablename);
+                                    // wait a minute, we cannot have more than l matching characters
+                                    if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
+                                        if(completiontype==1){
+                                            if(completion){
+                                                numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(variablename+l,completion);
+                                                if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
+                                                if(completionlength==0){ // too bad
+                                                    // we should return the initial characters available
+                                                    // the first character in the completion we had so far is appended to _completion
+                                                    // the first character in the functionname as well
+                                                    // if either fails we set the completion type to 0 otherwise to 2
+                                                    if(!string_append_char(_completion,completion[0])||!string_append_char(_completion,*(variablename+l)))completiontype=0;else completiontype=2;
+                                                    completion=NULL; // don't need completion anymore
+                                                    break;
+                                                }
+                                            }else{
+                                                completion=variablename+l; // point to the first character after name
+                                                completionlength=vnl-l; // use all following characters
+                                            }
+                                        }else{ // completiontype==2
+                                            // don't add twice!!!
+                                            if(string_find(_completion,(*(variablename+l)))<0)if(!string_append_char(_completion,*(variablename+l)))completiontype=0;               
+                                        }
                                     }
-                                }else{
-                                    completion=variablename+l; // point to the first character after name
-                                    completionlength=vnl-l; // use all following characters
                                 }
                             }
+                            variableMapelement=variableMapelement->_next;
                         }
+                        if(completiontype==0)break; // OOPS apparently contradictory continuations
                     }
-                    variableMapelement=variableMapelement->_next;
+                    // check functions
+                    Mfunctionmap* functionMap=_environment->_functionMap;
+                    if(functionMap){
+                        size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,fnl;
+                        char *functionname;
+                        // as long as variable is defined, and the variable's name is not equal to the given name, continue
+                        // NOTE all variables that match should have the same characters behind the name part in order to be considered a valid completion
+                        Mfunctionmapelement* functionMapelement=functionMap->_first;
+                        while(functionMapelement){
+                            functionname=string(functionMapelement->_name); // TODO why is the function name an Mstring and not simply char*
+                            fnl=(functionname?strlen(functionname):0);
+                            if(fnl>l){ // the variable name is larger then name is
+                                numberOfMatchingCharacters=getNumberOfMatchingCharacters(name,functionname);
+                                // wait a minute, we cannot have more than l matching characters
+                                if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
+                                    if(completiontype==1){
+                                        if(completion){
+                                            numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(functionname+l,completion);
+                                            if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
+                                            if(completionlength==0){ // too bad: no matching characters with the current completion, meaning that the first continuation characters do not match, so that no continuation can be returned
+                                                // we should return the initial characters available
+                                                // the first character in the completion we had so far is appended to _completion
+                                                // the first character in the functionname as well
+                                                // if either fails we set the completion type to 0 otherwise to 2
+                                                if(!string_append_char(_completion,completion[0])||!string_append_char(_completion,*(functionname+l)))completiontype=0;else completiontype=2;
+                                                completion=NULL; // don't need completion anymore
+                                                break;
+                                            }
+                                        }else{
+                                            completion=functionname+l; // point to the first character after name
+                                            completionlength=fnl-l; // use all following characters
+                                        }
+                                    }else{ // completiontype==2
+                                        // don't add twice!!!
+                                        if(string_find(_completion,(*(functionname+l)))<0)if(!string_append_char(_completion,*(functionname+l)))completiontype=0;               
+                                    }
+                                }
+                            }
+                            functionMapelement=functionMapelement->_next;
+                        }
+                        if(completiontype==0)break; // OOPS apparently some error
+                    }
+                    // and check the parent as well
+                    _environment=_environment->_parent;
                 }
-                if(nocompletion)break; // OOPS apparently contradictory continuations
+                // either append completion (when the completion type equals 1), or replace the completion type
+                if(completiontype==1)if(completion&&!string_append_chars(_completion,completion,completionlength))completiontype=0;
+                // we set the completion type if not equal to 1
+                // NOTE if completiontype happens to be 0, and to make this work, I've adapted string_setchar() to adapt its length to 0 when this happens (which makes perfect sense to do so)
+                if(completiontype!=1)string_setchar(_completion,completiontype,0);
             }
-            // TODO check the function names as well!!!!
-            // and check the parent as well
-            _environment=_environment->_parent;
         }
     }
+    return _completion;
+    /*
     return(nocompletion?NULL:strndup(completion,completionlength));
+    if(!nocompletion)string_append()
+    }
+    */
+    // I like strndup!
 }
 
 // write access

@@ -219,6 +219,8 @@ Mstring* string_setchar(Mstring* const str,char c,uint32_t pos){
     if(!str)return NULL;
     if(pos>=str->length)return NULL;
     str->chars[pos]=c;
+    // MDH@24SEP2019: if somebody is so smart to use '\0' for c we should adapt the length as well (which could happen in _getCompletion() in Menvironment.h/c)
+    if(c=='\0')str->length=pos;
     return str;
 }
 char* _stringstart(const Mstring* const str,uint32_t length){
@@ -227,6 +229,18 @@ char* _stringstart(const Mstring* const str,uint32_t length){
     char* _result=strdup(str->chars); // create a copy of the entire string
     if(_result)if(length>0&&length<str->length)_result[length]='\0'; // 'cut off' the part we don't want!!
     return _result;
+}
+
+// MDH@24SEP2019: same as string_append but stopping when count characters were appended!!!
+//                changed it as little as possible by breaking out of the while as soon as the number of appended characters (index) exceeds count!!!!
+Mstring* string_append_chars(Mstring* const str,const char* pc,size_t count){
+    if(str!=NULL&&pc!=NULL){ // something to append
+        char c;
+        uint32_t index=0;
+        while((c=pc[index++])){if(index>count)break;if(string_append_char(str,c)==NULL)return NULL;}
+        /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
+    }
+    return str;
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array
