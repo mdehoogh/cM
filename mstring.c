@@ -309,3 +309,13 @@ void string_reverse(Mstring* const str){
     while(halfway>=0){c=str->chars[halfway];str->chars[halfway]=str->chars[l-halfway];str->chars[l-halfway]=c;halfway--;}   
     //////////////printf("\nReversed: '%s'.",string(str));
 }
+
+// MDH@24SEP2019: in order to be able to use a smaller part from the beginning of text we'd like to be able to replace a character by '\0' and later on restore it
+//                we will succeed if we have a function that will return the replaced character so we can put it back in again
+//                this method will NOT change str->length ever, meaning that if you forget to put the character back you're in trouble
+char string_replacedchar(Mstring* const str,char c,uint32_t pos){
+    if(!str||pos>=str->length)return '\0';
+    char replacedchar=str->chars[pos];
+    str->chars[pos]=c;
+    return replacedchar;
+}

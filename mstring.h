@@ -52,5 +52,5 @@ Mstring* string_prepend(Mstring* const str,const char* pc);
 void string_reverse(Mstring* const str);
 
 Mstring* string_append_chars(Mstring* const str,const char* pc,size_t count); // MDH@24SEP2019: we need to be able to append count characters from pc
-
+char string_replacedchar(Mstring* const str,char c,uint32_t pos); // returns the character at position pos replaced by c (but does not change the length ever)
 #endif /* __MSTRING_H__ */

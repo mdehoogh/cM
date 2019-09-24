@@ -1452,7 +1452,7 @@ typedef struct Mfeedforwardtext{
 	///////bool inactive; // keep track of whether or not active... (a feed forward text can become inactive when the associated token itself is still around but the text was moved to the command with a left or right arrow key)
 }Mfeedforwardtext;
 Mfeedforwardtext* _firstFeedforwardtext=NULL;
-Mstring* getBehindCursorText(){
+Mstring* getBehindCursorText(char sep){
 	// if behindCursorText is undefined, we have to compose it, so only when it changes do we need to reconstruct it
 	if(!behindCursorText){
 		behindCursorText=__string();
@@ -1460,7 +1460,7 @@ Mstring* getBehindCursorText(){
 			Mfeedforwardtext* _feedforwardtext=_firstFeedforwardtext;
 			while(_feedforwardtext){
 				if(!string_append(behindCursorText,_feedforwardtext->_text))break;
-				if(!string_append_char(behindCursorText,'|'))break;
+				if(sep)if(!string_append_char(behindCursorText,sep))break;
 				_feedforwardtext=_feedforwardtext->_next;
 			}
 		}
@@ -1498,10 +1498,35 @@ void addFeedforwardTextOfToken(Mtoken* token,char* _text){
 void setLastTokenFeedforwardText(char* _text){
 	if(!_text)return;
 	// do not prepend empty feed forward texts!!!
-	if(strlen(_text)){
-		inputInfo("Feed forward text: '%s'.",_text);
+	size_t l=strlen(_text);
+	if(l>0){
+		// the point is that a part of the feed forward text might already be visible as feed forward text AND we do not want to duplicate feed forward text
+		// this means we have to determine how many characters actually to prepend
+		// alternatively: we could consume characters from the feed forward text and insert the entire feed forward text which is much more convenient to implement
+		getBehindCursorText(0); // let's use behindCursorText to determine which characters match
+		size_t matching=0;
+		char c;
+		int nomatch;
+		// can match at most l characters
+		while(matching<l){
+			c=string_replacedchar(behindCursorText,'\0',matching+1); // pretend that the behind cursor text ends at position matching+1
+			nomatch=(strcmp(string(behindCursorText),_text+(l-matching-1))!=0); // if strcmp returns a nonzero value the text are not the same!!!
+			// put c back
+			string_replacedchar(behindCursorText,c,matching);
+			if(nomatch)break;
+			matching++; // another match
+			if(c=='\0')break; // entire behind cursor text compared...
+		}
+		if(matching>0)_text[l-matching]='\0'; // force the given text to end NOTE free() will still free all initially allocated characters no matter where the end-of-string indicator is placed
+		inputInfo("Non-matching feed forward text: '%s' - behind cursor text: '%s'.",_text,string(behindCursorText));
+		if(matching<l){ // something left
+			addFeedforwardTextOfToken(pLastCommandToEvaluateToken,_text);
+			return;
+		}
+		/*
 		// find the last token's feed forward text (if any)
-		Mfeedforwardtext* _feedforwardtext=_firstFeedforwardtext;while(_feedforwardtext&&_feedforwardtext->token!=pLastCommandToEvaluateToken)_feedforwardtext=_feedforwardtext->_next;
+		Mfeedforwardtext* _feedforwardtext=_firstFeedforwardtext;
+		while(_feedforwardtext&&_feedforwardtext->token!=pLastCommandToEvaluateToken)_feedforwardtext=_feedforwardtext->_next;
 		if(_feedforwardtext){
 			// relink the rest of the feed forward text chain to skip this feed forward text
 			// if we have a previous feed forward text make if point to the successor of the feed forward text we are now removing, otherwise we get a new first feed forward text
@@ -1510,8 +1535,9 @@ void setLastTokenFeedforwardText(char* _text){
 			free_behindcursortext();
 		}else // not yet present, addFeedforwardTextOfToken will take care of freeing _text when appropriate
 			addFeedforwardTextOfToken(pLastCommandToEvaluateToken,_text);
-	}else
-		free(_text);
+		*/
+	}
+	free(_text);
 }
 void removeFeedforwardTextOfToken(Mtoken* token){
 	Mfeedforwardtext *_previousFeedforwardtext=NULL,*_feedforwardtext=_firstFeedforwardtext;
@@ -1605,7 +1631,7 @@ Mtoken* pCommandToEvaluate=NULL;
 
 // keeping track of both the cursor position and the total command length
 uint16_t cursorPosition(){return(inputMode==IM_COMMAND?(pLastCommandToEvaluateToken?pLastCommandToEvaluateToken->offset+string_length(pLastCommandToEvaluateToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));}
-uint16_t behindCursor(){return string_length(getBehindCursorText());} // MDH@20SEP2019: behindCursorText replaced by getBehindCursorText(), this is done everywhere!!!!!
+uint16_t behindCursor(){return string_length(getBehindCursorText(0));} // MDH@20SEP2019: behindCursorText replaced by getBehindCursorText(), this is done everywhere!!!!!
 uint16_t commandLength(){return cursorPosition()+behindCursor();}
 
 uint8_t promptLength=0;
@@ -1765,7 +1791,7 @@ void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartO
 
 void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),commandLength());
-	getBehindCursorText();
+	getBehindCursorText(0);
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),commandLength(),string(behindCursorText));
 	if(amDebugging())
 		inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %" PRIu16 " | Command length: %" PRIu16 " | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),commandLength(),string(behindCursorText));
@@ -4368,7 +4394,7 @@ char switchToControlMode(char* message){
 }
 
 void writeBehindCursorText(bool clearAfterBehindCursorText){
-	uint16_t l=string_length(getBehindCursorText()); // MDH@20SEP2019: calling getBehindCursorText() once ascertains that the behind cursor text will be updated to the actual value
+	uint16_t l=string_length(getBehindCursorText('|')); // MDH@20SEP2019: calling getBehindCursorText() once ascertains that the behind cursor text will be updated to the actual value
 	if(l||clearAfterBehindCursorText){
 		debugWrite("Behind cursor text to write: '%s'.",string(behindCursorText));
 		resetOutputColor();
