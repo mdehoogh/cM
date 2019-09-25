@@ -489,7 +489,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
                    _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     _map->_last=_mapelement;
-                    if(amDebugging())outputLine("Returning the single list map");
+                    if(amDebugging())outputLine("Returning the single list map!");
                     return _map;
                 }
                 outputError("Failed to create the list variable map");
