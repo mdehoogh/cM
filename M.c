@@ -1545,7 +1545,10 @@ void removeFeedforwardTextOfToken(Mtoken* token){
 	if(feedforwardtext==_firstFeedforwardtext)_firstFeedforwardtext=NULL; // TODO should not be needed though
 }// call setLastTokenFeedforwardText with text not empty, to remove call remove
 // _text is dynamically allocated and should be freed if not bound to some!!
-// ok, when replacing the feed forward of the last token the previous one is to be removed, and the new one prepended!!!!
+// MDH@24SEP2019: whenever the user uses the left arrow to move characters out of the token into the feed forward text
+//                it should be remembered that these characters were associated with this token
+//                so that when the feed forward text for a given token is set
+//                the removed token characters and the actual feed forward characters of the token can be combined
 void setLastTokenFeedforwardText(char* _text){
 	// do not prepend empty feed forward texts!!!
 	if(!_text)return;
@@ -1652,7 +1655,8 @@ char firstFeedforwardCharacterRemoved(){
 }
 // a character can be 'anonymously' prepended to the feed forward text
 // BUT if it matches the feed forward text of the current token and the current token does not have a feed forward text yet, it shouldn't be anonymous!!!
-// NO it should be done anonymously so that the system knows that the user EXPLICITLY kept this character in the feed forward text!!!!!!
+// MDH@24SEP2019: NO not anonymous because the character was removed from the current token and should be remembered as such
+//                however this cause a problem if the originating token actually is the feed forward character of another token
 bool feedforwardCharacterPrepended(char c,bool matchesLastTokenFeedforwardText){
 	bool result=false;
 	if(c){
