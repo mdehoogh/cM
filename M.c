@@ -1666,6 +1666,7 @@ bool feedforwardCharacterPrepended(char c,bool matchesLastTokenFeedforwardText){
 		*/
 		if(!_firstFeedforwardtext||_firstFeedforwardtext->token){ // there is no first feed forward text, or it is not anonymous
 			feedforwardtext=CALLOC(1,sizeof(Mfeedforwardtext),'F');
+			feedforwardtext->token=NULL; // TODO shouldn't be needed though
 			if(feedforwardtext){feedforwardtext->_next=_firstFeedforwardtext;_firstFeedforwardtext=feedforwardtext;} // prepend!!!!
 		}else // we have a first feed forward text that is anonymous
 			feedforwardtext=_firstFeedforwardtext;
