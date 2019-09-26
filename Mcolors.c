@@ -56,8 +56,9 @@ const char* RESULT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
 ///////const char* OPTION_COLORS[]={BLACK,WHITE};
 const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the info color
 
-const char* BEHIND_CURSOR_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARKER_GREY};
-const char* BEHIND_CURSOR_TOKEN_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019: special color for generated feed forward text
+// MDH@26SEP2019: distinguishing between identifier continuation text and feed forward text (behind the cursor)
+const char* FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARKER_GREY};
+const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019: special color for generated feed forward text
 
 // operator token colors (all the same)
 const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
@@ -71,8 +72,8 @@ uint8_t colorscheme=0; // the active color scheme (either 0 for white, or 1 for 
 const char* getInfoColor(){return INFO_COLORS[colorscheme];}
 const char* getBackgroundColor(){return BACKGROUND_COLORS[colorscheme];}
 const char* getErrorColor(){return ERROR_COLORS[colorscheme];}
-const char* getBehindCursorTextColor(){return BEHIND_CURSOR_TEXT_COLORS[colorscheme];}
-const char* getBehindCursorTokenTextColor(){return BEHIND_CURSOR_TOKEN_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for generated feed forward text
+const char* getFeedForwardTextColor(){return FEED_FORWARD_TEXT_COLORS[colorscheme];}
+const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for generated feed forward text
 const char* getCommentColor(){return COMMENT_COLORS[colorscheme];}
 const char* getOperatorTokenColor(uint8_t opid){return OPERATOR_TOKEN_COLORS[opid][colorscheme];}
 const char* getValueTokenColor(uint8_t tokentypeid){return VALUE_TOKEN_COLORS[tokentypeid][colorscheme];}
