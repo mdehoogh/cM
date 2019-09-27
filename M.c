@@ -1580,6 +1580,7 @@ void deleteFeedforwardTextOfToken(Mtoken* token){
 void setLastTokenFeedforwardText(char* _text){
 	// do not prepend empty feed forward texts!!!
 	if(!_text)return;
+	inputInfo("Last token feed forward text: '%s'.",_text);
 	// something to replace or add
 	/*
 	if(l>0){
@@ -5694,24 +5695,29 @@ int main(int argc, char **argv){
 					char* consumableText=(_identifierContinuationText?_identifierContinuationText:getFeedforwardCharacters());
 					size_t numberOfConsumableCharacters=(consumableText?strlen(consumableText):0);
 					if(numberOfConsumableCharacters){
-						char newInputChar;
+						char newInputChar='\0';
 						for(size_t consumableCharacterIndex=0;consumableCharacterIndex<numberOfConsumableCharacters;consumableCharacterIndex++){
 							newInputChar=consumableText[consumableCharacterIndex];
 							if(!newInputChar){
-								writeBehindCursorText(true); // there will be characters behind the cursor left to show
-								inputCharType=switchToControlMode("Premature end of text character.");
+								inputCharType=switchToControlMode("Suggested characters vanishing somehow.");
 								break;
 							}
 							if(newInputChar=='#')continue;
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							if(!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],false,true)){
-								inputCharType=switchToControlMode("Failed to accept a suggested character.");
+								inputCharType=switchToControlMode("Failed to consume a suggested character.");
+								newInputChar='\0'; // to indicate some error occurred
 								break;
 							}
 						}
-						// how about forcing the creation of feed forward text (as if endOfInput was true)?
-						updateLastTokenFeedforwardText();writeBehindCursorText(true);
+						// MDH@27SEP2019: either the identifier continuation or the token feed forward texts will all be consumed!!!! (did this before processing earlier, and then the suggested characters vanished!!!)
+						if(_identifierContinuationText)deleteIdentifierContinuation();else deleteTokenfeedforwardtexts();
+						// if successful
+						if(newInputChar){
+							updateLastTokenFeedforwardText();
+							writeBehindCursorText(true); // there could be a new identifier continuation so pass true in not false!!
+						}
 					}else // no consumable text
 						beep();
 				}else
