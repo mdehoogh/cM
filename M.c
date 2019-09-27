@@ -1397,53 +1397,6 @@ bool endFunctionBodyInput(){
 Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
 
 // FEED FORWARD STUFF
-char getTokenTypeFeedforwardCharacter(TokenType tokenType){
-	// some token types have an associated feed forward character!!!
-	switch(pLastCommandToEvaluateToken->type){
-		case TT_BINARY_aErU:return '=';
-		case TT_DQSTRING:return '"'; 
-		case TT_FUNCTION:return '(';
-		case TT_FUNCTION_CALL:return ')';
-		case TT_LIST:return ']';
-		case TT_MAP:return '}';
-		case TT_NEW_VARIABLE:return '=';
-		case TT_SQSTRING:return '\'';
-	}
-	return '\0';
-}
-
-// MDH@24SEP2019: we do not always want to set the identifier continuation characters
-char* _getLastTokenFeedforwardText(){
-	char* tokenFeedforwardText=""; // on the stack
-	if(amMatchingparentheses())
-	if(pLastCommandToEvaluateToken)
-	switch(pLastCommandToEvaluateToken->type){
-		case TT_ASSIGNMENT:break;
-		case TT_BINARY_AeRu:case TT_BINARY_Aeru:case TT_BINARY_aERu:break;
-		case TT_BINARY_aErU:tokenFeedforwardText="=";break;
-		case TT_BINARY_aeru:break;
-		case TT_COMMENT:break;
-		case TT_DQSTRING:tokenFeedforwardText="\"";break; // TODO using " for the double quoted string might change in the future and we'd be in trouble then
-		case TT_END_OF_DQSTRING:case TT_END_OF_FUNCTION_CALL:case TT_END_OF_LIST:case TT_END_OF_MAP:case TT_END_OF_SQSTRING:break;
-		case TT_ERROR:break;
-		case TT_EXPRESSION:if(string_last_char(pLastCommandToEvaluateToken->text)=='(')tokenFeedforwardText=")";break; // TODO use other type e.g. TT_FUNCTION_CALL instead of TT_EXPRESSION on (
-		case TT_FUNCTION:tokenFeedforwardText="(";break;
-		case TT_FUNCTION_CALL:tokenFeedforwardText=")";break;
-		case TT_INTEGER:break;
-		case TT_LIST:tokenFeedforwardText="]";break;
-		case TT_LISTELEMENT:break;
-		case TT_MAP:tokenFeedforwardText="}";break;
-		case TT_MAP_VALUE:break;
-		case TT_NEW_VARIABLE:tokenFeedforwardText="=";break;
-		case TT_REAL:break;
-		case TT_SQSTRING:tokenFeedforwardText="'";break; // TODO using ' for the double quoted string might change in the future and we'd be in trouble then
-		case TT_TERNARY_aeru:break;
-		case TT_UNARY:break;
-		case TT_VARIABLE:;break;
-	}
-	return strdup(tokenFeedforwardText); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
-}
-
 void inputInfo(const char* const fmt,...); // prototype
 void inputError(const char* const fmt,...); // prototype
 
@@ -1465,8 +1418,7 @@ Mstring* _getFeedforwardText(char sep){
 	if(_feedforwardText){
 		Mtokenfeedforwardtext* tokenfeedforwardtext=_firstTokenfeedforwardtext;
 		while(tokenfeedforwardtext){
-			//////if(feedforwardtext->token)if(!string_append_char(_feedforwardText,'#'))break;
-			if(!string_append(_feedforwardText,tokenfeedforwardtext->_text))break;
+			if(tokenfeedforwardtext->_text)if(!string_append(_feedforwardText,tokenfeedforwardtext->_text))break;
 			///////if(feedforwardtext->token)if(!string_append_char(_feedforwardText,'#'))break;
 			if(sep)if(!string_append_char(_feedforwardText,sep))break;
 			tokenfeedforwardtext=tokenfeedforwardtext->_next;
@@ -1528,6 +1480,55 @@ void updateIdentifierContinuation(){
 	}
 }
 
+char getTokenTypeFeedforwardCharacter(TokenType tokenType){
+	// some token types have an associated feed forward character!!!
+	switch(pLastCommandToEvaluateToken->type){
+		case TT_BINARY_aErU:return '=';
+		case TT_DQSTRING:return '"'; 
+		case TT_FUNCTION:return '(';
+		case TT_FUNCTION_CALL:return ')';
+		case TT_LIST:return ']';
+		case TT_MAP:return '}';
+		case TT_NEW_VARIABLE:return '=';
+		case TT_SQSTRING:return '\'';
+	}
+	return '\0';
+}
+
+// MDH@24SEP2019: we do not always want to set the identifier continuation characters
+char* _getLastTokenFeedforwardText(){
+	char* tokenFeedforwardText=""; // on the stack
+	if(amMatchingparentheses())
+	if(pLastCommandToEvaluateToken)
+	switch(pLastCommandToEvaluateToken->type){
+		case TT_ASSIGNMENT:break;
+		case TT_BINARY_AeRu:case TT_BINARY_Aeru:case TT_BINARY_aERu:break;
+		case TT_BINARY_aErU:tokenFeedforwardText="=";break;
+		case TT_BINARY_aeru:break;
+		case TT_COMMENT:break;
+		case TT_DQSTRING:tokenFeedforwardText="\"";break; // TODO using " for the double quoted string might change in the future and we'd be in trouble then
+		case TT_END_OF_DQSTRING:case TT_END_OF_FUNCTION_CALL:case TT_END_OF_LIST:case TT_END_OF_MAP:case TT_END_OF_SQSTRING:break;
+		case TT_ERROR:break;
+		case TT_EXPRESSION:if(string_last_char(pLastCommandToEvaluateToken->text)=='(')tokenFeedforwardText=")";break; // TODO use other type e.g. TT_FUNCTION_CALL instead of TT_EXPRESSION on (
+		case TT_FUNCTION:tokenFeedforwardText="(";break;
+		case TT_FUNCTION_CALL:tokenFeedforwardText=")";break;
+		case TT_INTEGER:break;
+		case TT_LIST:tokenFeedforwardText="]";break;
+		case TT_LISTELEMENT:break;
+		case TT_MAP:tokenFeedforwardText="}";break;
+		case TT_MAP_VALUE:break;
+		// MDH@27SEP2019: if there's an identifier continuation behind the name of a new variable, the user can't reach it, so appending = is not going to be a good idea
+		//                however, this would require the identifier continuation text to be updated BEFORE calling this method
+		case TT_NEW_VARIABLE:if(!_identifierContinuationText)tokenFeedforwardText="=";break;
+		case TT_REAL:break;
+		case TT_SQSTRING:tokenFeedforwardText="'";break; // TODO using ' for the double quoted string might change in the future and we'd be in trouble then
+		case TT_TERNARY_aeru:break;
+		case TT_UNARY:break;
+		case TT_VARIABLE:;break;
+	}
+	return strdup(tokenFeedforwardText); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
+}
+
 void free_tokenfeedforwardtext(Mtokenfeedforwardtext* _feedforwardtext){
 	if(!_feedforwardtext)return;
 	if(_feedforwardtext->_next)free_tokenfeedforwardtext(_feedforwardtext->_next);
@@ -1561,16 +1562,16 @@ void addFeedforwardTextOfToken(Mtoken* token,char* _text){
 	free(_text);
 }
 void deleteFeedforwardTextOfToken(Mtoken* token){
-	Mtokenfeedforwardtext *prevfeedforwardtext=NULL,*feedforwardtext=_firstTokenfeedforwardtext;
-	while(feedforwardtext&&feedforwardtext->token!=token){prevfeedforwardtext=feedforwardtext;feedforwardtext=prevfeedforwardtext->_next;}
-	if(!feedforwardtext)return; // the token apparently does not have feed forward text
+	Mtokenfeedforwardtext *prevtokenfeedforwardtext=NULL,*tokenfeedforwardtext=_firstTokenfeedforwardtext;
+	while(tokenfeedforwardtext&&tokenfeedforwardtext->token!=token){prevtokenfeedforwardtext=tokenfeedforwardtext;tokenfeedforwardtext=prevtokenfeedforwardtext->_next;}
+	if(!tokenfeedforwardtext)return; // the token apparently does not have feed forward text
 	// relink the rest of the feed forward text chain to skip this feed forward text
 	// if we have a previous feed forward text make if point to the successor of the feed forward text we are now removing, otherwise we get a new first feed forward text
-	if(prevfeedforwardtext)prevfeedforwardtext->_next=feedforwardtext->_next;else _firstTokenfeedforwardtext=feedforwardtext->_next;
-	deleteTokenfeedforwardtexts(); // the feed forward text changed so needs to be reconstructed whenever it is to be shown
-	feedforwardtext->_next=NULL; // we need to do this to prevent free_tokenfeedforwardtext() to also free all successors
-	free_tokenfeedforwardtext(feedforwardtext);
-	if(feedforwardtext==_firstTokenfeedforwardtext)_firstTokenfeedforwardtext=NULL; // TODO should not be needed though
+	if(prevtokenfeedforwardtext)prevtokenfeedforwardtext->_next=tokenfeedforwardtext->_next;else _firstTokenfeedforwardtext=tokenfeedforwardtext->_next;
+	deleteFeedforwardText(); // the feed forward text changed so needs to be reconstructed whenever it is to be shown
+	tokenfeedforwardtext->_next=NULL; // we need to do this to prevent free_tokenfeedforwardtext() to also free all successors
+	free_tokenfeedforwardtext(tokenfeedforwardtext);
+	if(tokenfeedforwardtext==_firstTokenfeedforwardtext)_firstTokenfeedforwardtext=NULL; // TODO should not be needed though
 }// call setLastTokenFeedforwardText with text not empty, to remove call remove
 // _text is dynamically allocated and should be freed if not bound to some!!
 // MDH@24SEP2019: whenever the user uses the left arrow to move characters out of the token into the feed forward text
@@ -1662,7 +1663,7 @@ void removeFirstFeedforwardCharacterFromLastTokenWhenMatching(char inputChar){
 }
 */
 char getFirstFeedforwardCharacterRemoved(){
-	inputInfo("%s","Determining the first feed forward character!");
+	if(amVerbose())inputInfo("%s","Determining the first feed forward character!");
 	char firstFeedforwardCharacterRemoved='\0';
 	// find first feed forward text with text (so skipping all without text)
 	Mtokenfeedforwardtext *prevtokenfeedforwardtext=NULL,*tokenfeedforwardtext=_firstTokenfeedforwardtext;
@@ -1672,12 +1673,12 @@ char getFirstFeedforwardCharacterRemoved(){
 		if(p){
 			if(p[0]){
 				firstFeedforwardCharacterRemoved=p[0];
-				inputInfo("First feed forward character '%c'.",firstFeedforwardCharacterRemoved);
-				char* _leftover=strdup(p+1); // copy remainder dynamically
-				if(_leftover&&strlen(_leftover)>0){ // replace the feed forward text
-					free(tokenfeedforwardtext->_text); // free the previous text pointer memory (otherwise it'll keep hanging around)
-					tokenfeedforwardtext->_text=_leftover; // point to the new remainder
-				}else{ // nothing left over so it's easier to remove feedforwardtext
+				deleteFeedforwardText(); // ESSENTIAL otherwise it wouldn't update the feed forward text when it needs to (when writing the behind cursor text!!)
+				if(amVerbose())inputInfo("First feed forward character '%c'.",firstFeedforwardCharacterRemoved);
+				// replace the current text by what's behind the first character (if any)
+				tokenfeedforwardtext->_text=(strlen(p)>1?strdup(p+1):NULL);
+				free(p); // free the currently used dynamic memory still pointed to by p
+				if(!tokenfeedforwardtext->_text){ // nothing left (or failing to copy the remainder over)
 					Mtokenfeedforwardtext* nexttokenfeedforwardtext=tokenfeedforwardtext->_next; // remember where to link the previous to
 					tokenfeedforwardtext->_next=NULL;free_tokenfeedforwardtext(tokenfeedforwardtext); // get rid of the feed forward text
 					// link the predecessor to the successor
@@ -4516,11 +4517,20 @@ char switchToControlMode(char* message){
 }
 
 size_t getNumberOfIdentifierContinuationTextCharactersWritten(){
-	updateIdentifierContinuation();
+	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateIdentifierContinuation();
 	if(!_identifierContinuationText)return 0;
 	setColor(getIdentifierContinuationTextColor());
 	output("%s",_identifierContinuationText); // the first 'character' in the identifier continuation text is the type actually!!!
 	return strlen(_identifierContinuationText); // one less character written than the computed length!!!
+}
+size_t getNumberOfFeedforwardCharacters(){
+	return strlen(getFeedforwardCharacters());
+}
+size_t getNumberOfTokenFeedforwardTexts(){
+	size_t numberOfTokenFeedforwardTexts=0;
+	Mtokenfeedforwardtext* tokenfeedforwardtext=_firstTokenfeedforwardtext;
+	while(tokenfeedforwardtext){numberOfTokenFeedforwardTexts++;tokenfeedforwardtext=tokenfeedforwardtext->_next;}
+	return numberOfTokenFeedforwardTexts;
 }
 size_t getNumberOfFeedforwardCharactersWritten(){
 	char* feedforwardCharacters=getFeedforwardCharacters(); // ascertain to have feedforwardText
@@ -4533,7 +4543,7 @@ size_t getNumberOfFeedforwardCharactersWritten(){
 	return feedforwardCharactersLength;
 }
 // MDH@27SEP2019: when the user just deleted the identifier continuation we would not want it to be generated immediately
-void writeBehindCursorText(bool updateIdentifierContinuation){
+void writeBehindCursorText(bool updateIdentifierContinuationText){
 	// MDH@26SEP2019: behind cursor text now consists of two parts now: identifier continuation text and feed forward text
 	// 0. preparation
 	resetOutputColor();
@@ -4542,11 +4552,14 @@ void writeBehindCursorText(bool updateIdentifierContinuation){
 	// 1. write the identifier continuation text and feed forward text
 	size_t commandLength=getCommandLength();
 	size_t newNumberOfBehindPromptCharactersWritten=commandLength;
-	if(updateIdentifierContinuation)newNumberOfBehindPromptCharactersWritten+=getNumberOfIdentifierContinuationTextCharactersWritten();
+	if(updateIdentifierContinuationText)updateIdentifierContinuation(); // force an update of the identifier continuation (could have been already done in updateLastTokenFeedforwardText()!)
+	newNumberOfBehindPromptCharactersWritten+=getNumberOfIdentifierContinuationTextCharactersWritten();
 	newNumberOfBehindPromptCharactersWritten+=getNumberOfFeedforwardCharactersWritten();
+	///////////////inputInfo("Number of written characters: %zu.",newNumberOfBehindPromptCharactersWritten);
 	// 2. write additional blanks overwriting what we had before
 	while(newNumberOfBehindPromptCharactersWritten<numberOfBehindPromptCharactersWritten){newNumberOfBehindPromptCharactersWritten++;outputChar(' ');}
-	moveCursorLeft(newNumberOfBehindPromptCharactersWritten-commandLength); // return to where the command ends
+	outputChar(' ');  // one extra to be on the safe size TODO why?????????
+	moveCursorLeft(newNumberOfBehindPromptCharactersWritten+1-commandLength); // return to where the command ends
 	// update numberOfBehindPromptCharactersWritten
 	numberOfBehindPromptCharactersWritten=newNumberOfBehindPromptCharactersWritten;
 	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
@@ -4556,7 +4569,8 @@ void writeBehindCursorText(bool updateIdentifierContinuation){
 // MDH@20SEP2019: whenever a token changes the associated feed forward text might change, so it makes sense to update the feed forward text accordingly
 //                assuming that the given type is correct (e.g. an identifier of which has been determined whether it is a function or variable name)
 //MDH@26SEP2019: due to the separation of the identifier continuation text and the other feed forward text we separate getting the identifier continution text from getting the other feed forward text
-void updateLastTokenFeedforwardText(){
+void updateLastTokenFeedforwardText(bool updateIdentifierContinuationText){
+	if(updateIdentifierContinuationText)updateIdentifierContinuation(); // MDH@27SEP2019: we do this because _getLastTokenFeedforwardText() won't return = for new variables when there's continuation text!!!!
 	// MDH@27SEP2019: updating the identifier continuation now moved to writeBehindCursorText(true), so JIT update
 	setLastTokenFeedforwardText(_getLastTokenFeedforwardText()); // MDH@24SEP2019: the bool forces setting the identifier continuation characters when available, so we can show them to the user
 }
@@ -4650,7 +4664,7 @@ bool commandUp(){
 //                therefore it is best to set the last token type using a separate function
 void setLastTokenType(TokenType tokenType,bool endOfInput){
 	pLastCommandToEvaluateToken->type=tokenType;
-	if(endOfInput)updateLastTokenFeedforwardText();
+	if(endOfInput)updateLastTokenFeedforwardText(false);
 }
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 Mtoken* newCommandToken(TokenType tokenType,bool endOfInput){
@@ -5411,8 +5425,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			/////if(amDebugging())inputInfo("M");
 		}
 		*/
-		updateLastTokenFeedforwardText(); // it makes sense to update the current token feed forward text just before actually showing it
-		writeBehindCursorText(true); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
+		updateLastTokenFeedforwardText(true); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
+		writeBehindCursorText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amDebugging())inputInfo("N");
 		debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
 		if(!initializationsChanged)outputStatus(inputChar,inputCharacterType);
@@ -5715,8 +5729,8 @@ int main(int argc, char **argv){
 						if(_identifierContinuationText)deleteIdentifierContinuation();else deleteTokenfeedforwardtexts();
 						// if successful
 						if(newInputChar){
-							updateLastTokenFeedforwardText();
-							writeBehindCursorText(true); // there could be a new identifier continuation so pass true in not false!!
+							updateLastTokenFeedforwardText(true); // update identifier continuation before calling _getLastTokenFeedforwardText() as it checks whether there is identifier continuation!!
+							writeBehindCursorText(false); // there could be a new identifier continuation so pass true in not false!!
 						}
 					}else // no consumable text
 						beep();
@@ -5730,9 +5744,10 @@ int main(int argc, char **argv){
 								if(inputChar==51){
 									if(inputCharRead(&inputChar)){//inputChar=getInputChar();
 										if(inputChar==126){ // delete
-											inputInfo("Delete");
+											///////inputInfo("Delete");
 											if(_identifierContinuationText){
 												deleteIdentifierContinuation();
+												updateLastTokenFeedforwardText(false); // we do this because deleting identifier continuation might possibly force an assignment operator to appear behind a new variable (otherwise it wouldn't)
 												writeBehindCursorText(false);
 											}else
 											if(_firstTokenfeedforwardtext){ // MDH@20SEP2019 replacing: string_length(feedforwardText)){
@@ -5785,11 +5800,13 @@ int main(int argc, char **argv){
 										////////////bool success=false;
 										char newInputChar=(_identifierContinuationText?getFirstIdentifierContinuationCharacterRemoved():getFirstFeedforwardCharacterRemoved()); // MDH@23SEP2019 replacing: string_removed_char(feedforwardText,0);
 										if(newInputChar){
+											/////if(!_identifierContinuationText)inputInfo("Character removed: '%c'. Number of characters left: %zu. Number of feed forward texts: %zu.",newInputChar,getNumberOfFeedforwardCharacters(),getNumberOfTokenFeedforwardTexts());
 											// MDH@14AUG2019: commandCharacterAccepted() will remove the same character if matching parenthesis that was consumed just now unless we tell commandCharacterAccepted not to do that, so we add an additional argument
 											// MDH@24APR2019: getCommandLength()--;
-											if(commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],true,true)){
-												deleteTokenfeedforwardtexts();
-												writeBehindCursorText(true);
+											if(commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],false,true)){
+												// taken over from what Tab does after appending
+												updateLastTokenFeedforwardText(true); // update identifier continuation before calling _getLastTokenFeedforwardText() as it checks whether there is identifier continuation!!
+												writeBehindCursorText(false); // there could be a new identifier continuation so pass true in not false!!
 											}else
 												inputCharType=switchToControlMode("Suggested character accepted, but not removed.");
 										}else
@@ -5815,6 +5832,11 @@ int main(int argc, char **argv){
 										char c=removedTokenCharacter(1);
 										if(c){ // removing the character behind the cursor succeeded
 											debugWrite("Character '%c' removed.",c);
+											if(feedforwardCharacterPrepended(c,false))
+												success=true;
+											else
+												inputError("Failed to move the command character to the feed forward text.");
+											/*
 											// MDH@26SEP2019: normally we would call updateLastTokenFeedforwardText() but we're NOT calling setLastTokenFeedforwardText()?????????
 											updateIdentifierContinuation(); // will 'remove' the current identifier continuation, and compute the new one (and if the token was removed no new identifier continuation will be created)
 											if(identifierContinuationCharacters)inputInfo("Continuation characters: %s",identifierContinuationCharacters);else inputInfo("%s",""); // show any identifier continuation characters
@@ -5824,12 +5846,13 @@ int main(int argc, char **argv){
 											//                second parameter indicates whether or not the character removed from the command matches the expected first character of the feed forward text associated with the current token
 											char* _lastTokenFeedforwardText=_getLastTokenFeedforwardText(); // are we interested in showing the identifier continuation characters????? free asap
 											if(!_lastTokenFeedforwardText||_lastTokenFeedforwardText[0]!=c){ // consumed character does NOT match the intended continuation
-												if(feedforwardCharacterPrepended(c,_lastTokenFeedforwardText&&_lastTokenFeedforwardText[0]==c))
-													deleteTokenfeedforwardtexts();
-												else
+												if(feedforwardCharacterPrepended(c,_lastTokenFeedforwardText&&_lastTokenFeedforwardText[0]==c)){
+													
+												}else
 													inputError("Failed to change the command character into a suggested character.");
 											}
 											if(_lastTokenFeedforwardText)free(_lastTokenFeedforwardText); // freed!!
+											*/
 											/* MDH@20SEP2019 replacing: 
 											// prefix it to feedforwardText
 											string_insert_char(feedforwardText,0,c); 
@@ -5844,7 +5867,8 @@ int main(int argc, char **argv){
 											*/
 											// if the cursor position now matches the offset of the current token
 											// i.e. the current token is now empty!!!!
-											if(string_length(pLastCommandToEvaluateToken->text)==0){ // nothing left in current token
+											bool notoken=string_length(pLastCommandToEvaluateToken->text)==0;
+											if(notoken){ // nothing left in current token
 												// MDH@23SEP2019: it seems better to call removeToken() here as removeToken() will also remove the token's feed forward text
 												removeToken();
 												/* replacing:
@@ -5856,9 +5880,11 @@ int main(int argc, char **argv){
 												} // if no last command token anymore, we apparently released the first command token
 												*/
 											}else{ // something left in current token
-												if(tokenCheckedForBeingAFunction(true,false))updateLastTokenFeedforwardText();
-											}											
-											writeBehindCursorText(true);
+												tokenCheckedForBeingAFunction(true,false);
+												/////////updateLastTokenFeedforwardText(true);
+											}							
+											updateLastTokenFeedforwardText(true);				
+											writeBehindCursorText(false);
 										}else
 											inputCharType=switchToControlMode("Failed to move the cursor left.");
 									}else
