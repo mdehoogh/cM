@@ -4561,8 +4561,9 @@ size_t getNumberOfFeedforwardCharactersWritten(){
 	}
 	return feedforwardCharactersLength;
 }
+/*
 // MDH@27SEP2019: when the user just deleted the identifier continuation we would not want it to be generated immediately
-void writeBehindCursorText(bool updateIdentifierContinuationText){
+void writeSuggestedText(bool updateIdentifierContinuationText){
 	// MDH@26SEP2019: behind cursor text now consists of two parts now: identifier continuation text and feed forward text
 	// 0. preparation
 	resetOutputColor();
@@ -4584,13 +4585,35 @@ void writeBehindCursorText(bool updateIdentifierContinuationText){
 	// update numberOfBehindPromptCharactersWritten (we do not need to remember blanks written!!!å)
 	if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken); // return to the color of the current token
 }
+*/
+// MDH@01OCT2019: it's better to show the suggested text JIT i.e. just before asking the user for input
+//                this is also better because at that moment we know the user should be seeing it
+size_t numberOfSuggestedCharactersWritten=0;
+void showSuggestedText(){
+	// MDH@26SEP2019: behind cursor text now consists of two parts now: identifier continuation text and feed forward text
+	// 0. preparation
+	resetOutputColor();
+	// 1. write the identifier continuation text and feed forward text
+	numberOfSuggestedCharactersWritten=getNumberOfIdentifierContinuationTextCharactersWritten()+getNumberOfFeedforwardCharactersWritten();
+	// 2. and back to where the cursor is supposed to be
+	moveCursorLeft(numberOfSuggestedCharactersWritten); // return to where the command ends
+	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
+	// update numberOfBehindPromptCharactersWritten (we do not need to remember blanks written!!!å)
+	if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken); // return to the color of the current token
+}
+void hideSuggestedText(){
+	if(numberOfSuggestedCharactersWritten==0)return;
+	int32_t numberOfBlanksToWrite=numberOfSuggestedCharactersWritten;
+	while(--numberOfBlanksToWrite)outputChar(' ');
+	moveCursorLeft(numberOfSuggestedCharactersWritten);
+}
 
 // MDH@20SEP2019: whenever a token changes the associated feed forward text might change, so it makes sense to update the feed forward text accordingly
 //                assuming that the given type is correct (e.g. an identifier of which has been determined whether it is a function or variable name)
 //MDH@26SEP2019: due to the separation of the identifier continuation text and the other feed forward text we separate getting the identifier continution text from getting the other feed forward text
 void updateLastTokenFeedforwardText(bool updateIdentifierContinuationText){
 	if(updateIdentifierContinuationText)updateIdentifierContinuation(); // MDH@27SEP2019: we do this because _getLastTokenFeedforwardText() won't return = for new variables when there's continuation text!!!!
-	// MDH@27SEP2019: updating the identifier continuation now moved to writeBehindCursorText(true), so JIT update
+	// MDH@27SEP2019: updating the identifier continuation now moved to writeSuggestedText(true), so JIT update
 	setLastTokenFeedforwardText(_getLastTokenFeedforwardText()); // MDH@24SEP2019: the bool forces setting the identifier continuation characters when available, so we can show them to the user
 }
 
@@ -4617,7 +4640,7 @@ void backToPrompt(){
 void setCommandToEvaluate(Mtoken* pCommand){
 	pLastCommandToEvaluateToken=pCommandToEvaluate=pCommand;
 	writeCommand();
-	writeBehindCursorText(true);
+	//////////writeSuggestedText(true);
 	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
 	////////// removing: determineCommandInitializations();
 }
@@ -4950,7 +4973,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 		// before writing the behind cursor text we're going to check whether the current token still is a function or variable
 		tokenCheckedForBeingAFunction(true/*,false*/); // MDH@14AUG2019: no, not a suggested character (as called on the backspace user action)
 		// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in feedforwardText that's what we should now write
-		//// MDH@14AUG2019 moving to execute always: writeBehindCursorText(true);
+		//// MDH@14AUG2019 moving to execute always: writeSuggestedText(true);
 		// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
 	}/* removedTokenCharacter() calls removeToken which will NULL the pCommandToEvaluate and pLastCommandToEvaluateToken when the first command character is removed, in which case we do not need:
 		else clearCommand();*/
@@ -4958,7 +4981,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 	// MDH@20SEP2019: the following is about removing the feed forward characters that were added when a certain token started but as you can see 
 	//                it is all about feed forward associated with the start of a token, so removing the associated feed forward can also be done at the moment the token is actually removed
 	//                so for now we remove the following block and simply write the behind cursor text
-	writeBehindCursorText(true);
+	////////writeSuggestedText(true);
 	/* replacing:
 	// MDH@14AUG2019: how about removing any matching character?????
 	if(string_length(getFeedforwardCharacters())){ // MDH@20SEP2019: will reconstruct feedforwardText if need be
@@ -4983,7 +5006,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 		}
 		if(string_length(feedforwardText)){
 			//////////if(amVerbose())inputInfo("Writing suggested text.");
-			writeBehindCursorText(true);
+			writeSuggestedText(true);
 		}
 	}
 	*/
@@ -5496,7 +5519,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		bool acceptedFirstSuggestedCharacterDeleted=(!aSuggestedCharacter||(_identifierContinuationText?deleteFirstIdentifierContinuationCharacter():deleteFirstFeedforwardCharacter(inputChar,true)));
 		if(!acceptedFirstSuggestedCharacterDeleted)inputError("Failed to remove the accepted first suggested character."); // i.e. we're NOT switching to control mode or returning false
 		updateLastTokenFeedforwardText(acceptedFirstSuggestedCharacterDeleted); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
-		writeBehindCursorText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
+		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amDebugging())inputInfo("N");
 		debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
 		if(!initializationsChanged)outputStatus(inputChar,inputCharacterType);
@@ -5539,7 +5562,7 @@ char getFirstSuggestedCharacter(bool autogenerated){return(_identifierContinuati
 
 // MDH@01OCT2019: I created consumeFirstSuggestedCharacter() today to consume the first suggested character but initially called commandCharacterAccepted with endOfInput flag equal to false
 //                I suppose that was wrong because there's exactly one character being accepted and that's also the end of input character 
-//                the result will be that updateLastTokenFeedforwardText(true) and writeBehindCursorText(true) are executed already by commandCharacterAccepted() so I won't have to do that here anymore
+//                the result will be that updateLastTokenFeedforwardText(true) and writeSuggestedText(true) are executed already by commandCharacterAccepted() so I won't have to do that here anymore
 char consumeFirstSuggestedCharacter(char firstSuggestedCharacter,char onSuccessCharacter){
 	// if the first suggested character is provided use that, otherwise get any
 	if(!firstSuggestedCharacter)firstSuggestedCharacter=getFirstSuggestedCharacter(false); // any first suggested character will do
@@ -5646,7 +5669,7 @@ int main(int argc, char **argv){
 	// let's mark the allocations BEFORE we start looping
 	addallocationtype('!');
 
-	while(1){
+	while(1){ // command loop
 
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
 		promptForUserInput();
@@ -5667,7 +5690,7 @@ int main(int argc, char **argv){
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
 			// MDH@24APR2019: pCommandToEvaluate could be non-null if we failed to evaluate it (e.g. when being imcomplete), and we allow a retry
 			//                NOTE registered commands should always be successfully evaluated, so do NOT get rid of any pending command!!!!
-			if(pCommandToEvaluate){writeCommand();writeBehindCursorText(true);}else deleteTokenfeedforwardtexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0);
+			if(pCommandToEvaluate){writeCommand();/*writeSuggestedText(true);*/}else deleteTokenfeedforwardtexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0);
 			/////////////// if(pCommandToEvaluate)clearCommand(); // TODO do we need this????
 			/* replacing:
 			if(pCommandToEvaluate==NULL)if(!string_setlength(feedforwardText,0))output("??"); // TODO should we be loosing feedforwardText here????
@@ -5690,8 +5713,19 @@ int main(int argc, char **argv){
 		// we do NOT need a command until after the first character which makes sense because we allow ` and arrow up and down to switch to option mode or select another command
 		// now we need to read characters one at a time and echo them from the command line
 		// Ctrl-D to exit M
-		while(inputCharRead(&inputChar)){
+		while(1){ // command input loop
 			
+			// update the identifier continuation (only depends on the current token), and show it along with the feed forward texts
+			updateIdentifierContinuation();showSuggestedText();
+
+			///////////outputChar('X');
+
+			// ask the user for input
+			if(!inputCharRead(&inputChar))break;
+
+			// hide the suggested text again before processing the character read
+			hideSuggestedText();
+
 			////////inputChar=getInputChar();
 
 			if(inputChar>127)continue; // undefined input character
@@ -5738,12 +5772,12 @@ int main(int argc, char **argv){
 					// MDH@27SEP2019: removing the identifier continuation text takes precedence!!!
 					if(_identifierContinuationText){
 						deleteIdentifierContinuation();
-						writeBehindCursorText(false);
+						///////writeSuggestedText(false);
 					}else
 					if(_firstTokenfeedforwardtext){ // replacing: string_length(feedforwardText)){ // something to delete
 						if(getFirstFeedforwardCharacterRemoved()){ // replacing: string_removed_char(feedforwardText,0)){ // success!!!
 							// MDH@25SEP2019: now done in getFirstFeedforwardCharacterRemoved() removing: deleteTokenfeedforwardtexts();
-							writeBehindCursorText(false);
+							////////writeSuggestedText(false);
 						}else
 							inputCharType=switchToControlMode("Failed to remove the first character in the suggested text.");
 					}else // no first feed forward text (and character)!
@@ -5787,9 +5821,9 @@ int main(int argc, char **argv){
 							}
 						}
 						// MDH@25SEP2019: we now need to generate the completion text again
-						deleteTokenfeedforwardtexts(); // APPARENTLY I need to do this to force writeBehindCursorText(true) to reconstruct it (although I thought updateLastTokenFeedforwardText() would call deleteTokenfeedforwardtexts())
+						deleteTokenfeedforwardtexts(); // APPARENTLY I need to do this to force writeSuggestedText(true) to reconstruct it (although I thought updateLastTokenFeedforwardText() would call deleteTokenfeedforwardtexts())
 						updateLastTokenFeedforwardText();
-						writeBehindCursorText(true); // TODO can we not find a better way to do this??????
+						writeSuggestedText(true); // TODO can we not find a better way to do this??????
 					}else
 						beep();
 					*/
@@ -5820,7 +5854,7 @@ int main(int argc, char **argv){
 						// if successful
 						if(newInputChar){
 							updateLastTokenFeedforwardText(true); // update identifier continuation before calling _getLastTokenFeedforwardText() as it checks whether there is identifier continuation!!
-							writeBehindCursorText(false); // there could be a new identifier continuation so pass true in not false!!
+							///////writeSuggestedText(false); // there could be a new identifier continuation so pass true in not false!!
 						}
 					}else // no consumable text
 						beep();
@@ -5838,11 +5872,11 @@ int main(int argc, char **argv){
 											if(_identifierContinuationText){
 												deleteIdentifierContinuation();
 												updateLastTokenFeedforwardText(false); // we do this because deleting identifier continuation might possibly force an assignment operator to appear behind a new variable (otherwise it wouldn't)
-												writeBehindCursorText(false);
+												//////writeSuggestedText(false);
 											}else
 											if(_firstTokenfeedforwardtext){ // MDH@20SEP2019 replacing: string_length(feedforwardText)){
 												if(getFirstFeedforwardCharacterRemoved()){ // MDH@20SEP2019 replacing: string_removed_char(feedforwardText,0))
-													writeBehindCursorText(false); // there isn't any identifier continuation text to start with
+													///////writeSuggestedText(false); // there isn't any identifier continuation text to start with
 												}else
 													inputCharType=switchToControlMode("Failed to delete the first character of the suggested text.");	
 											}else // nothing under the cursor to delete
@@ -5928,7 +5962,7 @@ int main(int argc, char **argv){
 											if(!feedforwardCharacterPrepended(c))
 											inputError("Failed to accept the removed command character as suggested text.");
 											updateLastTokenFeedforwardText(false); // if we haven't updated the identifier continuation text do it again	
-											writeBehindCursorText(false);
+											////////writeSuggestedText(false);
 											/* replacing:
 											bool removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter=false;
 											Mstring* identifierContinuationText=NULL;
@@ -5946,7 +5980,7 @@ int main(int argc, char **argv){
 											if(!feedforwardCharacterPrepended(c))
 											inputError("Failed to accept the removed command character as suggested text.");
 											updateLastTokenFeedforwardText(identifierContinuationText==NULL); // if we haven't updated the identifier continuation text do it again	
-											writeBehindCursorText(false);
+											writeSuggestedText(false);
 											if(identifierContinuationText)free_string(identifierContinuationText);
 											*/
 										}else
@@ -6020,7 +6054,7 @@ int main(int argc, char **argv){
 					if(cp){
 						if(string_removed_char(shellCommand,cp-1)){
 							moveCursorLeft(1);
-							writeBehindCursorText(true);
+							////////writeSuggestedText(true);
 						}else
 							inputCharType=switchToControlMode("Failed to remove the shell command character!");
 					}else // nothing to remove
@@ -6029,7 +6063,8 @@ int main(int argc, char **argv){
 				if(inputCharType=='d'){
 					if(string_length(feedforwardText)){ // something behind the cursor that we can remove
 						if(string_removed_char(feedforwardText,0))
-							writeBehindCursorText(true);
+							///////writeSuggestedText(true)
+							;
 						else
 							inputCharType=switchToControlMode("Failed to remove the first autocompletion character!");
 					}else // nothing to remove
@@ -6050,7 +6085,7 @@ int main(int argc, char **argv){
 						while(bc--){
 							char newInputChar=string_removed_char(feedforwardText,0);
 							if(!newInputChar){
-								writeBehindCursorText(true);
+								///////writeSuggestedText(true);
 								inputCharType=switchToControlMode("Failed to accept all suggested characters.");
 								break;
 							}
@@ -6086,7 +6121,7 @@ int main(int argc, char **argv){
 									if(behindCursor()){
 										char newInputChar=string_removed_char(feedforwardText,0);
 										if(!newInputChar){
-											writeBehindCursorText(true);
+											////////writeSuggestedText(true);
 											inputCharType=switchToControlMode("Failed to accept the suggested characters.");
 										}else
 											string_insert_char(shellCommand,cursorPosition(),newInputChar);
@@ -6102,7 +6137,7 @@ int main(int argc, char **argv){
 											// prefix it to feedforwardText
 											string_insert_char(feedforwardText,0,c);
 											moveCursorLeft(1);
-											writeBehindCursorText(true);
+											///////writeSuggestedText(true);
 										}else
 											inputCharType=switchToControlMode("Failed to move the cursor left.");
 									}else
