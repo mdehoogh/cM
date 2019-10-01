@@ -1463,10 +1463,10 @@ bool deleteFirstIdentifierContinuationCharacter(){
 	_identifierContinuationText=newIdentifierContinuationText; // NOTE if we failed to copy the remainder, we get NULL now
 	return true;
 }
-char* identifierContinuationCharacters=NULL; // the set of characters expected next of existing identifiers
+char* _identifierContinuationCharacters=NULL; // the set of characters expected next of existing identifiers
 // MDH@26SEP2019: we create a separate method that will determine the last token identifier continuation text and continuation characters
 void deleteIdentifierContinuation(){
-	if(identifierContinuationCharacters){free(identifierContinuationCharacters);identifierContinuationCharacters=NULL;}
+	if(_identifierContinuationCharacters){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
 	if(_identifierContinuationText){free(_identifierContinuationText);_identifierContinuationText=NULL;}
 }
 void updateIdentifierContinuation(){
@@ -1477,14 +1477,26 @@ void updateIdentifierContinuation(){
 		case TT_VARIABLE:case TT_NEW_VARIABLE:case TT_FUNCTION:_completionText=_getCompletion(string(pLastCommandToEvaluateToken->text));break;
 	}
 	// need at least two characters (the type and something text behind it)
-	if(_completionText&&string_length(_completionText)>1){
+	// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
+	if(_completionText){
+		if(string_length(_completionText)>1)
 		switch(string_char(_completionText,0)){
-			case 1:_identifierContinuationText=strdup(string(_completionText)+1);break;
-			case 2:identifierContinuationCharacters=strdup(string(_completionText)+1);break;
+			case 1:
+				{
+					_identifierContinuationText=strdup(string(_completionText)+1);
+					if(!_identifierContinuationText)inputError("Failed to create the identifier autocompletion text");
+				}
+				break;
+			case 2:
+				{
+					_identifierContinuationCharacters=strdup(string(_completionText)+1);
+					if(_identifierContinuationCharacters)inputInfo("Existing identifier continuation characters: %s.",_identifierContinuationCharacters);else inputError("Unable to show existing identifier continuation characters!");
+				}
+				break;
 		}
-		free(_completionText);
+		free_string(_completionText);
 	}
-}
+}/* VALIDATED */
 
 char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 	// some token types have an associated feed forward character!!!
@@ -1525,7 +1537,8 @@ char* _getLastTokenFeedforwardText(){
 		case TT_MAP_VALUE:break;
 		// MDH@27SEP2019: if there's an identifier continuation behind the name of a new variable, the user can't reach it, so appending = is not going to be a good idea
 		//                however, this would require the identifier continuation text to be updated BEFORE calling this method
-		case TT_NEW_VARIABLE:if(!_identifierContinuationText)tokenFeedforwardText="=";break;
+		// MDH@01OCT2019: it's probably better to leave the assignment operator character showing to indicate that the current identifier is new, the user can always delete the identifier continuation using Delete key
+		case TT_NEW_VARIABLE:/*if(!_identifierContinuationText)*/tokenFeedforwardText="=";break;
 		case TT_REAL:break;
 		case TT_SQSTRING:tokenFeedforwardText="'";break; // TODO using ' for the double quoted string might change in the future and we'd be in trouble then
 		case TT_TERNARY_aeru:break;
@@ -1948,7 +1961,7 @@ void outputStatus(char inputChar,char inputCharType){
 	if(!amDebugging())return;
 	Mstring* _separatedBehindCursorText=_getFeedforwardText('|');
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %zu | Command length: %zu | Behind cursor text: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),getCommandLength(),string(_separatedBehindCursorText));
+	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %u | Cursor position: %zu | Command length: %zu | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?pLastCommandToEvaluateToken->type:255),cursorPosition(),getCommandLength(),(_identifierContinuationText?_identifierContinuationText:"-"),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
 }
@@ -4564,11 +4577,11 @@ void writeBehindCursorText(bool updateIdentifierContinuationText){
 	////////inputInfo("Number of written suggested characters: %zu.",newNumberOfBehindPromptCharactersWritten);
 	// 2. write additional blanks overwriting what we had before
 	while(newNumberOfBehindPromptCharactersWritten<numberOfBehindPromptCharactersWritten){newNumberOfBehindPromptCharactersWritten++;outputChar(' ');}
+	numberOfBehindPromptCharactersWritten=newNumberOfBehindPromptCharactersWritten;
 	outputChar(' ');  // one extra to be on the safe size TODO why?????????
 	moveCursorLeft(newNumberOfBehindPromptCharactersWritten+1-commandLength); // return to where the command ends
 	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
 	// update numberOfBehindPromptCharactersWritten (we do not need to remember blanks written!!!å)
-	numberOfBehindPromptCharactersWritten=newNumberOfBehindPromptCharactersWritten;
 	if(pLastCommandToEvaluateToken)outputTokenColor(pLastCommandToEvaluateToken); // return to the color of the current token
 }
 
@@ -4849,7 +4862,7 @@ bool existsInCommand(char* identifierName,uint64_t identifierEnvironmentId){ // 
 		// get the next identifier
 		commandIdentifier=commandIdentifier->prevIdentifier;
 	}
-	if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
+	//////////if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
 	return found;
 }
 
