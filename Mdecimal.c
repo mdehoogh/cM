@@ -784,6 +784,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 		int cmp;
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
 		while(!mpd_error(mpd_context)){
+			///// doesn't work I think!!! if(kbhit()!=0)break;
 			iter++;
 #ifdef __ADEBUG__
 			//if(amVerbose())output("Iteration: %lld: ",iter);
@@ -845,15 +846,19 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext){
 			mpd_add(s,s,t,mpd_context); // add t to s
 			//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
 			if(amVerbose()){
-				output("Iteration %u:",iter);
-				//char* _lasts=mpd_to_sci(lasts,0);if(_lasts){output(" lasts=%s");free(_lasts);}else output(" ?");
-				char* _t=mpd_to_sci(t,0);if(_t){output(" t=%s",_t);free(_t);}else output(" ?");
-				char* _s=mpd_to_sci(s,0);if(_s){output(" s=%s",_s);free(_s);}else output(" ?");
-				char* _n=mpd_to_sci(n,0);if(_n){output(" n=%s",_n);free(_n);}else output(" ?");
-				char* _na=mpd_to_sci(na,0);if(_na){output(" na=%s",_na);free(_na);}else output(" ?");
-				char* _d=mpd_to_sci(d,0);if(_d){output(" d=%s",_d);free(_d);}else output(" ?");
-				char* _da=mpd_to_sci(da,0);if(_da){output(" da=%s",_da);free(_da);}else output(" ?");
-				outputChar('\n');
+				if(amDebugging()){
+					output("Iteration %u:",iter);
+					//char* _lasts=mpd_to_sci(lasts,0);if(_lasts){output(" lasts=%s");free(_lasts);}else output(" ?");
+					char* _t=mpd_to_sci(t,0);if(_t){output(" t=%s",_t);free(_t);}else output(" ?");
+					char* _s=mpd_to_sci(s,0);if(_s){output(" s=%s",_s);free(_s);}else output(" ?");
+					char* _n=mpd_to_sci(n,0);if(_n){output(" n=%s",_n);free(_n);}else output(" ?");
+					char* _na=mpd_to_sci(na,0);if(_na){output(" na=%s",_na);free(_na);}else output(" ?");
+					char* _d=mpd_to_sci(d,0);if(_d){output(" d=%s",_d);free(_d);}else output(" ?");
+					char* _da=mpd_to_sci(da,0);if(_da){output(" da=%s",_da);free(_da);}else output(" ?");
+					outputChar('\n');				
+				}else{
+					if((iter%100)==0)output("Iteration %u.\n",iter);
+				}
 			}
 #endif
 		}
