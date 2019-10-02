@@ -148,28 +148,29 @@ extern const char* const VALUETYPENAMES[];
 // can be asked to remove unused values
 // TODO check whether it functions correctly (think so though)
 size_t getNumberOfRemovedValues(){
+    bool showDebugInfo=amDebugging()&&amVerbose();
     unsigned long long tofree=0,removed=0;
     if(_valueList){
         Mlistelement* _valueListelement=_valueList->_first;
-        if(amDebugging())output("Number of values to check: %llu.\n",_valueList->numberOfElements);
+        if(showDebugInfo)output("Number of values to check: %llu.\n",_valueList->numberOfElements);
         unsigned long long checked=0;
         while(_valueListelement){
             checked++;
-            if(amDebugging())output("Checking value #%llu.",checked);
+            if(showDebugInfo)output("Checking value #%llu.",checked);
             if(_valueListelement->_value){
-                if(amDebugging())outputLine("\tChecking the count!");
+                if(showDebugInfo)outputLine("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
-                    if(amDebugging())output("About to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+                    if(showDebugInfo)output("About to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                     free_value(_valueListelement->_value);
                     _valueListelement->_value=NULL; // just in case
                     tofree++;
                 }else
-                if(amDebugging())outputLine("\tStill in use!");
+                if(showDebugInfo)outputLine("\tStill in use!");
             }else
                 output("%sNo value stored in value #%llu.\n",ERROR_PREFIX,checked);
             _valueListelement=_valueListelement->_next;
         }
-        if(amDebugging())output("Number of values checked: %llu.\nNumber of value list elements to free: %llu.\n",checked,tofree);
+        if(showDebugInfo)output("Number of values checked: %llu.\nNumber of value list elements to free: %llu.\n",checked,tofree);
         // the list is now intact, are we going to correct the links??????
         if(tofree){ // some values were freed
             Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
@@ -198,7 +199,7 @@ size_t getNumberOfRemovedValues(){
         }
     }
     if(tofree){
-        if(tofree>removed)output("WARNING: Failed to free %llu unused value list elements.\n",(tofree-removed));else if(amDebugging())outputLine("All unused value list elements freed!");
+        if(tofree>removed)output("WARNING: Failed to free %llu unused value list elements.\n",(tofree-removed));else if(showDebugInfo)outputLine("All unused value list elements freed!");
     }
     return removed;
 }/* VALIDATED */
