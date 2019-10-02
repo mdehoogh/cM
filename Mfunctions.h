@@ -34,5 +34,10 @@ Mvalue* Mlog(Mvalue* _value);
 Mvalue* Mlog10(Mvalue* _value);
 Mvalue* Msqrt(Mvalue* _value);
 
+// additional one-argument functions
+Mvalue* Mout(Mvalue* _value);
+Mvalue* Mbc(Mvalue* _value); // set background color
+Mvalue* Mtc(Mvalue* _value); // set text color
+
 // math two-argument functions
 Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue);

@@ -553,3 +553,28 @@ Mvalue* Mfac(Mvalue* _value){
     return _getRealValue(result);
     */
 }/* VALIDATED */
+
+// method for writing a value to standard out
+Mvalue* Mout(Mvalue* _value){
+    Mstring* _valueText=_getValueText(_value,true);
+    size_t result=string_length(_valueText);
+    if(result>0)output("%s",string(_valueText));
+    free_string(_valueText);
+    return _getIntegerValue(result);
+}
+// set the backcolor
+Mvalue* Mbc(Mvalue* _value){
+    Mstring* _valueText=_getValueText(_value,true);
+    size_t result=string_length(_valueText);
+    if(result>0)setBackColor(_valueText);
+    free_string(_valueText);
+    return _getIntegerValue(result); 
+}
+ // set text color
+Mvalue* Mtc(Mvalue* _value){
+    Mstring* _valueText=_getValueText(_value,true);
+    size_t result=string_length(_valueText);
+    if(result>0)setColor(_valueText);
+    free_string(_valueText);
+    return _getIntegerValue(result);    
+}

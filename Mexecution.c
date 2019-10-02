@@ -1016,9 +1016,41 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){
         Mstring* _p=_stringText;
         if(amDebugging())_p=string_append_char(_p,'s');
         if(_p){
-            if(!dequoted)_p=string_append_char(_p,_text->presuffix);
-            _p=string_append(_p,_text->_c);
-            if(!dequoted)_p=string_append_char(_p,_text->presuffix);
+            // MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
+            if(dequoted){
+                char c;
+                size_t lastindex=strlen(_text->_c);
+                if(lastindex>0){
+                    lastindex--;
+                    for(size_t index=0;index<=lastindex;index++){
+                        c=_text->_c[index];
+                        if(index<lastindex&&c=='\\'){
+                            c=_text->_c[++index];
+                            switch(c){
+                                case 'a':_p=string_append_char(_p,0x07);break;
+                                case 'b':_p=string_append_char(_p,0x08);break;
+                                case 'e':_p=string_append_char(_p,0x1B);break;
+                                case 'f':_p=string_append_char(_p,0x0C);break;
+                                case 'n':_p=string_append_char(_p,0x0A);break;
+                                case 'r':_p=string_append_char(_p,0x0D);break;
+                                case 't':_p=string_append_char(_p,0x09);break;
+                                case 'v':_p=string_append_char(_p,0x0B);break;
+                                case '\\':_p=string_append_char(_p,0x5C);break;
+                                case '\'':_p=string_append_char(_p,0x27);break;
+                                case '"':_p=string_append_char(_p,0x22);break;
+                                case '?':_p=string_append_char(_p,0x3F);break;
+                                case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':_p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));break; // assume octal
+                                case 'x':case 'X':index+=2;break; // TODO for now skip, so still left to do
+                            }
+                        }else
+                            _p=string_append_char(_p,c);
+                    }
+                }
+            }else{
+                _p=string_append_char(_p,_text->presuffix);
+                _p=string_append(_p,_text->_c);
+                _p=string_append_char(_p,_text->presuffix);
+            }
         }
         if(!_p){free_string(_stringText);_stringText=NULL;}
     }

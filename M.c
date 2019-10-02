@@ -4444,6 +4444,7 @@ bool evaluateCommand(){
 	getEnvironment()->expressionToken=pCommandToEvaluate->next; // initialize the (current) expression token
 	clock_t then=clock();
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
+	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings
 	long long elapsed=(clock()-then)/1000;if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
 	// output the commandText
 	output("%s = ",string(commandText));
@@ -5225,11 +5226,23 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 #endif
 		/////if(amDebugging())inputInfo("B");
 		//MDH@17JUL2019: typically we'd get an error immediately when NOT entering a function call character ( behind a function identifier
-		if(newTokenType==TT_ERROR&&pLastCommandToEvaluateToken->type==TT_FUNCTION){
-			// we should assume that the identifier represents a (new) variable (identifier)
-			changeFunctionTokenToAVariable(endOfInput);
-			newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType);
+		// MDH@02OCT2019: we need some additional corrections in certain situations i.e. do NOT end a single/double quoted string if ' or " was entered behind the escape character
+		switch(newTokenType){
+			case TT_ERROR:
+				if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
+					// we should assume that the identifier represents a (new) variable (identifier)
+					changeFunctionTokenToAVariable(endOfInput);
+					newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType);
+				}
+				break;
+			case TT_END_OF_DQSTRING:
+				if(string_last_char(pLastCommandToEvaluateToken->text)=='\\')newTokenType=TT_DQSTRING;
+				break;
+			case TT_END_OF_SQSTRING:
+				if(string_last_char(pLastCommandToEvaluateToken->text)=='\\')newTokenType=TT_SQSTRING;
+				break;
 		}
+
 		/////if(amDebugging())inputInfo("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
@@ -6260,6 +6273,7 @@ int main(int argc, char **argv){
 						free_string(commandText);
 						continue;
 					}
+					resetOutputColor();
 					if(amVerbose())outputLine("Command evaluated!");
 					deleteTokenfeedforwardtexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
