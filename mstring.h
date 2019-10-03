@@ -43,6 +43,8 @@ int32_t string_find(Mstring const * const str,char c);
 // changing the string
 char string_removed_char(Mstring * const str,size_t pos);
 
+size_t string_removed(Mstring * const str,size_t pos,size_t length); // MDH@03OCT2019: remove length characters from str starting at position pos
+
 Mstring* string_insert_char(Mstring * const str,size_t pos,char c);
 Mstring* string_append_char(Mstring * const str,char c);
 Mstring* string_setchar(Mstring * const str,char c,size_t pos);

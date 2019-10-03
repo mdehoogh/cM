@@ -91,7 +91,7 @@ bool string_empty(const Mstring* const str){
 }
 
 size_t string_length(const Mstring* const str){
-    return(str==NULL?0:str->length);
+    return(str?str->length:0);
 }
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
 Mstring* string_setlength(Mstring* const str,size_t length){
@@ -154,6 +154,26 @@ char string_removed_char(Mstring* const str,size_t pos){
         }
     }
     return rc;
+}
+
+size_t string_removed(Mstring * const str,size_t pos,size_t length){ // MDH@03OCT2019: remove length characters from str starting at position pos
+    size_t removed=0;
+    if(str){
+        size_t l=str->length;
+        if(pos<l){ // the position of the first character to remove is valid
+            size_t remainderpos=pos+length; // the position of the first character to move
+            if(remainderpos<l){ // l-remainderpos characters to move
+                // we can use strcpy IFF we guarantee the end-of-string character to be the terminator
+                // BUT because the arrays might overlap memmove should be used instead of strcpy as it guarantees 
+                ////// no need to do this when using memmove!!!!! str->chars[l]='\0';
+                removed=length; // all suggested characters will be 'removed'
+                memmove(str->chars+pos,str->chars+remainderpos,(sizeof(char))*(l-remainderpos)); // TODO sizeof(char) would be 1 always????
+            }else // rest of string to remove i.e. l-pos characters
+                removed=l-pos; // l-pos elements will be 'removed'
+            str->length-=removed;
+        }
+    }
+    return removed;
 }
 
 /** 
