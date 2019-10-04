@@ -1010,6 +1010,13 @@ Mstring* _getRealText(Mreal* _real){
     }
 	return _realText;
 }/* VALIDATED */
+
+unsigned char hexdigit(char c){
+    if(c>=97&&c<=102)return hexdigit(c-32);
+    if(c>=65&&c<=70)return c-55;
+    if(c>=48&&c<=57)return c-48;
+    return '\0';
+}
 Mstring* _getStringText(Mtext* _text,bool dequoted){
 	Mstring* _stringText=(_text?__string():NULL);
     if(_stringText){
@@ -1039,8 +1046,27 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){
                                 case '\'':_p=string_append_char(_p,0x27);break;
                                 case '"':_p=string_append_char(_p,0x22);break;
                                 case '?':_p=string_append_char(_p,0x3F);break;
-                                case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':_p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));break; // assume octal
-                                case 'x':case 'X':index+=2;break; // TODO for now skip, so still left to do
+                                case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
+                                    { // octal representations can't have 8 or 9 in it
+                                        char oct=(c-48);
+                                        // check successive characters if they are octal digits
+                                        while(index+1<=lastindex){
+                                            c=_text->_c[index+1];
+                                            if(c<48||c>55)break; // not an octal digit
+                                            oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
+                                            index++;
+                                        }
+                                        _p=string_append_char(_p,oct);
+                                        // replacing: _p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));
+                                    }
+                                    break; // assume octal
+                                case 8:case 9:break; // this would be invalid
+                                case 'x':case 'X':
+                                    {
+                                        if(index+2<=lastindex){_p=string_append_char(_p,(hexdigit(_text->_c[index+1])<<4)+hexdigit(_text->_c[index+2]));}
+                                        index+=2;
+                                    }
+                                    break; // TODO for now skip, so still left to do
                             }
                         }else
                             _p=string_append_char(_p,c);
