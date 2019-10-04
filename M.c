@@ -5896,10 +5896,11 @@ int main(int argc, char **argv){
 
 			inputCharType=INPUTCHARACTERTYPES[inputChar];
 			
+			/* something terribly going wrong when the following code is executed!!!
 			if(inputMode==IM_COMMAND){
 				if(!amDebugging())outputStatus(inputChar,inputCharType);
 			}
-
+			*/
 			////////printf("(%d)",inputCharType);
 
 			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE cursorPosition() is only defined in the other two modes)

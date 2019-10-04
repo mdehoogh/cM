@@ -1011,7 +1011,7 @@ Mstring* _getRealText(Mreal* _real){
 	return _realText;
 }/* VALIDATED */
 
-unsigned char hexdigit(char c){
+char hexdigit(char c){
     if(c>=97&&c<=102)return hexdigit(c-32);
     if(c>=65&&c<=70)return c-55;
     if(c>=48&&c<=57)return c-48;
