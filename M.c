@@ -1404,26 +1404,33 @@ bool inIdentifierToken(){
 void inputInfo(const char* const fmt,...); // prototype
 void inputError(const char* const fmt,...); // prototype
 
+// manual feed forward characters stuff
+// what the user consumed manually, and is supposed to remain continguous
+Mstring* _manualFeedforwardText=NULL;
+bool manualFeedforwardCharacterPrepepended(char c){
+	return(_manualFeedforwardText&&string_insert_char(_manualFeedforwardText,0,c)!=NULL);
+}
+
 // identifier continuation stuff
 bool identifierCouldHaveChanged=false; // whether or not the identifier has changed
-char* _identifierContinuationText=NULL; // the single text that we can continue the current identifier token with
+char* _identifierContinuationCharacters=NULL; // the single text that we can continue the current identifier token with
 char getFirstIdentifierContinuationCharacter(){
 	inputInfo("%s","Determining the first identifier continuation character!");
-	return(_identifierContinuationText?_identifierContinuationText[0]:'\0');
+	return(_identifierContinuationCharacters?_identifierContinuationCharacters[0]:'\0');
 }
 bool deleteFirstIdentifierContinuationCharacter(){
-	if(!_identifierContinuationText)return false;
+	if(!_identifierContinuationCharacters)return false;
 	// not undefined or empty...
-	char* newIdentifierContinuationText=(strlen(_identifierContinuationText)>1?strdup(_identifierContinuationText+1):NULL); // get dynamic copy of remainder, ignore if we fail!!!
-	free(_identifierContinuationText);
-	_identifierContinuationText=newIdentifierContinuationText; // NOTE if we failed to copy the remainder, we get NULL now
+	char* newIdentifierContinuationText=(strlen(_identifierContinuationCharacters)>1?strdup(_identifierContinuationCharacters+1):NULL); // get dynamic copy of remainder, ignore if we fail!!!
+	free(_identifierContinuationCharacters);
+	_identifierContinuationCharacters=newIdentifierContinuationText; // NOTE if we failed to copy the remainder, we get NULL now
 	return true;
 }
-char* _identifierContinuationCharacters=NULL; // the set of characters expected next of existing identifiers
+char* _identifierContinuationOptionalCharacters=NULL; // the set of characters expected next of existing identifiers
 // MDH@26SEP2019: we create a separate method that will determine the last token identifier continuation text and continuation characters
 void deleteIdentifierContinuation(){
+	if(_identifierContinuationOptionalCharacters){free(_identifierContinuationOptionalCharacters);_identifierContinuationOptionalCharacters=NULL;}
 	if(_identifierContinuationCharacters){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
-	if(_identifierContinuationText){free(_identifierContinuationText);_identifierContinuationText=NULL;}
 }
 void updateIdentifierContinuation(){
 	bool couldHaveAnIdentifierContinuation=inIdentifierToken();
@@ -1439,14 +1446,14 @@ void updateIdentifierContinuation(){
 			switch(string_char(_completionText,0)){
 				case 1:
 					{
-						_identifierContinuationText=strdup(string(_completionText)+1);
-						if(!_identifierContinuationText)inputError("Failed to create the identifier autocompletion text");
+						_identifierContinuationCharacters=strdup(string(_completionText)+1);
+						if(!_identifierContinuationCharacters)inputError("Failed to create the identifier autocompletion text");
 					}
 					break;
 				case 2:
 					{
-						_identifierContinuationCharacters=strdup(string(_completionText)+1);
-						if(_identifierContinuationCharacters)inputInfo("Existing identifier continuation characters: %s.",_identifierContinuationCharacters);else inputError("Unable to show existing identifier continuation characters!");
+						_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
+						if(_identifierContinuationOptionalCharacters)inputInfo("Existing identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("Unable to show existing identifier continuation characters!");
 					}
 					break;
 			}
@@ -1483,13 +1490,13 @@ Mstring* _getAutoCompletionText(char sep){
 		/* MDH@04OCT2019: moved over to updateAutoCompletionText()
 		// MDH@03OCT2019: remove the identifier continuation text from the start of the feed forward text (as we should)
 		if(!sep){
-			if(_identifierContinuationText){
-				size_t numberOfIdentifierContinuationCharacters=strlen(_identifierContinuationText);
+			if(_identifierContinuationCharacters){
+				size_t numberOfIdentifierContinuationCharacters=strlen(_identifierContinuationCharacters);
 				if(numberOfIdentifierContinuationCharacters>0){
 					size_t numberOfFeedforwardCharacters=string_length(_suggestedText);
 					if(numberOfIdentifierContinuationCharacters<numberOfFeedforwardCharacters){ // there might be feed forward characters left
 						char c=string_replacedchar(_suggestedText,'\0',numberOfIdentifierContinuationCharacters); // temporarily pretend the feed forward text to have the same length as the identifier continuation text
-						bool matching=(strcmp(string(_suggestedText),_identifierContinuationText)==0); // get the comparison result
+						bool matching=(strcmp(string(_suggestedText),_identifierContinuationCharacters)==0); // get the comparison result
 						string_setchar(_suggestedText,c,numberOfIdentifierContinuationCharacters); // // put the removed character back BEFORE removing the identifier continuation when matching
 						if(matching) // the same!!!
 							if(string_removed(_suggestedText,0,numberOfIdentifierContinuationCharacters)!=numberOfIdentifierContinuationCharacters) // remove the identifier continuation from the feed forward text
@@ -1513,13 +1520,13 @@ void updateAutoCompletionText(){
 	if(_autoCompletionText)free_string(_autoCompletionText); // free what we might currently have
 	_autoCompletionText=_getAutoCompletionText('\0'); // get the new characters
 	// merge with identifier continuation text
-	if(_autoCompletionText&&_identifierContinuationText){
-		size_t numberOfIdentifierContinuationCharacters=strlen(_identifierContinuationText);
+	if(_autoCompletionText&&_identifierContinuationCharacters){
+		size_t numberOfIdentifierContinuationCharacters=strlen(_identifierContinuationCharacters);
 		if(numberOfIdentifierContinuationCharacters>0){
 			size_t numberOfFeedforwardCharacters=string_length(_autoCompletionText);
 			if(numberOfIdentifierContinuationCharacters<numberOfFeedforwardCharacters){ // there might be feed forward characters left
 				char c=string_replacedchar(_autoCompletionText,'\0',numberOfIdentifierContinuationCharacters); // temporarily pretend the feed forward text to have the same length as the identifier continuation text
-				bool matching=(strcmp(string(_autoCompletionText),_identifierContinuationText)==0); // get the comparison result
+				bool matching=(strcmp(string(_autoCompletionText),_identifierContinuationCharacters)==0); // get the comparison result
 				string_setchar(_autoCompletionText,c,numberOfIdentifierContinuationCharacters); // // put the removed character back BEFORE removing the identifier continuation when matching
 				if(matching) // the same!!!
 					if(string_removed(_autoCompletionText,0,numberOfIdentifierContinuationCharacters)!=numberOfIdentifierContinuationCharacters) // remove the identifier continuation from the feed forward text
@@ -1573,7 +1580,7 @@ char* _getLastTokenAutoCompletionText(){
 		// MDH@27SEP2019: if there's an identifier continuation behind the name of a new variable, the user can't reach it, so appending = is not going to be a good idea
 		//                however, this would require the identifier continuation text to be updated BEFORE calling this method
 		// MDH@01OCT2019: it's probably better to leave the assignment operator character showing to indicate that the current identifier is new, the user can always delete the identifier continuation using Delete key
-		// MDH@03OCT2019: case TT_NEW_VARIABLE:/*if(!_identifierContinuationText)*/tokenFeedforwardText="=";break;
+		// MDH@03OCT2019: case TT_NEW_VARIABLE:/*if(!_identifierContinuationCharacters)*/tokenFeedforwardText="=";break;
 		case TT_REAL:break;
 		// MDH@03OCT2019: case TT_SQSTRING:tokenFeedforwardText="'";break; // TODO using ' for the double quoted string might change in the future and we'd be in trouble then
 		case TT_TERNARY_aeru:break;
@@ -2061,7 +2068,7 @@ void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),cursorPosition(),getCommandLength(),(_identifierContinuationText?_identifierContinuationText:"-"),string(_separatedBehindCursorText));
+	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),cursorPosition(),getCommandLength(),(_identifierContinuationCharacters?_identifierContinuationCharacters:"-"),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
 }
@@ -2069,7 +2076,7 @@ void outputDebugInfo(){
 	////////printf("[%u,%u]",cursorPosition(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Identifier continuation: '%s' | Feed forward: '%s'.",cursorPosition(),getCommandLength(),(pLastCommandToEvaluateToken?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),(_identifierContinuationText?_identifierContinuationText:"-"),string(_separatedBehindCursorText));
+	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Identifier continuation: '%s' | Feed forward: '%s'.",cursorPosition(),getCommandLength(),(pLastCommandToEvaluateToken?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),(_identifierContinuationCharacters?_identifierContinuationCharacters:"-"),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
 }
@@ -4660,10 +4667,10 @@ size_t getNumberOfTokenAutocompletionTexts(){
 
 size_t getNumberOfIdentifierContinuationTextCharactersWritten(){
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateIdentifierContinuation();
-	size_t numberOfIdentifierContinuationCharactersWritten=(_identifierContinuationText?strlen(_identifierContinuationText):0);
+	size_t numberOfIdentifierContinuationCharactersWritten=(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0);
 	// MDH@04OCT2019: append it to the suggested text
-	if(numberOfIdentifierContinuationCharactersWritten>0)if(!string_append(_suggestedText,_identifierContinuationText))numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
-	if(numberOfIdentifierContinuationCharactersWritten>0){setColor(getIdentifierContinuationTextColor());output("%s",_identifierContinuationText);}
+	if(numberOfIdentifierContinuationCharactersWritten>0)if(!string_append(_suggestedText,_identifierContinuationCharacters))numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
+	if(numberOfIdentifierContinuationCharactersWritten>0){setColor(getIdentifierContinuationTextColor());output("%s",_identifierContinuationCharacters);}
 	return numberOfIdentifierContinuationCharactersWritten; // one less character written than the computed length!!!
 }
 size_t getNumberOfImmediateFeedforwardCharactersWritten(){
@@ -5661,7 +5668,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			/////if(amDebugging())inputInfo("M");
 		}
 		*/
-		bool acceptedFirstSuggestedCharacterDeleted=(!aSuggestedCharacter||(_identifierContinuationText?deleteFirstIdentifierContinuationCharacter():deleteFirstAutocompletionCharacter(inputChar,true)));
+		bool acceptedFirstSuggestedCharacterDeleted=(!aSuggestedCharacter||(_identifierContinuationCharacters?deleteFirstIdentifierContinuationCharacter():deleteFirstAutocompletionCharacter(inputChar,true)));
 		if(!acceptedFirstSuggestedCharacterDeleted)inputError("Failed to remove the accepted first suggested character."); // i.e. we're NOT switching to control mode or returning false
 		updateLastTokenAutocompletionText(/*acceptedFirstSuggestedCharacterDeleted*/); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
 		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
@@ -5703,7 +5710,7 @@ void switchToCommandMode(){
 	deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 }
 
-char getFirstSuggestedCharacter(bool autogenerated){return(_identifierContinuationText&&strlen(_identifierContinuationText)>0?getFirstIdentifierContinuationCharacter():getFirstAutocompletionCharacter(autogenerated));}
+char getFirstSuggestedCharacter(bool autogenerated){return(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0?getFirstIdentifierContinuationCharacter():getFirstAutocompletionCharacter(autogenerated));}
 
 // MDH@01OCT2019: I created consumeFirstSuggestedCharacter() today to consume the first suggested character but initially called commandCharacterAccepted with endOfInput flag equal to false
 //                I suppose that was wrong because there's exactly one character being accepted and that's also the end of input character 
@@ -5716,7 +5723,7 @@ char getFirstSuggestedCharacterConsumed(char firstSuggestedCharacter,bool endOfI
 }
 
 void removeFirstSuggestedCharacter(char firstSuggestedCharacter,bool consumed){
-	if(!_identifierContinuationText||strlen(_identifierContinuationText)==0){ // a feed forward text character was consumed
+	if(!_identifierContinuationCharacters||strlen(_identifierContinuationCharacters)==0){ // a feed forward text character was consumed
 		deleteFirstAutocompletionCharacter(firstSuggestedCharacter,consumed);
 	}
 }
@@ -5806,7 +5813,8 @@ int main(int argc, char **argv){
 	// TODO shouldn't we do this in initEnvironment? (or its alternative initM() yet to be created)
 	_immediateFeedforwardText=__string();if(!_immediateFeedforwardText)outputError("Failed to allow immediate feed forward"); // TODO we can do better than this!!
 	_suggestedText=__string();if(!_suggestedText)outputError("Failed to allow suggested text");
-
+	_manualFeedforwardText=__string();if(!_manualFeedforwardText)outputError("Failed to allow manual feed forward");
+	
 	char inputChar,inputCharType;
 
 	outputLine("");
@@ -5939,7 +5947,7 @@ int main(int argc, char **argv){
 					/////debugWrite("DELETE");
 					// MDH@20SEP2019: equivalent to removing ANY first character in the first feed forward text (if any)
 					// MDH@27SEP2019: removing the identifier continuation text takes precedence!!!
-					if(_identifierContinuationText){
+					if(_identifierContinuationCharacters){
 						deleteIdentifierContinuation();
 						///////writeSuggestedText(false);
 					}else
@@ -6000,7 +6008,7 @@ int main(int argc, char **argv){
 					// MDH@26SEP2019: how about only consuming the identifier continuation text if we have it as a service to the user????? I think that makes sense doesn't it
 					//                updateBehindCursorText() adjusted to return (if available) a pointer to the characters in the feed forward text (TODO change behind cursor into feed forward when appropriate)
 					// MDH@04OCT2019: are we going to consume in parts????? NOTE if there's no identifier continuation text, the immediate feed forward and auto completion texts to consume are present in _suggestedText (thank god)
-					char* consumableText=(_identifierContinuationText&&strlen(_identifierContinuationText)>0?_identifierContinuationText:string(_suggestedText));
+					char* consumableText=(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0?_identifierContinuationCharacters:string(_suggestedText));
 					size_t numberOfConsumableCharacters=(consumableText?strlen(consumableText):0);
 					if(numberOfConsumableCharacters){
 						char newInputChar='\0';
@@ -6021,7 +6029,7 @@ int main(int argc, char **argv){
 						}
 						// MDH@04OCT2019: only the token auto completion texts need to be cleared (the identifier continuation and immediate feed forward text are always redetermined at the start of the input loop)
 						// MDH@27SEP2019: either the identifier continuation or the token feed forward texts will all be consumed!!!! (did this before processing earlier, and then the suggested characters vanished!!!)
-						if(!_identifierContinuationText||strlen(_identifierContinuationText)==0)deleteTokenautocompletiontexts();
+						if(!_identifierContinuationCharacters||strlen(_identifierContinuationCharacters)==0)deleteTokenautocompletiontexts();
 						// if successful
 						///////////////if(newInputChar)updateLastTokenAutocompletionText(); // TODO should we do this?????
 					}else // no consumable text
@@ -6038,16 +6046,16 @@ int main(int argc, char **argv){
 										if(inputChar==126){ // delete
 											/////////inputInfo("Delete");
 											// we should have suggested (identifier continuation or feed forward (autocompletion)) text
-											if(_identifierContinuationText||(_suggestedText&&string_length(_suggestedText))){
-												if(_identifierContinuationText){
-													if(strlen(_identifierContinuationText)>0){
+											if(_identifierContinuationCharacters||(_suggestedText&&string_length(_suggestedText))){
+												if(_identifierContinuationCharacters){
+													if(strlen(_identifierContinuationCharacters)>0){
 														identifierCouldHaveChanged=false; // mark the identifier as unchanged to prevent the automatic update of the identifier continuation
-														_identifierContinuationText[0]='\0'; // TODO this is a quick fix to make the identifier continuation text seem empty
+														_identifierContinuationCharacters[0]='\0'; // TODO this is a quick fix to make the identifier continuation text seem empty
 														//// MDH@02OCT2019: the = sign would already be there: updateLastTokenAutocompletionText(false); // we do this because deleting identifier continuation might possibly force an assignment operator to appear behind a new variable (otherwise it wouldn't)
 													}else // already didn't have any identifier continuation, so start consuming token feed forward text (see below)
 														deleteIdentifierContinuation();
 												}
-												if(!_identifierContinuationText){
+												if(!_identifierContinuationCharacters){
 													if(string_length(_immediateFeedforwardText)==0){ // MDH@20SEP2019 replacing: string_length(feedforwardText)){
 														if(getFirstAutocompletionCharacterRemoved()){ // MDH@20SEP2019 replacing: string_removed_char(feedforwardText,0))
 															///////writeSuggestedText(false); // there isn't any identifier continuation text to start with
@@ -6097,7 +6105,7 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==67){ // right arrow
 									// MDH@27SEP2019: don't forget the continuation text as well!!!
-									if(_identifierContinuationText||_firstTokenautocompletiontext){  ///// MDH@23SEP2019: replacing: behindCursor()){
+									if(_identifierContinuationCharacters||_firstTokenautocompletiontext){  ///// MDH@23SEP2019: replacing: behindCursor()){
 										// MDH@02OCT2019: just as with Tab we do the end of input actions ourselves!!!
 										char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed('\0',false);
 										if(firstSuggestedCharacterConsumed){
@@ -6149,7 +6157,7 @@ int main(int argc, char **argv){
 											updateIdentifierContinuation();
 											///outputChar('1');
 											// prepend only anonymously when not matching the identifier continuation character!!
-											if(!_identifierContinuationText||_identifierContinuationText[0]!=c)
+											if(!_identifierContinuationCharacters||_identifierContinuationCharacters[0]!=c)
 											if(!getAutocompletionTextOfCharacterPrepended(c,false))
 											inputError("Failed to accept the removed command character as suggested text.");
 											///outputChar('2');
@@ -6164,9 +6172,9 @@ int main(int argc, char **argv){
 												identifierContinuationText=__string();
 												if(identifierContinuationText){
 													string_append_char(identifierContinuationText,c);
-													if(_identifierContinuationText)string_append(identifierContinuationText,_identifierContinuationText);
+													if(_identifierContinuationCharacters)string_append(identifierContinuationText,_identifierContinuationCharacters);
 													updateIdentifierContinuation(); // determine the new identifier continuation
-													if(_identifierContinuationText&&strcmp(_identifierContinuationText,string(identifierContinuationText))==0)
+													if(_identifierContinuationCharacters&&strcmp(_identifierContinuationCharacters,string(identifierContinuationText))==0)
 														removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter=true;
 												}
 											}
