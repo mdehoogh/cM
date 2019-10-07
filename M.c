@@ -4691,9 +4691,11 @@ size_t getNumberOfIdentifierContinuationTextCharactersWritten(){
 	if(numberOfIdentifierContinuationCharactersWritten>0)if(!string_append(_suggestedText,_identifierContinuationCharacters))numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
 	if(numberOfIdentifierContinuationCharactersWritten>0){
 		setColor(getIdentifierContinuationTextColor());
-		///////output("%s",_identifierContinuationCharacters);
+		output("%s",_identifierContinuationCharacters);
+		/*
 		size_t numberOfIdentifierContinuationCharactersToWrite=numberOfIdentifierContinuationCharactersWritten;
 		while(numberOfIdentifierContinuationCharactersToWrite){outputChar(' ');numberOfIdentifierContinuationCharactersToWrite--;}
+		*/
 	}
 	return numberOfIdentifierContinuationCharactersWritten; // one less character written than the computed length!!!
 }
@@ -5907,6 +5909,12 @@ int main(int argc, char **argv){
 				if(_manualFeedforwardText){ // existing manual feed forward text that may block identifier continuation characters
 					// if _manualFeedforwardText is empty ANY identifier continuation will be blocked (e.g. when a single identifier continuation character is removed)
 					if(_identifierContinuationCharacters){
+						// MDH@06OCT2019: if they are the same we should prefer the identifier continuation
+						if(strcmp(string(_manualFeedforwardText),_identifierContinuationCharacters)) // manual feed forward text starts with the identifier continuation
+							deleteIdentifierContinuation();
+						else
+							string_setlength(_manualFeedforwardText,0);
+						/* replacing:
 						size_t numberOfIdentifierContinuationCharacters=strlen(_identifierContinuationCharacters);
 						if(numberOfIdentifierContinuationCharacters>0&&numberOfIdentifierContinuationCharacters<=string_length(_manualFeedforwardText)){
 							char c=string_replacedchar(_manualFeedforwardText,'\0',numberOfIdentifierContinuationCharacters);
@@ -5920,6 +5928,7 @@ int main(int argc, char **argv){
 							string_replacedchar(_manualFeedforwardText,c,numberOfIdentifierContinuationCharacters);
 						}else // no match
 							deleteIdentifierContinuation();
+						*/
 					}
 				}
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
