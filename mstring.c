@@ -339,3 +339,21 @@ char string_replacedchar(Mstring* const str,char c,size_t pos){
     str->chars[pos]=c;
     return replacedchar;
 }
+
+// the number of matching character at the start
+size_t string_number_of_matching_chars(Mstring const * const str,char const * chars){
+    size_t numberOfMatchingCharacters=0;
+    // if str and chars are used as value arguments so the pointers themselves shouldn't be constant
+    if(str&&chars){
+        char* strchars=str->chars;
+        if(strchars){
+            strchars[str->length]='\0'; // perhaps important
+            // as long as the same and not end-of-line character increment
+            while(*strchars==*chars&&(*chars)!='\0'){
+                numberOfMatchingCharacters++; // increment number of matching characters
+                ++strchars;++chars; // increment character pointers
+            }
+        }
+    }
+    return numberOfMatchingCharacters;
+} 

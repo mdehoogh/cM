@@ -1408,6 +1408,7 @@ void inputError(const char* const fmt,...); // prototype
 // what the user consumed manually, and is supposed to remain continguous i.e. uninterrupted by other feed forward texts
 // it's possible that manual feed forward text is empty so it will block the identifier continuation text when that is the case!!
 Mstring* _manualFeedforwardText=NULL;
+size_t numberOfIdentifierContinuationManualFeedforwardCharacters=0; // MDH@06OCT2019: determine the number of manual feed forward characterr matching the identifier continuation
 bool manualFeedforwardCharacterPrepended(char c){
 	if(!c)return false;
 	if(!_manualFeedforwardText)_manualFeedforwardText=__string();
@@ -4680,8 +4681,24 @@ size_t getNumberOfManualFeedforwardCharactersWritten(){
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateIdentifierContinuation();
 	size_t numberOfManualFeedforwardCharactersWritten=(_manualFeedforwardText?string_length(_manualFeedforwardText):0);
 	// MDH@04OCT2019: append it to the suggested text
-	if(numberOfManualFeedforwardCharactersWritten>0)if(!string_append(_suggestedText,string(_manualFeedforwardText)))numberOfManualFeedforwardCharactersWritten=0; // append to suggested text
-	if(numberOfManualFeedforwardCharactersWritten>0){setColor(getManualFeedforwardTextColor());output("%s",string(_manualFeedforwardText));}
+	if(numberOfManualFeedforwardCharactersWritten>0){
+		if(!string_append(_suggestedText,string(_manualFeedforwardText)))numberOfManualFeedforwardCharactersWritten=0; // append to suggested text
+		if(numberOfManualFeedforwardCharactersWritten>0){
+			if(numberOfIdentifierContinuationManualFeedforwardCharacters>0){
+				setColor(getIdentifierContinuationTextColor());
+				char c=string_replacedchar(_manualFeedforwardText,'\0',numberOfIdentifierContinuationManualFeedforwardCharacters);
+				output("%s",string(_manualFeedforwardText));
+				if(!c){ // something completely manual to write
+					setColor(getManualFeedforwardTextColor());
+					output("%s",string(_manualFeedforwardText)+numberOfManualFeedforwardCharactersWritten);
+					string_setchar(_manualFeedforwardText,c,numberOfIdentifierContinuationManualFeedforwardCharacters);
+				}
+			}else{
+				setColor(getManualFeedforwardTextColor());
+				output("%s",string(_manualFeedforwardText));
+			}
+		}
+	}
 	return numberOfManualFeedforwardCharactersWritten; // one less character written than the computed length!!!
 }
 size_t getNumberOfIdentifierContinuationTextCharactersWritten(){
@@ -4751,7 +4768,7 @@ void showSuggestedText(){
 	string_setlength(_suggestedText,0); // clear the suggested text!!!
 	resetOutputColor();
 	// 1. write the identifier continuation first, then the manual feed forward, the immediate feed forward characters and finally the auto completion text
-	numberOfSuggestedCharactersWritten=getNumberOfIdentifierContinuationTextCharactersWritten()+getNumberOfManualFeedforwardCharactersWritten()+getNumberOfImmediateFeedforwardCharactersWritten()+getNumberOfAutocompletionCharactersWritten();
+	numberOfSuggestedCharactersWritten=(string_length(_manualFeedforwardText)==0?getNumberOfIdentifierContinuationTextCharactersWritten():getNumberOfManualFeedforwardCharactersWritten())+getNumberOfImmediateFeedforwardCharactersWritten()+getNumberOfAutocompletionCharactersWritten();
 	// 2. and back to where the cursor is supposed to be
 	moveCursorLeft(numberOfSuggestedCharactersWritten); // return to where the command ends
 	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
@@ -5908,12 +5925,16 @@ int main(int argc, char **argv){
 				// and the identifier continuation will be removed from the manual feed forward
 				if(_manualFeedforwardText){ // existing manual feed forward text that may block identifier continuation characters
 					// if _manualFeedforwardText is empty ANY identifier continuation will be blocked (e.g. when a single identifier continuation character is removed)
-					if(_identifierContinuationCharacters){
+					numberOfIdentifierContinuationManualFeedforwardCharacters=
+						string_number_of_matching_chars(_manualFeedforwardText,_identifierContinuationCharacters);
+					///// replacing: if(_identifierContinuationCharacters){
+						/* replacing:
 						// MDH@06OCT2019: if they are the same we should prefer the identifier continuation
 						if(strcmp(string(_manualFeedforwardText),_identifierContinuationCharacters)) // manual feed forward text starts with the identifier continuation
 							deleteIdentifierContinuation();
 						else
 							string_setlength(_manualFeedforwardText,0);
+						*/
 						/* replacing:
 						size_t numberOfIdentifierContinuationCharacters=strlen(_identifierContinuationCharacters);
 						if(numberOfIdentifierContinuationCharacters>0&&numberOfIdentifierContinuationCharacters<=string_length(_manualFeedforwardText)){
@@ -5929,7 +5950,7 @@ int main(int argc, char **argv){
 						}else // no match
 							deleteIdentifierContinuation();
 						*/
-					}
+					//////////}
 				}
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it

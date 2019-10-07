@@ -58,4 +58,6 @@ void string_reverse(Mstring * const str);
 Mstring* string_append_chars(Mstring * const str,char const * pc,size_t count); // MDH@24SEP2019: we need to be able to append count characters from pc
 char string_replacedchar(Mstring * const str,char c,size_t pos); // returns the character at position pos replaced by c (but does not change the length ever)
 
+size_t string_number_of_matching_chars(Mstring const * const str,char const * chars); // the number of matching character at the start
+
 #endif /* __MSTRING_H__ */
