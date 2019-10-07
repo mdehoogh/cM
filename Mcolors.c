@@ -23,6 +23,9 @@ const char LIGHT_YELLOW[]="11";
 const char LIGHT_BLUE[]="45"; // "12" is really TOO dark!!
 const char LIGHT_PURPLE[]="13";
 const char LIGHT_CYAN[]="14";
+const char CYAN[]="39";
+const char GREY[]="249"; // MDH@07OCT2019: between dark and light grey
+const char BLUE[]="27"; // MDH@07OCT2019: what we use for the identifier continuation text
 const char WHITE[]="15";
 const char ORANGE[]="202"; // instead of DARK_YELLOW use (a dark version of) ORANGE
 // the background colors (which are not used behind 38;5 or 48;5 but directly )
@@ -58,7 +61,8 @@ const char* PROMPT_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK}; // same as the
 
 // MDH@26SEP2019: distinguishing between identifier continuation text and feed forward text (behind the cursor)
 const char* FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARKER_GREY};
-const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHTER_GREY,DARK_GREY}; // MDH@25SEP2019: special color for generated feed forward text
+const char* IDENTIFIER_CONTINUATION_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={GREY,GREY}; // MDH@25SEP2019: special color for identifier continuation text
+const char* MANUAL_FEED_FORWARD_TEXT_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHTER_GREY,DARK_GREY}; // MDH@07OCT2019: same color as the identifier continuation text
 
 // operator token colors (all the same)
 const char** OPERATOR_TOKEN_COLORS[]={ASSIGNMENT_COLORS,UNARY_OPERATOR_COLORS,BINARY_OPERATOR_COLORS,TERNARY_OPERATOR_COLORS};
@@ -73,6 +77,7 @@ const char* getInfoColor(){return INFO_COLORS[colorscheme];}
 const char* getBackgroundColor(){return BACKGROUND_COLORS[colorscheme];}
 const char* getErrorColor(){return ERROR_COLORS[colorscheme];}
 const char* getFeedForwardTextColor(){return FEED_FORWARD_TEXT_COLORS[colorscheme];}
+const char* getManualFeedforwardTextColor(){return MANUAL_FEED_FORWARD_TEXT_COLORS[colorscheme];}
 const char* getIdentifierContinuationTextColor(){return IDENTIFIER_CONTINUATION_TEXT_COLORS[colorscheme];} // MDH@25SEP2019: special color for generated feed forward text
 const char* getCommentColor(){return COMMENT_COLORS[colorscheme];}
 const char* getOperatorTokenColor(uint8_t opid){return OPERATOR_TOKEN_COLORS[opid][colorscheme];}

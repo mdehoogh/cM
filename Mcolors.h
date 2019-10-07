@@ -7,8 +7,11 @@
 const char* getInfoColor();
 const char* getBackgroundColor();
 const char* getErrorColor();
+
 const char* getFeedForwardTextColor();
+const char* getManualFeedforwardTextColor();
 const char* getIdentifierContinuationTextColor();
+
 const char* getCommentColor();
 const char* getOperatorTokenColor(uint8_t opid);
 const char* getValueTokenColor(uint8_t tokentypeid);
