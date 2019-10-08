@@ -719,21 +719,20 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
  * \brief returns a decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
  */
 Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){
-    if(!decimalText)return NULL;
-    Mdecimal* decimal=NULL;
-    if(strlen(decimalText)){
+    Mdecimal* _textDecimal=NULL;
+    if(decimalText&&strlen(decimalText)){
         if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
         // can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
         // the rounding at the end of course could prove to be problematic
-        decimal=__decimal(NULL,0,repeating);
-        if(decimal){
-            mpd_set_string(decimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context); // NOTE here we have to pass in the default decimal context
-            if(!decimal->mpd){free_decimal(decimal);decimal=NULL;} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
+        _textDecimal=__decimal(NULL,0,repeating);
+        if(_textDecimal){
+            mpd_set_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context); // NOTE here we have to pass in the default decimal context
+            if(!_textDecimal->mpd){free_decimal(_textDecimal);_textDecimal=NULL;} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
         }
-        if(!decimal)output("%sFailed to create a decimal from '%s'.\n",ERROR_PREFIX,decimalText);
+        if(!_textDecimal)output("%sFailed to create a decimal from '%s'.\n",ERROR_PREFIX,decimalText);
     }else
         outputError("No decimal text to parse");
-    return decimal;
+    return _textDecimal;
 }/* VALIDATED */
 
 // END BASE STUFF

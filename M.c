@@ -687,7 +687,9 @@ Mvalue* d(Mvalue* _value){
 	if(_value){
 		switch(_value->type){
 			// TODO all other types
+			case VT_BIGINTEGER:return _getDecimalValue(_getBigintegerDecimal(_value->value._biginteger),true);
 			case VT_RATIONAL:return _getDecimalValue(_getRationalDecimal(_value->value._rational),true);
+			case VT_DECIMAL:return _value;
 			default:break;
 		}
 	}
@@ -3955,7 +3957,21 @@ Mvalue* _getBigintegerPower(Mvalue* baseValue,Mbiginteger* exponentBiginteger){
 			return _getBigintegerBigintegerPowerValue(baseValue->value._biginteger,exponentBiginteger);
 		case VT_RATIONAL:
 			return _getRationalValue(_getRationalBigintegerPower(baseValue->value._rational,exponentBiginteger),true);
-		case VT_DECIMAL:;
+		case VT_DECIMAL:
+			if(baseValue->value._decimal->repeating>0){
+				Mrational* _decimalRational=_getDecimalRational(baseValue->value._decimal);
+				if(_decimalRational){
+					Mrational* _decimalRationalPower=_getRationalBigintegerPower(_decimalRational,exponentBiginteger);
+					free_rational(_decimalRational);
+					return _getRationalValue(_decimalRationalPower,true);
+				}
+			}else{ // base is a 'true' decimal
+				Mdecimal* _exponentDecimal=_getBigintegerDecimal(exponentBiginteger);
+				Mdecimal* _decimalPower=_getDecimalPower(baseValue->value._decimal,_exponentDecimal->mpd,getContextOfDecimals(baseValue->value._decimal,_exponentDecimal));
+				free_decimal(_exponentDecimal);
+				return _getDecimalValue(_decimalPower,true);
+			}
+			break;
 	}
 	return NULL;
 }

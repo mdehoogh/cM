@@ -149,7 +149,7 @@ void free_bigintegerListelement(MbigintegerListelement* _bile){
     if(_bile->_next)free_bigintegerListelement(_bile->_next);
     if(_bile->_biginteger)free_biginteger(_bile->_biginteger);
 }/* VALIDATED */
-Mdecimal* _getRationalDecimal(const Mrational* const _rational){
+Mdecimal* _getRationalDecimal(Mrational const * const _rational){
     if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     // _decimalText is a local variable that when set should be freed before returning!!!
     Mstring* _decimalText=NULL;
