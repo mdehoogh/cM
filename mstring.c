@@ -90,9 +90,8 @@ bool string_empty(const Mstring* const str){
     */
 }
 
-size_t string_length(const Mstring* const str){
-    return(str?str->length:0);
-}
+size_t string_length(const Mstring* const str){return(str?str->length:0);}
+
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
 Mstring* string_setlength(Mstring* const str,size_t length){
     if(!str)return NULL;
@@ -297,7 +296,7 @@ char* string_remainder(Mstring* const str,size_t firstpos){
 */
 char* string(Mstring* const str){
     if(!str)return NULL;
-    str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
+    if(str->chars)str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
     return str->chars;
     // MDH@21JUN2019: replacing: return (str?str->chars:NULL);
 }
@@ -333,7 +332,7 @@ void string_reverse(Mstring* const str){
 // MDH@24SEP2019: in order to be able to use a smaller part from the beginning of text we'd like to be able to replace a character by '\0' and later on restore it
 //                we will succeed if we have a function that will return the replaced character so we can put it back in again
 //                this method will NOT change str->length ever, meaning that if you forget to put the character back you're in trouble
-char string_replacedchar(Mstring* const str,char c,size_t pos){
+char string_replacedchar(Mstring * const str,char c,size_t pos){
     if(!str||pos>=str->length)return '\0';
     char replacedchar=str->chars[pos];
     str->chars[pos]=c;

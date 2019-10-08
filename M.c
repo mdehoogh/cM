@@ -1620,7 +1620,11 @@ void deleteTokenautocompletiontexts(){
 	_firstTokenautocompletiontext=NULL; // OOPS pretty essential!!!!
 	immediateFeedforwardToken=NULL; // MDH@04OCT2019: also pretty essential as we won't have a feed forward text with this token anymore
 }
+/*
+void deleteTokenautocompletionCharacters(size_t numberOfTokenAutocompletionCharacters){
 
+}
+*/
 // every time feed forward text is to be added, it is prepended to the list of feed forward texts setting the token pointer to pLastCommandToEvaluateToken
 Mtokenautocompletiontext* getTokenAutocompletionText(Mtoken* token){
 	Mtokenautocompletiontext* tokenautocompletiontext=_firstTokenautocompletiontext;
@@ -2080,7 +2084,7 @@ void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",cursorPosition(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),cursorPosition(),getCommandLength(),(_identifierContinuationCharacters?_identifierContinuationCharacters:"-"),string(_separatedBehindCursorText));
+	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Manual feed forward: '%s' | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(pLastCommandToEvaluateToken!=NULL?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),cursorPosition(),getCommandLength(),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
 }
@@ -2088,7 +2092,7 @@ void outputDebugInfo(){
 	////////printf("[%u,%u]",cursorPosition(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Identifier continuation: '%s' | Feed forward: '%s'.",cursorPosition(),getCommandLength(),(pLastCommandToEvaluateToken?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),(_identifierContinuationCharacters?_identifierContinuationCharacters:"-"),string(_separatedBehindCursorText));
+	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'.",cursorPosition(),getCommandLength(),(pLastCommandToEvaluateToken?TOKENTYPE_STRING[pLastCommandToEvaluateToken->type]:""),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
 }
@@ -4679,24 +4683,20 @@ size_t getNumberOfTokenAutocompletionTexts(){
 
 size_t getNumberOfManualFeedforwardCharactersWritten(){
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateIdentifierContinuation();
-	size_t numberOfManualFeedforwardCharactersWritten=(_manualFeedforwardText?string_length(_manualFeedforwardText):0);
+	size_t numberOfManualFeedforwardCharactersWritten=0;
 	// MDH@04OCT2019: append it to the suggested text
-	if(numberOfManualFeedforwardCharactersWritten>0){
-		if(!string_append(_suggestedText,string(_manualFeedforwardText)))numberOfManualFeedforwardCharactersWritten=0; // append to suggested text
-		if(numberOfManualFeedforwardCharactersWritten>0){
-			if(numberOfIdentifierContinuationManualFeedforwardCharacters>0){
-				setColor(getIdentifierContinuationTextColor());
-				char c=string_replacedchar(_manualFeedforwardText,'\0',numberOfIdentifierContinuationManualFeedforwardCharacters);
-				output("%s",string(_manualFeedforwardText));
-				if(!c){ // something completely manual to write
-					setColor(getManualFeedforwardTextColor());
-					output("%s",string(_manualFeedforwardText)+numberOfManualFeedforwardCharactersWritten);
-					string_setchar(_manualFeedforwardText,c,numberOfIdentifierContinuationManualFeedforwardCharacters);
-				}
-			}else{
-				setColor(getManualFeedforwardTextColor());
-				output("%s",string(_manualFeedforwardText));
-			}
+	if(string_length(_manualFeedforwardText)>0){
+		if(numberOfIdentifierContinuationManualFeedforwardCharacters>0){
+			char c=string_replacedchar(_manualFeedforwardText,'\0',numberOfIdentifierContinuationManualFeedforwardCharacters);
+			setColor(getIdentifierContinuationTextColor());
+			numberOfManualFeedforwardCharactersWritten=output("%s",string(_manualFeedforwardText));
+			string_setchar(_manualFeedforwardText,c,numberOfIdentifierContinuationManualFeedforwardCharacters); // OOPS put it back before showing not after showing!!!
+		}
+		setColor(getManualFeedforwardTextColor());
+		numberOfManualFeedforwardCharactersWritten+=output("%s",string(_manualFeedforwardText)+numberOfManualFeedforwardCharactersWritten);
+		if(numberOfManualFeedforwardCharactersWritten){
+			string_setlength(_manualFeedforwardText,numberOfManualFeedforwardCharactersWritten); // just in case not all characters were written!!!
+			if(!string_append(_suggestedText,string(_manualFeedforwardText)))numberOfManualFeedforwardCharactersWritten=0;
 		}
 	}
 	return numberOfManualFeedforwardCharactersWritten; // one less character written than the computed length!!!
@@ -4768,7 +4768,11 @@ void showSuggestedText(){
 	string_setlength(_suggestedText,0); // clear the suggested text!!!
 	resetOutputColor();
 	// 1. write the identifier continuation first, then the manual feed forward, the immediate feed forward characters and finally the auto completion text
-	numberOfSuggestedCharactersWritten=(string_length(_manualFeedforwardText)==0?getNumberOfIdentifierContinuationTextCharactersWritten():getNumberOfManualFeedforwardCharactersWritten())+getNumberOfImmediateFeedforwardCharactersWritten()+getNumberOfAutocompletionCharactersWritten();
+	if(string_length(_manualFeedforwardText)>0)
+		numberOfSuggestedCharactersWritten=getNumberOfManualFeedforwardCharactersWritten();
+	else
+		numberOfSuggestedCharactersWritten=getNumberOfIdentifierContinuationTextCharactersWritten();
+	numberOfSuggestedCharactersWritten+=getNumberOfImmediateFeedforwardCharactersWritten()+getNumberOfAutocompletionCharactersWritten();
 	// 2. and back to where the cursor is supposed to be
 	moveCursorLeft(numberOfSuggestedCharactersWritten); // return to where the command ends
 	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
@@ -5925,8 +5929,22 @@ int main(int argc, char **argv){
 				// and the identifier continuation will be removed from the manual feed forward
 				if(_manualFeedforwardText){ // existing manual feed forward text that may block identifier continuation characters
 					// if _manualFeedforwardText is empty ANY identifier continuation will be blocked (e.g. when a single identifier continuation character is removed)
-					numberOfIdentifierContinuationManualFeedforwardCharacters=
-						string_number_of_matching_chars(_manualFeedforwardText,_identifierContinuationCharacters);
+					numberOfIdentifierContinuationManualFeedforwardCharacters=string_number_of_matching_chars(_manualFeedforwardText,_identifierContinuationCharacters);
+					// MDH@08OCT2019: when the manual feed forward matches the start of the identifier continuation use the latter
+					//                this poses a problem though, the alternative being to always show the identifier continuation behind the manual feed forward
+					//                which means that we have to get rid of the identifier continuation if we are not showing it
+					//                the point is we cannot simply get rid of the manual feed forward text being the result of a number of left arrow actions
+					//                we can only augment it with identifier continuation although the identifier continuation would reappear automatically when we do
+					/*
+					if(numberOfIdentifierContinuationManualFeedforwardCharacters==string_length(_manualFeedforwardText)){ // the entire manual feed forward text starts the identifier continuation
+						// we want to keep the manual feed forward but also show the remainder of the identifier continuation
+						// there's no need to delete the identifier continuation because the manual feed forward takes precendence over showing the identifier continuation
+						if(strlen(_identifierContinuationCharacters)>numberOfIdentifierContinuationManualFeedforwardCharacters){
+							string_append(_manualFeedforwardText,_identifierContinuationCharacters+numberOfIdentifierContinuationManualFeedforwardCharacters);
+						}
+						// using the identifier continuation instead of the manual feed forward text replacing: free_string(_manualFeedforwardText);_manualFeedforwardText=NULL;
+					}
+					*/
 					///// replacing: if(_identifierContinuationCharacters){
 						/* replacing:
 						// MDH@06OCT2019: if they are the same we should prefer the identifier continuation
@@ -5952,6 +5970,7 @@ int main(int argc, char **argv){
 						*/
 					//////////}
 				}
+				////////////if(amVerbose()||!amDebugging())inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0);
@@ -6092,8 +6111,9 @@ int main(int argc, char **argv){
 					// MDH@07OCT2019: manual feed forward text (as a whole) takes precedence
 					size_t numberOfCharactersToConsume=string_length(_suggestedText);
 					if(numberOfCharactersToConsume>0){
-						size_t numberOfIdentifierContinuationCharacters=(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0);
+						// if there are manual feed forward characters it can start with a number of identifier continuation characters to consume as a whole using Tab
 						size_t numberOfManualFeedforwardCharacters=(_manualFeedforwardText?string_length(_manualFeedforwardText):0);
+						size_t numberOfIdentifierContinuationCharacters=(numberOfManualFeedforwardCharacters?numberOfIdentifierContinuationManualFeedforwardCharacters:(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0));
 						// the feed forward text that is colored differently (identifier continuation and manual feed forward text is to be accepted as a whole when Tab is used)
 						// it's easiest to do that by specifying the number of suggested characters to consume
 						if(numberOfIdentifierContinuationCharacters>0)numberOfCharactersToConsume=numberOfIdentifierContinuationCharacters;
@@ -6119,16 +6139,25 @@ int main(int argc, char **argv){
 						// remove at most numberOfSuggestedCharactersAccepted from the suggested text
 						if(inputMode==IM_COMMAND){
 							// if identifier continuation characters were consumed nothing to do, otherwise either to clear the manual
-							if(numberOfIdentifierContinuationCharacters==0){
-								// how about always clearing the manual feed forward characters (even if we actually haven't shown them)
-								if(_manualFeedforwardText){free_string(_manualFeedforwardText);_manualFeedforwardText=NULL;}
-								// if no manual feed forward character consumption then we have to remove the rest
-								if(numberOfManualFeedforwardCharacters==0){
-									deleteTokenautocompletiontexts();
-								}
-							}
-							// we might end up behind some character that produces auto completion stuff like [ or {
-							updateLastTokenAutocompletionText(); // TODO do we need the following????
+							// MDH@08OCT2019: have to be careful here because identifier continuation characters might come out of the manual feed forward text
+							if(numberOfSuggestedCharactersAccepted){ // at least one character consumed
+								if(numberOfSuggestedCharactersAccepted==numberOfCharactersToConsume){
+									if(numberOfManualFeedforwardCharacters){ // some of the manual feed forward characters were consumed
+										if(numberOfSuggestedCharactersAccepted>=string_length(_manualFeedforwardText)){ // all manual feed forward characters were consumed
+											free_string(_manualFeedforwardText);_manualFeedforwardText=NULL;
+										}else{ // not all manual feed forward characters were consumed 
+											// remove numberOfSuggestedCharactersAccepted from the start of the manual feed forward text
+											if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersAccepted))
+												inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
+										}
+									}else
+										deleteTokenautocompletiontexts();
+									updateLastTokenAutocompletionText(); // TODO do we need the following????
+								}else
+									inputCharType=switchToControlMode("Not all suggested characters accepted.");
+								// we might end up behind some character that produces auto completion stuff like [ or {
+							}else
+								inputCharType=switchToControlMode("No suggested characters accepted.");					
 						}
 					}else // no consumable text
 						beep();
@@ -6147,17 +6176,17 @@ int main(int argc, char **argv){
 											// MDH@07OCT2019: manual feed forward text goes first
 											if(_suggestedText&&string_length(_suggestedText)){ // there is suggested text with parts to delete
 												// any identifier continuation characters precede manual feed forward text
+												if(string_length(_manualFeedforwardText)){
+													if(getFirstManualFeedforwardCharacterRemoved()){
+														if(string_length(_manualFeedforwardText)==0){free_string(_manualFeedforwardText);_manualFeedforwardText=NULL;}
+													}else
+														inputCharType=switchToControlMode("Failed to delete the first suggested character.");
+												}else
 												if(_identifierContinuationCharacters&&strlen(_identifierContinuationCharacters)>0){
 													// if there's immediate feed forward token, there's no manual feed forward
 													// PROBLEM can't remove the identifier continuation characters as a whole because if I do it will be recreated
 													if(!prependedToManualFeedforwardText(_identifierContinuationCharacters+1))
 														inputCharType=switchToControlMode("Failed to delete the first suggested character.");
-												}else
-												if(!_manualFeedforwardText&&string_length(_manualFeedforwardText)){
-													if(getFirstManualFeedforwardCharacterRemoved()){
-														if(string_length(_manualFeedforwardText)==0){free_string(_manualFeedforwardText);_manualFeedforwardText=NULL;}
-													}else
-														inputCharType=switchToControlMode("Failed to delete the first suggested character");
 												}else{
 													// MDH@06OCT2019: as long as the user is manually deleting identifier continuation characters
 													//                we prevent the automatic update of the identifier continuation?????
@@ -6174,7 +6203,7 @@ int main(int argc, char **argv){
 															inputCharType=switchToControlMode("Failed to delete the first character of the suggested text.");	
 													}else{ // remove the immediate feed forward text
 														string_setlength(_immediateFeedforwardText,0);
-														immediateFeedforwardToBeUpdated=false; // do not update next time
+														/////////////immediateFeedforwardToBeUpdated=false; // do not update next time
 													}
 												}
 											}else
@@ -6216,23 +6245,26 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==67){ // right arrow
 									// MDH@27SEP2019: don't forget the continuation text as well!!!
-									// manual feed forward text goes first
-									if(string_length(_manualFeedforwardText)){
-										char c=getFirstManualFeedforwardCharacterRemoved();
+									if(string_length(_suggestedText)){
+										char c=string_char(_suggestedText,0);
 										if(c){
-											if(!commandCharacterAccepted(c,INPUTCHARACTERTYPES[c],true,false))
-												switchToControlMode("Failed to append the first suggested character");
+											if(commandCharacterAccepted(c,INPUTCHARACTERTYPES[c],true,false)){
+												// where to remove it from????
+												// NOTE identifier continuation and immediate feed forward are redetermined automatically so do not need to be adjusted here
+												if(string_length(_manualFeedforwardText)){
+													if(getFirstManualFeedforwardCharacterRemoved()!=c)
+														inputCharType=switchToControlMode("Wrong first suggested character accepted!");
+												}else
+												if(!_identifierContinuationCharacters||strlen(_identifierContinuationCharacters)==0){
+													if(string_length(_immediateFeedforwardText)==0){
+														if(!getFirstAutocompletionCharacterRemoved())
+															inputCharType=switchToControlMode("Failed to remove the accepted first auto completion character.");
+													}
+												}												
+											}else
+												inputCharType=switchToControlMode("First suggested character not accepted.");
 										}else
-											switchToControlMode("Failed to retrieve the first suggested character");
-									}else
-									if(_identifierContinuationCharacters||_firstTokenautocompletiontext){  ///// MDH@23SEP2019: replacing: behindCursor()){
-										// MDH@02OCT2019: just as with Tab we do the end of input actions ourselves!!!
-										char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed('\0',false);
-										if(firstSuggestedCharacterConsumed){
-											removeFirstSuggestedCharacter(firstSuggestedCharacterConsumed,true);
-											updateLastTokenAutocompletionText();
-										}else // failure
-											inputCharType=switchToControlMode("Failed to accept the first suggested character!");
+											inputCharType=switchToControlMode("First suggested character vanished.");
 									}else
 										beep();
 								}else
@@ -6275,6 +6307,11 @@ int main(int argc, char **argv){
 											//                that the user took out of the (tokenized) command to e.g. correct a command
 											if(!manualFeedforwardCharacterPrepended(c)) // replacing: if(!getAutocompletionTextOfCharacterPrepended(c,true))
 												inputCharType=switchToControlMode("Failed to accept the removed command character as suggested text.");
+											/*
+											else
+											if(amVerbose())
+											inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
+											*/
 											/* replacing:
 											updateIdentifierContinuation();
 											///outputChar('1');
