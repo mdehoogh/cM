@@ -250,6 +250,14 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){
     return _rational;
 }/* VALIDATED */
 
+// MDH@08OCT2019: TODO do we have this already somewhere else??????
+Mdecimal* _getBigintegerDecimal(Mbiginteger const * const _biginteger){
+	Mstring* _bigintegerText=(_biginteger?_getBigintegerText(_biginteger):NULL);
+	Mdecimal* _bigintegerDecimal=(_bigintegerText?_getTextDecimal(string(_bigintegerText),0):NULL);
+	if(_bigintegerText)free_string(_bigintegerText);
+	return _bigintegerDecimal;
+}/* VALIDATED */
+
 Mdecimal* _getRationalDecimal(Mrational const * const _rational){
     if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     // _decimalText is a local variable that when set should be freed before returning!!!

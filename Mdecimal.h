@@ -69,9 +69,12 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x);
 
 // CONVERSION
+Mdecimal* _getBigintegerDecimal(Mbiginteger const * const _biginteger); // MDH@08OCT2019
+
 Mdecimal* _getRationalDecimal(Mrational const * const _rational); // converts a rational to a decimal
 Mrational* _getDecimalRational(Mdecimal const * const decimal); // converts a decimal back to a rational
 
 Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating);
 
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
+

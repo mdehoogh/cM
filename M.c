@@ -3853,6 +3853,112 @@ long double getRealValuePower(Mvalue* _baseValue,long double power){
 	return M_LD_NAN; // uncomputable
 }
 
+mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){
+	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
+	return(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+}
+Mdecimal* _getDecimalPower(mpd_t* base,mpd_t* exponent,mpd_context_t* mpd_context){
+	Mdecimal* _decimalPower=NULL;
+	if(base&&exponent&&mpd_context){
+		_decimalPower=__decimal(mpd_context,0,0);
+		if(_decimalPower){
+			uint32_t status=0;
+			mpd_qpow(_decimalPower->mpd,base,exponent,mpd_context,&status);
+			if((status&0xEFBF)!=0){outputError("Failed to apply the decimal power function");free_decimal(_decimalPower);_decimalPower=NULL;}
+		}else
+			outputError("Failed to create decimal power function result");
+	}else
+		outputError("Insufficient input for computing a decimal power");
+	return _decimalPower;
+}
+
+// computing the integer power of some value, can be performed more exact than when the exponent is not an integer
+Mbiginteger* _getBigintegerPowerWithPositiveBigintegerExponent(Mbiginteger* baseBiginteger,Mbiginteger* exponentBiginteger){
+	// ASSERT assuming exponentBiginteger is positive (so never zero!!!)
+	Mbiginteger* _resultBiginteger=NULL;
+	if(baseBiginteger&&exponentBiginteger){
+		////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
+		if(isBigintegerZero(exponentBiginteger))
+			_resultBiginteger=_getBiginteger(1);
+		else
+		if(!isBigintegerOne(exponentBiginteger)){
+			// determine half the exponent
+			Mbiginteger* _halfexponentBiginteger=__biginteger();
+			if(mp_div_2(exponentBiginteger,_halfexponentBiginteger)==MP_OKAY){
+				Mbiginteger* _halfresultBiginteger=_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,_halfexponentBiginteger);
+				if(_halfresultBiginteger){
+					Mbiginteger* _doublehalfresultBiginteger=__biginteger();
+					if(mp_sqr(_halfresultBiginteger,_doublehalfresultBiginteger)==MP_OKAY){
+						if(!mp_isodd(exponentBiginteger)||mp_mul(_doublehalfresultBiginteger,baseBiginteger,_doublehalfresultBiginteger)==MP_OKAY)
+							_resultBiginteger=_doublehalfresultBiginteger;
+						else
+							free_biginteger(_doublehalfresultBiginteger);
+					}else
+						free_biginteger(_doublehalfresultBiginteger);
+					free_biginteger(_halfresultBiginteger);
+				}
+			}
+			free_biginteger(_halfexponentBiginteger);
+		}else
+			_resultBiginteger=_getBigintegerCopy(baseBiginteger);
+	}
+	return _resultBiginteger;
+}
+Mvalue* _getBigintegerBigintegerPowerValue(Mbiginteger* baseBiginteger,Mbiginteger* exponentBiginteger){
+	Mbiginteger* _bigintegerPower=NULL;
+	bool neg=false;
+	if(baseBiginteger&&exponentBiginteger){
+		//////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
+		if(mp_iszero(baseBiginteger)==MP_NO){ // non-zero base
+			neg=(mp_isneg(exponentBiginteger)==MP_YES);
+			if(mp_iszero(exponentBiginteger)!=MP_YES){ // not zero
+				exponentBiginteger->sign=MP_ZPOS; // sneaky, sneaky!! ascertaining to use a positive exponent!
+				_bigintegerPower=_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,exponentBiginteger);
+			}else
+				_bigintegerPower=_getBiginteger(1);
+		}else // base is zero, so power is zero as well
+			_bigintegerPower=_getBiginteger(0);
+	}
+	return(_bigintegerPower?(neg?_getRationalValue(_getRational(NULL,_bigintegerPower,0,false,true),true):_getBigintegerValue(_bigintegerPower,true)):NULL);
+}
+Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* exponentBiginteger){
+	// the result is the rational of the power of the numerator and the power of the denominator
+	// if the exponent is negative we simply exchange the numerator and the denominator!!	
+	Mrational* _rationalPower=NULL;
+	if(baseRational&&exponentBiginteger){
+		bool neg=(mp_isneg(exponentBiginteger)==MP_YES);
+		exponentBiginteger->sign=MP_ZPOS;
+		Mbiginteger *baseNumerator=(neg?baseRational->den:baseRational->num),*baseDenominator=(neg?baseRational->num:baseRational->den);
+		Mbiginteger *_numerator=_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger);
+		Mbiginteger *_denominator=_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger);
+		_rationalPower=_getRational(_numerator,_denominator,M_LD_NAN,true,true);
+		if(!_rationalPower||!_rationalPower->num)free_biginteger(_numerator);
+		if(!_rationalPower||!_rationalPower->den)free_biginteger(_denominator);
+	}
+	return _rationalPower;
+}
+Mvalue* _getBigintegerPower(Mvalue* baseValue,Mbiginteger* exponentBiginteger){
+	// the general idea is to recursively half the exponent until we end up with having to compute the square which is easy to do
+	// but perhaps we should delegate further to functions that deal with specific base value types
+	switch(baseValue->type){
+		case VT_INTEGER:
+			{
+				Mvalue* _resultValue=NULL;
+				Mbiginteger* _baseBiginteger=_getBiginteger(baseValue->value._integer->ll);
+				if(_baseBiginteger){
+					_resultValue=_getBigintegerBigintegerPowerValue(_baseBiginteger,exponentBiginteger);
+					free_biginteger(_baseBiginteger);
+				}
+				return _resultValue;
+			}
+		case VT_BIGINTEGER:
+			return _getBigintegerBigintegerPowerValue(baseValue->value._biginteger,exponentBiginteger);
+		case VT_RATIONAL:
+			return _getRationalValue(_getRationalBigintegerPower(baseValue->value._rational,exponentBiginteger),true);
+		case VT_DECIMAL:;
+	}
+	return NULL;
+}
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1))return _value1;
@@ -3866,18 +3972,59 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		// ASSERT exponent is NOT a real
 		if(_value1->type==VT_REAL)return _getRealValue(getRealPowerValue(_value1->value._real->ld,_value2));
 		// ASSERT base and exponent are not reals
-		// therefore exact computations should be possible
-		// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
-		// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
-		Mdecimal* _baseDecimal=getValueDecimal(_value1);
-		Mdecimal* _exponentDecimal=getValueDecimal(_value2);
-		Mdecimal* _powerDecimal=__decimal(get_default_mpd_context(),0,0);
-		if(_powerDecimal){
-			mpd_pow(_powerDecimal->mpd,_baseDecimal->mpd,_exponentDecimal->mpd,get_default_mpd_context());
-			// TODO are we converting back?
+		
+		// given that the way to compute the power might be different depending on the type of the exponent if differentiate between that
+		Mvalue* _returnValue=NULL;
+		if(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||(_value2->type==VT_RATIONAL&&(!_value2->value._rational->den||isBigintegerOne(_value2->value._rational->den)))){
+			Mbiginteger* _exponentBiginteger=_getValueBiginteger(_value2);
+			_returnValue=_getBigintegerPower(_value1,_exponentBiginteger);
+			if(_value2->type!=VT_BIGINTEGER)free_biginteger(_exponentBiginteger);
+		}else{
+			// non-integer exponent			
+			// therefore exact computations should be possible
+			// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
+			// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
+			Mdecimal *_baseDecimal=getValueDecimal(_value1),*_exponentDecimal=getValueDecimal(_value2);
+			if(_baseDecimal&&_exponentDecimal){
+				Mdecimal* _powerDecimal=NULL;
+				mpd_context_t* mpd_context=getContextOfDecimals(_baseDecimal,_exponentDecimal);
+				if(!mpd_context)outputError("No decimal context for use in the power function");
+				// the decimal library has a function to compute the power of two decimals and we can use that for most of the value pairs
+				// if either has a repeating part we have a problem
+				if(_baseDecimal->repeating>0){
+					if(amVerbose())outputLine("Computing the power of a rational.");
+					// the result is the quotient of the power of the numerator divided by the power of the denominator of the associated rational
+					Mrational* _baseRational=getValueRational(_value1);
+					Mdecimal* _baseNumDecimal=_getBigintegerDecimal(_baseRational->num);
+					Mdecimal* _numPowerDecimal=_getDecimalPower(_baseNumDecimal->mpd,_exponentDecimal->mpd,mpd_context);
+					Mdecimal* _baseDenDecimal=_getBigintegerDecimal(_baseRational->den);
+					Mdecimal* _denPowerDecimal=_getDecimalPower(_baseDenDecimal->mpd,_exponentDecimal->mpd,mpd_context);
+					_powerDecimal=__decimal(mpd_context,0,0);
+					// the quotient of the numerator and denominator power is the end result
+					if(_powerDecimal){
+						uint32_t status=0;
+						mpd_qdiv(_powerDecimal->mpd,_numPowerDecimal->mpd,_denPowerDecimal->mpd,mpd_context,&status);
+						if((status&0xEFBF)!=0){outputError("Failed to divide the numerator and denominator powers");free_decimal(_powerDecimal);_powerDecimal=NULL;}
+					}else
+						outputError("Failed to create the decimal result of applying the power function to a rational");
+					free_decimal(_baseNumDecimal);free_decimal(_baseDenDecimal);
+					free_decimal(_numPowerDecimal);free_decimal(_denPowerDecimal);
+					if(_value1->type!=VT_RATIONAL)free_rational(_baseRational);
+				}else
+				if(_exponentDecimal->repeating>0){
+					outputLine("Computing a power using a rational exponent not implemented yet!");
+				}else{ // base and exponent decimals is true
+					_powerDecimal=_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context);
+					outputLine("Power decimal computed!");
+					// if the exponent is integer typed, the base type determines what to return
+				}
+				if(_powerDecimal)_returnValue=_getDecimalValue(_powerDecimal,true);else outputError("Failed to create the power function result decimal");
+			}
+			// if the originals weren't decimals, free the created decimals!!!!
+			if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal);
+			if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal);
 		}
-		if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal);if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal);
-		return _getDecimalValue(_powerDecimal,true);
+		return _returnValue;
 	}
 	return NULL;
 }
