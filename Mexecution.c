@@ -1237,7 +1237,10 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
             long long a,p,q; // p and q now store the initial values of pmin1 and qmin1
             long double delta,rem=ld;
             // ascertain to execute the following at least once (so when maxiter<=1 we at least get the integer part of the rational)
-            for(int i=1;i<=MAX(1,maxiter);i++){
+            // MDH@09OCT2019: if maxiter equals zero never stop
+            int i=0;
+            while(!maxiter||i<maxiter){
+                i++;
                 a=lrint(floorl(rem));
                 p=a*pmin1+pmin2;
                 q=a*qmin1+qmin2;

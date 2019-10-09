@@ -249,12 +249,12 @@ long long getDP(){
 	if(dp==M_LL_INVALID)outputLine("BUG: No default decimal context active!");
 	return dp;
 }
-Mvalue* setdp(Mvalue* _value){
+Mvalue* setdp(Mvalue* value){
 	// how about returning the current value, no matter what the argument is????
 	long long olddecimalprecision=getDP();
 	// ignore if NO value specified...
-	if(_value&&_value->type==VT_INTEGER){
-		long long decimalprecision=_value->value._integer->ll;
+	if(value&&value->type==VT_INTEGER){
+		long long decimalprecision=value->value._integer->ll;
 		if(decimalprecision!=M_LL_INVALID){ // if not the default!!!
 			if(decimalprecision>=6){
 				// if I fail to create the associated decimal context, no go
@@ -375,9 +375,9 @@ print("Pi = PI(353,5022,5020)")
  */
 // but the primary formula is pretty simple: 4*sum((-1)k/(2k+1)): this is the very slow Gregory-Leibniz series approximation
 // this is a very slow algorithm
-Mvalue* pi_ql(Mvalue* _value){
-	if(_value&&_value->type==VT_INTEGER){
-		long long maxiter=_value->value._integer->ll;
+Mvalue* pi_ql(Mvalue* value){
+	if(value&&value->type==VT_INTEGER){
+		long long maxiter=value->value._integer->ll;
 		if(maxiter>=0){
 			if(amVerbose())output("Approximating pi/4 by a sum of %llu rational fractions.\n",maxiter);
 			// the first approximation (when iter=0) equals 4
@@ -455,9 +455,9 @@ Mvalue* pi_ql(Mvalue* _value){
 }
 
 // and the following is an implementation that can approximate pi using this formula
-Mvalue* pi_q(Mvalue* _value){
-	if(_value&&_value->type==VT_INTEGER){
-		long long iter=_value->value._integer->ll;
+Mvalue* pi_q(Mvalue* value){
+	if(value&&value->type==VT_INTEGER){
+		long long iter=value->value._integer->ll;
 		if(iter>=0){
 			if(amVerbose())output("Computing %llu continued fractions of pi.\n",iter);
 			Mrational* _rational=_getRational(_getBiginteger(3),NULL,M_LD_NAN,false,true);
@@ -543,20 +543,20 @@ for i in range(10000):
 for i in range(10000):
     y = pi(decimal, 28)
  */
-Mvalue* pi_d(Mvalue* _value){
+Mvalue* pi_d(Mvalue* value){
 	// _value should be a positive integer defining the required precision
 	if(amVerbose())output("Computing pi using decimals.\n");
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
-	return _getDecimalValue(pi_decimal(_value&&_value->type==VT_INTEGER?_getDecimalcontext(_value->value._integer->ll):NULL),true);
+	return _getDecimalValue(pi_decimal(value&&value->type==VT_INTEGER?_getDecimalcontext(value->value._integer->ll):NULL),true);
 }
 
 // how about storing all results here?????? instead of in the root environment????
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
-Mvalue* getResult(Mvalue* _indexValue){
+Mvalue* getResult(Mvalue* indexValue){
 	if(amVerbose())outputLine("Result requested!");
-	if(!_indexValue)return _resultListValue;
-	long long indexValueInteger=getValueInteger(_indexValue); // NOTE all index values should be positive!!!
+	if(!indexValue)return _resultListValue;
+	long long indexValueInteger=getValueInteger(indexValue); // NOTE all index values should be positive!!!
 	return (indexValueInteger>0?getValueAtIndex(_resultListValue->value._list,indexValueInteger):NULL); // TODO are we calling getResult anywhere????
 }
 
@@ -564,55 +564,55 @@ Mvalue* getResult(Mvalue* _indexValue){
 ////////Mvalue* ml(Menvironment* _executionEnvironment){return _getListValue(VT_LIST);} // a list that may only contain list elements is acceptable as map list!!
 
 // list to map
-Mvalue* l2m(Mvalue* _value){
+Mvalue* l2m(Mvalue* value){
 	Mvalue* _mapValue=NULL;
-	if(_value&&_value->type==VT_LIST){
-		_mapValue=_getMapValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
-		if(!listAppendedToMap(_mapValue->value._map,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	if(value&&value->type==VT_LIST){
+		_mapValue=_getMapValue(value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		if(!listAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _mapValue;
 }
 // list to map list
-Mvalue* l2ml(Mvalue* _value){
+Mvalue* l2ml(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
-	if(_value&&_value->type==VT_LIST){
+	if(value&&value->type==VT_LIST){
 		_maplistValue=_getListValue(VT_LIST); // a map list ALWAYS requires element of type VT_LIST
-		if(!listAppendedToMaplist(_maplistValue->value._list,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+		if(!listAppendedToMaplist(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _maplistValue;
 }
 // map list to list conversion
-Mvalue* ml2l(Mvalue* _value){
+Mvalue* ml2l(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
-	if(_value&&_value->type==VT_LIST){
-		_maplistValue=_getListValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
-		if(!maplistAppendedToList(_maplistValue->value._list,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	if(value&&value->type==VT_LIST){
+		_maplistValue=_getListValue(value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		if(!maplistAppendedToList(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _maplistValue;
 }
-Mvalue* ml2m(Mvalue* _value){
+Mvalue* ml2m(Mvalue* value){
 	Mvalue* _mapValue=NULL;
-	if(_value&&_value->type==VT_LIST){
-		_mapValue=_getMapValue(_value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
-		if(!maplistAppendedToMap(_mapValue->value._map,_value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	if(value&&value->type==VT_LIST){
+		_mapValue=_getMapValue(value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		if(!maplistAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _mapValue;
 }
 
 // map to map list conversion i.e. each list element is a attribute name - value pair
-Mvalue* m2ml(Mvalue* _value){
+Mvalue* m2ml(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
-	if(_value&&_value->type==VT_MAP){
+	if(value&&value->type==VT_MAP){
 		_maplistValue=_getListValue(VT_LIST); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
-		if(!mapAppendedToMaplist(_maplistValue->value._list,_value->value._map))return NULL; // TODO should we release the list that was created somehow????
+		if(!mapAppendedToMaplist(_maplistValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
 	return _maplistValue;
 }
-Mvalue* m2l(Mvalue* _value){
+Mvalue* m2l(Mvalue* value){
 	Mvalue* _listValue=NULL;
-	if(_value&&_value->type==VT_MAP){
-		_listValue=_getListValue(_value->type);
-		if(!mapAppendedToList(_listValue->value._list,_value->value._map))return NULL; // TODO should we release the list that was created somehow????
+	if(value&&value->type==VT_MAP){
+		_listValue=_getListValue(value->type);
+		if(!mapAppendedToList(_listValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
 	return _listValue;
 }
@@ -683,34 +683,37 @@ Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
 }
 
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
-Mvalue* d(Mvalue* _value){
-	if(_value){
-		switch(_value->type){
-			// TODO all other types
-			case VT_BIGINTEGER:return _getDecimalValue(_getBigintegerDecimal(_value->value._biginteger),true);
-			case VT_RATIONAL:return _getDecimalValue(_getRationalDecimal(_value->value._rational),true);
-			case VT_DECIMAL:return _value;
-			default:break;
+// TODO we should delegate to (_)getValueDecimal
+Mvalue* d(Mvalue* value){
+	if(value){
+		switch(value->type){
+			// TODO all other types_
+			case VT_INTEGER:return _getDecimalValue(__decimal(NULL,value->value._integer->ll,0),true); // TODO assuming long long and int64_t are the same type!!!!!
+			case VT_BIGINTEGER:return _getDecimalValue(_getBigintegerDecimal(value->value._biginteger),true);
+			case VT_RATIONAL:return _getDecimalValue(_getRationalDecimal(value->value._rational),true);
+			case VT_DECIMAL:return value;
+			case VT_REAL: // TODO check whether somewhere I am converting a long double without using text
+			default:return _getDecimalValue(_getValueTextDecimal(value),true);
 		}
 	}
 	return NULL;
 }
-Mvalue* b(Mvalue* _value){ // little-endian representation list to return
-	if(_value){
-		switch(_value->type){
-			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,true);
-			case VT_REAL:return getRealDecimalMapValue(_value->value._real->ld,true);
+Mvalue* b(Mvalue* value){ // little-endian representation list to return
+	if(value){
+		switch(value->type){
+			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
+			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,true);
 			default:break;
 		}
 	}
 	return NULL;
 } 
 
-Mvalue* B(Mvalue* _value){ // big endian decimal representation list to return
-	if(_value){
-		switch(_value->type){
-			case VT_INTEGER:return getIntegerDecimalListValue(_value->value._integer->ll,false);
-			case VT_REAL:return getRealDecimalMapValue(_value->value._real->ld,false);
+Mvalue* B(Mvalue* value){ // big endian decimal representation list to return
+	if(value){
+		switch(value->type){
+			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
+			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,false);
 			default:break;
 		}
 	}
@@ -718,17 +721,17 @@ Mvalue* B(Mvalue* _value){ // big endian decimal representation list to return
 }
 // TODO to add h/H and b/B functions
 
-Mvalue* i(Mvalue* _value){
-	if(amVerbose())outputValue("\nConverting '",_value,"' to an integer.");
-	long long ll=getValueInteger(_value);
+Mvalue* i(Mvalue* value){
+	if(amVerbose())outputValue("Converting '",value,"' to an integer.\n");
+	long long ll=getValueInteger(value);
 	return(ll!=M_LL_INVALID?_getIntegerValue(ll):NULL);
 }
 
 // convert to a big integer
-Mvalue* I(Mvalue* _value){
-	if(_value){
-		if(_value->type==VT_BIGINTEGER)return _value; // already a big integer
-		Mbiginteger* _bigInteger=_getValueBiginteger(_value);
+Mvalue* I(Mvalue* value){
+	if(value){
+		if(value->type==VT_BIGINTEGER)return value; // already a big integer
+		Mbiginteger* _bigInteger=_getValueBiginteger(value);
 		if(_bigInteger)return _getBigintegerValue(_bigInteger,true);
 	}
 	return NULL;
@@ -881,6 +884,24 @@ Mrational* getValueRational(Mvalue* _value){
 	return _getValueRational(_value);
 }
 
+// MDH@09OCT2019: unpure rationals can be purified using _getPurifiedRational
+long double getReal(Mreal* _real){return(_real?_real->ld:M_LD_NAN);}
+Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){
+	Mrational* _purifiedRational=NULL;
+	if(pureRational){
+		// convert delta into a rational
+		Mrational* _deltaRational=_getLongDoubleRational(delta,0);
+		if(_deltaRational){
+			_purifiedRational=_getPureRationalSum(pureRational,_deltaRational);
+			free_rational(_deltaRational);
+			if(!_purifiedRational)outputError("Failed to sum two pure rationals");
+		}else
+			outputError("Failed to rationalize a real");
+	}else
+		outputError("No base pure rational to use in purification");
+	return _purifiedRational;
+}
+
 // TODO how many iterations would we accept at most?????
 Mvalue* Q(Mvalue* _value){
 	if(!_value)return NULL;
@@ -890,9 +911,23 @@ Mvalue* Q(Mvalue* _value){
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
 }
+// MDH@09OCT2019: TODO=DONE how about turning a unpure rational into a pure rational???? yes, that's a good idea
 Mvalue* q(Mvalue* _value){
 	if(!_value)return NULL;
-	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
+	if(_value->type==VT_RATIONAL){
+		Mrational* rational=_value->value._rational;
+		if(realIsUndefinedOrZero(rational->delta))return _value;
+		long double rationaldelta=getReal(rational->delta);
+		Mrational* _purifiedRational=NULL;
+		Mrational* _pureRational=_getRational(_getBigintegerCopy(rational->num),_getBigintegerCopy(rational->den),M_LD_NAN,true,true);
+		if(_pureRational){
+			_purifiedRational=_getPurifiedRational(_pureRational,rationaldelta);
+			free_rational(_pureRational);
+			if(!_purifiedRational)outputError("Failed to purify a rational");
+		}else
+			outputError("Failed to create a pure rational");
+		return _getRationalValue(_purifiedRational,true);
+	}
 	if(_value->type==VT_REAL)return _getRationalValue(_getLongDoubleRational(_value->value._real->ld,250),true); // forcefully free the _getLongDoubleRational if we failed to wrap it
 	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value),true); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
@@ -901,15 +936,6 @@ Mvalue* q(Mvalue* _value){
 
 // convert to a real
 
-long double getDecimalLongDouble(Mdecimal* _decimal){
-	// easiest way is to transform to text first, and take if from there...
-	long double ldDecimal=M_LD_NAN;
-	if(_decimal){
-		char* _decimalText=mpd_to_sci(_decimal->mpd,0); // NOTE do NOT use _getDecimalText here!!!
-		if(_decimalText){ldDecimal=_strtold(_decimalText,ldDecimal);free(_decimalText);} // no need for this anymore
-	}
-	return ldDecimal;
-}
 // TODO complete with conversion from big integer and rational
 Mvalue* r(Mvalue* _value){
 	Mvalue* _realValue=NAR_value;
@@ -1564,6 +1590,7 @@ char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 		case TT_MAP:return '}';
 		case TT_NEW_VARIABLE:return '=';
 		case TT_SQSTRING:return '\'';
+		default:break;
 	}
 	return '\0';
 }
@@ -1600,7 +1627,8 @@ char* _getLastTokenAutoCompletionText(){
 		// MDH@03OCT2019: case TT_SQSTRING:tokenFeedforwardText="'";break; // TODO using ' for the double quoted string might change in the future and we'd be in trouble then
 		case TT_TERNARY_aeru:break;
 		case TT_UNARY:break;
-		case TT_VARIABLE:;break;
+		case TT_VARIABLE:
+		default:break;
 	}
 	return strdup(tokenAutoCompletionText); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
 }
@@ -1704,6 +1732,7 @@ char getImmediateFeedforwardCharacterOfToken(Mtoken* token){
 		case TT_DQSTRING:return '"';
 		case TT_FUNCTION:return '(';
 		case TT_SQSTRING:return '\'';
+		default:break;
 	}
 	return '\0';
 }
@@ -3855,10 +3884,6 @@ long double getRealValuePower(Mvalue* _baseValue,long double power){
 	return M_LD_NAN; // uncomputable
 }
 
-mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){
-	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
-	return(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
-}
 Mdecimal* _getDecimalPower(mpd_t* base,mpd_t* exponent,mpd_context_t* mpd_context){
 	Mdecimal* _decimalPower=NULL;
 	if(base&&exponent&&mpd_context){
@@ -3939,7 +3964,11 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 	}
 	return _rationalPower;
 }
-Mvalue* _getBigintegerPower(Mvalue* baseValue,Mbiginteger* exponentBiginteger){
+mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){
+	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
+	return(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+}
+Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteger){
 	// the general idea is to recursively half the exponent until we end up with having to compute the square which is easy to do
 	// but perhaps we should delegate further to functions that deal with specific base value types
 	switch(baseValue->type){
@@ -3967,13 +3996,168 @@ Mvalue* _getBigintegerPower(Mvalue* baseValue,Mbiginteger* exponentBiginteger){
 				}
 			}else{ // base is a 'true' decimal
 				Mdecimal* _exponentDecimal=_getBigintegerDecimal(exponentBiginteger);
-				Mdecimal* _decimalPower=_getDecimalPower(baseValue->value._decimal,_exponentDecimal->mpd,getContextOfDecimals(baseValue->value._decimal,_exponentDecimal));
+				Mdecimal* _decimalPower=_getDecimalPower(baseValue->value._decimal->mpd,_exponentDecimal->mpd,getContextOfDecimals(baseValue->value._decimal,_exponentDecimal));
 				free_decimal(_exponentDecimal);
 				return _getDecimalValue(_decimalPower,true);
 			}
+		default:
 			break;
 	}
 	return NULL;
+}
+
+// for finding the decimal root with an integer root degree we need to be able to compute any power of a decimal
+// TODO more convenient to work with raw mpd_t instances directly
+Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,Mbiginteger* exponentBiginteger){
+	// ASSERT assuming exponentBiginteger is positive (so never zero!!!)
+	Mdecimal* _resultDecimal=NULL;
+	if(baseDecimal&&exponentBiginteger){
+		////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
+		if(isBigintegerZero(exponentBiginteger))
+			_resultDecimal=__decimal(NULL,1,0);
+		else
+		if(!isBigintegerOne(exponentBiginteger)){
+			// get a decimal context
+			Mdecimalcontext* decimalcontext=_getDecimalcontext(baseDecimal->prec);
+			mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+			// determine half the exponent
+			Mbiginteger* _halfexponentBiginteger=__biginteger();
+			if(mp_div_2(exponentBiginteger,_halfexponentBiginteger)==MP_OKAY){
+				Mdecimal* _halfresultDecimal=_getDecimalPowerWithPositiveBigintegerExponent(baseDecimal,_halfexponentBiginteger);
+				if(_halfresultDecimal){
+					Mdecimal* _doublehalfresultDecimal=__decimal(NULL,1,0);
+					if(_doublehalfresultDecimal){
+						uint32_t status=0;
+						mpd_qmul(_doublehalfresultDecimal->mpd,_halfresultDecimal->mpd,_halfresultDecimal->mpd,mpd_context,&status);
+						if((status&0xEFBF)==0){
+							if(mp_isodd(exponentBiginteger)){
+								_resultDecimal=__decimal(mpd_context,0,0);
+								if(_resultDecimal){
+									mpd_qmul(_resultDecimal->mpd,_doublehalfresultDecimal->mpd,baseDecimal->mpd,mpd_context,&status);
+									if((status&0xEFBF)!=0){free_decimal(_resultDecimal);_resultDecimal=NULL;}
+								}else
+									outputError("Failed to create a decimal in computing the integer power of a decimal");
+							}else
+								_resultDecimal=_getDecimalCopy(_doublehalfresultDecimal);
+						}else
+							outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
+						free_decimal(_doublehalfresultDecimal);
+					}
+					free_decimal(_halfresultDecimal);
+				}
+			}
+			free_biginteger(_halfexponentBiginteger);
+		}else
+			_resultDecimal=_getDecimalCopy(baseDecimal);
+	}
+	return _resultDecimal;
+}
+Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegreeBiginteger){
+	Mvalue* _bigintegerRootValue=NULL;
+	if(rootArgumentValue&&rootDegreeBiginteger){
+		////if(amVerbose())
+		{outputValue("Determining the root of ",rootArgumentValue,NULL);outputBiginteger(" with degree ",rootDegreeBiginteger,".\n");}
+		// TODO check for special values like 0 or 1 or negatives...
+		// computing with true decimals is fine, but with a decimal that is a rational approximation (i.e. with repeating) we're in trouble
+		// a rational with a delta should be purified
+		// we can do the decimal approximation first
+		Mdecimal* _rootArgumentDecimal=_getValueDecimal(rootArgumentValue);
+		if(_rootArgumentDecimal){
+			outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
+			// we need an mpd_context for use in the decimal computations!!
+			Mdecimalcontext* _decimalcontext=_getDecimalcontext(_rootArgumentDecimal->prec);
+			mpd_context_t* mpd_context=(_decimalcontext?_decimalcontext->mpd_context:get_default_mpd_context());
+			if(mpd_context){
+				Mdecimal* _rootDegreeDecimal=_getBigintegerDecimal(rootDegreeBiginteger);
+				if(_rootDegreeDecimal){
+					outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
+					Mdecimal *_bigintegerRootDecimal=_getDecimalCopy(_rootArgumentDecimal),*_nextBigintegerRootDecimal=__decimal(mpd_context,0,0); // start with the root argument as initial approximation to the root
+					if(_bigintegerRootDecimal&&_nextBigintegerRootDecimal){
+						outputLine("Root computation result decimals created...");
+						// 0. preparations: we need (root degree - 1 ) regularly
+						Mdecimal* _rootDegreeMinus1Decimal=__decimal(mpd_context,0,0); /////_getDecimalCopy(_rootDegreeDecimal);
+						if(_rootDegreeMinus1Decimal){
+							outputLine("Root computation helper decimal created...");
+							uint32_t status=0;
+							// can't I use getDecimalOne() here?????? apparently not!!
+							mpd_t* _decimalOne=__mpd(mpd_context,1);
+							mpd_qsub(_rootDegreeMinus1Decimal->mpd,_rootDegreeDecimal->mpd,_decimalOne,mpd_context,&status);
+							free_mpd(_decimalOne);
+							if((status&0xEFBF)==0){
+								outputLine("Root computation helper decimal initialized...");
+								// we need the root degree minus 1 as big integer as well
+								Mbiginteger* _rootDegreeMinus1Biginteger=_getBigintegerCopy(rootDegreeBiginteger);
+								if(_rootDegreeMinus1Biginteger){
+									outputLine("Root computation helper big integer created...");
+									if(mp_decr(_rootDegreeMinus1Biginteger)==MP_OKAY){
+										outputLine("Root computation helper big integer initialized...");
+										// we need a product, a quotient and an addition help decimal
+										Mdecimal *_product=__decimal(mpd_context,0,0),*_quotient=__decimal(mpd_context,0,0),*_productplusquotient=__decimal(mpd_context,0,0),*_power=__decimal(mpd_context,0,0);
+										// initial value of the quotient denominator that we need for checking whether we're done and in the computation
+										if(_product&&_quotient&&_productplusquotient&&_power){
+											outputLine("Root computation helper decimals created...");
+											// ready to rock 'n' roll, eh iterate
+											// NOTE iterating until the next value is the same wasn't working, it might be better to compute the power value itself and to compare with the root argument value, if match stop!!
+											unsigned long long iter=0;
+											Mdecimal *_quotientdenominator=NULL;
+											while((status&0xEFBF)==0){
+												// 'update' the quotient denominator, so we can use it in checking whether we are already there yet, and if not in the computation
+												// TODO might it be a good idea to compute the quotient and compare the quotient with the current solution??????
+												_quotientdenominator=_getDecimalPowerWithPositiveBigintegerExponent(_bigintegerRootDecimal,_rootDegreeMinus1Biginteger);
+												if(!_quotientdenominator){status=0xFFFFFFFF;break;}
+												// are we there yet?????
+												// compute the current power value
+												mpd_qmul(_power->mpd,_quotientdenominator->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
+												if((status&0xEFBF)!=0)break;
+												// if the product of the quotient denominator and the root decimal equals the root argument
+												if(mpd_qcmp(_power->mpd,_bigintegerRootDecimal->mpd,&status)==0)break; // a match, so done
+												// next iteration!!!!
+												iter++;
+												mpd_qdiv(_quotient->mpd,_rootArgumentDecimal->mpd,_quotientdenominator->mpd,mpd_context,&status);
+												free_decimal(_quotientdenominator); // don't need it anymore
+												mpd_qmul(_product->mpd,_rootDegreeMinus1Decimal->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
+												mpd_qadd(_productplusquotient->mpd,_product->mpd,_quotient->mpd,mpd_context,&status);
+												// update the solution
+												mpd_qdiv(_bigintegerRootDecimal->mpd,_productplusquotient->mpd,_rootDegreeDecimal->mpd,mpd_context,&status);
+											}
+											if((status&0xEFBF)!=0){
+												output("%sRoot computation ended with error code " PRIu32 ".\n",ERROR_PREFIX,status);
+												free_decimal(_bigintegerRootDecimal);
+											}else{
+												_bigintegerRootValue=_getDecimalValue(_bigintegerRootDecimal,true);
+												///////if(amVerbose())
+												outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
+											}
+										}else
+											outputError("Failed to create helper decimals in computing a root decimal");
+										free_decimal(_product);free_decimal(_quotient);free_decimal(_productplusquotient);free_decimal(_power);
+									}else
+										outputError("Failed to compute a helper big integer in computing a root decimal");
+									free_biginteger(_rootDegreeMinus1Biginteger);
+									outputLine("Root computation helper big integer released...");
+								}else
+									outputError("Failed to copy the root degree in computing a root decimal");
+							}else
+								outputError("Failed to compute a helper decimal in computing a root decimal");
+						}else
+							outputError("Failed to create a helper decimal in computing a root decimal");
+						free_decimal(_rootDegreeMinus1Decimal);
+						outputLine("Root computation helper decimal released...");
+					}else
+						outputError("Failed to initialize the root");
+					free_decimal(_rootDegreeDecimal);
+					outputLine("Root computation degree decimal released...");
+				}else{
+					output("%s",ERROR_PREFIX);outputBiginteger("Failed to convert root degree '",rootDegreeBiginteger,"' to a decimal.\n");
+				}
+			}else
+				outputError("Failed to create a decimal context for computing a decimal root");
+			if(rootArgumentValue->type!=VT_DECIMAL)free_decimal(_rootArgumentDecimal);
+		}else{
+			output("%s",ERROR_PREFIX);outputValue("Failed to convert root argument '",rootArgumentValue,"' to a decimal.\n");
+		}
+	}
+	return _bigintegerRootValue;
 }
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
@@ -3991,61 +4175,79 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		
 		// given that the way to compute the power might be different depending on the type of the exponent if differentiate between that
 		Mvalue* _returnValue=NULL;
+		// 1. when the exponent is integer
 		if(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||(_value2->type==VT_RATIONAL&&(!_value2->value._rational->den||isBigintegerOne(_value2->value._rational->den)))){
 			Mbiginteger* _exponentBiginteger=_getValueBiginteger(_value2);
-			_returnValue=_getBigintegerPower(_value1,_exponentBiginteger);
+			_returnValue=_getBigintegerPowerValue(_value1,_exponentBiginteger);
 			if(_value2->type!=VT_BIGINTEGER)free_biginteger(_exponentBiginteger);
-		}else{
-			// non-integer exponent			
-			// therefore exact computations should be possible
-			// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
-			// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
-			Mdecimal *_baseDecimal=getValueDecimal(_value1),*_exponentDecimal=getValueDecimal(_value2);
-			if(_baseDecimal&&_exponentDecimal){
-				Mdecimal* _powerDecimal=NULL;
-				mpd_context_t* mpd_context=getContextOfDecimals(_baseDecimal,_exponentDecimal);
-				if(!mpd_context)outputError("No decimal context for use in the power function");
-				// the decimal library has a function to compute the power of two decimals and we can use that for most of the value pairs
-				// if either has a repeating part we have a problem
-				if(_baseDecimal->repeating>0){
-					if(amVerbose())outputLine("Computing the power of a rational.");
-					// the result is the quotient of the power of the numerator divided by the power of the denominator of the associated rational
-					Mrational* _baseRational=getValueRational(_value1);
-					Mdecimal* _baseNumDecimal=_getBigintegerDecimal(_baseRational->num);
-					Mdecimal* _numPowerDecimal=_getDecimalPower(_baseNumDecimal->mpd,_exponentDecimal->mpd,mpd_context);
-					Mdecimal* _baseDenDecimal=_getBigintegerDecimal(_baseRational->den);
-					Mdecimal* _denPowerDecimal=_getDecimalPower(_baseDenDecimal->mpd,_exponentDecimal->mpd,mpd_context);
-					_powerDecimal=__decimal(mpd_context,0,0);
-					// the quotient of the numerator and denominator power is the end result
-					if(_powerDecimal){
-						uint32_t status=0;
-						mpd_qdiv(_powerDecimal->mpd,_numPowerDecimal->mpd,_denPowerDecimal->mpd,mpd_context,&status);
-						if((status&0xEFBF)!=0){outputError("Failed to divide the numerator and denominator powers");free_decimal(_powerDecimal);_powerDecimal=NULL;}
-					}else
-						outputError("Failed to create the decimal result of applying the power function to a rational");
-					free_decimal(_baseNumDecimal);free_decimal(_baseDenDecimal);
-					free_decimal(_numPowerDecimal);free_decimal(_denPowerDecimal);
-					if(_value1->type!=VT_RATIONAL)free_rational(_baseRational);
-				}else
-				if(_exponentDecimal->repeating>0){
-					outputLine("Computing a power using a rational exponent not implemented yet!");
-				}else{ // base and exponent decimals is true
-					_powerDecimal=_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context);
-					outputLine("Power decimal computed!");
-					// if the exponent is integer typed, the base type determines what to return
+		}else{ // non-integer exponent, only decimals and rationals remaining
+			// if the exponent is inherently rational we should use 
+			Mrational* _exponentRational=NULL;
+			if(_value2->type==VT_RATIONAL)_exponentRational=_value2->value._rational;
+			else 
+			if(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0)_exponentRational=_getDecimalRational(_value2->value._decimal);
+			if(_exponentRational){ // the exponent is rational
+				//if(amVerbose())
+				outputRational("Computing a power with rational exponent ",_exponentRational,".\n");
+				// base to the power of a rational is the denominatorth root of the numerators power of the base
+				Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_exponentRational->num);// NOTE will be released by the value garbage collector
+				//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
+				Mvalue* _rootValue=_getBigintegerRootValue(_rootArgumentValue,_exponentRational->den);
+				outputValue("Rational exponent root of ",_rootArgumentValue,NULL);outputValue(": ",_rootValue,".\n");
+				// don't forget the delta (if any)
+				if(!realIsUndefinedOrZero(_exponentRational->delta)) // a defined delta
+					// multiply the result with base to the power of delta
+					// TODO the base should determine what the type of the power computation should be???????
+					_returnValue=multiply(_rootValue,_getRealValue(getRealValuePower(_value1,getReal(_exponentRational->delta))));
+				else
+					_returnValue=_rootValue;
+				if(_value2->type!=VT_RATIONAL)free_rational(_exponentRational);
+			}else{ // not integer based exponent (so if the exponent is a decimal is does not have a repeating part), so use decimals
+				// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
+				// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
+				Mdecimal *_baseDecimal=getValueDecimal(_value1),*_exponentDecimal=getValueDecimal(_value2);
+				if(_baseDecimal&&_exponentDecimal){
+					Mdecimal* _powerDecimal=NULL;
+					mpd_context_t* mpd_context=getContextOfDecimals(_baseDecimal,_exponentDecimal);
+					if(!mpd_context)outputError("No decimal context for use in the power function");
+					// the decimal library has a function to compute the power of two decimals and we can use that for most of the value pairs
+					// if either has a repeating part we have a problem
+					if(_baseDecimal->repeating>0){
+						if(amVerbose())outputLine("Computing the power of a rational.");
+						// the result is the quotient of the power of the numerator divided by the power of the denominator of the associated rational
+						Mrational* _baseRational=getValueRational(_value1);
+						Mdecimal* _baseNumDecimal=_getBigintegerDecimal(_baseRational->num);
+						Mdecimal* _numPowerDecimal=_getDecimalPower(_baseNumDecimal->mpd,_exponentDecimal->mpd,mpd_context);
+						Mdecimal* _baseDenDecimal=_getBigintegerDecimal(_baseRational->den);
+						Mdecimal* _denPowerDecimal=_getDecimalPower(_baseDenDecimal->mpd,_exponentDecimal->mpd,mpd_context);
+						_powerDecimal=__decimal(mpd_context,0,0);
+						// the quotient of the numerator and denominator power is the end result
+						if(_powerDecimal){
+							uint32_t status=0;
+							mpd_qdiv(_powerDecimal->mpd,_numPowerDecimal->mpd,_denPowerDecimal->mpd,mpd_context,&status);
+							if((status&0xEFBF)!=0){outputError("Failed to divide the numerator and denominator powers");free_decimal(_powerDecimal);_powerDecimal=NULL;}
+						}else
+							outputError("Failed to create the decimal result of applying the power function to a rational");
+						free_decimal(_baseNumDecimal);free_decimal(_baseDenDecimal);
+						free_decimal(_numPowerDecimal);free_decimal(_denPowerDecimal);
+						if(_value1->type!=VT_RATIONAL)free_rational(_baseRational);
+					}else{ // base and exponent decimals is true
+						_powerDecimal=_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context);
+						outputLine("Power decimal computed!");
+						// if the exponent is integer typed, the base type determines what to return
+					}
+					if(_powerDecimal)_returnValue=_getDecimalValue(_powerDecimal,true);else outputError("Failed to create the power function result decimal");
 				}
-				if(_powerDecimal)_returnValue=_getDecimalValue(_powerDecimal,true);else outputError("Failed to create the power function result decimal");
+				// if the originals weren't decimals, free the created decimals!!!!
+				if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal);
+				if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal);
 			}
-			// if the originals weren't decimals, free the created decimals!!!!
-			if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal);
-			if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal);
 		}
 		return _returnValue;
 	}
 	return NULL;
 }
 
-long double getReal(Mreal* _real){return(_real?_real->ld:M_LD_NAN);}
 // MDH@15AUG2019: given that epower means base times 10 to the power of exponent, it makes sense to actually compute epower as mul(base,power(10,exponent)) where for 10 we use a single integer
 Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	// we can still use the shortcuts
@@ -5775,6 +5977,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 									inputError("Failed to register a next function call argument!");
 								*/
 							}
+						default:
 							break;
 					}
 					/* removing:

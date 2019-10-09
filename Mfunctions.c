@@ -566,15 +566,15 @@ Mvalue* Mout(Mvalue* _value){
 Mvalue* Mbc(Mvalue* _value){
     Mstring* _valueText=_getValueText(_value,true);
     size_t result=string_length(_valueText);
-    if(result>0)setBackColor(_valueText);
+    if(result>0)setBackColor(string(_valueText));
     free_string(_valueText);
-    return _getIntegerValue(result); 
+    return _getIntegerValue(result);
 }
  // set text color
 Mvalue* Mtc(Mvalue* _value){
     Mstring* _valueText=_getValueText(_value,true);
     size_t result=string_length(_valueText);
-    if(result>0)setColor(_valueText);
+    if(result>0)setColor(string(_valueText));
     free_string(_valueText);
     return _getIntegerValue(result);    
 }

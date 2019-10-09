@@ -953,7 +953,28 @@ long long getValueInteger(const Mvalue* const _value){
     }
     return M_LL_INVALID;
 }/* VALIDATED */
-long double getValueReal(const Mvalue* const _value){return(_value&&_value->type==VT_REAL?_value->value._real->ld:M_LD_NAN);}/* VALIDATED */
+
+// MDH@09OCT2019: TODO is there a better way than through parsing?????
+long double getBigintegerLongDouble(Mbiginteger* biginteger){
+    long double ldBiginteger=M_LD_NAN;
+   	Mstring* _bigintegerText=(biginteger?_getBigintegerText(biginteger):NULL);
+    if(_bigintegerText){ldBiginteger=_strtold(string(_bigintegerText),ldBiginteger);free_string(_bigintegerText);}
+	return ldBiginteger;
+}
+long double getValueReal(const Mvalue* const _value){
+    // MDH@09OCT2019: a little more complicated then just getting out the real in that all scalar numeric values are convertable
+    long double valueReal=M_LD_NAN;
+    if(_value)
+    switch(_value->type){
+        case VT_INTEGER:valueReal=_value->value._integer->ll;break;
+        case VT_BIGINTEGER:valueReal=getBigintegerLongDouble(_value->value._biginteger);break;
+        case VT_REAL:valueReal=_value->value._real->ld;break;
+        case VT_DECIMAL:valueReal=getDecimalLongDouble(_value->value._decimal);break;
+        default:break;
+    }
+    return valueReal;
+}/* VALIDATED */
+
 long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}/* VALIDATED */
 
 Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
@@ -1162,18 +1183,51 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map){
 }/* VALIDATED */
 
 // DECIMAL EXTRACTION
+Mdecimal* _getValueTextDecimal(Mvalue* value){
+    // MDH@09OCT2019: delegating to _getTextDecimal() is preferable over doing it ourselves
+    Mdecimal* _valueTextDecimal=NULL;
+    if(value){
+        if(value->type!=VT_DECIMAL){
+    	    Mstring* _valueText=_getValueText(value,true); // TODO will there be any brackets around a repeating part of a 
+	        if(_valueText){
+                _valueTextDecimal=_getTextDecimal(string(_valueText),0);
+                free_string(_valueText);
+            }else
+                outputError("Failed to create the text trying to convert a value to a decimal");
+        }else
+            _valueTextDecimal=_getDecimalCopy(value->value._decimal); // shouldn't happen though
+    }
+    return _valueTextDecimal;
+    /* replacing:
+    Mdecimal* _parsedValueDecimal=__decimal(NULL,0,0);
+    if(_parsedValueDecimal){
+
+		Mstring* _valueText=_getValueText(value,true);
+		if(_valueText){
+            uint32_t status=0;
+            mpd_qset_string(_parsedValueDecimal->mpd,string(_valueText),get_default_mpd_context(),&status);
+            free_string(_valueText);
+            if((status&0xEFBF)!=0){free_decimal(_parsedValueDecimal);_parsedValueDecimal=NULL;outputError("Failed to parse the decimal text");}
+        }
+    }else
+        outputError("Failed to create a decimal");
+    return _parsedValueDecimal;
+    */
+}
+
 // the work horse of converting any value (if possible) to a decimal
-Mdecimal* _getValueDecimal(Mvalue* _value){
+// TODO shouldn't we use this function in d()???????
+Mdecimal* _getValueDecimal(Mvalue* value){
 	Mdecimal* _decimal=NULL;
-	if(_value){
-		if(_value->type!=VT_LIST&&_value->type!=VT_MAP){
-			switch(_value->type){
-				case VT_DECIMAL:_decimal=_getDecimalCopy(_value->value._decimal);break;
-				case VT_INTEGER:_decimal=__decimal(M_DECIMALCONTEXT->mpd_context,_value->value._integer->ll,0);break; // MDH@29AUG2019: replacing a call to _getDecimal()
+	if(value){
+		if(value->type!=VT_LIST&&value->type!=VT_MAP){
+			switch(value->type){
+				case VT_DECIMAL:_decimal=_getDecimalCopy(value->value._decimal);break;
+				case VT_INTEGER:_decimal=__decimal(NULL,value->value._integer->ll,0);break; // MDH@29AUG2019: replacing a call to _getDecimal()
                 case VT_BIGINTEGER:
                     {
                         // NOTE we need to make a copy of the big integer because otherwise free_rational() below would free the big integer wrapped inside the value, which would be a terrible mistake
-                        Mrational* _rational=_getRational(_getBigintegerCopy(_value->value._biginteger),NULL,M_LD_NAN,false,true);
+                        Mrational* _rational=_getRational(_getBigintegerCopy(value->value._biginteger),NULL,M_LD_NAN,false,true);
                         if(_rational){
                             _decimal=_getRationalDecimal(_rational);
                             free_rational(_rational);
@@ -1181,80 +1235,73 @@ Mdecimal* _getValueDecimal(Mvalue* _value){
                     }
                     break;
 				case VT_RATIONAL:
-					_decimal=_getRationalDecimal(_value->value._rational);
+					_decimal=_getRationalDecimal(value->value._rational);
 					break;
 				default:
-					{ // TODO: use _getTextDecimal instead!!!
-                        _decimal=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
-                        if(_decimal){
-						    Mstring* _valueText=_getValueText(_value,true);
-						    if(_valueText){mpd_set_string(_decimal->mpd,string(_valueText),M_DECIMALCONTEXT->mpd_context);free_string(_valueText);}
-                        }
-					}
+                    _decimal=_getValueTextDecimal(value); // delegates to _getValueTextDecimal() which always parses the decimal from the text representation of the value
 					break;
 			}
 		}
 	}
 	return _decimal;
 }
-
-Mdecimal* getValueDecimal(Mvalue* _value){
-	return(_value?(_value->type==VT_DECIMAL?_value->value._decimal:_getValueDecimal(_value)):NULL);
+Mdecimal* getValueDecimal(Mvalue* value){
+	return(value?(value->type==VT_DECIMAL?value->value._decimal:_getValueDecimal(value)):NULL);
 }
 // END DECIMAL EXTRACTION
 
 Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=CALLOC(1,sizeof(Mlist),'L');_list->valuetype=valuetype;return _list;}/* VALIDATED */
 Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=CALLOC(1,sizeof(Mmap),'M');_map->valuetype=valuetype;return _map;}/* VALIDATED */
 
-bool isValueZero(Mvalue* _value){
-    if(_value){
-        if(_value->type==VT_INTEGER)return _value->value._integer->ll==0;
-        if(_value->type==VT_BIGINTEGER)return isBigintegerZero(_value->value._biginteger);
-        if(_value->type==VT_REAL)return ldIsZero(_value->value._real->ld);
-        if(_value->type==VT_DECIMAL)return isDecimalZero(_value->value._decimal);
-        if(_value->type==VT_RATIONAL)return isBigintegerZero(_value->value._rational->num);
+bool isValueZero(Mvalue* value){
+    if(value){
+        if(value->type==VT_INTEGER)return value->value._integer->ll==0;
+        if(value->type==VT_BIGINTEGER)return isBigintegerZero(value->value._biginteger);
+        if(value->type==VT_REAL)return ldIsZero(value->value._real->ld);
+        if(value->type==VT_DECIMAL)return isDecimalZero(value->value._decimal);
+        if(value->type==VT_RATIONAL)return isBigintegerZero(value->value._rational->num);
     }
     return false;
 }/* VALIDATED */
-bool isValueOne(Mvalue* _value){
-    if(_value){
-        if(_value->type==VT_INTEGER)return _value->value._integer->ll==1;
-        if(_value->type==VT_BIGINTEGER)return isBigintegerOne(_value->value._biginteger);
-        if(_value->type==VT_REAL)return _value->value._real->ld==1;
-        if(_value->type==VT_DECIMAL)return isDecimalOne(_value->value._decimal);
-        if(_value->type==VT_RATIONAL)return isRationalOne(_value->value._rational);
+bool isValueOne(Mvalue* value){
+    if(value){
+        if(value->type==VT_INTEGER)return value->value._integer->ll==1;
+        if(value->type==VT_BIGINTEGER)return isBigintegerOne(value->value._biginteger);
+        if(value->type==VT_REAL)return value->value._real->ld==1;
+        if(value->type==VT_DECIMAL)return isDecimalOne(value->value._decimal);
+        if(value->type==VT_RATIONAL)return isRationalOne(value->value._rational);
     }
     return false;
 }/* VALIDATED */
 
 // null test for the value to be considered NULL
-bool isNull(Mvalue* _value){
-    if(_value)
-    switch(_value->type){
-        case VT_INTEGER:return !_value->value._integer;
-        case VT_BIGINTEGER:return !_value->value._biginteger;
-        case VT_DECIMAL:return !_value->value._decimal;
-        case VT_RATIONAL:return !_value->value._rational;
-        case VT_REAL:return !_value->value._real;
-        case VT_TEXT:return !_value->value._text;
-        case VT_LIST:return !_value->value._list;
-        case VT_MAP:return !_value->value._map;
-        case VT_TOKEN:return !_value->value._token;
+bool isNull(Mvalue* value){
+    if(value)
+    switch(value->type){
+        case VT_INTEGER:return !value->value._integer;
+        case VT_BIGINTEGER:return !value->value._biginteger;
+        case VT_DECIMAL:return !value->value._decimal;
+        case VT_RATIONAL:return !value->value._rational;
+        case VT_REAL:return !value->value._real;
+        case VT_TEXT:return !value->value._text;
+        case VT_LIST:return !value->value._list;
+        case VT_MAP:return !value->value._map;
+        case VT_TOKEN:return !value->value._token;
         default:break;
     }
     return true;
 }/* VALIDATED */
 // MDH@18JUL2019: we consider certain non-null values as undefined, this is to fill the gap between non-null values that represent missings
 //                TODO is a map or list undefined when empty???????
-bool isUndefined(Mvalue* _value){
+bool isUndefined(Mvalue* value){
     // values that are considered NULL are also undefined
-    if(!isNull(_value))
-    switch(_value->type){
-        case VT_INTEGER:return _value->value._integer->ll==M_LL_INVALID;
+    if(!isNull(value))
+    switch(value->type){
+        case VT_INTEGER:return value->value._integer->ll==M_LL_INVALID;
         case VT_BIGINTEGER:return false;
-        case VT_DECIMAL:return mpd_isnan((mpd_t*)_value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
+        case VT_DECIMAL:return mpd_isnan((mpd_t*)value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
         case VT_RATIONAL:return false;
-        case VT_REAL:return ldIsNaN(_value->value._real->ld);
+        case VT_REAL:return ldIsNaN(value->value._real->ld);
         case VT_TEXT:return false; ////strlen(_value->value._text->_c)==0;
         case VT_LIST:return false; ////Mlen(_value)==0;
         case VT_MAP:return false; ////Mlen(_value)==0;

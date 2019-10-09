@@ -84,9 +84,12 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){
 static mpd_t* decimalOne=NULL;
 // getDecimalOne() return a decimal but this is a decimal that should never be freed
 const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);return decimalOne;}/* VALIDATED */
-bool isDecimalOne(Mdecimal const * const _decimal){
+bool isDecimalOne(Mdecimal const * const decimal){
+	if(!decimal)return false;
+	if(decimal->repeating)return false;
     // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
-    return (_decimal->repeating&&mpd_cmp(_decimal->mpd,getDecimalOne(),M_DECIMALCONTEXT->mpd_context)==MP_EQ);
+	uint32_t status=0;int result=mpd_qcmp(decimal->mpd,getDecimalOne(),&status);
+	return((status&0xEFBF)==0&&result==0);
 }/* VALIDATED */
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
@@ -251,13 +254,29 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){
 }/* VALIDATED */
 
 // MDH@08OCT2019: TODO do we have this already somewhere else??????
-Mdecimal* _getBigintegerDecimal(Mbiginteger const * const _biginteger){
-	Mstring* _bigintegerText=(_biginteger?_getBigintegerText(_biginteger):NULL);
-	Mdecimal* _bigintegerDecimal=(_bigintegerText?_getTextDecimal(string(_bigintegerText),0):NULL);
-	if(_bigintegerText)free_string(_bigintegerText);
+Mdecimal* _getBigintegerDecimal(Mbiginteger const * const biginteger){
+	Mdecimal* _bigintegerDecimal=NULL;
+	if(biginteger){
+		Mstring* _bigintegerText=_getBigintegerText(biginteger);
+		if(_bigintegerText){
+			_bigintegerDecimal=_getTextDecimal(string(_bigintegerText),0);
+			free_string(_bigintegerText);
+		}
+	}
 	return _bigintegerDecimal;
 }/* VALIDATED */
 
+long double getDecimalLongDouble(Mdecimal* _decimal){
+	// easiest way is to transform to text first, and take if from there...
+	long double ldDecimal=M_LD_NAN;
+	if(_decimal){
+		char* _decimalText=mpd_to_sci(_decimal->mpd,0); // NOTE do NOT use _getDecimalText here!!!
+		if(_decimalText){ldDecimal=_strtold(_decimalText,ldDecimal);free(_decimalText);} // no need for this anymore
+	}
+	return ldDecimal;
+}/* VALIDATED */
+
+// MDH@09OCT2019: TODO think we forgot to take the delta into account (if any)
 Mdecimal* _getRationalDecimal(Mrational const * const _rational){
     if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     // _decimalText is a local variable that when set should be freed before returning!!!
@@ -726,10 +745,12 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){
         // the rounding at the end of course could prove to be problematic
         _textDecimal=__decimal(NULL,0,repeating);
         if(_textDecimal){
-            mpd_set_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context); // NOTE here we have to pass in the default decimal context
-            if(!_textDecimal->mpd){free_decimal(_textDecimal);_textDecimal=NULL;} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
-        }
-        if(!_textDecimal)output("%sFailed to create a decimal from '%s'.\n",ERROR_PREFIX,decimalText);
+			uint32_t status=0;
+            mpd_qset_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context,&status); // NOTE here we have to pass in the default decimal context
+            if((status&0xEFBF)!=0){free_decimal(_textDecimal);_textDecimal=NULL;output("%sFailed to parse a decimal (error status: %" PRIu32 ").\n",ERROR_PREFIX,status);} // if we failed to get a mpdecimal instance from the text, the text is probably wrong!!!
+        }else
+			outputError("Failed to create a decimal");
+        ////////////if(!_textDecimal)output("%sFailed to create a decimal from '%s'.\n",ERROR_PREFIX,decimalText);
     }else
         outputError("No decimal text to parse");
     return _textDecimal;

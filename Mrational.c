@@ -199,7 +199,8 @@ long double ldquotient(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld
 long double realquotient(Mreal* r1,Mreal* r2){return(r1&&r2?ldquotient(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
 Mreal* _realquotient(Mreal* r1,Mreal* r2){return(r1||r2?_getReal(realquotient(r1,r2)):NULL);} // either undefined, product undefined
 
-bool realIsUndefined(Mreal* _real){return(!_real||ldIsNaN(_real->ld));}
+bool realIsUndefined(Mreal* real){return(!real||ldIsNaN(real->ld));}
+bool realIsUndefinedOrZero(Mreal* real){return(!real||ldIsNaN(real->ld)||ldIsZero(real->ld));}
 
 mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
@@ -301,6 +302,22 @@ bool _qeq(Mrational* q1,Mrational* q2,mp_err *status){
     }
     return(!q1&&!q2); // if both are NULL return true, false otherwise
 }
+
+Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * const q2){
+    Mrational* _pureRationalSum=NULL;
+    if(q1&&q2){ // rationals defined
+        if(realIsUndefinedOrZero(q1->delta)&&realIsUndefinedOrZero(q2->delta)){ // both are pure
+            _pureRationalSum=__rational();
+            if(_pureRationalSum){
+                if(_qadd(_pureRationalSum,q1,q2)!=MP_OKAY){
+                    free_rational(_pureRationalSum);_pureRationalSum=NULL;
+                    if(amVerbose())outputError("Failed to compute the sum of two pure rationals");
+                }
+            }else if(amVerbose())outputError("Failed to create the pure sum rational");
+        }else if(amVerbose())outputError("Both rationals should be pure, and are not");
+    }
+    return _pureRationalSum;
+}/* VALIDATED */
 
 // the following methods take rationals with deltas into account whereas the _qmul, _qdiv, _qadd and _qsub do not
 Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2){

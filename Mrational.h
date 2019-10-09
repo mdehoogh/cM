@@ -8,6 +8,9 @@ mp_err _qmul(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qdiv(Mrational* c,Mrational const * const a,Mrational const * const b);
 
 bool realIsUndefined(Mreal* _real);
+bool realIsUndefinedOrZero(Mreal* _real);
+
+Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * const q2); // MDH@09OCT2019: can come in handy
 
 Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2);
 Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * const q2);

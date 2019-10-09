@@ -188,3 +188,4 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational);
 Mdecimal* _getValueDecimal(Mvalue* _value);
 Mdecimal* getValueDecimal(Mvalue* _value);
 
+Mdecimal* _getValueTextDecimal(Mvalue* value); // MDH@09OCT2019: delegates to _getTextDecimal() in Mdecimal.h/c, guarantees to return a new decimal from parsing the value text representation (unless the value wraps a decimal itself)
