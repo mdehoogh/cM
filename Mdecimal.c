@@ -2702,3 +2702,21 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 	return NULL;
 }
 
+Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){
+	if(decimal){
+		Mdecimalcontext* decimalcontext=_getDecimalcontext(decimal->prec);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+		Mdecimal* _inverseDecimal=__decimal(mpd_context,0,0);
+		if(_inverseDecimal){
+			mpd_t* _mpd1=__mpd(mpd_context,1);
+			if(_mpd1){
+				uint32_t status=0;
+				mpd_qdiv(_inverseDecimal->mpd,_mpd1,decimal->mpd,mpd_context,&status);
+				free_mpd(_mpd1);
+				if((status&0xEFBF)){free_decimal(_inverseDecimal);_inverseDecimal=NULL;outputError("Failed to compute the reciprocal of a decimal");}
+			}
+			return _inverseDecimal;
+		}
+	}
+	return NULL;
+}

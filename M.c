@@ -993,6 +993,33 @@ Mvalue* Msum(Mvalue* _value){
     return NULL;
 }
 
+// MDH@10OCT2019: applying unary operator (=function) to all elements in a list
+Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function){
+	// scalars are to be added to each element of the original list
+	// lists are to be added to the elements at the same position, so listwise
+	Mlist* _result=NULL;
+	if(function&&_list){ // we need both a function and a list
+		_result=_getListOfType(_list->valuetype); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
+		Mlistelement* _listelement=_list->_first;
+		while(_listelement&&appendedToList(_result,function(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+	}
+	return(_result?_getValueOfList(_result,true):NULL);
+}
+// MDH@10OCT2019: a special function to compute a reciprocal value
+Mvalue* Mreciprocal(Mvalue* value){
+	if(value)
+	switch(value->type){
+		case VT_LIST:return _functionAppliedToList(value->value._list,Mreciprocal);
+		case VT_REAL:return _getRealValue(1/value->value._real->ld); // TODO check what happens when the real equals 0
+		case VT_RATIONAL:return _getRationalValue(_getInverseRational(value->value._rational),true);
+		case VT_INTEGER:return _getRationalValue(_getRational(NULL,_getBiginteger(value->value._integer->ll),M_LD_NAN,true,true),true);
+		case VT_BIGINTEGER:return _getRationalValue(_getRational(NULL,value->value._biginteger,M_LD_NAN,true,false),true); // same as with VT_INTEGER but without freeing the to remain bound big integer
+		case VT_DECIMAL:return _getDecimalValue(_getInverseDecimal(value->value._decimal),true);
+		default:break; // TODO maps!!!!
+	}
+	return NULL;
+}
+
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
@@ -1152,6 +1179,10 @@ bool initEnvironment(){
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),"fac",Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),"facd",Mfacd)){
 				outputError("Failed to register the fac and facd function");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"reciprocal"),"reciprocal",Mreciprocal)){ // MDH@10OCT2019
+				outputError("Failed to register the reciprocal function");
 				return false;
 			}
 			// register list conversions
@@ -4052,6 +4083,61 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 	}
 	return _resultDecimal;
 }
+
+// MDH@10OCT2019: if both the argument and the degree is rational we can use rational approximations of the (Newtonian) (decimal) algorithm used in _getBigintegerRootValue()
+Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mbiginteger* rootDegreeBiginteger){
+	// ASSERT the root degree rational is assumed to be equal to or smaller than 1
+	Mrational* _rationalBigintegerRootRational=NULL;
+	if(rootArgumentRational&&rootDegreeBiginteger){
+		// if either rational is one, return a copy of the root argument rational
+		if(!isBigintegerOne(rootDegreeBiginteger)&&!isRationalOne(rootArgumentRational)){ // neither equals 1
+			Mbiginteger *p_a=rootArgumentRational->num,*q_a=rootArgumentRational->den; // helpers that will contain the numerator and denominator of A (the root argument)
+			Mbiginteger *_pk=_getBigintegerCopy(p_a),*_qk=_getBiginteger(1); // initialize the solution to the root argument allowing that q_k equals NULL to indicate it is equal to 1
+			if(_pk&&_qk){
+				// try to initialize root degree times the denominator of the root argument (which could be NULL when it equals 1)
+				Mbiginteger* _np_a=_getBigintegerCopy(rootDegreeBiginteger);
+				if(_np_a&&q_a&&mp_mul(_np_a,q_a,_np_a)!=MP_OKAY){free_biginteger(_np_a);_np_a=NULL;}
+				if(_np_a){
+					// we need some additional helper big integers
+					Mbiginteger *_pktothepowern=__biginteger(),*_qktothepowern=_getBiginteger(1),*_delta1=__biginteger(),*_delta2=__biginteger(),*_delta=__biginteger(),*_pktothepowernminus1=__biginteger();
+					if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_delta&&_pktothepowernminus1){
+						char c;
+						unsigned long long iter=0;
+						while(++iter){
+							output("Rational approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");outputChar(".");
+							output(" %s...","Press any key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
+							// update the delta
+							if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+							if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
+							if(mp_mul(_pktothepowern,q_a,_delta1)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+							if(mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+							if(mp_add(_delta1,_delta2,_delta)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+							if(mp_iszero(_delta))break; // if delta is zero, we're done
+							if(mp_div(_pktothepowern,_pk,_pktothepowernminus1,NULL)!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
+							if(mp_mul(_pktothepowern,_np_a,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+							if(mp_add(_pk,_delta,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+							if(mp_mul(_qk,_pktothepowernminus1,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+							if(mp_mul(_qk,_np_a,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+							// that's neat isn't it?
+						}
+						free_biginteger(_pktothepowern);free_biginteger(_qktothepowern);free_biginteger(_delta1);free_biginteger(_delta2);free_biginteger(_delta);free_biginteger(_pktothepowernminus1);
+					}
+					free_biginteger(_np_a);
+					_rationalBigintegerRootRational=_getRational(_pk,_qk,M_LD_NAN,true,false);
+				}
+			}else
+				outputError("Failed to initialize the rational rational root approximation");
+			// take care of freeing the result numerator and denominator when we do not have a rational root rational
+			if(!_rationalBigintegerRootRational){free_biginteger(_pk);free_biginteger(_qk);}
+			// TODO some other special situations to address (like 0 or negative root degree rational)
+			// as first approximation I'll use the root argument rational (so that it's ALWAYS larger than the solution we're looking for)
+		}else
+			_rationalBigintegerRootRational=_getRationalCopy(rootArgumentRational);
+	}
+	return _rationalBigintegerRootRational;
+}
+// MDH@10OCT2019: better to return a decimal instead of already wrapping the result in a value (so we can do postprocessing!!!!)
+//                wait we're wrapping it because the result could be different from a decimal!!!!
 Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegreeBiginteger){
 	Mvalue* _bigintegerRootValue=NULL;
 	if(rootArgumentValue&&rootDegreeBiginteger){
@@ -4063,6 +4149,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 		// we can do the decimal approximation first
 		Mdecimal* _rootArgumentDecimal=_getValueDecimal(rootArgumentValue);
 		if(_rootArgumentDecimal){
+			uint32_t status=0;
 			outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
 			// we need an mpd_context for use in the decimal computations!!
 			Mdecimalcontext* _decimalcontext=_getDecimalcontext(_rootArgumentDecimal->prec);
@@ -4071,80 +4158,126 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 				Mdecimal* _rootDegreeDecimal=_getBigintegerDecimal(rootDegreeBiginteger);
 				if(_rootDegreeDecimal){
 					outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
-					Mdecimal *_bigintegerRootDecimal=_getDecimalCopy(_rootArgumentDecimal),*_nextBigintegerRootDecimal=__decimal(mpd_context,0,0); // start with the root argument as initial approximation to the root
+					// MDH@10OCT2019: to anticipate on root arguments smaller than 1 of which the root will be larger instead of smaller we use the square root as first approximation
+					// MDH@10OCT2019: because we are approaching the root from above, as soon as the next approximation is equal to or larger than the previous approximation we're done
+					//                this means not using the distance anymore because e.g. 2**(7/9) with decimal precision 20 failed to converge (resulted in toggling between two decimals that different by the final digit)
+					Mdecimal *_bigintegerRootDecimal=__decimal(mpd_context,1,0),*_nextBigintegerRootDecimal=__decimal(mpd_context,0,0); // let's use 1 as first approximation for any decimal that is below 1
 					if(_bigintegerRootDecimal&&_nextBigintegerRootDecimal){
 						outputLine("Root computation result decimals created...");
-						// 0. preparations: we need (root degree - 1 ) regularly
-						Mdecimal* _rootDegreeMinus1Decimal=__decimal(mpd_context,0,0); /////_getDecimalCopy(_rootDegreeDecimal);
-						if(_rootDegreeMinus1Decimal){
-							outputLine("Root computation helper decimal created...");
-							uint32_t status=0;
-							// can't I use getDecimalOne() here?????? apparently not!!
-							mpd_t* _decimalOne=__mpd(mpd_context,1);
-							mpd_qsub(_rootDegreeMinus1Decimal->mpd,_rootDegreeDecimal->mpd,_decimalOne,mpd_context,&status);
-							free_mpd(_decimalOne);
-							if((status&0xEFBF)==0){
-								outputLine("Root computation helper decimal initialized...");
-								// we need the root degree minus 1 as big integer as well
-								Mbiginteger* _rootDegreeMinus1Biginteger=_getBigintegerCopy(rootDegreeBiginteger);
-								if(_rootDegreeMinus1Biginteger){
-									outputLine("Root computation helper big integer created...");
-									if(mp_decr(_rootDegreeMinus1Biginteger)==MP_OKAY){
-										outputLine("Root computation helper big integer initialized...");
-										// we need a product, a quotient and an addition help decimal
-										Mdecimal *_product=__decimal(mpd_context,0,0),*_quotient=__decimal(mpd_context,0,0),*_productplusquotient=__decimal(mpd_context,0,0),*_power=__decimal(mpd_context,0,0);
-										// initial value of the quotient denominator that we need for checking whether we're done and in the computation
-										if(_product&&_quotient&&_productplusquotient&&_power){
-											outputLine("Root computation helper decimals created...");
-											// ready to rock 'n' roll, eh iterate
-											// NOTE iterating until the next value is the same wasn't working, it might be better to compute the power value itself and to compare with the root argument value, if match stop!!
-											unsigned long long iter=0;
-											Mdecimal *_quotientdenominator=NULL;
-											while((status&0xEFBF)==0){
-												// 'update' the quotient denominator, so we can use it in checking whether we are already there yet, and if not in the computation
-												// TODO might it be a good idea to compute the quotient and compare the quotient with the current solution??????
-												_quotientdenominator=_getDecimalPowerWithPositiveBigintegerExponent(_bigintegerRootDecimal,_rootDegreeMinus1Biginteger);
-												if(!_quotientdenominator){status=0xFFFFFFFF;break;}
-												// are we there yet?????
-												// compute the current power value
-												mpd_qmul(_power->mpd,_quotientdenominator->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
-												if((status&0xEFBF)!=0)break;
-												// if the product of the quotient denominator and the root decimal equals the root argument
-												if(mpd_qcmp(_power->mpd,_bigintegerRootDecimal->mpd,&status)==0)break; // a match, so done
-												// next iteration!!!!
-												iter++;
-												mpd_qdiv(_quotient->mpd,_rootArgumentDecimal->mpd,_quotientdenominator->mpd,mpd_context,&status);
-												free_decimal(_quotientdenominator); // don't need it anymore
-												mpd_qmul(_product->mpd,_rootDegreeMinus1Decimal->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
-												mpd_qadd(_productplusquotient->mpd,_product->mpd,_quotient->mpd,mpd_context,&status);
-												// update the solution
-												mpd_qdiv(_bigintegerRootDecimal->mpd,_productplusquotient->mpd,_rootDegreeDecimal->mpd,mpd_context,&status);
-											}
-											if((status&0xEFBF)!=0){
-												output("%sRoot computation ended with error code " PRIu32 ".\n",ERROR_PREFIX,status);
-												free_decimal(_bigintegerRootDecimal);
-											}else{
-												_bigintegerRootValue=_getDecimalValue(_bigintegerRootDecimal,true);
-												///////if(amVerbose())
-												outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
-											}
+						uint32_t status=0;
+						// let's determine on which side of one the root argument is located!!!!
+						int rootArgumentComparison=mpd_qcmp(_rootArgumentDecimal->mpd,_bigintegerRootDecimal->mpd,&status);
+						// if the root argument is equal to 1, the solution is 1 of course, and no need to continue
+						if(rootArgumentComparison>0)mpd_qsqrt(_bigintegerRootDecimal->mpd,_rootArgumentDecimal->mpd,mpd_context,&status);
+						// if the root argument does not equal one and we managed to initialize the root argument (to either 1 or the square root), we may continue
+						if(rootArgumentComparison&&!(status&0xEFBF)){
+							outputDecimal("Root computation result decimals initialized to ",_bigintegerRootDecimal,".\n");
+							// TODO only when the root degree is larger than 2 do we do the iterative process
+							// 0. preparations: we need (root degree - 1 ) regularly
+							Mdecimal* _rootDegreeMinus1Decimal=__decimal(mpd_context,0,0); /////_getDecimalCopy(_rootDegreeDecimal);
+							if(_rootDegreeMinus1Decimal){
+								outputLine("Root computation helper decimal created...");
+								// can't I use getDecimalOne() here?????? apparently not!!
+								mpd_t* _decimalOne=__mpd(mpd_context,1);
+								mpd_qsub(_rootDegreeMinus1Decimal->mpd,_rootDegreeDecimal->mpd,_decimalOne,mpd_context,&status);
+								free_mpd(_decimalOne);
+								if((status&0xEFBF)==0){
+									outputLine("Root computation helper decimal initialized...");
+									// we need the root degree minus 1 as big integer as well
+									Mbiginteger* _rootDegreeMinus1Biginteger=_getBigintegerCopy(rootDegreeBiginteger);
+									if(_rootDegreeMinus1Biginteger){
+										outputLine("Root computation helper big integer created...");
+										if(mp_decr(_rootDegreeMinus1Biginteger)==MP_OKAY){
+											outputLine("Root computation helper big integer initialized...");
+											// we need a product, a quotient and an addition help decimal
+											/*
+											Mdecimal *_distance=__decimal(mpd_context,0,0),*_prevdistance=__decimal(mpd_context,0,0);
+											*/
+											Mdecimal *_product=__decimal(mpd_context,0,0),*_quotient=__decimal(mpd_context,0,0),*_productplusquotient=__decimal(mpd_context,0,0),*_power=__decimal(mpd_context,0,0);
+											// initial value of the quotient denominator that we need for checking whether we're done and in the computation
+											if(/*_distance&&_prevdistance&&*/_product&&_quotient&&_productplusquotient&&_power){
+												outputLine("Root computation helper decimals created...");
+												// ready to rock 'n' roll, eh iterate
+												// NOTE iterating until the next value is the same wasn't working, it might be better to compute the power value itself and to compare with the root argument value, if match stop!!
+												unsigned long long iter=0;
+												Mdecimal *_quotientdenominator=NULL;
+												char c;
+												while((status&0xEFBF)==0){
+													// 'update' the quotient denominator, so we can use it in checking whether we are already there yet, and if not in the computation
+													// TODO might it be a good idea to compute the quotient and compare the quotient with the current solution??????
+													_quotientdenominator=_getDecimalPowerWithPositiveBigintegerExponent(_bigintegerRootDecimal,_rootDegreeMinus1Biginteger);
+													if(!_quotientdenominator){status=0xFFFFFFFF;break;}
+													/* MDH@10OCT2019: not using the distance anymore!!!
+													// are we there yet?????
+													// compute the current power value
+													mpd_qmul(_power->mpd,_quotientdenominator->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
+													if((status&0xEFBF)!=0)break;
+													// if we like to know the distance to the goal we have to compute the difference
+													mpd_qsub(_distance->mpd,_power->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
+													if((status&0xEFBF)!=0)break;
+													// if the distance hasn't changed we're done (as we noticed the distance won't be zero in general)
+													if(mpd_qcmp(_distance->mpd,_prevdistance->mpd,&status)==0)break; // a match, so done
+													free_mpd(_prevdistance->mpd);_prevdistance->mpd=mpd_qncopy(_distance->mpd);
+													if(!_prevdistance->mpd){outputError("Failed to copy the distance!");break;}
+													*/
+													// replacing: if(mpd_iszero(_distance->mpd))break;
+													// if the product of the quotient denominator and the root decimal equals the root argument
+													// replacing: if(mpd_qcmp(_power->mpd,_bigintegerRootDecimal->mpd,&status)==0)break; // a match, so done
+													// next iteration!!!!
+													iter++;
+													if(amVerbose()){
+														output("Root approximation at iteration #%" PRIu32 ":",iter);
+														outputDecimal(" ",_bigintegerRootDecimal,".");
+														////////outputDecimal(" Distance: ",_distance,".");
+														output(" %s...","Press any key to continue");
+														inputCharRead(&c);
+														outputChar('\n');
+													}
+													mpd_qdiv(_quotient->mpd,_rootArgumentDecimal->mpd,_quotientdenominator->mpd,mpd_context,&status);
+													free_decimal(_quotientdenominator); // don't need it anymore
+													mpd_qmul(_product->mpd,_rootDegreeMinus1Decimal->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
+													mpd_qadd(_productplusquotient->mpd,_product->mpd,_quotient->mpd,mpd_context,&status);
+													// update the solution
+													mpd_qdiv(_nextBigintegerRootDecimal->mpd,_productplusquotient->mpd,_rootDegreeDecimal->mpd,mpd_context,&status);
+													// check whether done or not which is when the next approximation is not smaller than the previous approximation
+													if(mpd_qcmp(_nextBigintegerRootDecimal->mpd,_bigintegerRootDecimal->mpd,&status)>=0)break;
+													// update _bigintegerRootDecimal to _nextBigintegerRootDecimal
+													free_mpd(_bigintegerRootDecimal->mpd);_bigintegerRootDecimal->mpd=mpd_qncopy(_nextBigintegerRootDecimal->mpd);
+												}
+												if((status&0xEFBF)!=0){
+													output("%sRoot computation ended with error code " PRIu32 ".\n",ERROR_PREFIX,status);
+													free_decimal(_bigintegerRootDecimal);
+												}else{
+													_bigintegerRootValue=_getDecimalValue(_bigintegerRootDecimal,true);
+													///////if(amVerbose())
+													outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
+												}
+											}else
+												outputError("Failed to create helper decimals in computing a root decimal");
+											/*
+											free_decimal(_distance);free_decimal(_prevdistance);
+											*/
+											free_decimal(_product);free_decimal(_quotient);
+											free_decimal(_productplusquotient);free_decimal(_power);
 										}else
-											outputError("Failed to create helper decimals in computing a root decimal");
-										free_decimal(_product);free_decimal(_quotient);free_decimal(_productplusquotient);free_decimal(_power);
+											outputError("Failed to compute a helper big integer in computing a root decimal");
+										free_biginteger(_rootDegreeMinus1Biginteger);
+										outputLine("Root computation helper big integer released...");
 									}else
-										outputError("Failed to compute a helper big integer in computing a root decimal");
-									free_biginteger(_rootDegreeMinus1Biginteger);
-									outputLine("Root computation helper big integer released...");
+										outputError("Failed to copy the root degree in computing a root decimal");
 								}else
-									outputError("Failed to copy the root degree in computing a root decimal");
+									outputError("Failed to compute a helper decimal in computing a root decimal");
 							}else
-								outputError("Failed to compute a helper decimal in computing a root decimal");
+								outputError("Failed to create a helper decimal in computing a root decimal");
+							free_decimal(_rootDegreeMinus1Decimal);
+							outputLine("Root computation helper decimal released...");
 						}else
-							outputError("Failed to create a helper decimal in computing a root decimal");
-						free_decimal(_rootDegreeMinus1Decimal);
-						outputLine("Root computation helper decimal released...");
-					}else
-						outputError("Failed to initialize the root");
+						if(rootArgumentComparison)
+							outputError("Failed to initialize the result of the root computation to the square root");
+						else // wrap the result (which is 1)
+							_bigintegerRootValue=_getDecimalValue(_bigintegerRootDecimal,true);
+					}
+					free_decimal(_nextBigintegerRootDecimal);
 					free_decimal(_rootDegreeDecimal);
 					outputLine("Root computation degree decimal released...");
 				}else{
@@ -4159,6 +4292,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 	}
 	return _bigintegerRootValue;
 }
+
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1))return _value1;
@@ -4187,13 +4321,60 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 			else 
 			if(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0)_exponentRational=_getDecimalRational(_value2->value._decimal);
 			if(_exponentRational){ // the exponent is rational
+				Mvalue* _rootValue=NULL; // the result of the computation of taking the power of a decimal to a rational exponent
 				//if(amVerbose())
 				outputRational("Computing a power with rational exponent ",_exponentRational,".\n");
-				// base to the power of a rational is the denominatorth root of the numerators power of the base
-				Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_exponentRational->num);// NOTE will be released by the value garbage collector
-				//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
-				Mvalue* _rootValue=_getBigintegerRootValue(_rootArgumentValue,_exponentRational->den);
-				outputValue("Rational exponent root of ",_rootArgumentValue,NULL);outputValue(": ",_rootValue,".\n");
+				// TODO now we are testing whether the denominator does not equal one, but in the future all rationals with denominator 1 should have a NULL denominator!!!
+				if(_exponentRational->den&&!isBigintegerOne(_exponentRational->den)){ // a 'real' rational (i.e. not simply pretending to be one)
+					// MDH@10OCT2019: we can improve on the computation of the power by computing the integer quotient of the rational and the remainder
+					// MDH@10OCT2019: we can even improve even more by choosing the smallest of the numerator and denominator to be used in the power computation
+					//                NO we can't because 2**(x/y) is NOT equal to 1/2**(y/x) as I conjectured, so we have to stick to the original approximation for now
+					int numdencomp=mp_cmp(_exponentRational->num,_exponentRational->den);
+					if(numdencomp!=MP_EQ){ // numerator and denominator are not equal
+						Mbiginteger *_integerdividend=__biginteger(),*_remainder=__biginteger(); // the defaults when the denominator equals NULL
+						// we divide the maximum of the numerator and the denominator by the minimum of the numerator and the denominator (which typically means that _integerdividend will always be nonzero essentially)
+						if(_integerdividend&&_remainder&&mp_div(_exponentRational->num,_exponentRational->den,_integerdividend,_remainder)==MP_OKAY){
+							// if _integerdividend is not zero we may compute the multiplier
+							Mvalue* _multiplierValue=(mp_iszero(_integerdividend)!=MP_YES?_getBigintegerPowerValue(_value1,_integerdividend):NULL);
+							// MDH@10OCT2019: we have a special situation when the root argument (_value1) is rational itself in which case we are computing the 
+								// instead of computing the power of the numerator we use the _remainder instead
+								Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
+								// if the root argument is rational, we should use pure big integer computations and have all rational approximations to the root
+								if(_rootArgumentValue->type==VT_RATIONAL&&realIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)){ // a pure decimal
+									// TODO if the base is not a pure rational, we could of course purify it
+									_rootValue=_getRationalValue(_getRationalBigintegerRootRational(_rootArgumentValue->value._rational,_exponentRational->den),true);
+								}else{ // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
+									_rootValue=_getBigintegerRootValue(_rootArgumentValue,_exponentRational->den);
+								// now apply the multiplier if need be
+								//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
+								if(_multiplierValue){ // have to multiply
+									_rootValue=multiply(_multiplierValue,_rootValue);
+									outputValue("Rational exponent root equals the product of multiplier ",_multiplierValue," and ");
+									outputBiginteger("the ",_exponentRational->den,"th ");
+									outputValue("root of ",_rootArgumentValue,NULL);
+									outputValue(" which is ",_rootValue,".\n");
+								}else{ // no need to multiply
+									outputBiginteger("The ",_exponentRational->den,"th ");
+									outputValue("root of ",_rootArgumentValue,NULL);
+									outputValue("equals ",_rootValue,".\n");
+								}
+							}
+							///// wrong: if(numdencomp==MP_LT)_rootValue=Mreciprocal(_rootValue); // the numerator is smaller than the denominator, so we need to invert the value
+							/* replacing NOT splitting up the rational exponent in an integer and remainder part (under 1)
+							// base to the power of a rational is the denominatorth root of the numerators power of the base
+							Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_exponentRational->num);// NOTE will be released by the value garbage collector
+							//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
+							Mvalue* _rootValue=_getBigintegerRootValue(_rootArgumentValue,_exponentRational->den);
+							outputValue("Rational exponent root of ",_rootArgumentValue,NULL);outputValue(": ",_rootValue,".\n");
+							*/
+						}else
+							outputError("Failed to determine the integer and fractional part of a rational exponent");
+						free_biginteger(_integerdividend);free_biginteger(_remainder);
+					}else // the numerator equals the denominator meaning that _value1 is the value to return
+						_rootValue=_value1;
+
+				}else // an integer rational, so no need to take the root at all!!!
+					_rootValue=_getBigintegerPowerValue(_value1,_exponentRational->num); // that's all folks
 				// don't forget the delta (if any)
 				if(!realIsUndefinedOrZero(_exponentRational->delta)) // a defined delta
 					// multiply the result with base to the power of delta

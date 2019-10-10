@@ -2,6 +2,26 @@
 
 long double realsum(Mreal* _real1,Mreal* _real2); // TODO should be moved to Mreal I suppose at some point 
 
+// MDH@10OCT2019: moved over from Mexecution.h/c
+// the following two methods will use M_LD_Q_EPS as default cut-off value
+Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
+long double getRationalLongDouble(const Mrational* const _rational);
+
+Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/); 
+// used by (now moved over to Mdecimal.h/c): Mrational* _getDecimalRational(Mdecimal* _decimal);
+
+Mrational* __rational();
+void free_rational(Mrational* _rational);
+bool isRationalZero(Mrational* _rational);
+bool isRationalOne(Mrational* _rational);
+void normalizeRational(Mrational* _rational);
+Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure);
+Mrational* _getInverseRational(Mrational const * const _rational);
+Mstring* _getRationalText(const Mrational* const _rational);
+Mbiginteger* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
+void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix);
+
+
 mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qsub(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qmul(Mrational* c,Mrational const * const a,Mrational const * const b);

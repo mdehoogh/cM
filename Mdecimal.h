@@ -79,3 +79,5 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal); // converts a de
 Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating);
 
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
+
+Mdecimal* _getInverseDecimal(Mdecimal const * const decimal);
