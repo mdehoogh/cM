@@ -118,19 +118,19 @@ Mbiginteger* _getBiginteger(int64_t ll){
 }/* VALIDATED */
 
 // replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
-Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger){
+Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){
     Mbiginteger* _bigintegerNeg=(_biginteger?__biginteger():NULL); // the result we will be returning
     if(_bigintegerNeg&&mp_neg(_biginteger,_bigintegerNeg)!=MP_OKAY){free_biginteger(_bigintegerNeg);_bigintegerNeg=NULL;}
     return _bigintegerNeg;
 }// VALIDATED
 
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
-Mbiginteger* _getBigintegerCopy(Mbiginteger* biginteger){
-    if(!biginteger)return NULL;
-    Mbiginteger* bigintegerCopy=__biginteger();
+Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){
+    Mbiginteger* bigintegerCopy=(biginteger?__biginteger():NULL);
     if(bigintegerCopy&&mp_copy(biginteger,bigintegerCopy)!=MP_OKAY){free_biginteger(bigintegerCopy);bigintegerCopy=NULL;}
     return bigintegerCopy;
 }/* VALIDATED */
+
 mp_int* _mp_int(){return (mp_int*)__biginteger();}/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)

@@ -156,10 +156,10 @@ Mreal* _getReal(long double ld);
 // BIG INTEGER STUFF
 void free_biginteger(Mbiginteger* _biginteger);
 Mbiginteger* __biginteger();
-Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger);
+Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger);
 Mbiginteger* _getBiginteger(int64_t l);
 
-Mbiginteger* _getBigintegerNeg(Mbiginteger* _biginteger); // NOTE there's a replicate called getNegatedBiginteger in Mbiginteger.h/c but I need it here
+Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger); // NOTE there's a replicate called getNegatedBiginteger in Mbiginteger.h/c but I need it here
 
 Mbiginteger* getBigintegerLLMin();
 Mbiginteger* getBigintegerLLMax();

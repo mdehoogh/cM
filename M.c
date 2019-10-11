@@ -4084,6 +4084,31 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 	return _resultDecimal;
 }
 
+// MDH@11OCT2019: until we know a better way I stick to using squared exponentation
+mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteger const * const exponentBiginteger,Mbiginteger * const powerBiginteger){
+	mp_err result=(baseBiginteger&&exponentBiginteger&&powerBiginteger?MP_OKAY:MP_ERR);
+	if(result==MP_OKAY){
+		if(!isBigintegerOne(baseBiginteger)&&!isBigintegerZero(exponentBiginteger)){
+			Mbiginteger *_multiplierBiginteger=_getBigintegerCopy(baseBiginteger),*_exponentBiginteger=_getBigintegerCopy(exponentBiginteger);
+			if(_multiplierBiginteger&&_exponentBiginteger){
+				if(mp_isodd(_exponentBiginteger)!=MP_YES)mp_set_i32(powerBiginteger,1);else result=mp_copy(baseBiginteger,powerBiginteger); // initialize powerBiginteger to 1
+				// can we do this iteratively???
+				while(result==MP_OKAY){
+					if(mp_iszero(_exponentBiginteger)==MP_YES)break;
+					// half the exponent
+					if((result=mp_div_2(_exponentBiginteger,_exponentBiginteger))!=MP_OKAY)break;
+					// square the multiplier
+					if((result=mp_sqr(_multiplierBiginteger,_multiplierBiginteger))!=MP_OKAY)break;
+					if(mp_isodd(_exponentBiginteger)==MP_YES)if((result=mp_mul(powerBiginteger,_multiplierBiginteger,powerBiginteger))!=MP_OKAY)break;
+				}
+			}
+			free_biginteger(_multiplierBiginteger);free_biginteger(_exponentBiginteger);
+		}else
+			result=mp_copy(baseBiginteger,powerBiginteger);
+	}
+	return result;
+}
+
 // MDH@10OCT2019: if both the argument and the degree is rational we can use rational approximations of the (Newtonian) (decimal) algorithm used in _getBigintegerRootValue()
 Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mbiginteger* rootDegreeBiginteger){
 	// ASSERT the root degree rational is assumed to be equal to or smaller than 1
@@ -4099,28 +4124,57 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 				if(_np_a&&q_a&&mp_mul(_np_a,q_a,_np_a)!=MP_OKAY){free_biginteger(_np_a);_np_a=NULL;}
 				if(_np_a){
 					// we need some additional helper big integers
-					Mbiginteger *_pktothepowern=__biginteger(),*_qktothepowern=_getBiginteger(1),*_delta1=__biginteger(),*_delta2=__biginteger(),*_delta=__biginteger(),*_pktothepowernminus1=__biginteger();
-					if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_delta&&_pktothepowernminus1){
+					Mbiginteger *_pktothepowern=__biginteger(),*_qktothepowern=_getBiginteger(1),*_delta1=__biginteger(),*_delta2=__biginteger(),*_delta=__biginteger(),*_pktothepowernminus1=__biginteger(),*_divremainder=__biginteger(),*_gcd=__biginteger();
+					Mbiginteger *_num1=__biginteger(),*_num=__biginteger(),*_den=__biginteger(),*_nextpk=__biginteger(),*_nextqk=__biginteger(); // initially the same as _pk and _qk
+					if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_delta&&_pktothepowernminus1&&_divremainder&&_gcd&&_nextpk&&_nextqk&&_num1&&_num&&_den){
 						char c;
 						unsigned long long iter=0;
 						while(++iter){
-							output("Rational approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");outputChar(".");
-							output(" %s...","Press any key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
+							output("Rational approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");outputChar('.');
+							output(" %s...","Press Enter to break, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
+							if(c=='\n'||c=='\r')break;
 							// update the delta
+							outputBiginteger("\tNumerator ",_pk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
+							if(computeBigintegerPower(_pk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+							outputBiginteger(" ",_pktothepowern,".\n");
+							outputBiginteger("\tDenominator ",_qk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
+							if(computeBigintegerPower(_qk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+							outputBiginteger(" ",_qktothepowern,".\n");
+							/* replacing:
 							if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 							if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
+							*/
 							if(mp_mul(_pktothepowern,q_a,_delta1)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+							outputBiginteger("\tDelta 1: ",_delta1,".\n");
 							if(mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
-							if(mp_add(_delta1,_delta2,_delta)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+							outputBiginteger("\tDelta 2: ",_delta2,".\n");
+							if(mp_sub(_delta2,_delta1,_delta)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
 							if(mp_iszero(_delta))break; // if delta is zero, we're done
-							if(mp_div(_pktothepowern,_pk,_pktothepowernminus1,NULL)!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
-							if(mp_mul(_pktothepowern,_np_a,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-							if(mp_add(_pk,_delta,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-							if(mp_mul(_qk,_pktothepowernminus1,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
-							if(mp_mul(_qk,_np_a,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+							outputBiginteger("\tDelta: ",_delta,".\n");
+							if(mp_div(_pktothepowern,_pk,_pktothepowernminus1,_divremainder)!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
+							// update _pk (next) and _qk (next)
+							if(mp_mul(_pktothepowern,_np_a,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+							if(mp_add(_nextpk,_delta,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+							if(mp_mul(_qk,_pktothepowernminus1,_nextqk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+							if(mp_mul(_nextqk,_np_a,_nextqk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 							// that's neat isn't it?
+							// how about normalizing _pk and _qk here, which might help
+							if(mp_gcd(_nextpk,_nextqk,_gcd)!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
+							if(!isBigintegerOne(_gcd)&&(mp_div(_nextpk,_gcd,_nextpk,_divremainder)!=MP_OKAY||mp_div(_nextqk,_gcd,_nextqk,_divremainder)!=MP_OKAY)){outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
+							// what's the change in approximation?
+							if(mp_mul(_pk,_nextqk,_num)!=MP_OKAY){outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
+							if(mp_mul(_qk,_nextpk,_num1)!=MP_OKAY){outputError("Failed to initialize the change to the rational root approximation");break;}
+							if(mp_sub(_num,_num1,_num)!=MP_OKAY){outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
+							if(mp_mul(_nextqk,_qk,_den)!=MP_OKAY){outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
+							if(mp_gcd(_num,_den,_gcd)!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
+							if(!isBigintegerOne(_gcd)&&(mp_div(_num,_gcd,_num,_divremainder)!=MP_OKAY||mp_div(_den,_gcd,_den,_divremainder)!=MP_OKAY)){outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
+							output("\tChange in rational approximation: ",iter);outputBiginteger("(",_num,NULL);outputBiginteger("/",_den,").\n\n");
+							if(mp_copy(_nextpk,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
+							if(mp_copy(_nextqk,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
 						}
-						free_biginteger(_pktothepowern);free_biginteger(_qktothepowern);free_biginteger(_delta1);free_biginteger(_delta2);free_biginteger(_delta);free_biginteger(_pktothepowernminus1);
+						free_biginteger(_pktothepowern);free_biginteger(_qktothepowern);free_biginteger(_delta1);free_biginteger(_delta2);free_biginteger(_delta);
+						free_biginteger(_pktothepowernminus1);free_biginteger(_divremainder);free_biginteger(_gcd);
+						free_biginteger(_num1);free_biginteger(_num);free_biginteger(_den);free_biginteger(_nextpk);free_biginteger(_nextqk);
 					}
 					free_biginteger(_np_a);
 					_rationalBigintegerRootRational=_getRational(_pk,_qk,M_LD_NAN,true,false);
