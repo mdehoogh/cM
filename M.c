@@ -4131,8 +4131,8 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						unsigned long long iter=0;
 						while(++iter){
 							output("Rational approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");outputChar('.');
-							output(" %s...","Press Enter to break, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
-							if(c=='\n'||c=='\r')break;
+							output(" %s...","Press Ctrl-C to break, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
+							if(c==3)break;
 							// update the delta
 							outputBiginteger("\tNumerator ",_pk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
 							if(computeBigintegerPower(_pk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
