@@ -4153,8 +4153,13 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 							if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_delta&&_pktothepowernminus1&&_divremainder&&_gcd&&_nextpk&&_nextqk&&_num1&&_num&&_den){
 								char c;
 								unsigned long long iter=0;
+								Mrational* _rational;Mdecimal* _decimal;
 								while(++iter){
-									output("Rational root approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,").\n");
+									output("Rational root approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");
+									// let's show the decimal representation of this value
+									_rational=_getRational(_getBigintegerCopy(_pk),_getBigintegerCopy(_qk),M_LD_NAN,false,true);
+									if(_rational){_decimal=_getRationalDecimal(_rational);free_rational(_rational);if(_decimal){outputDecimal("=",_decimal,NULL);free_decimal(_decimal);}}
+									output(".\n");
 									// update the delta
 									outputBiginteger("\tNumerator ",_pk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
 									if(computeBigintegerPower(_pk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
@@ -4175,9 +4180,6 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 
 									if(mp_iszero(_delta))break; // if delta is zero, we're done
 
-									output(" %s...","Press Ctrl-C to stop, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
-									if(c==3)break;
-
 									if(mp_div(_pktothepowern,_pk,_pktothepowernminus1,_divremainder)!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
 									// update _pk (next) and _qk (next)
 									if(mp_mul(_pktothepowern,_np_a,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
@@ -4195,7 +4197,23 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 									if(mp_mul(_nextqk,_qk,_den)!=MP_OKAY){outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
 									if(mp_gcd(_num,_den,_gcd)!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
 									if(!isBigintegerOne(_gcd)&&(mp_div(_num,_gcd,_num,_divremainder)!=MP_OKAY||mp_div(_den,_gcd,_den,_divremainder)!=MP_OKAY)){outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
-									output("\tChange in rational approximation: ",iter);outputBiginteger("(",_num,NULL);outputBiginteger("/",_den,").\n\n");
+									output("\tChange in rational approximation: ",iter);outputBiginteger("(",_num,NULL);outputBiginteger("/",_den,")");
+									bool decimalprecisionreached=false;
+									_rational=_getRational(_getBigintegerCopy(_num),_getBigintegerCopy(_den),M_LD_NAN,false,true);
+									if(_rational){
+										_decimal=_getRationalDecimal(_rational);free_rational(_rational);
+										if(_decimal){
+											if(mpd_iszero(_decimal->mpd)==MP_YES)decimalprecisionreached=true;
+											outputDecimal("=",_decimal,NULL);
+											free_decimal(_decimal);
+										}
+									}
+									output(".\n");
+									if(decimalprecisionreached)break; // decimal precision reached
+									
+									output(" %s...","Press Ctrl-C to stop, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
+									if(c==3)break;
+
 									if(mp_copy(_nextpk,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
 									if(mp_copy(_nextqk,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
 								}
