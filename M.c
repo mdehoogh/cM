@@ -3760,10 +3760,14 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	}
 	// the other integer one could be a big integer in which case we return a big integer
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _sumBiginteger=NULL;
 		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(amVerbose()){outputBiginteger("Adding big integers '",_biginteger1,"'");outputValue(" and '",_biginteger2,"'.\n");}
-		Mbiginteger* _sumBiginteger=__biginteger();
-		if(_sumBiginteger&&mp_add(_biginteger1,_biginteger2,_sumBiginteger)!=MP_OKAY){free_biginteger(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+			_sumBiginteger=__biginteger();
+			if(_sumBiginteger&&mp_add(_biginteger1,_biginteger2,_sumBiginteger)!=MP_OKAY){free_biginteger(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		}else 
+			outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_sumBiginteger,true);
 	}
@@ -3827,13 +3831,6 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||isValueZero(_value1))return Mneg(_value2);if(!_value2||isValueZero(_value1))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
-		Mrational* _differenceRational=_getRationalDifference(_rational1,_rational2); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
-		return _getRationalValue(_differenceRational,true);
-	}
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 			if(amVerbose())output("Subtracting integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
@@ -3841,12 +3838,23 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	}
 	// the other integer one could be a big integer in which case we return a big integer
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _differenceBiginteger=NULL;
 		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(amVerbose()){outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputValue(" and '",_biginteger2,"'.\n");}
-		Mbiginteger* _differenceBiginteger=__biginteger();
-		if(_differenceBiginteger&&mp_sub(_biginteger1,_biginteger2,_differenceBiginteger)!=MP_OKAY){free_biginteger(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+			_differenceBiginteger=__biginteger();
+			if(_differenceBiginteger&&mp_sub(_biginteger1,_biginteger2,_differenceBiginteger)!=MP_OKAY){free_biginteger(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		}else
+			outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_differenceBiginteger,true);
+	}
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
+		Mrational* _differenceRational=_getRationalDifference(_rational1,_rational2); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
+		return _getRationalValue(_differenceRational,true);
 	}
 	// if either is a decimal, compute the difference decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -3867,6 +3875,24 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueOne(_value2))return _value1;if(isValueZero(_value2)||isValueOne(_value1))return _value2;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
+	// if both are integers, the result should be integer as well!!!
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
+			if(amVerbose())output("Multiplying integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
+			return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
+	}
+	// the other integer one could be a big integer in which case we return a big integer
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _productBiginteger=NULL;
+		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+			Mbiginteger* _productBiginteger=__biginteger();
+			if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		}else
+			outputError("Failed to create two helper big integers");
+		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getBigintegerValue(_productBiginteger,true);
+	}
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		if(amVerbose()){outputValue("Multiplying rationals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
@@ -3875,20 +3901,6 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		if(!_multiplicationRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_multiplicationRational,true);
-	}
-	// if both are integers, the result should be integer as well!!!
-	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
-			if(amVerbose())output("Multiplying integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
-			return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
-	}
-	// the other integer one could be a big integer in which case we return a big integer
-	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputValue(" and '",_biginteger2,"'.\n");}
-		Mbiginteger* _productBiginteger=__biginteger();
-		if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
-		return _getBigintegerValue(_productBiginteger,true);
 	}
 	// if either is a decimal, compute the product decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -4688,12 +4700,23 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 	}
 	// the other integer one could be a big integer in which case we return a big integer
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _integerdivideBiginteger=NULL;
 		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
-		if(mp_iszero(_biginteger2)==MP_YES)return NULL;
-		Mbiginteger *_integerdivideBiginteger=__biginteger(),*_integerremainderBiginteger=__biginteger();
-		if(_integerdivideBiginteger&&_integerremainderBiginteger&&mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerdivideBiginteger);_integerdivideBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-		free_biginteger(_integerremainderBiginteger);
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+			if(mp_iszero(_biginteger2)==MP_NO){
+				_integerdivideBiginteger=__biginteger();
+				if(_integerdivideBiginteger){
+					Mbiginteger* _integerremainderBiginteger=__biginteger();
+					if(_integerremainderBiginteger){
+						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerdivideBiginteger);_integerdivideBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+						free_biginteger(_integerremainderBiginteger);
+					}
+				}else 
+					outputError("Failed to create the integer divide result big integer");
+			}
+		}else 
+			outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_integerdivideBiginteger,true);
 	}
@@ -4717,12 +4740,21 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	}
 	// the other integer one could be a big integer in which case we return a big integer
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(amVerbose()){outputBiginteger("Remainder of dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
-		if(mp_iszero(_biginteger2)==MP_YES)return NULL;
-		Mbiginteger *_integerdivideBiginteger=__biginteger(),*_integerremainderBiginteger=__biginteger();
-		if(_integerdivideBiginteger&&_integerremainderBiginteger&&mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerremainderBiginteger);_integerremainderBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-		free_biginteger(_integerdivideBiginteger);
+		Mbiginteger* _integerremainderBiginteger=NULL; // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2);
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Remainder of dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+			if(mp_iszero(_biginteger2)==MP_NO){
+				_integerremainderBiginteger=__biginteger();
+				if(_integerremainderBiginteger){
+					Mbiginteger *_integerdivideBiginteger=__biginteger();
+					if(_integerdivideBiginteger){
+						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerremainderBiginteger);_integerremainderBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+						free_biginteger(_integerdivideBiginteger);
+					}
+				}
+			}
+		}
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_integerremainderBiginteger,true);
 	}
