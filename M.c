@@ -3753,6 +3753,20 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);
 	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
+	// if both are integers, the result should be integer as well!!!
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
+			if(amVerbose())output("Adding integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
+			return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll);
+	}
+	// the other integer one could be a big integer in which case we return a big integer
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(amVerbose()){outputBiginteger("Adding big integers '",_biginteger1,"'");outputValue(" and '",_biginteger2,"'.\n");}
+		Mbiginteger* _sumBiginteger=__biginteger();
+		if(_sumBiginteger&&mp_add(_biginteger1,_biginteger2,_sumBiginteger)!=MP_OKAY){free_biginteger(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getBigintegerValue(_sumBiginteger,true);
+	}
 	// if either is a rational, compute the sum rational
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
@@ -3820,6 +3834,20 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_differenceRational,true);
 	}
+	// if both are integers, the result should be integer as well!!!
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
+			if(amVerbose())output("Subtracting integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
+			return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
+	}
+	// the other integer one could be a big integer in which case we return a big integer
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(amVerbose()){outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputValue(" and '",_biginteger2,"'.\n");}
+		Mbiginteger* _differenceBiginteger=__biginteger();
+		if(_differenceBiginteger&&mp_sub(_biginteger1,_biginteger2,_differenceBiginteger)!=MP_OKAY){free_biginteger(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getBigintegerValue(_differenceBiginteger,true);
+	}
 	// if either is a decimal, compute the difference decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
@@ -3841,14 +3869,30 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		if(amVerbose()){outputValue("Multiplying rationals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
 		Mrational* _multiplicationRational=_getRationalProduct(_rational1,_rational2); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		if(!_multiplicationRational)return NULL; // failed to create the sum for whatever reason
 		return _getRationalValue(_multiplicationRational,true);
 	}
+	// if both are integers, the result should be integer as well!!!
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
+			if(amVerbose())output("Multiplying integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
+			return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
+	}
+	// the other integer one could be a big integer in which case we return a big integer
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputValue(" and '",_biginteger2,"'.\n");}
+		Mbiginteger* _productBiginteger=__biginteger();
+		if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getBigintegerValue(_productBiginteger,true);
+	}
 	// if either is a decimal, compute the product decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		if(amVerbose()){outputValue("Multiplying decimals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		Mdecimal* _productDecimal=_getDecimalProduct(_decimal1,_decimal2); // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
@@ -3856,7 +3900,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_productDecimal,true);
 	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll*_value2->value._integer->ll);
+		if(amVerbose()){outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)*(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
 	}
 	return NULL;
@@ -4423,7 +4467,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 			else 
 			if(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0)_exponentRational=_getDecimalRational(_value2->value._decimal);
 			// MDH@14OCT2019: let's only do a rational approximation if the exponent is rational but the denominator is not too large i.e. using at most a single mp_digit (which might be large enough as it is though)
-			if(_exponentRational&&(!_exponentRational->den||_exponentRational->den->used==1)){ // the exponent is rational
+			if(_exponentRational&&(!_exponentRational->den||_exponentRational->den->used==1)){ // the exponent is rational and the exponent denominator (which results in root finding is not too large)
 				Mvalue* _rootValue=NULL; // the result of the computation of taking the power of a decimal to a rational exponent
 				//if(amVerbose())
 				outputRational("Computing a power with rational exponent ",_exponentRational,".\n");
@@ -4446,27 +4490,26 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 								// if _integerdividend is not zero we may compute the multiplier
 								Mvalue* _multiplierValue=(mp_iszero(_integerdividend)!=MP_YES?_getBigintegerPowerValue(_value1,_integerdividend):NULL);
 								// MDH@10OCT2019: we have a special situation when the root argument (_value1) is rational itself in which case we are computing the 
-									// instead of computing the power of the numerator we use the _remainder instead
-									Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
-									// if the root argument is rational, we should use pure big integer computations and have all rational approximations to the root
-									if(_rootArgumentValue->type==VT_RATIONAL&&realIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)){ // a pure decimal
-										// TODO if the base is not a pure rational, we could of course purify it
-										_rootValue=_getRationalValue(_getRationalBigintegerRootRational(_rootArgumentValue->value._rational,exponentDenominator),true);
-									}else{ // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
-										_rootValue=_getBigintegerRootValue(_rootArgumentValue,exponentDenominator);
-									// now apply the multiplier if need be
-									//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
-									if(_multiplierValue){ // have to multiply
-										_rootValue=multiply(_multiplierValue,_rootValue);
-										outputValue("Rational exponent root equals the product of multiplier ",_multiplierValue," and ");
-										outputBiginteger("the ",exponentDenominator,"th ");
-										outputValue("root of ",_rootArgumentValue,NULL);
-										outputValue(" which is ",_rootValue,".\n");
-									}else{ // no need to multiply
-										outputBiginteger("The ",exponentDenominator,"th ");
-										outputValue("root of ",_rootArgumentValue,NULL);
-										outputValue("equals ",_rootValue,".\n");
-									}
+								// instead of computing the power of the numerator we use the _remainder instead
+								Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
+								// if the root argument is rational, we should use pure big integer computations and have all rational approximations to the root
+								if(_rootArgumentValue->type==VT_RATIONAL&&realIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)) // a pure decimal
+									// TODO if the base is not a pure rational, we could of course purify it
+									_rootValue=_getRationalValue(_getRationalBigintegerRootRational(_rootArgumentValue->value._rational,exponentDenominator),true);
+								else // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
+									_rootValue=_getBigintegerRootValue(_rootArgumentValue,exponentDenominator);
+								// now apply the multiplier if need be
+								//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
+								if(_multiplierValue){ // have to multiply
+									_rootValue=multiply(_multiplierValue,_rootValue);
+									outputValue("Rational exponent root equals the product of multiplier ",_multiplierValue," and ");
+									outputBiginteger("the ",exponentDenominator,"th ");
+									outputValue("root of ",_rootArgumentValue,NULL);
+									outputValue(" which is ",_rootValue,".\n");
+								}else{ // no need to multiply
+									outputBiginteger("The ",exponentDenominator,"th ");
+									outputValue("root of ",_rootArgumentValue,NULL);
+									outputValue("equals ",_rootValue,".\n");
 								}
 								///// wrong: if(numdencomp==MP_LT)_rootValue=Mreciprocal(_rootValue); // the numerator is smaller than the denominator, so we need to invert the value
 								/* replacing NOT splitting up the rational exponent in an integer and remainder part (under 1)
@@ -4638,6 +4681,22 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1)||isValueOne(_value2))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide);
+	// if both are integers, the result should be integer as well!!!
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
+			if(amVerbose())output("Integer dividing integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
+			return(_value2->value._integer->ll!=0?_getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot):NULL);
+	}
+	// the other integer one could be a big integer in which case we return a big integer
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+		if(mp_iszero(_biginteger2)==MP_YES)return NULL;
+		Mbiginteger *_integerdivideBiginteger=__biginteger(),*_integerremainderBiginteger=__biginteger();
+		if(_integerdivideBiginteger&&_integerremainderBiginteger&&mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerdivideBiginteger);_integerdivideBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		free_biginteger(_integerremainderBiginteger);
+		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getBigintegerValue(_integerdivideBiginteger,true);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// if both integer, use lldiv to perform the integer division
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot);
@@ -4652,9 +4711,22 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(isValueZero(_value1))return _value1;if(isValueOne(_value2))return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getRealValue(0));
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
+		if(amVerbose())output("Integer remainder of dividing integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
+		return(_value2->value._integer->ll!=0?_getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).rem):NULL);
+	}
+	// the other integer one could be a big integer in which case we return a big integer
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(amVerbose()){outputBiginteger("Remainder of dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
+		if(mp_iszero(_biginteger2)==MP_YES)return NULL;
+		Mbiginteger *_integerdivideBiginteger=__biginteger(),*_integerremainderBiginteger=__biginteger();
+		if(_integerdivideBiginteger&&_integerremainderBiginteger&&mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerremainderBiginteger);_integerremainderBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		free_biginteger(_integerdivideBiginteger);
+		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getBigintegerValue(_integerremainderBiginteger,true);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		// if both integer, use lldiv to perform the integer division
-		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).rem);
 		// at least one is real, perform floating point division, then trunc!!!
 		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
 		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
@@ -4662,7 +4734,9 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	}
 	return NULL;
 }
+
 // integer arithmetic 
+// TODO yet to complete for big integers, rationals, decimals etc.
 Mvalue* xor(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,xor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,xor);
@@ -4773,6 +4847,32 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 		}
 	}
 	return NULL;
+}
+// MDH@14OCT2019: using (almost the) same precedence as used in C (except I have power operators as well ** and e)
+char getOperatorPrecedence(Mstring* operator){
+	if(operator){
+		char c;
+		switch(c=string_char(operator,0)){
+			// real arithmetic
+			case 'e' :return 11;
+			case '*' :return 9+string_length(operator); // ** has precedence 11, * 10
+			case '\\':
+			case '%' :
+			case '/' :return 10;
+			case '+':
+			case '-' :return 9;
+			case '>' :
+			case '<' :return (c==string_char(operator,1)?8:7); // shift operators have precedence 8, comparison operators (<, <=, > and >=) 7
+			// bitwise (or logical) operators
+			case '^' :return 4;
+			case '&' :return (string_char(operator,1)?2:5);
+			case '|' :return (string_char(operator,1)?1:3);
+			// not-equal/equal operator
+			case '!' :
+			case '=' :return 6;
+		}
+	}
+	return 0;
 }
 
 typedef struct Mformulaelement{
@@ -4928,9 +5028,43 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_formulaelement->_next;
 			}
 			if(amVerbose())output("Number of assignments: %u.\n",numberOfAssignments);
-
+			
+			// MDH@14OCT2019: applying binary operators typically is done taking operator precedence into account which means we cannot apply lower precedence binary operators until higher precedence binary operators are applied first
+			//                which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
+			//                we always need to compare two successive operators if the precedence of the first is not below the precedence of the second you may apply the first operator, otherwise you skip applying the operator
+			//                perhaps it's best to immediately consume formula elements we no longer need!!!!!
+			Mvalue* _result=(_formulaelement->_next?NULL:getReferencedValue(_formulaelement->_operand)); // bit of a nuisance though!!!
+			Mformulaelement* nextformulaelement;
+			char operatorprecedence,nextoperatorprecedence;
+			while(_formulaelement->_next){
+				operatorprecedence=getOperatorPrecedence(_formulaelement->_operator);
+				nextoperatorprecedence=getOperatorPrecedence(_formulaelement->_next->_operator);
+				if(operatorprecedence>=nextoperatorprecedence){ // current operator has higher or the same precedence which means we can apply it
+					_result=applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_formulaelement->_operand),getReferencedValue(_formulaelement->_next->_operand));
+					// if we replace any value stored in the value reference of the first operand, we can reuse that formula element
+					assignValue(&(_formulaelement->_operand->_value),_result);
+					// but because _result could be NULL we have to force _name to be NULL just in case 
+					if(_formulaelement->_operand->_name){free(_formulaelement->_operand->_name);_formulaelement->_operand->_name=NULL;}
+					// we need to point the formula operand to the next of the consumed formula element, so the consumed formula element won't be used again in computations
+					nextformulaelement=_formulaelement->_next;
+					// point the formula element now storing the result to the next of the consumed formula element
+					_formulaelement->_next=nextformulaelement->_next;
+					// release the applied operator, and replace it by the successor operator
+					free_string(_formulaelement->_operator);_formulaelement->_operator=nextformulaelement->_operator;
+					// can't reach the consumed formula element anymore, so release whatever it contains (except for the operator which we have retained)
+					free_valuereference(nextformulaelement->_operand); // free the consumed operand
+					FREE(nextformulaelement,'F'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
+					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
+					// is there a formula element in front of it that has not yet been applied?????
+					outputValue("Result: '",_result,"'.\n");
+				}else{ // we have to apply the next operator BEFORE applying this operator
+					_formulaelement->_next->_prev=_formulaelement; // point the next formula element to me, so it's knows that the operator behind it has not yet been applied
+					_formulaelement=_formulaelement->_next; // skip applying the current operator for now
+				}
+			}
+			/* replacing:
 			Mvalue* _result=getReferencedValue(_formulaelement->_operand); // the first result computed
-
 			if(amVerbose())outputValue("First result: '",_result,"'.\n");
 			// 'applying' the binary operators left-to-right remembering the intermediate result in _result
 			// NOTE because all formula-elements are freed afterwards (see below) there's no need to so while applying the binary operators
@@ -4940,6 +5074,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(amVerbose())outputValue("Next result: '",_result,"'.\n");
 				_formulaelement=_formulaelement->_next;
 			}
+			*/
 			if(amVerbose())outputValue("Result: '",_result,"'.\n");
 			
 			// perform assignments right-to-left (which is a little problematic though)
@@ -4987,6 +5122,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
+			if(amVerbose())outputLine("Freeing formula elements.");
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;
 			while(_formulaelement){
@@ -4996,6 +5132,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				free(_formulaelement);
 				_formulaelement=_nextformulaelement;
 			}
+			if(amVerbose())outputLine("Formula elements freed.");
 		}else
 		if(amVerbose())output("No result of expression '%s' to store.",info);
 	}

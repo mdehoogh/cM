@@ -254,7 +254,7 @@ Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     return _decimalValue;
 }/* VALIDATED */
 Mvalue* _getIntegerValue(long long ll){
-    if(amVerbose())output("Wrapping integer '%ll'.\n",ll);
+    if(amVerbose())output("Wrapping integer '%lld'.\n",ll);
     Mvalue* _integerValue=__value();
     if(_integerValue){
         _integerValue->value._integer=_getInteger(ll);
