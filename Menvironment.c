@@ -141,8 +141,8 @@ Mstring* _getEnvironmentName(){
 }
 Mtoken* getEnvironmentExpressionToken(){
     // MDH@22JUL2019: let's allow breaking here
-    if(kbhit())return NULL;
-    return _executionEnvironment->expressionToken;
+    ////////if(kbhit())return NULL;
+    return(_executionEnvironment?_executionEnvironment->expressionToken:NULL);
 }/* VALIDATED */
 Mtoken* nextEnvironmentExpressionToken(){
     if(!_executionEnvironment)return NULL;

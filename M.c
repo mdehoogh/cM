@@ -2966,16 +2966,18 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 				_listElementValue=_getValueOfToken(_firstUnevaluatedToken,true);
 			}
 		}else{ // evaluate
-		// theoretically it is possible that this list element is empty in which case we should append NULL to the list
+			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
+			if(amVerbose())outputValue("List element value: '",_listElementValue,"'.\n");
 		}
 		if(!_listElementValue){if(amVerbose())output("List element missing!\n");continue;} // undefined list elements should NEVER be added to the list
-		if(amVerbose())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
+		if(expressionToken)if(amVerbose())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
-		if(!maximumNumberOfElements||listElementIndex<=maximumNumberOfElements){
+		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
+			if(amVerbose())output("Appending list element #%llu.\n",listElementIndex);
 			unsigned long long newListElementIndex=appendedToList(_list,_listElementValue,listElementIndex);
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex==0){
@@ -2986,6 +2988,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			if(amVerbose())output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
 		}else
 		if(amVerbose())output("Maximum number of elements reached.\n");
+		if(!expressionToken)break; // MDH@15OCT2019: might be useful!!
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
 	if(amVerbose())outputValue("List '",_listValue,"' extracted!\n");
