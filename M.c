@@ -976,21 +976,23 @@ Mvalue* t(Mvalue* _value){
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
     if(_value){
-		if(amVerbose())outputValue("\nComputing the sum of '",_value,"'.");
-        if(_value->type!=VT_LIST)return _value;
-				// all the values in the list could be integer
-				Mlist* _list=_value->value._list;
-				if(_list){
-					Mlistelement* _listelement=_list->_first;
-					if(_listelement){
-						// what if all the elements are integer????
-						Mvalue* _sumValue=_getRealValue(0);
-						while(_listelement){_sumValue=add(_sumValue,_listelement->_value);_listelement=_listelement->_next;}
-						return _sumValue;
-					}
+		if(amVerbose())outputValue("Computing the sum of '",_value,"'.\n");
+        if(_value->type==VT_LIST){
+			Mvalue* _sumValue=NULL;
+			// all the values in the list could be integer
+			Mlist* _list=_value->value._list;
+			if(_list){
+				Mlistelement* _listelement=_list->_first;
+				if(_listelement){
+					// how about adding as decimals????
+					assignValue(&_sumValue,_listelement->_value); // TODO I suppose we can do this????
+					while(_listelement->_next){_listelement=_listelement->_next;_sumValue=add(_sumValue,_listelement->_value);}
 				}
+			}
+			return _sumValue;
+		}
     }
-    return NULL;
+    return _value; // the default
 }
 
 // MDH@10OCT2019: applying unary operator (=function) to all elements in a list
@@ -3152,7 +3154,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
  * \param _value the Mvalue to wrap
  */
 Mvaluereference* _getValuereference(Mvalue* _value){
-	if(amVerbose())outputValue("\nWrapping value '",_value,"'.");
+	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
 	Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
 	assignValue(&_valuereference->_value,_value);
 	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
@@ -3179,6 +3181,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	if(!_valuereference->_name)return NULL;
 	// if there is no itemid we simply return the 'entire' value of the given variable
 	Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
+	if(amVerbose()){output("Current value of '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
 	// if we have index/attribute names we have to get the final subvalue
 	if(_valuereference->_itemid){
 		Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
@@ -3480,7 +3483,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// a variable can be followed by an index that we should store in the value reference's itemid field
 				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
 					///////expressionToken=nextEnvironmentExpressionToken();
+					if(amVerbose()){output("Extracting the indices.\n");}
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0); // typically allow for any number of indices (although perhaps we should check!!)
+					if(amVerbose()){output("XXXXXXX Index value of list '%s'",_valueReference->_name);outputValue("'",indexListValue,"'.\n");}
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
@@ -3501,11 +3506,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						assignValue(&_valueReference->_itemid,indexListelement->_value); // store the last index value in the _itemid field
 						*/
 					}
-				}
+				}else
+				if(amVerbose())output("Unindexed variable '%s'!\n",_valueReference->_name);
 				// MDH@29MAY2019: if we do NOT have an indexed value, retrieve the value...
 				// TODO as a side-effect getReferencedValue() will bind the added value to the value reference (as result) BUT I don't think that is how it should be!!! no the assignment takes care of that
 				if(!_valueReference->_itemid){
-					if(amVerbose())output("Retrieving the value of '%s'.\n",_valueReference->_name);
+					if(amVerbose())output("Retrieving the value of '%s' when no item id was specified.\n",_valueReference->_name);
 					assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
 				}
 				break;
@@ -4166,6 +4172,7 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 }
 
 // MDH@10OCT2019: if both the argument and the degree is rational we can use rational approximations of the (Newtonian) (decimal) algorithm used in _getBigintegerRootValue()
+// MDH@15OCT2019: how about checking whether the root approximation is near the actual root????
 Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mbiginteger* rootDegreeBiginteger){
 	// ASSERT root degree big integer must NOT be negative, and use a single mp_digit (otherwise computing the function value computation is too hard)
 	Mrational* _rationalBigintegerRootRational=NULL;
@@ -4203,14 +4210,18 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 							if(_np_a&&q_a&&mp_mul(_np_a,q_a,_np_a)!=MP_OKAY){free_biginteger(_np_a);_np_a=NULL;}
 							if(_np_a){
 								// we need some additional helper big integers
-								Mbiginteger *_pktothepowern=__biginteger(),*_qktothepowern=_getBiginteger(1),*_delta1=__biginteger(),*_delta2=__biginteger(),*_delta=__biginteger(),*_pktothepowernminus1=__biginteger(),*_divremainder=__biginteger(),*_gcd=__biginteger();
+								Mbiginteger *_pktothepowern=__biginteger(),*_qktothepowern=_getBiginteger(1),*_delta1=__biginteger(),*_delta2=__biginteger(),*_distancenumerator=__biginteger(),*_pktothepowernminus1=__biginteger(),*_divremainder=__biginteger(),*_gcd=__biginteger();
 								Mbiginteger *_num1=__biginteger(),*_num=__biginteger(),*_den=__biginteger(),*_nextpk=__biginteger(),*_nextqk=__biginteger(); // initially the same as _pk and _qk
-								if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_delta&&_pktothepowernminus1&&_divremainder&&_gcd&&_nextpk&&_nextqk&&_num1&&_num&&_den){
+								Mbiginteger *_distancedenominator=__biginteger(); // the distance to the root
+								Mbiginteger *_pkctothepowern=__biginteger();
+								Mbiginteger *_pkonthisside=__biginteger(),*_pkontheotherside=__biginteger(),*_deltapk=__biginteger(),*_distanceonthisside=__biginteger(),*_distanceontheotherside=__biginteger(),*_pkdifference=__biginteger(),*_pkhalfway=__biginteger(),*_distancehalfway=__biginteger(),*_one=_getBiginteger(1); // what we'll use for determining a value below the root
+								if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_distancenumerator&&_pktothepowernminus1&&_divremainder&&_gcd&&_nextpk&&_nextqk&&_num1&&_num&&_den&&_distancedenominator&&_pkctothepowern&&_pkonthisside&&_pkontheotherside&&_deltapk&&_distanceonthisside&&_distanceontheotherside&&_pkdifference&&_pkhalfway&&_distancehalfway&&_one){
 									char c;
 									unsigned long long iter=0;
-									Mrational* _rational;Mdecimal* _decimal;
+									Mrational* _rational;
+									Mdecimal* _decimal;
 									while(++iter){
-										output("Rational root approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");
+										output("\nRational root approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");
 										// let's show the decimal representation of this value
 										_rational=_getRational(_getBigintegerCopy(_pk),_getBigintegerCopy(_qk),M_LD_NAN,false,true);
 										if(_rational){_decimal=_getRationalDecimal(_rational);free_rational(_rational);if(_decimal){outputDecimal("=",_decimal,NULL);free_decimal(_decimal);}}
@@ -4222,6 +4233,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										outputBiginteger("\tDenominator ",_qk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
 										if(computeBigintegerPower(_qk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										outputBiginteger(" ",_qktothepowern,".\n");
+
 										/* replacing:
 										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
@@ -4230,21 +4242,91 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										outputBiginteger("\tDelta 1: ",_delta1,".\n");
 										if(mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 2: ",_delta2,".\n");
-										if(mp_sub(_delta2,_delta1,_delta)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
-										outputBiginteger("\tDelta: ",_delta,".\n");
+										if(mp_sub(_delta2,_delta1,_distancenumerator)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+										// we can compute the denominator of the distance as well which is q_a times _qktothepowern
+										if(mp_mul(_qktothepowern,q_a,_distancedenominator)!=MP_OKAY){outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
 
-										if(mp_iszero(_delta))break; // if delta is zero, we're done
+										outputBiginteger("\tDistance from (",_pk,"/");outputBiginteger(NULL,_qk,")");outputBiginteger("**",rootDegreeBiginteger," to ");
+										outputBiginteger("root argument (",p_a,"/");outputBiginteger(NULL,q_a,"): ");
+										outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,")");
+										_rational=_getRational(_getBigintegerCopy(_distancenumerator),_getBigintegerCopy(_distancedenominator),M_LD_NAN,false,true);
+										if(_rational){_decimal=_getRationalDecimal(_rational);free_rational(_rational);if(_decimal){outputDecimal("=",_decimal,NULL);free_decimal(_decimal);}}
+										outputChar('\n');
 
+										if(mp_iszero(_distancenumerator))break; // if delta is zero, exact hit (which I think can only happen when)
+										
 										if(mp_div(_pktothepowern,_pk,_pktothepowernminus1,_divremainder)!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
 										// update _pk (next) and _qk (next)
 										if(mp_mul(_pktothepowern,_np_a,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-										if(mp_add(_nextpk,_delta,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										if(mp_add(_nextpk,_distancenumerator,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
 										if(mp_mul(_qk,_pktothepowernminus1,_nextqk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 										if(mp_mul(_nextqk,_np_a,_nextqk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 										// that's neat isn't it?
 										// how about normalizing _pk and _qk here, which might help
 										if(mp_gcd(_nextpk,_nextqk,_gcd)!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
 										if(!isBigintegerOne(_gcd)&&(mp_div(_nextpk,_gcd,_nextpk,_divremainder)!=MP_OKAY||mp_div(_nextqk,_gcd,_nextqk,_divremainder)!=MP_OKAY)){outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
+
+										// do the bracketing here (on the next pk and qk) 
+										// ASSERT we have to ascertain that the denominator remains the same!!!!!
+										// the sign of distance numerator tells us on which side of the root we are
+										// how about using two big integers???? starting out with 
+										if(computeBigintegerPower(_nextpk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance numerator for bracketing.");break;}
+										if(computeBigintegerPower(_nextqk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance denominator for bracketing.");break;}
+										if(mp_mul(_pktothepowern,q_a,_delta1)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_sub(_delta2,_delta1,_distancenumerator)!=MP_OKAY){outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
+										if(mp_mul(_qktothepowern,q_a,_distancedenominator)!=MP_OKAY){outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
+										outputBiginteger("\n\tDistance of the next Newtonian approximation (",_nextpk,"/");
+										outputBiginteger(NULL,_nextqk,"):");outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,").\n");
+
+										if(mp_copy(_nextpk,_pkonthisside)==MP_OKAY&&mp_copy(_nextpk,_pkontheotherside)==MP_OKAY&&mp_copy(_distancenumerator,_distanceonthisside)==MP_OKAY){
+											output("\tWill use the Newtonian approximation to bracket the rational root with two successive rationals");outputBiginteger(" with denominator ",_nextqk,".\n");
+											/* show the starting point of bracketing!!!
+											outputBiginteger("\tBracketing initialized starting at (",_nextpk,"/");outputBiginteger(NULL,_nextqk,")");
+											outputBiginteger(" with distance (",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,").\n");
+											*/
+											mp_set_i64(_deltapk,(mp_isneg(_distancenumerator)==MP_YES?-1:1));
+											unsigned long long halvingiterations=0,bracketingiterations=0;
+											while(1){
+												if(mp_iszero(_deltapk)){ // we have two solutions, one on this side and one on the other side
+													// the difference could be one between pkonthisside and pkontheotherside in which case we're done
+													if(mp_sub(_pkonthisside,_pkontheotherside,_pkdifference)!=MP_OKAY)break;
+													if(mp_cmp_mag(_pkdifference,_one)<=0)break;
+													if(mp_add(_pkonthisside,_pkontheotherside,_pkhalfway)!=MP_OKAY)break;
+													if(mp_div_2(_pkhalfway,_pkhalfway)!=MP_OKAY)break;
+													if(computeBigintegerPower(_pkhalfway,rootDegreeBiginteger,_distancehalfway)!=MP_OKAY)break;
+													if(mp_mul(_distancehalfway,q_a,_distancehalfway)!=MP_OKAY)break;
+													if(mp_sub(_delta2,_distancehalfway,_distancehalfway)!=MP_OKAY)break;
+													//////outputBiginteger("\tDistance of half way numerator (",_pkhalfway,"/");outputBiginteger(NULL,_qk,"):");outputBiginteger(" ",_distancehalfway,".\n");
+													// replace the pk on the same side with the half way one, so soon the bracketing will end
+													if(mp_copy(_pkhalfway,(mp_isneg(_distancehalfway)==mp_isneg(_distanceontheotherside)?_pkontheotherside:_pkonthisside))!=MP_OKAY)break;
+													halvingiterations++;
+												}else{
+													if(mp_add(_pkontheotherside,_deltapk,_pkontheotherside)!=MP_OKAY)break; // keep going 
+													// as we are computing _distanceontheotherside we can use it to store intermediate results
+													if(computeBigintegerPower(_pkontheotherside,rootDegreeBiginteger,_distanceontheotherside)!=MP_OKAY)break;
+													// what is the distance now???? NOTE _delta2 remains the same because _qk won't change!!!!
+													if(mp_mul(_distanceontheotherside,q_a,_distanceontheotherside)!=MP_OKAY)break;
+													if(mp_sub(_delta2,_distanceontheotherside,_distanceontheotherside)!=MP_OKAY)break;
+													///////outputBiginteger("\tDistance of corrected numerator (",_pkontheotherside,"/");outputBiginteger(NULL,_qk,"):");outputBiginteger(" ",_distanceontheotherside,".\n");
+													if(mp_isneg(_distanceonthisside)==mp_isneg(_distanceontheotherside)){ // still on this side
+														if(mp_mul_2(_deltapk,_deltapk)!=MP_OKAY)break; // double _deltapk otherwise we're going to slow!!!
+													}else // yes we're on the other side now, so make _deltapk 0
+														mp_set_i64(_deltapk,0);
+													bracketingiterations++;
+												}
+											}
+											// how about showing the brackets
+											output("\tNumber of bracketing iterations=%llu - number of halving iterations=%llu.\n",bracketingiterations,halvingiterations);
+											outputBiginteger("\tNumerator of approximation on this side of the root: ",_pkonthisside,NULL);outputBiginteger(" with distance ",_distanceonthisside,".\n");
+											outputBiginteger("\tNumerator of approximation on the other side of the root: ",_pkontheotherside,NULL);outputBiginteger(" with distance ",_distanceontheotherside,".\n");
+											// we need the one with a negative distance
+											if(mp_copy((mp_isneg(_distanceontheotherside)?_pkontheotherside:_pkonthisside),_nextpk)!=MP_OKAY)break;
+											outputBiginteger("\tAccepted approximation numerator from bracketing: ",_nextpk,".\n");
+										}else
+											output("\t%sFailed to perform rational root bracketing.\n",ERROR_PREFIX);
+
+
 										// what's the change in approximation?
 										if(mp_mul(_pk,_nextqk,_num)!=MP_OKAY){outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
 										if(mp_mul(_qk,_nextpk,_num1)!=MP_OKAY){outputError("Failed to initialize the change to the rational root approximation");break;}
@@ -4265,16 +4347,21 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										}
 										output(".\n");
 										if(decimalprecisionreached)break; // decimal precision reached
-										
-										output(" %s...","Press Ctrl-C to stop, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
+
+										output("\t%s...","Press Ctrl-C to stop, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
 										if(c==3)break;
 
 										if(mp_copy(_nextpk,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
 										if(mp_copy(_nextqk,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
+
 									}
-									free_biginteger(_pktothepowern);free_biginteger(_qktothepowern);free_biginteger(_delta1);free_biginteger(_delta2);free_biginteger(_delta);
+									free_biginteger(_pktothepowern);free_biginteger(_qktothepowern);free_biginteger(_delta1);free_biginteger(_delta2);free_biginteger(_distancenumerator);
 									free_biginteger(_pktothepowernminus1);free_biginteger(_divremainder);free_biginteger(_gcd);
 									free_biginteger(_num1);free_biginteger(_num);free_biginteger(_den);free_biginteger(_nextpk);free_biginteger(_nextqk);
+									free_biginteger(_distancedenominator);
+									free_biginteger(_pkctothepowern);
+									free_biginteger(_pkonthisside);free_biginteger(_pkontheotherside);free_biginteger(_deltapk);free_biginteger(_distanceonthisside);free_biginteger(_distanceontheotherside);
+									free_biginteger(_pkhalfway);free_biginteger(_distancehalfway);free_biginteger(_one);
 								}
 								free_biginteger(_np_a);
 								_rationalBigintegerRootRational=_getRational(_pk,_qk,M_LD_NAN,true,false);
@@ -4516,11 +4603,11 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 									_rootValue=multiply(_multiplierValue,_rootValue);
 									outputValue("Rational exponent root equals the product of multiplier ",_multiplierValue," and ");
 									outputBiginteger("the ",exponentDenominator,"th ");
-									outputValue("root of ",_rootArgumentValue,NULL);
-									outputValue(" which is ",_rootValue,".\n");
+									outputValue("root of ",_rootArgumentValue," ");
+									outputValue("which is ",_rootValue,".\n");
 								}else{ // no need to multiply
 									outputBiginteger("The ",exponentDenominator,"th ");
-									outputValue("root of ",_rootArgumentValue,NULL);
+									outputValue("root of ",_rootArgumentValue," ");
 									outputValue("equals ",_rootValue,".\n");
 								}
 								///// wrong: if(numdencomp==MP_LT)_rootValue=Mreciprocal(_rootValue); // the numerator is smaller than the denominator, so we need to invert the value

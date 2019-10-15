@@ -285,97 +285,103 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
     uint64_t repeating=0;
     if(denominator){
         // local variables to be freed at the end (so NOT before)
-        Mbiginteger *_digit=__biginteger(),*_remainder=__biginteger(),*_bi10=_getBiginteger(10);
-        if(!_bi10){outputError("Failed to create big integer 10");return NULL;}
-        if(_digit&&_remainder&&_bi10&&mp_div(numerator,denominator,_digit,_remainder)==MP_OKAY){
-            // the integer part is _dividend
-            _decimalText=_getBigintegerText(_digit);
-            if(_decimalText&&!isBigintegerZero(_remainder)){ // we've got a fraction to add!!!
-                Mstring* _p=string_append_char(_decimalText,'.'); // append the decimal period, storing the result in _p so we will know when that failed...
-                // in order to find the repeating fraction we have to continue computing the remainders
-                // and we have to register the remainders and compare the one we find with all remembered remainders, so far
-                MbigintegerListelement *_firstRemainderListelement=NULL,*lastRemainderListelement=NULL;
-                ////////////////////////if(!_lastRemainderListelement){outputError("Failed to create the list to store the remainders");return NULL;}
-                /* replacing, using an Mlist):
-                Mlist* _remainderList=_getListOfType(VT_BIGINTEGER);
-                Mlistelement* _remainderListelement=NULL;
-                */
-                uint64_t remainderIndex,remainderCount=0; // where we found a match
-                long long decimalsLeft=M_DECIMALCONTEXT->mpd_context->prec+2; // stop as soon as we have sufficient decimals
-                if(amVerbose())output("Number of decimals to determine: %llu.\n",decimalsLeft);
-                Mstring* _digitText; // for storing the dividend digit character
-                MbigintegerListelement* _remainderListelement=NULL;
-                bool failure=false;
-                while(--decimalsLeft>=0&&_p){
-                    // ASSERT the current remainder is nonzero, therefore we have to store it (if different from any we have so far)
-                    // compare first, if not present store and continue
-                    // if the new remainder is not-zero and present in the list, we will know how many repeating fractions we have
-                    _remainderListelement=_firstRemainderListelement; //_remainderList->_first;
-                    remainderIndex=0;
-                    while(_remainderListelement){
-                        ///////////////if(amVerbose()){outputBiginteger("Comparing '",_remainderListelement->_value->value._biginteger,"'");outputBiginteger(" with remainder '",_remainder,"'.\n");}
-                        if(mp_cmp(_remainderListelement->_biginteger,_remainder)==MP_EQ)break;
-                        // replacing: if(mp_cmp(_remainderListelement->_value->value._biginteger,_remainder)==MP_EQ)break;
-                        remainderIndex++;
-                        _remainderListelement=_remainderListelement->_next;
-                    }
-                    if(_remainderListelement){ // we know the repeating part, so no need to add the remainder anymore!!!
-                        repeating=(remainderCount-remainderIndex); // replacing: _remainderList->numberOfElements-remainderIndex);
-                        if(amVerbose())output("Number of repeating decimals: %llu.\n",repeating);
-                        break;
-                    }
+		// MDH@15OCT2019: take the sign into account
+		Mbiginteger *_nonnegativenumerator=(mp_isneg(numerator)?_getBigintegerNeg(numerator):numerator);
+		if(_nonnegativenumerator){
+			Mbiginteger *_digit=__biginteger(),*_remainder=__biginteger(),*_bi10=_getBiginteger(10);
+			if(!_bi10){outputError("Failed to create big integer 10");return NULL;}
+			if(_digit&&_remainder&&_bi10&&mp_div(_nonnegativenumerator,denominator,_digit,_remainder)==MP_OKAY){
+				// the integer part is _dividend
+				_decimalText=_getBigintegerText(_digit);
+				if(_decimalText&&!isBigintegerZero(_remainder)){ // we've got a fraction to add!!!
+					Mstring* _p=string_append_char(_decimalText,'.'); // append the decimal period, storing the result in _p so we will know when that failed...
+					// in order to find the repeating fraction we have to continue computing the remainders
+					// and we have to register the remainders and compare the one we find with all remembered remainders, so far
+					MbigintegerListelement *_firstRemainderListelement=NULL,*lastRemainderListelement=NULL;
+					////////////////////////if(!_lastRemainderListelement){outputError("Failed to create the list to store the remainders");return NULL;}
+					/* replacing, using an Mlist):
+					Mlist* _remainderList=_getListOfType(VT_BIGINTEGER);
+					Mlistelement* _remainderListelement=NULL;
+					*/
+					uint64_t remainderIndex,remainderCount=0; // where we found a match
+					long long decimalsLeft=M_DECIMALCONTEXT->mpd_context->prec+2; // stop as soon as we have sufficient decimals
+					if(amVerbose())output("Number of decimals to determine: %llu.\n",decimalsLeft);
+					Mstring* _digitText; // for storing the dividend digit character
+					MbigintegerListelement* _remainderListelement=NULL;
+					bool failure=false;
+					while(--decimalsLeft>=0&&_p){
+						// ASSERT the current remainder is nonzero, therefore we have to store it (if different from any we have so far)
+						// compare first, if not present store and continue
+						// if the new remainder is not-zero and present in the list, we will know how many repeating fractions we have
+						_remainderListelement=_firstRemainderListelement; //_remainderList->_first;
+						remainderIndex=0;
+						while(_remainderListelement){
+							///////////////if(amVerbose()){outputBiginteger("Comparing '",_remainderListelement->_value->value._biginteger,"'");outputBiginteger(" with remainder '",_remainder,"'.\n");}
+							if(mp_cmp(_remainderListelement->_biginteger,_remainder)==MP_EQ)break;
+							// replacing: if(mp_cmp(_remainderListelement->_value->value._biginteger,_remainder)==MP_EQ)break;
+							remainderIndex++;
+							_remainderListelement=_remainderListelement->_next;
+						}
+						if(_remainderListelement){ // we know the repeating part, so no need to add the remainder anymore!!!
+							repeating=(remainderCount-remainderIndex); // replacing: _remainderList->numberOfElements-remainderIndex);
+							if(amVerbose())output("Number of repeating decimals: %llu.\n",repeating);
+							break;
+						}
 
-                    // remainder hasn't appeared before so store it in the list of remainders
-                    _remainderListelement=(MbigintegerListelement*)calloc(1,sizeof(MbigintegerListelement)); // NOTE re-use of _remainderListelement
-                    if(!_remainderListelement){outputError("Failed to create a big integer list element for storing the new remainder");_p=NULL;break;}
+						// remainder hasn't appeared before so store it in the list of remainders
+						_remainderListelement=(MbigintegerListelement*)calloc(1,sizeof(MbigintegerListelement)); // NOTE re-use of _remainderListelement
+						if(!_remainderListelement){outputError("Failed to create a big integer list element for storing the new remainder");_p=NULL;break;}
 
-                    // at this point we have a new remainder list element (in _remainderListelement) that should be bound or freed
-                    _remainderListelement->_biginteger=_getBigintegerCopy(_remainder); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
-                    if(!_remainderListelement->_biginteger){
-                        outputError("Failed to store the remainder");
-                        free(_remainderListelement); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
-                        _p=NULL;break;
-                    }
-                    // 'store' _remainderListelement in the list (this means that we can be certain that _remainderListelement will be freed after the loop ends)
-                    if(!lastRemainderListelement)_firstRemainderListelement=_remainderListelement;else lastRemainderListelement->_next=_remainderListelement;
-                    lastRemainderListelement=_remainderListelement; // replace lastRemainderListelement with the new big integer list element
-                    remainderCount++;
-                    /* replacing:
-                    Mvalue* remainderValue=_getBigintegerValue(_getBigintegerCopy(_remainder),true);
-                    if(!remainderValue){outputError("Failed to store the remainder");break;}
-                    if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);outputError("Failed to remember the remainder in order to recognized the repeating fraction");break;}
-                    */
-                    if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY){outputError("Failed to multiply the remainder by 10");_p=NULL;break;}
-                    if(amVerbose()){outputBiginteger("Dividing '",_remainder,"'");outputBiginteger(" by '",denominator,"'.\n");}
-                    // _digit and _remainder are getting re-used here as well, which does not pose a problem (so we've created them once)
-                    if(mp_div(_remainder,denominator,_digit,_remainder)!=MP_OKAY){outputError("Failed to perform a long division to obtain the next decimal digit");_p=NULL;break;}
-                    if(amVerbose()){outputBiginteger("Digit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.\n");}
+						// at this point we have a new remainder list element (in _remainderListelement) that should be bound or freed
+						_remainderListelement->_biginteger=_getBigintegerCopy(_remainder); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
+						if(!_remainderListelement->_biginteger){
+							outputError("Failed to store the remainder");
+							free(_remainderListelement); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
+							_p=NULL;break;
+						}
+						// 'store' _remainderListelement in the list (this means that we can be certain that _remainderListelement will be freed after the loop ends)
+						if(!lastRemainderListelement)_firstRemainderListelement=_remainderListelement;else lastRemainderListelement->_next=_remainderListelement;
+						lastRemainderListelement=_remainderListelement; // replace lastRemainderListelement with the new big integer list element
+						remainderCount++;
+						/* replacing:
+						Mvalue* remainderValue=_getBigintegerValue(_getBigintegerCopy(_remainder),true);
+						if(!remainderValue){outputError("Failed to store the remainder");break;}
+						if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);outputError("Failed to remember the remainder in order to recognized the repeating fraction");break;}
+						*/
+						if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY){outputError("Failed to multiply the remainder by 10");_p=NULL;break;}
+						if(amVerbose()){outputBiginteger("Dividing '",_remainder,"'");outputBiginteger(" by '",denominator,"'.\n");}
+						// _digit and _remainder are getting re-used here as well, which does not pose a problem (so we've created them once)
+						if(mp_div(_remainder,denominator,_digit,_remainder)!=MP_OKAY){outputError("Failed to perform a long division to obtain the next decimal digit");_p=NULL;break;}
+						if(amVerbose()){outputBiginteger("Digit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.\n");}
 
-                    // append the dividend to the decimal text
-                    // NOTE that _digitText is freed as soon as possible
-                    _digitText=_getBigintegerText(_digit);
-                    if(!_digitText){outputError("Failed to store the next decimal character");_p=NULL;break;}
-                    _p=string_append(_p,string(_digitText));
-                    free_string(_digitText);
+						// append the dividend to the decimal text
+						// NOTE that _digitText is freed as soon as possible
+						_digitText=_getBigintegerText(_digit);
+						if(!_digitText){outputError("Failed to store the next decimal character");_p=NULL;break;}
+						_p=string_append(_p,string(_digitText));
+						free_string(_digitText);
 
-                    if(amVerbose())if(_p)output("Decimal text so far: '%s'.\n",string(_p));
+						if(amVerbose())if(_p)output("Decimal text so far: '%s'.\n",string(_p));
 
-                    // if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
-                    if(isBigintegerZero(_remainderListelement->_biginteger)){if(amVerbose())outputLine("Remainder is zero, so the decimal is finished.");break;}
-                }
-                if(_firstRemainderListelement)free_bigintegerListelement(_firstRemainderListelement); // replacing: free_list(_remainderList);
-                if(!_p){free_string(_decimalText);_decimalText=NULL;} // some failure occurred
-            }
-        }
-        // free all locally used pointers to dynamic memory
-        free_biginteger(_digit);free_biginteger(_remainder);free_biginteger(_bi10);
+						// if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
+						if(isBigintegerZero(_remainderListelement->_biginteger)){if(amVerbose())outputLine("Remainder is zero, so the decimal is finished.");break;}
+					}
+					if(_firstRemainderListelement)free_bigintegerListelement(_firstRemainderListelement); // replacing: free_list(_remainderList);
+					if(!_p){free_string(_decimalText);_decimalText=NULL;} // some failure occurred
+				}
+			}
+			// prepend the sign if the numerator is negative TODO what if this fails?????
+			if(mp_isneg(numerator)){if(_decimalText&&!string_insert_char(_decimalText,0,'-')){free_string(_decimalText);_decimalText=NULL;}free_biginteger(_nonnegativenumerator);}
+			// free all locally used pointers to dynamic memory
+			free_biginteger(_digit);free_biginteger(_remainder);free_biginteger(_bi10);
+		}
     }else
         _decimalText=_getBigintegerText(numerator);
     // parse _decimalText to a decimal
     Mdecimal* _decimal=NULL;
     if(_decimalText){
         _decimal=_getTextDecimal(string(_decimalText),repeating);
-        if(!_decimal)outputError("Failed to parse the decimal text of the corresponding rational");else if(amVerbose())outputDecimal("Decimal of rational: '",_decimal,"'.\n");
+        if(!_decimal)output("%sFailed to parse decimal text '%s' of the corresponding rational",ERROR_PREFIX,string(_decimalText));else if(amVerbose())outputDecimal("Decimal of rational: '",_decimal,"'.\n");
         free_string(_decimalText);
     }
     return _decimal;
