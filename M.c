@@ -2988,7 +2988,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			if(amVerbose())output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
 		}else
 		if(amVerbose())output("Maximum number of elements reached.\n");
-		if(!expressionToken)break; // MDH@15OCT2019: might be useful!!
+		if(!expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
 	if(amVerbose())outputValue("List '",_listValue,"' extracted!\n");
@@ -3027,6 +3027,7 @@ Mvalue* getValueOfMap(){
 			output("%s",ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
 		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
 		free_string(_attributeName); // ALWAYS free the name text
+		if(!expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(amVerbose())output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
@@ -3187,6 +3188,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	if(amVerbose()){output("Current value of '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
 	// if we have index/attribute names we have to get the final subvalue
 	if(_valuereference->_itemid){
+		if(amVerbose())outputValue("Item id: '",_valuereference->_itemid,"'.\n");
 		Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
 		// empty lists should also return the full element, so only something to do when we actually have list elements!!!
 		if(_itemidlist->_first){
@@ -3199,6 +3201,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 				indexorattributenameListelement=indexorattributenameListelement->_next;
 				// if no value is defined, it is ignored TODO should we????
 				if(indexorattributenameListelementValue){
+					if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
 					// if we are accessing a map we have to ascertain that the attribute name in a string
 					if(_value->type==VT_MAP){
 						Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
@@ -3493,7 +3496,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->_first){ // a non-empty list
-						assignValue(&_valueReference->_itemid,indexListValue); // now storing the entire index/attribute name list
+						if(amVerbose())outputValue("Index id: '",indexListValue,"'.\n");
+						// MDH@15OCT2019: apparently there is enlisting too many: we can take the first element to unlist what we received BUT this must mean there's a mistake somewhere
+						assignValue(&_valueReference->_itemid,indexListValue->value._list->_first->_value); // now storing the entire index/attribute name list
 						/* replacing (storing only the last index/attribute name):
 						Mlist* indexList=indexListValue->value._list;
 						Mlistelement* indexListelement=indexList->_first; // must be there!!!
