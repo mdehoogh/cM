@@ -2988,7 +2988,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		if(amVerbose())output("Maximum number of elements reached.\n");
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
-	if(amVerbose())output("List extracted!\n");
+	if(amVerbose())outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
 
@@ -3505,7 +3505,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						// TODO what is going to happen to indexListValue?????? it should be discarded as its reference count will remain zero but all elements that are used elsewhere (like the last index stored in _valueReference will persist a little longer!!)
 						assignValue(&_valueReference->_itemid,indexListelement->_value); // store the last index value in the _itemid field
 						*/
-					}
+					}else
+						output("%sNo index list value of variable '%s'!",ERROR_PREFIX,_valueReference->_name);
 				}else
 				if(amVerbose())output("Unindexed variable '%s'!\n",_valueReference->_name);
 				// MDH@29MAY2019: if we do NOT have an indexed value, retrieve the value...
