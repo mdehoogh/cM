@@ -2206,11 +2206,23 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 			}else
 				pNewToken->envid=prevToken->envid; // MDH@09AUG2019: take over the environment id!!
 
+			// MDH@16OCT2019: if the previous token was an end of list/function call/map it was accepted and itself would be pointing to the start of the list/function call/map
+			//                therefore we do not need to set 
+			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
+				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
+				//                TODO this is checked afterwards, so perhaps we should do that here?????
+				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
+			}
+			// we still have to recognize an error
+			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)if(!pNewToken->expr)newTokenType=TT_ERROR;
+
+			/* replacing:
 			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP){
 				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
 				//                TODO this is checked afterwards, so perhaps we should do that here?????
 				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
 			}
+			*/
 			/*
 			if(amVerbose()){
 				if(pNewToken->expr)inputInfo("Matching: %s",string(pNewToken->expr->text));else inputInfo("%s","-");
@@ -3173,77 +3185,92 @@ void free_valuereference(Mvaluereference* _valuereference){
 		free(_valuereference);
 	}
 }
+void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* suffix){
+	if(prefix)output("%s",prefix);
+	if(_valuereference){
+		if(_valuereference->_name)output("%s",_valuereference->_name);
+		if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
+		if(_valuereference->_value)outputValue("='",_valuereference->_value,"'");
+	}
+	if(suffix)output("%s",suffix);
+}
 // two essential methods for getting and setting referenced values
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	// _itemid now represents the entire list of index/attribute name combinations
 	if(!_valuereference)return NULL;
-	if(_valuereference->_value){
-		if(amVerbose())outputValue("Returning referenced value: '",_valuereference->_value,"'.\n");
-		return _valuereference->_value; // if we have a value return that!!!
-	}
-	// if we do NOT have a name it's a literal
-	if(!_valuereference->_name)return NULL;
-	// if there is no itemid we simply return the 'entire' value of the given variable
-	Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
-	if(amVerbose()){output("Current value of '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
-	// if we have index/attribute names we have to get the final subvalue
-	if(_valuereference->_itemid){
-		if(amVerbose())outputValue("Item id: '",_valuereference->_itemid,"'.\n");
-		Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
-		// empty lists should also return the full element, so only something to do when we actually have list elements!!!
-		if(_itemidlist->_first){
-			// let's get the first index/attribute name
-			Mlistelement* indexorattributenameListelement=_itemidlist->_first;
-			Mvalue* indexorattributenameListelementValue;
-			while(indexorattributenameListelement){
-				indexorattributenameListelementValue=indexorattributenameListelement->_value;
-				// after extracting the value increment indexorattributenameListelement, so we can use continue
-				indexorattributenameListelement=indexorattributenameListelement->_next;
-				// if no value is defined, it is ignored TODO should we????
-				if(indexorattributenameListelementValue){
-					if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
-					// if we are accessing a map we have to ascertain that the attribute name in a string
-					if(_value->type==VT_MAP){
-						Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
-						if(attributenameText){
-							_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
-							free_string(attributenameText);
-							continue;	
+	Mvalue* referencedValue=NULL;
+	if(amVerbose())outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
+	if(!_valuereference->_value){ // not an actual (preset) value
+		// if we do NOT have a name it's a literal
+		if(_valuereference->_name){
+			// if there is no itemid we simply return the 'entire' value of the given variable
+			Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
+			if(amVerbose()){output("Current value of referenced variable '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
+			// if we have index/attribute names we have to get the final subvalue
+			if(_valuereference->_itemid){
+				if(amVerbose()){output("Item id of indexed variable '%s'",_valuereference->_name);outputValue(": '",_valuereference->_itemid,"'.\n");}
+				Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
+				// empty lists should also return the full element, so only something to do when we actually have list elements!!!
+				if(_itemidlist->_first){
+					// let's get the first index/attribute name
+					Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+					Mvalue* indexorattributenameListelementValue;
+					while(indexorattributenameListelement){
+						indexorattributenameListelementValue=indexorattributenameListelement->_value;
+						// after extracting the value increment indexorattributenameListelement, so we can use continue
+						indexorattributenameListelement=indexorattributenameListelement->_next;
+						// if no value is defined, it is ignored TODO should we????
+						if(indexorattributenameListelementValue){
+							if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
+							// if we are accessing a map we have to ascertain that the attribute name in a string
+							if(_value->type==VT_MAP){
+								Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
+								if(attributenameText){
+									referencedValue=getValueOfAttribute(_value->value._map,string(attributenameText));		
+									free_string(attributenameText);
+									continue;	
+								}
+								output("%s",ERROR_PREFIX);
+								outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
+							}
+							if(_value->type==VT_LIST){
+								// try to convert the index value into a positive integer
+								long long index=getValueInteger(indexorattributenameListelementValue);
+								if(index!=0&&index!=M_LL_INVALID){
+									referencedValue=getValueAtIndex(_value->value._list,index);
+									continue;
+								}
+								if(index){
+									output("%s",ERROR_PREFIX);
+									outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
+								}else
+									outputError("A zero index is not allowed");
+							}
+							// neither a list nor a map, so nothing to return!!!
+							return NULL;
+							/* replacing:
+							// check the validity of the index or attribute name against the current value
+							if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
+							if(indexorattributenameListelementValue->type==VT_INTEGER){
+								if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
+								_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
+							}else{
+								if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
+								_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
+							}
+							*/
 						}
-						output("%s",ERROR_PREFIX);
-						outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
 					}
-					if(_value->type==VT_LIST){
-						// try to convert the index value into a positive integer
-						long long index=getValueInteger(indexorattributenameListelementValue);
-						if(index!=0&&index!=M_LL_INVALID){
-							_value=getValueAtIndex(_value->value._list,index);
-							continue;
-						}
-						if(index){
-							output("%s",ERROR_PREFIX);
-							outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
-						}else
-							outputError("A zero index is not allowed");
-					}
-					// neither a list nor a map, so nothing to return!!!
-					return NULL;
-					/* replacing:
-					// check the validity of the index or attribute name against the current value
-					if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
-					if(indexorattributenameListelementValue->type==VT_INTEGER){
-						if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
-						_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
-					}else{
-						if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
-						_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
-					}
-					*/
+					if(amVerbose())outputValue("Value of indexed variable: '",_value,"'.\n");
 				}
 			}
 		}
+	}else{
+		if(amVerbose())outputValue("Returning referenced value: '",_valuereference->_value,"'.\n");
+		assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
 	}
-	return _value;
+	if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
+	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
@@ -3482,23 +3509,24 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
 				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
-				if(amVerbose())output("Variable name: '%s'.\n",_valueReference->_name);
+				if(amVerbose())output("Value reference variable name: '%s'.\n",_valueReference->_name);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
 				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				// a variable can be followed by an index that we should store in the value reference's itemid field
 				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
-					///////expressionToken=nextEnvironmentExpressionToken();
+					expressionToken=nextEnvironmentExpressionToken(); // MDH@16OCT2019: why was this commented out???????
 					if(amVerbose()){output("Extracting the indices.\n");}
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0); // typically allow for any number of indices (although perhaps we should check!!)
 					if(amVerbose()){output("XXXXXXX Index value of list '%s'",_valueReference->_name);outputValue("'",indexListValue,"'.\n");}
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
+					if(amVerbose()){if(expressionToken){output("End of list index token: ");outputToken(expressionToken);}else output("No end of list index token!");outputChar('\n');}
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->_first){ // a non-empty list
 						if(amVerbose())outputValue("Index id: '",indexListValue,"'.\n");
 						// MDH@15OCT2019: apparently there is enlisting too many: we can take the first element to unlist what we received BUT this must mean there's a mistake somewhere
-						assignValue(&_valueReference->_itemid,indexListValue->value._list->_first->_value); // now storing the entire index/attribute name list
+						assignValue(&_valueReference->_itemid,indexListValue); //////////// NOT SURE... indexListValue->value._list->_first->_value); // now storing the entire index/attribute name list
 						/* replacing (storing only the last index/attribute name):
 						Mlist* indexList=indexListValue->value._list;
 						Mlistelement* indexListelement=indexList->_first; // must be there!!!
@@ -3523,6 +3551,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(amVerbose())output("Retrieving the value of '%s' when no item id was specified.\n",_valueReference->_name);
 					assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
 				}
+				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
 				break;
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				// MDH@20JUN2019: some error in the following part because every now and then we get a segmentation fault!!!!
@@ -3901,8 +3930,13 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
-			Mbiginteger* _productBiginteger=__biginteger();
-			if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			_productBiginteger=__biginteger();
+			if(!_productBiginteger)outputError("Failed to create the product big integer");else
+			if(mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){
+				free_biginteger(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
+			}else
+			if(amVerbose())outputBiginteger("Big integer product: '",_productBiginteger,"'.\n");
+			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		}else
 			outputError("Failed to create two helper big integers");
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
@@ -4840,7 +4874,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2);
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Remainder of dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
-			if(mp_iszero(_biginteger2)==MP_NO){
+			if(mp_iszero(_biginteger2)!=MP_YES){
 				_integerremainderBiginteger=__biginteger();
 				if(_integerremainderBiginteger){
 					Mbiginteger *_integerdivideBiginteger=__biginteger();
@@ -4865,54 +4899,157 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 
 // integer arithmetic 
 // TODO yet to complete for big integers, rationals, decimals etc.
+// bitwise operators (and, or, xor)
 Mvalue* xor(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,xor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,xor);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _xorbiginteger=__biginteger();
+		if(_xorbiginteger){
+			// creating two intermediate big integers that need to be freed asap
+			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+			if(_biginteger1&&_biginteger2&&mp_xor(_biginteger1,_biginteger2,_xorbiginteger)!=MP_OKAY){free_biginteger(_xorbiginteger);_xorbiginteger=NULL;}
+			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+			return _getBigintegerValue(_xorbiginteger,true);
+		}else
+			outputError("Failed to create the xor result big integer");
+	}
 	return NULL;
 }
 Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseand);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseand);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
-	return NULL;
-}
-Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){
-	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicaland);
-	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _bitwiseandbiginteger=__biginteger();
+		if(_bitwiseandbiginteger){
+			// creating two intermediate big integers that need to be freed asap
+			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+			if(_biginteger1&&_biginteger2&&mp_and(_biginteger1,_biginteger2,_bitwiseandbiginteger)!=MP_OKAY){free_biginteger(_bitwiseandbiginteger);_bitwiseandbiginteger=NULL;}
+			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+			return _getBigintegerValue(_bitwiseandbiginteger,true);
+		}else
+			outputError("Failed to create the bitwise and result big integer");
+	}
 	return NULL;
 }
 Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseor);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _bitwiseorbiginteger=__biginteger();
+		if(_bitwiseorbiginteger){
+			// creating two intermediate big integers that need to be freed asap
+			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+			if(_biginteger1&&_biginteger2&&mp_or(_biginteger1,_biginteger2,_bitwiseorbiginteger)!=MP_OKAY){free_biginteger(_bitwiseorbiginteger);_bitwiseorbiginteger=NULL;}
+			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+			return _getBigintegerValue(_bitwiseorbiginteger,true);
+		}else
+			outputError("Failed to create the bitwise or result big integer");
+	}
+	return NULL;
+}
+
+// logical binary operators
+Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicaland);
+	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _logicalandbiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_logicalandbiginteger=_getBiginteger(mp_iszero(_biginteger1)==MP_YES||mp_iszero(_biginteger2)==MP_YES?0:1); // if either is zero, the result is zero otherwise 1
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_logicalandbiginteger,true);
+	}	
 	return NULL;
 }
 Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicalor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicalor);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll||_value2->value._integer->ll);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _logicalorbiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_logicalorbiginteger=_getBiginteger(mp_iszero(_biginteger1)==MP_NO||mp_iszero(_biginteger2)==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_logicalorbiginteger,true);
+	}
 	return NULL;
 }
+
+// binary shift operators
 Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isValueZero(_value2))return _value1; // MDH@16OCT2019: if shifting by 0 return the other value
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll<<_value2->value._integer->ll);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		if(_value2->type==VT_INTEGER||_value2->value._biginteger->used<=1){
+			// TODO int64_t should match int and unsigned long long (perhaps not too likely????)
+			int64_t shl=(_value2->type==VT_INTEGER?_value2->value._integer->ll:mp_get_i64(_value2->value._biginteger));
+			if(shl!=M_LL_INVALID){
+				Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+				if(_biginteger1){
+					if(amVerbose()){outputBiginteger("Shifting big integer '",_biginteger1,"' left");output(" by %" PRIi64 ".\n",shl);}
+					if((shl>0?mp_mul_2d(_biginteger1,shl,_biginteger1):mp_div_2d(_biginteger1,-shl,_biginteger1,NULL))==MP_OKAY)return _getBigintegerValue(_biginteger1,true);
+					output("%s",ERROR_PREFIX);output("Failed to shift '",_biginteger1,"' left.\n");
+					free_biginteger(_biginteger1);				
+				}
+			}
+		}else
+			outputError("Number of shift positions too large");
+	}
 	return NULL;
 }
 Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
+	if(isValueZero(_value2))return _value1; // MDH@16OCT2019: if shifting by 0 return the other value
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll>>_value2->value._integer->ll);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		// what we shift by should fit in int64_t!!!!
+		if(_value2->type==VT_INTEGER||_value2->value._biginteger->used<=1){
+			int64_t shr=(_value2->type==VT_INTEGER?_value2->value._integer->ll:mp_get_i64(_value2->value._biginteger));
+			if(shr!=M_LL_INVALID){
+				Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+				if(_biginteger1){
+					if(amVerbose()){outputBiginteger("Shifting big integer '",_biginteger1,"' left");output(" by %" PRIi64 ".\n",shr);}
+					if((shr>0?mp_div_2d(_biginteger1,shr,_biginteger1,NULL):mp_mul_2d(_biginteger1,-shr,_biginteger1))==MP_OKAY)return _getBigintegerValue(_biginteger1,true);
+					output("%s",ERROR_PREFIX);outputBiginteger("Failed to shift '",_biginteger1,"' to the right.\n");			
+					free_biginteger(_biginteger1);
+				}
+			}
+		}else
+			outputError("Number of shift positions too large");
+	}
 	return NULL;
 }
-// comparison operators
+
+// binary comparison operators
 Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthan);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _smallerthanbiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_smallerthanbiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_LT?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_smallerthanbiginteger,true);
+	}
 	return NULL;
 }
 Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
@@ -4920,6 +5057,15 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthanorequalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _smallerthanorequaltobiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_smallerthanorequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_GT?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_smallerthanorequaltobiginteger,true);
+	}
 	return NULL;
 }
 Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
@@ -4927,6 +5073,15 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthan);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _largerthanbiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_largerthanbiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_GT?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_largerthanbiginteger,true);
+	}
 	return NULL;
 }
 Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
@@ -4934,6 +5089,15 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthanorequalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _largerthanorequaltobiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_largerthanorequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_LT?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_largerthanorequaltobiginteger,true);
+	}
 	return NULL;
 }
 Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
@@ -4941,6 +5105,28 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,unequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,unequalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _unequaltobiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_unequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_unequaltobiginteger,true);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2);
+		Mdecimal *_decimal=_getDecimalDifference(_decimal1,_decimal2);
+		long long result=(_decimal?(isDecimalZero(_decimal)?0:1):M_LL_INVALID);
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
+		if(result!=M_LL_INVALID){free_decimal(_decimal);return _getIntegerValue(result);}
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
+		long long result=qcmp(_rational1,_rational2);
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);if(_value2->type!=VT_RATIONAL)free_rational(_rational2);
+		if(result!=M_LL_INVALID)return _getIntegerValue(result==MP_EQ?0:1);
+	}
 	return NULL;
 }
 Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
@@ -4948,33 +5134,58 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _equaltobiginteger=NULL;
+		// creating two intermediate big integers that need to be freed asap
+		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
+		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		if(_biginteger1&&_biginteger2)_equaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		return _getBigintegerValue(_equaltobiginteger,true);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2);
+		Mdecimal *_decimal=_getDecimalDifference(_decimal1,_decimal2);
+		long long result=(_decimal?(isDecimalZero(_decimal)?1:0):M_LL_INVALID);
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
+		if(result!=M_LL_INVALID){free_decimal(_decimal);return _getIntegerValue(result);}
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
+		long long result=qcmp(_rational1,_rational2);
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);if(_value2->type!=VT_RATIONAL)free_rational(_rational2);
+		if(result!=M_LL_INVALID)return _getIntegerValue(result==MP_EQ?1:0);
+	}
 	return NULL;
 }
 
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
+	Mvalue* result=NULL;
 	if(_value1&&_value2){
 		if(amVerbose()){outputValue("Computing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.\n");}
 		switch(operator[0]){
 			// real arithmetic
-			case '+' :return add(_value1,_value2);
-			case '-' :return subtract(_value1,_value2);
-			case '*' :return (strlen(operator)-1?power(_value1,_value2):multiply(_value1,_value2));
-			case 'e' :return epower(_value1,_value2);
-			case '/' :return (strlen(operator)-1?integerdivide(_value1,_value2):divide(_value1,_value2));
-			case '\\':return integerdivide(_value1,_value2);
-			case '%' :return divideremainder(_value1,_value2);
+			case '+' :result=add(_value1,_value2);break;
+			case '-' :result=subtract(_value1,_value2);break;
+			case '*' :result=(strlen(operator)-1?power(_value1,_value2):multiply(_value1,_value2));break;
+			case 'e' :result=epower(_value1,_value2);break;
+			case '/' :result=(strlen(operator)-1?integerdivide(_value1,_value2):divide(_value1,_value2));break;
+			case '\\':result=integerdivide(_value1,_value2);break;
+			case '%' :result=divideremainder(_value1,_value2);break;
 			// integer arithmetic
-			case '^' :return xor(_value1,_value2);
-			case '&' :return (strlen(operator)-1?logicaland(_value1,_value2):bitwiseand(_value1,_value2));
-			case '|' :return (strlen(operator)-1?logicalor(_value1,_value2):bitwiseor(_value1,_value2));
+			case '^' :result=xor(_value1,_value2);break;
+			case '&' :result=(strlen(operator)-1?logicaland(_value1,_value2):bitwiseand(_value1,_value2));break;
+			case '|' :result=(strlen(operator)-1?logicalor(_value1,_value2):bitwiseor(_value1,_value2));break;
 			// comparison operators
-			case '<' :return (strlen(operator)-1?(operator[1]=='<'?shiftleft(_value1,_value2):smallerthanorequalto(_value1,_value2)):smallerthan(_value1,_value2));
-			case '>' :return (strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));
-			case '!' :return unequalto(_value1,_value2);
-			case '=' :return equalto(_value1,_value2);
+			case '<' :result=(strlen(operator)-1?(operator[1]=='<'?shiftleft(_value1,_value2):smallerthanorequalto(_value1,_value2)):smallerthan(_value1,_value2));break;
+			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));break;
+			case '!' :result=unequalto(_value1,_value2);break;
+			case '=' :result=equalto(_value1,_value2);break;
+			default:output("%sUnknown binary operator '%s'.\n",ERROR_PREFIX,operator);
 		}
+		if(amVerbose()){if(result)outputValue("Result of applying binary operator: '",result,"'.\n");else outputLine("No result!");}
 	}
-	return NULL;
+	return result;
 }
 // MDH@14OCT2019: using (almost the) same precedence as used in C (except I have power operators as well ** and e)
 char getOperatorPrecedence(Mstring* operator){
@@ -5410,6 +5621,7 @@ void unfinishToken(){
 				pLastCommandToEvaluateToken->significantCharacterCount=0;
 }
 
+void outputCommandInfo();
 // anything the user types is a sequence of tokens which we can store in a linked list
 bool evaluateCommand(){
 	
@@ -5443,13 +5655,26 @@ bool evaluateCommand(){
 	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
 	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
 	//////////// already noticed while entering the expression!!!!: if(!pLastCommandToEvaluateToken->expr){outputError("Too many parentheses!");return false;}
-	if(pLastCommandToEvaluateToken->expr){
+	Mtoken* expressionToken=pLastCommandToEvaluateToken->expr; // the token pointed to by the last command token
+	if(expressionToken)if(pLastCommandToEvaluateToken->type==TT_END_OF_LIST||pLastCommandToEvaluateToken->type==TT_END_OF_FUNCTION_CALL||pLastCommandToEvaluateToken->type==TT_END_OF_MAP)expressionToken=expressionToken->expr;
+	if(expressionToken){ // could be a problem
+		// MDH@16OCT2019: I made ] ) and } again point to the associated [ ( and {, which of course should be pointing to NULL if it does not the command is incomplete
+		if(amVerbose())output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
+		switch(expressionToken->type){
+			case TT_LIST:outputError("Missing end of list");break;
+			case TT_FUNCTION_CALL:outputError("Missing end of function call");break;
+			case TT_MAP:outputError("Missing end of map");break;
+			default:output("%sUnknown expression with first token of type %s left unfinished.\n",ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);break;
+		}
+		return false;
+		/* replacing:
 		// MDH@23JUL2019: we can now be very strict
 		//                the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
 		if(pLastCommandToEvaluateToken->expr->type!=TT_EXPRESSION||(string_length(pLastCommandToEvaluateToken->expr->text)&&string_char(pLastCommandToEvaluateToken->expr->text,0)!=' ')){
 			outputError("Incomplete command");
 			return false;
 		}
+		*/
 		/* replacing:
 		// this is allowed if this token ends something that points to NULL
 		if((pLastCommandToEvaluateToken->type!=TT_END_OF_LIST&&pLastCommandToEvaluateToken->type!=TT_END_OF_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_END_OF_MAP)||pLastCommandToEvaluateToken->expr->expr){
@@ -6217,13 +6442,13 @@ void outputCommandInfo(){
 	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`\n",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
-		if(token->expr){
-			output("%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
-		}
-		if(token->prevIdentifier){
+		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
+		if(token->expr)
+			output("\n%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
+		else
+			output("\t%s\n","Not part of another expression!");
+		if(token->prevIdentifier)
 			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
-		}
 		/* removing:
 		if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
 			Mtoken* specialFunctionCallToken=getSpecialFunctionCallToken(token);

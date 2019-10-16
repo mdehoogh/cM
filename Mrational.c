@@ -135,7 +135,7 @@ mp_err _qdiv_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* c
 /**
  * \brief computes the difference of \p a and \p b and puts the result in \p c
  */
-mp_err _qsub(Mrational* const c,const Mrational* const a,const Mrational* const b){
+mp_err _qsub(Mrational* const c,Mrational const * const a,Mrational const * const b){
     Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
     if(status==MP_OKAY)status=_bimul(a->den,b->den,&_den); // multiply denominators to become the result denominator
@@ -152,6 +152,7 @@ mp_err _qsub(Mrational* const c,const Mrational* const a,const Mrational* const 
     }else{ // numerator and denominator computed
         c->num=_num;
         c->den=_den;
+        /////// not on pure rationals!!!! c->delta=_realdifference(a->delta,b->delta);
         if(!c->normalized)normalizeRational(c);
     }
     return status;
@@ -353,6 +354,42 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
         outputError("Failed to create the rational for storing the difference of two rationals");
     return _rational;
 }
+long long qsign(Mrational* rational){
+    if(!rational)return M_LL_INVALID;
+    // assuming that the denominator is always positive we only have to consider the sign of (num/den)+delta=(num+den*delta/den), so the sign of num+den*delta
+    // if delta is defined which is obviously not recommended at all
+    if(realIsUndefinedOrZero(rational->delta))return(isBigintegerZero(rational->num)?0:(mp_isneg(rational->num)?-1:1));
+    // convert num and den to doubles
+    long double lddelta=rational->delta->ld,ldnum=mp_get_long_double(rational->num),ldden=(rational->den?mp_get_long_double(rational->den):1);
+    long double ldsign=(ldnum-lddelta*ldden);
+    return(ldsign<0?-1:(ldsign>0?1:0));
+}
+// MDH@16OCT2019: what to return if a or b is not defined????? I suppose NULL is smaller than any value???????
+//                qcmp() will return M_LL_INVALID if something goes wrong!!!
+long long qcmp(Mrational const * const a,Mrational const * const b){
+    mp_err status=MP_OKAY;
+    mp_ord result=MP_EQ;
+    if(a||b){ // not both NULL
+        if(a&&b){ // both not NULL
+            // a and b defined
+            // taking deltas into account makes things more complex
+            // now we can use _qsub and see from there
+            Mrational* _rational=_getRationalDifference(a,b);
+            if(_rational){
+                // the sign of the rational determines what the result will be
+                long long sign=qsign(_rational);
+                if(sign!=M_LL_INVALID){if(sign<0)result=MP_LT;else if(sign>0)result=MP_GT;}else status=MP_ERR;
+                free_rational(_rational);
+            }else
+                status=MP_MEM;
+        }else // either a or b NULL 
+        if(!a)result=MP_LT;
+        else
+        if(!b)result=MP_GT;
+    }
+    return(status==MP_OKAY?result:M_LL_INVALID);
+}
+
 // computation of the actual delta is much harder in products and quotients
 long double getLongDoubleRationalProduct(long double ld,Mrational* r){
     if(!r)return M_LD_NAN; // unlikely though as we're calling it ourselves with a defined rational

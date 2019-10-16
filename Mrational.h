@@ -21,11 +21,12 @@ Mstring* _getRationalText(const Mrational* const _rational);
 Mbiginteger* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
 void outputRational(const char* const prefix,const Mrational* const _rational,const char* const postfix);
 
-
 mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qsub(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qmul(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qdiv(Mrational* c,Mrational const * const a,Mrational const * const b);
+
+long long qcmp(Mrational const * const a,Mrational const * const b); // MDH@16OCT2019: what to return if a or b is not defined????? I suppose NULL is smaller than any value???????
 
 bool realIsUndefined(Mreal* _real);
 bool realIsUndefinedOrZero(Mreal* _real);

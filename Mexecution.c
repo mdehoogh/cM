@@ -101,7 +101,7 @@ bool initExecution(){
  */
 void free_biginteger(Mbiginteger* biginteger){
     if(biginteger){
-        if(amVerbose())outputLine("Freeing a big integer."); // TODO can we display the value?
+        if(amDebugging())outputLine("Freeing a big integer."); // TODO can we display the value?
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
     }else
     if(amVerbose())outputLine("No big integer to free!");

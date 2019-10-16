@@ -263,9 +263,15 @@ Mvalue* _getIntegerValue(long long ll){
     return _integerValue;
 }/* VALIDATED */
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
-    if(!_biginteger)return NULL;
-    Mvalue* _bigintegerValue=__value();
-    if(_bigintegerValue){_bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;}else if(freeonfailure)free_biginteger(_biginteger);
+    Mvalue* _bigintegerValue=(_biginteger?__value():NULL);
+    if(_bigintegerValue){
+        _bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;
+    }else
+    if(_biginteger){
+        if(freeonfailure)free_biginteger(_biginteger);
+        if(amVerbose()){output("%s",ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
+    }else
+    if(amVerbose())outputLine("No big integer to wrap.");
     return _bigintegerValue;
 }/* VALIDATED */
 Mvalue* _getRealValue(long double ld){
@@ -654,7 +660,7 @@ void checkList(Mlist* _list){
                         if(_list->_last!=_listelement)outputError("Registered last list element not equal to the actual last list element");
                         break;                        
                     }
-                    output("List element with index %llu OK.",_listelement->index);
+                    output("List element with index %llu OK.\n",_listelement->index);
                     _listelement=_listelement->_next;
                 }
                 if(l>0)outputError("Less elements in list than accounted for");else 
@@ -704,7 +710,7 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue const * const _value
         if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
         if(!_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
     }
-    if(amVerbose())checkList(_list);
+    if(amDebugging())checkList(_list);
     return _listelement->index;
 }/* VALIDATED */
 
@@ -903,14 +909,14 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     return _UNDEFINED_VALUETEXT;
     */
 }/* VALIDATED */
-void outputValue(const char* const prefix,const Mvalue* const _value,const char* const postfix){
+void outputValue(const char* const prefix,const Mvalue* const value,const char* const suffix){
     if(prefix)output("%s",prefix);
-    if(_value){
-        Mstring* _valueText=_getValueText(_value,false); // free asap
+    if(value){
+        Mstring* _valueText=_getValueText(value,false); // free asap
         if(_valueText){output("%s",string(_valueText));free_string(_valueText);}
     }else
-        outputChar('?');
-    if(postfix)output("%s",postfix);
+        outputChar('-');
+    if(suffix)output("%s",suffix);
 }/* VALIDATED */
 
 long long getValueInteger(const Mvalue* const _value){
