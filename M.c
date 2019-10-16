@@ -4817,6 +4817,10 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld); // TODO casting to a long double is perhaps not the best way?
 		return _getRealValue(ld1/ld2);
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
@@ -4858,6 +4862,10 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
 		return _getIntegerValue(truncl(ld1/ld2));
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
@@ -4894,6 +4902,10 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
 		return _getRealValue(ld1-ld2*truncl(ld1/ld2)); // what's left after subtracting the truncated value
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 
@@ -4916,6 +4928,10 @@ Mvalue* xor(Mvalue* _value1,Mvalue* _value2){
 		}else
 			outputError("Failed to create the xor result big integer");
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){
@@ -4933,6 +4949,10 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){
 			return _getBigintegerValue(_bitwiseandbiginteger,true);
 		}else
 			outputError("Failed to create the bitwise and result big integer");
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 	}
 	return NULL;
 }
@@ -4952,6 +4972,10 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){
 		}else
 			outputError("Failed to create the bitwise or result big integer");
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 
@@ -4969,6 +4993,10 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_logicalandbiginteger,true);
 	}	
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){
@@ -4983,6 +5011,10 @@ Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2)_logicalorbiginteger=_getBiginteger(mp_iszero(_biginteger1)==MP_NO||mp_iszero(_biginteger2)==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_logicalorbiginteger,true);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 	}
 	return NULL;
 }
@@ -5009,6 +5041,10 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 		}else
 			outputError("Number of shift positions too large");
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
@@ -5032,6 +5068,10 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 		}else
 			outputError("Number of shift positions too large");
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 
@@ -5050,6 +5090,10 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_smallerthanbiginteger,true);
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
@@ -5065,6 +5109,10 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2)_smallerthanorequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_GT?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_smallerthanorequaltobiginteger,true);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 	}
 	return NULL;
 }
@@ -5082,6 +5130,10 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_largerthanbiginteger,true);
 	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	}
 	return NULL;
 }
 Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
@@ -5097,6 +5149,10 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2)_largerthanorequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_LT?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_largerthanorequaltobiginteger,true);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+	}else
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 	}
 	return NULL;
 }
@@ -5131,7 +5187,8 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
