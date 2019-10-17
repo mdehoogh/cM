@@ -142,6 +142,7 @@ void outputValue(const char* const prefix,const Mvalue* value,const char* const 
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getTokenTokenMap(char* name1,char* name2);
 Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
+Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
 
 // list to map (list) conversions

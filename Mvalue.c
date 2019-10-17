@@ -598,6 +598,37 @@ Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){
     }
     return NULL;
 }/* VALIDATED */
+Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){
+    if(name1&&name2&&name3){
+        if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2&&_mapelement3){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_INTEGER,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_INTEGER,true);
+                    _mapelement3->_variable=_getVariable(name3,VT_INTEGER,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
+                        _map->_last=_mapelement3;
+                        _map->numberOfElements=3;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1);
+            free_mapelement(_mapelement2);
+            free_mapelement(_mapelement3);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4){
     if(name1&&name2&&name3&&name4){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
@@ -675,16 +706,21 @@ void checkList(Mlist* _list){
 }/* VALIDATED */
 // instead of returning a boolean we could return the assigned index (0 on failure)
 // MDH@02JUN2019: check (and correct) prepending
+// MDH@17OCT2019: passing in 0 should NOT do appending but prepending (use index len(l)+1 for appending!!!!!!)
+//                OOPS we used to use 0 to force an append, so we now use M_LL_INVALID to force that!!!!
 unsigned long long appendedToList(Mlist* const _list,Mvalue const * const _value,long long index){
     if(!_list||!_value){outputError("No list to append to or no value to append");return 0;}
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
-    if(index<=0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
-    if(index<=0){output("%sIndex %lld of (new) list element too small.\n",ERROR_PREFIX,index);return 0;}
-    if(amVerbose())outputValue("Appending '",_value,"' to list.\n");
+    // MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
+    if(index==M_LL_INVALID)index=lastindex+1; // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
+    if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
+    // MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
+    if(index<0){output("%sIndex %lld of (new) list element too small.\n",ERROR_PREFIX,index);return 0;} // MDH@17OCT2019: can't return negative value!!!
+    if(amVerbose())outputValue((index>0?"Appending '":"Prepending '"),_value,"' to a list.\n");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
-    Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index<=lastindex?_list->_first:NULL);
+    Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index>0&&index<=lastindex?_list->_first:NULL);
     if(_listelement){ // we are not appending and we have a first element, so this might be an insert or replace
         // NOTE testing _listelement is just a fail-safe as that should never happen
         while(index>_listelement->index){
@@ -694,21 +730,41 @@ unsigned long long appendedToList(Mlist* const _list,Mvalue const * const _value
         }
         // if we're going to insert there will be a successor
         if(_listelement->index!=index){_nextListelement=(_prevListelement?_prevListelement->_next:_list->_first);_listelement=NULL;} // so that we are forced to create one
-    }else // we'll be appending, so the current last is the predecessor (and no successor)
+    }else // we'll be insertingappending/prepending, so the current last is the predecessor (and no successor)
+    if(index>0) // MdH@17OCT2019: when not prepending...
         _prevListelement=_list->_last;
     // if we do not have a list element ascertain to have one
     if(!_listelement){ // not yet present in list, so we have to create a new element
         _listelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l');
-        if(!_listelement){outputError("Failed to create a list element to insert/append");return 0;} // failure
+        if(!_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
     }
     assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
     // if replacing i.e. the index of _listelement matches index, we're done
+    // if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
     if(_listelement->index!=index){ // insert or append
         _listelement->index=index;
-        (_list->numberOfElements)++; // an additional element
         // linking
         if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
         if(!_nextListelement){if(_list->_last)_list->_last->_next=_listelement;_list->_last=_listelement;}else _listelement->_next=_nextListelement;
+        (_list->numberOfElements)++; // an additional element
+    }else
+    if(index==0){ // prepending
+        // linking into the list
+        _listelement->_next=_list->_first;
+        _list->_first=_listelement;
+        if(!_list->_last)_list->_last=_list->_first;
+        (_list->numberOfElements)++;
+        if(amVerbose())outputValue("Prepending '",_listelement->_value,"'.\n");
+        // we should increment the index of all elements (consuming _listelement on the go which is OK)
+        _nextListelement=_listelement;
+        while(_nextListelement){
+            if(amDebugging()){outputValue("Incrementing the index of '",_nextListelement->_value,"'.\n");}
+            (_nextListelement->index)++;
+            if(amDebugging()){outputValue("Index of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);}
+            _nextListelement=_nextListelement->_next;
+            if(amDebugging())if(_nextListelement)outputLine("A element to consider!");else outputLine("No next element to consider!");
+        }
+        if(amVerbose())outputValue("'",_listelement->_value,"' prepended.\n");
     }
     if(amDebugging())checkList(_list);
     return _listelement->index;
@@ -1048,7 +1104,7 @@ bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list){
                 if(!_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
                 Mlist* _maplistelement=_maplistelementValue->value._list;
                 // if we fail to construct the maplist element or to add it
-                if(!_maplistelement||!appendedToList(_maplistelement,_getIntegerValue(_listelement->index),0)||!appendedToList(_maplistelement,_listelement->_value,0)||!appendedToList(_maplist,_maplistelementValue,0)){
+                if(!_maplistelement||!appendedToList(_maplistelement,_getIntegerValue(_listelement->index),M_LL_INVALID)||!appendedToList(_maplistelement,_listelement->_value,M_LL_INVALID)||!appendedToList(_maplist,_maplistelementValue,M_LL_INVALID)){
                     outputError("Failed to create or populate map list element");
                     result=false;
                 }else
@@ -1159,8 +1215,8 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map){
                         p=string_append(p,_mapelement->_variable->_name);
                         if(p){
                             Mvalue* _attributeNameValue=_getTextValue(string(_attributeName),false);
-                            if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,0)){
-                                if(!appendedToList(_maplistelement,_mapelement->_variable->_value,0)||!appendedToList(_maplist,_maplistelementValue,0)){
+                            if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,M_LL_INVALID)){
+                                if(!appendedToList(_maplistelement,_mapelement->_variable->_value,M_LL_INVALID)||!appendedToList(_maplist,_maplistelementValue,M_LL_INVALID)){
                                     result=false;
                                     outputError("Failed to append the attribute value in constructing a map list element");
                                 }

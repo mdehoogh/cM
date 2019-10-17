@@ -28,12 +28,13 @@ const char GREY[]="249"; // MDH@07OCT2019: between dark and light grey
 const char BLUE[]="27"; // MDH@07OCT2019: what we use for the identifier continuation text
 const char WHITE[]="15";
 const char ORANGE[]="202"; // instead of DARK_YELLOW use (a dark version of) ORANGE
-// the background colors (which are not used behind 38;5 or 48;5 but directly )
+/* the background colors (which are not used behind 38;5 or 48;5 but directly )
 const char BACKGROUND_BLACK[]="40";
 const char BACKGROUND_WHITE[]="47";
-
+*/
 // colors
-const char* BACKGROUND_COLORS[NUMBER_OF_COLOR_SCHEMES]={BACKGROUND_BLACK,BACKGROUND_WHITE}; // assuming either a black or white background
+// MDH@17OCT2019: switching to colors that do use the 256-color table i.e. BLACK and WHITE instead of BACKGROUND_BLACK and BACKGROUND_WHITE
+const char* BACKGROUND_COLORS[NUMBER_OF_COLOR_SCHEMES]={BLACK,WHITE}; // assuming either a black or white background
 
 const char* DEBUG_COLORS[NUMBER_OF_COLOR_SCHEMES]={LIGHT_GREY,DARK_GREY};
 const char* INFO_COLORS[NUMBER_OF_COLOR_SCHEMES]={WHITE,BLACK};
@@ -82,16 +83,9 @@ const char* getCommentColor(){return COMMENT_COLORS[colorscheme];}
 const char* getOperatorTokenColor(uint8_t opid){return OPERATOR_TOKEN_COLORS[opid][colorscheme];}
 const char* getValueTokenColor(uint8_t tokentypeid){return VALUE_TOKEN_COLORS[tokentypeid][colorscheme];}
 
-void activateColorscheme(){
-	output(ES"%sm",getBackgroundColor()); // TODO can't use outputControlText here!!!
-	clearDisplay();
-	///////outputLine((colorscheme?"Will assume white background!":"Will assume black background!"));
-}
-
 // display flags
 uint8_t getColorscheme(){return colorscheme;}
 uint8_t setColorscheme(uint8_t newColorscheme){
 	colorscheme=(newColorscheme%NUMBER_OF_COLOR_SCHEMES);
-    activateColorscheme();
     return colorscheme;
 }

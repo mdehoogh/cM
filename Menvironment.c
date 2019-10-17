@@ -431,7 +431,7 @@ long long appendToListVariable(const Menvironment* const _environment,const char
         if(variableValue&&variableValue->type==VT_LIST){ // yes a list we can append to
             // we should prevent circular references
             if(variableValue!=_value){
-                unsigned long long index=appendedToList(variableValue->value._list,_value,0); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
+                unsigned long long index=appendedToList(variableValue->value._list,_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
                 if(index>0)return index;
                 output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",ERROR_PREFIX,name,(_value?_value->type:-1));
             }else
@@ -802,6 +802,19 @@ bool completedValueTokenTokenFunction(Mfunction* const _function,const char* con
     }
     return false;
 }/* VALIDATED */
+bool completedThreeIntegersFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=_getThreeIntegerMap("red","green","blue");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register three integer argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_FOUR_ARGUMENTS;
@@ -840,7 +853,7 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){
         if(_commandValue){
             if(!function->functionunion._userfunction->_bodyCommandList)
                 function->functionunion._userfunction->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
-            if(appendedToList(function->functionunion._userfunction->_bodyCommandList,_commandValue,0))return true;
+            if(appendedToList(function->functionunion._userfunction->_bodyCommandList,_commandValue,M_LL_INVALID))return true;
             output("%sFailed to add command to list of body of '%s'.\n",ERROR_PREFIX,functionName);
         }else
             output("%sFailed to wrap a command of function '%s'.\n",ERROR_PREFIX,functionName);
@@ -861,7 +874,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                 // user function expects a list of commands, so we have to wrap the single token (if any)
                 if(_bodyTokenValue){
                     _userfunction->_bodyCommandList=_getListOfType(VT_TOKEN);
-                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,_bodyTokenValue,0))
+                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,_bodyTokenValue,M_LL_INVALID))
                         output("%sFailed to store the inline command as body of function definition of '%s'.\n",ERROR_PREFIX,functionName->_c);
                     // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
                 }
@@ -938,6 +951,7 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedValueFunction(_getFunction(_environment,"out"),"out",Mout))return false;
     if(!completedValueFunction(_getFunction(_environment,"bc"),"bc",Mbc))return false;
     if(!completedValueFunction(_getFunction(_environment,"tc"),"tc",Mtc))return false;
-
+    if(!completedThreeIntegersFunction(_getFunction(_environment,"brgb"),"brgb",Mbrgb))return false;
+    if(!completedThreeIntegersFunction(_getFunction(_environment,"trgb"),"trgb",Mtrgb))return false;
     return true;
 }/* VALIDATED */

@@ -644,7 +644,7 @@ Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){
 	longlongunion llu;
 	llu.ll=ll;
 	int l=sizeof(long long);
-	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:0))>0);
+	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
 	return _getValueOfList(_dlist,true);
 }
 const char* const REAL_OCTET_INDEX_IDS[]={"1","2","3","4","5","6","7","8","9","10"};
@@ -671,6 +671,37 @@ Mvalue* getRealDecimalMapValue(long double ld,bool littleEndianOrder){
 	*/
 	return _getValueOfMap(_dmap,true);
 }
+char* _getIntegerCharacters(long long ll){
+	char str[20];sprintf(str,"%lld",ll);return _strdup(str);
+}
+Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){
+	if(!text)return NULL;
+	Mmap* _dmap=_getMapOfType(VT_INTEGER);
+	if(!_dmap)return NULL;
+	char* characters=text->_c;
+	long long index=0;
+	char* _indexCharacters;
+	if(ascendingindex){
+		appendedToMap(_dmap,"0",_getIntegerValue(text->presuffix)); // the quote character
+		while(*characters){
+			_indexCharacters=_getIntegerCharacters(++index);
+			appendedToMap(_dmap,_indexCharacters,_getIntegerValue(*characters));
+			free(_indexCharacters);
+			characters++; // OOPS pretty essential
+		}
+	}else{
+		// go to the end
+		while(*characters){index++;characters++;}
+		while(index){
+			_indexCharacters=_getIntegerCharacters(index--);
+			characters--;
+			appendedToMap(_dmap,_indexCharacters,_getIntegerValue(*characters));
+			free(_indexCharacters);
+		}
+		appendedToMap(_dmap,"0",_getIntegerValue(text->presuffix)); // the quote character
+	}
+	return _getValueOfMap(_dmap,true);
+}
 Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
 	Mlist* _dlist=_getListOfType(VT_INTEGER);
 	if(!_dlist)return NULL;
@@ -678,7 +709,7 @@ Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
 	lld.ld=ld;
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
 	// how about adding a two-element list with the first equal to the field name?????
-	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:0))>0);
+	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
 	return _getValueOfList(_dlist,true);
 }
 
@@ -703,6 +734,7 @@ Mvalue* b(Mvalue* value){ // little-endian representation list to return
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
 			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,true);
+			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
 			default:break;
 		}
 	}
@@ -714,6 +746,7 @@ Mvalue* B(Mvalue* value){ // big endian decimal representation list to return
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
 			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,false);
+			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
 			default:break;
 		}
 	}
@@ -2339,7 +2372,7 @@ bool registerCommand(){
 		Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(pCommandToEvaluate,false);
 		if(_commandToEvaluateTokenValue){
 			if(!_currentFunctionBodyInput->_function->_bodyCommandList)_currentFunctionBodyInput->_function->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
-			if(appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_commandToEvaluateTokenValue,0))return true;
+			if(appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_commandToEvaluateTokenValue,M_LL_INVALID)>0)return true;
 			outputError("Failed to add the command to the body of the function");
 		}
 	}
@@ -3234,20 +3267,38 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 								outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
 							}
 							if(_value->type==VT_LIST){
-								// try to convert the index value into a positive integer
-								long long index=getValueInteger(indexorattributenameListelementValue);
-								if(index!=0&&index!=M_LL_INVALID){
-									referencedValue=getValueAtIndex(_value->value._list,index);
-									continue;
+								// MDH@17OCT2019: how about allowing an index to be a list of indices????
+								long long index;
+								if(indexorattributenameListelementValue->type==VT_LIST){
+									// we'll be returning a list value
+									Mlist* _referencedValueList=_getListOfType(_value->value._list->valuetype);
+									Mlist* indexelementList=indexorattributenameListelementValue->value._list;
+									Mlistelement* indexelementListelement=indexelementList->_first;
+									Mvalue* valueAtIndex;
+									while(indexelementListelement){
+										index=getValueInteger(indexelementListelement->_value);
+										valueAtIndex=(index!=0&&index!=M_LL_INVALID?getValueAtIndex(_value->value._list,index):NULL);
+										// OOPS can't append with 0 anymore, because 0 will do prepending
+										if(appendedToList(_referencedValueList,valueAtIndex,M_LL_INVALID)==0)break;
+										indexelementListelement=indexelementListelement->_next;
+									}
+									referencedValue=_getValueOfList(_referencedValueList,true);
+								}else{
+									// try to convert the index value into a positive integer
+									long long index=getValueInteger(indexorattributenameListelementValue);
+									if(index!=0&&index!=M_LL_INVALID){
+										referencedValue=getValueAtIndex(_value->value._list,index);
+										continue;
+									}
+									if(index){
+										output("%s",ERROR_PREFIX);
+										outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
+									}else
+										outputError("A zero index is not allowed");
 								}
-								if(index){
-									output("%s",ERROR_PREFIX);
-									outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
-								}else
-									outputError("A zero index is not allowed");
 							}
 							// neither a list nor a map, so nothing to return!!!
-							return NULL;
+							////////////////////////return NULL;
 							/* replacing:
 							// check the validity of the index or attribute name against the current value
 							if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
@@ -3439,7 +3490,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
 								functionCallArgumentList=_getListOfType(VT_UNDEFINED); // creating a list
-								if(functionCallArgumentList&&!appendedToList(functionCallArgumentList,_functionArgumentsValue,0)){
+								if(functionCallArgumentList&&!appendedToList(functionCallArgumentList,_functionArgumentsValue,M_LL_INVALID)){
 									outputError("Failed to create the to do expression list");
 									free_list(functionCallArgumentList);
 									functionCallArgumentList=NULL; // so nothing will get done!!
@@ -3836,11 +3887,16 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	}
 	if(_value1->type==VT_TEXT){ // force string concatenation using the quote character in the Mvalue in the resulting text
 		Mstring* _valueText=__string();
+		if(!_valueText)return NULL;
 		Mstring* p=_valueText;
 		p=string_append_char(p,_value1->value._text->presuffix);
 		p=string_append(p,_value1->value._text->_c);
+		// MDH@17OCT2019: we can't use _getValueText() here, because _getValueText() will resolve escape sequences which we do NOT want here
+		p=string_append(p,_value2->value._text->_c);
+		/* replacing:
 		Mstring* _value2Text=_getValueText(_value2,true); // get the text representation of the second argument without quotes
 		if(_value2Text){p=string_append(p,string(_value2Text));free_string(_value2Text);}
+		*/
 		Mvalue* _value=(p?_getTextValue(string(_valueText),false):NULL);
 		free_string(_valueText);
 		return _value;

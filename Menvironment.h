@@ -147,6 +147,7 @@ bool completedTokenTokenFunction(Mfunction* const _function,const char* const fu
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
 bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
+bool completedValueValueValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 
 bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
 

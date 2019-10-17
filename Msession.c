@@ -81,18 +81,24 @@ void showcursor(){outputControlText("?25h");}
 void emptyline(){outputControlText("2K\r");}
 void backspace(){outputControlText("D"); /* go left one character */ outputControlText("K"); /* clear the rest of the line */}
 
-void setColor(const char* colortext){output(ES"38;5;%sm",colortext);}
-void setBackColor(const char* colortext){output(ES"48;5%sm",colortext);}
+void setColor(char const * const colortext){output(ES"38;5;%sm",colortext);}
+void setBackColor(char const * const colortext){output(ES"48;5%sm",colortext);}
 
 void resetOutputColor(){setColor(getInfoColor());setBackColor(getBackgroundColor());}
 
 void outputLine(char* s){resetOutputColor();output("%s\n",s);} // for writing a single line of output text in the info color
 
+void activateColorscheme(){
+	setBackColor(getBackgroundColor()); // MDH@17OCT2019 replacing: output(ES"%sm",getBackgroundColor()); // TODO can't use outputControlText here!!!
+	clearDisplay();
+	///////outputLine((colorscheme?"Will assume white background!":"Will assume black background!"));
+}
 void initDisplay(){
 	outputControlText("=3h"); // 80x25 color mode
 	outputControlText("?3l"); // switch to 132 column mode (if possible)
 	outputControlText("0m");
-	setColorscheme(getColorscheme()); // activate the current color scheme
+	setColorscheme(getColorscheme());
+	activateColorscheme(); // activate the current color scheme
 	///////setWrapping(amWrapping()); // activate the current wrap mode!!!
 }
 

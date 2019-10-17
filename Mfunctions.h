@@ -38,6 +38,8 @@ Mvalue* Msqrt(Mvalue* _value);
 Mvalue* Mout(Mvalue* _value);
 Mvalue* Mbc(Mvalue* _value); // set background color
 Mvalue* Mtc(Mvalue* _value); // set text color
+Mvalue* Mbrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3); // set background color
+Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3); // set text color
 
 // math two-argument functions
 Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue);
