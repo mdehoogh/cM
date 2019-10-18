@@ -982,6 +982,7 @@ long long getValueInteger(const Mvalue* const _value){
             case VT_INTEGER:return _value->value._integer->ll;
 		    case VT_REAL:return double2long(_value->value._real->ld);
             case VT_BIGINTEGER:return biginteger2long(_value->value._biginteger);
+            case VT_DECIMAL:return decimal2long(_value->value._decimal);
             case VT_TEXT:
                 {
                     // alternative which doesn't check for 0 explicitly I think: _strtoll(_value->value._text->_c,M_LL_INVALID);

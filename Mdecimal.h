@@ -84,3 +84,5 @@ Mdecimal* _getInverseDecimal(Mdecimal const * const decimal);
 
 bool isDecimalPositive(Mdecimal const * const decimal);
 bool isDecimalNegative(Mdecimal const * const decimal);
+
+long long decimal2long(Mdecimal* decimal);

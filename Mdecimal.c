@@ -2729,3 +2729,12 @@ Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){
 
 bool isDecimalPositive(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)!=0?false:mpd_ispositive(decimal->mpd)!=0):false);}
 bool isDecimalNegative(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)!=0?false:mpd_isnegative(decimal->mpd)!=0):false);}
+
+// MDH@18OCT2019: assuming that \p decimal already is rounded somehow to the given integer using ceil, floor, trunc or round
+//                so that we should simply remove the fractional part
+long long decimal2long(Mdecimal* decimal){
+	uint32_t status=0;
+	int64_t ll=mpd_qget_i64(decimal->mpd,&status);
+	if((status&0xEFBF)==0)return ll;
+	return M_LL_INVALID;
+}

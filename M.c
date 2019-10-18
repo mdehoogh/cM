@@ -249,6 +249,29 @@ long long getDP(){
 	if(dp==M_LL_INVALID)outputLine("BUG: No default decimal context active!");
 	return dp;
 }
+// MDH@18OCT2019: if someone wants to know about the decimal context
+Mvalue* getdc(Mvalue* value){
+	if(value&&value->type==VT_DECIMAL){
+		Mdecimalcontext* decimalcontext=_getDecimalcontext(value->value._decimal->prec);
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
+		if(mpd_context){
+			Mmap* _contextMap=_getMapOfType(VT_INTEGER);
+			if(_contextMap){
+				appendedToMap(_contextMap,"status",_getIntegerValue(mpd_context->status));
+				appendedToMap(_contextMap,"precision",_getIntegerValue(mpd_context->prec));
+				appendedToMap(_contextMap,"round",_getIntegerValue(mpd_context->round));
+				appendedToMap(_contextMap,"exponentminimum",_getIntegerValue(mpd_context->emin));
+				appendedToMap(_contextMap,"exponentmaximum",_getIntegerValue(mpd_context->emax));
+				appendedToMap(_contextMap,"allcr",_getIntegerValue(mpd_context->allcr));
+				appendedToMap(_contextMap,"clamp",_getIntegerValue(mpd_context->clamp));
+				appendedToMap(_contextMap,"newtrap",_getIntegerValue(mpd_context->newtrap));
+				appendedToMap(_contextMap,"traps",_getIntegerValue(mpd_context->traps));
+				return _getValueOfMap(_contextMap,true);
+			}
+		}
+	}
+	return NULL;
+}
 Mvalue* getdp(Mvalue* value){
 	return(value&&value->type==VT_DECIMAL?_getIntegerValue(value->value._decimal->prec):NULL);
 }
@@ -1184,8 +1207,8 @@ bool initEnvironment(){
 				return false;
 			}
 			*/
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)||!completedIntegerFunction(_getFunction(_Menvironment,"getdp"),"getdp",getdp)){
-				outputError("Failed to register the setdp and getdp functions");
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)||!completedIntegerFunction(_getFunction(_Menvironment,"getdc"),"getdc",getdc)||!completedIntegerFunction(_getFunction(_Menvironment,"getdp"),"getdp",getdp)){
+				outputError("Failed to register the setdp, getdc and getdp functions");
 				return false;
 			}
 			// pi() functions (decimal and rational)
@@ -5326,30 +5349,36 @@ Mvalue* integerrange(Mvalue* _value1,Mvalue* _value2){
 		bool up=(upValue->value._integer->ll!=0);
 		// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
 		// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
-		long long rangeInteger=getValueInteger(up?Mceil(_value1):Mfloor(_value1));
-		Mvalue* integerrangeValue=(rangeInteger!=M_LL_INVALID?_getIntegerValue(rangeInteger):NULL);
-		if(integerrangeValue){
-			if(amVerbose()){
-				Mvalue* lastIntegerrangeValue=(up?Mceil(_value2):Mfloor(_value2));
-				outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
-				char c;output("Press Ctrl-C to stop or any other key to continue...");inputCharRead(&c);if(c==3)return NULL;
-			}
-			Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
-			Mvalue* inrangeValue;
-			while(integerrangeValue){
-				// determine whether this value does not exceed the last value
-				inrangeValue=(up?smallerthanorequalto(integerrangeValue,_value2):largerthanorequalto(integerrangeValue,_value2));
-				if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
-				if(inrangeValue->value._integer->ll==0)break; // not in range
-				if(appendedToList(integerrangeValueList,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
-				// determine the next value to insert into the integer range
-				if(up)rangeInteger++;else rangeInteger--;
-				integerrangeValue=_getIntegerValue(rangeInteger);
-			}
-			return _getValueOfList(integerrangeValueList,true);
-		}else{
-			output("%s",ERROR_PREFIX);outputValue("Failed to determine the first candidate range integer of '",_value1,"'.\n");
-		}
+		Mvalue* firstIntegerrangeValue=(up?Mceil(_value1):Mfloor(_value1));
+		if(firstIntegerrangeValue){
+			long long rangeInteger=getValueInteger(firstIntegerrangeValue);
+			if(rangeInteger!=M_LL_INVALID){
+				Mvalue* integerrangeValue=_getIntegerValue(rangeInteger);
+				if(integerrangeValue){
+					if(amVerbose()){
+						Mvalue* lastIntegerrangeValue=(up?Mfloor(_value2):Mceil(_value2));
+						outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
+						char c;output("Press Ctrl-C to stop or any other key to continue...");inputCharRead(&c);if(c==3)return NULL;
+					}
+					Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
+					Mvalue* inrangeValue;
+					while(integerrangeValue){
+						// determine whether this value does not exceed the last value
+						inrangeValue=(up?smallerthanorequalto(integerrangeValue,_value2):largerthanorequalto(integerrangeValue,_value2));
+						if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
+						if(inrangeValue->value._integer->ll==0)break; // not in range
+						if(appendedToList(integerrangeValueList,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
+						// determine the next value to insert into the integer range
+						if(up)rangeInteger++;else rangeInteger--;
+						integerrangeValue=_getIntegerValue(rangeInteger);
+					}
+					return _getValueOfList(integerrangeValueList,true);
+				}else
+					outputError("Failed to initialize the first candidate range integer");
+			}else
+				outputError("Failed to extract the lower bound of the integer range");
+		}else
+			outputError("Failed to determine the first integer range value");
 	}else
 		outputError("Unable to determine whether to go up or down in the integer range");
 	return NULL;
