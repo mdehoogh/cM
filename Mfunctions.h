@@ -7,6 +7,10 @@ Mvalue* Mnot(Mvalue* _value); // not a value
 
 Mvalue* Mnull(Mvalue* _value); // whether null!!!
 Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
+Mvalue* Mzero(Mvalue* _value);
+Mvalue* Mpositive(Mvalue* _value);
+Mvalue* Mnegative(Mvalue* _value);
+Mvalue* Mscalar(Mvalue* _value);
 
 Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
 Mvalue* Mlen(Mvalue* _value); // length (typically of a list)

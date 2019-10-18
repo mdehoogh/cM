@@ -708,8 +708,8 @@ void checkList(Mlist* _list){
 // MDH@02JUN2019: check (and correct) prepending
 // MDH@17OCT2019: passing in 0 should NOT do appending but prepending (use index len(l)+1 for appending!!!!!!)
 //                OOPS we used to use 0 to force an append, so we now use M_LL_INVALID to force that!!!!
-unsigned long long appendedToList(Mlist* const _list,Mvalue const * const _value,long long index){
-    if(!_list||!_value){outputError("No list to append to or no value to append");return 0;}
+unsigned long long appendedToList(Mlist * const _list,Mvalue const * const _value,long long index){
+    if(!_list){outputError("No list to append to");return 0;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     // MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
@@ -895,7 +895,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
                 if(showquotes)p=string_append_char(p,'\'');
                 p=string_append(p,_mapVariable->_name);
                 if(showquotes)p=string_append_char(p,'\'');
-                if(showmissings||!isUndefined(_mapVariable->_value)){
+                if(showmissings||!isValueUndefined(_mapVariable->_value)){
                     /////output("%s",string(p));
                     p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
                     /////output("%s",string(p));
@@ -1335,9 +1335,33 @@ bool isValueOne(Mvalue* value){
     }
     return false;
 }/* VALIDATED */
+bool isValuePositive(Mvalue* value){
+    if(value){
+        if(value->type==VT_INTEGER)return value->value._integer->ll>0;
+        if(value->type==VT_BIGINTEGER)return isBigintegerPositive(value->value._biginteger);
+        if(value->type==VT_REAL)return ldIsPositive(value->value._real->ld);
+        if(value->type==VT_DECIMAL)return isDecimalPositive(value->value._decimal);
+        if(value->type==VT_RATIONAL)return isBigintegerPositive(value->value._rational->num); // assuming the numerator is never NULL and the denominator is always positive
+    }
+    return false;
+}/* VALIDATED */
+bool isValueNegative(Mvalue* value){
+    if(value){
+        if(value->type==VT_INTEGER)return value->value._integer->ll<0;
+        if(value->type==VT_BIGINTEGER)return isBigintegerNegative(value->value._biginteger);
+        if(value->type==VT_REAL)return ldIsNegative(value->value._real->ld);
+        if(value->type==VT_DECIMAL)return isDecimalNegative(value->value._decimal);
+        if(value->type==VT_RATIONAL)return isBigintegerNegative(value->value._rational->num);
+    }
+    return false;
+}/* VALIDATED */
+bool isValueScalar(Mvalue* value){
+    if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_REAL:case VT_TEXT:case VT_TOKEN:return true;}
+    return false;
+}/* VALIDATED */
 
 // null test for the value to be considered NULL
-bool isNull(Mvalue* value){
+bool isValueNull(Mvalue* value){
     if(value)
     switch(value->type){
         case VT_INTEGER:return !value->value._integer;
@@ -1355,9 +1379,9 @@ bool isNull(Mvalue* value){
 }/* VALIDATED */
 // MDH@18JUL2019: we consider certain non-null values as undefined, this is to fill the gap between non-null values that represent missings
 //                TODO is a map or list undefined when empty???????
-bool isUndefined(Mvalue* value){
+bool isValueUndefined(Mvalue* value){
     // values that are considered NULL are also undefined
-    if(!isNull(value))
+    if(!isValueNull(value))
     switch(value->type){
         case VT_INTEGER:return value->value._integer->ll==M_LL_INVALID;
         case VT_BIGINTEGER:return false;
@@ -1565,6 +1589,75 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
         free_biginteger(_remainder);
         free_biginteger(_absnum);
         return _dividend;
+    }
+    return NULL;
+}
+
+// MDH@18OCT2019: same for decimals
+// TODO should we store the result in a big integer or an integer (if possible????)
+//      theoretically we should return a decimal!!!
+Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){
+    // NOTE decimals can have repeating parts BUT those repeating digits are only behind the decimal comma, so won't have effect on the integers
+    // ceil: false,false / trunc: true,true / floor: true,false / ?: false,true
+    if(_decimal){
+        Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
+        mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+        if(mpd_context){
+            if(floor){
+                if(towardszero){
+                    Mdecimal* _truncDecimal=__decimal(mpd_context,0,0);
+                    if(_truncDecimal){
+                        uint32_t status;
+                        mpd_qtrunc(_truncDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                        if((status&0xEFBE)==0)return _truncDecimal;
+                        output("%s",ERROR_PREFIX);outputDecimal("Failed to truncate decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                        free_decimal(_truncDecimal);
+                    }
+                }else{
+                   Mdecimal* _floorDecimal=__decimal(mpd_context,0,0);
+                    if(_floorDecimal){
+                        uint32_t status;
+                        mpd_qfloor(_floorDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                        if((status&0xEFBE)==0)return _floorDecimal;
+                        output("%s",ERROR_PREFIX);outputDecimal("Failed to floor decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                        free_decimal(_floorDecimal);
+                    }                    
+                }
+            }else{
+                if(towardszero){
+
+                }else{
+                    Mdecimal* _ceilDecimal=__decimal(mpd_context,0,0);
+                    if(_ceilDecimal){
+                        uint32_t status;
+                        mpd_qceil(_ceilDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                        if((status&0xEFBE)==0)return _ceilDecimal;
+                        output("%s",ERROR_PREFIX);outputDecimal("Failed to ceil decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                        free_decimal(_ceilDecimal);
+                    }
+                }
+            }
+        }else
+            outputError("No context available for converting a decimal to an integer");
+    }
+    return NULL;
+}
+
+Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){
+    if(_decimal){
+        Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
+        mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+        if(mpd_context){
+            Mdecimal* _roundDecimal=__decimal(mpd_context,0,0);
+            if(_roundDecimal){
+                uint32_t status;
+                mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                if((status&0xEFBE)==0)return _roundDecimal;
+                output("%s",ERROR_PREFIX);outputDecimal("Failed to round decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                free_decimal(_roundDecimal);
+            }
+        }else
+            outputError("No context available for rounding a decimal");
     }
     return NULL;
 }

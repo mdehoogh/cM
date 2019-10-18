@@ -40,6 +40,7 @@ Mvalue* Mfloor(Mvalue* _value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,true,false),true);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getDecimalInteger(_value->value._decimal,true,false),true);
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mfloor),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mfloor),true);
     }
@@ -51,6 +52,7 @@ Mvalue* Mtrunc(Mvalue* _value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,true,true),true);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getDecimalInteger(_value->value._decimal,true,true),true);
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtrunc),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtrunc),true);
     }
@@ -65,6 +67,7 @@ Mvalue* Mround(Mvalue* _value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRoundedRationalInteger(_value->value._rational),true);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getRoundedDecimal(_value->value._decimal),true);
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil),true);
     }
@@ -79,6 +82,7 @@ Mvalue* Mceil(Mvalue* _value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,false,false),true);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getDecimalInteger(_value->value._decimal,false,false),true);
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil),true);
     }
@@ -476,11 +480,15 @@ Mvalue* Mbnot(Mvalue* _value){ // not a value
     return NULL;
 }/* VALIDATED */
 Mvalue* Mnull(Mvalue* _value){
-    return _getIntegerValue(isNull(_value)?1:0);
+    return _getIntegerValue(isValueNull(_value)?1:0);
 }/* VALIDATED */
 Mvalue* Mundefined(Mvalue* _value){
-    return _getIntegerValue(isUndefined(_value)?1:0); // MDH@18JUL2019: isUndefined() now comes in handy
+    return _getIntegerValue(isValueUndefined(_value)?1:0); // MDH@18JUL2019: isUndefined() now comes in handy
 }/* VALIDATED */
+Mvalue* Mzero(Mvalue* _value){return(_value?_getIntegerValue(isValueZero(_value)?1:0):NULL);}/* VALIDATED */
+Mvalue* Mpositive(Mvalue* _value){return(_value?_getIntegerValue(isValuePositive(_value)?1:0):NULL);}/* VALIDATED */
+Mvalue* Mnegative(Mvalue* _value){return(_value?_getIntegerValue(isValueNegative(_value)?1:0):NULL);}/* VALIDATED */
+Mvalue* Mscalar(Mvalue* _value){return(_value?_getIntegerValue(isValueScalar(_value)?1:0):NULL);}/* VALIDATED */
 
 // TODO the length of a text is the number of characters in a text????
 // MDH@17OCT2019: the length of a list should now return the index of the last element (instead of the number of non-null values)

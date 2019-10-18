@@ -249,6 +249,9 @@ long long getDP(){
 	if(dp==M_LL_INVALID)outputLine("BUG: No default decimal context active!");
 	return dp;
 }
+Mvalue* getdp(Mvalue* value){
+	return(value&&value->type==VT_DECIMAL?_getIntegerValue(value->value._decimal->prec):NULL);
+}
 Mvalue* setdp(Mvalue* value){
 	// how about returning the current value, no matter what the argument is????
 	long long olddecimalprecision=getDP();
@@ -1181,8 +1184,8 @@ bool initEnvironment(){
 				return false;
 			}
 			*/
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)){
-				outputError("Failed to register the setdp function");
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)||!completedIntegerFunction(_getFunction(_Menvironment,"getdp"),"getdp",getdp)){
+				outputError("Failed to register the setdp and getdp functions");
 				return false;
 			}
 			// pi() functions (decimal and rational)
@@ -1204,8 +1207,12 @@ bool initEnvironment(){
 				outputError("Failed to register all unary functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"exists"),"exists",Mexists)||!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
-				outputError("Failed to register the null and undefined function");
+			if(!completedValueFunction(_getFunction(_Menvironment,"exists"),"exists",Mexists)||!completedValueFunction(_getFunction(_Menvironment,"scalar"),"scalar",Mscalar)||!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
+				outputError("Failed to register the exists, scalar, null and undefined functions");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
+				outputError("Failed to register the zero, positive and negative functions");
 				return false;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),"sum",Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),"len",Mlen)){
@@ -3328,71 +3335,83 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
 		if(amVerbose()){output("Setting the value reference of '%s'",_valuereference->_name);outputValue(" to '",_newValue,"'.\n");}
+		// MDH@18OCT2019: without an _itemid the variable is allowed to NOT yet exist
 		if(_valuereference->_itemid){ // the hard part: index/attribute name list assignment!!
-			result=true;
-			if(amVerbose())outputLine("Element to set.");
-			Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
-			// let's get the first index/attribute name
-			Mlistelement* indexorattributenameListelement=_itemidlist->_first;
-			if(indexorattributenameListelement){ // we've got one, so not an empty index/attribute name list!!
-				Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // we'll be needing the value at the top level
-				// we need to find the last index or attribute name
-				Mvalue* indexorattributenameListelementValue;
-				while(indexorattributenameListelement->_next){
-					indexorattributenameListelementValue=indexorattributenameListelement->_value;
-					indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
-					// if no value is defined, it is ignored TODO should we????
-					if(indexorattributenameListelementValue){
-						// if we are accessing a map we have to ascertain that the attribute name in a string
-						if(_value->type==VT_MAP){
-							Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
-							if(attributenameText){
-								_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
-								free_string(attributenameText);
-								continue;	
+			Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
+			if(_value&&(_value->type==VT_LIST||_value->type==VT_MAP)){
+				result=true;
+				if(amVerbose())outputLine("Element to set.");
+				Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
+				// let's get the first index/attribute name
+				Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
+				//                this works for lists not for maps
+				if(indexorattributenameListelement||_value->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
+					// we need to find the last index or attribute name
+					Mvalue* indexorattributenameListelementValue;
+					if(indexorattributenameListelement) // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
+					while(indexorattributenameListelement->_next){
+						indexorattributenameListelementValue=indexorattributenameListelement->_value;
+						indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
+						// if no value is defined, it is ignored TODO should we????
+						if(indexorattributenameListelementValue){
+							// if we are accessing a map we have to ascertain that the attribute name in a string
+							if(_value->type==VT_MAP){
+								Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
+								if(attributenameText){
+									_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
+									free_string(attributenameText);
+									continue;	
+								}
+								outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
 							}
-							outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
-						}
-						if(_value->type==VT_LIST){
-							if(indexorattributenameListelementValue->type==VT_INTEGER){
-								_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue->value._integer->ll);
-								continue;
+							if(_value->type==VT_LIST){
+								if(indexorattributenameListelementValue->type==VT_INTEGER){
+									_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue->value._integer->ll);
+									continue;
+								}
+								outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' not an integer.");
 							}
-							outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' not an integer.");
+							// neither a list nor a map, so nothing to return!!!
+							break;
 						}
-						// neither a list nor a map, so nothing to return!!!
-						break;
 					}
-				}
-				// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
-				if(_value->type==VT_MAP){
-					Mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
-					if(!appendedToMap(_value->value._map,string(_attributeName),_newValue)){
-						result=false;
-					}
-					free_string(_attributeName);
-					if(!result)return false;
-				}else
-				if(_value->type==VT_LIST){
-					// NOTE allow appending using 0 or inserting with negative values
-					long long index=getValueInteger(indexorattributenameListelement->_value);
-					// replace the index to the actual index with the index of the element in the list (so getReferencedValue() will not complain!!!)
-					if(index!=LLONG_MIN){
-						index=appendedToList(_value->value._list,_newValue,index);
-						if(index>0){
-							assignValue(&indexorattributenameListelement->_value,_getIntegerValue(index));
-						}else{
+					// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
+					if(_value->type==VT_MAP){
+						Mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
+						if(!appendedToMap(_value->value._map,string(_attributeName),_newValue)){
 							result=false;
-						}				
-					}else{
-						result=false;
+						}
+						free_string(_attributeName);
+						if(!result)return false;
+					}else
+					if(_value->type==VT_LIST){
+						// NOTE allow appending using 0 or inserting with negative values
+						// MDH@18OCT2019: we now have four situations: 0=prepend, NULL=append, negative integers=set from the back (-1=last element)
+						//                so if no list element is defined, we just append to the list!!!!
+						//                the only invalid situations is when the _value is NULL although it still could NOT denote an integer
+						long long index=(indexorattributenameListelement?getValueInteger(indexorattributenameListelement->_value):M_LL_INVALID);
+						// replace the index to the actual index with the index of the element in the list (so getReferencedValue() will not complain!!!)
+						if(!indexorattributenameListelement||index!=LLONG_MIN){
+							index=appendedToList(_value->value._list,_newValue,index);
+							// MDH@18OCT2019: why are we doing this????? i.e. is the value in the list still pointing somewhere??????
+							if(index>0){
+								if(indexorattributenameListelement)assignValue(&indexorattributenameListelement->_value,_getIntegerValue(index));
+							}else
+								result=false;	
+						}else
+							result=false;
 					}
-				}
-			}
+				}else
+				if(_value->type!=VT_LIST)
+					outputError("No index/attribute name specified");
+			}else
+				output("%sReferenced variable '%s' cannot be indexed: it's value is not a list or a map.\n",ERROR_PREFIX,_valuereference->_name);
 		}else
 		if(setValue(getEnvironment(),_valuereference->_name,_newValue)){
 			// NOTE even if the value itself is NULL, its address is never NULL
 			assignValue(&_valuereference->_value,_newValue);
+			result=true;
 			if(amVerbose())outputLine("Value set!");
 		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
@@ -3574,7 +3593,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(amVerbose()){if(expressionToken){output("End of list index token: ");outputToken(expressionToken);}else output("No end of list index token!");outputChar('\n');}
 					// using the indexValue we should now update the value represented up until the last index (in case we have an assignment)
 					// which means that only the last index value has to be stored and the container of that last index (map or list)
-					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list->_first){ // a non-empty list
+					// MDH@18OCT2019: let's allow a NULL value to allow for appending to a list (as with Python)
+					//                how should we treat an empty list???????? differently I guess
+					//                the problem with NULL is that _itemid is NULL by itself, so this poses a problem it can't be NULL
+					//                I think we'd get an empty list in return not a NULL value (which is a problem if we do!!!!)
+					//                for now allow an empty list
+					if(indexListValue&&indexListValue->type==VT_LIST /*&&indexListValue->value._list->_first*/){ // a non-empty list
 						if(amVerbose())outputValue("Index id: '",indexListValue,"'.\n");
 						// MDH@15OCT2019: apparently there is enlisting too many: we can take the first element to unlist what we received BUT this must mean there's a mistake somewhere
 						assignValue(&_valueReference->_itemid,indexListValue); //////////// NOT SURE... indexListValue->value._list->_first->_value); // now storing the entire index/attribute name list
@@ -3593,13 +3617,17 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						assignValue(&_valueReference->_itemid,indexListelement->_value); // store the last index value in the _itemid field
 						*/
 					}else
-						output("%sNo index list value of variable '%s'!",ERROR_PREFIX,_valueReference->_name);
+					if(indexListValue)
+						output("%sIndex of variable '%s' not a list!\n",ERROR_PREFIX,_valueReference->_name);
+					else
+						output("%sIndex of variable '%s' undefined!\n",ERROR_PREFIX,_valueReference->_name);	
 				}else
 				if(amVerbose())output("Unindexed variable '%s'!\n",_valueReference->_name);
 				// MDH@29MAY2019: if we do NOT have an indexed value, retrieve the value...
 				// TODO as a side-effect getReferencedValue() will bind the added value to the value reference (as result) BUT I don't think that is how it should be!!! no the assignment takes care of that
 				if(!_valueReference->_itemid){
 					if(amVerbose())output("Retrieving the value of '%s' when no item id was specified.\n",_valueReference->_name);
+					// MDH@18OCT2019: TODO this is dangerous?!
 					assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
 				}
 				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
@@ -5167,6 +5195,21 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		return _getBigintegerValue(_smallerthanorequaltobiginteger,true);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		// creating two intermediate big integers that need to be freed asap
+		bool result=false;
+		Mdecimal* _decimalDifference=NULL;
+		Mdecimal* _decimal1=_getValueDecimal(_value1),*_decimal2=_getValueDecimal(_value2);
+		if(_decimal1&&_decimal2){
+			_decimalDifference=_getDecimalDifference(_decimal1,_decimal2);
+			if(_decimalDifference){
+				/////if(amVerbose())
+				outputDecimal("Decimal difference: '",_decimalDifference,"'.\n");
+				result=!isDecimalPositive(_decimalDifference);
+				free_decimal(_decimalDifference);
+			}
+		}
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
+		if(_decimalDifference)return _getIntegerValue(result?1:0); // NOTE even though we freed _decimalDifference the pointer is still not NULL!!!!
 	}else
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 	}
@@ -5271,6 +5314,47 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 	}
 	return NULL;
 }
+// MDH@18OCT2019: we can get the range of integers between two values
+Mvalue* integerrange(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
+	if(_value1->type==VT_MAP||_value2->type==VT_MAP)return NULL; // neither operand can be a map for sure
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerrange);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerrange);
+	// now we're dealing with scalars
+	Mvalue* upValue=smallerthanorequalto(_value1,_value2); // the direction we'll be going
+	if(upValue&&upValue->type==VT_INTEGER){
+		bool up=(upValue->value._integer->ll!=0);
+		// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
+		// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
+		long long rangeInteger=getValueInteger(up?Mceil(_value1):Mfloor(_value1));
+		Mvalue* integerrangeValue=(rangeInteger!=M_LL_INVALID?_getIntegerValue(rangeInteger):NULL);
+		if(integerrangeValue){
+			if(amVerbose()){
+				Mvalue* lastIntegerrangeValue=(up?Mceil(_value2):Mfloor(_value2));
+				outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
+				char c;output("Press Ctrl-C to stop or any other key to continue...");inputCharRead(&c);if(c==3)return NULL;
+			}
+			Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
+			Mvalue* inrangeValue;
+			while(integerrangeValue){
+				// determine whether this value does not exceed the last value
+				inrangeValue=(up?smallerthanorequalto(integerrangeValue,_value2):largerthanorequalto(integerrangeValue,_value2));
+				if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
+				if(inrangeValue->value._integer->ll==0)break; // not in range
+				if(appendedToList(integerrangeValueList,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
+				// determine the next value to insert into the integer range
+				if(up)rangeInteger++;else rangeInteger--;
+				integerrangeValue=_getIntegerValue(rangeInteger);
+			}
+			return _getValueOfList(integerrangeValueList,true);
+		}else{
+			output("%s",ERROR_PREFIX);outputValue("Failed to determine the first candidate range integer of '",_value1,"'.\n");
+		}
+	}else
+		outputError("Unable to determine whether to go up or down in the integer range");
+	return NULL;
+	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
+}
 
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	Mvalue* result=NULL;
@@ -5294,6 +5378,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));break;
 			case '!' :result=unequalto(_value1,_value2);break;
 			case '=' :result=equalto(_value1,_value2);break;
+			case ':' :result=integerrange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:output("%sUnknown binary operator '%s'.\n",ERROR_PREFIX,operator);
 		}
 		if(amVerbose()){if(result)outputValue("Result of applying binary operator: '",result,"'.\n");else outputLine("No result!");}
@@ -5319,6 +5404,7 @@ char getOperatorPrecedence(Mstring* operator){
 			case '^' :return 4;
 			case '&' :return (string_char(operator,1)?2:5);
 			case '|' :return (string_char(operator,1)?1:3);
+			case ':' : // MDH@18OCT2019: lowest priority right now but have to check on this!!!!
 			// not-equal/equal operator
 			case '!' :
 			case '=' :return 6;
@@ -5823,7 +5909,7 @@ bool evaluateCommand(){
 	// output the commandText
 	output("%s = ",string(commandText));
 	// if the result is a null value, show the NULL_value
-	outputValueColored(isNull(_commandExpressionValue)?NULL_value:_commandExpressionValue);
+	outputValueColored(isValueNull(_commandExpressionValue)?NULL_value:_commandExpressionValue);
 	
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputLine("Result released!"); // TODO do we need to do this?????
 

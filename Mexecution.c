@@ -724,6 +724,10 @@ const char* M_INF="Inf";
 bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}/* VALIDATED */
 bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
 bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
+// MDH@18OCT2019: lettting the comparison take care of the result!!!
+bool ldIsPositive(long double ld){return(ld>0);}/* VALIDATED */
+bool ldIsNegative(long double ld){return(ld<0);}/* VALIDATED */
+
 long long double2long(long double ld){
     if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
     // TODO perhaps there are some other 

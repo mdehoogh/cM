@@ -2726,3 +2726,6 @@ Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){
 	}
 	return NULL;
 }
+
+bool isDecimalPositive(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)!=0?false:mpd_ispositive(decimal->mpd)!=0):false);}
+bool isDecimalNegative(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)!=0?false:mpd_isnegative(decimal->mpd)!=0):false);}

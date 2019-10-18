@@ -156,9 +156,11 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map);
 
 bool isValueZero(Mvalue* _value);
 bool isValueOne(Mvalue* _value);
- 
-bool isNull(Mvalue* _value); // expose as well
-bool isUndefined(Mvalue* _value); // expose as well
+bool isValuePositive(Mvalue* _value);
+bool isValueNegative(Mvalue* _value);
+bool isValueScalar(Mvalue* _value);
+bool isValueNull(Mvalue* _value); // expose as well
+bool isValueUndefined(Mvalue* _value); // expose as well
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);
@@ -185,6 +187,9 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
 // some conversion functions that might be moved to some more specialized 'module'
 Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero); // TODO probably to be moved to Mrational.h/c
 Mbiginteger* _getRoundedRationalInteger(Mrational* _rational);
+
+Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero);
+Mdecimal* _getRoundedDecimal(Mdecimal* _decimal);
 
 Mdecimal* _getValueDecimal(Mvalue* _value);
 Mdecimal* getValueDecimal(Mvalue* _value);

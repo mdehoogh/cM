@@ -179,6 +179,9 @@ const Mbiginteger* getBigintegerThree();
 bool ldIsZero(long double ld);
 bool ldIsNaN(long double ld);
 bool ldIsInf(long double ld);
+bool ldIsPositive(long double ld);
+bool ldIsNegative(long double ld);
+
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getIntegerText(Minteger* _integer);

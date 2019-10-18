@@ -81,3 +81,6 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating);
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
 
 Mdecimal* _getInverseDecimal(Mdecimal const * const decimal);
+
+bool isDecimalPositive(Mdecimal const * const decimal);
+bool isDecimalNegative(Mdecimal const * const decimal);
