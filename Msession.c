@@ -82,7 +82,7 @@ void emptyline(){outputControlText("2K\r");}
 void backspace(){outputControlText("D"); /* go left one character */ outputControlText("K"); /* clear the rest of the line */}
 
 void setColor(char const * const colortext){output(ES"38;5;%sm",colortext);}
-void setBackColor(char const * const colortext){output(ES"48;5%sm",colortext);}
+void setBackColor(char const * const colortext){output(ES"48;5;%sm",colortext);}
 
 void resetOutputColor(){setColor(getInfoColor());setBackColor(getBackgroundColor());}
 
