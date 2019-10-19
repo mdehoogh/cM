@@ -302,10 +302,10 @@ char* string(Mstring* const str){
 }
 
 /** Get where the first occurrence of a character in the String is */
-int32_t string_find(const Mstring* const str,char c){
+long long string_find(const Mstring* const str,char c){
     if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
-        int32_t pos=0;
+        long long pos=0;
         size_t l=str->length; // first character to check
         while(pos<l){ // still within the text
             if(str->chars[pos]==c)return pos; // if a match return pos
@@ -321,7 +321,7 @@ void string_reverse(Mstring* const str){
     size_t l=str->length;
     if(!l)return;
     l--;
-    int32_t halfway=(l>>1);
+    long long halfway=(l>>1);
     if(!halfway)return;
     ///////////printf("\nReversing: '%s'.",string(str));
     char c;

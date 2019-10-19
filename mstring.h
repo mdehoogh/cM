@@ -38,7 +38,7 @@ char* _stringstart(Mstring const * const str,size_t length); // returns a copy o
 
 bool string_shorten(Mstring * const str,size_t length);
 
-int32_t string_find(Mstring const * const str,char c);
+long long string_find(Mstring const * const str,char c);
 
 // changing the string
 char string_removed_char(Mstring * const str,size_t pos);

@@ -1604,38 +1604,33 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){
         Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
         mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
         if(mpd_context){
-            if(floor){
-                if(towardszero){
-                    Mdecimal* _truncDecimal=__decimal(mpd_context,0,0);
-                    if(_truncDecimal){
-                        uint32_t status;
-                        mpd_qtrunc(_truncDecimal->mpd,_decimal->mpd,mpd_context,&status);
-                        if((status&0xEFBE)==0)return _truncDecimal;
-                        output("%s",ERROR_PREFIX);outputDecimal("Failed to truncate decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
-                        free_decimal(_truncDecimal);
-                    }
-                }else{
-                   Mdecimal* _floorDecimal=__decimal(mpd_context,0,0);
-                    if(_floorDecimal){
-                        uint32_t status;
-                        mpd_qfloor(_floorDecimal->mpd,_decimal->mpd,mpd_context,&status);
-                        if((status&0xEFBE)==0)return _floorDecimal;
-                        output("%s",ERROR_PREFIX);outputDecimal("Failed to floor decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
-                        free_decimal(_floorDecimal);
-                    }                    
+            if(towardszero){ // always means truncing!!!
+                Mdecimal* _truncDecimal=__decimal(mpd_context,0,0);
+                if(_truncDecimal){
+                    uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
+                    mpd_qtrunc(_truncDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                    if((status&0xEFBF)==0)return _truncDecimal;
+                    output("%s",ERROR_PREFIX);outputDecimal("Failed to truncate decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                    free_decimal(_truncDecimal);
                 }
+            }else
+            if(floor){
+                Mdecimal* _floorDecimal=__decimal(mpd_context,0,0);
+                if(_floorDecimal){
+                    uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
+                    mpd_qfloor(_floorDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                    if((status&0xEFBF)==0)return _floorDecimal;
+                    output("%s",ERROR_PREFIX);outputDecimal("Failed to floor decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                    free_decimal(_floorDecimal);
+                }                    
             }else{
-                if(towardszero){
-
-                }else{
-                    Mdecimal* _ceilDecimal=__decimal(mpd_context,0,0);
-                    if(_ceilDecimal){
-                        uint32_t status;
-                        mpd_qceil(_ceilDecimal->mpd,_decimal->mpd,mpd_context,&status);
-                        if((status&0xEFBE)==0)return _ceilDecimal;
-                        output("%s",ERROR_PREFIX);outputDecimal("Failed to ceil decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
-                        free_decimal(_ceilDecimal);
-                    }
+                Mdecimal* _ceilDecimal=__decimal(mpd_context,0,0);
+                if(_ceilDecimal){
+                    uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
+                    mpd_qceil(_ceilDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                    if((status&0xEFBF)==0)return _ceilDecimal;
+                    output("%s",ERROR_PREFIX);outputDecimal("Failed to ceil decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                    free_decimal(_ceilDecimal);
                 }
             }
         }else
@@ -1651,9 +1646,9 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){
         if(mpd_context){
             Mdecimal* _roundDecimal=__decimal(mpd_context,0,0);
             if(_roundDecimal){
-                uint32_t status;
+                uint32_t status=0;
                 mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
-                if((status&0xEFBE)==0)return _roundDecimal;
+                if((status&0xEFBF)==0)return _roundDecimal;
                 output("%s",ERROR_PREFIX);outputDecimal("Failed to round decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
                 free_decimal(_roundDecimal);
             }
