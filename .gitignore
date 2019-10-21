@@ -18,4 +18,3 @@ libtommath/*.o
 
 src/*.o
 src/M
-src/Makefile.am
