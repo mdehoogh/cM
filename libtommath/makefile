@@ -84,7 +84,8 @@ profiled_single:
 	$(AR) $(ARFLAGS) $(LIBNAME) mpi.o
 	ranlib $(LIBNAME)
 
-install: $(LIBNAME)
+# MDH@21OCT2019: to prevent installation together with M install has been changed to installmpint
+installmpint: $(LIBNAME)
 	install -d $(DESTDIR)$(LIBPATH)
 	install -d $(DESTDIR)$(INCPATH)
 	install -m 644 $(LIBNAME) $(DESTDIR)$(LIBPATH)

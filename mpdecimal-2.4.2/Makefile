@@ -31,8 +31,8 @@ check_alloc: default
 profile: FORCE
 	cd libmpdec && $(MAKE) profile
 
-
-install: FORCE
+# MDH@21OCT2019: in order to prevent installation with M install has been altered to installmpdec
+installmpdec: FORCE
 	$(INSTALL) -d -m 755 $(DESTDIR)$(includedir)
 	$(INSTALL) -m 644 libmpdec/mpdecimal.h $(DESTDIR)$(includedir)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(libdir)

@@ -20,7 +20,7 @@
 
 char const * const M_VERSION="0.1.0";
 char const * const M_BUILD="1";
-char const * const M_DATE="21 October 2019, 14:00";
+char const * const M_DATE="21 October 2019, 15:00";
 
 // used externally in Mexecution.h, Mvalue.h, Mfunctions.h, Menvironment.h
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
