@@ -86,8 +86,8 @@ profiled_single:
 
 # MDH@21OCT2019: to prevent installation together with M install has been changed to installmpint
 install:
-	echo "The 'install' option has been renamed to 'installmpint' to prevent unintended installation of libtommath when installing M, as this is not required by M."
-	echo "Therefore, use 'make installmpint' to truely install libtommath on your computer!"
+	@(info The 'install' option has been renamed to 'installmpint' to prevent unintended installation of libtommath when installing M, as this is not required by M.)
+	@(info Therefore, use 'make installmpint' to truely install libtommath on your computer!)
 
 installmpint: $(LIBNAME)
 	install -d $(DESTDIR)$(LIBPATH)
