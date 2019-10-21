@@ -3,14 +3,13 @@ mpdecimal-2.4.2/config.log
 mpdecimal-2.4.2/libmpdec/*.o
 mpdecimal-2.4.2/libmpdec/*.a
 mpdecimal-2.4.2/libmpdec/.objs/*
-mpdecimal-2.4.2/Makefile
-mpdecimal.h
-libmpdec.a
+
+lib/libmpdec.a
+lib/libtommath.a
 
 cdecimal-2.3/*
 
 libtommath-1.1.0/*
-tommath.h
 libtommath.a
 libtommath/*.a
 libtommath/*.o
