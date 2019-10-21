@@ -6,6 +6,21 @@
 # remove M so if we fail we'd know it
 rm -f M
 
+if [[ ! -d lib ]]; then
+    if [[ ! -f lib ]]; then
+        mkdir lib
+        if [[ -d lib ]]; then
+            echo "lib subdirectory created..."
+        else
+            echo "ERROR: Failed to create the lib subdirectory!"
+            exit 1
+        fi
+    else
+        echo "A file called lib already exists. Cannot create the subdirectory..."
+        exit 1
+    fi
+fi
+
 # if libmpdec.a is not present, we should create it
 if [[ ! -f lib/libmpdec.a && ! -d lib/libmpdec.a ]]; then
 #    # force running as sudo check
