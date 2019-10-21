@@ -34,7 +34,7 @@ profile: FORCE
 # MDH@21OCT2019: in order to prevent installation with M install has been altered to installmpdec
 install: FORCE
 	@echo
-	@echo The 'install' option has been renamed to 'installmpdec' in order to prevent installation of mpdecimal 2.4.2 when installing M (as this is not required by M).
+	@echo The 'install' option has been renamed to 'installmpdec' in order to prevent installation of mpdecimal 2.4.2 when installing M, as this is not required by M.
 	@echo Therefore, use 'make installmpdec' to truely install mpdecimal 2.4.2 on your computer!
 	@echo
 
