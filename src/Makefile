@@ -98,13 +98,13 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_M_OBJECTS = M-M.$(OBJEXT) M-Menvironment.$(OBJEXT) \
-	M-Mfunctions.$(OBJEXT) M-Mvalue.$(OBJEXT) M-Mdecimal.$(OBJEXT) \
-	M-Mrational.$(OBJEXT) M-Mbiginteger.$(OBJEXT) \
-	M-Mexecution.$(OBJEXT) M-Mmemory.$(OBJEXT) \
-	M-Mexpression.$(OBJEXT) M-Msession.$(OBJEXT) \
-	M-Moutput.$(OBJEXT) M-Mcolors.$(OBJEXT) M-Msettings.$(OBJEXT) \
-	M-Mstring.$(OBJEXT) M-Malloc.$(OBJEXT)
+am_M_OBJECTS = M-Malloc.$(OBJEXT) M-Mstring.$(OBJEXT) \
+	M-Msettings.$(OBJEXT) M-Mcolors.$(OBJEXT) M-Moutput.$(OBJEXT) \
+	M-Msession.$(OBJEXT) M-Mexpression.$(OBJEXT) \
+	M-Mmemory.$(OBJEXT) M-Mexecution.$(OBJEXT) \
+	M-Mbiginteger.$(OBJEXT) M-Mrational.$(OBJEXT) \
+	M-Mdecimal.$(OBJEXT) M-Mvalue.$(OBJEXT) M-Mfunctions.$(OBJEXT) \
+	M-Menvironment.$(OBJEXT) M-M.$(OBJEXT)
 M_OBJECTS = $(am_M_OBJECTS)
 M_LDADD = $(LDADD)
 M_LINK = $(CCLD) $(M_CFLAGS) $(CFLAGS) $(M_LDFLAGS) $(LDFLAGS) -o $@
@@ -264,7 +264,7 @@ top_srcdir = ..
 # the C flags for the M target
 M_CFLAGS = -Wno-incompatible-pointer-types -Wno-dangling-else -Wno-incompatible-pointer-types-discards-qualifiers
 M_LDFLAGS = -L.. -lmpdec -ltommath
-M_SOURCES = M.c Menvironment.c Mfunctions.c Mvalue.c Mdecimal.c Mrational.c Mbiginteger.c Mexecution.c Mmemory.c Mexpression.c Msession.c Moutput.c Mcolors.c Msettings.c Mstring.c Malloc.c tommath.h mpdecimal.h
+M_SOURCES = tommath.h mpdecimal.h Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c
 all: all-am
 
 .SUFFIXES:
@@ -388,201 +388,19 @@ am--depfiles: $(am__depfiles_remade)
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
-M-M.o: M.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-M.o -MD -MP -MF $(DEPDIR)/M-M.Tpo -c -o M-M.o `test -f 'M.c' || echo '$(srcdir)/'`M.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-M.Tpo $(DEPDIR)/M-M.Po
-#	$(AM_V_CC)source='M.c' object='M-M.o' libtool=no \
+M-Malloc.o: Malloc.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Malloc.o -MD -MP -MF $(DEPDIR)/M-Malloc.Tpo -c -o M-Malloc.o `test -f 'Malloc.c' || echo '$(srcdir)/'`Malloc.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Malloc.Tpo $(DEPDIR)/M-Malloc.Po
+#	$(AM_V_CC)source='Malloc.c' object='M-Malloc.o' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-M.o `test -f 'M.c' || echo '$(srcdir)/'`M.c
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Malloc.o `test -f 'Malloc.c' || echo '$(srcdir)/'`Malloc.c
 
-M-M.obj: M.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-M.obj -MD -MP -MF $(DEPDIR)/M-M.Tpo -c -o M-M.obj `if test -f 'M.c'; then $(CYGPATH_W) 'M.c'; else $(CYGPATH_W) '$(srcdir)/M.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-M.Tpo $(DEPDIR)/M-M.Po
-#	$(AM_V_CC)source='M.c' object='M-M.obj' libtool=no \
+M-Malloc.obj: Malloc.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Malloc.obj -MD -MP -MF $(DEPDIR)/M-Malloc.Tpo -c -o M-Malloc.obj `if test -f 'Malloc.c'; then $(CYGPATH_W) 'Malloc.c'; else $(CYGPATH_W) '$(srcdir)/Malloc.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Malloc.Tpo $(DEPDIR)/M-Malloc.Po
+#	$(AM_V_CC)source='Malloc.c' object='M-Malloc.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-M.obj `if test -f 'M.c'; then $(CYGPATH_W) 'M.c'; else $(CYGPATH_W) '$(srcdir)/M.c'; fi`
-
-M-Menvironment.o: Menvironment.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Menvironment.o -MD -MP -MF $(DEPDIR)/M-Menvironment.Tpo -c -o M-Menvironment.o `test -f 'Menvironment.c' || echo '$(srcdir)/'`Menvironment.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Menvironment.Tpo $(DEPDIR)/M-Menvironment.Po
-#	$(AM_V_CC)source='Menvironment.c' object='M-Menvironment.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Menvironment.o `test -f 'Menvironment.c' || echo '$(srcdir)/'`Menvironment.c
-
-M-Menvironment.obj: Menvironment.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Menvironment.obj -MD -MP -MF $(DEPDIR)/M-Menvironment.Tpo -c -o M-Menvironment.obj `if test -f 'Menvironment.c'; then $(CYGPATH_W) 'Menvironment.c'; else $(CYGPATH_W) '$(srcdir)/Menvironment.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Menvironment.Tpo $(DEPDIR)/M-Menvironment.Po
-#	$(AM_V_CC)source='Menvironment.c' object='M-Menvironment.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Menvironment.obj `if test -f 'Menvironment.c'; then $(CYGPATH_W) 'Menvironment.c'; else $(CYGPATH_W) '$(srcdir)/Menvironment.c'; fi`
-
-M-Mfunctions.o: Mfunctions.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mfunctions.o -MD -MP -MF $(DEPDIR)/M-Mfunctions.Tpo -c -o M-Mfunctions.o `test -f 'Mfunctions.c' || echo '$(srcdir)/'`Mfunctions.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mfunctions.Tpo $(DEPDIR)/M-Mfunctions.Po
-#	$(AM_V_CC)source='Mfunctions.c' object='M-Mfunctions.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mfunctions.o `test -f 'Mfunctions.c' || echo '$(srcdir)/'`Mfunctions.c
-
-M-Mfunctions.obj: Mfunctions.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mfunctions.obj -MD -MP -MF $(DEPDIR)/M-Mfunctions.Tpo -c -o M-Mfunctions.obj `if test -f 'Mfunctions.c'; then $(CYGPATH_W) 'Mfunctions.c'; else $(CYGPATH_W) '$(srcdir)/Mfunctions.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mfunctions.Tpo $(DEPDIR)/M-Mfunctions.Po
-#	$(AM_V_CC)source='Mfunctions.c' object='M-Mfunctions.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mfunctions.obj `if test -f 'Mfunctions.c'; then $(CYGPATH_W) 'Mfunctions.c'; else $(CYGPATH_W) '$(srcdir)/Mfunctions.c'; fi`
-
-M-Mvalue.o: Mvalue.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mvalue.o -MD -MP -MF $(DEPDIR)/M-Mvalue.Tpo -c -o M-Mvalue.o `test -f 'Mvalue.c' || echo '$(srcdir)/'`Mvalue.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mvalue.Tpo $(DEPDIR)/M-Mvalue.Po
-#	$(AM_V_CC)source='Mvalue.c' object='M-Mvalue.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mvalue.o `test -f 'Mvalue.c' || echo '$(srcdir)/'`Mvalue.c
-
-M-Mvalue.obj: Mvalue.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mvalue.obj -MD -MP -MF $(DEPDIR)/M-Mvalue.Tpo -c -o M-Mvalue.obj `if test -f 'Mvalue.c'; then $(CYGPATH_W) 'Mvalue.c'; else $(CYGPATH_W) '$(srcdir)/Mvalue.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mvalue.Tpo $(DEPDIR)/M-Mvalue.Po
-#	$(AM_V_CC)source='Mvalue.c' object='M-Mvalue.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mvalue.obj `if test -f 'Mvalue.c'; then $(CYGPATH_W) 'Mvalue.c'; else $(CYGPATH_W) '$(srcdir)/Mvalue.c'; fi`
-
-M-Mdecimal.o: Mdecimal.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mdecimal.o -MD -MP -MF $(DEPDIR)/M-Mdecimal.Tpo -c -o M-Mdecimal.o `test -f 'Mdecimal.c' || echo '$(srcdir)/'`Mdecimal.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mdecimal.Tpo $(DEPDIR)/M-Mdecimal.Po
-#	$(AM_V_CC)source='Mdecimal.c' object='M-Mdecimal.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mdecimal.o `test -f 'Mdecimal.c' || echo '$(srcdir)/'`Mdecimal.c
-
-M-Mdecimal.obj: Mdecimal.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mdecimal.obj -MD -MP -MF $(DEPDIR)/M-Mdecimal.Tpo -c -o M-Mdecimal.obj `if test -f 'Mdecimal.c'; then $(CYGPATH_W) 'Mdecimal.c'; else $(CYGPATH_W) '$(srcdir)/Mdecimal.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mdecimal.Tpo $(DEPDIR)/M-Mdecimal.Po
-#	$(AM_V_CC)source='Mdecimal.c' object='M-Mdecimal.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mdecimal.obj `if test -f 'Mdecimal.c'; then $(CYGPATH_W) 'Mdecimal.c'; else $(CYGPATH_W) '$(srcdir)/Mdecimal.c'; fi`
-
-M-Mrational.o: Mrational.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mrational.o -MD -MP -MF $(DEPDIR)/M-Mrational.Tpo -c -o M-Mrational.o `test -f 'Mrational.c' || echo '$(srcdir)/'`Mrational.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mrational.Tpo $(DEPDIR)/M-Mrational.Po
-#	$(AM_V_CC)source='Mrational.c' object='M-Mrational.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mrational.o `test -f 'Mrational.c' || echo '$(srcdir)/'`Mrational.c
-
-M-Mrational.obj: Mrational.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mrational.obj -MD -MP -MF $(DEPDIR)/M-Mrational.Tpo -c -o M-Mrational.obj `if test -f 'Mrational.c'; then $(CYGPATH_W) 'Mrational.c'; else $(CYGPATH_W) '$(srcdir)/Mrational.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mrational.Tpo $(DEPDIR)/M-Mrational.Po
-#	$(AM_V_CC)source='Mrational.c' object='M-Mrational.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mrational.obj `if test -f 'Mrational.c'; then $(CYGPATH_W) 'Mrational.c'; else $(CYGPATH_W) '$(srcdir)/Mrational.c'; fi`
-
-M-Mbiginteger.o: Mbiginteger.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mbiginteger.o -MD -MP -MF $(DEPDIR)/M-Mbiginteger.Tpo -c -o M-Mbiginteger.o `test -f 'Mbiginteger.c' || echo '$(srcdir)/'`Mbiginteger.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mbiginteger.Tpo $(DEPDIR)/M-Mbiginteger.Po
-#	$(AM_V_CC)source='Mbiginteger.c' object='M-Mbiginteger.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mbiginteger.o `test -f 'Mbiginteger.c' || echo '$(srcdir)/'`Mbiginteger.c
-
-M-Mbiginteger.obj: Mbiginteger.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mbiginteger.obj -MD -MP -MF $(DEPDIR)/M-Mbiginteger.Tpo -c -o M-Mbiginteger.obj `if test -f 'Mbiginteger.c'; then $(CYGPATH_W) 'Mbiginteger.c'; else $(CYGPATH_W) '$(srcdir)/Mbiginteger.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mbiginteger.Tpo $(DEPDIR)/M-Mbiginteger.Po
-#	$(AM_V_CC)source='Mbiginteger.c' object='M-Mbiginteger.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mbiginteger.obj `if test -f 'Mbiginteger.c'; then $(CYGPATH_W) 'Mbiginteger.c'; else $(CYGPATH_W) '$(srcdir)/Mbiginteger.c'; fi`
-
-M-Mexecution.o: Mexecution.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexecution.o -MD -MP -MF $(DEPDIR)/M-Mexecution.Tpo -c -o M-Mexecution.o `test -f 'Mexecution.c' || echo '$(srcdir)/'`Mexecution.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexecution.Tpo $(DEPDIR)/M-Mexecution.Po
-#	$(AM_V_CC)source='Mexecution.c' object='M-Mexecution.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexecution.o `test -f 'Mexecution.c' || echo '$(srcdir)/'`Mexecution.c
-
-M-Mexecution.obj: Mexecution.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexecution.obj -MD -MP -MF $(DEPDIR)/M-Mexecution.Tpo -c -o M-Mexecution.obj `if test -f 'Mexecution.c'; then $(CYGPATH_W) 'Mexecution.c'; else $(CYGPATH_W) '$(srcdir)/Mexecution.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexecution.Tpo $(DEPDIR)/M-Mexecution.Po
-#	$(AM_V_CC)source='Mexecution.c' object='M-Mexecution.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexecution.obj `if test -f 'Mexecution.c'; then $(CYGPATH_W) 'Mexecution.c'; else $(CYGPATH_W) '$(srcdir)/Mexecution.c'; fi`
-
-M-Mmemory.o: Mmemory.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mmemory.o -MD -MP -MF $(DEPDIR)/M-Mmemory.Tpo -c -o M-Mmemory.o `test -f 'Mmemory.c' || echo '$(srcdir)/'`Mmemory.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mmemory.Tpo $(DEPDIR)/M-Mmemory.Po
-#	$(AM_V_CC)source='Mmemory.c' object='M-Mmemory.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mmemory.o `test -f 'Mmemory.c' || echo '$(srcdir)/'`Mmemory.c
-
-M-Mmemory.obj: Mmemory.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mmemory.obj -MD -MP -MF $(DEPDIR)/M-Mmemory.Tpo -c -o M-Mmemory.obj `if test -f 'Mmemory.c'; then $(CYGPATH_W) 'Mmemory.c'; else $(CYGPATH_W) '$(srcdir)/Mmemory.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mmemory.Tpo $(DEPDIR)/M-Mmemory.Po
-#	$(AM_V_CC)source='Mmemory.c' object='M-Mmemory.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mmemory.obj `if test -f 'Mmemory.c'; then $(CYGPATH_W) 'Mmemory.c'; else $(CYGPATH_W) '$(srcdir)/Mmemory.c'; fi`
-
-M-Mexpression.o: Mexpression.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexpression.o -MD -MP -MF $(DEPDIR)/M-Mexpression.Tpo -c -o M-Mexpression.o `test -f 'Mexpression.c' || echo '$(srcdir)/'`Mexpression.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexpression.Tpo $(DEPDIR)/M-Mexpression.Po
-#	$(AM_V_CC)source='Mexpression.c' object='M-Mexpression.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexpression.o `test -f 'Mexpression.c' || echo '$(srcdir)/'`Mexpression.c
-
-M-Mexpression.obj: Mexpression.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexpression.obj -MD -MP -MF $(DEPDIR)/M-Mexpression.Tpo -c -o M-Mexpression.obj `if test -f 'Mexpression.c'; then $(CYGPATH_W) 'Mexpression.c'; else $(CYGPATH_W) '$(srcdir)/Mexpression.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexpression.Tpo $(DEPDIR)/M-Mexpression.Po
-#	$(AM_V_CC)source='Mexpression.c' object='M-Mexpression.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexpression.obj `if test -f 'Mexpression.c'; then $(CYGPATH_W) 'Mexpression.c'; else $(CYGPATH_W) '$(srcdir)/Mexpression.c'; fi`
-
-M-Msession.o: Msession.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msession.o -MD -MP -MF $(DEPDIR)/M-Msession.Tpo -c -o M-Msession.o `test -f 'Msession.c' || echo '$(srcdir)/'`Msession.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msession.Tpo $(DEPDIR)/M-Msession.Po
-#	$(AM_V_CC)source='Msession.c' object='M-Msession.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msession.o `test -f 'Msession.c' || echo '$(srcdir)/'`Msession.c
-
-M-Msession.obj: Msession.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msession.obj -MD -MP -MF $(DEPDIR)/M-Msession.Tpo -c -o M-Msession.obj `if test -f 'Msession.c'; then $(CYGPATH_W) 'Msession.c'; else $(CYGPATH_W) '$(srcdir)/Msession.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msession.Tpo $(DEPDIR)/M-Msession.Po
-#	$(AM_V_CC)source='Msession.c' object='M-Msession.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msession.obj `if test -f 'Msession.c'; then $(CYGPATH_W) 'Msession.c'; else $(CYGPATH_W) '$(srcdir)/Msession.c'; fi`
-
-M-Moutput.o: Moutput.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Moutput.o -MD -MP -MF $(DEPDIR)/M-Moutput.Tpo -c -o M-Moutput.o `test -f 'Moutput.c' || echo '$(srcdir)/'`Moutput.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Moutput.Tpo $(DEPDIR)/M-Moutput.Po
-#	$(AM_V_CC)source='Moutput.c' object='M-Moutput.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Moutput.o `test -f 'Moutput.c' || echo '$(srcdir)/'`Moutput.c
-
-M-Moutput.obj: Moutput.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Moutput.obj -MD -MP -MF $(DEPDIR)/M-Moutput.Tpo -c -o M-Moutput.obj `if test -f 'Moutput.c'; then $(CYGPATH_W) 'Moutput.c'; else $(CYGPATH_W) '$(srcdir)/Moutput.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Moutput.Tpo $(DEPDIR)/M-Moutput.Po
-#	$(AM_V_CC)source='Moutput.c' object='M-Moutput.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Moutput.obj `if test -f 'Moutput.c'; then $(CYGPATH_W) 'Moutput.c'; else $(CYGPATH_W) '$(srcdir)/Moutput.c'; fi`
-
-M-Mcolors.o: Mcolors.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mcolors.o -MD -MP -MF $(DEPDIR)/M-Mcolors.Tpo -c -o M-Mcolors.o `test -f 'Mcolors.c' || echo '$(srcdir)/'`Mcolors.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mcolors.Tpo $(DEPDIR)/M-Mcolors.Po
-#	$(AM_V_CC)source='Mcolors.c' object='M-Mcolors.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mcolors.o `test -f 'Mcolors.c' || echo '$(srcdir)/'`Mcolors.c
-
-M-Mcolors.obj: Mcolors.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mcolors.obj -MD -MP -MF $(DEPDIR)/M-Mcolors.Tpo -c -o M-Mcolors.obj `if test -f 'Mcolors.c'; then $(CYGPATH_W) 'Mcolors.c'; else $(CYGPATH_W) '$(srcdir)/Mcolors.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mcolors.Tpo $(DEPDIR)/M-Mcolors.Po
-#	$(AM_V_CC)source='Mcolors.c' object='M-Mcolors.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mcolors.obj `if test -f 'Mcolors.c'; then $(CYGPATH_W) 'Mcolors.c'; else $(CYGPATH_W) '$(srcdir)/Mcolors.c'; fi`
-
-M-Msettings.o: Msettings.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msettings.o -MD -MP -MF $(DEPDIR)/M-Msettings.Tpo -c -o M-Msettings.o `test -f 'Msettings.c' || echo '$(srcdir)/'`Msettings.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msettings.Tpo $(DEPDIR)/M-Msettings.Po
-#	$(AM_V_CC)source='Msettings.c' object='M-Msettings.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msettings.o `test -f 'Msettings.c' || echo '$(srcdir)/'`Msettings.c
-
-M-Msettings.obj: Msettings.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msettings.obj -MD -MP -MF $(DEPDIR)/M-Msettings.Tpo -c -o M-Msettings.obj `if test -f 'Msettings.c'; then $(CYGPATH_W) 'Msettings.c'; else $(CYGPATH_W) '$(srcdir)/Msettings.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msettings.Tpo $(DEPDIR)/M-Msettings.Po
-#	$(AM_V_CC)source='Msettings.c' object='M-Msettings.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msettings.obj `if test -f 'Msettings.c'; then $(CYGPATH_W) 'Msettings.c'; else $(CYGPATH_W) '$(srcdir)/Msettings.c'; fi`
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Malloc.obj `if test -f 'Malloc.c'; then $(CYGPATH_W) 'Malloc.c'; else $(CYGPATH_W) '$(srcdir)/Malloc.c'; fi`
 
 M-Mstring.o: Mstring.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mstring.o -MD -MP -MF $(DEPDIR)/M-Mstring.Tpo -c -o M-Mstring.o `test -f 'Mstring.c' || echo '$(srcdir)/'`Mstring.c
@@ -598,19 +416,201 @@ M-Mstring.obj: Mstring.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mstring.obj `if test -f 'Mstring.c'; then $(CYGPATH_W) 'Mstring.c'; else $(CYGPATH_W) '$(srcdir)/Mstring.c'; fi`
 
-M-Malloc.o: Malloc.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Malloc.o -MD -MP -MF $(DEPDIR)/M-Malloc.Tpo -c -o M-Malloc.o `test -f 'Malloc.c' || echo '$(srcdir)/'`Malloc.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Malloc.Tpo $(DEPDIR)/M-Malloc.Po
-#	$(AM_V_CC)source='Malloc.c' object='M-Malloc.o' libtool=no \
+M-Msettings.o: Msettings.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msettings.o -MD -MP -MF $(DEPDIR)/M-Msettings.Tpo -c -o M-Msettings.o `test -f 'Msettings.c' || echo '$(srcdir)/'`Msettings.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msettings.Tpo $(DEPDIR)/M-Msettings.Po
+#	$(AM_V_CC)source='Msettings.c' object='M-Msettings.o' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Malloc.o `test -f 'Malloc.c' || echo '$(srcdir)/'`Malloc.c
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msettings.o `test -f 'Msettings.c' || echo '$(srcdir)/'`Msettings.c
 
-M-Malloc.obj: Malloc.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Malloc.obj -MD -MP -MF $(DEPDIR)/M-Malloc.Tpo -c -o M-Malloc.obj `if test -f 'Malloc.c'; then $(CYGPATH_W) 'Malloc.c'; else $(CYGPATH_W) '$(srcdir)/Malloc.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Malloc.Tpo $(DEPDIR)/M-Malloc.Po
-#	$(AM_V_CC)source='Malloc.c' object='M-Malloc.obj' libtool=no \
+M-Msettings.obj: Msettings.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msettings.obj -MD -MP -MF $(DEPDIR)/M-Msettings.Tpo -c -o M-Msettings.obj `if test -f 'Msettings.c'; then $(CYGPATH_W) 'Msettings.c'; else $(CYGPATH_W) '$(srcdir)/Msettings.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msettings.Tpo $(DEPDIR)/M-Msettings.Po
+#	$(AM_V_CC)source='Msettings.c' object='M-Msettings.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Malloc.obj `if test -f 'Malloc.c'; then $(CYGPATH_W) 'Malloc.c'; else $(CYGPATH_W) '$(srcdir)/Malloc.c'; fi`
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msettings.obj `if test -f 'Msettings.c'; then $(CYGPATH_W) 'Msettings.c'; else $(CYGPATH_W) '$(srcdir)/Msettings.c'; fi`
+
+M-Mcolors.o: Mcolors.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mcolors.o -MD -MP -MF $(DEPDIR)/M-Mcolors.Tpo -c -o M-Mcolors.o `test -f 'Mcolors.c' || echo '$(srcdir)/'`Mcolors.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mcolors.Tpo $(DEPDIR)/M-Mcolors.Po
+#	$(AM_V_CC)source='Mcolors.c' object='M-Mcolors.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mcolors.o `test -f 'Mcolors.c' || echo '$(srcdir)/'`Mcolors.c
+
+M-Mcolors.obj: Mcolors.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mcolors.obj -MD -MP -MF $(DEPDIR)/M-Mcolors.Tpo -c -o M-Mcolors.obj `if test -f 'Mcolors.c'; then $(CYGPATH_W) 'Mcolors.c'; else $(CYGPATH_W) '$(srcdir)/Mcolors.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mcolors.Tpo $(DEPDIR)/M-Mcolors.Po
+#	$(AM_V_CC)source='Mcolors.c' object='M-Mcolors.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mcolors.obj `if test -f 'Mcolors.c'; then $(CYGPATH_W) 'Mcolors.c'; else $(CYGPATH_W) '$(srcdir)/Mcolors.c'; fi`
+
+M-Moutput.o: Moutput.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Moutput.o -MD -MP -MF $(DEPDIR)/M-Moutput.Tpo -c -o M-Moutput.o `test -f 'Moutput.c' || echo '$(srcdir)/'`Moutput.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Moutput.Tpo $(DEPDIR)/M-Moutput.Po
+#	$(AM_V_CC)source='Moutput.c' object='M-Moutput.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Moutput.o `test -f 'Moutput.c' || echo '$(srcdir)/'`Moutput.c
+
+M-Moutput.obj: Moutput.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Moutput.obj -MD -MP -MF $(DEPDIR)/M-Moutput.Tpo -c -o M-Moutput.obj `if test -f 'Moutput.c'; then $(CYGPATH_W) 'Moutput.c'; else $(CYGPATH_W) '$(srcdir)/Moutput.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Moutput.Tpo $(DEPDIR)/M-Moutput.Po
+#	$(AM_V_CC)source='Moutput.c' object='M-Moutput.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Moutput.obj `if test -f 'Moutput.c'; then $(CYGPATH_W) 'Moutput.c'; else $(CYGPATH_W) '$(srcdir)/Moutput.c'; fi`
+
+M-Msession.o: Msession.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msession.o -MD -MP -MF $(DEPDIR)/M-Msession.Tpo -c -o M-Msession.o `test -f 'Msession.c' || echo '$(srcdir)/'`Msession.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msession.Tpo $(DEPDIR)/M-Msession.Po
+#	$(AM_V_CC)source='Msession.c' object='M-Msession.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msession.o `test -f 'Msession.c' || echo '$(srcdir)/'`Msession.c
+
+M-Msession.obj: Msession.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Msession.obj -MD -MP -MF $(DEPDIR)/M-Msession.Tpo -c -o M-Msession.obj `if test -f 'Msession.c'; then $(CYGPATH_W) 'Msession.c'; else $(CYGPATH_W) '$(srcdir)/Msession.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Msession.Tpo $(DEPDIR)/M-Msession.Po
+#	$(AM_V_CC)source='Msession.c' object='M-Msession.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Msession.obj `if test -f 'Msession.c'; then $(CYGPATH_W) 'Msession.c'; else $(CYGPATH_W) '$(srcdir)/Msession.c'; fi`
+
+M-Mexpression.o: Mexpression.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexpression.o -MD -MP -MF $(DEPDIR)/M-Mexpression.Tpo -c -o M-Mexpression.o `test -f 'Mexpression.c' || echo '$(srcdir)/'`Mexpression.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexpression.Tpo $(DEPDIR)/M-Mexpression.Po
+#	$(AM_V_CC)source='Mexpression.c' object='M-Mexpression.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexpression.o `test -f 'Mexpression.c' || echo '$(srcdir)/'`Mexpression.c
+
+M-Mexpression.obj: Mexpression.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexpression.obj -MD -MP -MF $(DEPDIR)/M-Mexpression.Tpo -c -o M-Mexpression.obj `if test -f 'Mexpression.c'; then $(CYGPATH_W) 'Mexpression.c'; else $(CYGPATH_W) '$(srcdir)/Mexpression.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexpression.Tpo $(DEPDIR)/M-Mexpression.Po
+#	$(AM_V_CC)source='Mexpression.c' object='M-Mexpression.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexpression.obj `if test -f 'Mexpression.c'; then $(CYGPATH_W) 'Mexpression.c'; else $(CYGPATH_W) '$(srcdir)/Mexpression.c'; fi`
+
+M-Mmemory.o: Mmemory.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mmemory.o -MD -MP -MF $(DEPDIR)/M-Mmemory.Tpo -c -o M-Mmemory.o `test -f 'Mmemory.c' || echo '$(srcdir)/'`Mmemory.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mmemory.Tpo $(DEPDIR)/M-Mmemory.Po
+#	$(AM_V_CC)source='Mmemory.c' object='M-Mmemory.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mmemory.o `test -f 'Mmemory.c' || echo '$(srcdir)/'`Mmemory.c
+
+M-Mmemory.obj: Mmemory.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mmemory.obj -MD -MP -MF $(DEPDIR)/M-Mmemory.Tpo -c -o M-Mmemory.obj `if test -f 'Mmemory.c'; then $(CYGPATH_W) 'Mmemory.c'; else $(CYGPATH_W) '$(srcdir)/Mmemory.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mmemory.Tpo $(DEPDIR)/M-Mmemory.Po
+#	$(AM_V_CC)source='Mmemory.c' object='M-Mmemory.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mmemory.obj `if test -f 'Mmemory.c'; then $(CYGPATH_W) 'Mmemory.c'; else $(CYGPATH_W) '$(srcdir)/Mmemory.c'; fi`
+
+M-Mexecution.o: Mexecution.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexecution.o -MD -MP -MF $(DEPDIR)/M-Mexecution.Tpo -c -o M-Mexecution.o `test -f 'Mexecution.c' || echo '$(srcdir)/'`Mexecution.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexecution.Tpo $(DEPDIR)/M-Mexecution.Po
+#	$(AM_V_CC)source='Mexecution.c' object='M-Mexecution.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexecution.o `test -f 'Mexecution.c' || echo '$(srcdir)/'`Mexecution.c
+
+M-Mexecution.obj: Mexecution.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mexecution.obj -MD -MP -MF $(DEPDIR)/M-Mexecution.Tpo -c -o M-Mexecution.obj `if test -f 'Mexecution.c'; then $(CYGPATH_W) 'Mexecution.c'; else $(CYGPATH_W) '$(srcdir)/Mexecution.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mexecution.Tpo $(DEPDIR)/M-Mexecution.Po
+#	$(AM_V_CC)source='Mexecution.c' object='M-Mexecution.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mexecution.obj `if test -f 'Mexecution.c'; then $(CYGPATH_W) 'Mexecution.c'; else $(CYGPATH_W) '$(srcdir)/Mexecution.c'; fi`
+
+M-Mbiginteger.o: Mbiginteger.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mbiginteger.o -MD -MP -MF $(DEPDIR)/M-Mbiginteger.Tpo -c -o M-Mbiginteger.o `test -f 'Mbiginteger.c' || echo '$(srcdir)/'`Mbiginteger.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mbiginteger.Tpo $(DEPDIR)/M-Mbiginteger.Po
+#	$(AM_V_CC)source='Mbiginteger.c' object='M-Mbiginteger.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mbiginteger.o `test -f 'Mbiginteger.c' || echo '$(srcdir)/'`Mbiginteger.c
+
+M-Mbiginteger.obj: Mbiginteger.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mbiginteger.obj -MD -MP -MF $(DEPDIR)/M-Mbiginteger.Tpo -c -o M-Mbiginteger.obj `if test -f 'Mbiginteger.c'; then $(CYGPATH_W) 'Mbiginteger.c'; else $(CYGPATH_W) '$(srcdir)/Mbiginteger.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mbiginteger.Tpo $(DEPDIR)/M-Mbiginteger.Po
+#	$(AM_V_CC)source='Mbiginteger.c' object='M-Mbiginteger.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mbiginteger.obj `if test -f 'Mbiginteger.c'; then $(CYGPATH_W) 'Mbiginteger.c'; else $(CYGPATH_W) '$(srcdir)/Mbiginteger.c'; fi`
+
+M-Mrational.o: Mrational.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mrational.o -MD -MP -MF $(DEPDIR)/M-Mrational.Tpo -c -o M-Mrational.o `test -f 'Mrational.c' || echo '$(srcdir)/'`Mrational.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mrational.Tpo $(DEPDIR)/M-Mrational.Po
+#	$(AM_V_CC)source='Mrational.c' object='M-Mrational.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mrational.o `test -f 'Mrational.c' || echo '$(srcdir)/'`Mrational.c
+
+M-Mrational.obj: Mrational.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mrational.obj -MD -MP -MF $(DEPDIR)/M-Mrational.Tpo -c -o M-Mrational.obj `if test -f 'Mrational.c'; then $(CYGPATH_W) 'Mrational.c'; else $(CYGPATH_W) '$(srcdir)/Mrational.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mrational.Tpo $(DEPDIR)/M-Mrational.Po
+#	$(AM_V_CC)source='Mrational.c' object='M-Mrational.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mrational.obj `if test -f 'Mrational.c'; then $(CYGPATH_W) 'Mrational.c'; else $(CYGPATH_W) '$(srcdir)/Mrational.c'; fi`
+
+M-Mdecimal.o: Mdecimal.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mdecimal.o -MD -MP -MF $(DEPDIR)/M-Mdecimal.Tpo -c -o M-Mdecimal.o `test -f 'Mdecimal.c' || echo '$(srcdir)/'`Mdecimal.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mdecimal.Tpo $(DEPDIR)/M-Mdecimal.Po
+#	$(AM_V_CC)source='Mdecimal.c' object='M-Mdecimal.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mdecimal.o `test -f 'Mdecimal.c' || echo '$(srcdir)/'`Mdecimal.c
+
+M-Mdecimal.obj: Mdecimal.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mdecimal.obj -MD -MP -MF $(DEPDIR)/M-Mdecimal.Tpo -c -o M-Mdecimal.obj `if test -f 'Mdecimal.c'; then $(CYGPATH_W) 'Mdecimal.c'; else $(CYGPATH_W) '$(srcdir)/Mdecimal.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mdecimal.Tpo $(DEPDIR)/M-Mdecimal.Po
+#	$(AM_V_CC)source='Mdecimal.c' object='M-Mdecimal.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mdecimal.obj `if test -f 'Mdecimal.c'; then $(CYGPATH_W) 'Mdecimal.c'; else $(CYGPATH_W) '$(srcdir)/Mdecimal.c'; fi`
+
+M-Mvalue.o: Mvalue.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mvalue.o -MD -MP -MF $(DEPDIR)/M-Mvalue.Tpo -c -o M-Mvalue.o `test -f 'Mvalue.c' || echo '$(srcdir)/'`Mvalue.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mvalue.Tpo $(DEPDIR)/M-Mvalue.Po
+#	$(AM_V_CC)source='Mvalue.c' object='M-Mvalue.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mvalue.o `test -f 'Mvalue.c' || echo '$(srcdir)/'`Mvalue.c
+
+M-Mvalue.obj: Mvalue.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mvalue.obj -MD -MP -MF $(DEPDIR)/M-Mvalue.Tpo -c -o M-Mvalue.obj `if test -f 'Mvalue.c'; then $(CYGPATH_W) 'Mvalue.c'; else $(CYGPATH_W) '$(srcdir)/Mvalue.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mvalue.Tpo $(DEPDIR)/M-Mvalue.Po
+#	$(AM_V_CC)source='Mvalue.c' object='M-Mvalue.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mvalue.obj `if test -f 'Mvalue.c'; then $(CYGPATH_W) 'Mvalue.c'; else $(CYGPATH_W) '$(srcdir)/Mvalue.c'; fi`
+
+M-Mfunctions.o: Mfunctions.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mfunctions.o -MD -MP -MF $(DEPDIR)/M-Mfunctions.Tpo -c -o M-Mfunctions.o `test -f 'Mfunctions.c' || echo '$(srcdir)/'`Mfunctions.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mfunctions.Tpo $(DEPDIR)/M-Mfunctions.Po
+#	$(AM_V_CC)source='Mfunctions.c' object='M-Mfunctions.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mfunctions.o `test -f 'Mfunctions.c' || echo '$(srcdir)/'`Mfunctions.c
+
+M-Mfunctions.obj: Mfunctions.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Mfunctions.obj -MD -MP -MF $(DEPDIR)/M-Mfunctions.Tpo -c -o M-Mfunctions.obj `if test -f 'Mfunctions.c'; then $(CYGPATH_W) 'Mfunctions.c'; else $(CYGPATH_W) '$(srcdir)/Mfunctions.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Mfunctions.Tpo $(DEPDIR)/M-Mfunctions.Po
+#	$(AM_V_CC)source='Mfunctions.c' object='M-Mfunctions.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Mfunctions.obj `if test -f 'Mfunctions.c'; then $(CYGPATH_W) 'Mfunctions.c'; else $(CYGPATH_W) '$(srcdir)/Mfunctions.c'; fi`
+
+M-Menvironment.o: Menvironment.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Menvironment.o -MD -MP -MF $(DEPDIR)/M-Menvironment.Tpo -c -o M-Menvironment.o `test -f 'Menvironment.c' || echo '$(srcdir)/'`Menvironment.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Menvironment.Tpo $(DEPDIR)/M-Menvironment.Po
+#	$(AM_V_CC)source='Menvironment.c' object='M-Menvironment.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Menvironment.o `test -f 'Menvironment.c' || echo '$(srcdir)/'`Menvironment.c
+
+M-Menvironment.obj: Menvironment.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-Menvironment.obj -MD -MP -MF $(DEPDIR)/M-Menvironment.Tpo -c -o M-Menvironment.obj `if test -f 'Menvironment.c'; then $(CYGPATH_W) 'Menvironment.c'; else $(CYGPATH_W) '$(srcdir)/Menvironment.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-Menvironment.Tpo $(DEPDIR)/M-Menvironment.Po
+#	$(AM_V_CC)source='Menvironment.c' object='M-Menvironment.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-Menvironment.obj `if test -f 'Menvironment.c'; then $(CYGPATH_W) 'Menvironment.c'; else $(CYGPATH_W) '$(srcdir)/Menvironment.c'; fi`
+
+M-M.o: M.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-M.o -MD -MP -MF $(DEPDIR)/M-M.Tpo -c -o M-M.o `test -f 'M.c' || echo '$(srcdir)/'`M.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-M.Tpo $(DEPDIR)/M-M.Po
+#	$(AM_V_CC)source='M.c' object='M-M.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-M.o `test -f 'M.c' || echo '$(srcdir)/'`M.c
+
+M-M.obj: M.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -MT M-M.obj -MD -MP -MF $(DEPDIR)/M-M.Tpo -c -o M-M.obj `if test -f 'M.c'; then $(CYGPATH_W) 'M.c'; else $(CYGPATH_W) '$(srcdir)/M.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/M-M.Tpo $(DEPDIR)/M-M.Po
+#	$(AM_V_CC)source='M.c' object='M-M.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(M_CFLAGS) $(CFLAGS) -c -o M-M.obj `if test -f 'M.c'; then $(CYGPATH_W) 'M.c'; else $(CYGPATH_W) '$(srcdir)/M.c'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -851,7 +851,6 @@ uninstall-am: uninstall-binPROGRAMS
 
 .PRECIOUS: Makefile
 
-#M_LDADD = mpdecimal-2.4.2/libmpdec/libmpdec.a libtommath/libtommath.a
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

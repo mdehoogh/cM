@@ -4,5 +4,4 @@ bin_PROGRAMS = M
 M_CFLAGS = -Wno-incompatible-pointer-types -Wno-dangling-else -Wno-incompatible-pointer-types-discards-qualifiers
 M_LDFLAGS =  -L.. -lmpdec -ltommath
 
-M_SOURCES = M.c Menvironment.c Mfunctions.c Mvalue.c Mdecimal.c Mrational.c Mbiginteger.c Mexecution.c Mmemory.c Mexpression.c Msession.c Moutput.c Mcolors.c Msettings.c Mstring.c Malloc.c tommath.h mpdecimal.h
-#M_LDADD = mpdecimal-2.4.2/libmpdec/libmpdec.a libtommath/libtommath.a
+M_SOURCES = tommath.h mpdecimal.h Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c
