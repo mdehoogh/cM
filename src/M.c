@@ -18,6 +18,10 @@
 // Menvironment includes Mvalue includes Mexecution includes ...
 #include "Menvironment.h"
 
+char const * const M_VERSION="0.1.0";
+char const * const M_BUILD="1";
+char const * const M_DATE="21 October 2019, 14:00";
+
 // used externally in Mexecution.h, Mvalue.h, Mfunctions.h, Menvironment.h
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
@@ -7202,7 +7206,8 @@ int main(int argc, char **argv){
 	prepareForUserInput(); // AFTER using the command-line parameters (will effectuate wrap mode and color scheme)
 
 	resetOutputColor(); // just in case
-	outputLine("M, the fancy interpreter, welcomes you.");
+	outputLine("Welcome to M.");
+	output("\nVersion: %s - Build: %s - Date: %s\n",M_VERSION,M_BUILD,M_DATE);
 	outputLine("");
 	displayFlags();
 	outputLine("");

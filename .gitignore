@@ -1,11 +1,13 @@
+configure.ac
+Makefile.am
+
 mpdecimal-2.4.2/config.status
 mpdecimal-2.4.2/config.log
 mpdecimal-2.4.2/libmpdec/*.o
 mpdecimal-2.4.2/libmpdec/*.a
 mpdecimal-2.4.2/libmpdec/.objs/*
 
-lib/libmpdec.a
-lib/libtommath.a
+lib/*
 
 cdecimal-2.3/*
 
@@ -13,3 +15,7 @@ libtommath-1.1.0/*
 libtommath.a
 libtommath/*.a
 libtommath/*.o
+
+src/*.o
+src/M
+src/Makefile.am

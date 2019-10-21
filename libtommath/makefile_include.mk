@@ -9,6 +9,9 @@ VERSION_SO=2:0:1
 
 PLATFORM := $(shell uname | sed -e 's/_.*//')
 
+# all make target
+all: ${LIBNAME}
+
 # default make target
 default: ${LIBNAME}
 
