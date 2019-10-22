@@ -8,6 +8,7 @@ Mvalue* Mnot(Mvalue* _value); // not a value
 Mvalue* Mnull(Mvalue* _value); // whether null!!!
 Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
 Mvalue* Mzero(Mvalue* _value);
+Mvalue* Msign(Mvalue const * const value);
 Mvalue* Mpositive(Mvalue* _value);
 Mvalue* Mnegative(Mvalue* _value);
 Mvalue* Mscalar(Mvalue* _value);

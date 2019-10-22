@@ -6,5 +6,12 @@ Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){
     if(_bineg&&mp_neg(_biginteger,_bineg)!=MP_OKAY){free_biginteger(_bineg);_bineg=NULL;outputError("Failed to negate a big integer");}
     return _bineg;
 }
-bool isBigintegerPositive(Mbiginteger* _biginteger){return(_biginteger!=NULL&&mp_iszero(_biginteger)==MP_NO&&_biginteger->sign==MP_ZPOS);}
-bool isBigintegerNegative(Mbiginteger* _biginteger){return(_biginteger!=NULL&&_biginteger->sign==MP_NEG);}
+
+long long getBigintegerSign(Mbiginteger const * const biginteger){
+    if(!biginteger)return M_LL_INVALID;
+    if(mp_iszero(biginteger))return 0;
+    return(mp_isneg(biginteger)==MP_NO?1:-1);
+}
+
+bool isBigintegerPositive(Mbiginteger const * const biginteger){long long bigintegerSign=getBigintegerSign(biginteger);return(bigintegerSign==M_LL_INVALID?false:bigintegerSign>0);}
+bool isBigintegerNegative(Mbiginteger const * const biginteger){long long bigintegerSign=getBigintegerSign(biginteger);return(bigintegerSign==M_LL_INVALID?false:bigintegerSign<0);}

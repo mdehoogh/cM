@@ -1316,6 +1316,17 @@ Mdecimal* getValueDecimal(Mvalue* value){
 Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=CALLOC(1,sizeof(Mlist),'L');_list->valuetype=valuetype;return _list;}/* VALIDATED */
 Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=CALLOC(1,sizeof(Mmap),'M');_map->valuetype=valuetype;return _map;}/* VALIDATED */
 
+long long getIntegerSign(long long integer){return(integer>0?1:(integer<0?-1:0));}
+long long getValueSign(Mvalue const * const value){
+    if(value){
+        if(value->type==VT_INTEGER)return getIntegerSign(value->value._integer->ll);
+        if(value->type==VT_BIGINTEGER)return getBigintegerSign(value->value._biginteger);
+        if(value->type==VT_REAL)return getLongDoubleSign(value->value._real->ld);
+        if(value->type==VT_DECIMAL)return getDecimalSign(value->value._decimal);
+        if(value->type==VT_RATIONAL)return getRationalSign(value->value._rational->num);
+    }
+    return M_LL_INVALID;
+}
 bool isValueZero(Mvalue* value){
     if(value){
         if(value->type==VT_INTEGER)return value->value._integer->ll==0;

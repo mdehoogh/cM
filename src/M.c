@@ -1272,8 +1272,8 @@ bool initEnvironment(){
 				outputError("Failed to register the exists, scalar, null and undefined functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
-				outputError("Failed to register the zero, positive and negative functions");
+			if(!completedValueFunction(_getFunction(_Menvironment,"sign"),"sign",Msign)||!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
+				outputError("Failed to register the sign, zero, positive and negative functions");
 				return false;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),"sum",Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),"len",Mlen)){
@@ -5241,6 +5241,7 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 	}
 	return NULL;
 }
+// MDH@21OCT2019: first comparison method dealing with decimals and rationals from which the rest was produced
 Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthanorequalto);
@@ -5256,14 +5257,14 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		return _getBigintegerValue(_smallerthanorequaltobiginteger,true);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		// creating two intermediate big integers that need to be freed asap
+		// creating two intermediate decimals that need to be freed asap
 		bool result=false;
 		Mdecimal* _decimalDifference=NULL;
 		Mdecimal* _decimal1=_getValueDecimal(_value1),*_decimal2=_getValueDecimal(_value2);
 		if(_decimal1&&_decimal2){
 			_decimalDifference=_getDecimalDifference(_decimal1,_decimal2);
 			if(_decimalDifference){
-				/////if(amVerbose())
+				if(amVerbose())
 				outputDecimal("Decimal difference: '",_decimalDifference,"'.\n");
 				result=!isDecimalPositive(_decimalDifference);
 				free_decimal(_decimalDifference);
@@ -5273,6 +5274,20 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		if(_decimalDifference)return _getIntegerValue(result?1:0); // NOTE even though we freed _decimalDifference the pointer is still not NULL!!!!
 	}else
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		bool result=false;
+		Mrational* _rationalDifference=NULL;
+		Mrational* _rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2);
+		if(_rational1&&_rational2){
+			_rationalDifference=_getRationalDifference(_rational1,_rational2);
+			if(_rationalDifference){
+				if(amVerbose())
+				outputRational("Rational difference: '",_rationalDifference,"'.\n");
+				result=!isRationalPositive(_rationalDifference);
+				free_rational(_rationalDifference);
+			}
+		}
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);if(_value2->type!=VT_RATIONAL)free_rational(_rational2);
+		if(_rationalDifference)return _getIntegerValue(result?1:0); // NOTE even though we freed _rationalDifference the pointer is still not NULL!!!!
 	}
 	return NULL;
 }

@@ -127,6 +127,8 @@ bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue
 long double getValueReal(const Mvalue* const _value);
 Mbiginteger* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
 
+long long getValueSign(Mvalue const * const value); // return -1 for negative values, 1 for positive values, 0 for zero values, and M_LL_INVALID for non-scalar values obviously
+
 Mvalue* getValueAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 

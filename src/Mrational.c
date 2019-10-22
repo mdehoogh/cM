@@ -132,29 +132,51 @@ mp_err _qdiv_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* c
     }
     return status;
 }
+
+// MDH@21OCT2019: TODO restyled _qsub (assuming that if num is NULL it's undefined)
 /**
  * \brief computes the difference of \p a and \p b and puts the result in \p c
  */
-mp_err _qsub(Mrational* const c,Mrational const * const a,Mrational const * const b){
-    Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
-    mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
-    if(status==MP_OKAY)status=_bimul(a->den,b->den,&_den); // multiply denominators to become the result denominator
-    if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-    if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num1); // multiply numerator of a with denominator of b for the plus term of the result numerator
-    if(status==MP_OKAY)status=_bimul(a->den,b->num,&_num2); // multiply denominator of a with numerator of b for the min term of the result numerator
-    if(status==MP_OKAY)status=_bisub(_num1,_num2,&_num);
-    // loose the numerator parts (are not stored in the result rational anyway)
-    if(_num1)free_biginteger(_num1);
-    if(_num2)free_biginteger(_num2);
-    if(status!=MP_OKAY){ // numerator and denominator not computed both
-        if(_num)free_biginteger(_num);
-        if(_den)free_biginteger(_den);
-    }else{ // numerator and denominator computed
-        c->num=_num;
-        c->den=_den;
-        /////// not on pure rationals!!!! c->delta=_realdifference(a->delta,b->delta);
-        if(!c->normalized)normalizeRational(c);
-    }
+mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * const b){
+    mp_err status=(c&&(a||b)?MP_OKAY:MP_ERR);
+    if(status==MP_OKAY){ // c and at least a or b provided
+        // should we NULL the numerator and denominator of c?????
+        if(c->num){free_biginteger(c->num);c->num=NULL;}
+        // TODO do we need to NULL the denominator????? if(c->den){free_biginteger(c->den);c->den=NULL;}
+        // if b is not defined, or zero, copy a into c
+        if(!b||!b->num||isBigintegerZero(b->num)){ // b is undefined or zero: return a
+            if(amVerbose())outputLine("Second rational argument undefined or zero.");
+            if(a->num){c->num=_getBigintegerCopy(a->num);if(!c->num)return MP_ERR;}
+            if(a->den){c->den=_getBigintegerCopy(a->den);if(!c->den)return MP_ERR;}
+        }else
+        if(!a||!a->num||isBigintegerZero(a->num)){ // a is undefined or zero: return b
+            if(amVerbose())outputLine("First rational argument undefined or zero.");
+            if(b->num){c->num=_getBigintegerCopy(b->num);if(!c->num)return MP_ERR;}
+            if(b->den){c->den=_getBigintegerCopy(b->den);if(!c->den)return MP_ERR;}
+        }else{
+            if(amVerbose())outputLine("Subtracting two pure rationals.");
+            // ASSERT a and b both defined
+            Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
+            if(a->den||b->den)status=_bimul(a->den,b->den,&_den); // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
+            if(status==MP_OKAY)if(_den&&mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+            if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num1); // multiply numerator of a with denominator of b for the plus term of the result numerator
+            if(status==MP_OKAY)status=_bimul(a->den,b->num,&_num2); // multiply denominator of a with numerator of b for the min term of the result numerator
+            if(status==MP_OKAY)status=_bisub(_num1,_num2,&_num);
+            // loose the numerator parts (are not stored in the result rational anyway)
+            if(_num1)free_biginteger(_num1);
+            if(_num2)free_biginteger(_num2);
+            if(status!=MP_OKAY){ // numerator and denominator not computed both
+                if(_num)free_biginteger(_num);
+                if(_den)free_biginteger(_den);
+            }else{ // numerator and denominator computed
+                c->num=_num;
+                c->den=_den;
+                /////// not on pure rationals!!!! c->delta=_realdifference(a->delta,b->delta);
+                if(!c->normalized)normalizeRational(c);
+            }
+        }
+    }else
+        outputError("Not all rationals provided for computing the difference of two rationals");
     return status;
 }
 
@@ -190,7 +212,11 @@ long double realdifference(Mreal* _real1,Mreal* _real2){
     // both are defined BUT then we still have the problem that either could be undefined
     return lddifference(_real1->ld,_real2->ld);
 }
-Mreal* _realdifference(Mreal* r1,Mreal* r2){return(r1||r2?_getReal(realdifference(r1,r2)):NULL);}
+Mreal* _realdifference(Mreal* r1,Mreal* r2){
+    if(realIsUndefinedOrZero(r2))return _getRealCopy(r1);
+    if(realIsUndefinedOrZero(r1))return _getRealNeg(r2);
+    return _getReal(realdifference(r1,r2));
+}
 // for the computation of the product of two reals (which is very simple)
 long double ldproduct(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld2==M_LD_NAN?M_LD_NAN:ld1*ld2);} // either undefined, product undefined
 long double realproduct(Mreal* r1,Mreal* r2){return(r1&&r2?ldproduct(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
@@ -200,9 +226,6 @@ Mreal* _realproduct(Mreal* r1,Mreal* r2){return(r1||r2?_getReal(realproduct(r1,r
 long double ldquotient(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld2==M_LD_NAN?M_LD_NAN:ld1/ld2);} // either undefined, quotient undefined
 long double realquotient(Mreal* r1,Mreal* r2){return(r1&&r2?ldquotient(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
 Mreal* _realquotient(Mreal* r1,Mreal* r2){return(r1||r2?_getReal(realquotient(r1,r2)):NULL);} // either undefined, product undefined
-
-bool realIsUndefined(Mreal* real){return(!real||ldIsNaN(real->ld));}
-bool realIsUndefinedOrZero(Mreal* real){return(!real||ldIsNaN(real->ld)||ldIsZero(real->ld));}
 
 mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
@@ -342,13 +365,16 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
     // NOTE leaving it to _qmul to deal with NULL rational input (which should never happen though)
     Mrational* _rational=__rational();
     if(_rational){
+        if(amVerbose()){outputRational("Subtracting '",q2,"'");outputRational(" from '",q1,"'.\n");}
         mp_err status=_qsub(_rational,q1,q2);
         if(status==MP_OKAY){
+            if(amVerbose()){outputRational("Difference '",_rational,"'.\n");}
             // compute the delta
         	_rational->delta=_realdifference(q1->delta,q2->delta);
             // if failed to compute the delta mark error
-            if(q1->delta&&q2->delta)if(!_rational->delta)status=MP_ERR;
-        }
+            if(q1->delta&&q2->delta)if(!_rational->delta){outputError("Failed to compute the difference of two rational deltas");status=MP_ERR;}
+        }else
+            outputError("Failed to subtract two pure rationals");
         if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;outputError("Failed to compute the difference of two rationals");}
     }else
         outputError("Failed to create the rational for storing the difference of two rationals");
@@ -871,13 +897,15 @@ Mrational* _getInverseRational(Mrational const * const _rational){
     return _inverseRational;
 }/* VALIDATED */
 
+/* MDH@21OCT2019: see below for the corrected implementation (that actually computes the 'true' (real) numerator)
 // MDH@08JUN2019 NOTE: adapted so that if the numerator is NULL will assume the numerator to equal 1
 // BUT _getRational has been adapted to NOT allow a NULL numerator, i.e. replacing NULL with big integer 1, so actually a NULL numerator is unlikely to occur!!!
 // rationals can equal zero or one but only when the delta value equals 0 (or is not defined which is the same)
 bool isRationalZero(Mrational* _rational){
     // if the rational does not have a num, the numerator equals 1, and obviously is NOT zero
-    return(_rational&&_rational->num?isBigintegerZero(_rational->num)&&(!_rational->delta||ldIsZero(_rational->delta->ld)||ldIsNaN(_rational->delta->ld)):false); // the delta needs to be undefined (i.e. zero)
-}/* VALIDATED */
+    return(_rational&&_rational->num?isBigintegerZero(_rational->num)&&realIsUndefinedOrZero(_rational->delta):false); // the delta needs to be undefined (i.e. zero)
+}// VALIDATED 
+
 bool isRationalOne(Mrational* _rational){
     // when the numerator is NULL, it is considered to be equal to 1
     if(!_rational)return false;
@@ -885,7 +913,8 @@ bool isRationalOne(Mrational* _rational){
     if(_rational->delta)if(!ldIsZero(_rational->delta->ld)&&!ldIsNaN(_rational->delta->ld))return false; // TODO if the rational delta is not zero, do not consider to be equal to 1 (although theoretically it could be)
     return (_rational->den?mp_cmp(_rational->num,_rational->den)==MP_EQ:!_rational->num||isBigintegerOne(_rational->num));
     // replacing: return(_rational?!(_rational->num||isBigintegerOne(_rational->num))&&(!_rational->den||isBigintegerOne(_rational->den))&&(!_rational->delta||ldIsZero(_rational->delta->ld)):false);
-}/* VALIDATED */
+}// VALIDATED
+*/
 
 // TODO good idea to always return something (if we can), as in _getBigintegerText()
 Mstring* _getRationalText(const Mrational* const _rational){
@@ -1037,3 +1066,59 @@ long double getRationalLongDouble(const Mrational* const _rational){
     }
     return M_LD_NAN; // if something went wrong
 }/* VALIDATED */
+
+// functions for testing the sign that return false if rational is not defined, and assume that the sign of the numerator is the sign of the rational (i.e. the denominator should never be negative!!)
+// MDH@22OCT2019: how about delegating to sign???
+long double getUnpureRationalNumerator(Mbiginteger* numerator,Mbiginteger* denominator,long double ld){
+    if(numerator){
+        if(ld!=M_LD_NAN){ // as it should be
+            // an 'unpure' (fake) rational, we're forced to use ld to compute the 'true' numerator
+            if(denominator){ // the denominator isn't 1
+                long double lddenominator=mp_get_long_double(denominator);
+                if(lddenominator==M_LD_NAN){outputError("Failed to convert a rational denominator to a real.");return false;}
+                if(lddenominator!=1)ld*=lddenominator; // if the denominator doesn't equal 1 multiply ld by it
+            }
+            long double ldnumerator=mp_get_long_double(numerator);
+            if(ldnumerator==M_LD_NAN){outputError("Failed to convert a rational numerator to a real.");return false;}
+            return ld+ldnumerator;
+        }
+    }
+    return M_LD_NAN;
+}
+long long ldsign(long double ld){
+    if(ld==M_LD_NAN)return M_LL_INVALID;
+    if(ld>0)return 1;
+    if(ld<0)return -1;
+    return 0;
+}
+bool isRationalOne(Mrational const * const rational){
+    if(rational){
+        long double ld=getRealLongDouble(rational->delta);
+        // without a delta, a rational equals 1 when the numerator and denominator are the same
+        if(ld==M_LD_NAN)return(rational->den?(rational->num?mp_cmp(rational->den,rational->num)==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):true));
+        return getUnpureRationalNumerator(rational->num,rational->den,ld)==1;
+    }
+    return false;
+}
+long long getRationalSign(Mrational const * const rational){
+    // ASSERT if rational->num should always be defined (even if it equals 1), if it is not it is not a valid rational!!!!
+    if(rational&&rational->num){
+        long double ld=getRealLongDouble(rational->delta);
+        if(ld==M_LD_NAN)return getBigintegerSign(rational->num);
+        return ldsign(getUnpureRationalNumerator(rational->num,rational->den,ld));
+    }
+    return M_LL_INVALID;
+}
+// if the rational has an associated delta, it's a bit more complicated, converting to a real of the numerator and denominator might fail or be inaccurate if the big integers are too large
+bool isRationalPositive(Mrational const * const rational){
+    long long rationalSign=getRationalSign(rational);
+    return(rationalSign==M_LL_INVALID?false:rationalSign>0);
+}
+bool isRationalNegative(Mrational const * const rational){
+    long long rationalSign=getRationalSign(rational);
+    return(rationalSign==M_LL_INVALID?false:rationalSign<0);
+}
+bool isRationalZero(Mrational const * const rational){
+    long long rationalSign=getRationalSign(rational);
+    return(rationalSign==M_LL_INVALID?false:rationalSign==0);
+}

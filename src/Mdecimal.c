@@ -639,7 +639,7 @@ Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const
 					_decimal=_getRationalDecimal(_r);
 					free_rational(_r);
 				}else
-					outputError("Failed to compute the difference of two rationals");
+					outputError("Failed to compute the difference of two rationalized decimals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
 			free_rational(_r1);
@@ -2727,8 +2727,10 @@ Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){
 	return NULL;
 }
 
-bool isDecimalPositive(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)!=0?false:mpd_ispositive(decimal->mpd)!=0):false);}
-bool isDecimalNegative(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)!=0?false:mpd_isnegative(decimal->mpd)!=0):false);}
+long long getDecimalSign(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)?0:(mpd_ispositive(decimal->mpd)?1:-1)):M_LL_INVALID);}
+
+bool isDecimalPositive(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?decimalSign>0:false);}
+bool isDecimalNegative(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?decimalSign<0:false);}
 
 // MDH@18OCT2019: assuming that \p decimal already is rounded somehow to the given integer using ceil, floor, trunc or round
 //                so that we should simply remove the fractional part

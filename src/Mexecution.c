@@ -269,6 +269,12 @@ Mreal* _getReal(long double ld){
     return _real;
 }/* VALIDATED */
 
+bool realIsUndefined(Mreal* real){return(!real||ldIsNaN(real->ld));}
+bool realIsUndefinedOrZero(Mreal* real){return(!real||ldIsNaN(real->ld)||ldIsZero(real->ld));}
+
+Mreal* _getRealCopy(Mreal* real){return(!realIsUndefined(real)?_getReal(real->ld):NULL);}/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
+Mreal* _getRealNeg(Mreal* real){return(!realIsUndefined(real)?_getReal(-real->ld):NULL);}/* VALIDATED */ // just switching the sign of what _getRealCopy returns
+
 // Mtext is an immutable version of Mstring* in that it cannot be changed
 Mtext* _getText(char* _text){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
     return (Mtext*)_strdup(_text);
@@ -725,8 +731,9 @@ bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}/* VALIDATED */
 bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
 bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
 // MDH@18OCT2019: lettting the comparison take care of the result!!!
-bool ldIsPositive(long double ld){return(ld>0);}/* VALIDATED */
-bool ldIsNegative(long double ld){return(ld<0);}/* VALIDATED */
+long long getLongDoubleSign(long double ld){if(ldIsNaN(ld))return M_LL_INVALID;if(ld>0)return 1;if(ld<0)return -1;return 0;}
+bool ldIsPositive(long double ld){long long ldSign=getLongDoubleSign(ld);return(ldSign==M_LL_INVALID?false:ldSign>0);}/* VALIDATED */
+bool ldIsNegative(long double ld){long long ldSign=getLongDoubleSign(ld);return(ldSign==M_LL_INVALID?false:ldSign<0);}/* VALIDATED */
 
 long long double2long(long double ld){
     if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;

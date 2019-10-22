@@ -486,6 +486,7 @@ Mvalue* Mundefined(Mvalue* _value){
     return _getIntegerValue(isValueUndefined(_value)?1:0); // MDH@18JUL2019: isUndefined() now comes in handy
 }/* VALIDATED */
 Mvalue* Mzero(Mvalue* _value){return(_value?_getIntegerValue(isValueZero(_value)?1:0):NULL);}/* VALIDATED */
+Mvalue* Msign(Mvalue const * const value){return(_getIntegerValue(getValueSign(value)));} /* VALIDATED */
 Mvalue* Mpositive(Mvalue* _value){return(_value?_getIntegerValue(isValuePositive(_value)?1:0):NULL);}/* VALIDATED */
 Mvalue* Mnegative(Mvalue* _value){return(_value?_getIntegerValue(isValueNegative(_value)?1:0):NULL);}/* VALIDATED */
 Mvalue* Mscalar(Mvalue* _value){return(_value?_getIntegerValue(isValueScalar(_value)?1:0):NULL);}/* VALIDATED */

@@ -154,6 +154,12 @@ void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *expo
 long double getRealLongDouble(const Mreal* const _real);
 Mreal* _getReal(long double ld);
 
+bool realIsUndefined(Mreal* _real);
+bool realIsUndefinedOrZero(Mreal* _real);
+// copying Mreal's
+Mreal* _getRealCopy(Mreal* real);
+Mreal* _getRealNeg(Mreal* real);
+
 // BIG INTEGER STUFF
 void free_biginteger(Mbiginteger* _biginteger);
 Mbiginteger* __biginteger();
@@ -182,6 +188,8 @@ bool ldIsNaN(long double ld);
 bool ldIsInf(long double ld);
 bool ldIsPositive(long double ld);
 bool ldIsNegative(long double ld);
+
+long long getLongDoubleSign(long double ld);
 
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!

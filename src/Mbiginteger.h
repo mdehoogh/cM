@@ -2,5 +2,8 @@
 #include "Mexecution.h"
 
 Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger);
-bool isBigintegerPositive(Mbiginteger* _biginteger);
-bool isBigintegerNegative(Mbiginteger* _biginteger);
+
+long long getBigintegerSign(Mbiginteger const * const biginteger);
+
+bool isBigintegerPositive(Mbiginteger const * const biginteger);
+bool isBigintegerNegative(Mbiginteger const * const biginteger);

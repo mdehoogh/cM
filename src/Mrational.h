@@ -12,8 +12,6 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/);
 
 Mrational* __rational();
 void free_rational(Mrational* _rational);
-bool isRationalZero(Mrational* _rational);
-bool isRationalOne(Mrational* _rational);
 void normalizeRational(Mrational* _rational);
 Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure);
 Mrational* _getInverseRational(Mrational const * const _rational);
@@ -28,9 +26,6 @@ mp_err _qdiv(Mrational* c,Mrational const * const a,Mrational const * const b);
 
 long long qcmp(Mrational const * const a,Mrational const * const b); // MDH@16OCT2019: what to return if a or b is not defined????? I suppose NULL is smaller than any value???????
 
-bool realIsUndefined(Mreal* _real);
-bool realIsUndefinedOrZero(Mreal* _real);
-
 Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * const q2); // MDH@09OCT2019: can come in handy
 
 Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2);
@@ -39,3 +34,9 @@ Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * cons
 Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * const q2);
 
 Mrational* _qsinorcos(Mrational const * const x,bool sin);
+
+bool isRationalOne(Mrational const * const _rational);
+long long getRationalSign(Mrational const * const rational); // returns -1 for negative rationals, 1 for positive rationals, 0 for zero rationals and M_LL_INVALID for undefined rationals
+bool isRationalZero(Mrational const * const _rational);
+bool isRationalPositive(Mrational const * const rational);
+bool isRationalNegative(Mrational const * const rational);
