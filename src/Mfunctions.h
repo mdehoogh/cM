@@ -39,11 +39,13 @@ Mvalue* Mlog10(Mvalue* _value);
 Mvalue* Msqrt(Mvalue* _value);
 
 // additional one-argument functions
-Mvalue* Mout(Mvalue* _value);
-Mvalue* Mbc(Mvalue* _value); // set background color
-Mvalue* Mtc(Mvalue* _value); // set text color
-Mvalue* Mbrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3); // set background color
-Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3); // set text color
+Mvalue* Mout(Mvalue* _value); // for writing text to standard output (console)
+Mvalue* Min(Mvalue* value); // for reading text from standard input (console)
+
+Mvalue* Mbc(Mvalue* _value); // get a background color text representation where value indicates a color in 256-color mode, so an integer in range [0,255]
+Mvalue* Mtc(Mvalue* _value); // get a text color text representation
+Mvalue* Mbrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3); // get rgb background color text representation
+Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3); // get rgb text color text representation
 
 // math two-argument functions
 Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue);

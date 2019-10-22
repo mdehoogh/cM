@@ -789,6 +789,19 @@ bool completedTokenTokenFunction(Mfunction* const _function,const char* const fu
     }
     return false;
 }/* VALIDATED */
+bool completedValueValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=_getTokenTokenMap("value to text","format specifier");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register two value argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
@@ -949,6 +962,8 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedValueFunction(_getFunction(_environment,"return"),"return",Mreturn))return false;
 
     if(!completedValueFunction(_getFunction(_environment,"out"),"out",Mout))return false;
+    if(!completedValueFunction(_getFunction(_environment,"in"),"in",Min))return false;
+
     if(!completedValueFunction(_getFunction(_environment,"bc"),"bc",Mbc))return false;
     if(!completedValueFunction(_getFunction(_environment,"tc"),"tc",Mtc))return false;
     if(!completedThreeIntegersFunction(_getFunction(_environment,"brgb"),"brgb",Mbrgb))return false;

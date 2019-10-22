@@ -19,8 +19,9 @@
 #include "Menvironment.h"
 
 char const * const M_VERSION="0.1.0";
-char const * const M_BUILD="1";
-char const * const M_DATE="21 October 2019, 16:00";
+
+//char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
+char const * const M_BUILD="2";char const * const M_DATE="22 October 2019, 12:00";
 
 // used externally in Mexecution.h, Mvalue.h, Mfunctions.h, Menvironment.h
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
@@ -1017,17 +1018,46 @@ Mvalue* r(Mvalue* _value){
 	if(amVerbose())outputValue("Converted to '",_realValue,"'.\n");
 	return _realValue;
 }
+// MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
+Mvalue* t(Mvalue* value,Mvalue* format){
+	Mvalue* result=NULL;
+	Mstring* _valueText=_getValueText(value,true); // typically dequoted
+	if(_valueText){
+		if(amVerbose()){outputValue("Text representation of '",value,"' before formatting: ");output("'%s'.\n",string(_valueText));}
+		if(format){
+			if(format->type==VT_INTEGER){
+				long long ll=format->value._integer->ll;
+				if(ll>0){ // left-aligned in ll positions
+					ll-=string_length(_valueText); // number of blanks to append
+					while(--ll>=0)if(!string_append_char(_valueText,' '))break;
+				}else
+				if(ll<0){ // right-aligned in -ll positions
+					ll+=string_length(_valueText); // - number of blanks to prepend
+					while(++ll<=0)if(!string_insert_char(_valueText,0,' '))break;
+				}
+			}
+		}
+		if(string_insert_char(_valueText,0,(value->type==VT_TEXT?value->value._text->presuffix:'\''))){ // prepend a quote character otherwise we're in trouble in _getTextValue
+			if(amVerbose()){outputValue("Text representation of '",value,"': ");output("'%s'.\n",string(_valueText));}
+			result=_getTextValue(string(_valueText),false);
+		}else
+			outputError("Failed to prepend a quote character to a text representation");
+		free_string(_valueText);
+	}
+	return result;
+}
+
 // the type of a value
-Mvalue* t(Mvalue* _value){
+Mvalue* type(Mvalue* _value){
 	if(_value)
 	switch(_value->type){
-		case VT_TOKEN:return _getTextValue("'t",false);
+		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that????
 		case VT_INTEGER:return _getTextValue("'i",false);
 		case VT_BIGINTEGER:return _getTextValue("'I",false);
 		case VT_DECIMAL:return _getTextValue("'d",false);
 		case VT_RATIONAL:return _getTextValue("'q",false);
 		case VT_REAL:return _getTextValue("'r",false);
-		case VT_TEXT:return _getTextValue("'s",false);
+		case VT_TEXT:return _getTextValue("'t",false);
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
 		case VT_UNDEFINED:return _getTextValue("'u",false);
@@ -1220,14 +1250,18 @@ bool initEnvironment(){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return false;
 			}
-			// conversions
+			// conversions 
 			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"I"),"I",I)
-					||!completedValueFunction(_getFunction(_Menvironment,"t"),"t",t)
+					||!completedValueValueFunction(_getFunction(_Menvironment,"t"),"t",t)
 					||!completedValueFunction(_getFunction(_Menvironment,"r"),"r",r)
 					||!completedValueFunction(_getFunction(_Menvironment,"q"),"q",q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),"Q",Q)
 					||!completedValueFunction(_getFunction(_Menvironment,"d"),"d",d)
 					||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)||!completedValueFunction(_getFunction(_Menvironment,"B"),"B",B)){
 				outputError("Failed to register value type conversion functions");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"type"),"type",type)){
+				outputError("Failed to register the type function");
 				return false;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),"neg",Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),"bnot",Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),"not",Mnot)){

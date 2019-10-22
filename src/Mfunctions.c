@@ -572,6 +572,72 @@ Mvalue* Mout(Mvalue* _value){
     free_string(_valueText);
     return _getIntegerValue(result);
 }
+// method for reading a text from standard out which means reading characters until Enter-key is encountered!!
+Mvalue* Min(Mvalue* value){
+    Mvalue* result=NULL;
+    // value represents the text to write in front of the prompt for text i.e. it's a prompt text
+    Mout(value); // just get it out!!!!
+    Mstring* _inText=_getString("'"); // initialize _inText to a a single quote character (as required by _getTextValue)
+    char c;
+    while(inputCharRead(&c)){ // should be Ok to use inputCharRead() here
+        outputChar(c);/////output("[%u]",c);
+        // how about allowing starting over (with Ctrl-C)
+        if(c==13||c==10)break;
+        if(c==3){
+            string_setlength(_inText,1);
+            outputChar('\n');
+            Mout(value);
+            continue;
+        }
+        if(c==127){
+            if(string_length(_inText)>1){
+                // take the last character off
+                string_setlength(_inText,string_length(_inText)-1);
+                backspace();
+                outputChar(' ');
+                backspace();
+            }else
+                beep();
+            continue;
+        }
+        if(c==27){ // Escape sequence
+            if(inputCharRead(&c)){
+                if(c==91){
+                    if(inputCharRead(&c)){
+                        if(c==51){
+                            if(inputCharRead(&c)){
+                                if(c==126){ // delete
+                                    beep();
+                                }
+                            }
+                        }else
+                        if(c==65){ // up arrow 
+                            beep();
+                        }else
+                        if(c==66){ // down arrow
+                            beep();
+                        }else
+                        if(c==67){ // right arrow
+                            beep();
+                        }else
+                        if(c==68){ // left arrow
+                            beep();
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        string_append_char(_inText,c);
+    }
+    outputChar('\n'); // go to the next line...
+    if(_inText){
+        result=_getTextValue(string(_inText),false);
+        free_string(_inText);
+    }
+    return result;
+}
+
 // MDH@17OCT2019: instead of setting the back color we can return the text to be used in out to set the back color
 // set the backcolor
 Mvalue* Mbc(Mvalue* _value){

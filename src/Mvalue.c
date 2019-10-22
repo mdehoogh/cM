@@ -10,13 +10,13 @@
 
 #include "Mvalue.h"
 
-extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
-extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
-extern const char* const ERROR_PREFIX;
+extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
+extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
+extern const char * const ERROR_PREFIX;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const long double LD_PI; // for Mfacd()
-extern const Mdecimalcontext* M_DECIMALCONTEXT; // the application-wide (default) decimal context
+extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (default) decimal context
 
 void free_variable(Mvariable* _variable){
     if(_variable){
@@ -1357,7 +1357,7 @@ bool isValueNegative(Mvalue* value){
     return false;
 }/* VALIDATED */
 bool isValueScalar(Mvalue* value){
-    if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_REAL:case VT_TEXT:case VT_TOKEN:return true;}
+    if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_REAL:case VT_TEXT:case VT_TOKEN:return true;default:return false;}
     return false;
 }/* VALIDATED */
 
@@ -1602,7 +1602,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){
     // ceil: false,false / trunc: true,true / floor: true,false / ?: false,true
     if(_decimal){
         Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
-        mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+        mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
         if(mpd_context){
             if(towardszero){ // always means truncing!!!
                 Mdecimal* _truncDecimal=__decimal(mpd_context,0,0);
@@ -1642,7 +1642,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){
 Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){
     if(_decimal){
         Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
-        mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+        mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
         if(mpd_context){
             Mdecimal* _roundDecimal=__decimal(mpd_context,0,0);
             if(_roundDecimal){

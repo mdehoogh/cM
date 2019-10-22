@@ -97,6 +97,7 @@ void free_real(Mreal* _real);
 
 bool strIsZero(char* str);
 Mstring* appendll(Mstring* const ms,long long ll);
+Mstring* appendld(Mstring* const ms,long double ld);
 
 // MDH@20MAY2019: we need free_map to free the function argument maps!!
 /* MDH@01MAY2019: we do not want helper functions to free structure pointers visible to the outside

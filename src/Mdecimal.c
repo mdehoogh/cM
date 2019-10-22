@@ -6,8 +6,8 @@
 #include "Msession.h"
 
 extern long double const M_LD_NAN;
-extern const char* const ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
-extern /*const*/ Mdecimalcontext* M_DECIMALCONTEXT; // ASSERT should not be NULL whenever M is up and running
+extern char const * const ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
+extern Mdecimalcontext* const M_DECIMALCONTEXT; // ASSERT should not be NULL whenever M is up and running
 
 mpd_t* get_mpd_copy(mpd_context_t const * mpd_context,mpd_t* mpd){
 	if(!mpd)return NULL;
@@ -2711,7 +2711,7 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){
 	if(decimal){
 		Mdecimalcontext* decimalcontext=_getDecimalcontext(decimal->prec);
-		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
+		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
 		Mdecimal* _inverseDecimal=__decimal(mpd_context,0,0);
 		if(_inverseDecimal){
 			mpd_t* _mpd1=__mpd(mpd_context,1);
