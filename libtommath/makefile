@@ -60,6 +60,8 @@ $(OBJECTS): $(HEADERS)
 $(LIBNAME):  $(OBJECTS)
 	$(AR) $(ARFLAGS) $@ $(OBJECTS)
 	$(RANLIB) $@
+	rm -f ../$@
+	cp $@ ..
 
 #make a profiled library (takes a while!!!)
 #

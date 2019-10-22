@@ -21,6 +21,8 @@ all: default
 
 default: FORCE
 	cd libmpdec && $(MAKE)
+	rm -f ../${LIBSTATIC}
+	cp libmpdec/${LIBSTATIC} ../
 
 check: default
 	cd tests && $(MAKE) && ./runshort.sh

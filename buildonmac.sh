@@ -22,14 +22,14 @@ if [[ ! -d lib ]]; then
 fi
 
 # if libmpdec.a is not present, we should create it
-if [[ ! -f lib/libmpdec.a && ! -d lib/libmpdec.a ]]; then
+if [[ ! -f libmpdec.a && ! -d libmpdec.a ]]; then
 #    # force running as sudo check
 #    if [[ ! "$EUID" = 0 ]]; then
 #        echo "Please sudo run me (in order to be able to create the decimal library)!"
 #        exit 1
 #    fi
-    echo "Creating mpdecimal library..."
     if [ -d mpdecimal-2.4.2 ]; then
+        echo "Creating mpdecimal library..."
         # mpdecimal.h won't exist in libmpdec there until we run ./configure
         cd mpdecimal-2.4.2
         ./configure
@@ -49,17 +49,11 @@ if [[ ! -f lib/libmpdec.a && ! -d lib/libmpdec.a ]]; then
         echo "Ready for compile the mpdecimal static library..."
         # we want make to actually create the .o files now
         sudo make
-        if [ -f libmpdec/libmpdec.a ]; then
+	# Makefile has been adjusted to move libmpdec.a to the root folder
+	cd ..
+        if [ -f libmpdec.a ]; then
             echo "Static library 'libmpdec.a' created successfully!"
-            cd ..
-            cp mpdecimal-2.4.2/libmpdec/libmpdec.a lib/
-            if [ -f lib/libmpdec.a ]; then
-                # ascertain that we can at least read it
-                chmod 644 lib/libmpdec.a
-            else
-                echo "ERROR: Failed to copy 'libmpdec.a' from the mpdecimal-2.4.2/libmpdec subdirectory to the lib/ subdirectory."
-                exit 1
-            fi
+            chmod 644 libmpdec.a
         else
             echo "ERROR: Failed to create static library 'libmpdec.a'!"
             exit 1
@@ -73,14 +67,14 @@ else
 fi
 
 # if libtommath.a is not present, we should create it
-if [[ ! -f lib/libtommath.a && ! -d lib/libtommath.a ]]; then
+if [[ ! -f libtommath.a && ! -d libtommath.a ]]; then
 #    # force running as sudo check
 #    if [[ ! "$EUID" = 0 ]]; then
 #        echo "Please sudo run me (in order to be able to create the big integer library)!"
 #        exit 1
 #    fi
-    echo "Creating tommath big integer library..."
     if [ -d libtommath ]; then
+        echo "Creating tommath big integer library..."
         # ascertain to hold tommath.h
         if [ ! -f src/tommath.h ]; then
             echo "Will copy 'tommath.h' from the libtommath subdirectory..."
@@ -92,7 +86,7 @@ if [[ ! -f lib/libtommath.a && ! -d lib/libtommath.a ]]; then
                 chmod 644 tommath.h
             fi
         fi
-        echo "Will attempt to create 'libtommath.a'..."
+        echo "Will attempt to create static library 'libtommath.a'..."
         # can I run the make from here?????
         cd libtommath
         # we want make to actually create the .o files now
@@ -100,19 +94,13 @@ if [[ ! -f lib/libtommath.a && ! -d lib/libtommath.a ]]; then
         rm -f *.a
         echo "About to create the libtommath static library..."
         sudo make
+	# Makefile has been adjusted to move libtommath.a to the base folder, so
+	cd ..
         if [ -f libtommath.a ]; then
             echo "Static library 'libtommath.a' created successfully!"
-            cd ..
-            cp libtommath/libtommath.a lib/
-            if [ -f lib/libtommath.a ]; then
-                # ascertain that we can at least read it
-                chmod 644 lib/libtommath.a
-            else
-                echo "ERROR: Failed to copy static library 'libtommath.a' from the libtommath subdirectory to the lib subdirectory."
-                exit 1
-            fi
+            chmod 644 libtommath.a
         else
-            echo "ERROR: Failed to create static library 'libtommath.a' in the libtommath subdirectory!"
+            echo "ERROR: Failed to create static library 'libtommath.a'!"
             exit 1
         fi
     else
