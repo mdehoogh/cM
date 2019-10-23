@@ -50,9 +50,6 @@ Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const
 Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2);
 Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2);
 
-bool isDecimalZero(Mdecimal const * const decimal);
-bool isDecimalOne(Mdecimal const * const _decimal);
-
 // compute an decimal approximation to pi which we can then store in the given decimal context unless it's already in there of course
 Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext);
 
@@ -82,9 +79,13 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint);
 
 Mdecimal* _getInverseDecimal(Mdecimal const * const decimal);
 
-long long getDecimalSign(Mdecimal const * const decimal);
-
-bool isDecimalPositive(Mdecimal const * const decimal);
-bool isDecimalNegative(Mdecimal const * const decimal);
-
 long long decimal2long(Mdecimal* decimal);
+
+// the now well-known sign and M boolean functions
+long long isDecimalUndefined(Mdecimal const * const decimal);
+long long getDecimalSign(Mdecimal const * const decimal);
+long long isDecimalPositive(Mdecimal const * const decimal);
+long long isDecimalNegative(Mdecimal const * const decimal);
+long long isDecimalZero(Mdecimal const * const decimal);
+long long isDecimalOne(Mdecimal const * const decimal);
+

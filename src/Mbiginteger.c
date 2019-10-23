@@ -1,5 +1,7 @@
 #include "Mbiginteger.h"
 
+extern const long long M_LL_INVALID,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
+
 Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){
     if(!_biginteger)return NULL;
     Mbiginteger* _bineg=__biginteger();
@@ -9,9 +11,19 @@ Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){
 
 long long getBigintegerSign(Mbiginteger const * const biginteger){
     if(!biginteger)return M_LL_INVALID;
-    if(mp_iszero(biginteger))return 0;
-    return(mp_isneg(biginteger)==MP_NO?1:-1);
+    long long result=(mp_iszero(biginteger)==MP_YES?M_ZERO:(mp_isneg(biginteger)==MP_YES?M_NEGATIVE:M_POSITIVE)); // OOPS, comparing with MP_YES essential!!!
+    if(amVerbose()){outputBiginteger("Sign of big integer '",biginteger,"':");output("%lld.\n",result);}
+    return result;
 }
-
-bool isBigintegerPositive(Mbiginteger const * const biginteger){long long bigintegerSign=getBigintegerSign(biginteger);return(bigintegerSign==M_LL_INVALID?false:bigintegerSign>0);}
-bool isBigintegerNegative(Mbiginteger const * const biginteger){long long bigintegerSign=getBigintegerSign(biginteger);return(bigintegerSign==M_LL_INVALID?false:bigintegerSign<0);}
+long long isBigintegerZero(Mbiginteger const * const biginteger){
+    long long bigintegerSign=getBigintegerSign(biginteger);
+    return(bigintegerSign==M_LL_INVALID?M_LL_INVALID:(bigintegerSign==M_ZERO?M_TRUE:M_FALSE));
+}
+long long isBigintegerPositive(Mbiginteger const * const biginteger){
+    long long bigintegerSign=getBigintegerSign(biginteger);
+    return(bigintegerSign==M_LL_INVALID?M_LL_INVALID:(bigintegerSign==M_POSITIVE?M_TRUE:M_FALSE));
+}
+long long isBigintegerNegative(Mbiginteger const * const biginteger){
+    long long bigintegerSign=getBigintegerSign(biginteger);
+    return(bigintegerSign==M_LL_INVALID?M_LL_INVALID:(bigintegerSign==M_NEGATIVE?M_TRUE:M_FALSE));
+}

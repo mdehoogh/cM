@@ -129,7 +129,7 @@ Mtext* get_string(Mstring* s);
 
 // anybody can ask for a specific type of value (wrapping certain contents) and the pointer in it should be considered immutable i.e. Mvalue itself should be considered immutable
 // NOTE this doesn't mean that 
-/*
+/* moved over to initializing these in M.c where all the global constants go
 const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
 // it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
 const long long M_LL_MIN=LLONG_MIN+1;
@@ -137,11 +137,6 @@ const long long M_LL_MAX=LLONG_MAX;
 */
 
 long long double2long(long double ld); // convert long double to long long
-
-#define M_LL_INVALID LLONG_MIN // the invalid long long defaults to LLONG_MIN
-// it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
-#define M_LL_MIN LLONG_MIN+1
-#define M_LL_MAX LLONG_MAX
 
 // GENERAL FUNCTIONS
 Mstring* _getUint64BinaryText(uint64_t l,char presuffix);
@@ -161,6 +156,7 @@ Mreal* _getRealCopy(Mreal* real);
 Mreal* _getRealNeg(Mreal* real);
 
 // BIG INTEGER STUFF
+// TODO should be moved over to Mbiginteger.h/c
 void free_biginteger(Mbiginteger* _biginteger);
 Mbiginteger* __biginteger();
 Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger);
@@ -170,8 +166,9 @@ Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger); // NOTE t
 
 Mbiginteger* getBigintegerLLMin();
 Mbiginteger* getBigintegerLLMax();
-bool isBigintegerZero(Mbiginteger* _biginteger);
-bool isBigintegerOne(Mbiginteger* _biginteger);
+
+long long isBigintegerOne(Mbiginteger* _biginteger);
+
 // big integer conversions
 mp_err mp_set_long_double(Mbiginteger *a, long double b); // MDH@01MAY2019: which I made myself
 long double mp_get_long_double(const Mbiginteger* const a); // MDH@07JUN2019: same here
@@ -181,7 +178,20 @@ const Mbiginteger* getBigintegerOne();
 const Mbiginteger* getBigintegerTwo();
 const Mbiginteger* getBigintegerThree();
 
-// RATIONAL STUFF
+long long isIntegerOne(Minteger* integer);
+long long isIntegerUndefined(Minteger* integer);
+long long isIntegerZero(Minteger* integer);
+long long isIntegerPositive(Minteger* integer);
+long long isIntegerNegative(Minteger* integer);
+
+long long isRealZero(Mreal* real);
+long long isRealOne(Mreal* real);
+long long isRealInfinite(Mreal* real);
+long long isRealUndefined(Mreal* real);
+long long isRealPositive(Mreal* real);
+long long isRealNegative(Mreal* real);
+
+// long double stuff
 // some helper functions (TODO or should we use this on Mreal values?????)
 bool ldIsZero(long double ld);
 bool ldIsNaN(long double ld);
@@ -190,7 +200,11 @@ bool ldIsPositive(long double ld);
 bool ldIsNegative(long double ld);
 
 long long getLongDoubleSign(long double ld);
+long long isLongDoubleZero(long double ld);
+long long isLongDoublePositive(long double ld);
+long long isLongDoubleNegative(long double ld);
 
+// RATIONAL STUFF
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getIntegerText(Minteger* _integer);
@@ -199,6 +213,9 @@ Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
 Mstring* _getRealText(Mreal* _real);
 Mstring* _getStringText(Mtext* _string,bool dequoted);
 
+long long isBigintegerUndefined(Mbiginteger* biginteger);
+long long isTextUndefined(Mtext* text);
+long long isTokenUndefined(Mtoken* token);
 
 void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
 void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);

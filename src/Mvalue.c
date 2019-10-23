@@ -10,6 +10,7 @@
 
 #include "Mvalue.h"
 
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const ERROR_PREFIX;
@@ -897,7 +898,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
                 if(showquotes)p=string_append_char(p,'\'');
                 if(showmissings||!isValueUndefined(_mapVariable->_value)){
                     /////output("%s",string(p));
-                    p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+                    p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
                     /////output("%s",string(p));
                     Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
                     /////output("Map element: %s",string(p));
@@ -1323,90 +1324,98 @@ long long getValueSign(Mvalue const * const value){
         if(value->type==VT_BIGINTEGER)return getBigintegerSign(value->value._biginteger);
         if(value->type==VT_REAL)return getLongDoubleSign(value->value._real->ld);
         if(value->type==VT_DECIMAL)return getDecimalSign(value->value._decimal);
-        if(value->type==VT_RATIONAL)return getRationalSign(value->value._rational->num);
+        if(value->type==VT_RATIONAL)return getRationalSign(value->value._rational);
     }
     return M_LL_INVALID;
 }
-bool isValueZero(Mvalue* value){
+// TODO turn the result type of isValueZero() into long long
+long long isValueZero(Mvalue* value){
+    long long result=M_LL_INVALID;
     if(value){
-        if(value->type==VT_INTEGER)return value->value._integer->ll==0;
-        if(value->type==VT_BIGINTEGER)return isBigintegerZero(value->value._biginteger);
-        if(value->type==VT_REAL)return ldIsZero(value->value._real->ld);
-        if(value->type==VT_DECIMAL)return isDecimalZero(value->value._decimal);
-        if(value->type==VT_RATIONAL)return isBigintegerZero(value->value._rational->num);
+        if(amVerbose())outputValue("Checking whether '",value,"' is zero.");
+        if(value->type==VT_INTEGER)result=isIntegerZero(value->value._integer);else
+        if(value->type==VT_BIGINTEGER)result=isBigintegerZero(value->value._biginteger);else
+        if(value->type==VT_REAL)result=isRealZero(value->value._real);else
+        if(value->type==VT_DECIMAL)result=isDecimalZero(value->value._decimal);else
+        if(value->type==VT_RATIONAL)result=isRationalZero(value->value._rational);
     }
-    return false;
+    return result;
 }/* VALIDATED */
-bool isValueOne(Mvalue* value){
+long long isValueOne(Mvalue* value){
+    long long result=M_LL_INVALID;
     if(value){
-        if(value->type==VT_INTEGER)return value->value._integer->ll==1;
-        if(value->type==VT_BIGINTEGER)return isBigintegerOne(value->value._biginteger);
-        if(value->type==VT_REAL)return value->value._real->ld==1;
-        if(value->type==VT_DECIMAL)return isDecimalOne(value->value._decimal);
+        if(value->type==VT_INTEGER)return isIntegerOne(value->value._integer);else
+        if(value->type==VT_BIGINTEGER)return isBigintegerOne(value->value._biginteger);else
+        if(value->type==VT_REAL)return isRealOne(value->value._real);else
+        if(value->type==VT_DECIMAL)return isDecimalOne(value->value._decimal);else
         if(value->type==VT_RATIONAL)return isRationalOne(value->value._rational);
     }
-    return false;
+    return result;
 }/* VALIDATED */
-bool isValuePositive(Mvalue* value){
+long long isValuePositive(Mvalue* value){
+    long long result=M_LL_INVALID;
     if(value){
-        if(value->type==VT_INTEGER)return value->value._integer->ll>0;
-        if(value->type==VT_BIGINTEGER)return isBigintegerPositive(value->value._biginteger);
-        if(value->type==VT_REAL)return ldIsPositive(value->value._real->ld);
-        if(value->type==VT_DECIMAL)return isDecimalPositive(value->value._decimal);
-        if(value->type==VT_RATIONAL)return isBigintegerPositive(value->value._rational->num); // assuming the numerator is never NULL and the denominator is always positive
+        if(value->type==VT_INTEGER)result=isIntegerPositive(value->value._integer);else
+        if(value->type==VT_BIGINTEGER)result=isBigintegerPositive(value->value._biginteger);else
+        if(value->type==VT_REAL)result=isRealPositive(value->value._real);else
+        if(value->type==VT_DECIMAL)result=isDecimalPositive(value->value._decimal);else
+        if(value->type==VT_RATIONAL)result=isRationalPositive(value->value._rational); // assuming the numerator is never NULL and the denominator is always positive
     }
-    return false;
+    return result;
 }/* VALIDATED */
-bool isValueNegative(Mvalue* value){
+long long isValueNegative(Mvalue* value){
+    long long result=M_LL_INVALID;
     if(value){
         if(value->type==VT_INTEGER)return value->value._integer->ll<0;
         if(value->type==VT_BIGINTEGER)return isBigintegerNegative(value->value._biginteger);
         if(value->type==VT_REAL)return ldIsNegative(value->value._real->ld);
         if(value->type==VT_DECIMAL)return isDecimalNegative(value->value._decimal);
-        if(value->type==VT_RATIONAL)return isBigintegerNegative(value->value._rational->num);
+        if(value->type==VT_RATIONAL)return isRationalNegative(value->value._rational);
     }
-    return false;
+    return result;
 }/* VALIDATED */
-bool isValueScalar(Mvalue* value){
-    if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_REAL:case VT_TEXT:case VT_TOKEN:return true;default:return false;}
-    return false;
+long long isValueScalar(Mvalue* value){
+    if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_REAL:case VT_TEXT:case VT_TOKEN:return M_TRUE;default:return M_FALSE;}
+    return M_FALSE;
 }/* VALIDATED */
 
 // null test for the value to be considered NULL
-bool isValueNull(Mvalue* value){
+long long isValueNull(Mvalue* value){
+    long long result=M_LL_INVALID;
     if(value)
     switch(value->type){
-        case VT_INTEGER:return !value->value._integer;
-        case VT_BIGINTEGER:return !value->value._biginteger;
-        case VT_DECIMAL:return !value->value._decimal;
-        case VT_RATIONAL:return !value->value._rational;
-        case VT_REAL:return !value->value._real;
-        case VT_TEXT:return !value->value._text;
-        case VT_LIST:return !value->value._list;
-        case VT_MAP:return !value->value._map;
-        case VT_TOKEN:return !value->value._token;
-        default:break;
+        case VT_INTEGER:result=(value->value._integer?M_FALSE:M_TRUE);break;
+        case VT_BIGINTEGER:result=(value->value._biginteger?M_FALSE:M_TRUE);break;
+        case VT_DECIMAL:result=(value->value._decimal?M_FALSE:M_TRUE);break;
+        case VT_RATIONAL:result=(value->value._rational?M_FALSE:M_TRUE);break;
+        case VT_REAL:result=(value->value._real?M_FALSE:M_TRUE);break;
+        case VT_TEXT:result=(value->value._text?M_FALSE:M_TRUE);break;
+        case VT_LIST:result=(value->value._list?M_FALSE:M_TRUE);break;
+        case VT_MAP:result=(value->value._map?M_FALSE:M_TRUE);break;
+        case VT_TOKEN:result=(value->value._token?M_FALSE:M_TRUE);break;
+        case VT_UNDEFINED:result=M_TRUE;break;
     }
-    return true;
+    return result;
 }/* VALIDATED */
 // MDH@18JUL2019: we consider certain non-null values as undefined, this is to fill the gap between non-null values that represent missings
 //                TODO is a map or list undefined when empty???????
-bool isValueUndefined(Mvalue* value){
-    // values that are considered NULL are also undefined
-    if(!isValueNull(value))
+long long isValueUndefined(Mvalue* value){
+    long long result=M_LL_INVALID;
+    // values that are considered NULL are also undefined (even if value is NULL)
+    if(isValueNull(value)==M_FALSE)
     switch(value->type){
-        case VT_INTEGER:return value->value._integer->ll==M_LL_INVALID;
-        case VT_BIGINTEGER:return false;
-        case VT_DECIMAL:return mpd_isnan((mpd_t*)value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
-        case VT_RATIONAL:return false;
-        case VT_REAL:return ldIsNaN(value->value._real->ld);
-        case VT_TEXT:return false; ////strlen(_value->value._text->_c)==0;
-        case VT_LIST:return false; ////Mlen(_value)==0;
-        case VT_MAP:return false; ////Mlen(_value)==0;
-        case VT_TOKEN:return false; /////string_length(_value->value._token->text)==0;
-        default:break;
+        case VT_INTEGER:result=isIntegerUndefined(value->value._integer);break; // replacing: value->value._integer->ll==M_LL_INVALID;
+        case VT_REAL:result=isRealUndefined(value->value._real);break; // replacing: return ldIsNaN(value->value._real->ld);
+        case VT_BIGINTEGER:result=isBigintegerUndefined(value->value._biginteger);break;
+        case VT_DECIMAL:result=isDecimalUndefined(value->value._decimal);break; // replacing: mpd_isnan((mpd_t*)value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
+        case VT_RATIONAL:result=isRationalUndefined(value->value._rational);break;
+        case VT_TEXT:result=isTextUndefined(value->value._text);break; ////strlen(_value->value._text->_c)==0;
+        case VT_LIST:result=isListUndefined(value->value._list);break; ////Mlen(_value)==0;
+        case VT_MAP:result=isMapUndefined(value->value._map);break; ////Mlen(_value)==0;
+        case VT_TOKEN:result=isTokenUndefined(value->value._token);break; /////string_length(_value->value._token->text)==0;
+        case VT_UNDEFINED:result=M_TRUE;break;
     }
-    return true;
+    return result;
 }/* VALIDATED */
 
 // MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
@@ -1668,3 +1677,6 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){
     }
     return NULL;
 }
+
+long long isListUndefined(Mlist* list){return(list?M_FALSE:M_TRUE);}
+long long isMapUndefined(Mmap* map){return(map?M_FALSE:M_TRUE);}

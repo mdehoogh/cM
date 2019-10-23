@@ -21,6 +21,7 @@
 #include "Mexecution.h"
 
 // externally (in M.c) defined constants
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char* const ERROR_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const mpd_context_t* _decimalContext;
@@ -141,11 +142,8 @@ const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
 const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}/* VALIDATED */
 const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}/* VALIDATED */
 
-bool isBigintegerZero(Mbiginteger* biginteger){return(biginteger?mp_iszero((mp_int*)biginteger)==MP_YES:false);}/* VALIDATED */
-bool isBigintegerOne(Mbiginteger* biginteger){return(biginteger?mp_cmp((mp_int*)biginteger,getBigintegerOne())==MP_EQ:false);}/* VALIDATED */
+long long isBigintegerOne(Mbiginteger* biginteger){return(biginteger?(mp_cmp((mp_int*)biginteger,getBigintegerOne())==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID);}/* VALIDATED */
 // END BIG INTEGER STUFF
-
-
 
 /////////mp_int* __mp_int(){return (mp_int*)MALLOC(sizeof(mp_int),'I');}
 // long double to rational or representation
@@ -269,11 +267,40 @@ Mreal* _getReal(long double ld){
     return _real;
 }/* VALIDATED */
 
+// special integer values to consider
+long long isIntegerOne(Minteger* integer){return(integer?(integer->ll==1?M_TRUE:M_FALSE):M_LL_INVALID);}
+// DISCUSSION it's debatable whether a NULL integer can be tested as it is NULL but isValueUndefined() will prevent call isIntegerUndefined() with a NULL pointer!!!
+long long isIntegerUndefined(Minteger* integer){return(integer?(integer->ll==M_LL_INVALID?M_TRUE:M_FALSE):M_TRUE);}
+long long isIntegerZero(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll==0?M_TRUE:M_FALSE));}
+long long isIntegerPositive(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll>0?M_TRUE:M_FALSE));}
+long long isIntegerNegative(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll<0?M_TRUE:M_FALSE));}
+
+// special real values
+// long double helper functions
+long long isLongDoubleZero(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld==0?M_TRUE:M_FALSE));} // a NaN value is considered NOT zero (obviously)
+long long isLongDoublePositive(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld>0?M_TRUE:M_FALSE));}
+long long isLongDoubleNegative(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld<0?M_TRUE:M_FALSE));}
+long long isLongDoubleOne(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld==1?M_TRUE:M_FALSE));} // same here
+
+// testing for special values TODO we need to make M functions to test for these special values like zero, inf, and undefined
+long long isRealOne(Mreal* real){return(real?isLongDoubleOne(real->ld):M_LL_INVALID);}
+long long isRealInfinite(Mreal* real){return(real?(ldIsInf(real->ld)?M_TRUE:M_FALSE):M_LL_INVALID);}
+long long isRealUndefined(Mreal* real){return(real?(ldIsNaN(real->ld)?M_TRUE:M_FALSE):M_TRUE);} // a real is undefined if it is NULL or the contained long double is undefined i.e. is NaN
+// in general for undefined reals we cannot determine the sign, therefore one should test for undefined first, of course one can test for invalid result of the comparison of course
+long long isRealZero(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleZero(real->ld));}
+long long isRealPositive(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoublePositive(real->ld));}
+long long isRealNegative(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleNegative(real->ld));}
+
+// TODO for now leave these two methods return a boolean, although we should decide whether or not they are derived or not
 bool realIsUndefined(Mreal* real){return(!real||ldIsNaN(real->ld));}
-bool realIsUndefinedOrZero(Mreal* real){return(!real||ldIsNaN(real->ld)||ldIsZero(real->ld));}
+bool realIsUndefinedOrZero(Mreal* real){return(!real||ldIsNaN(real->ld)||isRealZero(real)==M_TRUE);}
 
 Mreal* _getRealCopy(Mreal* real){return(!realIsUndefined(real)?_getReal(real->ld):NULL);}/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
 Mreal* _getRealNeg(Mreal* real){return(!realIsUndefined(real)?_getReal(-real->ld):NULL);}/* VALIDATED */ // just switching the sign of what _getRealCopy returns
+
+long long isBigintegerUndefined(Mbiginteger* biginteger){return(biginteger?M_FALSE:M_TRUE);}
+long long isTextUndefined(Mtext* text){return(text?M_FALSE:M_TRUE);}
+long long isTokenUndefined(Mtoken* token){return(token?M_FALSE:M_TRUE);}
 
 // Mtext is an immutable version of Mstring* in that it cannot be changed
 Mtext* _getText(char* _text){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
@@ -727,13 +754,16 @@ long double mp_get_long_double(const Mbiginteger* const a){
 // part of implementing _getRealText (so not present in the header)
 const char* M_NAN="NaN";
 const char* M_INF="Inf";
+
+// functions that operate purely on long doubles
 bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}/* VALIDATED */
 bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
 bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
 // MDH@18OCT2019: lettting the comparison take care of the result!!!
-long long getLongDoubleSign(long double ld){if(ldIsNaN(ld))return M_LL_INVALID;if(ld>0)return 1;if(ld<0)return -1;return 0;}
-bool ldIsPositive(long double ld){long long ldSign=getLongDoubleSign(ld);return(ldSign==M_LL_INVALID?false:ldSign>0);}/* VALIDATED */
-bool ldIsNegative(long double ld){long long ldSign=getLongDoubleSign(ld);return(ldSign==M_LL_INVALID?false:ldSign<0);}/* VALIDATED */
+bool ldIsPositive(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return false;return(ld>0);}/* VALIDATED */
+bool ldIsNegative(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return false;return(ld<0);}/* VALIDATED */
+
+long long getLongDoubleSign(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;if(ldIsPositive(ld))return M_POSITIVE;if(ldIsNegative(ld))return M_NEGATIVE;return M_ZERO;}
 
 long long double2long(long double ld){
     if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
@@ -884,6 +914,7 @@ bool strIsZero(char* str){
     return(!l?false:str[l]=='-'||str[l]=='+'||str[l]=='0');
 }/* VALIDATED */
 
+/* moved to Mdecimal.h/c
 bool isDecimalZero(Mdecimal* _decimal){
     if(!_decimal)return false;
     Mstring* _decimalText=_getDecimalText(_decimal,true); // free asap
@@ -892,5 +923,6 @@ bool isDecimalZero(Mdecimal* _decimal){
     bool result=(_decimal->mpd?mpd_iszero(_decimal->mpd)==MP_YES:false); // TODO apparently 0 means true, something else means false
     //////output(" %s.\n",(result?"YES":"NO"));
     return result;
-}/* VALIDATED */
+}// VALIDATED 
+*/
 

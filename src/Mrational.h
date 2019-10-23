@@ -24,7 +24,7 @@ mp_err _qsub(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qmul(Mrational* c,Mrational const * const a,Mrational const * const b);
 mp_err _qdiv(Mrational* c,Mrational const * const a,Mrational const * const b);
 
-long long qcmp(Mrational const * const a,Mrational const * const b); // MDH@16OCT2019: what to return if a or b is not defined????? I suppose NULL is smaller than any value???????
+// MDH@23OCT2019: use getRationalSign() now replacing: long long qcmp(Mrational const * const a,Mrational const * const b); // MDH@16OCT2019: what to return if a or b is not defined????? I suppose NULL is smaller than any value???????
 
 Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * const q2); // MDH@09OCT2019: can come in handy
 
@@ -35,8 +35,9 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
 
 Mrational* _qsinorcos(Mrational const * const x,bool sin);
 
-bool isRationalOne(Mrational const * const _rational);
+// getting the sign (M_POSITIVE, M_NEGATIVE, M_ZERO or M_LL_INVALID)
 long long getRationalSign(Mrational const * const rational); // returns -1 for negative rationals, 1 for positive rationals, 0 for zero rationals and M_LL_INVALID for undefined rationals
-bool isRationalZero(Mrational const * const _rational);
-bool isRationalPositive(Mrational const * const rational);
-bool isRationalNegative(Mrational const * const rational);
+long long isRationalZero(Mrational const * const rational);
+long long isRationalPositive(Mrational const * const rational);
+long long isRationalNegative(Mrational const * const rational);
+long long isRationalOne(Mrational const * const rational);

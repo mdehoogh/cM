@@ -5,6 +5,7 @@
 #include "Moutput.h"
 #include "Msession.h"
 
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char * const ERROR_PREFIX;
 extern const long double M_LD_NAN;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
@@ -144,12 +145,12 @@ mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * con
         if(c->num){free_biginteger(c->num);c->num=NULL;}
         // TODO do we need to NULL the denominator????? if(c->den){free_biginteger(c->den);c->den=NULL;}
         // if b is not defined, or zero, copy a into c
-        if(!b||!b->num||isBigintegerZero(b->num)){ // b is undefined or zero: return a
+        if(!b||!b->num||isBigintegerZero(b->num)==M_TRUE){ // b is undefined or zero: return a
             if(amVerbose())outputLine("Second rational argument undefined or zero.");
             if(a->num){c->num=_getBigintegerCopy(a->num);if(!c->num)return MP_ERR;}
             if(a->den){c->den=_getBigintegerCopy(a->den);if(!c->den)return MP_ERR;}
         }else
-        if(!a||!a->num||isBigintegerZero(a->num)){ // a is undefined or zero: return b
+        if(!a||!a->num||isBigintegerZero(a->num)==M_TRUE){ // a is undefined or zero: return b
             if(amVerbose())outputLine("First rational argument undefined or zero.");
             if(b->num){c->num=_getBigintegerCopy(b->num);if(!c->num)return MP_ERR;}
             if(b->den){c->den=_getBigintegerCopy(b->den);if(!c->den)return MP_ERR;}
@@ -380,6 +381,8 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
         outputError("Failed to create the rational for storing the difference of two rationals");
     return _rational;
 }
+/*
+// MDH@23OCT2019 TODO: I believe we have a getRationalSign now, that is to replace qsign!!!!
 long long qsign(Mrational* rational){
     if(!rational)return M_LL_INVALID;
     // assuming that the denominator is always positive we only have to consider the sign of (num/den)+delta=(num+den*delta/den), so the sign of num+den*delta
@@ -392,6 +395,7 @@ long long qsign(Mrational* rational){
 }
 // MDH@16OCT2019: what to return if a or b is not defined????? I suppose NULL is smaller than any value???????
 //                qcmp() will return M_LL_INVALID if something goes wrong!!!
+// MDH@23OCT2019 TODO: qcmp() also replaceable by getRationalSign() I guess
 long long qcmp(Mrational const * const a,Mrational const * const b){
     mp_err status=MP_OKAY;
     mp_ord result=MP_EQ;
@@ -415,7 +419,7 @@ long long qcmp(Mrational const * const a,Mrational const * const b){
     }
     return(status==MP_OKAY?result:M_LL_INVALID);
 }
-
+*/
 // computation of the actual delta is much harder in products and quotients
 long double getLongDoubleRationalProduct(long double ld,Mrational* r){
     if(!r)return M_LD_NAN; // unlikely though as we're calling it ourselves with a defined rational
@@ -667,7 +671,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 					decimalPartText++; // point to the first character of the decimal part
 					_decimalPartBiginteger=__biginteger();
 					if(_decimalPartBiginteger&&mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY){
-                        if(!isBigintegerZero(_decimalPartBiginteger)){
+                        if(isBigintegerZero(_decimalPartBiginteger)!=M_TRUE){
 						    // compute the power of ten denominator
 						    Mbiginteger* _bi10=_getBiginteger(10); // must be freed (see three lines down)
                             if(_bi10){
@@ -784,7 +788,7 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
     // if the given numerator/denominator is NULL assume 1
     if(amVerbose()){outputBiginteger("Determining the rational with numerator ",_numerator,NULL);outputBiginteger(" and denominator ",_denominator,".\n");}
     // determine if the denominator is zero
-    bool nonzeroDenominator=(!_denominator||!isBigintegerZero(_denominator));
+    bool nonzeroDenominator=(!_denominator||isBigintegerZero(_denominator)!=M_TRUE);
     Mrational* _rational=(nonzeroDenominator?__rational():NULL);
     if(_rational){
         // get the delta in
@@ -977,7 +981,7 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){
     if(_biginteger){        
         if(_rational->den){
             // if the numerator is NULL or 0 _biginteger should remain what it is (i.e. 0)
-            if(_rational->num&&!isBigintegerZero(_rational->num)){
+            if(_rational->num&&isBigintegerZero(_rational->num)!=M_TRUE){
                 Mbiginteger* absnum=NULL;
                 bool neg=mp_isneg(_rational->num);
                 if(neg){absnum=__biginteger();if(absnum&&mp_neg(_rational->num,absnum)!=MP_OKAY){free_biginteger(absnum);absnum=NULL;}}else absnum=_rational->num;
@@ -1087,38 +1091,45 @@ long double getUnpureRationalNumerator(Mbiginteger* numerator,Mbiginteger* denom
 }
 long long ldsign(long double ld){
     if(ld==M_LD_NAN)return M_LL_INVALID;
-    if(ld>0)return 1;
-    if(ld<0)return -1;
-    return 0;
+    if(ld>0)return M_POSITIVE;
+    if(ld<0)return M_NEGATIVE;
+    return M_ZERO;
 }
-bool isRationalOne(Mrational const * const rational){
-    if(rational){
-        long double ld=getRealLongDouble(rational->delta);
-        // without a delta, a rational equals 1 when the numerator and denominator are the same
-        if(ld==M_LD_NAN)return(rational->den?(rational->num?mp_cmp(rational->den,rational->num)==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):true));
-        return getUnpureRationalNumerator(rational->num,rational->den,ld)==1;
-    }
-    return false;
-}
+
+// if the rational has an associated delta, it's a bit more complicated, converting to a real of the numerator and denominator might fail or be inaccurate if the big integers are too large
+long long isRationalUndefined(Mrational const * const rational){return(rational&&rational->num?M_FALSE:M_TRUE);}
 long long getRationalSign(Mrational const * const rational){
     // ASSERT if rational->num should always be defined (even if it equals 1), if it is not it is not a valid rational!!!!
-    if(rational&&rational->num){
+    long long rationalSign=M_LL_INVALID;
+    if(isRationalUndefined(rational)==M_FALSE){ // the rational is defined (so it is not NULL and has a non NULL numerator)
         long double ld=getRealLongDouble(rational->delta);
-        if(ld==M_LD_NAN)return getBigintegerSign(rational->num);
-        return ldsign(getUnpureRationalNumerator(rational->num,rational->den,ld));
+        rationalSign=(ldIsNaN(ld)?getBigintegerSign(rational->num):ldsign(getUnpureRationalNumerator(rational->num,rational->den,ld)));
     }
-    return M_LL_INVALID;
+    if(amVerbose()){outputRational("Sign of rational '",rational,"':");output("%lld.\n",rationalSign);}
+    return rationalSign;
 }
-// if the rational has an associated delta, it's a bit more complicated, converting to a real of the numerator and denominator might fail or be inaccurate if the big integers are too large
-bool isRationalPositive(Mrational const * const rational){
+long long isRationalPositive(Mrational const * const rational){
     long long rationalSign=getRationalSign(rational);
-    return(rationalSign==M_LL_INVALID?false:rationalSign>0);
+    return(rationalSign==M_LL_INVALID?M_LL_INVALID:(rationalSign==M_POSITIVE?M_TRUE:M_FALSE));
 }
-bool isRationalNegative(Mrational const * const rational){
+long long isRationalNegative(Mrational const * const rational){
     long long rationalSign=getRationalSign(rational);
-    return(rationalSign==M_LL_INVALID?false:rationalSign<0);
+    return(rationalSign==M_LL_INVALID?M_LL_INVALID:(rationalSign==M_NEGATIVE?M_TRUE:M_FALSE));
 }
-bool isRationalZero(Mrational const * const rational){
+long long isRationalZero(Mrational const * const rational){
     long long rationalSign=getRationalSign(rational);
-    return(rationalSign==M_LL_INVALID?false:rationalSign==0);
+    return(rationalSign==M_LL_INVALID?M_LL_INVALID:(rationalSign==M_ZERO?M_TRUE:M_FALSE));
+}
+
+long long isRationalOne(Mrational const * const rational){
+    long long result=M_LL_INVALID;
+    if(isRationalUndefined(rational)==M_FALSE){
+        long double ld=getRealLongDouble(rational->delta);
+        // without a delta, a rational equals 1 when the numerator and denominator are the same
+        if(ld!=M_LD_NAN)
+            result=(isLongDoubleOne(getUnpureRationalNumerator(rational->num,rational->den,ld))?M_TRUE:M_FALSE);
+        else
+            result=(rational->den?(rational->num?mp_cmp(rational->den,rational->num)==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):M_TRUE));
+    }
+    return result;
 }

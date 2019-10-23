@@ -114,8 +114,9 @@ fi
 echo ""
 echo "Compiling M..."
 cd src
-cc -Wincompatible-pointer-types -Wdangling-else -Wincompatible-pointer-types-discards-qualifiers -L ../lib -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c -o ../M 
+cc -Wincompatible-pointer-types -Wdangling-else -Wincompatible-pointer-types-discards-qualifiers -L.. -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c -o M 
 cd ..
+mv src/M .
 # don't run M here, instead check whether it is there!!!
 if [ -f M ]; then
     # ascertain to be able to run it (when being sudo run)

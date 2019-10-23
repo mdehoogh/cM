@@ -4,6 +4,7 @@
 Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger);
 
 long long getBigintegerSign(Mbiginteger const * const biginteger);
+long long isBigintegerPositive(Mbiginteger const * const biginteger);
+long long isBigintegerNegative(Mbiginteger const * const biginteger);
 
-bool isBigintegerPositive(Mbiginteger const * const biginteger);
-bool isBigintegerNegative(Mbiginteger const * const biginteger);
+long long isBigintegerZero(Mbiginteger const * const biginteger);

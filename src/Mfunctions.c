@@ -3,11 +3,10 @@
 #include "Msession.h"
 #include "Mfunctions.h"
 
-extern const char* VALUETYPENAMES;
-extern const char* const ERROR_PREFIX;
-extern const long double M_LD_NAN;
-extern const long double M_LD_PI;
-
+extern char const * const VALUETYPENAMES[];
+extern char const * const ERROR_PREFIX;
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX;
+extern const long double M_LD_NAN,M_LD_PI;
 extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
 
 void outputDecimalStatus(uint32_t status){

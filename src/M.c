@@ -21,9 +21,10 @@
 char const * const M_VERSION="0.1.0";
 
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
-char const * const M_BUILD="2";char const * const M_DATE="22 October 2019, 12:00";
+//char const * const M_BUILD="2";char const * const M_DATE="22 October 2019, 12:00";
+char const * const M_BUILD="3";char const * const M_DATE="23 October 2019, 18:00";
 
-// used externally in Mexecution.h, Mvalue.h, Mfunctions.h, Menvironment.h
+// used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
 const char* const IFFUNCTION_NAME="if";
@@ -35,13 +36,21 @@ const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associat
 const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 
+const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
+// it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
+const long long M_LL_MIN=LLONG_MIN+1;
+const long long M_LL_MAX=LLONG_MAX;
+const long long M_FALSE=0;
+const long long M_TRUE=1;
+const long long M_ZERO=0;
+const long long M_POSITIVE=1;
+const long long M_NEGATIVE=-1;
 const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
 const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
-
-long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
-
 const long double M_LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
 const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
+
+long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
 
 const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
 
@@ -1049,6 +1058,7 @@ Mvalue* t(Mvalue* value,Mvalue* format){
 
 // the type of a value
 Mvalue* type(Mvalue* _value){
+	// every value should have a type text, even if NULL
 	if(_value)
 	switch(_value->type){
 		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that????
@@ -1063,7 +1073,7 @@ Mvalue* type(Mvalue* _value){
 		case VT_UNDEFINED:return _getTextValue("'u",false);
 		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
-	return NULL;
+	return _getTextValue("'",false);
 }
 
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
@@ -1134,8 +1144,12 @@ bool initEnvironment(){
 	NAR_value=_getRealValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
 
+	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
+	//                therefore it shouldn't be a token value 
+	/*
 	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
 	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputError("BUG: Failed to create NULL value!");
+	*/
 
 	// either set the DP_value to 0 (failed to get a decimal context somehow)
 	/* MDH@20JUN2019: no need for DP_value anymore (as setdp() return _decimalContext->prec now): 
@@ -1373,7 +1387,7 @@ void outputFunctions(){
 }/* VALIDATED */
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
-	Mstring* _variablesText=_getMapText(getEnvironment()->_variableMap,false,false,false);
+	Mstring* _variablesText=_getMapText(getEnvironment()->_variableMap,false,false,true);
 	output("\nVariables: %s.\n",string(_variablesText));
 	free_string(_variablesText);
 }/* VALIDATED */
@@ -3203,10 +3217,10 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 				if(amVerbose()){
-					output("Applying two-argument function '%s'.\n",functionName);
+					output("Applying two-argument function '%s'",functionName);
 					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
-					outputChar('\n');
+					outputChar('.');outputChar('\n');
 				}
 				return (*_function->functionunion.twoArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																	  ,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL));
@@ -3217,10 +3231,11 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
 				if(amVerbose()){
-					output("Applying three-argument function '%s'.\n",functionName);
+					output("Applying three-argument function '%s'",functionName);
 					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
 					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
+					outputChar('.');outputChar('\n');
 				}
 				return (*_function->functionunion.threeArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
@@ -3233,11 +3248,12 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
 				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement?_thirdArgumentmapelement->_next:NULL);
 				if(amVerbose()){
-					output("Applying four-argument function '%s'.\n",functionName);
+					output("Applying four-argument function '%s'",functionName);
 					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
 					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
 					if(_fourthArgumentmapelement)outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
+					outputChar('.');outputChar('\n');
 				}
 				return (*_function->functionunion.fourArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
@@ -3300,7 +3316,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	// _itemid now represents the entire list of index/attribute name combinations
 	if(!_valuereference)return NULL;
 	Mvalue* referencedValue=NULL;
-	if(amVerbose())outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
+	///////if(amVerbose())outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
 	if(!_valuereference->_value){ // not an actual (preset) value
 		// if we do NOT have a name it's a literal
 		if(_valuereference->_name){
@@ -3388,7 +3404,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 		if(amVerbose())outputValue("Returning referenced value: '",_valuereference->_value,"'.\n");
 		assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
 	}
-	if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
+	///////if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
@@ -4018,8 +4034,16 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 }
 
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
-	if(!_value1||isValueZero(_value1))return Mneg(_value2);if(!_value2||isValueZero(_value1))return _value1;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
+	if(amVerbose()){outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
+	if(!_value1||isValueZero(_value1))return Mneg(_value2);
+	////outputChar('A');
+	if(!_value2||isValueZero(_value2))return _value1;
+	////outputChar('B');
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);
+	////outputChar('C');
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
+	////outputChar('D');
+	if(amVerbose()){outputValue("Subtracting scalar '",_value2,"'");outputValue(" from scalar '",_value1,"'.\n");}
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 			if(amVerbose())output("Subtracting integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
@@ -4040,6 +4064,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 	}
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
+		if(amVerbose()){outputRational("Computing the difference of rational '",_rational1,"'");outputRational(" and rational '",_rational2,"'.\n");}
 		Mrational* _differenceRational=_getRationalDifference(_rational1,_rational2); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
@@ -5256,25 +5281,9 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_smallerthanorequaltobiginteger,true);
 	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		// creating two intermediate decimals that need to be freed asap
-		bool result=false;
-		Mdecimal* _decimalDifference=NULL;
-		Mdecimal* _decimal1=_getValueDecimal(_value1),*_decimal2=_getValueDecimal(_value2);
-		if(_decimal1&&_decimal2){
-			_decimalDifference=_getDecimalDifference(_decimal1,_decimal2);
-			if(_decimalDifference){
-				if(amVerbose())
-				outputDecimal("Decimal difference: '",_decimalDifference,"'.\n");
-				result=!isDecimalPositive(_decimalDifference);
-				free_decimal(_decimalDifference);
-			}
-		}
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
-		if(_decimalDifference)return _getIntegerValue(result?1:0); // NOTE even though we freed _decimalDifference the pointer is still not NULL!!!!
-	}else
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-		bool result=false;
+	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
+		long long result=M_LL_INVALID;
 		Mrational* _rationalDifference=NULL;
 		Mrational* _rational1=_getValueRational(_value1),*_rational2=_getValueRational(_value2);
 		if(_rational1&&_rational2){
@@ -5282,12 +5291,29 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 			if(_rationalDifference){
 				if(amVerbose())
 				outputRational("Rational difference: '",_rationalDifference,"'.\n");
-				result=!isRationalPositive(_rationalDifference);
+				result=(getRationalSign(_rationalDifference)<=0?1:0);
 				free_rational(_rationalDifference);
 			}
 		}
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);if(_value2->type!=VT_RATIONAL)free_rational(_rational2);
-		if(_rationalDifference)return _getIntegerValue(result?1:0); // NOTE even though we freed _rationalDifference the pointer is still not NULL!!!!
+		return _getIntegerValue(result); // NOTE even though we freed _rationalDifference the pointer is still not NULL!!!!
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		// creating two intermediate decimals that need to be freed asap
+		long long result=M_LL_INVALID;
+		Mdecimal* _decimalDifference=NULL;
+		Mdecimal* _decimal1=_getValueDecimal(_value1),*_decimal2=_getValueDecimal(_value2);
+		if(_decimal1&&_decimal2){
+			_decimalDifference=_getDecimalDifference(_decimal1,_decimal2);
+			if(_decimalDifference){
+				if(amVerbose())
+				outputDecimal("Decimal difference: '",_decimalDifference,"'.\n");
+				result=(getDecimalSign(_decimalDifference)<=0?1:0);
+				free_decimal(_decimalDifference);
+			}
+		}
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
+		return _getIntegerValue(result); // NOTE even though we freed _decimalDifference the pointer is still not NULL!!!!
 	}
 	return NULL;
 }
@@ -5345,18 +5371,21 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_unequaltobiginteger,true);
 	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2);
-		Mdecimal *_decimal=_getDecimalDifference(_decimal1,_decimal2);
-		long long result=(_decimal?(isDecimalZero(_decimal)?0:1):M_LL_INVALID);
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
-		if(result!=M_LL_INVALID){free_decimal(_decimal);return _getIntegerValue(result);}
-	}else
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
+		long long result=M_LL_INVALID;
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		long long result=qcmp(_rational1,_rational2);
+		Mrational* _rationalDifference=_getRationalDifference(_rational1,_rational2);
+		if(_rationalDifference){result=(getRationalSign(_rationalDifference)==0?0:1);free_rational(_rationalDifference);}
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);if(_value2->type!=VT_RATIONAL)free_rational(_rational2);
-		if(result!=M_LL_INVALID)return _getIntegerValue(result==MP_EQ?0:1);
+		return _getIntegerValue(result);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		long long result=M_LL_INVALID;
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2);
+		Mdecimal* _decimalDifference=_getDecimalDifference(_decimal1,_decimal2);
+		if(_decimalDifference){result=(getDecimalSign(_decimalDifference)==0?0:1);free_decimal(_decimalDifference);}
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
+		return _getIntegerValue(result);
 	}
 	return NULL;
 }
@@ -5375,18 +5404,21 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_equaltobiginteger,true);
 	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2);
-		Mdecimal *_decimal=_getDecimalDifference(_decimal1,_decimal2);
-		long long result=(_decimal?(isDecimalZero(_decimal)?1:0):M_LL_INVALID);
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
-		if(result!=M_LL_INVALID){free_decimal(_decimal);return _getIntegerValue(result);}
-	}else
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
+		long long result=M_LL_INVALID;
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		long long result=qcmp(_rational1,_rational2);
+		Mrational* _rationalDifference=_getRationalDifference(_rational1,_rational2);
+		if(_rationalDifference){result=(getRationalSign(_rationalDifference)==0?1:0);free_rational(_rationalDifference);}
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);if(_value2->type!=VT_RATIONAL)free_rational(_rational2);
-		if(result!=M_LL_INVALID)return _getIntegerValue(result==MP_EQ?1:0);
+		return _getIntegerValue(result);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		long long result=M_LL_INVALID;
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2);
+		Mdecimal* _decimalDifference=_getDecimalDifference(_decimal1,_decimal2);
+		if(_decimalDifference){result=(getDecimalSign(_decimalDifference)==0?1:0);free_decimal(_decimalDifference);}
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2);
+		return _getIntegerValue(result);
 	}
 	return NULL;
 }

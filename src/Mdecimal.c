@@ -5,6 +5,7 @@
 #include "Moutput.h"
 #include "Msession.h"
 
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 extern long double const M_LD_NAN;
 extern char const * const ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
 extern Mdecimalcontext* const M_DECIMALCONTEXT; // ASSERT should not be NULL whenever M is up and running
@@ -79,18 +80,6 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){
 	}
 	return(decimalcontextElement?decimalcontextElement->_decimalcontext:NULL);
 }
-
-// MDH@25AUG2019: I'd see that decimalOne should be an Mdecimal? we can leave it the way it is for now but instead require the context passed to __mpd to be non-NULL!! i.e. __mpd does no longer default to _decimalContext
-static mpd_t* decimalOne=NULL;
-// getDecimalOne() return a decimal but this is a decimal that should never be freed
-const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);return decimalOne;}/* VALIDATED */
-bool isDecimalOne(Mdecimal const * const decimal){
-	if(!decimal)return false;
-	if(decimal->repeating)return false;
-    // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
-	uint32_t status=0;int result=mpd_qcmp(decimal->mpd,getDecimalOne(),&status);
-	return((status&0xEFBF)==0&&result==0);
-}/* VALIDATED */
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
@@ -2727,10 +2716,26 @@ Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){
 	return NULL;
 }
 
-long long getDecimalSign(Mdecimal const * const decimal){return(decimal?(mpd_iszero(decimal->mpd)?0:(mpd_ispositive(decimal->mpd)?1:-1)):M_LL_INVALID);}
+long long isDecimalUndefined(Mdecimal const * const decimal){return(decimal?(decimal->mpd?M_FALSE:M_TRUE):M_TRUE);} // used by the sign and sign testing functions
+long long getDecimalSign(Mdecimal const * const decimal){return(isDecimalUndefined(decimal)==M_FALSE?(mpd_iszero(decimal->mpd)?M_ZERO:(mpd_ispositive(decimal->mpd)?M_POSITIVE:M_NEGATIVE)):M_LL_INVALID);}
+long long isDecimalZero(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?(decimalSign==M_ZERO?M_TRUE:M_FALSE):M_LL_INVALID);}
+long long isDecimalPositive(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?(decimalSign==M_POSITIVE?M_TRUE:M_FALSE):M_LL_INVALID);}
+long long isDecimalNegative(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?(decimalSign==M_NEGATIVE?M_TRUE:M_FALSE):M_LL_INVALID);}
 
-bool isDecimalPositive(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?decimalSign>0:false);}
-bool isDecimalNegative(Mdecimal const * const decimal){long long decimalSign=getDecimalSign(decimal);return(decimalSign!=M_LL_INVALID?decimalSign<0:false);}
+// MDH@25AUG2019: I'd see that decimalOne should be an Mdecimal? we can leave it the way it is for now but instead require the context passed to __mpd to be non-NULL!! i.e. __mpd does no longer default to _decimalContext
+static mpd_t* decimalOne=NULL;
+// getDecimalOne() return a decimal but this is a decimal that should never be freed
+const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);return decimalOne;}/* VALIDATED */
+long long isDecimalOne(Mdecimal const * const decimal){
+	long long result=M_LL_INVALID;
+	if(isDecimalUndefined(decimal)==M_FALSE&&decimal->repeating==0){
+	    // MDH@17JUN2019: something that is repeating is definitely not equal to 1 (TODO unless it's 0.[9])
+		uint32_t status=0;
+		int cmpresult=mpd_qcmp(decimal->mpd,getDecimalOne(),&status);
+		if((status&0xEFBF)==0)result=(cmpresult==0?M_TRUE:M_FALSE);else output("%sFailed to determine whether a decimal equals 1 (status: %" PRIu32 ").\n",ERROR_PREFIX,status);
+	}
+	return result;
+}/* VALIDATED */
 
 // MDH@18OCT2019: assuming that \p decimal already is rounded somehow to the given integer using ceil, floor, trunc or round
 //                so that we should simply remove the fractional part

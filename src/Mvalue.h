@@ -86,6 +86,7 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
 Mmap* _getListMap(char* name,Mvalue* _listValue);
 Mmap* _getStringStringMap(char* name1,char* name2);
 Mmap* _getRealRealMap(char* name1,char* name2);
+long long isMapUndefined(Mmap* map);
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 // data wrappers
@@ -122,6 +123,8 @@ void free_value(Mvalue* _value);
 unsigned long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 void free_list(Mlist* _list);
 
+long long isListUndefined(Mlist* list);
+
 bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);
 
 long double getValueReal(const Mvalue* const _value);
@@ -156,13 +159,14 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
 bool mapAppendedToList(Mlist* const _list,const Mmap* const _map);
 bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map);
 
-bool isValueZero(Mvalue* _value);
-bool isValueOne(Mvalue* _value);
-bool isValuePositive(Mvalue* _value);
-bool isValueNegative(Mvalue* _value);
-bool isValueScalar(Mvalue* _value);
-bool isValueNull(Mvalue* _value); // expose as well
-bool isValueUndefined(Mvalue* _value); // expose as well
+// all is... methods should now return a long long equal to M_TRUE, M_FALSE or M_LL_INVALID
+long long isValueZero(Mvalue* value);
+long long isValueOne(Mvalue* value);
+long long isValuePositive(Mvalue* value);
+long long isValueNegative(Mvalue* value);
+long long isValueScalar(Mvalue* value);
+long long isValueNull(Mvalue* value); // expose as well
+long long isValueUndefined(Mvalue* value); // expose as well
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue* const _value);
