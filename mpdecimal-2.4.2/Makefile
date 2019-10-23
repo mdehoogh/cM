@@ -17,12 +17,14 @@ libdir = ${exec_prefix}/lib
 datarootdir = ${prefix}/share
 docdir = ${datarootdir}/doc/${PACKAGE_TARNAME}
 
+# MdH@23OCT2019: moving libmpdec.a to the root directory better done in all instead of the supplied default
 all: default
 
 default: FORCE
 	cd libmpdec && $(MAKE)
-	rm -f ../${LIBSTATIC}
-	cp libmpdec/${LIBSTATIC} ../
+	cd ..
+	rm -f ../libmpdec.a && cp libmpdec/libmpdec.a ..
+	rm -f ../src/mpdecimal.h && cp libmpdec/mpdecimal.h ../src/
 
 check: default
 	cd tests && $(MAKE) && ./runshort.sh
@@ -33,14 +35,8 @@ check_alloc: default
 profile: FORCE
 	cd libmpdec && $(MAKE) profile
 
-# MDH@21OCT2019: in order to prevent installation with M install has been altered to installmpdec
-install: FORCE
-	@echo
-	@echo The 'install' option has been renamed to 'installmpdec' in order to prevent installation of mpdecimal 2.4.2 when installing M, as this is not required by M.
-	@echo Therefore, use 'make installmpdec' to truely install mpdecimal 2.4.2 on your computer!
-	@echo
 
-installmpdec: FORCE
+install: FORCE
 	$(INSTALL) -d -m 755 $(DESTDIR)$(includedir)
 	$(INSTALL) -m 644 libmpdec/mpdecimal.h $(DESTDIR)$(includedir)
 	$(INSTALL) -d -m 755 $(DESTDIR)$(libdir)

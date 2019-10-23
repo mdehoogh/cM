@@ -276,6 +276,7 @@ psdir = ${docdir}
 sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com
 srcdir = .
+subdirs =  mpdecimal-2.4.2
 sysconfdir = ${prefix}/etc
 target_alias = 
 top_build_prefix = 

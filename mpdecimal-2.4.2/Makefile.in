@@ -17,9 +17,14 @@ libdir = @libdir@
 datarootdir = @datarootdir@
 docdir = @docdir@
 
+# MdH@23OCT2019: moving libmpdec.a to the root directory better done in all instead of the supplied default
+all: default
 
 default: FORCE
 	cd libmpdec && $(MAKE)
+	cd ..
+	rm -f ../libmpdec.a && cp libmpdec/libmpdec.a ..
+	rm -f ../src/mpdecimal.h && cp libmpdec/mpdecimal.h ../src/
 
 check: default
 	cd tests && $(MAKE) && ./runshort.sh
