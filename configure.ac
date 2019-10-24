@@ -6,8 +6,10 @@ AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
 AC_CONFIG_SRCDIR([M.c])
 AC_CONFIG_HEADERS([config.h])
 
+AM_INIT_AUTOMAKE
+
 # Checks for programs.
-AC_PROG_CXX
+#AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
@@ -38,6 +40,6 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([atexit floor memmove memset pow select sqrt strchr strdup strstr uname])
 
-AC_CONFIG_FILES([libtommath/makefile])
+AC_CONFIG_FILES([Makefile])
 AC_CONFIG_SUBDIRS([mpdecimal-2.4.2])
 AC_OUTPUT
