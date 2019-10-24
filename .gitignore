@@ -1,6 +1,6 @@
 # excluding the files required to create the configure script (running autoconf on configure.ac) and Makefile.in scripts (running automake on Makefile.am scripts in root and src subdirectory)
 aclocal.m4
-configure.ac
+#configure.ac
 Makefile
 
 mpdecimal-2.4.2/config.status
