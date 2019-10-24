@@ -197,7 +197,10 @@ long double realsum(Mreal* _real1,Mreal* _real2){
 Mreal* _realsum(Mreal* r1,Mreal* r2){
     // if either real is defined a sum real is to be produced
     // NOTE _getReal ALWAYS returns a real (if possible) so even when M_LD_NAN is in it
-    return(r1||r2?_getReal(realsum(r1,r2)):NULL);
+    if(realIsUndefinedOrZero(r2))return _getRealCopy(r1);
+    if(realIsUndefinedOrZero(r1))return _getRealCopy(r2);
+    // ASSERT neither is undefined or zero
+    return _getReal(realsum(r1,r2));
 }
 // for the computation of the difference of two reals
 long double lddifference(long double ld1,long double ld2){
@@ -459,7 +462,8 @@ Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * cons
     if(_rational){
         mp_err status=_qmul(_rational,q1,q2);
         if(status==MP_OKAY){
-        	bool delta1defined=!realIsUndefined(q1->delta),delta2defined=!realIsUndefined(q2->delta);
+            // TODO switch over from using realIsUndefinedOrZero() to isRealUndefined() and isRealZero()
+        	bool delta1defined=!realIsUndefinedOrZero(q1->delta),delta2defined=!realIsUndefinedOrZero(q2->delta);
             // if at least one is defined, there will be a delta in the product
             if(delta1defined||delta2defined){
                 // the delta is either a single term or the sum of three terms
@@ -486,7 +490,7 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
     if(_rational){
         mp_err status=_qdiv(_rational,q1,q2);
         if(status==MP_OKAY){
-        	bool delta1defined=!realIsUndefined(q1->delta),delta2defined=!realIsUndefined(q2->delta);
+        	bool delta1defined=!realIsUndefinedOrZero(q1->delta),delta2defined=!realIsUndefinedOrZero(q2->delta);
             // TODO if either delta is defined the new rational will also have a delta!!!
             if(delta2defined){
                  // the new delta is the quotient of (delta1-r*delta2) and the value of q2
@@ -1124,12 +1128,14 @@ long long isRationalZero(Mrational const * const rational){
 long long isRationalOne(Mrational const * const rational){
     long long result=M_LL_INVALID;
     if(isRationalUndefined(rational)==M_FALSE){
+        if(amVerbose())outputRational("Checking if '",rational,"' equals one");
         long double ld=getRealLongDouble(rational->delta);
         // without a delta, a rational equals 1 when the numerator and denominator are the same
-        if(ld!=M_LD_NAN)
+        if(!ldIsNaN(ld)&&!ldIsZero(ld))
             result=(isLongDoubleOne(getUnpureRationalNumerator(rational->num,rational->den,ld))?M_TRUE:M_FALSE);
         else
             result=(rational->den?(rational->num?mp_cmp(rational->den,rational->num)==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):M_TRUE));
+        if(amVerbose())output(": %s.\n",(result==M_LL_INVALID?"UNKNOWN":(result==M_TRUE?"YES":"NO")));
     }
     return result;
 }

@@ -2907,7 +2907,7 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
 
 Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue){
 	Mvalue* _result=NULL;
-	if(isValueZero(_conditionTokenValue)){
+	if(isValueZero(_conditionTokenValue)==M_TRUE){
 		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
 			getEnvironment()->expressionToken=_elseTokenValue->value._token;
 			_result=getValueOfExpression("else clause",'e',NULL,0);
@@ -2927,7 +2927,7 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 			// evaluate the condition
 			getEnvironment()->expressionToken=_conditionTokenValue->value._token;
 			Mvalue* _conditionValue=getValueOfExpression("while condition",'w',NULL,0);
-			if(isValueZero(_conditionValue))break; // condition evaluates to zero
+			if(isValueZero(_conditionValue)==M_TRUE)break; // condition evaluates to zero
 			// evaluate the body
 			getEnvironment()->expressionToken=_whilebodyTokenValue->value._token;
 			_result=getValueOfExpression("while loop",'l',NULL,0);
@@ -2958,7 +2958,7 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){
 								_doEnvironment->expressionToken=tokenExpressionValue->value._token;
 								if(_doEnvironment->expressionToken){
 									expressionValue=getValueOfExpression("do",'d',(TokenType[]){},0); // evaluate the expression
-									if(!isValueZero(getValue(_doEnvironment,"!")))break; // if the exit flag was set, exit
+									if(isValueZero(getValue(_doEnvironment,"!"))!=M_TRUE)break; // if the exit flag was set, exit
 								}
 							}
 							// move over to the next expression to evaluate...
@@ -3008,7 +3008,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							// evaluate the condition
 							_forEnvironment->expressionToken=_conditionTokenValue->value._token;
 							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
-							if(isValueZero(_conditionValue))break; // condition evaluates to zero
+							if(isValueZero(_conditionValue)==M_TRUE)break; // condition evaluates to zero
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
 							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
 							if(amVerbose()){
@@ -4075,15 +4075,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 }
 
 Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
+	if(!_value1||!_value2)return NULL;
 	if(amVerbose()){outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
-	if(!_value1||isValueZero(_value1))return Mneg(_value2);
-	////outputChar('A');
-	if(!_value2||isValueZero(_value2))return _value1;
-	////outputChar('B');
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);
-	////outputChar('C');
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
-	////outputChar('D');
+	// if either is zero, result is easy to determine
+	if(isValueZero(_value1)==M_TRUE)return Mneg(_value2);
+	if(isValueZero(_value2)==M_TRUE)return _value1;
 	if(amVerbose()){outputValue("Subtracting scalar '",_value2,"'");outputValue(" from scalar '",_value1,"'.\n");}
 	/*
 	// if both are integers, the result should be integer as well!!!
@@ -4153,8 +4151,9 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
-	if(isValueZero(_value1)||isValueOne(_value2))return _value1;if(isValueZero(_value2)||isValueOne(_value1))return _value2;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
+	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
+	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 			if(amVerbose())output("Multiplying integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
@@ -4819,9 +4818,9 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
-	if(isValueZero(_value1))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
-	if(isValueZero(_value2))return _getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
+	if(isValueZero(_value1)==M_TRUE)return _value1;
+	if(isValueZero(_value2)==M_TRUE)return _getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
 		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
 		// computing the power is not so easy for certain value type combinations
@@ -4965,7 +4964,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	// we can still use the shortcuts
 	if(!_value1||!_value2)return NULL;
-	if(isValueZero(_value1)||isValueZero(_value2))return _value1; // NOTE if the power is zero, the multiplication factor will be 1
+	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // NOTE if the power is zero, the multiplication factor will be 1
 	return multiply(_value1,power(_getIntegerValue(10),_value2)); // TODO check whether _getIntegerValue(10) actually gets freed by the 'gc'
 	/* replacing:
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
@@ -5020,8 +5019,8 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 // MDH@07JUN2019: when two integers are presented to divide instead of actually computing the division we can store the division as a rational (so we kind of have a slow evaluation of the division, and we maintain accuracy as long as possible)
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
-	if(isValueZero(_value1)||isValueOne(_value2))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
+	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	// integer divisions are not computed but stored in rational format (without a delta to not suggest that the division is decimal)
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
 		Mbiginteger* _numerator=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5061,8 +5060,8 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
-	if(isValueZero(_value1)||isValueOne(_value2))return _value1;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide);
+	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 			if(amVerbose())output("Integer dividing integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
@@ -5106,8 +5105,9 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 }
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
-	if(isValueZero(_value1))return _value1;if(isValueOne(_value2))return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getRealValue(0));
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
+	if(isValueZero(_value1)==M_TRUE)return _value1;
+	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getRealValue(0));
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 		if(amVerbose())output("Integer remainder of dividing integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
 		return(_value2->value._integer->ll!=0?_getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).rem):NULL);

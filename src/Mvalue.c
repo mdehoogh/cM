@@ -1333,45 +1333,52 @@ long long getValueSign(Mvalue const * const value){
 long long isValueZero(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
-        if(amVerbose())outputValue("Checking whether '",value,"' is zero.");
+        if(amVerbose())outputValue("Checking whether '",value,"' is zero");
         if(value->type==VT_INTEGER)result=isIntegerZero(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerZero(value->value._biginteger);else
         if(value->type==VT_REAL)result=isRealZero(value->value._real);else
         if(value->type==VT_DECIMAL)result=isDecimalZero(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalZero(value->value._rational);
     }
+    if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     return result;
 }/* VALIDATED */
 long long isValueOne(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
-        if(value->type==VT_INTEGER)return isIntegerOne(value->value._integer);else
-        if(value->type==VT_BIGINTEGER)return isBigintegerOne(value->value._biginteger);else
-        if(value->type==VT_REAL)return isRealOne(value->value._real);else
-        if(value->type==VT_DECIMAL)return isDecimalOne(value->value._decimal);else
-        if(value->type==VT_RATIONAL)return isRationalOne(value->value._rational);
+        if(amVerbose())outputValue("Checking whether '",value,"' equals one");
+        if(value->type==VT_INTEGER)result=isIntegerOne(value->value._integer);else
+        if(value->type==VT_BIGINTEGER)result=isBigintegerOne(value->value._biginteger);else
+        if(value->type==VT_REAL)result=isRealOne(value->value._real);else
+        if(value->type==VT_DECIMAL)result=isDecimalOne(value->value._decimal);else
+        if(value->type==VT_RATIONAL)result=isRationalOne(value->value._rational);
+        if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     }
     return result;
 }/* VALIDATED */
 long long isValuePositive(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
+        if(amVerbose())outputValue("Checking whether '",value,"' is positive");
         if(value->type==VT_INTEGER)result=isIntegerPositive(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerPositive(value->value._biginteger);else
         if(value->type==VT_REAL)result=isRealPositive(value->value._real);else
         if(value->type==VT_DECIMAL)result=isDecimalPositive(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalPositive(value->value._rational); // assuming the numerator is never NULL and the denominator is always positive
+        if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     }
     return result;
 }/* VALIDATED */
 long long isValueNegative(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
-        if(value->type==VT_INTEGER)return value->value._integer->ll<0;
-        if(value->type==VT_BIGINTEGER)return isBigintegerNegative(value->value._biginteger);
-        if(value->type==VT_REAL)return ldIsNegative(value->value._real->ld);
-        if(value->type==VT_DECIMAL)return isDecimalNegative(value->value._decimal);
-        if(value->type==VT_RATIONAL)return isRationalNegative(value->value._rational);
+        if(amVerbose())outputValue("Checking whether '",value,"' is negative");
+        if(value->type==VT_INTEGER)result=isIntegerNegative(value->value._integer);else
+        if(value->type==VT_BIGINTEGER)result=isBigintegerNegative(value->value._biginteger);else
+        if(value->type==VT_REAL)result=isRealNegative(value->value._real);else
+        if(value->type==VT_DECIMAL)result=isDecimalNegative(value->value._decimal);else
+        if(value->type==VT_RATIONAL)result=isRationalNegative(value->value._rational);
+        if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     }
     return result;
 }/* VALIDATED */
