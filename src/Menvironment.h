@@ -112,6 +112,10 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
 Mvalue* getValue(const Menvironment* const _environment,const char* const name);
 
+char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value); // MDH@24OCT2019: if we want to find a constant with the same value we can use that as a 'symbol'
+// MDH@24OCT2019: if we want to see the variables in an environment vall getVariableMapText(), which will also represent values by the names of constants with the same value (representing symbols)
+Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings);
+
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable);
 /*
 // if you want to set a value you have to pass in a pointer to the contents

@@ -210,6 +210,102 @@ Mvariable* getVariable(Menvironment const * const _environment,char const * cons
     return (_environment&&_environment->_parent?getVariable(_environment->_parent,name,verbose):NULL);
 }/* VALIDATED */
 bool containsVariable(Menvironment const * const _environment,char const * const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
+
+// MDH@24OCT2019: when representing variable values the value might match the value of a constant in which case we use the name of that constant variable instead (which is like a symbol)
+//                obviously the type of the value should match as well
+bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
+    if(!value1&&!value2)return false; // if both NULL not considered to be the same
+    if(value1==value2)return true; // the same value pointed to
+    if(!value1||!value2)return false; // if either is NULL, not the same of course
+    // ASSERT both not NULL
+    if(value1->type==value2->type) // if the types are different definitely not the same
+    switch(value1->type){
+        case VT_INTEGER:return(value1->value._integer->ll==value2->value._integer->ll);
+        case VT_REAL:return(ldEqual(value1->value._real->ld,value2->value._real->ld));
+        case VT_BIGINTEGER:return(mp_cmp(value1->value._biginteger,value2->value._biginteger)==MP_EQ);
+        case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
+        case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
+        case VT_LIST:case VT_MAP:break;
+        case VT_DECIMAL:case VT_RATIONAL:break;
+        case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
+    }
+    return false;
+}
+char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value){
+    if(!value)return NULL; // forget about NULL
+    // input valid
+    Mmap* variableMap=(environment?environment->_variableMap:(_executionEnvironment?_executionEnvironment->_variableMap:NULL));
+    if(!variableMap){output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
+    ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
+    Mmapelement* _variableMapelement=variableMap->_first;
+    // as long as variable is defined, and the variable's name is not equal to the given name, continue
+    Mvariable* variable;
+    while(_variableMapelement){
+        variable=_variableMapelement->_variable;
+        if(variable) // defined
+            if(strcmp(variable->_name,name)) // not the same as name
+                if(variable->immutable) // a constant
+                    if(areValuesEqual(variable->_value,value))
+                        break;
+        _variableMapelement=_variableMapelement->_next;
+    }
+    // MDH@20JUL2019: if found return
+    if(_variableMapelement){
+        if(amVerbose()){output("Variable '%s' found in environment '%s'",name,(environment?environment:_executionEnvironment)->_name);outputValue(" with value '",value,"'.\n");}
+        return _variableMapelement->_variable->_name;
+    }
+    // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
+    return (environment&&environment->_parent?getConstantWithValue(environment->_parent,name,value):NULL);
+}
+Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings){
+    Mmap* map=(environment?environment->_variableMap:_executionEnvironment->_variableMap);
+	Mstring* result=(map?__string():NULL);
+    if(result){
+	    Mstring* p=result;
+        if(amDebugging())p=string_append_char(p,'m');
+        if(showcurlybraces)p=string_append_char(p,'{');
+		//////output("%s",string(p));
+		Mmapelement* _mapelement=map->_first;
+		while(p&&_mapelement){
+			//////output("%s","start");
+			Mvariable* _mapVariable=_mapelement->_variable;
+			if(_mapVariable){
+                // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
+                if(showquotes)p=string_append_char(p,'\'');
+                p=string_append(p,_mapVariable->_name);
+                if(showquotes)p=string_append_char(p,'\'');
+                if(showmissings||!isValueUndefined(_mapVariable->_value)){
+                    /////output("%s",string(p));
+                    p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+                    // MDH@24OCT2019: here we deviate from _getMapText() (see Mvalue.h/c) in that we try to find a constant with the same value (like PI or E or NULL)
+                    char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name,_mapVariable->_value);
+                    if(!constantWithValue){ // not a 'symbolic' value
+                        /////output("%s",string(p));
+                        Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
+                        /////output("Map element: %s",string(p));
+                        // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
+                        if(_mapelementValueText){
+                            p=string_append(p,string(_mapelementValueText)); // append 
+                            free_string(_mapelementValueText); // release AFTER copying over
+                        }
+                    }else // a 'symbolic' value
+                        p=string_append(p,constantWithValue);
+                }
+            }
+			_mapelement=_mapelement->_next;
+			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
+			////output("%s","next");
+		}
+		//////output("%s(%d)",string(p),string_length(p));
+		if(showcurlybraces)p=string_append_char(p,'}');
+		//////output("%s",string(p));
+		// if we failed, we have to free s here!!!
+		if(!p){free_string(result);result=NULL;}
+	}
+	return result;
+}/* VALIDATED */
+// MDH@24OCT2019 END
+
 // use Mexists to determine if a variable exists passed in as text, we might decide to return the name of the environment it exists in
 Mvalue* Mexists(Mvalue* _value){
     if(_value&&_value->type==VT_TEXT){

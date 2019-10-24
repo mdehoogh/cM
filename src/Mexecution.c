@@ -763,7 +763,36 @@ bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
 bool ldIsPositive(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return false;return(ld>0);}/* VALIDATED */
 bool ldIsNegative(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return false;return(ld<0);}/* VALIDATED */
 
-long long getLongDoubleSign(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;if(ldIsPositive(ld))return M_POSITIVE;if(ldIsNegative(ld))return M_NEGATIVE;return M_ZERO;}
+bool ldEqual(long double ld1,long double ld2){
+    if(ldIsNaN(ld1)&&ldIsNaN(ld2))return true;
+    if(ldIsNaN(ld1)||ldIsNaN(ld2))return false;
+    // ASSERT both not NaN
+    if(ldIsInf(ld1)&&ldIsInf(ld2))return true;
+    if(ldIsInf(ld1)||ldIsInf(ld2))return false;
+    // ASSERT both not NaN and not Inf
+    return(ld1==ld2);
+}
+
+// 'shifting' a double means either doubling or halving a number of times
+long double ldShift(long double ld,long long shift){
+    long double result=(shift==M_LL_INVALID?M_LD_NAN:ld); // initialize the result to what we received, unless the shift value is invalid
+    // if something to shift by, and we can expect a change to the result go ahead...
+    if(shift!=0&&!ldIsNaN(result)&&!ldIsZero(result)&&!ldIsInf(result)){ // something to operate on (that allows doubling/halving), as well as something to shift by
+        if(shift>0){
+            while(--shift>=0)result*=2; // keep doubling
+        }else{
+            while(++shift<=0)result/=2; // keep halving
+        }
+    }
+    return result;
+}/* VALIDATED */
+
+long long getLongDoubleSign(long double ld){
+    if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;
+    if(ldIsPositive(ld))return M_POSITIVE;
+    if(ldIsNegative(ld))return M_NEGATIVE;
+    return M_ZERO;
+}/* VALIDATED */
 
 long long double2long(long double ld){
     if(ldIsNaN(ld)||ldIsInf(ld))return M_LL_INVALID;

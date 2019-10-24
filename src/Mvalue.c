@@ -922,6 +922,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
 	return result;
 }/* VALIDATED */
 
+// MDH@24OCT2019: if you want the value representation or perhaps the name of a constant depends on whether name is defined
 Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
 	Mstring* valueText=NULL;

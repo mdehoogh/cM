@@ -60,4 +60,6 @@ char string_replacedchar(Mstring * const str,char c,size_t pos); // returns the 
 
 size_t string_number_of_matching_chars(Mstring const * const str,char const * chars); // the number of matching character at the start
 
+bool string_equal(Mstring* str1,Mstring* str2); // MDH@24OCT2019: whether or not two strings are considered equal
+
 #endif /* __MSTRING_H__ */

@@ -198,6 +198,9 @@ bool ldIsNaN(long double ld);
 bool ldIsInf(long double ld);
 bool ldIsPositive(long double ld);
 bool ldIsNegative(long double ld);
+bool ldEqual(long double ld1,long double ld2);
+
+long double ldShift(long double ld,long long shift); // 'shifting' a double means either doubling or halving a number of times
 
 long long getLongDoubleSign(long double ld);
 long long isLongDoubleZero(long double ld);

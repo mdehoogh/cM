@@ -356,3 +356,15 @@ size_t string_number_of_matching_chars(Mstring const * const str,char const * ch
     }
     return numberOfMatchingCharacters;
 } 
+
+// MDH@24OCT2019: return true if str1 and str2 are equal (qua contents)
+bool string_equal(Mstring* str1,Mstring* str2){
+    if(!str1&&!str2)return false; // if both NULL not the same
+    if(str1==str2)return true; // if pointing to the same memory, the same
+    if(!str1||!str2)return false; // if either NULL not the same
+    // ASSERT both are not NULL
+    if(str1->length!=str2->length)return false; // if length not equal not the same
+    if(!str1->chars||!str2->chars)return false; // we need both chars arrays (actually should never be NULL though)
+    str1->chars[str1->length]='\0';str2->chars[str2->length]='\0'; // place end-of-text markers so we can use str_cmp for comparison
+    return(strcmp(str1->chars,str2->chars)==0);
+}
