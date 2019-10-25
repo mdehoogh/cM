@@ -45,7 +45,15 @@ fi
 echo ""
 echo "Compiling M..."
 cd src
-cc -Wno-incompatible-pointer-types-discards-qualifiers -L../lib -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c -o M 
+# remove all object files
+rm -rf *.o
+# and static libraries
+rm -rf *.a
+# move the static libraries in here
+cp ../lib/* .
+# make all files readable
+chmod 644 *
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c -o M 
 cd ..
 mv src/M .
 

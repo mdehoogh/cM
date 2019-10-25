@@ -11,10 +11,12 @@ PLATFORM := $(shell uname | sed -e 's/_.*//')
 
 # all make target
 all: ${LIBNAME}
-
+	mv libtommath.a ..
+	
 # default make target
 default: ${LIBNAME}
-
+	mv libtommath.a ..
+	
 # Compiler and Linker Names
 ifndef CROSS_COMPILE
   CROSS_COMPILE=
