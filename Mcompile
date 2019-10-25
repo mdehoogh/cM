@@ -4,7 +4,6 @@
 
 # the actual stuff
 # remove M so if we fail we'd know it
-rm -f M
 
 # will copy the static libraries to the lib folder (if the lib folder does not yet exist)
 if [[ ! -d lib ]]; then
@@ -45,30 +44,46 @@ fi
 echo ""
 echo "Compiling M..."
 cd src
+# remove M
+rm -f M
 # remove all object files
-rm -rf *.o
+rm -f *.o
 # and static libraries
-rm -rf *.a
+rm -f *.a
 # move the static libraries in here
 cp ../lib/* .
 # make all files readable
 chmod 644 *
 cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c -o M 
-cd ..
-mv src/M .
 
-# don't run M here, instead check whether it is there!!!
+# check whether it is there!!!
 if [ -f M ]; then
     # ascertain to be able to run it (when being sudo run)
     if [[ "$EUID" = 0 ]]; then
         chmod 755 M
-        echo "M has been created, run it with ./M!"
+        echo "M has been created!"
     else
         echo "M has been created but you may not be able to run it with ./M if the next command (chmod) fails."
         chmod 755 M
     fi
-#    echo "Command-line flags (specify behind a hyphen) include D (debug), s (verbose), A (assist)"
+    # copy M one directory up
+    if [ -f ../M ]; then
+        rm ../M
+        echo "Previous M removed..."
+    fi
+    cp M ..
+    cd ..
+    if [ -f M ]; then
+        echo "Execute ./M to run M now."
+    else
+        echo "M vanished. You will have to copy it from the scr subdirectory yourself manually."
+    fi
 else
     echo "ERROR: Failed to create the M executable!"
+    cd ..
+    if [ -f M ]; then
+        echo "You have to keep using the previously created one."
+    else
+        echo "Too bad. Please try again!"
+    fi
 fi
-echo ""
