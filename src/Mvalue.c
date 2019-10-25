@@ -763,7 +763,7 @@ unsigned long long appendedToList(Mlist * const _list,Mvalue const * const _valu
             (_nextListelement->index)++;
             if(amDebugging()){outputValue("Index of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);}
             _nextListelement=_nextListelement->_next;
-            if(amDebugging())if(_nextListelement)outputLine("A element to consider!");else outputLine("No next element to consider!");
+            if(amDebugging()){if(_nextListelement)outputLine("A element to consider!");else outputLine("No next element to consider!");}
         }
         if(amVerbose())outputValue("'",_listelement->_value,"' prepended.\n");
     }
@@ -1432,9 +1432,10 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
     Mlist* _iterationsList=_getListOfType(VT_UNDEFINED);
     if(_iterationsList){ // should be freed when NOT returned!!
         Mrational* _rational=NULL; // the last (computed) rational
-        if(!ldIsNaN(ld)&&!ldIsInf(ld)){ // neither a NaN nor Inf      
-            if(!ldIsZero(ld)){
-                bool neg=(ld<0);if(neg)ld=-ld; // remember if negative
+        if(isLongDoubleUndefined(ld)!=M_TRUE){ // not a NaN (might still be Infinity though), but Infinity has a sign too   
+            long long ldSign=getLongDoubleSign(ld);
+            if(ldSign!=M_ZERO){ // ld is not zero 
+                bool neg=(ldSign==M_NEGATIVE);if(neg)ld=-ld; // remember if negative
                 // ASSERT ld is positive 
                 long long pmin1=1,pmin2=0,qmin1=0,qmin2=1;
                 long long a,p,q;
@@ -1460,7 +1461,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     if(!appendedToList(_iterationsList,_rationalValue,i)){/*free_rational(_rational);*/outputError("Failed to register a rational approximation");break;}
                     // if we get here success in updating the iterations list!!!!
                     // if delta is now zero, we're done!!!
-                    if(ldIsZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
+                    if(isLongDoubleZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
                     rem-=a;
                     rem=1/rem;
                     // shift the lot

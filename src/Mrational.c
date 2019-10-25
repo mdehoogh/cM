@@ -424,7 +424,7 @@ long long qcmp(Mrational const * const a,Mrational const * const b){
 }
 */
 // computation of the actual delta is much harder in products and quotients
-long double getLongDoubleRationalProduct(long double ld,Mrational* r){
+long double getLongDoubleRationalProduct(long double ld,Mrational const * const r){
     if(!r)return M_LD_NAN; // unlikely though as we're calling it ourselves with a defined rational
     if(ld!=M_LD_NAN){
         if(amVerbose())output("Product of long double %.*Lf",LDBL_DIG,ld);
@@ -436,7 +436,7 @@ long double getLongDoubleRationalProduct(long double ld,Mrational* r){
     if(amVerbose()){outputRational(" and rational ",r,":");output("%.*Lf.\n",ld);}
     return ld;
 }
-long double getLongDoubleRationalQuotient(long double ld,Mrational* r){
+long double getLongDoubleRationalQuotient(long double ld,Mrational const * const r){
     if(!r)return M_LD_NAN; // unlikely though as we're calling it ourselves with a defined rational
     if(ld!=M_LD_NAN){
         // multiply ld with the numerator to start with
@@ -446,7 +446,7 @@ long double getLongDoubleRationalQuotient(long double ld,Mrational* r){
     }
     return ld;
 }
-long double getLongDoubleRationalSum(long double ld,Mrational* r){
+long double getLongDoubleRationalSum(long double ld,Mrational const * const r){
     if(!r)return M_LD_NAN; // unlikely though as we're calling it ourselves with a defined rational
     if(ld!=M_LD_NAN){
         // multiply ld with the numerator to start with
@@ -456,6 +456,7 @@ long double getLongDoubleRationalSum(long double ld,Mrational* r){
     }
     return ld;
 }
+
 Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * const q2){
     // NOTE leaving it to _qmul to deal with NULL rational input (which should never happen though)
     Mrational* _rational=__rational();
@@ -795,8 +796,8 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
     bool nonzeroDenominator=(!_denominator||isBigintegerZero(_denominator)!=M_TRUE);
     Mrational* _rational=(nonzeroDenominator?__rational():NULL);
     if(_rational){
-        // get the delta in
-        if(!ldIsNaN(delta)&&!ldIsInf(delta)){ // we need a delta
+        // get the delta in (for now we also store zero in a real i.e. the only requirement for delta is that it should be defined, i.e. not NaN or supernormal)
+        if(!isLongDoubleUndefined(delta)){ // we need a delta
             _rational->delta=_getReal(delta); // store the delta if a valid value
             if(!_rational->delta){free_rational(_rational);_rational=NULL;outputError("Failed to create the rational delta");}
         }
@@ -895,8 +896,8 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
 Mrational* _getInverseRational(Mrational const * const _rational){
     if(!_rational){outputError("No rational to invert");return NULL;}
     Mrational* _inverseRational=NULL;
-    // for now only allow inverting pure rationals!!!
-    if(!_rational->delta||ldIsZero(_rational->delta->ld)||ldIsNaN(_rational->delta->ld)){
+    // for now only allow inverting pure rationals!!! with a delta that is either undefined or considered zero (might still be subnormal though)!!!
+    if(isRealUndefined(_rational->delta)==M_TRUE||isRealZero(_rational->delta)==M_TRUE){
         Mbiginteger *_inverseNumerator=(_rational->den?_getBigintegerCopy(_rational->den):_getBiginteger(1)),*_inverseDenominator=(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1)); // free on failure
         if(_inverseNumerator&&_inverseDenominator)_inverseRational=_getRational(_inverseNumerator,_inverseDenominator,M_LD_NAN,!_rational->normalized,false);
         if(!_inverseRational){free_biginteger(_inverseNumerator);free_biginteger(_inverseDenominator);outputError("Failed to create the inverse rational");}else if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
@@ -1007,13 +1008,14 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){
 }/* VALIDATED */
 
 // when only interested in the end result, calling _getLongDoubleRational is the way to go
-Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
+Mrational* _getLongDoubleRational(long double ld,int maxiter){
     // if iterations, you're supposed to return all iteration results
     Mrational* _rational=NULL; // the last (computed) rational
-    if(!ldIsNaN(ld)&&!ldIsInf(ld)){ // neither a NaN nor Inf      
-        if(!ldIsZero(ld)){
-            bool neg=(ld<0);if(neg)ld=-ld; // remember if negative
-            // ASSERT ld is positive 
+    if(isLongDoubleUndefined(ld)!=M_TRUE){ // not an undefined long double (might still be Inf though)
+        long long ldSign=getLongDoubleSign(ld);
+        if(ldSign!=M_ZERO){ // not zero
+            bool neg=(ldSign==M_NEGATIVE);if(neg)ld=-ld; // if negative, reverse ld
+            // ASSERT ld is positive
             // if we use p for pmin1 and q for qmin1 we do not need pmin1 and qmin1
             long long pmin1=1,qmin1=0,pmin2=0,qmin2=1;
             long long a,p,q; // p and q now store the initial values of pmin1 and qmin1
@@ -1021,7 +1023,7 @@ Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter){
             // ascertain to execute the following at least once (so when maxiter<=1 we at least get the integer part of the rational)
             // MDH@09OCT2019: if maxiter equals zero never stop
             int i=0;
-            while(!maxiter||i<maxiter){
+            while(maxiter<=0||i<maxiter){
                 i++;
                 a=lrint(floorl(rem));
                 p=a*pmin1+pmin2;
@@ -1059,15 +1061,15 @@ long double getRationalLongDouble(const Mrational* const _rational){
         // TODO find a better way to do this
         long double ldNumerator=mp_get_long_double(_rational->num); // NOTE also shortcuts when _rational->num equals 0 but we have to add the delta, so we have to do it this way
         if(amVerbose())output("Rational numerator converted to real '%.*Lf'.\n",LDBL_DIG,ldNumerator);
-        if(!ldIsNaN(ldNumerator)&&!ldIsInf(ldNumerator)){ // TODO checking with ldIsInf probably NOT needed although the big integer might be too big!!!
+        if(isLongDoubleUndefined(ldNumerator)==M_FALSE){ // not undefined i.e. supposedly defined (although it could still be infinity theoretically)
             // if we do NOT have a denominator (i.e. the denominator equals one we only need to add the delta (if any))
             if(!_rational->den){if(_rational->delta)ldNumerator+=_rational->delta->ld;return ldNumerator;}
             // ASSERT a denominator is present
             long double ldDenominator=mp_get_long_double(_rational->den);
-            if(_rational->delta)ldNumerator+=(ldDenominator*_rational->delta->ld); // add the denominator multiplied by the delta to the numerator
+            if(isRealUndefined(_rational->delta)!=M_TRUE&&isRealZero(_rational->delta)!=M_TRUE)ldNumerator+=(ldDenominator*_rational->delta->ld); // if delta is NOT undefined and NOT zero, add the denominator multiplied by the delta to the numerator
             // a denominator which is not equal to 1
             if(amVerbose())output("Rational denominator converted to real '%.*Lf'.\n",LDBL_DIG,ldDenominator);
-            if(!ldIsNaN(ldDenominator)&&!ldIsInf(ldDenominator))return ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok
+            if(isLongDoubleUndefined(ldDenominator)!=M_TRUE&&isLongDoubleZero(ldDenominator)!=M_TRUE)return ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok but testing it just the same
             if(amVerbose())outputError("Failed to convert a rational denominator to a real");
         }
         if(amVerbose())outputError("Failed to convert a rational numerator to a real");
@@ -1082,24 +1084,25 @@ long double getUnpureRationalNumerator(Mbiginteger* numerator,Mbiginteger* denom
         if(ld!=M_LD_NAN){ // as it should be
             // an 'unpure' (fake) rational, we're forced to use ld to compute the 'true' numerator
             if(denominator){ // the denominator isn't 1
-                long double lddenominator=mp_get_long_double(denominator);
-                if(lddenominator==M_LD_NAN){outputError("Failed to convert a rational denominator to a real.");return false;}
-                if(lddenominator!=1)ld*=lddenominator; // if the denominator doesn't equal 1 multiply ld by it
+                long double ldDenominator=mp_get_long_double(denominator);
+                if(isLongDoubleUndefined(ldDenominator)==M_TRUE){outputError("Failed to convert a rational denominator to a real.");return false;}
+                if(isLongDoubleOne(ldDenominator)!=M_TRUE)ld*=ldDenominator; // if the denominator doesn't equal 1 multiply ld by it
             }
-            long double ldnumerator=mp_get_long_double(numerator);
-            if(ldnumerator==M_LD_NAN){outputError("Failed to convert a rational numerator to a real.");return false;}
-            return ld+ldnumerator;
+            long double ldNumerator=mp_get_long_double(numerator);
+            if(isLongDoubleUndefined(ldNumerator)==M_TRUE){outputError("Failed to convert a rational numerator to a real.");return false;}
+            return ld+ldNumerator;
         }
     }
     return M_LD_NAN;
 }
+/* MDH@25OCT2019: replaced by getLongDoubleSign() in Mexecution.h/c
 long long ldsign(long double ld){
     if(ld==M_LD_NAN)return M_LL_INVALID;
     if(ld>0)return M_POSITIVE;
     if(ld<0)return M_NEGATIVE;
     return M_ZERO;
 }
-
+*/
 // if the rational has an associated delta, it's a bit more complicated, converting to a real of the numerator and denominator might fail or be inaccurate if the big integers are too large
 long long isRationalUndefined(Mrational const * const rational){return(rational&&rational->num?M_FALSE:M_TRUE);}
 long long getRationalSign(Mrational const * const rational){
@@ -1107,7 +1110,7 @@ long long getRationalSign(Mrational const * const rational){
     long long rationalSign=M_LL_INVALID;
     if(isRationalUndefined(rational)==M_FALSE){ // the rational is defined (so it is not NULL and has a non NULL numerator)
         long double ld=getRealLongDouble(rational->delta);
-        rationalSign=(ldIsNaN(ld)?getBigintegerSign(rational->num):ldsign(getUnpureRationalNumerator(rational->num,rational->den,ld)));
+        rationalSign=(isLongDoubleUndefined(ld)==M_TRUE?getBigintegerSign(rational->num):getLongDoubleSign(getUnpureRationalNumerator(rational->num,rational->den,ld)));
     }
     if(amVerbose()){outputRational("Sign of rational '",rational,"':");output("%lld.\n",rationalSign);}
     return rationalSign;
@@ -1127,13 +1130,13 @@ long long isRationalZero(Mrational const * const rational){
 
 long long isRationalOne(Mrational const * const rational){
     long long result=M_LL_INVALID;
-    if(isRationalUndefined(rational)==M_FALSE){
+    if(isRationalUndefined(rational)!=M_TRUE){
         if(amVerbose())outputRational("Checking if '",rational,"' equals one");
         long double ld=getRealLongDouble(rational->delta);
         // without a delta, a rational equals 1 when the numerator and denominator are the same
-        if(!ldIsNaN(ld)&&!ldIsZero(ld))
+        if(isLongDoubleUndefined(ld)!=M_TRUE&&isLongDoubleZero(ld)!=M_TRUE) // neither undefined, nor zero
             result=(isLongDoubleOne(getUnpureRationalNumerator(rational->num,rational->den,ld))?M_TRUE:M_FALSE);
-        else
+        else // undefined or zero
             result=(rational->den?(rational->num?mp_cmp(rational->den,rational->num)==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):M_TRUE));
         if(amVerbose())output(": %s.\n",(result==M_LL_INVALID?"UNKNOWN":(result==M_TRUE?"YES":"NO")));
     }

@@ -4,7 +4,7 @@
 
 // helper functions
 // we need a local something to store the allocation types in
-struct {
+struct{
     size_t l; // the number of allocation types stored
     char* chars; // the allocation type characters
 }allocationtypes;
@@ -22,6 +22,7 @@ bool allocationrecordinginitialized(){
 }
 
 size_t addallocationtype(char allocationtype){
+    if(!allocationtype)return 0; // force using allocationtype to prevent unused-parameter warning
 #ifdef __ADEBUG__
     // increase size if necessary
     if(allocationtypes.chars&&!(allocationtypes.l&0xF))allocationtypes.chars=realloc(allocationtypes.chars,(allocationtypes.l+16)); // add a 'block' if now full
@@ -38,9 +39,9 @@ size_t allocationmark(){return addallocationtype(' ');}
 
 // unmark allocation returns the total number of encountered allocations
 size_t unmarkallocation(size_t mark){
-#ifdef __ADEBUG__
     if(!allocationtypes.chars){printf("No allocation recording!\n");return 0;}
     if(mark==0){printf("No mark!\n");return 0;}
+#ifdef __ADEBUG__
     if(mark>allocationtypes.l){printf("Mark %zu too large.\n",mark);return 0;}
     if(allocationtypes.chars[mark-1]!=' '){printf("No mark at position %zu!\n",mark);return 0;}
     allocationtypes.l=mark-1;
@@ -48,14 +49,12 @@ size_t unmarkallocation(size_t mark){
     return allocationtypes.l; // returning what's left!!!
 }
 void allocationreport(size_t mark){
+    if(mark==0||allocationtypes.chars==NULL)return;
 #ifdef __ADEBUG__
-    if(mark!=0&&allocationtypes.chars!=NULL){
-        printf("%s","Allocations: '");
-        size_t pos=mark-1;
-        while(pos<allocationtypes.l)printf("%c",allocationtypes.chars[pos++]);
-        printf("%c",'\'');
-    }else
-        printf("%s","No allocations.");
+    printf("%s","Allocations: '");
+    size_t pos=mark-1;
+    while(pos<allocationtypes.l)printf("%c",allocationtypes.chars[pos++]);
+    printf("%c",'\'');
     printf("\n");
 #endif
 }

@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# MDH@21OCT2019: assuming that the M source files are in subfolder src/ now and the library files to link in the current directory as we would expect after a make
+
+# the actual stuff
+# remove M so if we fail we'd know it
+rm -f M
+
+# will copy the static libraries to the lib folder (if the lib folder does not yet exist)
+if [[ ! -d lib ]]; then
+    if [[ ! -f lib ]]; then
+        mkdir lib
+        if [[ -d lib ]]; then
+            echo "lib subdirectory created..."
+        else
+            echo "ERROR: Failed to create the lib subdirectory!"
+            exit 1
+        fi
+    else
+        echo "A file called lib already exists. Cannot create the subdirectory..."
+        exit 1
+    fi
+fi
+
+# ASSERT the lib subdirectory should now exist
+
+# copy the library files over if present in the current directory after which we remove them
+# NOTE we will copy them over instead of moving, so we do not have to recreate them every time, wait a minute if they are already present in lib leave it
+# NOTE this means that this will happen once directly after a make (technically Mcompile would replace making src/Makefile)
+if [[ -f libmpdec.a && ! -f lib/libmpdec.a ]]; then
+    echo "Moving libmpdec.a to the lib subdirectory."
+    mv libmpdec.a lib/
+fi
+if [[ -f libtommath.a && ! -f lib/libtommath.a ]]; then
+    echo "Moving libtommath.a to the lib subdirectory."
+    mv libtommath.a lib/
+fi
+
+# the static libraries should now be present in the lib folder
+if [[ ! -f lib/libmpdec.a || ! -f lib/libtommath.a ]]; then
+    echo "ERROR: Static libraries as needed by M not present in the lib folder."
+    exit 1
+fi
+
+echo ""
+echo "Compiling M..."
+cd src
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L../lib -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mfunctions.c Menvironment.c M.c -o M 
+cd ..
+mv src/M .
+
+# don't run M here, instead check whether it is there!!!
+if [ -f M ]; then
+    # ascertain to be able to run it (when being sudo run)
+    if [[ "$EUID" = 0 ]]; then
+        chmod 755 M
+        echo "M has been created, run it with ./M!"
+    else
+        echo "M has been created but you may not be able to run it with ./M if the next command (chmod) fails."
+        chmod 755 M
+    fi
+#    echo "Command-line flags (specify behind a hyphen) include D (debug), s (verbose), A (assist)"
+else
+    echo "ERROR: Failed to create the M executable!"
+fi
+echo ""

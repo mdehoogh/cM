@@ -4,8 +4,8 @@ long double realsum(Mreal* _real1,Mreal* _real2); // TODO should be moved to Mre
 
 // MDH@10OCT2019: moved over from Mexecution.h/c
 // the following two methods will use M_LD_Q_EPS as default cut-off value
-Mrational* _getLongDoubleRational(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
-long double getRationalLongDouble(const Mrational* const _rational);
+Mrational* _getLongDoubleRational(long double ld,int maxiter); // convert a long double to its rational equivalent and wraps it in a value
+long double getRationalLongDouble(Mrational const * const _rational);
 
 Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/); 
 // used by (now moved over to Mdecimal.h/c): Mrational* _getDecimalRational(Mdecimal* _decimal);
@@ -36,6 +36,7 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
 Mrational* _qsinorcos(Mrational const * const x,bool sin);
 
 // getting the sign (M_POSITIVE, M_NEGATIVE, M_ZERO or M_LL_INVALID)
+long long isRationalUndefined(Mrational const * const rational);
 long long getRationalSign(Mrational const * const rational); // returns -1 for negative rationals, 1 for positive rationals, 0 for zero rationals and M_LL_INVALID for undefined rationals
 long long isRationalZero(Mrational const * const rational);
 long long isRationalPositive(Mrational const * const rational);

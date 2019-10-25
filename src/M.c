@@ -23,7 +23,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
 //char const * const M_BUILD="2";char const * const M_DATE="22 October 2019, 12:00";
 //char const * const M_BUILD="3";char const * const M_DATE="23 October 2019, 18:00";
-char const * const M_BUILD="4";char const * const M_DATE="24 October 2019, 11:00";
+//char const * const M_BUILD="4";char const * const M_DATE="24 October 2019, 11:00";
+char const * const M_BUILD="5";char const * const M_DATE="25 October 2019, 16:00"; // managed to get rid of (mostly) all the warnings!!!
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
@@ -1289,12 +1290,20 @@ bool initEnvironment(){
 				outputError("Failed to register the exists, scalar, null and undefined functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"sign"),"sign",Msign)||!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
-				outputError("Failed to register the sign, zero, positive and negative functions");
+			if(!completedValueFunction(_getFunction(_Menvironment,"sign"),"sign",Msign)){
+				outputError("Failed to register the sign function");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
+				outputError("Failed to register the zero, positive and negative functions");
 				return false;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),"sum",Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),"len",Mlen)){
-				outputError("Failed to register all list functions");
+				outputError("Failed to register the sum and len list functions");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"tl"),"tl",Mtl)){
+				outputError("Failed to register the tl text function");
 				return false;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),"fac",Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),"facd",Mfacd)){
@@ -4216,7 +4225,7 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){
 
 long double getRealPowerValue(long double base,Mvalue* _powerValue){
 	// ASSERT assuming power does not equal 0
-	if(!ldIsNaN(base)&&!ldIsInf(base)){
+	if(isLongDoubleUndefined(base)==M_FALSE){ // TODO might still be infinite though
 		if(_powerValue)
 		switch(_powerValue->type){
 			case VT_INTEGER:return powl(base,_powerValue->value._integer->ll); // very easy, as we can expext to be able to convert the integer to a long double
@@ -4236,7 +4245,7 @@ long double getRealPowerValue(long double base,Mvalue* _powerValue){
 }
 long double getRealValuePower(Mvalue* _baseValue,long double power){
 	// ASSERT assuming power does not equal 0
-	if(!ldIsNaN(power)&&!ldIsInf(power)){
+	if(isLongDoubleUndefined(power)==M_FALSE){ // TODO might still be infinite though
 		if(_baseValue)
 		switch(_baseValue->type){
 			case VT_INTEGER:return powl(_baseValue->value._integer->ll,power); // very easy, as we can expext to be able to convert the integer to a long double

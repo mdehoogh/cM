@@ -221,7 +221,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
     if(value1->type==value2->type) // if the types are different definitely not the same
     switch(value1->type){
         case VT_INTEGER:return(value1->value._integer->ll==value2->value._integer->ll);
-        case VT_REAL:return(ldEqual(value1->value._real->ld,value2->value._real->ld));
+        case VT_REAL:return(areRealsEqual(value1->value._real,value2->value._real)); // MDH@25OCT2019: replacing ldEqual() with a call to areRealsEqual()
         case VT_BIGINTEGER:return(mp_cmp(value1->value._biginteger,value2->value._biginteger)==MP_EQ);
         case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
         case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);

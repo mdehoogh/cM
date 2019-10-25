@@ -5,7 +5,7 @@
 
 extern char const * const VALUETYPENAMES[];
 extern char const * const ERROR_PREFIX;
-extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX;
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_NEGATIVE,M_POSITIVE;
 extern const long double M_LD_NAN,M_LD_PI;
 extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
 
@@ -432,7 +432,7 @@ Mvalue* Mneg(Mvalue* _value){ // negate a value
                     ////////outputBiginteger("Negated numerator '",_biNumerator,"' computed!\n");
                     Mbiginteger* _biDenominator=(rational->den?_getBigintegerCopy(rational->den):NULL);
                     ////////outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
-                    if(_biDenominator||!rational->den)return _getRationalValue(_getRational(_biNumerator,_biDenominator,(!rational->delta||ldIsNaN(rational->delta->ld)?M_LD_NAN:-rational->delta->ld),false,true),true);
+                    if(_biDenominator||!rational->den)return _getRationalValue(_getRational(_biNumerator,_biDenominator,(isRealUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false,true),true);
                     outputError("Failed to copy the numerator of the rational to negate");
                     if(_biDenominator)free_biginteger(_biDenominator);
                     free_biginteger(_biNumerator);
@@ -478,14 +478,12 @@ Mvalue* Mbnot(Mvalue* _value){ // not a value
     }
     return NULL;
 }/* VALIDATED */
-Mvalue* Mnull(Mvalue* _value){
-    return _getIntegerValue(isValueNull(_value)?1:0);
-}/* VALIDATED */
-Mvalue* Mundefined(Mvalue* _value){
-    return _getIntegerValue(isValueUndefined(_value)?1:0); // MDH@18JUL2019: isUndefined() now comes in handy
-}/* VALIDATED */
-Mvalue* Mzero(Mvalue* _value){return(_value?_getIntegerValue(isValueZero(_value)?1:0):NULL);}/* VALIDATED */
-Mvalue* Msign(Mvalue const * const value){return(_getIntegerValue(getValueSign(value)));} /* VALIDATED */
+
+Mvalue* Mnull(Mvalue* _value){return _getIntegerValue(isValueNull(_value)?M_TRUE:M_FALSE);}/* VALIDATED */
+Mvalue* Mundefined(Mvalue* _value){return _getIntegerValue(isValueUndefined(_value)?M_TRUE:M_FALSE);}/* VALIDATED */ // MDH@18JUL2019: isUndefined() now comes in handy
+Mvalue* Msign(Mvalue* value){return(_getIntegerValue(getValueSign(value)));} /* VALIDATED */
+// TODO use the sign in Mzero, Mpositive and Mnegative
+Mvalue* Mzero(Mvalue* _value){return(_getIntegerValue(_value?(isValueZero(_value)==M_TRUE?M_TRUE:M_FALSE):M_LL_INVALID));}/* VALIDATED */
 Mvalue* Mpositive(Mvalue* _value){return(_value?_getIntegerValue(isValuePositive(_value)?1:0):NULL);}/* VALIDATED */
 Mvalue* Mnegative(Mvalue* _value){return(_value?_getIntegerValue(isValueNegative(_value)?1:0):NULL);}/* VALIDATED */
 Mvalue* Mscalar(Mvalue* _value){return(_value?_getIntegerValue(isValueScalar(_value)?1:0):NULL);}/* VALIDATED */
@@ -494,15 +492,20 @@ Mvalue* Mscalar(Mvalue* _value){return(_value?_getIntegerValue(isValueScalar(_va
 // MDH@17OCT2019: the length of a list should now return the index of the last element (instead of the number of non-null values)
 //                because doing so means appending a value with l[len(l)+1] will do so, instead of overwriting some value!!!!
 Mvalue* Mlen(Mvalue* _value){
-    long long result=0;
+    long long result=M_LL_INVALID;
     if(_value){
         switch(_value->type){
-            case VT_INTEGER:case VT_BIGINTEGER:case VT_REAL:case VT_TEXT:result=1;break;
             case VT_LIST:result=(_value->value._list->_last?_value->value._list->_last->index:0);break;
             case VT_MAP:result=_value->value._map->numberOfElements;break;
             default:break;
         }
     }
+    return _getIntegerValue(result);
+}/* VALIDATED */
+// 25OCT2019: get the length of a text with M's tl function
+Mvalue* Mtl(Mvalue* _value){
+    long long result=M_LL_INVALID;
+    if(_value){if(_value->type==VT_TEXT)result=strlen(_value->value._text->_c);else if(_value->type==VT_TOKEN)result=string_length(_value->value._token->text);}
     return _getIntegerValue(result);
 }/* VALIDATED */
 

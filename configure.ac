@@ -1,45 +1,25 @@
-#                                               -*- Autoconf -*-
-# Process this file with autoconf to produce a configure script.
+AC_INIT([M],[0.1.0])
+AC_CONFIG_SRCDIR([src/M.c])
 
-AC_PREREQ([2.69])
-AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
-AC_CONFIG_SRCDIR([M.c])
-AC_CONFIG_HEADERS([config.h])
+PACKAGE=M
+VERSION=0.1.0
 
+# MDH@23OCT2019: we do not want to overwrite scr/Makefile.in (because I adjusted it)
+#                NO we can change Makefile.in after autoconf creates it!!!
 AM_INIT_AUTOMAKE
 
-# Checks for programs.
-#AC_PROG_CXX
+#INTI_REQUIRED_VERSION=1.0.7
+#PKG_CHECK_MODULES(INTI, inti-1.0 >= $INTI_REQUIRED_VERSION)
+#AC_SUBST(INTI_CFLAGS)
+#AC_SUBST(INTI_LIBS)
+
+# AC_PROG_CC replacing AC_PROG_CXX
 AC_PROG_CC
-AC_PROG_INSTALL
-AC_PROG_MAKE_SET
-AC_PROG_RANLIB
 
-# Checks for libraries.
-# FIXME: Replace `main' with a function in `-lgcov':
-AC_CHECK_LIB([gcov], [main])
-
-# Checks for header files.
-AC_CHECK_HEADERS([fcntl.h float.h inttypes.h limits.h stdint.h stdlib.h string.h termios.h unistd.h])
-
-# Checks for typedefs, structures, and compiler characteristics.
-AC_CHECK_HEADER_STDBOOL
-AC_TYPE_INT16_T
-AC_TYPE_INT32_T
-AC_TYPE_INT64_T
-AC_TYPE_INT8_T
-AC_TYPE_SIZE_T
-AC_TYPE_SSIZE_T
-AC_TYPE_UINT16_T
-AC_TYPE_UINT32_T
-AC_TYPE_UINT64_T
-AC_TYPE_UINT8_T
-
-# Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
-AC_CHECK_FUNCS([atexit floor memmove memset pow select sqrt strchr strdup strstr uname])
-
-AC_CONFIG_FILES([Makefile])
+# mpdecimal also has a configure script that we need to run before any make
+# NOTE: libtommath does NOT have a configure script
 AC_CONFIG_SUBDIRS([mpdecimal-2.4.2])
-AC_OUTPUT
+
+#AC_OUTPUT(Makefile src/Makefile)
+# by not making src we will have to execute Mcompile instead (I think)
+AC_OUTPUT(Makefile)

@@ -305,9 +305,9 @@ char* string(Mstring* const str){
 long long string_find(const Mstring* const str,char c){
     if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
-        long long pos=0;
-        size_t l=str->length; // first character to check
-        while(pos<l){ // still within the text
+        // MDH@25OCT2019: type of pos changed from long long to size_t and pos<l replaced by pos!=l because I'm not sure if 0<0 evaluates to false for unsigned integers like size_t
+        size_t pos=0,l=str->length; // first character to check
+        while(pos!=l){ // still within the text
             if(str->chars[pos]==c)return pos; // if a match return pos
             pos++; // keep looking
         }

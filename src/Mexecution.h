@@ -184,28 +184,42 @@ long long isIntegerZero(Minteger* integer);
 long long isIntegerPositive(Minteger* integer);
 long long isIntegerNegative(Minteger* integer);
 
-long long isRealZero(Mreal* real);
-long long isRealOne(Mreal* real);
-long long isRealInfinite(Mreal* real);
-long long isRealUndefined(Mreal* real);
-long long isRealPositive(Mreal* real);
-long long isRealNegative(Mreal* real);
-
-// long double stuff
-// some helper functions (TODO or should we use this on Mreal values?????)
-bool ldIsZero(long double ld);
-bool ldIsNaN(long double ld);
-bool ldIsInf(long double ld);
-bool ldIsPositive(long double ld);
-bool ldIsNegative(long double ld);
-bool ldEqual(long double ld1,long double ld2);
-
+// direct long double functions
 long double ldShift(long double ld,long long shift); // 'shifting' a double means either doubling or halving a number of times
 
+long long isLongDoubleUndefined(long double ld); // for use in isRealUndefined() and long double functions below...
 long long getLongDoubleSign(long double ld);
 long long isLongDoubleZero(long double ld);
 long long isLongDoublePositive(long double ld);
 long long isLongDoubleNegative(long double ld);
+long long isLongDoubleOne(long double ld);
+
+long long isRealUndefined(Mreal* real);
+long long isRealZero(Mreal* real);
+long long isRealOne(Mreal* real);
+long long isRealInfinite(Mreal* real);
+long long isRealPositive(Mreal* real);
+long long isRealNegative(Mreal* real);
+long long areRealsEqual(Mreal* real1,Mreal* real2);
+
+// long double stuff
+/* MDH@25OCT2019: only use the ld functions internally
+// some helper functions (TODO or should we use this on Mreal values?????)
+// tests that use fpclassify() directly (NOTE that ld)
+bool ldIsSubnormal(long double ld);
+bool ldIsSupernormal(long double ld);
+bool ldIsNaN(long double ld);
+bool ldIsInf(long double ld);
+// any long double is considered valid when either zero or normal (so subnormals are considered invalid although they are considered zero!!)
+bool ldIsInvalid(long double ld);
+bool ldIsValid(long double ld);
+// used in determining the sign of a real
+bool ldIsZero(long double ld);
+bool ldIsPositive(long double ld);
+bool ldIsNegative(long double ld);
+bool ldEqual(long double ld1,long double ld2);
+bool ldIsOne(long double ld);
+*/
 
 // RATIONAL STUFF
 // Mvalue -> text

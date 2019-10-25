@@ -275,22 +275,121 @@ long long isIntegerZero(Minteger* integer){return(isIntegerUndefined(integer)==M
 long long isIntegerPositive(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll>0?M_TRUE:M_FALSE));}
 long long isIntegerNegative(Minteger* integer){return(isIntegerUndefined(integer)==M_TRUE?M_LL_INVALID:(integer->ll<0?M_TRUE:M_FALSE));}
 
+// long double support functions (only for internal use)
+const char* M_NAN="NaN";
+const char* M_INF="Inf";
+
+// functions that operate purely on long doubles
+// MDH@25OCT2019: subnormal numbers are considered zero
+bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
+bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
+// MDH@25OCT2019: a long double is invalid if it is not zero and not normal
+//                NOTE a subnormal number is considered invalid but will be treated as a zero (i.e. ldIsZero() will return true on a subnormal number)
+bool ldIsSubnormal(long double ld){return fpclassify(ld)==FP_SUBNORMAL;}/* VALIDATED */
+bool ldIsSupernormal(long double ld){return fpclassify(ld)==FP_SUPERNORMAL;}/* VALIDATED */
+bool ldIsZero(long double ld){return(fpclassify(ld)==FP_ZERO);}/* VALIDATED */
+
+bool ldIsInvalid(long double ld){return(fpclassify(ld)!=FP_NORMAL&&fpclassify(ld)!=FP_ZERO);}
+bool ldIsValid(long double ld){return(fpclassify(ld)==FP_NORMAL||fpclassify(ld)==FP_ZERO);}
+
+// MDH@18OCT2019: lettting the comparison take care of the result!!!
+// MDH@25OCT2019: consider subnormal long doubles to be zero (to test BEFORE calling ldIsValid)
+// replaced by isLongDoubleZero (see below)... bool ldIsZero(long double ld){return(fpclassify(ld)==FP_SUBNORMAL?true:(ldIsValid(ld)?ld==0?false));}/* VALIDATED */
+bool ldIsPositive(long double ld){return(ldIsValid(ld)?ld>0:false);}/* VALIDATED */
+bool ldIsNegative(long double ld){return(ldIsValid(ld)?ld<0:false);}/* VALIDATED */
+/* MDH@25OCT2019: replaced by the ...LongDouble... functions
+bool ldEqual(long double ld1,long double ld2){
+    if(ldIsNaN(ld1)&&ldIsNaN(ld2))return true;
+    if(ldIsNaN(ld1)||ldIsNaN(ld2))return false;
+    // ASSERT both not NaN
+    if(ldIsInf(ld1)&&ldIsInf(ld2)&&signbit(ld1)==signbit(ld2))return true; // both infinite with the same sign
+    if(ldIsInf(ld1)||ldIsInf(ld2))return false; // either is infinite or both with a different sign
+    // ASSERT both not NaN and not Inf
+    return(ld1==ld2);
+}
+bool ldIsOne(long double ld){return(ldIsValid(ld)?false:ld==1);}
+*/
+// end long double support functions
+
 // special real values
 // long double helper functions
-long long isLongDoubleZero(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld==0?M_TRUE:M_FALSE));} // a NaN value is considered NOT zero (obviously)
-long long isLongDoublePositive(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld>0?M_TRUE:M_FALSE));}
-long long isLongDoubleNegative(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld<0?M_TRUE:M_FALSE));}
-long long isLongDoubleOne(long double ld){return(ldIsNaN(ld)?M_FALSE:(ld==1?M_TRUE:M_FALSE));} // same here
+// long doubles that classify as either subnormal or zero are considered zero, as well as all normal long doubles that equal zero
+// testing for zero is quite complicated, as theoretically it should always return either M_TRUE or M_FALSE, but we decide to return M_LL_INVALID if we cannot determine what the number is
+// 
+long long isLongDoubleUndefined(long double ld){ // returns M_TRUE or M_FALSE (never M_LL_INVALID)
+    // if the sign has any meaning we should return M_TRUE otherwise M_FALSE
+    switch(fpclassify(ld)){
+        case FP_NAN:return M_TRUE;
+        case FP_INFINITE:return M_FALSE;
+        case FP_ZERO:return M_FALSE;
+        case FP_NORMAL:return M_FALSE;
+        case FP_SUBNORMAL:return M_FALSE;
+        case FP_SUPERNORMAL:return M_TRUE;
+    }
+    return M_LL_INVALID; // should never happen though (if we have all possible values covered!!!)
+}
+long long isLongDoubleZero(long double ld){
+    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+    switch(fpclassify(ld)){
+        case FP_INFINITE:return M_FALSE;
+        case FP_SUBNORMAL:case FP_ZERO:return M_TRUE;
+        default:break;
+    }
+    return(ld==0);
+}
+long long isLongDoublePositive(long double ld){
+    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+    switch(fpclassify(ld)){
+        case FP_INFINITE:return(signbit(ld)?M_FALSE:M_TRUE);
+        case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
+        default:break;
+    }
+    return(ld>0);   
+}
+long long isLongDoubleNegative(long double ld){
+    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+    switch(fpclassify(ld)){
+        case FP_INFINITE:return(signbit(ld)?M_TRUE:M_FALSE);
+        case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
+        default:break;
+    }
+    return(ld<0);   
+}
+long long isLongDoubleOne(long double ld){
+    if(isLongDoubleUndefined(ld)!=M_FALSE)return M_LL_INVALID;
+    switch(fpclassify(ld)){
+        case FP_INFINITE:case FP_SUBNORMAL:case FP_ZERO:return M_FALSE;
+        default:break;
+    }
+    return(ld==1);
+}
 
 // testing for special values TODO we need to make M functions to test for these special values like zero, inf, and undefined
-long long isRealOne(Mreal* real){return(real?isLongDoubleOne(real->ld):M_LL_INVALID);}
-long long isRealInfinite(Mreal* real){return(real?(ldIsInf(real->ld)?M_TRUE:M_FALSE):M_LL_INVALID);}
-long long isRealUndefined(Mreal* real){return(real?(ldIsNaN(real->ld)?M_TRUE:M_FALSE):M_TRUE);} // a real is undefined if it is NULL or the contained long double is undefined i.e. is NaN
+// if a real is undefined, testing for a specific value or sign does not make any sense
+// isRealUndefined() always returns either M_TRUE or M_FALSE (never M_LL_INVALID)
+long long isRealUndefined(Mreal* real){return(real?isLongDoubleUndefined(real->ld):M_TRUE);} // a real is undefined if it is NULL or the contained long double is undefined i.e. is NaN
+// use isRealUndefined() first in the following specific functions
 // in general for undefined reals we cannot determine the sign, therefore one should test for undefined first, of course one can test for invalid result of the comparison of course
 long long isRealZero(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleZero(real->ld));}
 long long isRealPositive(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoublePositive(real->ld));}
 long long isRealNegative(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleNegative(real->ld));}
-
+long long isRealOne(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleOne(real->ld));}
+long long isRealInfinite(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:(ldIsInf(real->ld)?M_TRUE:M_FALSE));}
+long long areRealsEqual(Mreal* real1,Mreal* real2){
+    // TODO we are considering two NULL values equal for now although that's questionable
+    if(!real1&&!real2)return M_TRUE; // both NULL
+    if(!real1||!real2)return M_FALSE; // only one of them NULL
+    // ASSERT neither NULL
+    if(fpclassify(real1->ld)!=fpclassify(real2->ld))return M_FALSE; // if they classify differently definitely not the same
+    switch(fpclassify(real1->ld)){
+        case FP_NAN:return M_TRUE; // both NaN TODO check for signbit as well here?????
+        case FP_INFINITE:return(signbit(real1->ld)==signbit(real2->ld)?M_TRUE:M_FALSE); // both infinite but perhaps the wrong sign
+        case FP_ZERO:return M_TRUE; // both zero or subnormal zero TODO check for signbit as well here?????
+        case FP_SUBNORMAL:case FP_SUPERNORMAL:return M_LL_INVALID; // can't tell
+        default:break;
+    }
+    return(real1->ld==real2->ld);
+}
 // TODO for now leave these two methods return a boolean, although we should decide whether or not they are derived or not
 bool realIsUndefined(Mreal* real){return(!real||ldIsNaN(real->ld));}
 bool realIsUndefinedOrZero(Mreal* real){return(!real||ldIsNaN(real->ld)||isRealZero(real)==M_TRUE);}
@@ -752,26 +851,6 @@ long double mp_get_long_double(const Mbiginteger* const a){
 }/* VALIDATED */
 
 // part of implementing _getRealText (so not present in the header)
-const char* M_NAN="NaN";
-const char* M_INF="Inf";
-
-// functions that operate purely on long doubles
-bool ldIsZero(long double ld){return fpclassify(ld)==FP_ZERO;}/* VALIDATED */
-bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
-bool ldIsInf(long double ld){return fpclassify(ld)==FP_INFINITE;}/* VALIDATED */
-// MDH@18OCT2019: lettting the comparison take care of the result!!!
-bool ldIsPositive(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return false;return(ld>0);}/* VALIDATED */
-bool ldIsNegative(long double ld){if(ldIsNaN(ld)||ldIsInf(ld))return false;return(ld<0);}/* VALIDATED */
-
-bool ldEqual(long double ld1,long double ld2){
-    if(ldIsNaN(ld1)&&ldIsNaN(ld2))return true;
-    if(ldIsNaN(ld1)||ldIsNaN(ld2))return false;
-    // ASSERT both not NaN
-    if(ldIsInf(ld1)&&ldIsInf(ld2))return true;
-    if(ldIsInf(ld1)||ldIsInf(ld2))return false;
-    // ASSERT both not NaN and not Inf
-    return(ld1==ld2);
-}
 
 // 'shifting' a double means either doubling or halving a number of times
 long double ldShift(long double ld,long long shift){

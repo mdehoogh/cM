@@ -8,7 +8,7 @@ Mvalue* Mnot(Mvalue* _value); // not a value
 Mvalue* Mnull(Mvalue* _value); // whether null!!!
 Mvalue* Mundefined(Mvalue* _value); // whether undefined!!!
 Mvalue* Mzero(Mvalue* _value);
-Mvalue* Msign(Mvalue const * const value);
+Mvalue* Msign(Mvalue* value);
 Mvalue* Mpositive(Mvalue* _value);
 Mvalue* Mnegative(Mvalue* _value);
 Mvalue* Mscalar(Mvalue* _value);
@@ -17,6 +17,8 @@ Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
 Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
 Mvalue* Mfacd(Mvalue* _value); // faculty (for an integer)
 Mvalue* Mfac(Mvalue* _value); // faculty (for an integer)
+
+Mvalue* Mtl(Mvalue* _value); // length of a text
 
 ///////Mvalue* Mbi(Mvalue* _value); // convert to a big integer
 
