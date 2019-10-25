@@ -279,6 +279,10 @@ long long isIntegerNegative(Minteger* integer){return(isIntegerUndefined(integer
 const char* M_NAN="NaN";
 const char* M_INF="Inf";
 
+#ifndef FP_SUPERNORMAL
+#define FP_SUPERNORMAL 6
+#endif
+
 // functions that operate purely on long doubles
 // MDH@25OCT2019: subnormal numbers are considered zero
 bool ldIsNaN(long double ld){return fpclassify(ld)==FP_NAN;}/* VALIDATED */
