@@ -1749,7 +1749,7 @@ mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * c
 			if(_deltaAngle&&_predefinedAngleIndex){
 				uint32_t status=0;
 				mpd_qdivmod(_predefinedAngleIndex,_deltaAngle,angle,decimalcontext->predefinedsinedeltaangle,decimalcontext->mpd_context,&status);
-				uint32_t predefinedAngleIndex=mpd_qget_u32(_predefinedAngleIndex,&status);
+				uint64_t predefinedAngleIndex=mpd_qget_u64(_predefinedAngleIndex,&status);
 				if(predefinedAngleIndex<=256){
 					if(_intermediateResult)output("Predefined angle index %" PRIu32 ".\n",predefinedAngleIndex);
 					_relativeAngle->negative=false;
@@ -1943,7 +1943,7 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized CORDIC sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
-					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
 					if(amVerbose()){outputDecimal("Quadrant of CORDIC sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the CORDIC sine of a decimal");
@@ -2045,7 +2045,7 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized CORDIC cosine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
-					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
 					if(amVerbose()){outputDecimal("Quadrant of CORDIC cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the CORDIC cosine of a decimal");
@@ -2221,7 +2221,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
-					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
 					if(amVerbose()){outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the sine of a decimal");
@@ -2455,7 +2455,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized cosine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
-					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
 					if(amVerbose()){outputDecimal("Quadrant of cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the cosine of a decimal");
@@ -2567,7 +2567,7 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal);}}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
-					uint32_t xquadrant=mpd_qget_u32(_xquadrant,&status);
+					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
 					if(amVerbose()){outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the sine of a decimal");
