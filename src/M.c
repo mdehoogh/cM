@@ -25,7 +25,7 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="3";char const * const M_DATE="23 October 2019, 18:00";
 //char const * const M_BUILD="4";char const * const M_DATE="24 October 2019, 11:00";
 //char const * const M_BUILD="5";char const * const M_DATE="25 October 2019, 16:00"; // managed to get rid of (mostly) all the warnings!!!
-char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 19:00";
+char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 20:20";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
@@ -1076,6 +1076,7 @@ Mvalue* type(Mvalue* _value){
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
 		case VT_UNDEFINED:return _getTextValue("'u",false);
+		case VT_REFERENCE:return _getTextValue("'&",false); // TODO any better idea for a reference?????
 		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
 	return _getTextValue("'",false);
@@ -2808,12 +2809,14 @@ Mvaluepointeritem* getLastValuepointeritem(Mvaluepointer* _valuepointer){
 }
 */
 
+/* MDH@26OCT2019: moved over to Mvalue.h/c so we can use it in Mvalue's as well
 // MDH@06MAY2019: Mvaluereference stands for a variable in combination with an item id, this will allow assignments as we know the variable involved!!!!
 typedef struct Mvaluereference{
 	char* _name; // the name of the host variable or NULL if we're in a substructure
 	Mvalue* _value; // either the host value (if no variable name is defined), or the value of the host variable
 	Mvalue* _itemid; // the item referenced!!!
 }Mvaluereference;
+*/
 /*
 typedef struct Mexpressionvalue{
 	Mvaluereference* _valuereference; // thre result of evaluating an expression is always a single value!!!
@@ -3307,6 +3310,7 @@ Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	return _valuereference;
 }
+/* MDH@26OCT2019: moved over to Mvalue.h/c as we need it there so we can have value references as well!!!!!
 void free_valuereference(Mvaluereference* _valuereference){
 	if(_valuereference){
 		if(_valuereference->_name)free(_valuereference->_name);
@@ -3316,6 +3320,7 @@ void free_valuereference(Mvaluereference* _valuereference){
 		free(_valuereference);
 	}
 }
+*/
 void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* suffix){
 	if(prefix)output("%s",prefix);
 	if(_valuereference){

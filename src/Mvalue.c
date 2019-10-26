@@ -97,6 +97,16 @@ void free_map(Mmap* _map){
     }
 }/* VALIDATED */
 
+// MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
+void free_valuereference(Mvaluereference* _valuereference){
+    if(_valuereference){
+        if(_valuereference->_name){free(_valuereference->_name);_valuereference->_name=NULL;}
+        if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
+        if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
+        free(_valuereference);
+    }
+}/* VALIDATED */
+
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
@@ -113,6 +123,7 @@ void free_value(Mvalue* _value){
             case VT_TEXT:if(_value->value._text)free_text(_value->value._text);break;
             case VT_LIST:if(_value->value._list)free_list(_value->value._list);break;
             case VT_MAP:if(_value->value._map)free_map(_value->value._map);break;
+            case VT_REFERENCE:if(_value->value._reference)free_valuereference(_value->value._reference);break; // MDH@26OCT2019
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         if(amVerbose())output("Type-specific value freed.\n");
@@ -954,7 +965,28 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                     // replacing: valueText=_stringCopy(_value->value._token->text,0);
                 }
                 break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
-			default:break;
+			case VT_REFERENCE:
+                {
+                    valueText=__string();
+                    if(valueText){
+                        Mstring* p=valueText;
+                        if(_value->value._reference->_name)p=string_append(p,_value->value._reference->_name);
+                        if(_value->value._reference->_itemid){
+                            p=string_append_char(p,'[');
+                            Mstring* _valueText=_getValueText(_value->value._reference->_itemid,dequoted);
+                            if(_valueText){p=string_append(p,string(_valueText));free_string(_valueText);}
+                            p=string_append_char(p,']');
+                        }
+                        if(_value->value._reference->_value){
+                            p=string_append_char(p,'=');
+                            Mstring* _valueText=_getValueText(_value->value._reference->_value,dequoted);
+                            if(_valueText){p=string_append(p,string(_valueText));free_string(_valueText);}
+                        }
+                        if(!p){free_string(valueText);valueText=NULL;}
+                    }
+                }
+                break;
+            default:break;
 		}
 	}
     if(valueText)if(amAssisting())valueText=appendll(string_append_char(valueText,'#'),_value->count); // show the reference count as well
@@ -1012,6 +1044,8 @@ long long getValueInteger(const Mvalue* const _value){
                         return ll;
                     }
                 }
+            case VT_REFERENCE: // TODO this might be hard
+                break;
    		    default:break;
         }
         // TODO sometimes reals can also represent integers!!!
@@ -1035,6 +1069,8 @@ long double getValueReal(const Mvalue* const _value){
         case VT_BIGINTEGER:valueReal=getBigintegerLongDouble(_value->value._biginteger);break;
         case VT_REAL:valueReal=_value->value._real->ld;break;
         case VT_DECIMAL:valueReal=getDecimalLongDouble(_value->value._decimal);break;
+        case VT_REFERENCE: // TODO this might be hard
+            break;
         default:break;
     }
     return valueReal;
@@ -1070,6 +1106,8 @@ Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
                 if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
                 return _biginteger;
             }
+        case VT_REFERENCE: // TODO this may be hard
+            break;
         default:break;
     }
     return NULL;
@@ -1387,6 +1425,11 @@ long long isValueScalar(Mvalue* value){
     return M_FALSE;
 }/* VALIDATED */
 
+// MDH@26OCT2019: TODO perhaps a reference is invalid if it is no longer pointing somewhere??????
+long long isReferenceUndefined(Mvaluereference* valuereference){
+    return(valuereference?M_FALSE:M_TRUE);
+}
+
 // null test for the value to be considered NULL
 long long isValueNull(Mvalue* value){
     long long result=M_LL_INVALID;
@@ -1402,6 +1445,7 @@ long long isValueNull(Mvalue* value){
         case VT_MAP:result=(value->value._map?M_FALSE:M_TRUE);break;
         case VT_TOKEN:result=(value->value._token?M_FALSE:M_TRUE);break;
         case VT_UNDEFINED:result=M_TRUE;break;
+        case VT_REFERENCE:result=(value->value._reference?M_FALSE:M_TRUE);break;
     }
     return result;
 }/* VALIDATED */
@@ -1422,6 +1466,7 @@ long long isValueUndefined(Mvalue* value){
         case VT_MAP:result=isMapUndefined(value->value._map);break; ////Mlen(_value)==0;
         case VT_TOKEN:result=isTokenUndefined(value->value._token);break; /////string_length(_value->value._token->text)==0;
         case VT_UNDEFINED:result=M_TRUE;break;
+        case VT_REFERENCE:result=isReferenceUndefined(value->value._reference);break;
     }
     return result;
 }/* VALIDATED */

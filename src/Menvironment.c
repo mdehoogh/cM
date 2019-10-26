@@ -228,6 +228,8 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
         case VT_LIST:case VT_MAP:break;
         case VT_DECIMAL:case VT_RATIONAL:break;
         case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
+        case VT_REFERENCE: // TODO this might be hard
+            break;
     }
     return false;
 }

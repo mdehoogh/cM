@@ -6,6 +6,7 @@
 
 struct Mlist;
 struct Mmap;
+struct Mvaluereference; // MDH@26OCT2019: being able to store a value reference in a value coming up next...
 typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
@@ -16,6 +17,7 @@ typedef union Mvalueunion{
     Mtext* _text;
     struct Mlist* _list;
     struct Mmap* _map;
+    struct Mvaluereference* _reference;
     //////////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
@@ -27,6 +29,15 @@ typedef struct Mvalue{
     Mvaluetype type;
     Mvalueunion value;
 }Mvalue;
+
+// MDH@26OCT2019: moved over from M.c so that we can store value references in values as well (like pointers, well not exactly like pointers)
+typedef struct Mvaluereference{
+	char* _name; // the name of the host variable or NULL if we're in a substructure
+	Mvalue* _value; // either the host value (if no variable name is defined), or the value of the host variable
+	Mvalue* _itemid; // the item referenced!!!
+}Mvaluereference;
+
+void free_valuereference(Mvaluereference* _valuereference);
 
 // a variable is a named value of a certain value type
 typedef struct Mvariable{
