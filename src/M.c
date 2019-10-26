@@ -24,7 +24,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="2";char const * const M_DATE="22 October 2019, 12:00";
 //char const * const M_BUILD="3";char const * const M_DATE="23 October 2019, 18:00";
 //char const * const M_BUILD="4";char const * const M_DATE="24 October 2019, 11:00";
-char const * const M_BUILD="5";char const * const M_DATE="25 October 2019, 16:00"; // managed to get rid of (mostly) all the warnings!!!
+//char const * const M_BUILD="5";char const * const M_DATE="25 October 2019, 16:00"; // managed to get rid of (mostly) all the warnings!!!
+char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 19:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
@@ -4163,6 +4164,43 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
+	// MDH@26OCT2019: adapted from dealing with any integer type from add()
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _productBiginteger=NULL;
+		// no need to use _getValueBiginteger because we know the source will be integer
+		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
+		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
+		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
+		//             
+		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
+		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
+		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
+		// ASSERT both integers are considered valid (i.e. not invalid)
+		Mbiginteger *_biginteger1=(smallinteger1?_getBiginteger(_value1->value._integer->ll):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?_getBiginteger(_value2->value._integer->ll):_value2->value._biginteger);
+		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+			_productBiginteger=__biginteger();
+			if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(amVerbose()){outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
+		}else
+			outputError("Failed to convert a small integer to a big integer");
+		if(smallinteger1)free_biginteger(_biginteger1);
+		if(smallinteger2)free_biginteger(_biginteger2);
+		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
+		//                but if we can't don't
+		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
+			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
+			if(!_productBiginteger)return _getIntegerValue(M_LL_INVALID);
+			long long llproduct=getBigintegerInteger(_productBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
+			// if we do NOT have a sum big integer or the sum big integer is in range ()
+			if(llproduct!=M_LL_INVALID){free_biginteger(_productBiginteger);return _getIntegerValue(llproduct);}
+			output("WARNING: Small integer product out of range, will continue using big integer product.\n");
+		}
+		return _getBigintegerValue(_productBiginteger,true);
+	}
+	/* replacing:
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 			if(amVerbose())output("Multiplying integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
@@ -4186,6 +4224,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_productBiginteger,true);
 	}
+	*/
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		if(amVerbose()){outputValue("Multiplying rationals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
@@ -4830,6 +4869,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return _getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
+	// MDH@26OCT2019: TODO same approach with any integer as in the other binary operators??????
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
 		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
 		// computing the power is not so easy for certain value type combinations
@@ -5030,6 +5070,10 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
+	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO shouldn't we return infinity?????
+	// MDH@26OCT2019: dealing with any integer conform as we did in the other binary operators
+	//                NO dividing integers should result in a rational so we can keep the accuracy
+	// NOT replacing:
 	// integer divisions are not computed but stored in rational format (without a delta to not suggest that the division is decimal)
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
 		Mbiginteger* _numerator=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5071,6 +5115,44 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
+	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO or should we return some form of infinity?????
+	// MDH@26OCT2019: adapted from dealing with any integer type from add()
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _integerquotientBiginteger=NULL;
+		// no need to use _getValueBiginteger because we know the source will be integer
+		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
+		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
+		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
+		//             
+		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
+		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
+		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
+		// ASSERT both integers are considered valid (i.e. not invalid)
+		Mbiginteger *_biginteger1=(smallinteger1?_getBiginteger(_value1->value._integer->ll):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?_getBiginteger(_value2->value._integer->ll):_value2->value._biginteger);
+		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+			_integerquotientBiginteger=__biginteger();
+			if(_integerquotientBiginteger&&mp_div(_biginteger1,_biginteger2,_integerquotientBiginteger,NULL)!=MP_OKAY){free_biginteger(_integerquotientBiginteger);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(amVerbose()){outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
+		}else
+			outputError("Failed to convert a small integer to a big integer");
+		if(smallinteger1)free_biginteger(_biginteger1);
+		if(smallinteger2)free_biginteger(_biginteger2);
+		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
+		//                but if we can't don't
+		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
+			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
+			if(!_integerquotientBiginteger)return _getIntegerValue(M_LL_INVALID);
+			long long llintegerquotient=getBigintegerInteger(_integerquotientBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
+			// if we do NOT have a sum big integer or the sum big integer is in range ()
+			if(llintegerquotient!=M_LL_INVALID){free_biginteger(_integerquotientBiginteger);return _getIntegerValue(llintegerquotient);}
+			output("WARNING: Small integer integer quotient out of range, will continue using big integer integer quotient.\n");
+		}
+		return _getBigintegerValue(_integerquotientBiginteger,true);
+	}
+	/* replacing:
 	// if both are integers, the result should be integer as well!!!
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 			if(amVerbose())output("Integer dividing integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
@@ -5098,6 +5180,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_integerdivideBiginteger,true);
 	}
+	*/
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// if both integer, use lldiv to perform the integer division
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot);
@@ -5117,6 +5200,43 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
 	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getRealValue(0));
+	// MDH@26OCT2019: adapted from dealing with any integer type from add()
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
+		Mbiginteger* _moduloBiginteger=NULL;
+		// no need to use _getValueBiginteger because we know the source will be integer
+		// NOTE _getBiginteger() was adjusted to return NULL in case ll equals M_LL_INVALID because in that case the result should also be M_LL_INVALID
+		// CORRECTION: _getBiginteger() is also used in the I() function and it's a problem if NOT allowing to actually use NAI in computations (as the smallest possible integer)
+		// DISCUSSION: M_LL_INVALID is a single long long value that is considered invalid like dividing by zero, or asking for the sign of an undefined real (= long double)
+		//             
+		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
+		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
+		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
+		// ASSERT both integers are considered valid (i.e. not invalid)
+		Mbiginteger *_biginteger1=(smallinteger1?_getBiginteger(_value1->value._integer->ll):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?_getBiginteger(_value2->value._integer->ll):_value2->value._biginteger);
+		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Moduloing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+			_moduloBiginteger=__biginteger();
+			if(_moduloBiginteger&&mp_div(_biginteger1,_biginteger2,NULL,_moduloBiginteger)!=MP_OKAY){free_biginteger(_moduloBiginteger);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(amVerbose()){outputBiginteger(" - Integer division remainder: '",_moduloBiginteger,"'.\n");}
+		}else
+			outputError("Failed to convert a small integer to a big integer");
+		if(smallinteger1)free_biginteger(_biginteger1);
+		if(smallinteger2)free_biginteger(_biginteger2);
+		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
+		//                but if we can't don't
+		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
+			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
+			if(!_moduloBiginteger)return _getIntegerValue(M_LL_INVALID);
+			long long llmodulo=getBigintegerInteger(_moduloBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
+			// if we do NOT have a sum big integer or the sum big integer is in range ()
+			if(llmodulo!=M_LL_INVALID){free_biginteger(_moduloBiginteger);return _getIntegerValue(llmodulo);}
+			output("WARNING: Small integer quotient remainder out of range, will continue using big integer quotient remainder.\n");
+		}
+		return _getBigintegerValue(_moduloBiginteger,true);
+	}
+	/* replacing:
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
 		if(amVerbose())output("Integer remainder of dividing integers '%lld' and '%lld'.\n",_value1->value._integer->ll,_value2->value._integer->ll);
 		return(_value2->value._integer->ll!=0?_getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).rem):NULL);
@@ -5141,6 +5261,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_integerremainderBiginteger,true);
 	}
+	*/
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// at least one is real, perform floating point division, then trunc!!!
 		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
@@ -5275,9 +5396,12 @@ long long integerShift(long long integer,long long shift){
 Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft);
+	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@25OCT2019: if either value is zero the result is the first value
+	// ASSERT neither value zero
+	// TODO deal with integers separately
 	// do NOT allow shifting by anything that cannot be converted to an integer
 	long long shiftleftinteger=getValueInteger(_value2);if(shiftleftinteger==M_LL_INVALID)return NULL;
-	if(shiftleftinteger==0)return _value1; // return _value1 if no need to shift!!
+	///////////if(shiftleftinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,shiftleftinteger));
 	if(_value1->type==VT_REAL)return _getRealValue(ldShift(_value1->value._real->ld,shiftleftinteger));
@@ -5343,9 +5467,11 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright);
+	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@26OCT2019: if either value is zero return _value1
+	// ASSERT neither value is zero
 	// do NOT allow shifting by anything that cannot be converted to an integer
 	long long shiftrightinteger=getValueInteger(_value2);if(shiftrightinteger==M_LL_INVALID)return NULL;
-	if(shiftrightinteger==0)return _value1; // return _value1 if no need to shift!!
+	/////////////if(shiftrightinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,-shiftrightinteger));
 	if(_value1->type==VT_REAL)return _getRealValue(ldShift(_value1->value._real->ld,-shiftrightinteger));
@@ -5425,19 +5551,19 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 }
 
 // binary comparison operators
+// TODO these should return either TRUE, FALSE or UNDEFINED independent of the input type
 Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
-	if(!_value1||!_value2)return NULL;
+	if(!_value1||!_value2)return _getIntegerValue(M_LL_INVALID);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthan);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _smallerthanbiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_smallerthanbiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_LT?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
-		return _getBigintegerValue(_smallerthanbiginteger,true);
+		return _getIntegerValue(llsmallerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -5481,13 +5607,12 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _largerthanbiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_largerthanbiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_GT?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long lllargerthan=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
-		return _getBigintegerValue(_largerthanbiginteger,true);
+		return _getIntegerValue(lllargerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -5531,13 +5656,12 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _largerthanorequaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_largerthanorequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_LT?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long lllargerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
-		return _getBigintegerValue(_largerthanorequaltobiginteger,true);
+		return _getIntegerValue(lllargerthanorequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -5581,13 +5705,12 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _unequaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_unequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llunequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
-		return _getBigintegerValue(_unequaltobiginteger,true);
+		return _getIntegerValue(llunequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -5631,14 +5754,13 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _equaltobiginteger=NULL;
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){		Mbiginteger* _equaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_equaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
-		return _getBigintegerValue(_equaltobiginteger,true);
+		return _getIntegerValue(llequalto);
 	}
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
@@ -5682,13 +5804,12 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _smallerthanorequaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_smallerthanorequaltobiginteger=_getBiginteger(mp_cmp(_biginteger1,_biginteger2)==MP_GT?0:1); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
-		return _getBigintegerValue(_smallerthanorequaltobiginteger,true);
+		return _getIntegerValue(llsmallerthanorequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
