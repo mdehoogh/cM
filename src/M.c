@@ -25,7 +25,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="3";char const * const M_DATE="23 October 2019, 18:00";
 //char const * const M_BUILD="4";char const * const M_DATE="24 October 2019, 11:00";
 //char const * const M_BUILD="5";char const * const M_DATE="25 October 2019, 16:00"; // managed to get rid of (mostly) all the warnings!!!
-char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 20:20";
+//char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 20:20";
+char const * const M_BUILD="7";char const * const M_DATE="27 October 2019, 12:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
@@ -4868,22 +4869,54 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 	}
 	return _bigintegerRootValue;
 }
-
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return _getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
 	// MDH@26OCT2019: TODO same approach with any integer as in the other binary operators??????
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
-		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
+	// MDH@27OCT2019: let's deal with if either is a real first
+	// I suppose if the base or exponent is real, the result should also be real (because it will be approximate)
+	if(_value2->type==VT_REAL)return _getRealValue(getRealValuePower(_value1,_value2->value._real->ld));
+	// ASSERT exponent is NOT a real
+	if(_value1->type==VT_REAL)return _getRealValue(getRealPowerValue(_value1->value._real->ld,_value2));
+	// ASSERT neither is real
+	// MDH@27OCT2019: typically for integers with an expoonent that is positive the result should also be integer
+	//                and we deal with that separatately
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&
+		((_value2->type==VT_INTEGER&&isIntegerPositive(_value2->value._integer)==M_TRUE)||
+		 (_value2->type==VT_BIGINTEGER&&isBigintegerPositive(_value2->value._biginteger)==M_TRUE))){
+		bool smallinteger1=(_value1->type==VT_INTEGER),smallinteger2=(_value2->type==VT_INTEGER);
+		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
+		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
+		Mbiginteger* _powerBiginteger=NULL;
+		// ASSERT both integers are considered valid (i.e. not invalid)
+		Mbiginteger *_biginteger1=(smallinteger1?_getBiginteger(_value1->value._integer->ll):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?_getBiginteger(_value2->value._integer->ll):_value2->value._biginteger);
+		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		if(_biginteger1&&_biginteger2){
+			if(amVerbose()){outputBiginteger("Exponentiating big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+			_powerBiginteger=_getBigintegerPowerWithPositiveBigintegerExponent(_biginteger1,_biginteger2);
+			if(amVerbose()){outputBiginteger(" - Power: '",_powerBiginteger,"'.\n");}
+		}else
+			outputError("Failed to convert a small integer to a big integer");
+		if(smallinteger1)free_biginteger(_biginteger1);
+		if(smallinteger2)free_biginteger(_biginteger2);
+		// MDH@24OCT2019: if the base is integer, we're going to try to return a small integer
+		if(smallinteger1){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
+			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
+			if(!_powerBiginteger)return _getIntegerValue(M_LL_INVALID);
+			long long llpower=getBigintegerInteger(_powerBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
+			// if we do NOT have a sum big integer or the sum big integer is in range ()
+			if(llpower!=M_LL_INVALID){free_biginteger(_powerBiginteger);return _getIntegerValue(llpower);}
+			output("WARNING: Small integer power out of range, will continue using big integer power.\n");
+		}
+		return _getBigintegerValue(_powerBiginteger,true);
+	}
+	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
+		(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
 		// computing the power is not so easy for certain value type combinations
-		// I suppose if the base or exponent is real, the result should also be real (because it will be approximate)
-		if(_value2->type==VT_REAL)return _getRealValue(getRealValuePower(_value1,_value2->value._real->ld));
-		// ASSERT exponent is NOT a real
-		if(_value1->type==VT_REAL)return _getRealValue(getRealPowerValue(_value1->value._real->ld,_value2));
 		// ASSERT base and exponent are not reals
-		
 		// given that the way to compute the power might be different depending on the type of the exponent if differentiate between that
 		Mvalue* _returnValue=NULL;
 		// 1. when the exponent is integer
