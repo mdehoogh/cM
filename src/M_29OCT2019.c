@@ -1614,35 +1614,8 @@ char getFirstManualFeedforwardCharacterRemoved(){
 }
 
 // identifier continuation stuff
-// MDH@28OCT2019: because now often we need both the first and last token in a command it's probably best to combine them in a single command
-typedef struct{
-	Mtoken *_firstToken,*_lastToken;
-	bool identifierContinuationIsDirty; // convenient to keep it with the command itself
-}Mcommand;
-void free_command(Mcommand* _command){
-	if(!_command)return;
-	if(_command->_firstToken)free_token(_command->_firstToken); // will free ALL connected tokens!!!
-	free(_command);
-}
-Mcommand* _getNewCommand(bool endInput){
-	Mcommand* _command=CALLOC(1,sizeof(Mcommand),'C');
-	if(_command){
-		_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION,true,endInput);
-		if(_command->_firstToken){ // we've got a first token allocated
-			_command->_lastToken=_command->_firstToken;
-			_command->_firstToken->expr=NULL;
-		}else{ // too bad, out of memory!
-			FREE(_command,'C');_command=NULL;
-		}
-	}
-	return _command;
-}
-
-Mcommand* _userInputCommand=NULL; // the current input command
-/* MDH@28OCT2019 replacing: 
 Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the command input by the user
 bool identifierContinuationIsDirty=false; // whether or not the identifier has changed
-*/
 char* _identifierContinuationCharacters=NULL; // the single text that we can continue the current identifier token with
 char getFirstIdentifierContinuationCharacter(){
 	inputInfo("%s","Determining the first identifier continuation character!");
@@ -1668,12 +1641,12 @@ bool inIdentifierToken(Mtoken* lastCommandToken){
 	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE:false);
 }
 void updateIdentifierContinuation(){
-	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand->_lastToken);
+	bool couldHaveAnIdentifierContinuation=inIdentifierToken(pLastCommandToEvaluateToken);
 	// get rid of the identifier continuation if we're can't have one or the identifier has supposedly changed
-	if(!couldHaveAnIdentifierContinuation)_userInputCommand->identifierContinuationIsDirty=false; // if we're not in an identifier token always consider the identifier to be unchanged
-	if(!couldHaveAnIdentifierContinuation||_userInputCommand->identifierContinuationIsDirty)deleteIdentifierContinuation();
-	if(_userInputCommand->identifierContinuationIsDirty){ // the identifier has supposedly changed, and we could have an identifier continuation update it
-		Mstring* _completionText=_getCompletion(string(_userInputCommand->_lastToken->text));
+	if(!couldHaveAnIdentifierContinuation)identifierContinuationIsDirty=false; // if we're not in an identifier token always consider the identifier to be unchanged
+	if(!couldHaveAnIdentifierContinuation||identifierContinuationIsDirty)deleteIdentifierContinuation();
+	if(identifierContinuationIsDirty){ // the identifier has supposedly changed, and we could have an identifier continuation update it
+		Mstring* _completionText=_getCompletion(string(pLastCommandToEvaluateToken->text));
 		// need at least two characters (the type and something text behind it)
 		// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
 		if(_completionText){
@@ -2124,9 +2097,9 @@ void setLastCommandToken(Mtoken* newLastCommandToken){
 	//                however this should also happen when the type of the current token changes
 	// MDH@04OCT2019: a little less efficient to move it to the input loop but more reliable!!!
 	//// removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the last token immediate feed forward text.");
-	_userInputCommand->_lastToken=newLastCommandToken;
+	pLastCommandToEvaluateToken=newLastCommandToken;
 	//// removing: if(!updateImmediateFeedforwardText())inputError("Failed to add the last token immediate feed forward text.");
-	_userInputCommand->identifierContinuationIsDirty=inIdentifierToken(_userInputCommand->_lastToken);
+	identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken);
 }
 /*
 void deleteAutocompletionTextOfToken(Mtoken* token,bool deleteIdentifierContinuationText){
@@ -2482,23 +2455,23 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType,bool first){
 
 // keep track of all commands so far
 #define COMMAND_BLOCKSIZE 8
-Mcommand** commands=NULL; // array for storing the pointers to the first token of all commands entered
+Mtoken** commands=NULL; // array for storing the pointers to the first token of all commands entered
 uint32_t commandBlocks=0;
-bool registerCommand(Mcommand* command){
-	if(!command)return false;
+bool registerCommand(){
+	if(!pCommandToEvaluate)return false;
 	if(!_currentFunctionBodyInput){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			commandBlocks++;
-			Mcommand** newCommands=realloc(commands,COMMAND_BLOCKSIZE*commandBlocks*sizeof(Mtoken*));
+			Mtoken** newCommands=realloc(commands,COMMAND_BLOCKSIZE*commandBlocks*sizeof(Mtoken*));
 			if(newCommands==NULL)return false;
 			commands=newCommands;
 		}
-		commands[commandCount++]=command;
+		commands[commandCount++]=pCommandToEvaluate;
 		return true;
 	}else{ // should be added to the function body
 		// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
-		Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(command->_firstToken,false);
+		Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(pCommandToEvaluate,false);
 		if(_commandToEvaluateTokenValue){
 			if(!_currentFunctionBodyInput->_function->_bodyCommandList)_currentFunctionBodyInput->_function->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
 			if(appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_commandToEvaluateTokenValue,M_LL_INVALID)>0)return true;
@@ -2510,7 +2483,7 @@ bool registerCommand(Mcommand* command){
 // MDH@21JUN2019: reset() takes care of removing all stored commands
 void reset(){
 	while(commandCount>0){
-		free_command(commands[--commandCount]);
+		freeToken(commands[--commandCount]);
 	}
 #ifdef __ADEBUG__
 	outputChar('\n');
@@ -2784,17 +2757,16 @@ bool isOneCharacterTokenType(uint8_t tokenType){
 // MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
 bool removeToken(){		
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
-	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
+	deleteAutocompletionTextOfToken(pLastCommandToEvaluateToken);
 	// ASSERT pLastCommandToEvaluateToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
 	// NOTE if we call freeToken() to free this token all forwardly connected tokens are also freed, so pPrevToken->next should become NULL
 	// MDH@02OCT2019: every time pLastCommandToEvaluateToken changes, call setLastCommandToken which will set identifierContinuationIsDirty if it's an identifier token
-	setLastCommandToken(freeToken(_userInputCommand->_lastToken));
+	setLastCommandToken(freeToken(pLastCommandToEvaluateToken));
 	/* replacing:
 	pLastCommandToEvaluateToken=freeToken(pLastCommandToEvaluateToken); // pLastCommandToEvaluateToken now equals its own previous token!!
 	if(inIdentifierToken())identifierContinuationIsDirty=true; // every time the last command to evaluate token changes, we need this
 	*/
-	if(!_userInputCommand->_lastToken){_userInputCommand=NULL;return false;} // TODO is it safe to NULL _userInputCommand without freeing?????
-	_userInputCommand->_lastToken->next=NULL;
+	if(pLastCommandToEvaluateToken)pLastCommandToEvaluateToken->next=NULL;else pCommandToEvaluate=NULL;
 	return true;
 }
 
@@ -6413,12 +6385,9 @@ Mstring* _getCommandText(bool color){
 }
 
 void clearCommand(){
-	free_command(_userInputCommand);_userInputCommand=NULL; // MDH@28OCT2019: using the command now...
-	/* replacing:
-	pLastCommandToEvaluate=NULL;
+	pLastCommandToEvaluateToken=NULL;
 	// a small precaution here!!!
 	if(pCommandToEvaluate){freeToken(pCommandToEvaluate);pCommandToEvaluate=NULL;}
-	*/
 }
 void outputValueColored(Mvalue* _value){
 	if(_value)
@@ -6502,12 +6471,10 @@ void unfinishToken(Mtoken* lastCommandToken){
 				lastCommandToken->significantCharacterCount=0;
 }
 
-bool isAValidCommand(Mcommand* command,bool report){
+bool isAValidCommand(Mtoken* firstCommandToken,Mtoken* lastCommandToken,bool report){
 
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(!command->_firstToken){if(report)outputError("Undefined command");return false;}
-	
-	Mtoken* lastCommandToken=command->_lastToken;
+	if(!firstCommandToken){if(report)outputError("Undefined command");return false;}
 	if(!lastCommandToken){if(report)outputError("Unfinished command");return false;}
 	
 	// 2. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
@@ -6583,13 +6550,13 @@ bool isAValidCommand(Mcommand* command,bool report){
 
 }
 
-void outputCommandInfo(Mcommand* command);
+void outputCommandInfo(Mtoken* firstCommandToken,Mtoken* lastCommandToken);
 
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
-Mvalue* getCommandValue(Mcommand* command,char commandType){
-	if(amVerbose())outputCommandInfo(command);
-	if(!isAValidCommand(command,amVerbose()))return NULL;
-	getEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
+Mvalue* getCommandValue(Mtoken* firstCommandToken,Mtoken* lastCommandToken,char commandType){
+	if(amVerbose())outputCommandInfo(firstCommandToken,lastCommandToken);
+	if(!isAValidCommand(firstCommandToken,lastCommandToken,amVerbose()))return NULL;
+	getEnvironment()->expressionToken=firstCommandToken->next; // prepare the current environment for executing the command
 	if(amVerbose())outputLine("Evaluating...");
 	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
 }
@@ -6598,7 +6565,9 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 bool evaluateCommand(){
 	
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
-	if(!isAValidCommand(_userInputCommand,true))return false;
+	bool commandIsValid=isAValidCommand(pCommandToEvaluate,pLastCommandToEvaluateToken,true);
+
+	if(!commandIsValid)return false;
 
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
@@ -6631,13 +6600,13 @@ void prepareForUserInput(){
 }
 
 // MDH@24APR2019: writeCommand() writes the command to evaluate, and sets pLastCommandToEvaluateToken in the process
-void writeCommand(Mcommand* command){
-	Mtoken* token=command->_firstToken;
+void writeCommand(){
+	Mtoken* token=pCommandToEvaluate;
 	while(token){
-		numberOfBehindPromptCharactersWritten+=outputToken(command->_lastToken=token);
+		numberOfBehindPromptCharactersWritten+=outputToken(pLastCommandToEvaluateToken=token);
 		token=token->next;
 	}
-	command->identifierContinuationIsDirty=inIdentifierToken(command->_lastToken); // MDH@02OCT2019 because we're setting pLastCommandToEvaluateToken but not calling setLastCommandToken()
+	identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken); // MDH@02OCT2019 because we're setting pLastCommandToEvaluateToken but not calling setLastCommandToken()
 }
 
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
@@ -6864,10 +6833,9 @@ void backToPrompt(){
 	*/
 }
 
-void setCommandToEvaluate(Mcommand* command){
-	_userInputCommand=command;
-	// replacing: pLastCommandToEvaluateToken=pCommandToEvaluate=pCommand;
-	writeCommand(_userInputCommand);
+void setCommandToEvaluate(Mtoken* pCommand){
+	pLastCommandToEvaluateToken=pCommandToEvaluate=pCommand;
+	writeCommand();
 	//////////writeSuggestedText(true);
 	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
 	////////// removing: determineCommandInitializations();
@@ -6887,15 +6855,14 @@ void setCommandIndex(uint32_t newCommandIndex){
 	// TODO do we need to do this: clear the behind cursor text (in any situation)
 	deleteAutocompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	if(commandIndex){
-		_userInputCommand->_lastToken=NULL; 
-		// replacing: pLastCommandToEvaluateToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
+		pLastCommandToEvaluateToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
 		if(amVerbose())inputInfo("Showing command #%lld.",commandCount-commandIndex+1);
-		Mcommand* command=commands[commandCount-commandIndex];
+		Mtoken* token=commands[commandCount-commandIndex];
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		// TODO this construction (with a return in the middle is a bit unclear)
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
 			inputInfo("Showing registered command #%u.",commandCount-commandIndex+1);
-			setCommandToEvaluate(command);
+			setCommandToEvaluate(token);
 			return;
 		}
 		// the previous command will be used as behind cursor text, and not immediately as command
@@ -6905,7 +6872,6 @@ void setCommandIndex(uint32_t newCommandIndex){
 		// we can abuse feedforwardText, by using it to compose it, and afterwards use it to create a single feed forward text instance
 		Mstring* _commandFeedforward=__string(); // free asap
 		if(_commandFeedforward){
-			Mtoken* token=command->_firstToken;
 			while(token){
 				///////outputText("(%s)",tokenText);
 				if(!string_append(_commandFeedforward,string(token->text)))break;
@@ -6945,37 +6911,27 @@ void setLastTokenType(Mtoken* lastCommandToken,TokenType tokenType,bool endOfInp
 	}
 	if(endOfInput)updateLastTokenAutocompletionText();
 }
-
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
-// command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
-Mtoken* _getNewCommandToken(Mcommand* command,TokenType tokenType,bool endOfInput){
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool first,bool endOfInput){
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//                but we should remove any identifier continuation
 	//// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=_getToken(command->_lastToken,tokenType,command->_firstToken==command->_lastToken);
+	Mtoken* _newCommandToken=_getToken(lastCommandToken,tokenType,first);
 	if(_newCommandToken)setLastTokenType(_newCommandToken,tokenType,endOfInput);
 	return _newCommandToken;
 }
-// the following functions are user input command specific
 Mtoken* setLastCommandToEvaluateToken(Mtoken* lastCommandToEvaluateToken){
-	_userInputCommand->_lastToken=lastCommandToEvaluateToken;
-	_userInputCommand->identifierContinuationIsDirty=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
-	return _userInputCommand->_lastToken;
+	pLastCommandToEvaluateToken=lastCommandToEvaluateToken;
+	identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
+	return pLastCommandToEvaluateToken;
 }
 void newCommand(){
 	// MDH@24APR2019 obsolete: getCommandLength()=string_length(feedforwardText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
 	// MDH@23SEP2019: newCommandToken() added to take care of updating pLastCommandToEvaluateToken (should be NULL as it is used to represent the previous last token)
-	_userInputCommand=_getNewCommand(true);
-	if(_userInputCommand)
-		setLastCommandToEvaluateToken(_userInputCommand->_lastToken);
-	else
-		outputError("Failed to create a new command");
-	/* replacing: 
 	pCommandToEvaluate=_getNewCommandToken(NULL,TT_EXPRESSION,true,true);
 	setLastCommandToEvaluateToken(pCommandToEvaluate); // so updating identifierContinuationIsDirty is guaranteed!!!
 	if(!pCommandToEvaluate)outputError("Failed to create a new command");else pCommandToEvaluate->expr=NULL;
-	*/
 	/* replacing:
 	pLastCommandToEvaluateToken=pCommandToEvaluate=_getToken(NULL,TT_EXPRESSION);
 	if(!pCommandToEvaluate){outputError("Failed to create a new command");return;}
@@ -6989,14 +6945,14 @@ void newCommand(){
 // TODO copyCommand() should set ->expr correctly
 void copyCommand(){
 	// if fails to copy pCommandToEvaluate pLastCommandToEvaluateToken should end up as NULL
-	_userInputCommand->_lastToken=NULL;
-	Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
-	_userInputCommand->_firstToken=NULL;
+	pLastCommandToEvaluateToken=NULL;
+	Mtoken* _tokenToCopy=pCommandToEvaluate;
+	pCommandToEvaluate=NULL;
 	// the essence is that pLastCommandToEvaluateToken points to the last token in pCommandToEvaluate
 	// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to _getToken() failing to create a new token
 	while(_tokenToCopy){
 		// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to pLastCommandToEvaluateToken!!!
-		if(!setLastCommandToEvaluateToken(_getNewCommandToken(_userInputCommand,_tokenToCopy->type,false)))break; // MDH@23SEP2019: TODO should we do something to pCommandToEvaluate when this happens? or show some error???
+		if(!setLastCommandToEvaluateToken(_getNewCommandToken(pLastCommandToEvaluateToken,_tokenToCopy->type,pLastCommandToEvaluateToken==pCommandToEvaluate,false)))break; // MDH@23SEP2019: TODO should we do something to pCommandToEvaluate when this happens? or show some error???
 		/* MDH@23SEP2019 replacing:
 		pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,_tokenToCopy->type);
 		///////// MDH@23SEP2019: moved out of _getToken() using false for endOfInput to prevent adding/changing the associated feed forward text
@@ -7010,17 +6966,17 @@ void copyCommand(){
 				outputLine("BUG: End of argument list or map encountered, but not started.");
 		}
 		*/
-		_userInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
-		_userInputCommand->_lastToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
+		pLastCommandToEvaluateToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
+		pLastCommandToEvaluateToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
 		// if failing to copy the text over get rid of the command constructed so far, and break
-		_userInputCommand->_lastToken->text=_stringCopy(_tokenToCopy->text,0);
-		if(!_userInputCommand->_lastToken->text){_userInputCommand->_lastToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
+		pLastCommandToEvaluateToken->text=_stringCopy(_tokenToCopy->text,0);
+		if(!pLastCommandToEvaluateToken->text){pLastCommandToEvaluateToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
 		// MDH@24APR2019 obsolete: getCommandLength()+=string_length(pLastCommandToEvaluateToken->text);
 		// some additional fields to copy over (NOT the offset is that is set automatically)
 #ifdef __DEBUG__
         printf("%d:%s",pLastCommandToEvaluateToken->type,string(pLastCommandToEvaluateToken->text));
 #endif
-		if(!_userInputCommand->_firstToken)_userInputCommand->_firstToken=_userInputCommand->_lastToken; // TODO=DONE will never happen???? it does here
+		if(!pCommandToEvaluate)pCommandToEvaluate=pLastCommandToEvaluateToken;
 		// get the next token to copy...
 		_tokenToCopy=_tokenToCopy->next;
 	}
@@ -7274,11 +7230,11 @@ char removedTokenCharacter(bool endOfInput){
 #endif
 	// MDH@03SEP2019: 
 	char tokenCharacterRemoved='\0';
-	if(_userInputCommand){ // should ALWAYS be the case
+	if(pCommandToEvaluate){ // should ALWAYS be the case
 		uint16_t tokenCharacterPosition;
 		// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
-		while(_userInputCommand->_lastToken){
-			tokenCharacterPosition=string_length(_userInputCommand->_lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-pLastCommandToEvaluateToken->offset;
+		while(pLastCommandToEvaluateToken){
+			tokenCharacterPosition=string_length(pLastCommandToEvaluateToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-pLastCommandToEvaluateToken->offset;
 #ifdef __DEBUG__
 			printf("%d",tokenCharacterPosition);
 #endif
@@ -7286,13 +7242,13 @@ char removedTokenCharacter(bool endOfInput){
 #ifdef __DEBUG__
 			outputChar('.');
 #endif		
-			_userInputCommand->_lastToken=_userInputCommand->_lastToken->prev;
+			pLastCommandToEvaluateToken=pLastCommandToEvaluateToken->prev;
 		}
 #ifdef __DEBUG__
 			printf("%d",tokenCharacterPosition-behindCursor);
 #endif	
-		_userInputCommand->identifierContinuationIsDirty=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: should be called whenever pLastCommandToEvaluateToken changes...
-		if(_userInputCommand->_lastToken)tokenCharacterRemoved=string_removed_char(_userInputCommand->_lastToken->text,tokenCharacterPosition-1);
+		identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken); // MDH@02OCT2019: should be called whenever pLastCommandToEvaluateToken changes...
+		if(pLastCommandToEvaluateToken)tokenCharacterRemoved=string_removed_char(pLastCommandToEvaluateToken->text,tokenCharacterPosition-1);
 #ifdef __DEBUG__
 			outputChar(c);
 #endif	
@@ -7300,9 +7256,9 @@ char removedTokenCharacter(bool endOfInput){
 			if(endOfInput)moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//                HOWEVER we're assuming that we're dealing with an end of input situation
-			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)?removeToken():false);
-			unfinishToken(_userInputCommand->_lastToken); // we need to do this to allow appending characters to the token again
-			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,endOfInput);
+			bool tokenRemoved=(string_empty(pLastCommandToEvaluateToken->text)?removeToken():false);
+			unfinishToken(pLastCommandToEvaluateToken); // we need to do this to allow appending characters to the token again
+			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(pLastCommandToEvaluateToken,endOfInput);
 		}
 	}else
 		inputInfo("BUG: No command to remove characters from!");
@@ -7317,8 +7273,8 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 		// MDH@01OCT2019: moveCursorLeft(1); // TODO check if this is necessary also when cancelling the command
 		if(amVerbose()){inputInfo("Character '%c' removed.",removedCharacter);}
 		// if no text is left in the command we cancel the command (as a service to the user who wouldn't understand that Enter wouldn't switch to Control mode on an otherwise empty command!!!)
-		if(_userInputCommand){ // we still have a command being evaluated (NOTE that removedTokenCharacter() can actually set pCommandToEvaluate to NULL)
-			if(_userInputCommand->_lastToken==_userInputCommand->_firstToken&&string_length(_userInputCommand->_firstToken->text)==0){
+		if(pCommandToEvaluate){ // we still have a command being evaluated (NOTE that removedTokenCharacter() can actually set pCommandToEvaluate to NULL)
+			if(pLastCommandToEvaluateToken==pCommandToEvaluate&&string_length(pCommandToEvaluate->text)==0){
 				if(amDebugging()){inputInfo("%s","Cancelling the command.");}
 				cancelCommand();
 				if(amDebugging()){inputInfo("%s","Command cancelled.");}
@@ -7337,10 +7293,10 @@ void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
 		inputError("%s","Failed to remove the last entered character.");
 }
 
-void outputCommandInfo(Mcommand* command){
-	if(!command||!command->_lastToken)return;
+void outputCommandInfo(Mtoken* firstCommandToken,Mtoken* lastCommandToken){
+	if(!lastCommandToken)return;
 	// MDH@12AUG2019: identifiers first
-	Mtoken* identifierToken=command->_lastToken->prevIdentifier;
+	Mtoken* identifierToken=lastCommandToken->prevIdentifier;
 	if(identifierToken){
 		output("%s","Identifiers:");
 		while(1){
@@ -7357,7 +7313,7 @@ void outputCommandInfo(Mcommand* command){
 		outputChar('\n');
 	}
 	// tokens
-	Mtoken* token=command->_firstToken;
+	Mtoken* token=firstCommandToken;
 	uint16_t tokenIndex=0;
 	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
 	while(token!=NULL){
@@ -7384,18 +7340,18 @@ void outputCommandInfo(Mcommand* command){
 // MDH@09JUL2019: count the number of list elements in front of the current token
 uint32_t getListElementCount(){
 	uint32_t listElementCount=0;
-	Mtoken* token=_userInputCommand->_lastToken;
-	Mtoken* startToken=_userInputCommand->_lastToken->expr;
+	Mtoken* token=pLastCommandToEvaluateToken;
+	Mtoken* startToken=pLastCommandToEvaluateToken->expr;
 	while(token!=startToken){if(token->expr==startToken&&token->type==TT_LISTELEMENT)listElementCount++;token=token->prev;}
 	return listElementCount;
 }
 // TODO we could call the following function from tokenCheckedForBeingAFunction
 void changeFunctionTokenToAVariable(bool endOfInput){
-	char* _identifierName=_stringstart(_userInputCommand->_lastToken->text,_userInputCommand->_lastToken->significantCharacterCount); // free asap
+	char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
-	_userInputCommand->_lastToken->type=(_userInputCommand->_lastToken->argument!=1&&(existsInCommand(_identifierName,_userInputCommand->_lastToken->envid/* replacing:getSpecialFunctionCallToken(pLastCommandToEvaluateToken)*/)||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
+	pLastCommandToEvaluateToken->type=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,pLastCommandToEvaluateToken->envid/* replacing:getSpecialFunctionCallToken(pLastCommandToEvaluateToken)*/)||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
-	reoutputToken(_userInputCommand->_lastToken);
+	reoutputToken(pLastCommandToEvaluateToken);
 	/* MDH@01OCT2019 because the token isn't actually removed the feed forward text associated with the token does not need to be deleted actually
 	// MDH@20SEP2019: this function is called when a function name changes into a variable name (because the user did not enter ( behind a function name)
 	//                and it makes sense to simply remove the associated feed forward of the token
@@ -7415,10 +7371,9 @@ void changeFunctionTokenToAVariable(bool endOfInput){
 //                NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
 //                NOTE we have to use the pointer to the last command token because if we used the last command token itself, we wouldn't be able to change the last command token!!!!
 //                NOTE instead we're returning the last command token (which will change if starting a new token!!!!)
-Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputCharacterType,bool endOfInput){
+Mtoken* commandCharacterAppended(Mtoken* lastCommandToken,char inputChar,char inputCharacterType,bool first,bool endOfInput){
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
-	Mtoken* lastCommandToken=command->_lastToken;
 	if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))inputCharacterType='R';
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 	if(inputCharacterType=='W')if(lastCommandToken->type==TT_ERROR||lastCommandToken->type==TT_COMMENT||lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)inputCharacterType='w';
@@ -7518,9 +7473,8 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputChar
 			/////if(amDebugging())inputInfo("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			// MDH@23SEP2019: replacing _getToken() call by newCommandToken (and generating an error when this goes wrong somehow)
-			lastCommandToken=_getNewCommandToken(command,newTokenType,endOfInput); // TODO should we replace command->_lastToken????
+			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType,first,endOfInput);
 			if(!lastCommandToken)return NULL;
-			command->_lastToken=lastCommandToken;
 			/* replacing:
 			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,newTokenType);
 			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyCommand()!)
@@ -7698,29 +7652,27 @@ Mvalue* Mevalfunction(Mvalue* value){
 	Mstring* _evalValueText=_getValueText(value,true);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
-		Mcommand* _evalCommand=_getNewCommand(false);
-		if(_evalCommand){
-			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
-			/* already set: 
+		Mtoken* _evalCommandToken=_getNewCommandToken(NULL,TT_EXPRESSION,true,false);
+		if(_evalCommandToken){
 			_evalCommandToken->expr=NULL; // MDH@28OCT2019: essential bto'
 			Mtoken* _lastEvalCommandToken=_evalCommandToken;
-			*/
 			uint32_t pos=0;
 			char evalInputChar;
 			if(amVerbose())output("Parsing '");
 			while(pos<string_length(_evalValueText)){
 				evalInputChar=string_char(_evalValueText,pos++);
 				if(amVerbose())outputChar(evalInputChar);
-				if(!commandCharacterAppended(_evalCommand,evalInputChar,INPUTCHARACTERTYPES[evalInputChar],false))break;
+				_lastEvalCommandToken=commandCharacterAppended(_lastEvalCommandToken,evalInputChar,INPUTCHARACTERTYPES[evalInputChar],_lastEvalCommandToken==_evalCommandToken,false);
+				if(!_lastEvalCommandToken)break;
 			}
 			if(amVerbose())outputLine("'.");
-			if(_evalCommand->_lastToken){
+			if(_lastEvalCommandToken){
 				// just like with do() we have to evaluate the command in a subenvironment
 				Menvironment* _evalEnvironment=__environment();
 				if(_evalEnvironment){
 					_evalEnvironment->_name=_strdup("eval");
 					if(pushExecutionEnvironment(_evalEnvironment)){
-						_evalValue=getCommandValue(_evalCommand,'e');
+						_evalValue=getCommandValue(_evalCommandToken,_lastEvalCommandToken,'e');
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
 						output("%sUnable to setup the evaluation of '%s'.\n",ERROR_PREFIX,string(_evalValueText));
