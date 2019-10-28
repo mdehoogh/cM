@@ -138,8 +138,8 @@ long long isListUndefined(Mlist* list);
 
 bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);
 
-long double getValueReal(const Mvalue* const _value);
-Mbiginteger* _getValueBiginteger(const Mvalue* const _value); // converts a value to a big integer (if possible)
+long double getValueLongDouble(Mvalue const * const _value);
+Mbiginteger* _getValueBiginteger(Mvalue const * const _value); // converts a value to a big integer (if possible)
 
 long long getValueSign(Mvalue const * const value); // return -1 for negative values, 1 for positive values, 0 for zero values, and M_LL_INVALID for non-scalar values obviously
 

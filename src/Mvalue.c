@@ -1053,32 +1053,38 @@ long long getValueInteger(const Mvalue* const _value){
     return M_LL_INVALID;
 }/* VALIDATED */
 
-// MDH@09OCT2019: TODO is there a better way than through parsing?????
+// MDH@09OCT2019: TODO=DONE is there a better way than through parsing?????
 long double getBigintegerLongDouble(Mbiginteger* biginteger){
+    return mp_get_long_double(biginteger); // MDH@28OCT2019: definitely
+    /* replacing:
     long double ldBiginteger=M_LD_NAN;
    	Mstring* _bigintegerText=(biginteger?_getBigintegerText(biginteger):NULL);
     if(_bigintegerText){ldBiginteger=_strtold(string(_bigintegerText),ldBiginteger);free_string(_bigintegerText);}
 	return ldBiginteger;
+    */
 }
-long double getValueReal(const Mvalue* const _value){
+long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}/* VALIDATED */
+
+long double getValueLongDouble(const Mvalue* const _value){
     // MDH@09OCT2019: a little more complicated then just getting out the real in that all scalar numeric values are convertable
-    long double valueReal=M_LD_NAN;
+    long double valueLongDouble=M_LD_NAN;
     if(_value)
-    switch(_value->type){
-        case VT_INTEGER:valueReal=_value->value._integer->ll;break;
-        case VT_BIGINTEGER:valueReal=getBigintegerLongDouble(_value->value._biginteger);break;
-        case VT_REAL:valueReal=_value->value._real->ld;break;
-        case VT_DECIMAL:valueReal=getDecimalLongDouble(_value->value._decimal);break;
+    switch(_value->type){ // all scalar types should be convertible
+        case VT_INTEGER:valueLongDouble=_value->value._integer->ll;break;
+        case VT_BIGINTEGER:valueLongDouble=getBigintegerLongDouble(_value->value._biginteger);break;
+        case VT_REAL:valueLongDouble=_value->value._real->ld;break;
+        case VT_DECIMAL:valueLongDouble=getDecimalLongDouble(_value->value._decimal);break;
+        case VT_RATIONAL:valueLongDouble=getRationalLongDouble(_value->value._rational);break;
+        case VT_TEXT:valueLongDouble=_strtold(_value->value._text->_c,M_LD_NAN);break; // MDH@28OCT2019: OOPS text is also a 'scalar' 
+        case VT_TOKEN: valueLongDouble=_strtold(string_remainder(_value->value._token->text,1),M_LD_NAN);break; // MDH@28OCT2019: OOPS a token is also a 'scalar' (NOTE string_remainder simply skips the quote character)
         case VT_REFERENCE: // TODO this might be hard
             break;
         default:break;
     }
-    return valueReal;
+    return valueLongDouble;
 }/* VALIDATED */
 
-long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}/* VALIDATED */
-
-Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
+Mbiginteger* _getValueBiginteger(Mvalue const * const _value){
     if(_value)
         switch(_value->type){
         case VT_BIGINTEGER:return _value->value._biginteger;
@@ -1112,6 +1118,7 @@ Mbiginteger* _getValueBiginteger(const Mvalue* const _value){
     }
     return NULL;
 }/* VALIDATED */
+
 // (map) list conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a list to a (possibly empty) map using the indices as attribute name
     bool result=(_map!=NULL); // no map, no result!

@@ -26,7 +26,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="4";char const * const M_DATE="24 October 2019, 11:00";
 //char const * const M_BUILD="5";char const * const M_DATE="25 October 2019, 16:00"; // managed to get rid of (mostly) all the warnings!!!
 //char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 20:20";
-char const * const M_BUILD="7";char const * const M_DATE="27 October 2019, 12:00";
+//char const * const M_BUILD="7";char const * const M_DATE="27 October 2019, 12:00";
+char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
@@ -35,6 +36,7 @@ const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
 const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
+const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="function";
 const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
@@ -950,7 +952,7 @@ Mrational* _getValueRational(Mvalue* _value){
 			case VT_LIST:
 				if(_value->value._list->numberOfElements>1)
 					_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),
-											(_value->value._list->numberOfElements>2?getValueReal(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true,false);
+											(_value->value._list->numberOfElements>2?getValueLongDouble(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true,false);
 				break;
 			default:break;
 		}
@@ -1141,6 +1143,7 @@ Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue*
 Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue);
 Mvalue* Mdofunction(Mvalue* _doTokenValue);
 Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _forbodyTokenValue);
+Mvalue* Mevalfunction(Mvalue* value);
 
 bool initEnvironment(){
 
@@ -1246,6 +1249,7 @@ bool initEnvironment(){
 		    if(!completedTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
 			// MDH@05AUG2019: the do function has a single token to process
 		    if(!completedTokenListFunction(_getFunction(_Menvironment,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
+		    if(!completedValueFunction(_getFunction(_Menvironment,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
 
 			if(!registerInternalFunctions(_Menvironment)){
 				outputError("Failed to register all internal functions");
@@ -1586,12 +1590,6 @@ bool endFunctionBodyInput(){
 }
 // MDH@19JUL2019 END
 
-Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
-// MDH@02OCT2019: might need this in multiple places!!
-bool inIdentifierToken(){
-	return(pLastCommandToEvaluateToken?pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_FUNCTION||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE:false);
-}
-
 // FEED FORWARD STUFF
 void inputInfo(const char* const fmt,...); // prototype
 void inputError(const char* const fmt,...); // prototype
@@ -1616,6 +1614,7 @@ char getFirstManualFeedforwardCharacterRemoved(){
 }
 
 // identifier continuation stuff
+Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the command input by the user
 bool identifierContinuationIsDirty=false; // whether or not the identifier has changed
 char* _identifierContinuationCharacters=NULL; // the single text that we can continue the current identifier token with
 char getFirstIdentifierContinuationCharacter(){
@@ -1636,8 +1635,13 @@ void deleteIdentifierContinuation(){
 	if(_identifierContinuationOptionalCharacters){free(_identifierContinuationOptionalCharacters);_identifierContinuationOptionalCharacters=NULL;}
 	if(_identifierContinuationCharacters){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
 }
+/// MDH@28OCT2019: not needed here anymore... Mtoken* pLastCommandToEvaluateToken=NULL; // the last token in the sequence of tokens starting with pCommandToEvaluate
+// MDH@02OCT2019: might need this in multiple places!!
+bool inIdentifierToken(Mtoken* lastCommandToken){
+	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE:false);
+}
 void updateIdentifierContinuation(){
-	bool couldHaveAnIdentifierContinuation=inIdentifierToken();
+	bool couldHaveAnIdentifierContinuation=inIdentifierToken(pLastCommandToEvaluateToken);
 	// get rid of the identifier continuation if we're can't have one or the identifier has supposedly changed
 	if(!couldHaveAnIdentifierContinuation)identifierContinuationIsDirty=false; // if we're not in an identifier token always consider the identifier to be unchanged
 	if(!couldHaveAnIdentifierContinuation||identifierContinuationIsDirty)deleteIdentifierContinuation();
@@ -2095,7 +2099,7 @@ void setLastCommandToken(Mtoken* newLastCommandToken){
 	//// removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the last token immediate feed forward text.");
 	pLastCommandToEvaluateToken=newLastCommandToken;
 	//// removing: if(!updateImmediateFeedforwardText())inputError("Failed to add the last token immediate feed forward text.");
-	identifierContinuationIsDirty=inIdentifierToken();
+	identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken);
 }
 /*
 void deleteAutocompletionTextOfToken(Mtoken* token,bool deleteIdentifierContinuationText){
@@ -4028,6 +4032,24 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		}
 		return _getBigintegerValue(_sumBiginteger,true);
 	}
+	// if the first value is a text we should always do concatenation!!!!
+	if(_value1->type==VT_TEXT){ // force string concatenation using the quote character in the Mvalue in the resulting text
+		Mstring* _valueText=__string();
+		if(!_valueText)return NULL;
+		Mstring* p=_valueText;
+		p=string_append_char(p,_value1->value._text->presuffix);
+		p=string_append(p,_value1->value._text->_c);
+		// MDH@17OCT2019: we can't use _getValueText() here, because _getValueText() will resolve escape sequences which we do NOT want here
+		// MDH@28OCT2019: think twice this is only true when _value2 is also of type text
+		if(_value2->type!=VT_TEXT){
+			Mstring* _value2Text=_getValueText(_value2,true); // get the text representation of the second argument without quotes
+			if(_value2Text){p=string_append(p,string(_value2Text));free_string(_value2Text);}
+		}else // second argument also of type text
+			p=string_append(p,_value2->value._text->_c);
+		Mvalue* _value=(p?_getTextValue(string(_valueText),false):NULL);
+		free_string(_valueText);
+		return _value;
+	}
 	// if either is a rational, compute the sum rational
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
@@ -4047,22 +4069,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		if(!_sumDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_sumDecimal,true);
 	}
-	if(_value1->type==VT_TEXT){ // force string concatenation using the quote character in the Mvalue in the resulting text
-		Mstring* _valueText=__string();
-		if(!_valueText)return NULL;
-		Mstring* p=_valueText;
-		p=string_append_char(p,_value1->value._text->presuffix);
-		p=string_append(p,_value1->value._text->_c);
-		// MDH@17OCT2019: we can't use _getValueText() here, because _getValueText() will resolve escape sequences which we do NOT want here
-		p=string_append(p,_value2->value._text->_c);
-		/* replacing:
-		Mstring* _value2Text=_getValueText(_value2,true); // get the text representation of the second argument without quotes
-		if(_value2Text){p=string_append(p,string(_value2Text));free_string(_value2Text);}
-		*/
-		Mvalue* _value=(p?_getTextValue(string(_valueText),false):NULL);
-		free_string(_valueText);
-		return _value;
+	// if either is a real
+	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+		if(amVerbose()){outputValue("Adding integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
+		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1+ld2:M_LD_NAN);
 	}
+	/* MDH@28OCT2019: either real already dealt with above
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_TEXT)){
 		// if the second argument is text, convert it to a real or integer number
 		if(_value2->type==VT_TEXT){
@@ -4075,18 +4088,12 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 				_value2=_getRealValue(_strtold(valueText,getNAR()));
 			}else{ // no period
 				_value2=_getIntegerValue(_strtoll(valueText,getNAI()));
-				/* replacing:
-				int l=strlen(valueText)-1; // the last character
-				if(l<0||(l==((valueText[0]=='-'||valueText[0]=='+'))&&valueText[l]=='0'))return _value1; // if adding zero just return _value1 (and therefore something of the same type)
-				long long ll=atoll(valueText);
-				if(!ll){output("ERROR: Can't add '%s'!",valueText);return NULL;}; // if zero the text does not represent a valid integer!!!
-				_value2=_getIntegerValue(ll); //re-use the _value2 pointer so we can perform the requested addition
-				*/
 			}
 		}
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll);
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)+(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
 	}
+	*/
 	return NULL;
 }
 
@@ -4158,10 +4165,18 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		if(!_differenceDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_differenceDecimal,true);
 	}
+	// if either is a real
+	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+		if(amVerbose()){outputValue("Subtracting integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
+		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2:M_LD_NAN);
+	}
+	/* MDH@28OCT2019: now obsolete
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
 		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
 	}
+	*/
 	return NULL;
 }
 
@@ -4231,6 +4246,12 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		return _getBigintegerValue(_productBiginteger,true);
 	}
 	*/
+	// if either is a real
+	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+		if(amVerbose()){outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
+		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
+	}
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
 		if(amVerbose()){outputValue("Multiplying rationals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
@@ -4248,10 +4269,6 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_productDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_productDecimal,true);
-	}
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		if(amVerbose()){outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
-		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)*(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
 	}
 	return NULL;
 }
@@ -5134,19 +5151,22 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_divideDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_divideDecimal,true);
 	}
+	// if either is a real
+	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+		if(amVerbose()){outputValue("Dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
+		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1/ld2:M_LD_NAN);
+	}
+	/* replacing:
 	// always real divide
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld); // TODO casting to a long double is perhaps not the best way?
 		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld); // TODO casting to a long double is perhaps not the best way?
 		return _getRealValue(ld1/ld2);
 	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-	}else
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-	}
+	*/
 	return NULL;
 }
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
@@ -5219,6 +5239,34 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		return _getBigintegerValue(_integerdivideBiginteger,true);
 	}
 	*/
+	// MDH@28OCT2019: copied over from divide() and adjusted to return an integer
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
+		Mrational* _divisionRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
+		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
+		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
+		if(!_divisionRational)return NULL;
+		Mbiginteger* _rationalInteger=_getRationalInteger(_divisionRational,true,true);
+		free_rational(_divisionRational); // only used for temporary storage of the division rational
+		return _getBigintegerValue(_rationalInteger,true);
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(!_divideDecimal)return NULL;
+		Mdecimal* _decimalInteger=_getDecimalInteger(_divideDecimal,true,true);
+		free_decimal(_divideDecimal); // only used for temporary storage of the division result
+		return _getDecimalValue(_decimalInteger,true);
+	}
+	// MDH@28OCT2019: if either is a real
+	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+		if(amVerbose()){outputValue("Dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
+		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?truncl(ld1/ld2):M_LD_NAN); // same as divide, but applying truncl to the result (cutting off the fraction)
+	}
+	/* MDH@28OCT2019: see above
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// if both integer, use lldiv to perform the integer division
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot);
@@ -5227,10 +5275,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
 		return _getIntegerValue(truncl(ld1/ld2));
 	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-	}else
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-	}
+	*/
 	return NULL;
 }
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
@@ -5300,16 +5345,43 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		return _getBigintegerValue(_integerremainderBiginteger,true);
 	}
 	*/
+	// MDH@28OCT2019: copied over from integerdivide() and adjusted to return the remainder
+	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
+		Mrational* _divisionRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
+		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
+		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
+		if(!_divisionRational)return NULL;
+		Mbiginteger* _rationalInteger=_getRationalInteger(_divisionRational,true,true);
+		free_rational(_divisionRational); // only used for temporary storage of the division rational
+		if(!_rationalInteger)return NULL;
+		return subtract(_value1,multiply(_value2,_getBigintegerValue(_rationalInteger,true))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
+	}
+	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
+		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
+		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
+		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(!_divideDecimal)return NULL;
+		Mdecimal* _decimalInteger=_getDecimalInteger(_divideDecimal,true,true);
+		free_decimal(_divideDecimal); // only used for temporary storage of the division result
+		if(!_decimalInteger)return NULL;
+		return subtract(_value1,multiply(_value2,_getDecimalValue(_decimalInteger,true)));
+	}
+	// MDH@28OCT2019: if either is a real
+	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+		if(amVerbose()){outputValue("Determining what's left after dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
+		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2*truncl(ld1/ld2):M_LD_NAN);
+	}
+	/* replacing:
 	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
 		// at least one is real, perform floating point division, then trunc!!!
 		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
 		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
 		return _getRealValue(ld1-ld2*truncl(ld1/ld2)); // what's left after subtracting the truncated value
 	}
-	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
-	}else
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
-	}
+	*/
 	return NULL;
 }
 
@@ -5317,9 +5389,9 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 // TODO yet to complete for big integers, rationals, decimals etc.
 long long not(long long boolean){return(boolean==M_LL_INVALID?M_LL_INVALID:(boolean==M_TRUE?M_FALSE:M_TRUE));} // if invalid, stays invalid, otherwise return M_FALSE when M_TRUE and vice versa
 // bitwise operators (and, or, xor)
-Mvalue* xor(Mvalue* _value1,Mvalue* _value2){
+Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,xor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,xor);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwisexor);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwisexor);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _xorbiginteger=__biginteger();
@@ -5949,7 +6021,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '\\':result=integerdivide(_value1,_value2);break;
 			case '%' :result=divideremainder(_value1,_value2);break;
 			// integer arithmetic
-			case '^' :result=xor(_value1,_value2);break;
+			case '^' :result=bitwisexor(_value1,_value2);break;
 			case '&' :result=(strlen(operator)-1?logicaland(_value1,_value2):bitwiseand(_value1,_value2));break;
 			case '|' :result=(strlen(operator)-1?logicalor(_value1,_value2):bitwiseor(_value1,_value2));break;
 			// comparison operators
@@ -6388,40 +6460,39 @@ void outputValueColored(Mvalue* _value){
 	resetOutputColor();
 }
 
-void unfinishToken(){
+void unfinishToken(Mtoken* lastCommandToken){
 	// MDH@03SEP2019: adjusted so that not only the unary operators are left finished but all one character token types (which are the only tokens that are immediately finished once a single character is entered!!)
 	//                NOTE unfinishing of the current token is done so that the token can be continued, so technically we should unfinish all tokens that can be continued after a character is removed from them
 	// for all non-unary token that we are in now that is finished, unfinish 
 	// TODO there are other one-character tokens
-	if(pLastCommandToEvaluateToken)
-		if(!isOneCharacterTokenType(pLastCommandToEvaluateToken->type)) // not a unary operator (of length 1) we ended up in
-			if(string_length(pLastCommandToEvaluateToken->text)==pLastCommandToEvaluateToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
-				pLastCommandToEvaluateToken->significantCharacterCount=0;
+	if(lastCommandToken)
+		if(!isOneCharacterTokenType(lastCommandToken->type)) // not a unary operator (of length 1) we ended up in
+			if(string_length(lastCommandToken->text)==lastCommandToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
+				lastCommandToken->significantCharacterCount=0;
 }
 
 void outputCommandInfo();
-// anything the user types is a sequence of tokens which we can store in a linked list
-bool evaluateCommand(){
-	
-	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
+
+bool isAValidCommand(Mtoken* firstCommandToken,Mtoken* lastCommandToken,bool report){
 
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(!pCommandToEvaluate){outputError("Nothing to evaluate!");return false;}
+	if(!firstCommandToken){if(report)outputError("Undefined command");return false;}
+	if(!lastCommandToken){if(report)outputError("Unfinished command");return false;}
 	
 	// 2. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
 	//    as a result pLastCommandToEvaluateToken and pCommandToEvaluate could now both be NULL, that's why we test this first
-	if(pLastCommandToEvaluateToken->type==TT_COMMENT)if(!removeToken()){outputError("Failed to remove the comment");return false;}
+	if(lastCommandToken->type==TT_COMMENT)if(!removeToken()){if(report)outputError("Failed to remove the comment");return false;}
 
 	// 3. any command always has two significant tokens TODO could compare pCommandToEvaluate with pLastCommandToEvaluateToken which should be different!!!
 	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
-	if(pCommandToEvaluate==pLastCommandToEvaluateToken->expr){outputError("Empty command");clearCommand();return false;}
+	if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
 
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
-	if(pLastCommandToEvaluateToken->type==TT_ERROR){outputError("Can't evaluate erroneous command");if(!removeToken())outputError("Failed to remove the error");unfinishToken();return false;}
+	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Can't evaluate erroneous command");if(!removeToken()){if(report)outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
 
 	// 3. if the last token is an operator of sorts the command is incomplete
-	if(pLastCommandToEvaluateToken->type<=8){outputError("Value behind operator at end of command missing");return false;}
+	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return false;}
 
 	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
 	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
@@ -6433,11 +6504,12 @@ bool evaluateCommand(){
 	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
 	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
 	//////////// already noticed while entering the expression!!!!: if(!pLastCommandToEvaluateToken->expr){outputError("Too many parentheses!");return false;}
-	Mtoken* expressionToken=pLastCommandToEvaluateToken->expr; // the token pointed to by the last command token
-	if(expressionToken)if(pLastCommandToEvaluateToken->type==TT_END_OF_LIST||pLastCommandToEvaluateToken->type==TT_END_OF_FUNCTION_CALL||pLastCommandToEvaluateToken->type==TT_END_OF_MAP)expressionToken=expressionToken->expr;
+	Mtoken* expressionToken=lastCommandToken->expr; // the token pointed to by the last command token
+	if(expressionToken)if(lastCommandToken->type==TT_END_OF_LIST||lastCommandToken->type==TT_END_OF_FUNCTION_CALL||lastCommandToken->type==TT_END_OF_MAP)expressionToken=expressionToken->expr;
 	if(expressionToken){ // could be a problem
 		// MDH@16OCT2019: I made ] ) and } again point to the associated [ ( and {, which of course should be pointing to NULL if it does not the command is incomplete
-		if(amVerbose())output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
+		if(amVerbose())if(report)output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
+		if(report)
 		switch(expressionToken->type){
 			case TT_LIST:outputError("Missing end of list");break;
 			case TT_FUNCTION_CALL:outputError("Missing end of function call");break;
@@ -6469,12 +6541,30 @@ bool evaluateCommand(){
 
 	// 4. can't end with function of function call
 	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
-	if(pLastCommandToEvaluateToken->type==TT_FUNCTION){outputError("Function call missing at end of command");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_FUNCTION_CALL){outputError("Unfinished function call");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_LIST||pLastCommandToEvaluateToken->type==TT_LISTELEMENT){outputError("Unfinished list");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_DQSTRING||pLastCommandToEvaluateToken->type==TT_SQSTRING){outputError("Unfinished string literal");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_EXPRESSION){outputError("Unfinished expression");return false;}
-	if(pLastCommandToEvaluateToken->type==TT_MAP||pLastCommandToEvaluateToken->type==TT_MAP_VALUE){outputError("Unfinished map");return false;}
+	if(lastCommandToken->type==TT_FUNCTION){if(report)outputError("Function call missing at end of command");return false;}
+	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)outputError("Unfinished function call");return false;}
+	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)outputError("Unfinished list");return false;}
+	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)outputError("Unfinished string literal");return false;}
+	if(lastCommandToken->type==TT_EXPRESSION){if(report)outputError("Unfinished expression");return false;}
+	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return false;}
+	
+	return true;
+
+}
+// if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
+Mvalue* getCommandValue(Mtoken* firstCommandToken,Mtoken* lastCommandToken,char commandType){
+	if(!isAValidCommand(firstCommandToken,lastCommandToken,commandType=='\0'))return NULL;
+	getEnvironment()->expressionToken=firstCommandToken->next; // prepare the current environment for executing the command
+	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
+}
+
+// anything the user types is a sequence of tokens which we can store in a linked list
+bool evaluateCommand(){
+	
+	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
+	bool commandIsValid=isAValidCommand(pCommandToEvaluate,pLastCommandToEvaluateToken,true);
+
+	if(!commandIsValid)return false;
 
 	// evaluating means getting the value of the expression that pCommandToEvaluate points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
@@ -6496,6 +6586,7 @@ bool evaluateCommand(){
 	free_string(commandText);
 	////////if(amVerbose())outputLine("Command released!");
 	return true;
+
 }
 
 void prepareForUserInput(){
@@ -6512,7 +6603,7 @@ void writeCommand(){
 		numberOfBehindPromptCharactersWritten+=outputToken(pLastCommandToEvaluateToken=token);
 		token=token->next;
 	}
-	identifierContinuationIsDirty=inIdentifierToken(); // MDH@02OCT2019 because we're setting pLastCommandToEvaluateToken but not calling setLastCommandToken()
+	identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken); // MDH@02OCT2019 because we're setting pLastCommandToEvaluateToken but not calling setLastCommandToken()
 }
 
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
@@ -6807,33 +6898,36 @@ bool commandUp(){
 // MDH@23SEP2019: whenever the type of the current token (pLastCommandToEvaluateToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
 //                therefore it is best to set the last token type using a separate function
 // MDH@03OCT2019: every time the token type changes we need to sync the immediate feed forward text as well!!!!
-void setLastTokenType(TokenType tokenType,bool endOfInput){
-	if(pLastCommandToEvaluateToken){
-		if(tokenType!=pLastCommandToEvaluateToken->type){
+void setLastTokenType(Mtoken* lastCommandToken,TokenType tokenType,bool endOfInput){
+	if(lastCommandToken){
+		if(tokenType!=lastCommandToken->type){
 			// MDH@04OCT2019 moved to input loop removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the current token immediate feed forward text.");
-			pLastCommandToEvaluateToken->type=tokenType;
+			lastCommandToken->type=tokenType;
 			// MDH@04OCT2019 moved to input loop removing: if(!updateImmediateFeedforwardText())inputError("Failed to add the current token immediate feed forward text.");
 		}
 	}
 	if(endOfInput)updateLastTokenAutocompletionText();
 }
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
-Mtoken* newCommandToken(TokenType tokenType,bool endOfInput){
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType,bool endOfInput){
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//                but we should remove any identifier continuation
 	//// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,tokenType);
-	if(pLastCommandToEvaluateToken)setLastTokenType(tokenType,endOfInput);
-	identifierContinuationIsDirty=inIdentifierToken(); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!
+	Mtoken* _newCommandToken=_getToken(lastCommandToken,tokenType);
+	if(_newCommandToken)setLastTokenType(_newCommandToken,tokenType,endOfInput);
+	return _newCommandToken;
+}
+Mtoken* setLastCommandToEvaluateToken(Mtoken* lastCommandToEvaluateToken){
+	pLastCommandToEvaluateToken=lastCommandToEvaluateToken;
+	identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
 	return pLastCommandToEvaluateToken;
 }
-
 void newCommand(){
 	// MDH@24APR2019 obsolete: getCommandLength()=string_length(feedforwardText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
 	// MDH@23SEP2019: newCommandToken() added to take care of updating pLastCommandToEvaluateToken (should be NULL as it is used to represent the previous last token)
-	pLastCommandToEvaluateToken=NULL;
-	pCommandToEvaluate=newCommandToken(TT_EXPRESSION,true);
+	pCommandToEvaluate=_getNewCommandToken(NULL,TT_EXPRESSION,true);
+	setLastCommandToEvaluateToken(pCommandToEvaluate); // so updating identifierContinuationIsDirty is guaranteed!!!
 	if(!pCommandToEvaluate)outputError("Failed to create a new command");else pCommandToEvaluate->expr=NULL;
 	/* replacing:
 	pLastCommandToEvaluateToken=pCommandToEvaluate=_getToken(NULL,TT_EXPRESSION);
@@ -6854,7 +6948,8 @@ void copyCommand(){
 	// the essence is that pLastCommandToEvaluateToken points to the last token in pCommandToEvaluate
 	// NOTE theoretically pLastCommandToEvaluateToken could be NULL due to _getToken() failing to create a new token
 	while(_tokenToCopy){
-		if(!newCommandToken(_tokenToCopy->type,false))break; // MDH@23SEP2019: TODO should we do something to pCommandToEvaluate when this happens? or show some error???
+		// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to pLastCommandToEvaluateToken!!!
+		if(!setLastCommandToEvaluateToken(_getNewCommandToken(pLastCommandToEvaluateToken,_tokenToCopy->type,false)))break; // MDH@23SEP2019: TODO should we do something to pCommandToEvaluate when this happens? or show some error???
 		/* MDH@23SEP2019 replacing:
 		pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,_tokenToCopy->type);
 		///////// MDH@23SEP2019: moved out of _getToken() using false for endOfInput to prevent adding/changing the associated feed forward text
@@ -7004,12 +7099,12 @@ bool existsInCommand(char* identifierName,uint64_t identifierEnvironmentId){ // 
 // MDH@30APR2019: if the current token is a variable/function check whether it still is
 //                call whenever the current token changes (in removePreviousTokenCharacter() and commandCharacterAccepted())
 // MDH@01OCT2019: aSuggestedCharacter is actually not used anymore, so no need to pass it in anymore
-bool tokenCheckedForBeingAFunction(bool endOfInput/*,bool aSuggestedCharacter*/){
+bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bool aSuggestedCharacter*/){
 	// only identifiers should be checked...
-	if(pLastCommandToEvaluateToken->type!=TT_VARIABLE&&pLastCommandToEvaluateToken->type!=TT_NEW_VARIABLE&&pLastCommandToEvaluateToken->type!=TT_FUNCTION)return false;
+	if(lastCommandToken->type!=TT_VARIABLE&&lastCommandToken->type!=TT_NEW_VARIABLE&&lastCommandToken->type!=TT_FUNCTION)return false;
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
-	char* _identifierName=_stringstart(pLastCommandToEvaluateToken->text,pLastCommandToEvaluateToken->significantCharacterCount); // free asap
-	if(pLastCommandToEvaluateToken->type!=TT_FUNCTION){ // is it a function (now)?
+	char* _identifierName=_stringstart(lastCommandToken->text,lastCommandToken->significantCharacterCount); // free asap
+	if(lastCommandToken->type!=TT_FUNCTION){ // is it a function (now)?
 		if(getFunction(getEnvironment(),_identifierName)){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
 			// MDH@20SEP2019: I suppose we need to ascertain that an opening parenthesis is associated with the token now, and no longer anything else
@@ -7017,8 +7112,8 @@ bool tokenCheckedForBeingAFunction(bool endOfInput/*,bool aSuggestedCharacter*/)
 			if(amMatchingparentheses())if(pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE)if(string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			*/
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
-			setLastTokenType(TT_FUNCTION,endOfInput);
-			reoutputToken(pLastCommandToEvaluateToken);
+			setLastTokenType(lastCommandToken,TT_FUNCTION,endOfInput);
+			reoutputToken(lastCommandToken);
 			// insert an opening parenthesis for the function call
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: if(endOfInput&&amMatchingparentheses())setLastTokenAutocompletionText("(");else deleteAutocompletionTextOfToken(pLastCommandToEvaluateToken); // MDH@20SEP2019: either force the feedforward text to match an opening parenthesis or nothing TODO does endOfInput matter?????
 			/* MDH@20SEP2019 replacing:
@@ -7028,8 +7123,8 @@ bool tokenCheckedForBeingAFunction(bool endOfInput/*,bool aSuggestedCharacter*/)
 	}else{ // is it (still) a function?
 		if(!getFunction(getEnvironment(),_identifierName)){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
-			setLastTokenType(TT_VARIABLE,endOfInput);
-			reoutputToken(pLastCommandToEvaluateToken);
+			setLastTokenType(lastCommandToken,TT_VARIABLE,endOfInput);
+			reoutputToken(lastCommandToken);
 			//////////outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: deleteAutocompletionTextOfToken(pLastCommandToEvaluateToken); // MDH@20SEP2019: I suppose when TT_VARIABLE changes to TT_NEW_VARIABLE later on, an equal sign might be added!!!
@@ -7040,21 +7135,21 @@ bool tokenCheckedForBeingAFunction(bool endOfInput/*,bool aSuggestedCharacter*/)
 	}
 	// check whether the variable exists or not
 	// MDH@07AUG2019: this variable could exist in this command, which we should check
-	if(pLastCommandToEvaluateToken->type==TT_VARIABLE||pLastCommandToEvaluateToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
+	if(lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
-		bool variableExists=(pLastCommandToEvaluateToken->argument!=1&&(existsInCommand(_identifierName,pLastCommandToEvaluateToken->envid/*replacing:getSpecialFunctionCallToken(pLastCommandToEvaluateToken)*/)||containsVariable(getEnvironment(),_identifierName)));
-		if(pLastCommandToEvaluateToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
+		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(pLastCommandToEvaluateToken)*/)||containsVariable(getEnvironment(),_identifierName)));
+		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(!variableExists){ // apparently does NOT exist
-				setLastTokenType(TT_NEW_VARIABLE,endOfInput);
-				reoutputToken(pLastCommandToEvaluateToken);
+				setLastTokenType(lastCommandToken,TT_NEW_VARIABLE,endOfInput);
+				reoutputToken(lastCommandToken);
 				// suggested characters should make = show (probably already present in the behind cursor text)
 				// MDH@23SEP2019 take care of by setLastTokenType, so removed: setLastTokenAutocompletionText("="); // MDH@20SEP2019 replacing: if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(feedforwardText,0)!='=')string_insert_char(feedforwardText,0,'=');
 			}
 		}else{ // a new variable
 			if(variableExists){ // now an existing variable
-				setLastTokenType(TT_VARIABLE,endOfInput);
-				reoutputToken(pLastCommandToEvaluateToken);
+				setLastTokenType(lastCommandToken,TT_VARIABLE,endOfInput);
+				reoutputToken(lastCommandToken);
 				///// MDH@23SEP2019 removed: deleteAutocompletionTextOfToken(pLastCommandToEvaluateToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			}
 		}
@@ -7083,7 +7178,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 	if(cursorPosition()){ // still something left of the command (that we might check for being a function or not)
 		// on screen as well please
 		// before writing the behind cursor text we're going to check whether the current token still is a function or variable
-		tokenCheckedForBeingAFunction(true/*,false*/); // MDH@14AUG2019: no, not a suggested character (as called on the backspace user action)
+		tokenCheckedForBeingAFunction(pLastCommandToEvaluateToken,true/*,false*/); // MDH@14AUG2019: no, not a suggested character (as called on the backspace user action)
 		// MDH@27FEB2019: if what's behind the cursor is NOT in the command but in feedforwardText that's what we should now write
 		//// MDH@14AUG2019 moving to execute always: writeSuggestedText(true);
 		// replacing: if(pCommandToEvaluate)writeRestOfCommand(); // write all characters at and after the cursor (will reset the cursor!!)
@@ -7149,7 +7244,7 @@ char removedTokenCharacter(bool endOfInput){
 #ifdef __DEBUG__
 			printf("%d",tokenCharacterPosition-behindCursor);
 #endif	
-		identifierContinuationIsDirty=inIdentifierToken(); // MDH@02OCT2019: should be called whenever pLastCommandToEvaluateToken changes...
+		identifierContinuationIsDirty=inIdentifierToken(pLastCommandToEvaluateToken); // MDH@02OCT2019: should be called whenever pLastCommandToEvaluateToken changes...
 		if(pLastCommandToEvaluateToken)tokenCharacterRemoved=string_removed_char(pLastCommandToEvaluateToken->text,tokenCharacterPosition-1);
 #ifdef __DEBUG__
 			outputChar(c);
@@ -7159,8 +7254,8 @@ char removedTokenCharacter(bool endOfInput){
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//                HOWEVER we're assuming that we're dealing with an end of input situation
 			bool tokenRemoved=(string_empty(pLastCommandToEvaluateToken->text)?removeToken():false);
-			unfinishToken(); // we need to do this to allow appending characters to the token again
-			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(endOfInput);
+			unfinishToken(pLastCommandToEvaluateToken); // we need to do this to allow appending characters to the token again
+			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(pLastCommandToEvaluateToken,endOfInput);
 		}
 	}else
 		inputInfo("BUG: No command to remove characters from!");
@@ -7267,46 +7362,21 @@ void changeFunctionTokenToAVariable(bool endOfInput){
 	*/
 	// ready to redetermine the new token type!!!!
 }
-// MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
-//       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
-//                the endOfInput flag is used to indicate whether this is the end of the input
-//                the aSuggestedCharacter flag tells commandCharacterAccepted() that the input character came from feedforwardText (the feed forward), so it will in that case not alter feedforwardText (by removing the same character that was entered)
-bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
-	bool initializationsChanged=false;
-	// MDH@21APR2019: there are two situation where we need to get a command
-	//                1. we haven't got one 2. we have got a registered command which hasn't changed yet (in which case commandIndex will still be positive)
-	if(!pCommandToEvaluate) // no current command
-		newCommand(); // we need to make a new token (to start the command to evaluate)
-	else // we have a current command BUT 
-	if(commandIndex)
-		copyCommand();
-	// if pLastCommandToEvaluateToken is now NULL something went wrong (in copyCommand or newCommand most likely)
-	if(pLastCommandToEvaluateToken==NULL)return false;
-	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
-	clearInfo(); // TODO make a separate function to do this???
-	/////if(amDebugging())inputInfo("A");
-	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
-	if(inputCharType=='C'){
-		pLastCommandToEvaluateToken->type^=0x70; // toggling bit 7
-		// a comment character will NEVER change the (actual) token type but it should change the color to use
-		if(pLastCommandToEvaluateToken->type&0x70){commenting=true;outputTokenColor(pLastCommandToEvaluateToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
-	}else // not a comment character
-	if((pLastCommandToEvaluateToken->type&0x70)==0){ // not in a comment
-		if(notCommenting){notCommenting=false;outputTokenColor(pLastCommandToEvaluateToken);} // if behind coming out of a comment, we have to reset the output token color
-	*/
-	/*
-	// MDH@26FEB2019: when a user starts inserting characters instead of appending them we can cut off the rest of the characters in the command
-	//                and put it in a single Mstring instance and append these one at a time 
-	char* removed=removedRestOfCommand();
-	*/
+
+// MDH@28OCT2019: in order to implement the eval function the part in commandCharacterAccepted() that can work with any command is moved over to commandCharacterAppended()
+//                and is called from commandCharacterAccepted() passing pLastCommandToEvaluateToken in as first argument!!
+//                NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
+//                NOTE we have to use the pointer to the last command token because if we used the last command token itself, we wouldn't be able to change the last command token!!!!
+//                NOTE instead we're returning the last command token (which will change if starting a new token!!!!)
+Mtoken* commandCharacterAppended(Mtoken* lastCommandToken,char inputChar,char inputCharacterType,bool endOfInput){
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
-	if((TOKENTYPE_IDS[pLastCommandToEvaluateToken->type]&0x62)==0x62)if(inputChar==string_char(pLastCommandToEvaluateToken->text,0))inputCharacterType='R';
+	if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))inputCharacterType='R';
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
-	if(inputCharacterType=='W')if(pLastCommandToEvaluateToken->type==TT_ERROR||pLastCommandToEvaluateToken->type==TT_COMMENT||pLastCommandToEvaluateToken->type==TT_DQSTRING||pLastCommandToEvaluateToken->type==TT_SQSTRING)inputCharacterType='w';
+	if(inputCharacterType=='W')if(lastCommandToken->type==TT_ERROR||lastCommandToken->type==TT_COMMENT||lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)inputCharacterType='w';
 	int16_t newTokenType=0; // MDH@05JUN2019: we need newTokenType AFTER appending the last character allowed in a token (like q behind a integer or real)
 	if(inputCharacterType!='W'){ // only characters that are not whitespace can start a new token
-		newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		newTokenType=nextTokenType(lastCommandToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 	resetOutputColor();
 	printf("[%d+%c->%d]",pLastCommandToEvaluateToken->type,inputCharacterType,newTokenType);
@@ -7317,40 +7387,40 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		// MDH@02OCT2019: we need some additional corrections in certain situations i.e. do NOT end a single/double quoted string if ' or " was entered behind the escape character
 		switch(newTokenType){
 			case TT_ERROR:
-				if(pLastCommandToEvaluateToken->type==TT_FUNCTION){
+				if(lastCommandToken->type==TT_FUNCTION){
 					// we should assume that the identifier represents a (new) variable (identifier)
 					changeFunctionTokenToAVariable(endOfInput);
-					newTokenType=nextTokenType(pLastCommandToEvaluateToken->type,inputCharacterType);
+					newTokenType=nextTokenType(lastCommandToken->type,inputCharacterType);
 				}
 				break;
 			case TT_END_OF_DQSTRING:
-				if(string_last_char(pLastCommandToEvaluateToken->text)=='\\')newTokenType=TT_DQSTRING;
+				if(string_last_char(lastCommandToken->text)=='\\')newTokenType=TT_DQSTRING;
 				break;
 			case TT_END_OF_SQSTRING:
-				if(string_last_char(pLastCommandToEvaluateToken->text)=='\\')newTokenType=TT_SQSTRING;
+				if(string_last_char(lastCommandToken->text)=='\\')newTokenType=TT_SQSTRING;
 				break;
 		}
 
 		/////if(amDebugging())inputInfo("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
-		if(newTokenType<0||newTokenType==pLastCommandToEvaluateToken->type){
+		if(newTokenType<0||newTokenType==lastCommandToken->type){
 			/* 
 			   MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			   MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
 			   MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
 			*/
-			if(newTokenType==pLastCommandToEvaluateToken->type&&pLastCommandToEvaluateToken->significantCharacterCount>0){
+			if(newTokenType==lastCommandToken->type&&lastCommandToken->significantCharacterCount>0){
 				// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
 				// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
-				if(pLastCommandToEvaluateToken->type!=TT_LIST&&pLastCommandToEvaluateToken->type!=TT_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_UNARY&&pLastCommandToEvaluateToken->type!=TT_TERNARY_aeru&&pLastCommandToEvaluateToken->type!=TT_LISTELEMENT&&pLastCommandToEvaluateToken->type!=TT_END_OF_FUNCTION_CALL&&pLastCommandToEvaluateToken->type!=TT_END_OF_MAP&&pLastCommandToEvaluateToken->type!=TT_END_OF_LIST){
+				if(lastCommandToken->type!=TT_LIST&&lastCommandToken->type!=TT_FUNCTION_CALL&&lastCommandToken->type!=TT_UNARY&&lastCommandToken->type!=TT_TERNARY_aeru&&lastCommandToken->type!=TT_LISTELEMENT&&lastCommandToken->type!=TT_END_OF_FUNCTION_CALL&&lastCommandToken->type!=TT_END_OF_MAP&&lastCommandToken->type!=TT_END_OF_LIST){
 					newTokenType=TT_ERROR;
 					if(amVerbose())inputError("Token already finished!");
 				}
 			}
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
-			if(inputCharacterType=='='&&pLastCommandToEvaluateToken->type==TT_ASSIGNMENT&&(pLastCommandToEvaluateToken->prev->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->prev->type==TT_BINARY_Aeru)){
+			if(inputCharacterType=='='&&lastCommandToken->type==TT_ASSIGNMENT&&(lastCommandToken->prev->type==TT_BINARY_AeRu||lastCommandToken->prev->type==TT_BINARY_Aeru)){
 				newTokenType=TT_ERROR;
 				if(amVerbose())inputError("A shortcut operator assignment cannot change into an equality.");
 			}
@@ -7362,7 +7432,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		if(newTokenType<0){
 
 		}else
-		if(newTokenType!=pLastCommandToEvaluateToken->type||pLastCommandToEvaluateToken->type==TT_EXPRESSION||pLastCommandToEvaluateToken->significantCharacterCount>0){
+		if(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||lastCommandToken->significantCharacterCount>0){
 			///////////if(amVerbose())outputLine("!");/////inputInfo("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
@@ -7374,10 +7444,10 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			if(newTokenType==TT_ASSIGNMENT){
 				// checking for validity of accepting as assignment is not that easy
 				// we can allow a binary operator in front of the assignment of course in that case it definitely is an assignment if it is not the = is an error!!
-				bool behindBinaryOperator=(pLastCommandToEvaluateToken->type==TT_BINARY_AeRu||pLastCommandToEvaluateToken->type==TT_BINARY_Aeru);
+				bool behindBinaryOperator=(lastCommandToken->type==TT_BINARY_AeRu||lastCommandToken->type==TT_BINARY_Aeru);
 				// NOTE if behind binary operator there must always be a token in front of it, so pLastCommandToEvaluateTokenToCheck cannot be NULL!!
 				// MDH@21MAY2019: possibly we have multiple tokens representing a binary operator (like ** << and >> which are allowed!!!) so we need to skip all binary operators in front of the assignment character
-				Mtoken* pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateToken;
+				Mtoken* pLastCommandToEvaluateTokenToCheck=lastCommandToken;
 				if(behindBinaryOperator)while(pLastCommandToEvaluateTokenToCheck->type>=3&&pLastCommandToEvaluateTokenToCheck->type<=7)pLastCommandToEvaluateTokenToCheck=pLastCommandToEvaluateTokenToCheck->prev;
 				if(amVerbose())inputInfo("Type of token to check: %s.",TOKENTYPE_STRING[pLastCommandToEvaluateTokenToCheck->type]);
 				// ASSERT pLastCommandToEvaluateTokenToCheck should either represent a variable or the end of a list element to allow for operator
@@ -7400,8 +7470,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			/////if(amDebugging())inputInfo("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			// MDH@23SEP2019: replacing _getToken() call by newCommandToken (and generating an error when this goes wrong somehow)
-			newCommandToken(newTokenType,endOfInput);
-			if(!pLastCommandToEvaluateToken){outputError("Failed to start a new token");return false;}
+			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType,endOfInput);
+			if(!lastCommandToken)return NULL;
 			/* replacing:
 			pLastCommandToEvaluateToken=_getToken(pLastCommandToEvaluateToken,newTokenType);
 			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyCommand()!)
@@ -7480,14 +7550,14 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 			// MDH@27MAY2019: a lot of tokens are one-character tokens
 	
 			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
-			if(pLastCommandToEvaluateToken->significantCharacterCount==0){
-				if(isOneCharacterTokenType(pLastCommandToEvaluateToken->type)){
-					pLastCommandToEvaluateToken->significantCharacterCount=1;
+			if(lastCommandToken->significantCharacterCount==0){
+				if(isOneCharacterTokenType(lastCommandToken->type)){
+					lastCommandToken->significantCharacterCount=1;
 					////////bool initializationsChanged=false;
 					// MDH@06AUG2019: these are also the tokens we need to recognize for keeping track of the initialized variables (and the level)
-					switch(pLastCommandToEvaluateToken->type){
+					switch(lastCommandToken->type){
 						case TT_ASSIGNMENT:
-							if(pLastCommandToEvaluateToken->argument==1)pLastCommandToEvaluateToken->argument=-1; // indicating that whatever comes next, should not be considered local variables, i.e. should NOT be marked 'automatically' as new variables because they should exist!!!
+							if(lastCommandToken->argument==1)lastCommandToken->argument=-1; // indicating that whatever comes next, should not be considered local variables, i.e. should NOT be marked 'automatically' as new variables because they should exist!!!
 							/* replacing:
 							if(pLastCommandToEvaluateToken->prev->type==TT_NEW_VARIABLE)if(initializable()){
 								char* newVariableName=string(pLastCommandToEvaluateToken->prev->text);
@@ -7500,7 +7570,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							*/
 							break;
 						case TT_FUNCTION_CALL:
-							if(pLastCommandToEvaluateToken->prev->type==TT_FUNCTION){
+							if(lastCommandToken->prev->type==TT_FUNCTION){
 								/* replacing:
 								char* functionName=string(pLastCommandToEvaluateToken->prev->text);
 								// we do not need to store the function name itself, just the argument that will contain the local variable initializations
@@ -7515,7 +7585,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 								inputError("No function in front of function call.");
 							break;
 						case TT_END_OF_FUNCTION_CALL:
-							if(pLastCommandToEvaluateToken->argument==-1)pLastCommandToEvaluateToken->argument=1;
+							if(lastCommandToken->argument==-1)lastCommandToken->argument=1;
 							/* replacing:
 							if(pushInitialization(")")){ // will set the argument count appropriately...
 								if(amVerbose())inputInfo("End of function call registered.");
@@ -7525,8 +7595,8 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 							*/
 							break;
 						case TT_LISTELEMENT:
-							if(pLastCommandToEvaluateToken->expr&&pLastCommandToEvaluateToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
-								if(pLastCommandToEvaluateToken->argument==-1)pLastCommandToEvaluateToken->argument=1;
+							if(lastCommandToken->expr&&lastCommandToken->expr->type==TT_FUNCTION_CALL){ // TODO is this correct?
+								if(lastCommandToken->argument==-1)lastCommandToken->argument=1;
 								/* replacing:
 								// not any comma is a function call argument separator!!!
 								if(pushInitialization(",")){
@@ -7556,18 +7626,97 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 				*/
 			}
 			// TODO should we write the associated colors here?????
-			outputTokenColor(pLastCommandToEvaluateToken);
+			/////// moved over to commandCharacterAccepted because it's definitely not part of an inline command (evaluated by Meval!!!) outputTokenColor(lastCommandToken);
 			/////if(amDebugging())inputInfo("H");
 		}
 	}else // a functional whitespace character, ends a current token!!
-	if(pLastCommandToEvaluateToken->significantCharacterCount==0&&pLastCommandToEvaluateToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
-		pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
+	if(lastCommandToken->significantCharacterCount==0&&lastCommandToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+		lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 
 	/////if(amDebugging())inputInfo("I");
 	// append the typed character at cursorPosition() minus current token offset in pLastCommandToEvaluateToken->text
-	string_append_char(pLastCommandToEvaluateToken->text,inputChar);
+	string_append_char(lastCommandToken->text,inputChar);
 
-	if(newTokenType<0)pLastCommandToEvaluateToken->significantCharacterCount=string_length(pLastCommandToEvaluateToken->text);
+	if(newTokenType<0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
+
+	return lastCommandToken;
+
+}
+
+// this is a fun method, allowing us to parse and evaluate any command (which we're gonna need when running M starting with commands to execute from a file)
+Mvalue* Mevalfunction(Mvalue* value){
+	Mvalue* _evalValue=NULL;
+	Mstring* _evalValueText=_getValueText(value,true);
+	if(_evalValueText){
+		Mtoken* _evalCommandToken=_getNewCommandToken(NULL,TT_EXPRESSION,false);
+		if(_evalCommandToken){
+			Mtoken* _lastEvalCommandToken=_evalCommandToken;
+			uint32_t pos=0;
+			char evalInputChar;
+			while(pos<string_length(_evalValueText)){
+				evalInputChar=string_char(_evalValueText,pos++);
+				_lastEvalCommandToken=commandCharacterAppended(_lastEvalCommandToken,evalInputChar,INPUTCHARACTERTYPES[evalInputChar],false);
+				if(!_lastEvalCommandToken)break;
+			}
+			if(_lastEvalCommandToken){
+				// just like with do() we have to evaluate the command in a subenvironment
+				Menvironment* _evalEnvironment=__environment();
+				if(_evalEnvironment){
+					_evalEnvironment->_name=_strdup("eval");
+					if(pushExecutionEnvironment(_evalEnvironment)){
+						_evalValue=getCommandValue(_evalCommandToken,_lastEvalCommandToken,'e');
+						popExecutionEnvironment(); // pop the eval environment we successfully pushed
+					}else
+						output("%sUnable to setup the evaluation of '%s'.\n",ERROR_PREFIX,_evalValueText);
+				}else
+					output("%sUnable to evaluate '%s'.\n",ERROR_PREFIX,_evalValueText);
+			}else
+				output("%sUnable to evaluate the invalid command '%s'.\n",ERROR_PREFIX,_evalValueText);
+			free_token(_evalCommandToken); // clean up the command
+		}
+		free_string(_evalValueText);
+	}
+	return _evalValue;
+}
+
+// MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
+//       		  ASSERTION pCommandToEvaluate and pLastCommandToEvaluateToken are  NOT  NULL
+//                the endOfInput flag is used to indicate whether this is the end of the input
+//                the aSuggestedCharacter flag tells commandCharacterAccepted() that the input character came from feedforwardText (the feed forward), so it will in that case not alter feedforwardText (by removing the same character that was entered)
+bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
+	bool initializationsChanged=false;
+	// MDH@21APR2019: there are two situation where we need to get a command
+	//                1. we haven't got one 2. we have got a registered command which hasn't changed yet (in which case commandIndex will still be positive)
+	if(!pCommandToEvaluate) // no current command
+		newCommand(); // we need to make a new token (to start the command to evaluate)
+	else // we have a current command BUT 
+	if(commandIndex)
+		copyCommand();
+	// if pLastCommandToEvaluateToken is now NULL something went wrong (in copyCommand or newCommand most likely)
+	if(pLastCommandToEvaluateToken==NULL)return false;
+	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
+	clearInfo(); // TODO make a separate function to do this???
+	/////if(amDebugging())inputInfo("A");
+	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
+	if(inputCharType=='C'){
+		pLastCommandToEvaluateToken->type^=0x70; // toggling bit 7
+		// a comment character will NEVER change the (actual) token type but it should change the color to use
+		if(pLastCommandToEvaluateToken->type&0x70){commenting=true;outputTokenColor(pLastCommandToEvaluateToken);}else notCommenting=true; // if a comment was started, switch to the comment token color
+	}else // not a comment character
+	if((pLastCommandToEvaluateToken->type&0x70)==0){ // not in a comment
+		if(notCommenting){notCommenting=false;outputTokenColor(pLastCommandToEvaluateToken);} // if behind coming out of a comment, we have to reset the output token color
+	*/
+	/*
+	// MDH@26FEB2019: when a user starts inserting characters instead of appending them we can cut off the rest of the characters in the command
+	//                and put it in a single Mstring instance and append these one at a time 
+	char* removed=removedRestOfCommand();
+	*/
+
+	// MDH@28OCT2019: all the code that deals with updating the tokens 
+	//                NOTE passing in the address of pLastCommandToEvaluateToken, so it can be changed!!!!
+	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(pLastCommandToEvaluateToken,inputChar,inputCharacterType,endOfInput);
+	if(!newLastCommandToEvaluateToken)return false;
+	if(newLastCommandToEvaluateToken!=pLastCommandToEvaluateToken){pLastCommandToEvaluateToken=newLastCommandToEvaluateToken;outputTokenColor(pLastCommandToEvaluateToken);}
 
 	/////if(amDebugging())inputInfo("J");
 #ifdef __DEBUG__
@@ -7585,7 +7734,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	// MDH@07AUG2019: after a character is input by the user (or some other source) the identifier type will be checked...
 	//                BUT 
 	// MDH@01OCT2019: argument aSuggestedCharacter is no longer used in tokenCheckedForBeingAFunction and consequently by this function, so it is removed as argument and replaced by updateidentifiercontinuation (which we do need)
-	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(endOfInput/*,aSuggestedCharacter*/); // MDH@28MAY2019: ALWAYS check for being a function!!!!
+	bool notCheckedForBeingAFunction=!tokenCheckedForBeingAFunction(pLastCommandToEvaluateToken,endOfInput/*,aSuggestedCharacter*/); // MDH@28MAY2019: ALWAYS check for being a function!!!!
 	/////if(amDebugging())inputInfo("K");
 	if(endOfInput){
 		/* MDH@20SEP2019: because I created updateLastTokenAutocompletionText which should take care of adding the right token feed forward I do not need to do the following
