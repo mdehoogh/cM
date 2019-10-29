@@ -6713,15 +6713,11 @@ void prepareForUserInput(){
 
 // MDH@24APR2019: writeCommand() writes the command to evaluate, and sets _userInputCommand->_lastToken in the process
 void writeCommand(Mcommand * const command){
-	Mtoken* token=command->_firstToken;
+	Mtoken* token=(command?command->_firstToken:NULL);
 	while(token){
 		numberOfBehindPromptCharactersWritten+=outputToken(command->_lastToken=token);
 		token=token->next;
 	}
-}
-void writeUserInputCommand(){
-	writeCommand(_userInputCommand);
-	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
 }
 
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
@@ -6951,7 +6947,8 @@ void backToPrompt(){
 void setUserInputCommand(Mcommand* command){
 	_userInputCommand=command;
 	// replacing: _userInputCommand->_lastToken=_userInputCommand->_firstToken=pCommand;
-	writeUserInputCommand();
+	writeCommand(_userInputCommand);
+	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
 	//////////writeSuggestedText(true);
 	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
 	////////// removing: determineCommandInitializations();
@@ -6967,11 +6964,15 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){
 	// replacing: 
 	backToPrompt();
 	clearScreenFromCursor();
+	// MDH@29OCT2019: we have to do the following because otherwise inputInfo() will jump back to the end of the command instead of right behind the prompt!!!!
+	//                NOTE typically _userInputCommand will not be NULL when we're scrolling through the list of previous commands!!!!
+	if(_userInputCommand)setUserInputCommand(NULL); 
+	clearInfo();
 	// MDH@24APR2019 obsolete: getCommandLength()=getUserInputCursorPosition()=0; // do we need this????
 	// TODO do we need to do this: clear the behind cursor text (in any situation)
 	deleteAutocompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	if(commandIndex){
-		_userInputCommand->_lastToken=NULL; 
+		// MDH@29OCT2019 should already have _userInputCommand equal to NULL: _userInputCommand->_lastToken=NULL; 
 		// replacing: _userInputCommand->_lastToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
 		if(amVerbose())inputInfo("Showing command #%lld.",commandCount-commandIndex+1);
 		Mcommand* command=commands[commandCount-commandIndex];
@@ -7000,8 +7001,10 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){
 			free_string(_commandFeedforward); // get rid of the feed forward text we constructed
 		}
 	}
-	setUserInputCommand(NULL);
+	/* MDH@29OCT2019 removed to the start:
+	setUserInputCommand(NULL); // TODO probably shouldn't have to do this??????
 	clearInfo(); // TODO do we need this when showing a previous command as behind cursor text??????
+	*/
 	/////////////printf("(%d)",getCommandLength());
 }
 bool commandDown(){
@@ -8118,7 +8121,7 @@ int main(int argc, char **argv){
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
 			// MDH@24APR2019: _userInputCommand->_firstToken could be non-null if we failed to evaluate it (e.g. when being imcomplete), and we allow a retry
 			//                NOTE registered commands should always be successfully evaluated, so do NOT get rid of any pending command!!!!
-			if(_userInputCommand){writeCommand(_userInputCommand);/*writeSuggestedText(true);*/}else deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0);
+			if(_userInputCommand)writeCommand(_userInputCommand);else deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0);
 			/////////////// if(_userInputCommand->_firstToken)clearCommand(); // TODO do we need this????
 			/* replacing:
 			if(_userInputCommand->_firstToken==NULL)if(!string_setlength(feedforwardText,0))output("??"); // TODO should we be loosing feedforwardText here????
