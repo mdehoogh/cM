@@ -1,5 +1,5 @@
 // remove the line below when not in debug mode
-//#define __DEBUG__
+/////#define __DEBUG__
 
 #include <stdio.h>
 #include <unistd.h>
@@ -17,6 +17,9 @@
 
 // Menvironment includes Mvalue includes Mexecution includes ...
 #include "Menvironment.h"
+
+void toStartOfPreviousLine(){oneLineUp();toStartOfLine();clearLine();toStartOfLine();}
+void toStartOfNextLine(){oneLineDown();toStartOfLine();}
 
 char const * const M_VERSION="0.1.0";
 
@@ -1138,7 +1141,7 @@ Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
 // some prototypes we need in initEnvironment()
-Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType,bool first);
+Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType);
 Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue);
 Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue);
 Mvalue* Mdofunction(Mvalue* _doTokenValue);
@@ -1617,33 +1620,43 @@ char getFirstManualFeedforwardCharacterRemoved(){
 // MDH@28OCT2019: because now often we need both the first and last token in a command it's probably best to combine them in a single command
 typedef struct{
 	Mtoken *_firstToken,*_lastToken;
-	bool identifierContinuationIsDirty; // convenient to keep it with the command itself
+	/////////////////bool identifierContinuationIsDirty; // convenient to keep it with the command itself
 }Mcommand;
 void free_command(Mcommand* _command){
 	if(!_command)return;
 	if(_command->_firstToken)free_token(_command->_firstToken); // will free ALL connected tokens!!!
 	free(_command);
 }
-Mtoken* _getNewCommandToken(Mcommand* command,TokenType tokenType,bool endOfInput); // prototype
-Mcommand* _getNewCommand(bool endInput){
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
+Mcommand* _getNewCommand(/*bool endInput*/){
 	Mcommand* _command=CALLOC(1,sizeof(Mcommand),'C');
 	if(_command){
-		_command->_firstToken=_getNewCommandToken(_command,TT_EXPRESSION,endInput);
+		if(amDebugging())inputInfo("New command created.");
+		_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/);
 		if(_command->_firstToken){ // we've got a first token allocated
+			if(amDebugging())inputInfo("New command token created.");
 			_command->_lastToken=_command->_firstToken;
 			_command->_firstToken->expr=NULL;
 		}else{ // too bad, out of memory!
 			FREE(_command,'C');_command=NULL;
+			if(amDebugging())inputError("Failed to create the first command token.");
 		}
-	}
+	}else
+	if(amDebugging())inputError("Failed to create the command.");
 	return _command;
+}
+// MDH@28OCT2019: not needed here anymore... Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the sequence of tokens starting with _userInputCommand->_firstToken
+// MDH@02OCT2019: might need this in multiple places!!
+bool inIdentifierToken(Mcommand* command){
+	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
+	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE:false);
 }
 
 Mcommand* _userInputCommand=NULL; // the current input command
 /* MDH@28OCT2019 replacing: 
 Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the command input by the user
-bool identifierContinuationIsDirty=false; // whether or not the identifier has changed
 */
+bool userInputCommandIdentifierContinuationIsDirty=false; // whether or not the identifier has changed
 char* _identifierContinuationCharacters=NULL; // the single text that we can continue the current identifier token with
 char getFirstIdentifierContinuationCharacter(){
 	inputInfo("%s","Determining the first identifier continuation character!");
@@ -1663,17 +1676,13 @@ void deleteIdentifierContinuation(){
 	if(_identifierContinuationOptionalCharacters){free(_identifierContinuationOptionalCharacters);_identifierContinuationOptionalCharacters=NULL;}
 	if(_identifierContinuationCharacters){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
 }
-/// MDH@28OCT2019: not needed here anymore... Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the sequence of tokens starting with _userInputCommand->_firstToken
-// MDH@02OCT2019: might need this in multiple places!!
-bool inIdentifierToken(Mtoken* lastCommandToken){
-	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE:false);
-}
-void updateIdentifierContinuation(){
-	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand->_lastToken);
+// user input command specific
+void updateUserInputCommandIdentifierContinuation(){
+	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand);
 	// get rid of the identifier continuation if we're can't have one or the identifier has supposedly changed
-	if(!couldHaveAnIdentifierContinuation)_userInputCommand->identifierContinuationIsDirty=false; // if we're not in an identifier token always consider the identifier to be unchanged
-	if(!couldHaveAnIdentifierContinuation||_userInputCommand->identifierContinuationIsDirty)deleteIdentifierContinuation();
-	if(_userInputCommand->identifierContinuationIsDirty){ // the identifier has supposedly changed, and we could have an identifier continuation update it
+	if(!couldHaveAnIdentifierContinuation)userInputCommandIdentifierContinuationIsDirty=false; // if we're not in an identifier token always consider the identifier to be unchanged
+	if(!couldHaveAnIdentifierContinuation||userInputCommandIdentifierContinuationIsDirty)deleteIdentifierContinuation();
+	if(userInputCommandIdentifierContinuationIsDirty){ // the identifier has supposedly changed, and we could have an identifier continuation update it
 		Mstring* _completionText=_getCompletion(string(_userInputCommand->_lastToken->text));
 		// need at least two characters (the type and something text behind it)
 		// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
@@ -1696,6 +1705,7 @@ void updateIdentifierContinuation(){
 			free_string(_completionText);
 		}
 	}
+	if(amDebugging())inputInfo("User input command identifier continuation updated.");
 }/* VALIDATED */
 
 // MDH@20SEP2019: we used to keep track of the behind cursor text, in a single Mstring instance, but because we also want to be able to add variable completion we keep a sequence of char* 
@@ -1752,7 +1762,14 @@ size_t numberOfBehindPromptCharactersWritten=0; // MDH@25SEP2019: the total numb
 
 // the globally constructed behind cursor text (without separator!!!)
 Mstring* _autoCompletionText=NULL; // MDH@27FEB2019: we keep track of the auto completion text
-void deleteAutocompletionText(){if(_autoCompletionText){free_string(_autoCompletionText);_autoCompletionText=NULL;}}
+void deleteAutocompletionText(){
+	if(_autoCompletionText){
+		if(amDebugging())inputInfo("Deleting autocompletion text.");
+		free_string(_autoCompletionText);
+		_autoCompletionText=NULL;
+	}else
+	if(amDebugging())inputInfo("No auto completion text to delete.");
+}
 void updateAutoCompletionText(){
 	if(_autoCompletionText)free_string(_autoCompletionText); // free what we might currently have
 	_autoCompletionText=_getAutoCompletionText('\0'); // get the new characters
@@ -1797,7 +1814,7 @@ char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 char* _getLastTokenAutoCompletionText(){
 	char* tokenAutoCompletionText=""; // on the stack
 	if(amMatchingparentheses())
-	if(_userInputCommand->_lastToken)
+	if(_userInputCommand&&_userInputCommand->_lastToken)
 	switch(_userInputCommand->_lastToken->type){
 		case TT_ASSIGNMENT:break;
 		case TT_BINARY_AeRu:case TT_BINARY_Aeru:case TT_BINARY_aERu:break;
@@ -1841,10 +1858,12 @@ Mtoken* immediateFeedforwardToken=NULL;
 
 void deleteTokenautocompletiontexts(){
 	deleteAutocompletionText();
+	////////if(amDebugging())inputInfo("Autocompletion text deleted.");
 	/////////////////numberOfBehindPromptCharactersWritten=getCommandLength(); // MDH@25SEP2019: TODO if you know a better place to do this then here let me know
 	free_tokenautocompletiontext(_firstTokenautocompletiontext);
 	_firstTokenautocompletiontext=NULL; // OOPS pretty essential!!!!
 	immediateFeedforwardToken=NULL; // MDH@04OCT2019: also pretty essential as we won't have a feed forward text with this token anymore
+	if(amDebugging())inputInfo("Token autocompletion texts deleted.");
 }
 /*
 void deleteTokenautocompletionCharacters(size_t numberOfTokenAutocompletionCharacters){
@@ -1920,8 +1939,9 @@ bool deleteAutocompletionTextOfToken(Mtoken* token){
 	return true;
 }
 
-char getImmediateFeedforwardCharacterOfToken(Mtoken* token){
+char getImmediateFeedforwardCharacterOfUserInputCommand(){
 	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
+	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
 	if(token)
 	switch(token->type){
 		case TT_NEW_VARIABLE:case TT_BINARY_aErU:return '=';
@@ -2093,24 +2113,24 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 
 // MDH@03OCT2019: it's essential to differentiate between current token dependent feed forward and other feed forward
 //                deleteLastTokenImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken stops being the current token or when the type of the current token changes
-//                updateImmediateFeedforwardText() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
+//                updateImmediateFeedforwardTextOfUserInputCommand() is to be called when _userInputCommand->_lastToken just became the current token (or when its type changes)
 // MDH@04OCT2019: deciding to keep the immediate feed forward text separate from the other feed forward texts, that way it is easier to merge the identifier continuation and feed forward texts
 Mstring* _immediateFeedforwardText=NULL;
 bool immediateFeedforwardToBeUpdated=false;
-bool updateImmediateFeedforwardText(){
+bool updateImmediateFeedforwardTextOfUserInputCommand(){
 	if(!_immediateFeedforwardText)return false; // should have one
-	char lastTokenImmediateFeedforwardCharacter=getImmediateFeedforwardCharacterOfToken(_userInputCommand->_lastToken);
+	char lastTokenImmediateFeedforwardCharacter=getImmediateFeedforwardCharacterOfUserInputCommand();
 	return(!lastTokenImmediateFeedforwardCharacter||!string_append_char(_immediateFeedforwardText,lastTokenImmediateFeedforwardCharacter));
 }
 /* replacing:
 // \brief prepends the immediate feed forward character of the current token (if any), returns true on success, false otherwise
-bool updateImmediateFeedforwardText(){
+bool updateImmediateFeedforwardTextOfUserInputCommand(){
 	// MDH@03OCT2019: getAutocompletionTextOfCharacterPrepended was adjusted to return true when the character passed to it equals '\0'!!
 	//                however TODO currently the prepending is anonymous, whereas this prepending should NOT be done anonymous, otherwise we can't delete it later on
 	// get rid of any current immediate feed forward text
 	if(immediateFeedforwardToken&&!deleteAutocompletionTextOfToken(immediateFeedforwardToken))return false;
 	immediateFeedforwardToken=NULL;
-	char lastTokenImmediateFeedforwardCharacter=getImmediateFeedforwardCharacterOfToken(_userInputCommand->_lastToken);
+	char lastTokenImmediateFeedforwardCharacter=getImmediateFeedforwardCharacterOfUserInputCommand(_userInputCommand->_lastToken);
 	if(!lastTokenImmediateFeedforwardCharacter)return true;
 	// try to prepend the character
 	Mtokenautocompletiontext* lastTokenImmediateFeedforwardtext=getAutocompletionTextOfCharacterPrepended(lastTokenImmediateFeedforwardCharacter,true); // second argument forces always prepending this character!!
@@ -2120,15 +2140,24 @@ bool updateImmediateFeedforwardText(){
 	return true;
 }
 */
-void setLastCommandToken(Mtoken* newLastCommandToken){
+// the following functions are user input command specific
+Mtoken* setLastUserInputCommandToken(Mtoken* lastUserInputCommandToken){
+	if(!_userInputCommand){inputError("BUG: No user input command");return NULL;}
+	_userInputCommand->_lastToken=lastUserInputCommandToken;
+	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
+	return _userInputCommand->_lastToken;
+}
+/*
+Mtoken* setLastUserInputCommandToken(Mtoken* newLastCommandToken){
 	// MDH@03OCT2019: every time the current command token changes (preferably done by calling this function), we should first remove the immediate feed forward of the current token, update the current token, and add the immediate feed forward text on the newly accepted current token
 	//                however this should also happen when the type of the current token changes
 	// MDH@04OCT2019: a little less efficient to move it to the input loop but more reliable!!!
 	//// removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the last token immediate feed forward text.");
-	_userInputCommand->_lastToken=newLastCommandToken;
-	//// removing: if(!updateImmediateFeedforwardText())inputError("Failed to add the last token immediate feed forward text.");
-	_userInputCommand->identifierContinuationIsDirty=inIdentifierToken(_userInputCommand->_lastToken);
+	if(_userInputCommand)_userInputCommand->_lastToken=newLastCommandToken;else inputError("BUG: No user input command");
+	//// removing: if(!updateImmediateFeedforwardTextOfUserInputCommand())inputError("Failed to add the last token immediate feed forward text.");
+	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand);
 }
+*/
 /*
 void deleteAutocompletionTextOfToken(Mtoken* token,bool deleteIdentifierContinuationText){
 	if(!token)return;
@@ -2146,12 +2175,14 @@ Mstring* shellCommand=NULL;
 /// MDH@28OCT2019: replaced by _userInputCommand: Mtoken* _userInputCommand->_firstToken=NULL;
 
 // keeping track of both the cursor position and the total command length
-size_t cursorPosition(){return(inputMode==IM_COMMAND?(_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));}
-size_t behindCursor(){return(_suggestedText?string_length(_suggestedText):0);}
-size_t getCommandLength(){return cursorPosition()+behindCursor();} // TODO not correct this way!!!!
+size_t getUserInputCursorPosition(){
+	return(inputMode==IM_COMMAND?(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));
+}
+size_t getNumberOfSuggestedCharacters(){return(_suggestedText?string_length(_suggestedText):0);}
+size_t getCommandLength(){return getUserInputCursorPosition()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
 uint8_t promptLength=0;
-void prompt(){
+void showPrompt(){
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
 	///////////printf("%d-",commandIndex);
@@ -2194,7 +2225,7 @@ void prompt(){
 	/////////storeCursor();
 	///////////inputMode=true; // expecting a command (until the option character is received)
 	/* MDH@26FEB2019: we do not need the following because that's taken care of in writeTokens(_userInputCommand->_firstToken) right after promptForUserInput()
-	cursorPosition()=0; // starting at position 0
+	getUserInputCursorPosition()=0; // starting at position 0
 	*/
 }
 
@@ -2202,7 +2233,7 @@ void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
 	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
-	prompt();
+	showPrompt();
 }
 
 /* The following ANSI escape sequences are currently supported.
@@ -2281,11 +2312,12 @@ Mtoken* freeToken(Mtoken* _token){
 	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token);}return _prevToken;
 }
 // output functions that require access to the current token
-void toStartOfPreviousLine(){oneLineUp();toStartOfLine();clearLine();toStartOfLine();}
-void toStartOfNextLine(){oneLineDown();toStartOfLine();}
-void toCursorPosition(){
-	moveCursorRight(promptLength+cursorPosition());
-	if(_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
+void outputUserInputCommandTokenColor(){
+	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
+}
+void returnToUserInputCommandCursorPosition(){
+	moveCursorRight(promptLength+getUserInputCursorPosition());
+	outputUserInputCommandTokenColor();
 }
 
 // MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
@@ -2293,40 +2325,42 @@ void toCursorPosition(){
 
 void inputInfo(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
-		toStartOfPreviousLine();resetOutputColor(); // get the default output color!!
+		toStartOfPreviousLine();
+		resetOutputColor(); // get the default output color!!
 		// NOTE we have to call vprintf here NOT printf!!!
 		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toStartOfNextLine();toCursorPosition();
+		toStartOfNextLine();
+		returnToUserInputCommandCursorPosition();
 	}
 }
 void inputError(const char* const fmt,...){
 	toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());
 	va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-	toStartOfNextLine();toCursorPosition();
+	toStartOfNextLine();returnToUserInputCommandCursorPosition();
 }
-void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();toCursorPosition();}
+void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();returnToUserInputCommandCursorPosition();}
 
 void outputStatus(char inputChar,char inputCharType){
-	////////printf("[%u,%u]",cursorPosition(),getCommandLength());
+	////////printf("[%u,%u]",getUserInputCursorPosition(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
-	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Manual feed forward: '%s' | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(_userInputCommand->_lastToken!=NULL?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),cursorPosition(),getCommandLength(),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
+	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
+	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Manual feed forward: '%s' | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(_userInputCommand->_lastToken!=NULL?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),getUserInputCursorPosition(),getCommandLength(),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
-	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
+	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
 }
 void outputDebugInfo(){
-	////////printf("[%u,%u]",cursorPosition(),getCommandLength());
+	////////printf("[%u,%u]",getUserInputCursorPosition(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
-	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'.",cursorPosition(),getCommandLength(),(_userInputCommand->_lastToken?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
+	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
+	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'.",getUserInputCursorPosition(),getCommandLength(),(_userInputCommand&&_userInputCommand->_lastToken?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
-	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",cursorPosition(),getCommandLength(),string(feedforwardText));
+	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
 }
 
 // MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
 //                this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
-Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType,bool first){
+Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 	Mtoken* pNewToken=__token();
 	if(pNewToken){
 		/////if(amDebugging())inputInfo("E1");
@@ -2351,7 +2385,9 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType,bool first){
 			//                typically a new token points to the same expr that the predecessor points to
 			//                but we want 
 			// take special care when the new token ends a list, map or function call
-			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(!first&&prevToken->type==TT_EXPRESSION))
+			// MDH@29OCT2019: no need for \p first anymore (that we used previously) because testing for the first TT_EXPRESSION can also be done by looking at the text in the expression
+			//                TODO in time we should change the first token into a WHITESPACE token
+			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_length(prevToken->text)>0&&string_char(prevToken->text,0)!=' '))
 				pNewToken->expr=prevToken;
 			else
 				pNewToken->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token
@@ -2471,6 +2507,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType,bool first){
 			inputError("%sFailed to initialize the new token.",ERROR_PREFIX);
 			pNewToken->type=TT_ERROR; 
 		}
+		if(amDebugging())inputInfo("New token text initialized."); // TODOhow about 
 		/////if(amDebugging())inputInfo("E9");
 		/* not needed with calloc() allocation
 		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
@@ -2491,9 +2528,9 @@ bool registerCommand(Mcommand* command){
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			commandBlocks++;
-			Mcommand** newCommands=realloc(commands,COMMAND_BLOCKSIZE*commandBlocks*sizeof(Mtoken*));
-			if(newCommands==NULL)return false;
-			commands=newCommands;
+			Mcommand** createUserInputCommands=realloc(commands,COMMAND_BLOCKSIZE*commandBlocks*sizeof(Mtoken*));
+			if(createUserInputCommands==NULL)return false;
+			commands=createUserInputCommands;
 		}
 		commands[commandCount++]=command;
 		return true;
@@ -2788,8 +2825,8 @@ bool removeToken(){
 	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
 	// ASSERT _userInputCommand->_lastToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
 	// NOTE if we call freeToken() to free this token all forwardly connected tokens are also freed, so pPrevToken->next should become NULL
-	// MDH@02OCT2019: every time _userInputCommand->_lastToken changes, call setLastCommandToken which will set identifierContinuationIsDirty if it's an identifier token
-	setLastCommandToken(freeToken(_userInputCommand->_lastToken));
+	// MDH@02OCT2019: every time _userInputCommand->_lastToken changes, call setLastUserInputCommandToken which will set identifierContinuationIsDirty if it's an identifier token
+	setLastUserInputCommandToken(freeToken(_userInputCommand->_lastToken));
 	/* replacing:
 	_userInputCommand->_lastToken=freeToken(_userInputCommand->_lastToken); // _userInputCommand->_lastToken now equals its own previous token!!
 	if(inIdentifierToken())identifierContinuationIsDirty=true; // every time the last command to evaluate token changes, we need this
@@ -6638,13 +6675,16 @@ void writeCommand(Mcommand * const command){
 		numberOfBehindPromptCharactersWritten+=outputToken(command->_lastToken=token);
 		token=token->next;
 	}
-	command->identifierContinuationIsDirty=inIdentifierToken(command->_lastToken); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastCommandToken()
+}
+void writeUserInputCommand(){
+	writeCommand(_userInputCommand);
+	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
 }
 
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
 uint32_t commandPages=0; // the total number of command pages
-void setCommandPage(uint32_t newCommandPage){
-	commandPage=newCommandPage;
+void setCommandPage(uint32_t createUserInputCommandPage){
+	commandPage=createUserInputCommandPage;
 	int32_t commandToShowIndex=10,lastCommandToShowIndex=commandCount-(commandPage*10);
 	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
 		resetOutputColor();
@@ -6671,10 +6711,10 @@ void showPreviousCommandPage(){
 /*
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
 char* removedRestOfCommand(){
-	if(cursorPosition()<getCommandLength()){
+	if(getUserInputCursorPosition()<getCommandLength()){
 		Mstring* restOfCommand=__string();
 		if(restOfCommand!=NULL){
-			uint16_t tokenPosition=cursorPosition()-_userInputCommand->_lastToken->offset;
+			uint16_t tokenPosition=getUserInputCursorPosition()-_userInputCommand->_lastToken->offset;
 			if(tokenPosition)string_append(restOfCommand,string_remainder(_userInputCommand->_lastToken->text,tokenPosition));
 			string_setlength(_userInputCommand->_lastToken->text,tokenPosition); // the new length of the token (cutting off what's behind it)
 			// now to append the text in the rest of the tokens
@@ -6693,11 +6733,11 @@ char* removedRestOfCommand(){
 */
 /*
 void writeRestOfCommand(){ // writes rest of command assuming _userInputCommand->_lastToken is not NULL and we are to return to the current cursor position adterwards!!
-	uint16_t leftToWrite=getCommandLength()-cursorPosition();
+	uint16_t leftToWrite=getCommandLength()-getUserInputCursorPosition();
 	if(leftToWrite>0){ // something left to write
 		// something of the current token to write?
-		if(cursorPosition()>_userInputCommand->_lastToken->offset){ // part of current token to write
-			outputTokenColor(_userInputCommand->_lastToken);printf("%s",string_remainder(_userInputCommand->_lastToken->text,cursorPosition()-_userInputCommand->_lastToken->offset));
+		if(getUserInputCursorPosition()>_userInputCommand->_lastToken->offset){ // part of current token to write
+			outputTokenColor(_userInputCommand->_lastToken);printf("%s",string_remainder(_userInputCommand->_lastToken->text,getUserInputCursorPosition()-_userInputCommand->_lastToken->offset));
 		}
 		// write the rest of the tokens
 		writeTokens(_userInputCommand->_lastToken->next);
@@ -6733,7 +6773,7 @@ size_t getNumberOfTokenAutocompletionTexts(){
 }
 
 size_t getNumberOfManualFeedforwardCharactersWritten(){
-	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateIdentifierContinuation();
+	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
 	size_t numberOfManualFeedforwardCharactersWritten=0;
 	// MDH@04OCT2019: append it to the suggested text
 	if(string_length(_manualFeedforwardText)>0){
@@ -6753,7 +6793,7 @@ size_t getNumberOfManualFeedforwardCharactersWritten(){
 	return numberOfManualFeedforwardCharactersWritten; // one less character written than the computed length!!!
 }
 size_t getNumberOfIdentifierContinuationTextCharactersWritten(){
-	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateIdentifierContinuation();
+	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
 	size_t numberOfIdentifierContinuationCharactersWritten=(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0);
 	// MDH@04OCT2019: append it to the suggested text
 	if(numberOfIdentifierContinuationCharactersWritten>0)if(!string_append(_suggestedText,_identifierContinuationCharacters))numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
@@ -6785,7 +6825,7 @@ size_t getNumberOfAutocompletionCharactersWritten(){
 }
 /*
 // MDH@27SEP2019: when the user just deleted the identifier continuation we would not want it to be generated immediately
-void writeSuggestedText(bool updateIdentifierContinuationText){
+void writeSuggestedText(bool updateUserInputCommandIdentifierContinuationText){
 	// MDH@26SEP2019: behind cursor text now consists of two parts now: identifier continuation text and feed forward text
 	// 0. preparation
 	resetOutputColor();
@@ -6794,7 +6834,7 @@ void writeSuggestedText(bool updateIdentifierContinuationText){
 	// 1. write the identifier continuation text and feed forward text
 	size_t commandLength=getCommandLength();
 	size_t newNumberOfBehindPromptCharactersWritten=commandLength;
-	if(updateIdentifierContinuationText)updateIdentifierContinuation(); // force an update of the identifier continuation (could have been already done in updateLastTokenAutocompletionText()!)
+	if(updateUserInputCommandIdentifierContinuationText)updateUserInputCommandIdentifierContinuation(); // force an update of the identifier continuation (could have been already done in updateLastTokenAutocompletionText()!)
 	newNumberOfBehindPromptCharactersWritten+=getNumberOfIdentifierContinuationTextCharactersWritten();
 	newNumberOfBehindPromptCharactersWritten+=getNumberOfFeedforwardCharactersWritten();
 	////////inputInfo("Number of written suggested characters: %zu.",newNumberOfBehindPromptCharactersWritten);
@@ -6828,7 +6868,7 @@ void showSuggestedText(){
 	moveCursorLeft(numberOfSuggestedCharactersWritten); // return to where the command ends
 	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
 	// update numberOfBehindPromptCharactersWritten (we do not need to remember blanks written!!!å)
-	if(_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the color of the current token
+	outputUserInputCommandTokenColor(); // replacing: if(_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the color of the current token
 }
 void hideSuggestedText(){
 	int32_t numberOfBlanksToWrite=numberOfSuggestedCharactersWritten;
@@ -6851,10 +6891,10 @@ void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
 	// replacing: restoreCursor();clearScreenFromCursor();
-	uint16_t cp=cursorPosition();
-	while(cp--)backspace(); // MDH@24APR2019 replacing: while(cursorPosition()>0){cursorPosition()--;backspace();}
+	uint16_t cp=getUserInputCursorPosition();
+	while(cp--)backspace(); // MDH@24APR2019 replacing: while(getUserInputCursorPosition()>0){getUserInputCursorPosition()--;backspace();}
 	/*
-	if(cursorPosition()>0){moveCursorLeft(cursorPosition());cursorPosition()=0;}
+	if(getUserInputCursorPosition()>0){moveCursorLeft(getUserInputCursorPosition());getUserInputCursorPosition()=0;}
 	clearScreenFromCursor();
 	*/
 	/* replacing:
@@ -6865,26 +6905,26 @@ void backToPrompt(){
 	*/
 }
 
-void setCommandToEvaluate(Mcommand* command){
+void setUserInputCommand(Mcommand* command){
 	_userInputCommand=command;
 	// replacing: _userInputCommand->_lastToken=_userInputCommand->_firstToken=pCommand;
-	writeCommand(_userInputCommand);
+	writeUserInputCommand();
 	//////////writeSuggestedText(true);
 	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
 	////////// removing: determineCommandInitializations();
 }
 /**
- * setCommandIndex() accepts @newCommandIndex between 0 and commandCount at most
+ * setCommandIndex() accepts @createUserInputCommandIndex between 0 and commandCount at most
  * but 0 is now also accepted, returning to show _userInputCommand->_firstToken (if any)
  */
-void setCommandIndex(uint32_t newCommandIndex){
-	commandIndex=newCommandIndex;
+void setCommandIndex(uint32_t createUserInputCommandIndex){
+	commandIndex=createUserInputCommandIndex;
 	////if(amVerbose())inputInfo("Command index %lld.",commandIndex);
 	// it's easier to go to the beginning of the line although we could be on the line below!!!!
 	// replacing: 
 	backToPrompt();
 	clearScreenFromCursor();
-	// MDH@24APR2019 obsolete: getCommandLength()=cursorPosition()=0; // do we need this????
+	// MDH@24APR2019 obsolete: getCommandLength()=getUserInputCursorPosition()=0; // do we need this????
 	// TODO do we need to do this: clear the behind cursor text (in any situation)
 	deleteAutocompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	if(commandIndex){
@@ -6896,7 +6936,7 @@ void setCommandIndex(uint32_t newCommandIndex){
 		// TODO this construction (with a return in the middle is a bit unclear)
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
 			inputInfo("Showing registered command #%u.",commandCount-commandIndex+1);
-			setCommandToEvaluate(command);
+			setUserInputCommand(command);
 			return;
 		}
 		// the previous command will be used as behind cursor text, and not immediately as command
@@ -6917,7 +6957,7 @@ void setCommandIndex(uint32_t newCommandIndex){
 			free_string(_commandFeedforward); // get rid of the feed forward text we constructed
 		}
 	}
-	setCommandToEvaluate(NULL);
+	setUserInputCommand(NULL);
 	clearInfo(); // TODO do we need this when showing a previous command as behind cursor text??????
 	/////////////printf("(%d)",getCommandLength());
 }
@@ -6936,45 +6976,44 @@ bool commandUp(){
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
 //                therefore it is best to set the last token type using a separate function
 // MDH@03OCT2019: every time the token type changes we need to sync the immediate feed forward text as well!!!!
-void setLastTokenType(Mtoken* lastCommandToken,TokenType tokenType,bool endOfInput){
-	if(lastCommandToken){
-		if(tokenType!=lastCommandToken->type){
+void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
+	if(token){
+		if(tokenType!=token->type){
 			// MDH@04OCT2019 moved to input loop removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the current token immediate feed forward text.");
-			lastCommandToken->type=tokenType;
-			// MDH@04OCT2019 moved to input loop removing: if(!updateImmediateFeedforwardText())inputError("Failed to add the current token immediate feed forward text.");
+			token->type=tokenType;
+			// MDH@04OCT2019 moved to input loop removing: if(!updateImmediateFeedforwardTextOfUserInputCommand())inputError("Failed to add the current token immediate feed forward text.");
 		}
 	}
-	if(endOfInput)updateLastTokenAutocompletionText();
+	///////// MDH@29OCT2019 probably don't need this here anymore: if(endOfInput)updateLastTokenAutocompletionText();
 }
 
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
-Mtoken* _getNewCommandToken(Mcommand* command,TokenType tokenType,bool endOfInput){
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//                but we should remove any identifier continuation
-	//// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=_getToken(command->_lastToken,tokenType,command->_firstToken==command->_lastToken);
-	if(_newCommandToken)setLastTokenType(_newCommandToken,tokenType,endOfInput);
+	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
+	Mtoken* _newCommandToken=_getToken(lastCommandToken,tokenType);
+	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else if(amDebugging())inputError("Failed to create a command token");
 	return _newCommandToken;
 }
-// the following functions are user input command specific
-Mtoken* setLastCommandToEvaluateToken(Mtoken* lastCommandToEvaluateToken){
-	_userInputCommand->_lastToken=lastCommandToEvaluateToken;
-	_userInputCommand->identifierContinuationIsDirty=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
-	return _userInputCommand->_lastToken;
-}
-void newCommand(){
+
+void createUserInputCommand(){
 	// MDH@24APR2019 obsolete: getCommandLength()=string_length(feedforwardText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
-	// MDH@23SEP2019: newCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
-	_userInputCommand=_getNewCommand(true);
-	if(_userInputCommand)
-		setLastCommandToEvaluateToken(_userInputCommand->_lastToken);
-	else
-		outputError("Failed to create a new command");
+	if(amDebugging())inputInfo("Creating the new user input command.");
+	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
+	_userInputCommand=_getNewCommand();
+	// MDH@29OCT2019: the following is absolutely silly although how about updating 
+	if(_userInputCommand){
+		userInputCommandIdentifierContinuationIsDirty=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
+		updateLastTokenAutocompletionText(); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
+		if(amDebugging())inputInfo("New user input command created.");
+	}else
+		inputError("Failed to create a new user input command.");
 	/* replacing: 
 	_userInputCommand->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION,true,true);
-	setLastCommandToEvaluateToken(_userInputCommand->_firstToken); // so updating identifierContinuationIsDirty is guaranteed!!!
+	setLastUserInputCommandToken(_userInputCommand->_firstToken); // so updating identifierContinuationIsDirty is guaranteed!!!
 	if(!_userInputCommand->_firstToken)outputError("Failed to create a new command");else _userInputCommand->_firstToken->expr=NULL;
 	*/
 	/* replacing:
@@ -6987,9 +7026,11 @@ void newCommand(){
 	*/
 }
 
-// TODO copyCommand() should set ->expr correctly
-void copyCommand(){
+// TODO copyUserInputCommand() should set ->expr correctly
+void copyUserInputCommand(){
+	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
+	if(amDebugging())inputInfo("Preparing the user input command for editing.");
 	_userInputCommand->_lastToken=NULL;
 	Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
 	_userInputCommand->_firstToken=NULL;
@@ -6997,7 +7038,7 @@ void copyCommand(){
 	// NOTE theoretically _userInputCommand->_lastToken could be NULL due to _getToken() failing to create a new token
 	while(_tokenToCopy){
 		// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to _userInputCommand->_lastToken!!!
-		if(!setLastCommandToEvaluateToken(_getNewCommandToken(_userInputCommand,_tokenToCopy->type,false)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
+		if(!setLastUserInputCommandToken(_getNewCommandToken(_userInputCommand->_lastToken,_tokenToCopy->type)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
 		/* MDH@23SEP2019 replacing:
 		_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,_tokenToCopy->type);
 		///////// MDH@23SEP2019: moved out of _getToken() using false for endOfInput to prevent adding/changing the associated feed forward text
@@ -7027,16 +7068,16 @@ void copyCommand(){
 	}
 }
 
-// NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual newCommand
+// NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual createUserInputCommand
 /**
  * setCommand() creates a new (empty) command (in _userInputCommand->_firstToken) and initializes it to the token in pNewCommand (the command pointed to by commandIndex)
  *              which is supposedly showing behind the cursor!!!
- * ASSUMPTION should only be called when at the prompt (cursorPosition()=0) ready for starting or changing a command
+ * ASSUMPTION should only be called when at the prompt (getUserInputCursorPosition()=0) ready for starting or changing a command
  * setCommand() won't show the command anymore as we assume that any registered command passed in is already showing!!!
  */
 /*
 Mtoken* getCommand(){
-	return(commandIndex&&cursorPosition()?commands[commandCount-commandIndex]:_userInputCommand->_firstToken);
+	return(commandIndex&&getUserInputCursorPosition()?commands[commandCount-commandIndex]:_userInputCommand->_firstToken);
 }
 void echoCommand(){
 	Mtoken* token=_userInputCommand->_firstToken;
@@ -7044,11 +7085,11 @@ void echoCommand(){
 	while(token){printf("%s",string(token->text));token=token->next;}
 }
 void setCommand(Mtoken* pNewCommand){
-	// ASSERT let's assume we're at the prompt (i.e. cursorPosition()==0 and _userInputCommand->_firstToken==NULL)
+	// ASSERT let's assume we're at the prompt (i.e. getUserInputCursorPosition()==0 and _userInputCommand->_firstToken==NULL)
 	// NO we cannot assume that because there might be a command currently showing at the prompt
 	if(_userInputCommand->_firstToken){clearCommand();backToPrompt();} // if we have a command get rid of it and ascertain to be at the prompt!!
 	// the problem is that we do NOT want to actually change the new command, so we have to copy it somehow
-	newCommandToEvaluate(); // NOTE might fail, in which case _userInputCommand->_lastToken will be NULL!!
+	createUserInputCommandToEvaluate(); // NOTE might fail, in which case _userInputCommand->_lastToken will be NULL!!
 	if(pNewCommand){ // something to copy
 		// at least once we need to set _userInputCommand->_lastToken!!!
 		Mtoken* pNewToken=pNewCommand; // first token to copy!!
@@ -7160,7 +7201,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			if(amMatchingparentheses())if(_userInputCommand->_lastToken->type==TT_NEW_VARIABLE)if(string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			*/
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
-			setLastTokenType(lastCommandToken,TT_FUNCTION,endOfInput);
+			setTokenType(lastCommandToken,TT_FUNCTION/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 			reoutputToken(lastCommandToken);
 			// insert an opening parenthesis for the function call
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: if(endOfInput&&amMatchingparentheses())setLastTokenAutocompletionText("(");else deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019: either force the feedforward text to match an opening parenthesis or nothing TODO does endOfInput matter?????
@@ -7171,13 +7212,13 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	}else{ // is it (still) a function?
 		if(!getFunction(getEnvironment(),_identifierName)){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
-			setLastTokenType(lastCommandToken,TT_VARIABLE,endOfInput);
+			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 			reoutputToken(lastCommandToken);
 			//////////outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019: I suppose when TT_VARIABLE changes to TT_NEW_VARIABLE later on, an equal sign might be added!!!
 			/* MDH@20SEP2019 replacing:
-			if(endOfInput)if(amMatchingparentheses())if(behindCursor())if(string_char(feedforwardText,0)=='(')string_removed_char(feedforwardText,0);
+			if(endOfInput)if(amMatchingparentheses())if(getNumberOfSuggestedCharacters())if(string_char(feedforwardText,0)=='(')string_removed_char(feedforwardText,0);
 			*/
 		}
 	}
@@ -7189,14 +7230,14 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getEnvironment(),_identifierName)));
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(!variableExists){ // apparently does NOT exist
-				setLastTokenType(lastCommandToken,TT_NEW_VARIABLE,endOfInput);
+				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 				reoutputToken(lastCommandToken);
 				// suggested characters should make = show (probably already present in the behind cursor text)
 				// MDH@23SEP2019 take care of by setLastTokenType, so removed: setLastTokenAutocompletionText("="); // MDH@20SEP2019 replacing: if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(feedforwardText,0)!='=')string_insert_char(feedforwardText,0,'=');
 			}
 		}else{ // a new variable
 			if(variableExists){ // now an existing variable
-				setLastTokenType(lastCommandToken,TT_VARIABLE,endOfInput);
+				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 				reoutputToken(lastCommandToken);
 				///// MDH@23SEP2019 removed: deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			}
@@ -7223,7 +7264,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 	clearScreenFromCursor(); // will clear what's behind the cursor
 	// MDH@14AUG2019: shouldn't we ALWAYS write the behind cursor text, because I think we should, and if we want do not want to see it we should delete it beforehand!!!!! which is much preferred over not showing it when it is still there!!!!!
 	// MDH@24APR2019 obsolete: getCommandLength()--; // decrement the total command length
-	if(cursorPosition()){ // still something left of the command (that we might check for being a function or not)
+	if(getUserInputCursorPosition()){ // still something left of the command (that we might check for being a function or not)
 		// on screen as well please
 		// before writing the behind cursor text we're going to check whether the current token still is a function or variable
 		tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,true/*,false*/); // MDH@14AUG2019: no, not a suggested character (as called on the backspace user action)
@@ -7270,16 +7311,13 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 // MDH@01OCT2019: updating the type of an identifier token due to the removal of the last token character is now done in removeTokenCharacter() just as commandCharacterAccepted() does!!!
 //                also uint16_t behindCursor (as it is always called with constant value 1) removed as formal parameter, and endOfInput (typically true) added!!!
 char removedTokenCharacter(bool endOfInput){
-#ifdef __DEBUG__
-	printf("%d",behindCursor);
-#endif
 	// MDH@03SEP2019: 
 	char tokenCharacterRemoved='\0';
 	if(_userInputCommand){ // should ALWAYS be the case
 		uint16_t tokenCharacterPosition;
 		// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
 		while(_userInputCommand->_lastToken){
-			tokenCharacterPosition=string_length(_userInputCommand->_lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): cursorPosition()-_userInputCommand->_lastToken->offset;
+			tokenCharacterPosition=string_length(_userInputCommand->_lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): getUserInputCursorPosition()-_userInputCommand->_lastToken->offset;
 #ifdef __DEBUG__
 			printf("%d",tokenCharacterPosition);
 #endif
@@ -7289,14 +7327,11 @@ char removedTokenCharacter(bool endOfInput){
 #endif		
 			_userInputCommand->_lastToken=_userInputCommand->_lastToken->prev;
 		}
-#ifdef __DEBUG__
-			printf("%d",tokenCharacterPosition-behindCursor);
-#endif	
-		_userInputCommand->identifierContinuationIsDirty=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: should be called whenever _userInputCommand->_lastToken changes...
+		userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019: should be called whenever _userInputCommand->_lastToken changes...
 		if(_userInputCommand->_lastToken)tokenCharacterRemoved=string_removed_char(_userInputCommand->_lastToken->text,tokenCharacterPosition-1);
 #ifdef __DEBUG__
-			outputChar(c);
-#endif	
+			outputChar(tokenCharacterRemoved);
+#endif
 		if(tokenCharacterRemoved){
 			if(endOfInput)moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
@@ -7312,7 +7347,7 @@ char removedTokenCharacter(bool endOfInput){
 
 // in response to backspace the previous token character is to be removed
 void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
-	if(commandIndex){commandIndex=0;copyCommand();} // MDH@03SEP2019 BUG FIX: I have to do this if scrolling through the list of previous commands!!!
+	if(commandIndex){commandIndex=0;copyUserInputCommand();} // MDH@03SEP2019 BUG FIX: I have to do this if scrolling through the list of previous commands!!!
 	char removedCharacter=removedTokenCharacter(true); // MDH@01OCT2019: will now also perform moveCursorLeft(1) when the argument is true and success
 	if(removedCharacter){
 		// MDH@01OCT2019: moveCursorLeft(1); // TODO check if this is necessary also when cancelling the command
@@ -7419,7 +7454,10 @@ void changeFunctionTokenToAVariable(bool endOfInput){
 Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputCharacterType,bool endOfInput){
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
-	Mtoken* lastCommandToken=command->_lastToken;
+	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
+	// TODO shouldn't be outputting to the console if the command is not the user input command
+	if(!lastCommandToken){inputError("BUG: No last command token.");return NULL;}
+	if(amDebugging())inputInfo("Appending '%c'.",inputChar);
 	if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))inputCharacterType='R';
 	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 	if(inputCharacterType=='W')if(lastCommandToken->type==TT_ERROR||lastCommandToken->type==TT_COMMENT||lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)inputCharacterType='w';
@@ -7518,14 +7556,12 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputChar
 			}
 			/////if(amDebugging())inputInfo("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
-			// MDH@23SEP2019: replacing _getToken() call by newCommandToken (and generating an error when this goes wrong somehow)
-			lastCommandToken=_getNewCommandToken(command,newTokenType,endOfInput); 
+			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
+			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 			if(!lastCommandToken)return NULL;
-			// TODO=DONE should we replace command->_lastToken????
-			/// NO caller is doing that!!!! command->_lastToken=lastCommandToken;
 			/* replacing:
 			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,newTokenType);
-			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyCommand()!)
+			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyUserInputCommand()!)
 			setLastTokenType(newTokenType,endOfInput);
 			*/
 			/////if(amDebugging())inputInfo("F");
@@ -7685,7 +7721,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputChar
 		lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 
 	/////if(amDebugging())inputInfo("I");
-	// append the typed character at cursorPosition() minus current token offset in _userInputCommand->_lastToken->text
+	// append the typed character at getUserInputCursorPosition() minus current token offset in _userInputCommand->_lastToken->text
 	string_append_char(lastCommandToken->text,inputChar);
 
 	if(newTokenType<0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
@@ -7700,7 +7736,7 @@ Mvalue* Mevalfunction(Mvalue* value){
 	Mstring* _evalValueText=_getValueText(value,true);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
-		Mcommand* _evalCommand=_getNewCommand(false);
+		Mcommand* _evalCommand=_getNewCommand();
 		if(_evalCommand){
 			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
 			/* already set: 
@@ -7710,10 +7746,13 @@ Mvalue* Mevalfunction(Mvalue* value){
 			uint32_t pos=0;
 			char evalInputChar;
 			if(amVerbose())output("Parsing '");
+			Mtoken* newLastEvalCommandToken=NULL;
 			while(pos<string_length(_evalValueText)){
 				evalInputChar=string_char(_evalValueText,pos++);
 				if(amVerbose())outputChar(evalInputChar);
-				if(!commandCharacterAppended(_evalCommand,evalInputChar,INPUTCHARACTERTYPES[evalInputChar],false))break;
+				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,evalInputChar,INPUTCHARACTERTYPES[evalInputChar],false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
+				if(newLastEvalCommandToken!=_evalCommand->_lastToken)_evalCommand->_lastToken=newLastEvalCommandToken; // update our eval command's last token TODO do we need to test here????
+				if(!_evalCommand->_lastToken)break;
 			}
 			if(amVerbose())outputLine("'.");
 			if(_evalCommand->_lastToken){
@@ -7744,17 +7783,21 @@ Mvalue* Mevalfunction(Mvalue* value){
 bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
+	/////outputChar('1');
 	//                1. we haven't got one 2. we have got a registered command which hasn't changed yet (in which case commandIndex will still be positive)
 	if(!_userInputCommand) // no current command
-		newCommand(); // we need to make a new token (to start the command to evaluate)
+		createUserInputCommand(); // we need to make a new token (to start the command to evaluate)
 	else // we have a current command BUT 
 	if(commandIndex)
-		copyCommand();
-	// if _userInputCommand->_lastToken is now NULL something went wrong (in copyCommand or newCommand most likely)
-	if(_userInputCommand==NULL)return false;
+		copyUserInputCommand();
+	/////outputChar('2');
+	// if _userInputCommand->_lastToken is now NULL something went wrong (in copyUserInputCommand or createUserInputCommand most likely)
+	if(!_userInputCommand){inputError("BUG: No user input command.");return false;}
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
-	clearInfo(); // TODO make a separate function to do this???
-	/////if(amDebugging())inputInfo("A");
+	/////outputChar('3');
+	clearInfo();
+	/////outputChar('4');
+	/////////if(amDebugging())inputInfo("A");
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
 	if(inputCharType=='C'){
 		_userInputCommand->_lastToken->type^=0x70; // toggling bit 7
@@ -7776,7 +7819,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	if(!newLastCommandToEvaluateToken)return false;
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
 		_userInputCommand->_lastToken=newLastCommandToEvaluateToken;
-		outputTokenColor(_userInputCommand->_lastToken);
+		outputUserInputCommandTokenColor();
 	}
 
 	/////if(amDebugging())inputInfo("J");
@@ -7791,7 +7834,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		debugWrite("Command length after inserting %c: %zu.",inputChar,getCommandLength());
 	}
 
-	// MDH@24APR2019 obsolete: cursorPosition()++; // increment the current cursor position
+	// MDH@24APR2019 obsolete: getUserInputCursorPosition()++; // increment the current cursor position
 	// MDH@07AUG2019: after a character is input by the user (or some other source) the identifier type will be checked...
 	//                BUT 
 	// MDH@01OCT2019: argument aSuggestedCharacter is no longer used in tokenCheckedForBeingAFunction and consequently by this function, so it is removed as argument and replaced by updateidentifiercontinuation (which we do need)
@@ -7869,7 +7912,7 @@ bool COMMAND_PROCESSOR_AVAILABLE=0;
 void clearShellCommand(){
 	string_setlength(_suggestedText,0);
 	string_setlength(shellCommand,0);
-	// MDH@24APR2019 obsolete: cursorPosition()=0;
+	// MDH@24APR2019 obsolete: getUserInputCursorPosition()=0;
 }
 void executeShellCommand(){
 	// ASSERTION string_length(shellCommand) should be positive
@@ -7990,7 +8033,7 @@ int main(int argc, char **argv){
 	// initialize commands and input mode
 	shellCommand=__string(); // MDH@12APR2019: allow executing shell commands (calling system())
 	// MDH@20SEP2019 removing: feedforwardText=__string(); // MDH@27FEB2019: create the behind cursor text (to be cleared whenever we start a new command)
-	_userInputCommand->_firstToken=NULL; // the current command (token)
+	_userInputCommand=NULL; // the current (user input) command
 
 	///// writeCommand() will take care of this!!!! getCommandLength()=0; // keep track of the total command length...
 	inputMode=IM_COMMAND; // TODO should this go into promptForUserInput()?
@@ -8036,7 +8079,7 @@ int main(int argc, char **argv){
 			/////////////// if(_userInputCommand->_firstToken)clearCommand(); // TODO do we need this????
 			/* replacing:
 			if(_userInputCommand->_firstToken==NULL)if(!string_setlength(feedforwardText,0))output("??"); // TODO should we be loosing feedforwardText here????
-			getCommandLength()=cursorPosition()=writeTokens(_userInputCommand->_firstToken);
+			getCommandLength()=getUserInputCursorPosition()=writeTokens(_userInputCommand->_firstToken);
 			*/
 			/////////outputStatus();
 		}
@@ -8048,7 +8091,7 @@ int main(int argc, char **argv){
 		while(_userInputCommand->_lastToken!=NULL){
 			outputToken(_userInputCommand->_lastToken);
 			// the cursor will move along with every printf()
-			cursorPosition()+=string_length(_userInputCommand->_lastToken->text);
+			getUserInputCursorPosition()+=string_length(_userInputCommand->_lastToken->text);
 			_userInputCommand->_lastToken=_userInputCommand->_lastToken->next;
 		}
 		*/
@@ -8061,10 +8104,11 @@ int main(int argc, char **argv){
 				// MDH@07OCT2019: the newly created feed forward category (manual) takes precedence over the identifier continuation and immediate feed forward text
 				//                although it is shown in the same color
 				// MDH@07OCT2019: now decided to ALWAYS update the identifier continuation BUT it will be merged with the manual feed forward text
-				updateIdentifierContinuation();
+				updateUserInputCommandIdentifierContinuation();
 				// if we have manual feed forward starting with the given identifier continuation, the identifier continuation will remain
 				// and the identifier continuation will be removed from the manual feed forward
 				if(_manualFeedforwardText){ // existing manual feed forward text that may block identifier continuation characters
+					if(amDebugging())inputInfo("Determining manual feed forward text.");
 					// if _manualFeedforwardText is empty ANY identifier continuation will be blocked (e.g. when a single identifier continuation character is removed)
 					numberOfIdentifierContinuationManualFeedforwardCharacters=string_number_of_matching_chars(_manualFeedforwardText,_identifierContinuationCharacters);
 					// MDH@08OCT2019: when the manual feed forward matches the start of the identifier continuation use the latter
@@ -8111,18 +8155,19 @@ int main(int argc, char **argv){
 				// if we do NOT have manual feed forward text, 'update' the immediate feed forward text i.e. only show immediate feed forward text when there's no manual feed forward text!!!
 				// get rid of the current immediate feed forward text and update it
 				string_setlength(_immediateFeedforwardText,0);
-				if(!_manualFeedforwardText||string_length(_manualFeedforwardText)==0)updateImmediateFeedforwardText();
-				///outputChar('B');
+				////outputChar('A');
+				if(!_manualFeedforwardText||string_length(_manualFeedforwardText)==0)updateImmediateFeedforwardTextOfUserInputCommand();
+				////outputChar('B');
 				// MDH@03OCT2019: some feed forward texts are also current token specific, therefore we need to sync the feed forward texts
 				//                TODO perhaps we should distinguish between feed forward and auto completion (as with the brackets)
 				//                DONE solved this by taking care of immediate feed forward texts whenever the current token (type) changes
 				///////////updateFeedforwardTexts();
 				updateAutoCompletionText(); // to force it being reconstructed!!! TODO if we decide to always do that we do not need to do this here!!!
-				///outputChar('C');
+				////outputChar('C');
 				showSuggestedText();
-				///outputChar('D');
+				////outputChar('D');
 				if(amDebugging())outputDebugInfo();
-				///outputChar('E');
+				/////outputChar('E');
 			}
 			////////outputChar('X');
 
@@ -8147,7 +8192,7 @@ int main(int argc, char **argv){
 			*/
 			////////printf("(%d)",inputCharType);
 
-			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE cursorPosition() is only defined in the other two modes)
+			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE getUserInputCursorPosition() is only defined in the other two modes)
 			// MDH@16APR2019: I want to use the Enter key (ASCII 13) to switch to the next mode, because the associated input character type is n which will ALWAYS break
 			//                in that case we do NOT need the o input character type!!!
 			if(inputCharType=='o'){
@@ -8156,7 +8201,7 @@ int main(int argc, char **argv){
 					break;
 				}
 				// not in control mode, go to control mode if first character on line
-				if(!cursorPosition()){
+				if(!getUserInputCursorPosition()){
 					inputCharType=switchToControlMode(NULL);
 					break;
 				}
@@ -8200,7 +8245,7 @@ int main(int argc, char **argv){
 				if(inputCharType=='b'){ // backspace
 					///////debugWrite("BACKSPACE");
 					// something to remove?
-					if(cursorPosition()) // TODO _userInputCommand->_firstToken should be NULL at the same time getCommandLength() becomes 0!!!
+					if(getUserInputCursorPosition()) // TODO _userInputCommand->_firstToken should be NULL at the same time getCommandLength() becomes 0!!!
 						removePreviousTokenCharacter();
 					else // nothing to remove
 						beep();
@@ -8406,10 +8451,10 @@ int main(int argc, char **argv){
 										beep();
 								}else
 								if(inputChar==68){ // left arrow
-									if(cursorPosition()){
+									if(getUserInputCursorPosition()){
 										// TODO apparently _userInputCommand->_firstToken will still be NULL when we're scrolling through the list of previous commands...
-										// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyCommand() itself does not seem to do that!!!)
-										if(commandIndex){commandIndex=0;copyCommand();} // will also set getCommandLength()!!!
+										// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyUserInputCommand() itself does not seem to do that!!!)
+										if(commandIndex){commandIndex=0;copyUserInputCommand();} // will also set getCommandLength()!!!
 										// MDH@27FEB2019: we should remove the last character of the current token (and command) and move it into feedforwardText
 										// MDH@20SEP2019: we do NOT want the character removed to disappear when the token it came from disappears, therefore the addition to the feed forward text should be anonymous
 										// MDH@25SEP2019: because we're going to prepend c to the feed forward text, we have to determine the associated token i.e. the token that generated c
@@ -8450,7 +8495,7 @@ int main(int argc, char **argv){
 											inputInfo("Manual feed forward: '%s'.",string(_manualFeedforwardText));
 											*/
 											/* replacing:
-											updateIdentifierContinuation();
+											updateUserInputCommandIdentifierContinuation();
 											///outputChar('1');
 											// prepend only anonymously when not matching the identifier continuation character!!
 											if(!_identifierContinuationCharacters||_identifierContinuationCharacters[0]!=c)
@@ -8469,7 +8514,7 @@ int main(int argc, char **argv){
 												if(identifierContinuationText){
 													string_append_char(identifierContinuationText,c);
 													if(_identifierContinuationCharacters)string_append(identifierContinuationText,_identifierContinuationCharacters);
-													updateIdentifierContinuation(); // determine the new identifier continuation
+													updateUserInputCommandIdentifierContinuation(); // determine the new identifier continuation
 													if(_identifierContinuationCharacters&&strcmp(_identifierContinuationCharacters,string(identifierContinuationText))==0)
 														removedTokenCharacterMatchesFirstNewIdentifierContinuationTextCharacter=true;
 												}
@@ -8549,7 +8594,7 @@ int main(int argc, char **argv){
 			}else{ // Shell command input mode
 				// we still allow using certain 'special' characters for composing the command (much like we did with a command)
 				if(inputCharType=='b'){ // backspace
-					uint16_t cp=cursorPosition();
+					uint16_t cp=getUserInputCursorPosition();
 					if(cp){
 						if(string_removed_char(shellCommand,cp-1)){
 							moveCursorLeft(1);
@@ -8580,7 +8625,7 @@ int main(int argc, char **argv){
 				if(inputCharType=='t'){ // Tab character
 					// if there's a preview (well, code completion by way of a feedforwardText)
 					// here we have a serious problem in that we now have identifier continuation text, immediate feed forward text and permanent feed forward texts
-					uint16_t bc=behindCursor();
+					uint16_t bc=getNumberOfSuggestedCharacters();
 					if(bc){
 						while(bc--){
 							char newInputChar=string_removed_char(_suggestedText,0);
@@ -8602,7 +8647,7 @@ int main(int argc, char **argv){
 									if(inputCharRead(&inputChar)){///////inputChar=getInputChar();
 										if(inputChar==126){ // delete
 											// TODO FIX this does not seem to be right!!!!!
-											if(behindCursor()){
+											if(getNumberOfSuggestedCharacters()){
 												// we could go one to the right and do a backspace!!
 												moveCursorRight(1);
 												// TODO what to do here??? removePreviousTokenCharacter();
@@ -8618,18 +8663,18 @@ int main(int argc, char **argv){
 									beep();
 								}else
 								if(inputChar==67){ // right arrow
-									if(behindCursor()){
+									if(getNumberOfSuggestedCharacters()){
 										char newInputChar=string_removed_char(_suggestedText,0);
 										if(!newInputChar){
 											////////writeSuggestedText(true);
 											inputCharType=switchToControlMode("Failed to accept the suggested characters.");
 										}else
-											string_insert_char(shellCommand,cursorPosition(),newInputChar);
+											string_insert_char(shellCommand,getUserInputCursorPosition(),newInputChar);
 									}else
 										beep();
 								}else
 								if(inputChar==68){ // left arrow
-									uint16_t cp=cursorPosition();
+									uint16_t cp=getUserInputCursorPosition();
 									if(cp){
 										bool success=false;
 										char c=string_removed_char(shellCommand,cp-1);
@@ -8650,7 +8695,7 @@ int main(int argc, char **argv){
 				}else{
 					string_append_char(shellCommand,inputChar);
 					outputChar(inputChar);
-					// MDH@24APR2019: cursorPosition()++;
+					// MDH@24APR2019: getUserInputCursorPosition()++;
 				}
 			}
 			// if switched to control mode, inputCharType will be equal to 'o' and we break out of this input loop!!!
@@ -8689,14 +8734,14 @@ int main(int argc, char **argv){
 				Mtoken* _userInputCommand->_firstTokenToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
 				if(_userInputCommand->_firstToken){ // a current command being edited
 					// MDH@22MAR2019: currently the first token is an EXPRESSION token
-					if(cursorPosition()>string_length(_userInputCommand->_firstToken->text)){
+					if(getUserInputCursorPosition()>string_length(_userInputCommand->_firstToken->text)){
 						// finish the last token???
 						if(_userInputCommand->_lastToken->significantCharacterCount==0)_userInputCommand->_lastToken->significantCharacterCount=string_length(_userInputCommand->_lastToken->text);
 						_userInputCommand->_firstTokenToEvaluate=_userInputCommand->_firstToken; // but only when not at start of command!!!
 						if(amDebugging())outputTokenInfo();
 					}
 				}else // no command yet, although we might be looking at a previous command
-				if(commandIndex&&cursorPosition()) // NOTE using cursorPosition() is better than using amAcceptinghistorycommand() (causing it!!)
+				if(commandIndex&&getUserInputCursorPosition()) // NOTE using getUserInputCursorPosition() is better than using amAcceptinghistorycommand() (causing it!!)
 					_userInputCommand->_firstTokenToEvaluate=commands[commandCount-commandIndex];
 				*/
 
@@ -8729,7 +8774,7 @@ int main(int argc, char **argv){
 					if(!registerCommand(_userInputCommand)){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(!commandIndex){ // a new command being registered!!!
-							freeToken(_userInputCommand->_firstToken);
+							free_command(_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
 							outputError("Failed to register the command! Probable cause: out of memory");
 						}else
 							outputError("Failed to register the command again! Probable cause: out of memory");
@@ -8738,7 +8783,7 @@ int main(int argc, char **argv){
 					}
 
 					// start anew (without a current command to evaluate!!!!)
-					_userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
+					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
 
 					// garbage collection: remove any values not used anymore...
 					size_t removedValueCount=getNumberOfRemovedValues();
@@ -8751,7 +8796,7 @@ int main(int argc, char **argv){
 				}else{
 					// MDH@14AUG2019: if a user presses Enter when there's no command but still feedforwardText it looses feedforwardText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)
 					//                NOTE that I might consider keeping feedforwardText, so it will be redisplayed when the user returns to the command mode
-					switchToControlMode(NULL); // replacing: if(behindCursor()==0)switchToControlMode(NULL);else outputError("Still suggested text");
+					switchToControlMode(NULL); // replacing: if(getNumberOfSuggestedCharacters()==0)switchToControlMode(NULL);else outputError("Still suggested text");
 				}
 			}else
 			if(inputMode==IM_SHELL){
