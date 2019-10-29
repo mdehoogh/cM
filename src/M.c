@@ -1136,6 +1136,49 @@ Mvalue* Mreciprocal(Mvalue* value){
 	}
 	return NULL;
 }
+Mvalue* Mfibonacci(Mvalue* value){
+	// are we allowing big integers?
+	if(!value||value->type==VT_MAP)return NULL;
+	if(value->type==VT_LIST)return _functionAppliedToList(value->value._list,Mfibonacci);
+	// ASSERT assuming scalars
+	Mbiginteger* _biginteger=_getValueBiginteger(value);
+	if(_biginteger){
+		mp_err status=MP_OKAY; // keep track of the result status
+		Mbiginteger* _fibonacciBiginteger=NULL;
+		if(isBigintegerUndefined(_biginteger)==M_FALSE){ // not an undefined big integer
+			if(isBigintegerNegative(_biginteger)!=M_TRUE){ // not a negative big integer
+				Mbiginteger *_counterBiginteger=_getBigintegerCopy(_biginteger); // the number of times we will have to do an addition
+				_fibonacciBiginteger=__biginteger(); // where the result should be stored
+				if(_fibonacciBiginteger&&_counterBiginteger)status=mp_decr(_counterBiginteger);else status=MP_ERR;
+				if(status==MP_OKAY){
+					if(isBigintegerPositive(_counterBiginteger)==M_TRUE){ // at least one addition to do
+						Mbiginteger *_firstBiginteger=_getBiginteger(0),*_secondBiginteger=_getBiginteger(1);
+						if(_firstBiginteger&&_secondBiginteger){
+							// NOTE _counterBiginteger defines the number of times we need to add the first and second big integer
+							while(isBigintegerZero(_counterBiginteger)!=M_TRUE){ // the counter is not zero yet
+								if((status=mp_decr(_counterBiginteger))!=MP_OKAY)break;
+								if((status=mp_add(_firstBiginteger,_secondBiginteger,_fibonacciBiginteger))!=MP_OKAY)break;
+								// if we're smart we only need to exchange one big integer
+								if((status=mp_copy(_secondBiginteger,_firstBiginteger))!=MP_OKAY)break;
+								if((status=mp_copy(_fibonacciBiginteger,_secondBiginteger))!=MP_OKAY)break;
+							}
+						}else 
+							outputError("Failed to initialize the Fibonacci sequence");
+						free_biginteger(_firstBiginteger);free_biginteger(_secondBiginteger);
+					}else // no additions
+						status=mp_copy(_biginteger,_fibonacciBiginteger);
+				}else
+					outputError("Failed to initialize the Fibonacci sum");
+				free_biginteger(_counterBiginteger);
+			}
+		}
+		if(value->type!=VT_BIGINTEGER)free_biginteger(_biginteger);
+		if(status==MP_OKAY)return _getBigintegerValue(_fibonacciBiginteger,true);
+		// ASSERT something went wrong in the computations
+		if(_fibonacciBiginteger)free_biginteger(_fibonacciBiginteger); // not bound, so free here
+	}
+	return NULL;
+}
 
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
@@ -1320,7 +1363,7 @@ bool initEnvironment(){
 				outputError("Failed to register the fac and facd function");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"reciprocal"),"reciprocal",Mreciprocal)){ // MDH@10OCT2019
+			if(!completedValueFunction(_getFunction(_Menvironment,"reciprocal"),"reciprocal",Mreciprocal)||!completedValueFunction(_getFunction(_Menvironment,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
 				outputError("Failed to register the reciprocal function");
 				return false;
 			}
@@ -8395,7 +8438,7 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==65){ // up arrow 
 									if(inputMode==IM_COMMAND){ // i.e. show previous command if any
-										if(!commandIndex&&_userInputCommand->_firstToken)
+										if(!commandIndex&&_userInputCommand)
 											inputError("%s","Won't show previous commands when one is being entered.");
 										else
 										if(!commandDown())
@@ -8411,7 +8454,7 @@ int main(int argc, char **argv){
 								}else
 								if(inputChar==66){ // down arrow
 									if(inputMode==IM_COMMAND){									
-										if(!commandIndex&&_userInputCommand->_firstToken)
+										if(!commandIndex&&_userInputCommand)
 											inputError("%s","Won't show next commands when one is being entered!");
 										else 
 										if(!commandUp())
@@ -8778,16 +8821,15 @@ int main(int argc, char **argv){
 							outputError("Failed to register the command! Probable cause: out of memory");
 						}else
 							outputError("Failed to register the command again! Probable cause: out of memory");
-					}else{
-						if(amVerbose())outputLine("Command registered!");
-					}
+					}else
+					if(amVerbose())outputLine("Command registered!");
 
-					// start anew (without a current command to evaluate!!!!)
+					// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
 					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
 
 					// garbage collection: remove any values not used anymore...
 					size_t removedValueCount=getNumberOfRemovedValues();
-					if(amDebugging())output("Number of garbage collected values: %lu.",removedValueCount);
+					if(amDebugging()){if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputLine("No garbage collected values.");}
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
