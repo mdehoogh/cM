@@ -1136,6 +1136,52 @@ Mvalue* Mreciprocal(Mvalue* value){
 	}
 	return NULL;
 }
+// MDH@29OCT2019: concatenate textual, typically used for lists
+Mstring* _getConcatenated(Mlist* list,char* separator){
+	Mstring* _concatenated=__string();
+	if(_concatenated){
+		Mlistelement* listelement=list->_first;
+		Mvalue* listelementValue=NULL;
+		while(listelement){
+			listelementValue=listelement->_value;
+			Mstring* _listelementText=NULL;
+			if(listelementValue){
+				if(listelementValue->type==VT_LIST)
+					_listelementText=_getConcatenated(listelementValue->value._list,separator);
+				else
+					_listelementText=_getValueText(listelementValue,true);
+			}
+			if(_listelementText){
+				if(separator)if(string_length(_concatenated)>0)string_append(_concatenated,separator);
+				string_append(_concatenated,string(_listelementText));
+				free_string(_listelementText);
+			}
+			listelement=listelement->_next;
+		}
+	}else 
+		outputError("Failed to initialize the concatenation result text");
+	return _concatenated;
+}
+Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){
+	// the first value would be the list of things to concatenate, the second value the separator text (if any)
+	if(value1){
+		Mstring* _separator=(value2?_getValueText(value2,true):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
+		Mstring* _result;
+		if(value1->type==VT_LIST)
+			_result=_getConcatenated(value1->value._list,(_separator?string(_separator):NULL));
+		else
+			_result=_getValueText(value1,true);
+		Mvalue* _resultValue=NULL;
+		if(_result){
+			// _result itself won't contain quotes, so in order to make it usable we need to prepend either a single quote or a double quote
+			if(string_insert_char(_result,0,'\''))_resultValue=_getTextValue(string(_result),false);else outputError("Failed to construct the concatenation text");
+			free_string(_result);
+		}
+		if(_separator)free_string(_separator);
+		return _resultValue;
+	}
+	return NULL;
+}
 Mvalue* Mfibonacci(Mvalue* value){
 	// are we allowing big integers?
 	if(!value||value->type==VT_MAP)return NULL;
@@ -1364,7 +1410,11 @@ bool initEnvironment(){
 				return false;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"reciprocal"),"reciprocal",Mreciprocal)||!completedValueFunction(_getFunction(_Menvironment,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
-				outputError("Failed to register the reciprocal function");
+				outputError("Failed to register the reciprocal and fibonacci function");
+				return false;
+			}
+			if(!completedValueValueFunction(_getFunction(_Menvironment,"concat"),"concat",Mconcat)){
+				outputError("Failed to register the concat function");
 				return false;
 			}
 			// register list conversions
@@ -1377,7 +1427,6 @@ bool initEnvironment(){
 				outputError("Failed to register map conversion functions");
 				return false;
 			}
-
 		}
 	}
 	if(pushExecutionEnvironment(_Menvironment))return true;
