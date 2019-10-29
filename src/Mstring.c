@@ -53,7 +53,7 @@ Mstring* _stringCopy(Mstring* const src,size_t length){
     if(!src)return NULL;
     src->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
     Mstring* _result=_getString(src->chars);
-    if(length)if(_result)string_setlength(_result,length);
+    if(length>0)if(_result)string_setlength(_result,length);
     return _result;
     /* replacing:
     Mstring* dst=__string();

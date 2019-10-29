@@ -1720,18 +1720,20 @@ void free_command(Mcommand* _command){
 	free(_command);
 }
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
-Mcommand* _getNewCommand(/*bool endInput*/){
+Mcommand* _getNewCommand(bool withFirstToken){
 	Mcommand* _command=CALLOC(1,sizeof(Mcommand),'C');
 	if(_command){
 		if(amDebugging())inputInfo("New command created.");
-		_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/);
-		if(_command->_firstToken){ // we've got a first token allocated
-			if(amDebugging())inputInfo("New command token created.");
-			_command->_lastToken=_command->_firstToken;
-			_command->_firstToken->expr=NULL;
-		}else{ // too bad, out of memory!
-			FREE(_command,'C');_command=NULL;
-			if(amDebugging())inputError("Failed to create the first command token.");
+		if(withFirstToken){
+			_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/);
+			if(_command->_firstToken){ // we've got a first token allocated
+				if(amDebugging())inputInfo("New command token created.");
+				_command->_lastToken=_command->_firstToken;
+				_command->_firstToken->expr=NULL;
+			}else{ // too bad, out of memory!
+				FREE(_command,'C');_command=NULL;
+				if(amDebugging())inputError("Failed to create the first command token.");
+			}
 		}
 	}else
 	if(amDebugging())inputError("Failed to create the command.");
@@ -2432,6 +2434,13 @@ void inputError(const char* const fmt,...){
 	toStartOfNextLine();returnToUserInputCommandCursorPosition();
 }
 void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();returnToUserInputCommandCursorPosition();}
+void inputInfoCommand(Mcommand* command){
+	toStartOfPreviousLine();
+	resetOutputColor();
+	if(command){Mtoken* token=command->_firstToken;while(token){output("%s|",string(token->text));token=token->next;}}
+	toStartOfNextLine();
+	returnToUserInputCommandCursorPosition();
+}
 
 void outputStatus(char inputChar,char inputCharType){
 	////////printf("[%u,%u]",getUserInputCursorPosition(),getCommandLength());
@@ -7003,7 +7012,7 @@ void setUserInputCommand(Mcommand* command){
 	////////// removing: determineCommandInitializations();
 }
 /**
- * setCommandIndex() accepts @createUserInputCommandIndex between 0 and commandCount at most
+ * setCommandIndex() accepts \p createUserInputCommandIndex between 0 and commandCount at most
  * but 0 is now also accepted, returning to show _userInputCommand->_firstToken (if any)
  */
 void setCommandIndex(uint32_t createUserInputCommandIndex){
@@ -7023,15 +7032,16 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){
 	if(commandIndex){
 		// MDH@29OCT2019 should already have _userInputCommand equal to NULL: _userInputCommand->_lastToken=NULL; 
 		// replacing: _userInputCommand->_lastToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
-		if(amVerbose())inputInfo("Showing command #%lld.",commandCount-commandIndex+1);
 		Mcommand* command=commands[commandCount-commandIndex];
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		// TODO this construction (with a return in the middle is a bit unclear)
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
-			inputInfo("Showing registered command #%u.",commandCount-commandIndex+1);
+			/////if(amVerbose())
+			inputInfo("Showing registered command #%lld.",commandCount-commandIndex+1);
 			setUserInputCommand(command);
 			return;
 		}
+		if(amVerbose())inputInfo("Showing command #%lld as suggested text.",commandCount-commandIndex+1);
 		// the previous command will be used as behind cursor text, and not immediately as command
 		// MDH@20SEP2019
 		// this is a bit of a nuisance as there will be no associated tokens for the entire behind cursor text
@@ -7098,7 +7108,7 @@ void createUserInputCommand(){
 	resetOutputColor(); // TODO do we need this here?????
 	if(amDebugging())inputInfo("Creating the new user input command.");
 	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
-	_userInputCommand=_getNewCommand();
+	_userInputCommand=_getNewCommand(true);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand){
 		userInputCommandIdentifierContinuationIsDirty=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
@@ -7122,45 +7132,67 @@ void createUserInputCommand(){
 }
 
 // TODO copyUserInputCommand() should set ->expr correctly
+// MDH@29OCT2019: TODO caller should check whether or not _userInputCommand is NULL if it is copying failed!!!!
 void copyUserInputCommand(){
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
-	// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
-	if(amDebugging())inputInfo("Preparing the user input command for editing.");
-	_userInputCommand->_lastToken=NULL;
-	Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
-	_userInputCommand->_firstToken=NULL;
-	// the essence is that _userInputCommand->_lastToken points to the last token in _userInputCommand->_firstToken
-	// NOTE theoretically _userInputCommand->_lastToken could be NULL due to _getToken() failing to create a new token
-	while(_tokenToCopy){
-		// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to _userInputCommand->_lastToken!!!
-		if(!setLastUserInputCommandToken(_getNewCommandToken(_userInputCommand->_lastToken,_tokenToCopy->type)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
-		/* MDH@23SEP2019 replacing:
-		_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,_tokenToCopy->type);
-		///////// MDH@23SEP2019: moved out of _getToken() using false for endOfInput to prevent adding/changing the associated feed forward text
-		setLastTokenType(_tokenToCopy->type,false);
-		*/
-		/* TODO check whether the following is correct!!! guess not!!
-		if(_userInputCommand->_lastToken->type==TT_END_OF_FUNCTION_CALL||_userInputCommand->_lastToken->type==TT_END_OF_LIST||_userInputCommand->_lastToken->type==TT_END_OF_MAP){
-			if(_tokenToCopy->expr)
-				_userInputCommand->_lastToken->expr=_userInputCommand->_lastToken->expr->expr;
-			else
-				outputLine("BUG: End of argument list or map encountered, but not started.");
-		}
-		*/
-		_userInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
-		_userInputCommand->_lastToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
-		// if failing to copy the text over get rid of the command constructed so far, and break
-		_userInputCommand->_lastToken->text=_stringCopy(_tokenToCopy->text,0);
-		if(!_userInputCommand->_lastToken->text){_userInputCommand->_lastToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
-		// MDH@24APR2019 obsolete: getCommandLength()+=string_length(_userInputCommand->_lastToken->text);
-		// some additional fields to copy over (NOT the offset is that is set automatically)
+	//        it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
+	Mcommand* _newUserInputCommand=_getNewCommand(false); // get a new command without tokens (should NEVER fail unless memory shortage)
+	if(_newUserInputCommand){
+		// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
+		if(amDebugging())inputInfo("Preparing the user input command for editing.");
+		///// NOT NEEDED using the false flag in _getNewCommand()!!!! _newUserInputCommand->_lastToken=NULL;_newUserInputCommand->_firstToken=NULL;
+		Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
+		// the essence is that _userInputCommand->_lastToken points to the last token in _userInputCommand->_firstToken
+		// NOTE theoretically _userInputCommand->_lastToken could be NULL due to _getToken() failing to create a new token
+		while(_tokenToCopy){
+			// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to _userInputCommand->_lastToken!!!
+			_newUserInputCommand->_lastToken=_getNewCommandToken(_newUserInputCommand->_lastToken,_tokenToCopy->type);
+			if(!_newUserInputCommand->_lastToken)break;
+			// replacing: if(!setLastUserInputCommandToken(_getNewCommandToken(_userInputCommand->_lastToken,_tokenToCopy->type)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
+			/* MDH@23SEP2019 replacing:
+			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,_tokenToCopy->type);
+			///////// MDH@23SEP2019: moved out of _getToken() using false for endOfInput to prevent adding/changing the associated feed forward text
+			setLastTokenType(_tokenToCopy->type,false);
+			*/
+			/* TODO check whether the following is correct!!! guess not!!
+			if(_userInputCommand->_lastToken->type==TT_END_OF_FUNCTION_CALL||_userInputCommand->_lastToken->type==TT_END_OF_LIST||_userInputCommand->_lastToken->type==TT_END_OF_MAP){
+				if(_tokenToCopy->expr)
+					_userInputCommand->_lastToken->expr=_userInputCommand->_lastToken->expr->expr;
+				else
+					outputLine("BUG: End of argument list or map encountered, but not started.");
+			}
+			*/
+
+			// MDH@29OCT2019: if we want to do it right we should check who's referencing back to _tokenToCopy
+			Mtoken *referencedToken=_tokenToCopy->expr;
+			if(_tokenToCopy->expr){ // some token referenced
+				Mtoken *referencedToken=_tokenToCopy,*newReferencedToken=_newUserInputCommand->_lastToken;
+				// move back until we find the token referenced (and we should find it)
+				while(referencedToken!=_tokenToCopy->expr){referencedToken=referencedToken->prev;newReferencedToken=newReferencedToken->prev;}
+				// ASSERT referencedToken now equals the token in the original command being referenced (which could be itself obviously), and newReferencedToken is a token in the new user input command that should be pointed to!!!
+				if(newReferencedToken)_newUserInputCommand->_lastToken->expr=newReferencedToken;else inputError("BUG: Failed to synchronize a token reference.");
+			}else // nothing pointed to, so just in case
+				_newUserInputCommand->_lastToken->expr=NULL;
+			// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
+			
+			_newUserInputCommand->_lastToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
+			// if failing to copy the text over get rid of the command constructed so far, and break
+			_newUserInputCommand->_lastToken->text=_stringCopy(_tokenToCopy->text,0); // copies the entire Mstring over
+			if(!_newUserInputCommand->_lastToken->text){_newUserInputCommand->_lastToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
+			// MDH@24APR2019 obsolete: getCommandLength()+=string_length(_userInputCommand->_lastToken->text);
+			// some additional fields to copy over (NOT the offset is that is set automatically)
 #ifdef __DEBUG__
-        printf("%d:%s",_userInputCommand->_lastToken->type,string(_userInputCommand->_lastToken->text));
+			printf("%d:%s",_userInputCommand->_lastToken->type,string(_userInputCommand->_lastToken->text));
 #endif
-		if(!_userInputCommand->_firstToken)_userInputCommand->_firstToken=_userInputCommand->_lastToken; // TODO=DONE will never happen???? it does here
-		// get the next token to copy...
-		_tokenToCopy=_tokenToCopy->next;
-	}
+			if(!_newUserInputCommand->_firstToken)_newUserInputCommand->_firstToken=_newUserInputCommand->_lastToken; // TODO=DONE will never happen???? it does here
+			// get the next token to copy...
+			_tokenToCopy=_tokenToCopy->next;
+		}
+		if(!_newUserInputCommand->_lastToken){free_command(_newUserInputCommand);_newUserInputCommand=NULL;}
+	}else
+		inputError("Failed to prepare the command for editing");
+	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
+	_userInputCommand=_newUserInputCommand; // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
 }
 
 // NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual createUserInputCommand
@@ -7831,7 +7863,7 @@ Mvalue* Mevalfunction(Mvalue* value){
 	Mstring* _evalValueText=_getValueText(value,true);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
-		Mcommand* _evalCommand=_getNewCommand();
+		Mcommand* _evalCommand=_getNewCommand(true);
 		if(_evalCommand){
 			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
 			/* already set: 
@@ -8817,7 +8849,7 @@ int main(int argc, char **argv){
 			if(inputMode==IM_COMMAND){
 				// MDH@21JUL2019: if the last token appears to be a function identifier change it to a variable
 				//                so we won't end up with refusal of evaluation
-				if(_userInputCommand->_lastToken)if(_userInputCommand->_lastToken->type==TT_FUNCTION)changeFunctionTokenToAVariable(false);
+				if(_userInputCommand&&_userInputCommand->_lastToken)if(_userInputCommand->_lastToken->type==TT_FUNCTION)changeFunctionTokenToAVariable(false);
 				inputInfo("%s",""); // so that line will be empty
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore
@@ -8841,7 +8873,7 @@ int main(int argc, char **argv){
 				*/
 
 				// if we succeeded in evaluating a command we should register it
-				if(_userInputCommand->_firstToken){ // technically something to evaluate
+				if(_userInputCommand&&_userInputCommand->_firstToken){ // technically something to evaluate
 					if(amVerbose())outputCommandInfo(_userInputCommand);
 					size_t mark=allocationmark();
 					if(amVerbose())output("Mark: %zu.\n",mark);
