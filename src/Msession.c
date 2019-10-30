@@ -70,10 +70,12 @@ void oneLineUp(){outputControlText("1A");} // ascertain that the previous line i
 void oneLineDown(){outputControlText("1B");} // one line down
 void toStartOfLine(){outputChar('\r');}
 void clearLine(){toStartOfLine();outputControlText("K");} // MDH@30OCT2019: adjusted to always to the start of the line before clearing it, this is to ascertain that any called does not need toStartOfLine() per se
-void clearDisplay(){outputControlText("2J");}
 void moveCursorLeft(uint16_t pos){if(pos)output(ES"%huD",pos);} // TODO can't use outputControlText here!!!
 void moveCursorRight(uint16_t pos){if(pos)output(ES"%huC",pos);} // TODO can't use outputControlText here!!!
 void clearScreenFromCursor(){outputControlText("J");}
+void clearDisplay(){
+	clearScreenFromCursor();// replacing: outputControlText("2J");
+}
 void beep(){outputChar('\a');}
 void removeLastCharacter(){outputChar('\b');}
 void hidecursor(){outputControlText("?25l");}
@@ -90,7 +92,7 @@ void outputLine(char* s){resetOutputColor();output("%s\n",s);} // for writing a 
 
 void activateColorscheme(){
 	setBackColor(getBackgroundColor()); // MDH@17OCT2019 replacing: output(ES"%sm",getBackgroundColor()); // TODO can't use outputControlText here!!!
-	clearDisplay();
+	clearScreenFromCursor(); // MDH@30OCT2019 replacing: clearDisplay();
 	///////outputLine((colorscheme?"Will assume white background!":"Will assume black background!"));
 }
 void initDisplay(){

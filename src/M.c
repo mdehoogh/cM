@@ -30,7 +30,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="5";char const * const M_DATE="25 October 2019, 16:00"; // managed to get rid of (mostly) all the warnings!!!
 //char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 20:20";
 //char const * const M_BUILD="7";char const * const M_DATE="27 October 2019, 12:00";
-char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
+//char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
+char const * const M_BUILD="9";char const * const M_DATE="30 October 2019, 18:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -1077,7 +1078,7 @@ Mvalue* type(Mvalue* _value){
 		case VT_BIGINTEGER:return _getTextValue("'I",false);
 		case VT_DECIMAL:return _getTextValue("'d",false);
 		case VT_RATIONAL:return _getTextValue("'q",false);
-		case VT_FLOAT:return _getTextValue("'r",false);
+		case VT_FLOAT:return _getTextValue("'f",false);
 		case VT_TEXT:return _getTextValue("'t",false);
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
@@ -4790,7 +4791,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 				if(rootDegreeBiginteger->used==1){ // should ALWAYS be the case!!!!
 					outputBiginteger("Computing the rational approximation to the ",rootDegreeBiginteger,"th root");
 					outputRational(" of ",rootArgumentRational,".\n");
-					Mbiginteger *p_a=rootArgumentRational->num,*q_a=rootArgumentRational->den; // helpers that will contain the numerator and denominator of A (the root argument)
+					Mbiginteger *p_a=rootArgumentRational->num,*q_a=(rootArgumentRational->den?rootArgumentRational->den:_getBiginteger(1)); // helpers that will contain the numerator and denominator of A (the root argument)
 					Mbiginteger *_pk=__biginteger(),*_qk=_getBiginteger(1); // initialize the solution to the root argument allowing that q_k equals NULL to indicate it is equal to 1
 					if(_pk&&_qk){
 						// TODO how to check whether rootDegreeBiginteger is nottoo large????
@@ -4844,13 +4845,13 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
 										*/
-										if(mp_mul(_pktothepowern,q_a,_delta1)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(!q_a||!_delta1||mp_mul(_pktothepowern,q_a,_delta1)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 1: ",_delta1,".\n");
-										if(mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(!p_a||!_delta2||mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 2: ",_delta2,".\n");
-										if(mp_sub(_delta2,_delta1,_distancenumerator)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+										if(!_delta2||!_delta1||!_distancenumerator||mp_sub(_delta2,_delta1,_distancenumerator)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
 										// we can compute the denominator of the distance as well which is q_a times _qktothepowern
-										if(mp_mul(_qktothepowern,q_a,_distancedenominator)!=MP_OKAY){outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
+										if(!_qktothepowern||!q_a||!_distancedenominator||mp_mul(_qktothepowern,q_a,_distancedenominator)!=MP_OKAY){outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
 
 										outputBiginteger("\tDistance from (",_pk,"/");outputBiginteger(NULL,_qk,")");outputBiginteger("**",rootDegreeBiginteger," to ");
 										outputBiginteger("root argument (",p_a,"/");outputBiginteger(NULL,q_a,"): ");
@@ -4976,6 +4977,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 							outputError("Failed to initialize the rational root approximation");
 					}else
 						outputError("Failed to initialize the rational rational root approximation");
+					if(!rootArgumentRational->den)free_biginteger(q_a); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
 					// take care of freeing the result numerator and denominator when we do not have a rational root rational
 					if(!_rationalBigintegerRootRational){free_biginteger(_pk);free_biginteger(_qk);}
 				}else
@@ -5220,7 +5222,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 						//                NO we can't because 2**(x/y) is NOT equal to 1/2**(y/x) as I conjectured, so we have to stick to the original approximation for now
 						// MDH@13OCT2019: if the numerator is negative we will have to invert the solution
 						
-						int numdencomp=mp_cmp(_positiveExponentNumerator,exponentDenominator);
+						mp_ord numdencomp=mp_cmp(_positiveExponentNumerator,exponentDenominator);
 						if(numdencomp!=MP_EQ){ // numerator and denominator are not equal
 							Mbiginteger *_integerdividend=__biginteger(),*_remainder=__biginteger(); // the defaults when the denominator equals NULL
 							// we divide the maximum of the numerator and the denominator by the minimum of the numerator and the denominator (which typically means that _integerdividend will always be nonzero essentially)
@@ -5229,24 +5231,31 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 								Mvalue* _multiplierValue=(mp_iszero(_integerdividend)!=MP_YES?_getBigintegerPowerValue(_value1,_integerdividend):NULL);
 								// MDH@10OCT2019: we have a special situation when the root argument (_value1) is rational itself in which case we are computing the 
 								// instead of computing the power of the numerator we use the _remainder instead
-								Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
+								Mvalue* rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
 								// if the root argument is rational, we should use pure big integer computations and have all rational approximations to the root
-								if(_rootArgumentValue->type==VT_RATIONAL&&floatIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)) // a pure decimal
+								// MDH@30OCT2019: wait a minute, if the root argument value is a big integer we would still like to do a rational root instead of decimal root finding
+								//                and also when the it's a rational in disguise (stored as a decimal with repeating digits) CAREFUL use a copy of the big integer calling _getRational!!!
+								Mrational* _rootArgumentRational=NULL;
+								if(rootArgumentValue->type==VT_BIGINTEGER)_rootArgumentRational=_getRational(_getBigintegerCopy(rootArgumentValue->value._biginteger),NULL,M_LD_NAN,false,false);else
+								if(rootArgumentValue->type==VT_RATIONAL&&floatIsUndefinedOrZero(rootArgumentValue->value._rational->delta))_rootArgumentRational=rootArgumentValue->value._rational;else
+								if(rootArgumentValue->type==VT_DECIMAL&&rootArgumentValue->value._decimal->repeating>0)_rootArgumentRational=_getDecimalRational(rootArgumentValue->value._decimal);
+								if(_rootArgumentRational){ // the root argument is supposedly a rational
 									// TODO if the base is not a pure rational, we could of course purify it
-									_rootValue=_getRationalValue(_getRationalBigintegerRootRational(_rootArgumentValue->value._rational,exponentDenominator),true);
-								else // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
-									_rootValue=_getBigintegerRootValue(_rootArgumentValue,exponentDenominator);
+									_rootValue=_getRationalValue(_getRationalBigintegerRootRational(_rootArgumentRational,exponentDenominator),true);
+									if(rootArgumentValue->type!=VT_RATIONAL)free_rational(_rootArgumentRational);
+								}else // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
+									_rootValue=_getBigintegerRootValue(rootArgumentValue,exponentDenominator);
 								// now apply the multiplier if need be
 								//if(amVerbose())outputValue("The value to take the root of: '",_rootArgumentValue,"'.\n");
 								if(_multiplierValue){ // have to multiply
 									_rootValue=multiply(_multiplierValue,_rootValue);
 									outputValue("Rational exponent root equals the product of multiplier ",_multiplierValue," and ");
 									outputBiginteger("the ",exponentDenominator,"th ");
-									outputValue("root of ",_rootArgumentValue," ");
+									outputValue("root of ",rootArgumentValue," ");
 									outputValue("which is ",_rootValue,".\n");
 								}else{ // no need to multiply
 									outputBiginteger("The ",exponentDenominator,"th ");
-									outputValue("root of ",_rootArgumentValue," ");
+									outputValue("root of ",rootArgumentValue," "); // TODO what happened to rootArgumentValue????
 									outputValue("equals ",_rootValue,".\n");
 								}
 								///// wrong: if(numdencomp==MP_LT)_rootValue=Mreciprocal(_rootValue); // the numerator is smaller than the denominator, so we need to invert the value

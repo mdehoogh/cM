@@ -13,5 +13,3 @@ void outputChar(char c); // MDH@18APR2019: individual characters can use outputC
 
 // all output to the display has to go through output!!
 void outputControlText(char* s);
-
-void clearDisplay();
