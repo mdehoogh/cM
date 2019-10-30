@@ -43,7 +43,7 @@ void outputErrorAndText(const char* const error,const char* const text);
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
 // VT_REF coming up next for storing (second-level) references (main variables are the first named values)
-typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -56,17 +56,17 @@ typedef struct Mbiginteger{
     Mbiginteger* _mi;
 }Mbiginteger;
 */
-// TODO Mreal could become a union if we're storing multiple types of reals in it
-typedef struct Mreal{
+// TODO Mfloat could become a union if we're storing multiple types of reals in it
+typedef struct Mfloat{
     long double ld; // double precision floating point binary number (for now)
-}Mreal;
+}Mfloat;
 
 typedef mp_int Mbiginteger; // MDH@17JUN2019: use Mbiginteger the same as we would Mbiginteger, one-to-one correspondence with the structure used in libtommath 
 
 typedef struct Mrational{
     Mbiginteger* num;
     Mbiginteger* den;
-    Mreal* delta; // any deviation from the original long double
+    Mfloat* delta; // any deviation from the original long double
     bool normalized; // MDH@05JUN2019: remember whether or not normalized...
 }Mrational;
 
@@ -94,7 +94,7 @@ Mtext* _getCharText(char _char);
 
 ////////Menvironment* getExecutionEnvironment();
 void free_integer(Minteger* _integer);
-void free_real(Mreal* _real);
+void free_float(Mfloat* _float);
 
 bool strIsZero(char* str);
 Mstring* appendll(Mstring* const ms,long long ll);
@@ -119,9 +119,9 @@ void free_functionmap(Mfunctionmap* _functionmap);
 void free_environment(Menvironment* _environment);
 
 // helper function
-Mreal* get_real(long double ld);
+Mfloat* get_real(long double ld);
 
-Mvalue* getRealValue(Mreal* _real);
+Mvalue* getRealValue(Mfloat* _real);
 Minteger* get_integer(long long ll);
 Mvalue* getIntegerValue(Minteger* _integer);
 // Mstring* is assumed to start with the same prefix/suffix character
@@ -147,14 +147,14 @@ Minteger* _getInteger(long long ll);
 
 void extractMantisseAndExponent(long double ld,uint64_t *mantisse,uint16_t *exponent); // so we can also put these into the decimal representation of a double!!!
 ///////////long long getInteger(const Mvalue* const _value); // TODO check how this differs from getValueInteger()!!!
-long double getRealLongDouble(const Mreal* const _real);
-Mreal* _getReal(long double ld);
+long double getFloatLongDouble(Mfloat const * const _float);
+Mfloat* _getFloat(long double ld);
 
-bool realIsUndefined(Mreal* _real);
-bool realIsUndefinedOrZero(Mreal* _real);
-// copying Mreal's
-Mreal* _getRealCopy(Mreal* real);
-Mreal* _getRealNeg(Mreal* real);
+bool floatIsUndefined(Mfloat* afloat);
+bool floatIsUndefinedOrZero(Mfloat* afloat);
+// copying Mfloat's
+Mfloat* _getFloatCopy(Mfloat* afloat);
+Mfloat* _getFloatNeg(Mfloat* afloat);
 
 // BIG INTEGER STUFF
 // TODO should be moved over to Mbiginteger.h/c
@@ -188,24 +188,24 @@ long long isIntegerNegative(Minteger* integer);
 // direct long double functions
 long double ldShift(long double ld,long long shift); // 'shifting' a double means either doubling or halving a number of times
 
-long long isLongDoubleUndefined(long double ld); // for use in isRealUndefined() and long double functions below...
+long long isLongDoubleUndefined(long double ld); // for use in isFloatUndefined() and long double functions below...
 long long getLongDoubleSign(long double ld);
 long long isLongDoubleZero(long double ld);
 long long isLongDoublePositive(long double ld);
 long long isLongDoubleNegative(long double ld);
 long long isLongDoubleOne(long double ld);
 
-long long isRealUndefined(Mreal* real);
-long long isRealZero(Mreal* real);
-long long isRealOne(Mreal* real);
-long long isRealInfinite(Mreal* real);
-long long isRealPositive(Mreal* real);
-long long isRealNegative(Mreal* real);
-long long areRealsEqual(Mreal* real1,Mreal* real2);
+long long isFloatUndefined(Mfloat* afloat);
+long long isFloatZero(Mfloat* afloat);
+long long isFloatOne(Mfloat* afloat);
+long long isFloatInfinite(Mfloat* afloat);
+long long isFloatPositive(Mfloat* afloat);
+long long isFloatNegative(Mfloat* afloat);
+long long areFloatsEqual(Mfloat* float1,Mfloat* float2);
 
 // long double stuff
 /* MDH@25OCT2019: only use the ld functions internally
-// some helper functions (TODO or should we use this on Mreal values?????)
+// some helper functions (TODO or should we use this on Mfloat values?????)
 // tests that use fpclassify() directly (NOTE that ld)
 bool ldIsSubnormal(long double ld);
 bool ldIsSupernormal(long double ld);
@@ -228,7 +228,7 @@ bool ldIsOne(long double ld);
 Mstring* _getIntegerText(Minteger* _integer);
 Mstring* _getBigintegerText(const Mbiginteger* const _biginteger);
 Mstring* _getDecimalText(const Mdecimal* const _decimal,bool fixedpoint);
-Mstring* _getRealText(Mreal* _real);
+Mstring* _getFloatText(Mfloat* _real);
 Mstring* _getStringText(Mtext* _string,bool dequoted);
 
 long long isBigintegerUndefined(Mbiginteger* biginteger);

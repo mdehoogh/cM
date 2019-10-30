@@ -35,7 +35,7 @@ returns the largest integer equal to or smaller than \p _value
 */
 Mvalue* Mfloor(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(floorl(_value->value._real->ld));
+        if(_value->type==VT_FLOAT)return _getFloatValue(floorl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,true,false),true);
@@ -47,7 +47,7 @@ Mvalue* Mfloor(Mvalue* _value){
 }
 Mvalue* Mtrunc(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(truncl(_value->value._real->ld));
+        if(_value->type==VT_FLOAT)return _getFloatValue(truncl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,true,true),true);
@@ -62,7 +62,7 @@ Mvalue* Mtrunc(Mvalue* _value){
  */
 Mvalue* Mround(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(roundl(_value->value._real->ld));
+        if(_value->type==VT_FLOAT)return _getFloatValue(roundl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRoundedRationalInteger(_value->value._rational),true);
@@ -77,7 +77,7 @@ Mvalue* Mround(Mvalue* _value){
  */
 Mvalue* Mceil(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(ceill(_value->value._real->ld));
+        if(_value->type==VT_FLOAT)return _getFloatValue(ceill(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,false,false),true);
@@ -91,8 +91,8 @@ Mvalue* Mceil(Mvalue* _value){
 Mvalue* Msin(Mvalue* _value){
     if(_value){
         if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
-        if(_value->type==VT_REAL)return _getRealValue(sinl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin),true);
         if(_value->type==VT_RATIONAL){
@@ -193,8 +193,8 @@ Mvalue* Mcordicsin(Mvalue* _value){
     if(_value){
         if(amVerbose()){outputValue("Applying cordicsin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
         /* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
-        if(_value->type==VT_REAL)return _getRealValue(sinl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
         */
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin),true);
@@ -209,8 +209,8 @@ Mvalue* Mcordiccos(Mvalue* _value){
     if(_value){
         if(amVerbose()){outputValue("Applying cordiccos() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
         /* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
-        if(_value->type==VT_REAL)return _getRealValue(sinl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(sin(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
         */
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin),true);
@@ -224,8 +224,8 @@ Mvalue* Mcordiccos(Mvalue* _value){
 
 Mvalue* Mcos(Mvalue*  _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(cosl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(cos(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(cosl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(cos(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcos),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcos),true);
         if(_value->type==VT_RATIONAL){
@@ -245,8 +245,8 @@ Mvalue* Mtan(Mvalue*  _value){
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtan),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtan),true);
         // scalar arguments
-        if(_value->type==VT_REAL)return _getRealValue(tanl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(tan(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(tanl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(tan(_value->value._integer->ll));
         if(_value->type==VT_DECIMAL)return _getDecimalValue(_dtangent(NULL,_value->value._decimal),true);
         if(_value->type==VT_RATIONAL){
             Mrational* _sineRational=_qsinorcos(_value->value._rational,true);
@@ -261,8 +261,8 @@ Mvalue* Mtan(Mvalue*  _value){
 }/* VALIDATED */
 Mvalue* Mcosh(Mvalue*  _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(coshl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(cosh(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(coshl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(cosh(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcosh),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcosh),true);
     }
@@ -270,8 +270,8 @@ Mvalue* Mcosh(Mvalue*  _value){
 }/* VALIDATED */
 Mvalue* Msinh(Mvalue*  _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(sinhl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(sinh(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(sinhl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(sinh(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msinh),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msinh),true);
     }
@@ -279,8 +279,8 @@ Mvalue* Msinh(Mvalue*  _value){
 }/* VALIDATED */
 Mvalue* Mtanh(Mvalue*  _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(tanhl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(tanh(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(tanhl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(tanh(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtanh),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtanh),true);
     }
@@ -288,8 +288,8 @@ Mvalue* Mtanh(Mvalue*  _value){
 }/* VALIDATED */
 Mvalue* Mexp(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(expl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(exp(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),true);
         // use decimal conversion
@@ -314,8 +314,8 @@ Mvalue* Mexp(Mvalue* _value){
 // internal approximation by series expansion
 Mvalue* Mdexp(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(expl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(exp(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),true);
         // use decimal conversion
@@ -330,8 +330,8 @@ Mvalue* Mdexp(Mvalue* _value){
 }
 Mvalue* Mlog(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(logl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(log(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(logl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(log(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog),true);
         Mdecimal* _decimal=getValueDecimal(_value);
@@ -354,8 +354,8 @@ Mvalue* Mlog(Mvalue* _value){
 }
 Mvalue* Mlog10(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(log10l(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(log10(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(log10l(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(log10(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10),true);
         Mdecimal* _decimal=getValueDecimal(_value);
@@ -379,8 +379,8 @@ Mvalue* Mlog10(Mvalue* _value){
 
 Mvalue* Msqrt(Mvalue* _value){
     if(_value){
-        if(_value->type==VT_REAL)return _getRealValue(sqrtl(_value->value._real->ld));
-        if(_value->type==VT_INTEGER)return _getRealValue(sqrt(_value->value._integer->ll));
+        if(_value->type==VT_FLOAT)return _getFloatValue(sqrtl(_value->value._float->ld));
+        if(_value->type==VT_INTEGER)return _getFloatValue(sqrt(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msqrt),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msqrt),true);
         // the square root of big integer, decimal and rational values has to be computed by conversion to decimals first
@@ -408,8 +408,8 @@ Mvalue* Msqrt(Mvalue* _value){
 // TODO check different types convert to long double and use powl to compute the power!!
 Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){
     if(_value&&_exponentValue){
-        if(_value->type==VT_REAL&&_exponentValue->type==VT_REAL)return _getRealValue(powl(_value->value._real->ld,_exponentValue->value._real->ld));
-        if(_value->type==VT_INTEGER&&_exponentValue->type==VT_INTEGER)return _getRealValue(pow(_value->value._integer->ll,_exponentValue->value._integer->ll));
+        if(_value->type==VT_FLOAT&&_exponentValue->type==VT_FLOAT)return _getFloatValue(powl(_value->value._float->ld,_exponentValue->value._float->ld));
+        if(_value->type==VT_INTEGER&&_exponentValue->type==VT_INTEGER)return _getFloatValue(pow(_value->value._integer->ll,_exponentValue->value._integer->ll));
     }
     return NULL;
 }
@@ -418,7 +418,7 @@ Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){
 Mvalue* Mneg(Mvalue* _value){ // negate a value
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
-        if(_value->type==VT_REAL)return _getRealValue(-_value->value._real->ld);
+        if(_value->type==VT_FLOAT)return _getFloatValue(-_value->value._float->ld);
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg),true);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getNegatedBiginteger(_value->value._biginteger),true);
@@ -432,7 +432,7 @@ Mvalue* Mneg(Mvalue* _value){ // negate a value
                     ////////outputBiginteger("Negated numerator '",_biNumerator,"' computed!\n");
                     Mbiginteger* _biDenominator=(rational->den?_getBigintegerCopy(rational->den):NULL);
                     ////////outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
-                    if(_biDenominator||!rational->den)return _getRationalValue(_getRational(_biNumerator,_biDenominator,(isRealUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false,true),true);
+                    if(_biDenominator||!rational->den)return _getRationalValue(_getRational(_biNumerator,_biDenominator,(isFloatUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false,true),true);
                     outputError("Failed to copy the numerator of the rational to negate");
                     if(_biDenominator)free_biginteger(_biDenominator);
                     free_biginteger(_biNumerator);
@@ -563,7 +563,7 @@ Mvalue* Mfac(Mvalue* _value){
     }
     long double result=n;
     while(--n>1)result*=n;
-    return _getRealValue(result);
+    return _getFloatValue(result);
     */
 }/* VALIDATED */
 

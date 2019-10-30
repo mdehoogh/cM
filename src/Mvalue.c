@@ -59,7 +59,7 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
         switch(_variable->valueType){
             case VT_UNDEFINED:
             case VT_INTEGER:
-            case VT_REAL:break;
+            case VT_FLOAT:break;
             case VT_TEXT:_variable->_value->value._text=(Mtext*)calloc(1,sizeof(Mtext));break;
             case VT_LIST:_variable->_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
             case VT_MAP:_variable->_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
@@ -119,7 +119,7 @@ void free_value(Mvalue* _value){
             case VT_BIGINTEGER:if(_value->value._biginteger)free_biginteger(_value->value._biginteger);break;
             case VT_DECIMAL:if(_value->value._decimal)free_decimal(_value->value._decimal);break;
             case VT_RATIONAL:if(_value->value._rational)free_rational(_value->value._rational);break;
-            case VT_REAL:if(_value->value._real)free_real(_value->value._real);break;
+            case VT_FLOAT:if(_value->value._float)free_float(_value->value._float);break;
             case VT_TEXT:if(_value->value._text)free_text(_value->value._text);break;
             case VT_LIST:if(_value->value._list)free_list(_value->value._list);break;
             case VT_MAP:if(_value->value._map)free_map(_value->value._map);break;
@@ -286,14 +286,14 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     if(amVerbose())outputLine("No big integer to wrap.");
     return _bigintegerValue;
 }/* VALIDATED */
-Mvalue* _getRealValue(long double ld){
-    if(amVerbose())output("Wrapping real '%.*Lf'.\n",DBL_DIG,ld);
-    Mvalue* _realValue=__value();
-    if(_realValue){
-        _realValue->value._real=_getReal(ld);
-        if(!_realValue->value._real){free_value(_realValue);_realValue=NULL;}else _realValue->type=VT_REAL;
+Mvalue* _getFloatValue(long double ld){
+    if(amVerbose())output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
+    Mvalue* _floatValue=__value();
+    if(_floatValue){
+        _floatValue->value._float=_getFloat(ld);
+        if(!_floatValue->value._float){free_value(_floatValue);_floatValue=NULL;}else _floatValue->type=VT_FLOAT;
     }
-    return _realValue;
+    return _floatValue;
 }/* VALIDATED */
 Mvalue* _getTextValue(char* _s,bool freeonfailure){
     if(!_s)return NULL; // when no input, no go
@@ -337,10 +337,10 @@ Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure){
     if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);
     return _value;
 }/* VALIDATED */
-Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure){
-    if(!_real)return NULL;
+Mvalue* _getValueOfFloat(Mfloat* _float,bool freeonfailure){
+    if(!_float)return NULL;
     Mvalue* _value=__value();
-    if(_value){_value->type=VT_REAL;_value->value._real=_real;}else if(freeonfailure)free_real(_real);
+    if(_value){_value->type=VT_FLOAT;_value->value._float=_float;}else if(freeonfailure)free_float(_float);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){
@@ -365,29 +365,29 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 
 // helper function to create a parameter map with a single value
 // the following is a nuisance
-Mmap* _getRealMap(char* name,Mvalue* _realValue){
-    if(name&&_realValue){
-        Mvariable* _realVariable=_getVariable(name,VT_REAL,true);
+Mmap* _getFloatMap(char* name,Mvalue* _floatValue){
+    if(name&&_floatValue){
+        Mvariable* _realVariable=_getVariable(name,VT_FLOAT,true);
         if(_realVariable){
             Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
             if(_mapelement){
                 Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
                 if(_map){
-                    assignValue(&_realVariable->_value,_realValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
+                    assignValue(&_realVariable->_value,_floatValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
                     _mapelement->_variable=_realVariable;
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     _map->_last=_mapelement;
-                    if(amDebugging())outputLine("Returning the single real map!");
+                    if(amDebugging())outputLine("Returning the single float map!");
                     return _map;
                 }
-                outputError("Failed to create the real variable map");
+                outputError("Failed to create the float variable map");
                 free_mapelement(_mapelement);
             }else
-                outputError("Failed to create the real variable map element");
+                outputError("Failed to create the float variable map element");
             free_variable(_realVariable);
         }else
-            outputError("Failed to create the real variable");
+            outputError("Failed to create the float variable");
     }
     return NULL;
 }/* VALIDATED */
@@ -468,7 +468,7 @@ Mmap* _getStringStringMap(char* name1,char* name2){
         outputError("Not both map element attribute keys defined");
     return NULL;
 }/* VALIDATED */
-Mmap* _getRealRealMap(char* name1,char* name2){
+Mmap* _getFloatFloatMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
             Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
@@ -476,8 +476,8 @@ Mmap* _getRealRealMap(char* name1,char* name2){
             if(_mapelement1&&_mapelement2){
                 Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
                 if(_map){
-                    _mapelement1->_variable=_getVariable(name1,VT_REAL,true);
-                    _mapelement2->_variable=_getVariable(name2,VT_REAL,true);
+                    _mapelement1->_variable=_getVariable(name1,VT_FLOAT,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_FLOAT,true);
                     if(_mapelement1->_variable&&_mapelement2->_variable){
                         _map->_first=_mapelement1;
                         _mapelement1->_next=_mapelement2;
@@ -946,7 +946,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
             case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????
             case VT_DECIMAL:valueText=_getDecimalText(_value->value._decimal,false);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
             case VT_RATIONAL:valueText=_getRationalText(_value->value._rational);break;
-			case VT_REAL:valueText=_getRealText(_value->value._real);break;
+			case VT_FLOAT:valueText=_getFloatText(_value->value._float);break;
 			case VT_TEXT:valueText=_getStringText(_value->value._text,dequoted);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=_getMapText(_value->value._map,true,true,true);break;
 			case VT_LIST:valueText=_getListText(_value->value._list);break;
@@ -1014,7 +1014,7 @@ long long getValueInteger(const Mvalue* const _value){
     if(_value){
         switch(_value->type){
             case VT_INTEGER:return _value->value._integer->ll;
-		    case VT_REAL:return double2long(_value->value._real->ld);
+		    case VT_FLOAT:return double2long(_value->value._float->ld);
             case VT_BIGINTEGER:return biginteger2long(_value->value._biginteger);
             case VT_DECIMAL:return decimal2long(_value->value._decimal);
             case VT_TEXT:
@@ -1063,7 +1063,7 @@ long double getBigintegerLongDouble(Mbiginteger* biginteger){
 	return ldBiginteger;
     */
 }
-long double getRealLongDouble(const Mreal* const _real){return(_real?_real->ld:M_LD_NAN);}/* VALIDATED */
+long double getRealLongDouble(const Mfloat* const _real){return(_real?_real->ld:M_LD_NAN);}/* VALIDATED */
 
 long double getValueLongDouble(const Mvalue* const _value){
     // MDH@09OCT2019: a little more complicated then just getting out the real in that all scalar numeric values are convertable
@@ -1072,7 +1072,7 @@ long double getValueLongDouble(const Mvalue* const _value){
     switch(_value->type){ // all scalar types should be convertible
         case VT_INTEGER:valueLongDouble=_value->value._integer->ll;break;
         case VT_BIGINTEGER:valueLongDouble=getBigintegerLongDouble(_value->value._biginteger);break;
-        case VT_REAL:valueLongDouble=_value->value._real->ld;break;
+        case VT_FLOAT:valueLongDouble=_value->value._float->ld;break;
         case VT_DECIMAL:valueLongDouble=getDecimalLongDouble(_value->value._decimal);break;
         case VT_RATIONAL:valueLongDouble=getRationalLongDouble(_value->value._rational);break;
         case VT_TEXT:valueLongDouble=_strtold(_value->value._text->_c,M_LD_NAN);break; // MDH@28OCT2019: OOPS text is also a 'scalar' 
@@ -1090,11 +1090,11 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){
         case VT_BIGINTEGER:return _value->value._biginteger;
         case VT_INTEGER:return _getBiginteger(_value->value._integer->ll);
         case VT_RATIONAL:return _rational2biginteger(_value->value._rational); // TODO how can we be certain that the returned big integer is actually used? well, it should as this is _getValueBiginteger meaning you have to free it if you don't use it!!!
-        case VT_REAL:
+        case VT_FLOAT:
             {
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
                 Mbiginteger* _biginteger=__biginteger();
-                if(_biginteger&&mp_set_longdouble(_biginteger,_value->value._real->ld)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                if(_biginteger&&mp_set_longdouble(_biginteger,_value->value._float->ld)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
                 if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
                 return _biginteger;
             }
@@ -1202,7 +1202,7 @@ bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist){
                     /* replacing:
                     if(_attributeNameValue){
                         if(_attributeNameValue->type==VT_INTEGER)_attributeNameValueText=_getIntegerText(_attributeNameValue->value._integer);else
-                        if(_attributeNameValue->type==VT_REAL)_attributeNameValueText=_getRealText(_attributeNameValue->value._real);else
+                        if(_attributeNameValue->type==VT_FLOAT)_attributeNameValueText=_getFloatText(_attributeNameValue->value._float);else
                         if(_attributeNameValue->type==VT_TEXT)_attributeNameValueText=_getStringText(_attributeNameValue->value._text,true); // effectively cutting of the presuffix character TODO other solution????????
                     }
                     */
@@ -1368,7 +1368,7 @@ long long getValueSign(Mvalue const * const value){
     if(value){
         if(value->type==VT_INTEGER)return getIntegerSign(value->value._integer->ll);
         if(value->type==VT_BIGINTEGER)return getBigintegerSign(value->value._biginteger);
-        if(value->type==VT_REAL)return getLongDoubleSign(value->value._real->ld);
+        if(value->type==VT_FLOAT)return getLongDoubleSign(value->value._float->ld);
         if(value->type==VT_DECIMAL)return getDecimalSign(value->value._decimal);
         if(value->type==VT_RATIONAL)return getRationalSign(value->value._rational);
     }
@@ -1381,7 +1381,7 @@ long long isValueZero(Mvalue* value){
         if(amVerbose())outputValue("Checking whether '",value,"' is zero");
         if(value->type==VT_INTEGER)result=isIntegerZero(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerZero(value->value._biginteger);else
-        if(value->type==VT_REAL)result=isRealZero(value->value._real);else
+        if(value->type==VT_FLOAT)result=isFloatZero(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalZero(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalZero(value->value._rational);
     }
@@ -1394,7 +1394,7 @@ long long isValueOne(Mvalue* value){
         if(amVerbose())outputValue("Checking whether '",value,"' equals one");
         if(value->type==VT_INTEGER)result=isIntegerOne(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerOne(value->value._biginteger);else
-        if(value->type==VT_REAL)result=isRealOne(value->value._real);else
+        if(value->type==VT_FLOAT)result=isFloatOne(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalOne(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalOne(value->value._rational);
         if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
@@ -1407,7 +1407,7 @@ long long isValuePositive(Mvalue* value){
         if(amVerbose())outputValue("Checking whether '",value,"' is positive");
         if(value->type==VT_INTEGER)result=isIntegerPositive(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerPositive(value->value._biginteger);else
-        if(value->type==VT_REAL)result=isRealPositive(value->value._real);else
+        if(value->type==VT_FLOAT)result=isFloatPositive(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalPositive(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalPositive(value->value._rational); // assuming the numerator is never NULL and the denominator is always positive
         if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
@@ -1420,7 +1420,7 @@ long long isValueNegative(Mvalue* value){
         if(amVerbose())outputValue("Checking whether '",value,"' is negative");
         if(value->type==VT_INTEGER)result=isIntegerNegative(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerNegative(value->value._biginteger);else
-        if(value->type==VT_REAL)result=isRealNegative(value->value._real);else
+        if(value->type==VT_FLOAT)result=isFloatNegative(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalNegative(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalNegative(value->value._rational);
         if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
@@ -1428,7 +1428,7 @@ long long isValueNegative(Mvalue* value){
     return result;
 }/* VALIDATED */
 long long isValueScalar(Mvalue* value){
-    if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_REAL:case VT_TEXT:case VT_TOKEN:return M_TRUE;default:return M_FALSE;}
+    if(value)switch(value->type){case VT_INTEGER:case VT_BIGINTEGER:case VT_DECIMAL:case VT_RATIONAL:case VT_FLOAT:case VT_TEXT:case VT_TOKEN:return M_TRUE;default:return M_FALSE;}
     return M_FALSE;
 }/* VALIDATED */
 
@@ -1446,7 +1446,7 @@ long long isValueNull(Mvalue* value){
         case VT_BIGINTEGER:result=(value->value._biginteger?M_FALSE:M_TRUE);break;
         case VT_DECIMAL:result=(value->value._decimal?M_FALSE:M_TRUE);break;
         case VT_RATIONAL:result=(value->value._rational?M_FALSE:M_TRUE);break;
-        case VT_REAL:result=(value->value._real?M_FALSE:M_TRUE);break;
+        case VT_FLOAT:result=(value->value._float?M_FALSE:M_TRUE);break;
         case VT_TEXT:result=(value->value._text?M_FALSE:M_TRUE);break;
         case VT_LIST:result=(value->value._list?M_FALSE:M_TRUE);break;
         case VT_MAP:result=(value->value._map?M_FALSE:M_TRUE);break;
@@ -1464,7 +1464,7 @@ long long isValueUndefined(Mvalue* value){
     if(isValueNull(value)==M_FALSE)
     switch(value->type){
         case VT_INTEGER:result=isIntegerUndefined(value->value._integer);break; // replacing: value->value._integer->ll==M_LL_INVALID;
-        case VT_REAL:result=isRealUndefined(value->value._real);break; // replacing: return ldIsNaN(value->value._real->ld);
+        case VT_FLOAT:result=isFloatUndefined(value->value._float);break; // replacing: return ldIsNaN(value->value._float->ld);
         case VT_BIGINTEGER:result=isBigintegerUndefined(value->value._biginteger);break;
         case VT_DECIMAL:result=isDecimalUndefined(value->value._decimal);break; // replacing: mpd_isnan((mpd_t*)value->value._decimal); // sames right but no idea how to set/get this // decimal points directly to mpd_t so we can cast
         case VT_RATIONAL:result=isRationalUndefined(value->value._rational);break;

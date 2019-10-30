@@ -1,6 +1,6 @@
 #include "Mbiginteger.h"
 
-long double realsum(Mreal* _real1,Mreal* _real2); // TODO should be moved to Mreal I suppose at some point 
+long double realsum(Mfloat* _real1,Mfloat* _real2); // TODO should be moved to Mfloat I suppose at some point 
 
 // MDH@10OCT2019: moved over from Mexecution.h/c
 // the following two methods will use M_LD_Q_EPS as default cut-off value

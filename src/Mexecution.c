@@ -235,10 +235,10 @@ void free_integer(Minteger* _integer){
     }else
     if(amDebugging())outputLine("No integer to free!");
 }/* VALIDATED */
-void free_real(Mreal* _real){
-    if(_real){
-        if(amVerbose())output("Freeing real %.*Lf.\n",LDBL_DIG,_real->ld);
-        free(_real);
+void free_float(Mfloat* _float){
+    if(_float){
+        if(amVerbose())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
+        free(_float);
     }else
     if(amDebugging())outputLine("No real to free!");
 }/* VALIDATED */
@@ -260,11 +260,12 @@ Mbiginteger*__biginteger(z_t zt){
     return _biginteger;
 }
 */
+long double getFloatLongDouble(Mfloat const * const _float){return(_float?_float->ld:M_LD_NAN);}
 
-Mreal* _getReal(long double ld){
-    Mreal* _real=MALLOC(sizeof(Mreal),'R');
-    if(_real)_real->ld=ld;
-    return _real;
+Mfloat* _getFloat(long double ld){
+    Mfloat* _float=MALLOC(sizeof(Mfloat),'R');
+    if(_float)_float->ld=ld;
+    return _float;
 }/* VALIDATED */
 
 // special integer values to consider
@@ -370,36 +371,36 @@ long long isLongDoubleOne(long double ld){
 
 // testing for special values TODO we need to make M functions to test for these special values like zero, inf, and undefined
 // if a real is undefined, testing for a specific value or sign does not make any sense
-// isRealUndefined() always returns either M_TRUE or M_FALSE (never M_LL_INVALID)
-long long isRealUndefined(Mreal* real){return(real?isLongDoubleUndefined(real->ld):M_TRUE);} // a real is undefined if it is NULL or the contained long double is undefined i.e. is NaN
-// use isRealUndefined() first in the following specific functions
+// isFloatUndefined() always returns either M_TRUE or M_FALSE (never M_LL_INVALID)
+long long isFloatUndefined(Mfloat* afloat){return(afloat?isLongDoubleUndefined(afloat->ld):M_TRUE);} // a real is undefined if it is NULL or the contained long double is undefined i.e. is NaN
+// use isFloatUndefined() first in the following specific functions
 // in general for undefined reals we cannot determine the sign, therefore one should test for undefined first, of course one can test for invalid result of the comparison of course
-long long isRealZero(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleZero(real->ld));}
-long long isRealPositive(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoublePositive(real->ld));}
-long long isRealNegative(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleNegative(real->ld));}
-long long isRealOne(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:isLongDoubleOne(real->ld));}
-long long isRealInfinite(Mreal* real){return(isRealUndefined(real)==M_TRUE?M_LL_INVALID:(ldIsInf(real->ld)?M_TRUE:M_FALSE));}
-long long areRealsEqual(Mreal* real1,Mreal* real2){
+long long isFloatZero(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoubleZero(afloat->ld));}
+long long isFloatPositive(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoublePositive(afloat->ld));}
+long long isFloatNegative(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoubleNegative(afloat->ld));}
+long long isFloatOne(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:isLongDoubleOne(afloat->ld));}
+long long isFloatInfinite(Mfloat* afloat){return(isFloatUndefined(afloat)==M_TRUE?M_LL_INVALID:(ldIsInf(afloat->ld)?M_TRUE:M_FALSE));}
+long long areFloatsEqual(Mfloat* afloat1,Mfloat* afloat2){
     // TODO we are considering two NULL values equal for now although that's questionable
-    if(!real1&&!real2)return M_TRUE; // both NULL
-    if(!real1||!real2)return M_FALSE; // only one of them NULL
+    if(!afloat1&&!afloat2)return M_TRUE; // both NULL
+    if(!afloat1||!afloat2)return M_FALSE; // only one of them NULL
     // ASSERT neither NULL
-    if(fpclassify(real1->ld)!=fpclassify(real2->ld))return M_FALSE; // if they classify differently definitely not the same
-    switch(fpclassify(real1->ld)){
+    if(fpclassify(afloat1->ld)!=fpclassify(afloat2->ld))return M_FALSE; // if they classify differently definitely not the same
+    switch(fpclassify(afloat1->ld)){
         case FP_NAN:return M_TRUE; // both NaN TODO check for signbit as well here?????
-        case FP_INFINITE:return(signbit(real1->ld)==signbit(real2->ld)?M_TRUE:M_FALSE); // both infinite but perhaps the wrong sign
+        case FP_INFINITE:return(signbit(afloat1->ld)==signbit(afloat2->ld)?M_TRUE:M_FALSE); // both infinite but perhaps the wrong sign
         case FP_ZERO:return M_TRUE; // both zero or subnormal zero TODO check for signbit as well here?????
         case FP_SUBNORMAL:case FP_SUPERNORMAL:return M_LL_INVALID; // can't tell
         default:break;
     }
-    return(real1->ld==real2->ld);
+    return(afloat1->ld==afloat2->ld);
 }
 // TODO for now leave these two methods return a boolean, although we should decide whether or not they are derived or not
-bool realIsUndefined(Mreal* real){return(!real||ldIsNaN(real->ld));}
-bool realIsUndefinedOrZero(Mreal* real){return(!real||ldIsNaN(real->ld)||isRealZero(real)==M_TRUE);}
+bool floatIsUndefined(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld));}
+bool floatIsUndefinedOrZero(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld)||isFloatZero(afloat)==M_TRUE);}
 
-Mreal* _getRealCopy(Mreal* real){return(!realIsUndefined(real)?_getReal(real->ld):NULL);}/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
-Mreal* _getRealNeg(Mreal* real){return(!realIsUndefined(real)?_getReal(-real->ld):NULL);}/* VALIDATED */ // just switching the sign of what _getRealCopy returns
+Mfloat* _getFloatCopy(Mfloat* afloat){return(!floatIsUndefined(afloat)?_getFloat(afloat->ld):NULL);}/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
+Mfloat* _getFloatNeg(Mfloat* afloat){return(!floatIsUndefined(afloat)?_getFloat(-afloat->ld):NULL);}/* VALIDATED */ // just switching the sign of what _getRealCopy returns
 
 long long isBigintegerUndefined(Mbiginteger* biginteger){return(biginteger?M_FALSE:M_TRUE);}
 long long isTextUndefined(Mtext* text){return(text?M_FALSE:M_TRUE);}
@@ -438,15 +439,15 @@ void free_environment(Menvironment* _environment);
 /*
 // helper functions
 // helper functions to wrap literals for storage in M
-Mreal* get_real(long double ld){
-	Mreal* _real=(Mreal*)malloc(sizeof(Mreal));
+Mfloat* get_real(long double ld){
+	Mfloat* _real=(Mfloat*)malloc(sizeof(Mfloat));
 	if(_real)_real->ld=ld;
 	return _real;
 }
-Mvalue* getRealValue(Mreal* _real){
+Mvalue* getRealValue(Mfloat* _real){
     if(_real){
         Mvalue* _realValue=calloc(1,sizeof(Mvalue));
-        if(_realValue){_realValue->type=VT_REAL;_realValue->value._real=_real;return _realValue;}
+        if(_realValue){_realValue->type=VT_FLOAT;_realValue->value._float=_real;return _realValue;}
     }else
         printf("\nERROR: No real to wrap.");  
     return NULL;
@@ -513,7 +514,7 @@ bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer){
     }
     return false;
 }
-bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real){
+bool setValueOfRealVariable(Mvariable* _variable,Mfloat* _real){
     if(_variable){        
         Mvalue* _realValue=getRealValue(_real); // wrap in value
         if(_realValue){
@@ -628,7 +629,7 @@ long long getInteger(Mvalue* _value){
 			if(mp_cmp(_value->value._biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_value->value._biginteger,getBigintegerLLMax())!=MP_GT)
                 return mp_get_i64(_value->value._biginteger);
             break;
-		case VT_REAL:return double2long(_value->value._real->ld);
+		case VT_FLOAT:return double2long(_value->value._float->ld);
 		case VT_STRING:return _strtoll(_value->value._string->_c,M_LL_INVALID);
 		default:break;
     }
@@ -840,7 +841,7 @@ long double mp_get_long_double(const Mbiginteger* const a){
         while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
     }
     long double d=(long double)a->dp[i]; // initialize d to the most significant big integer digit
-    if(amVerbose())output("Real of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",a->dp[i],LDBL_DIG,d,i);
+    if(amVerbose())output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",a->dp[i],LDBL_DIG,d,i);
     while(--i>=0){
         if(amVerbose())output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
         d*=M_LD_DIGIT_MULTIPLIER;
@@ -887,21 +888,21 @@ long long double2long(long double ld){
 }/* VALIDATED */
 
 // STRINGIFY FUNCTIONS
-Mstring* _getRealText(Mreal* _real){
-	Mstring* _realText=(_real?__string():NULL);
-    if(_realText){
-        Mstring* _p=_realText;
+Mstring* _getFloatText(Mfloat* _float){
+	Mstring* _floatText=(_float?__string():NULL);
+    if(_floatText){
+        Mstring* _p=_floatText;
         if(amDebugging())_p=string_append_char(_p,'r');
         if(_p){
-            switch(fpclassify(_real->ld)){
+            switch(fpclassify(_float->ld)){
                 case FP_NAN:_p=string_append(_p,M_NAN);break;
                 case FP_INFINITE:_p=string_append(_p,M_INF);break;
-                default:_p=appendld(_p,_real->ld);break;
+                default:_p=appendld(_p,_float->ld);break;
             }
         }
-        if(!_p){free_string(_realText);_realText=NULL;}
+        if(!_p){free_string(_floatText);_floatText=NULL;}
     }
-	return _realText;
+	return _floatText;
 }/* VALIDATED */
 
 char hexdigit(char c){

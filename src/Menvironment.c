@@ -221,7 +221,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
     if(value1->type==value2->type) // if the types are different definitely not the same
     switch(value1->type){
         case VT_INTEGER:return(value1->value._integer->ll==value2->value._integer->ll);
-        case VT_REAL:return(areRealsEqual(value1->value._real,value2->value._real)); // MDH@25OCT2019: replacing ldEqual() with a call to areRealsEqual()
+        case VT_FLOAT:return(areFloatsEqual(value1->value._float,value2->value._float)); // MDH@25OCT2019: replacing ldEqual() with a call to areFloatsEqual()
         case VT_BIGINTEGER:return(mp_cmp(value1->value._biginteger,value2->value._biginteger)==MP_EQ);
         case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
         case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
@@ -720,7 +720,7 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
                 case 'R':
                     immutable=true;
                 case 'r':
-                    valuetype=VT_REAL;
+                    valuetype=VT_FLOAT;
                     break;
                 case 'S':
                     immutable=true;
@@ -781,11 +781,11 @@ bool completedValueFunction(Mfunction* const _function,const char* const functio
     }
     return false;
 }/* VALIDATED */
-bool completedRealFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){
+bool completedFloatFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
-        _function->_parameterMap=_getRealMap("x",_getRealValue(M_LD_NAN)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
+        _function->_parameterMap=_getFloatMap("x",_getFloatValue(M_LD_NAN)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
         if(_function->_parameterMap){
             if(amVerbose())output("Registered single real argument function '%s' completed.\n",functionName);
             return true;
@@ -849,11 +849,11 @@ bool completedStringStringFunction(Mfunction* const _function,const char* const 
     }
     return false;
 }/* VALIDATED */
-bool completedRealRealFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
+bool completedFloatFloatFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=_getRealRealMap("base","exponent");
+        _function->_parameterMap=_getFloatFloatMap("base","exponent");
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1036,26 +1036,26 @@ Mvalue* Mreturn(Mvalue* _value){
 bool registerInternalFunctions(Menvironment* const _environment){
     // variable functions
     // math functions
-    if(!completedRealFunction(_getFunction(_environment,"cos"),"cos",Mcos))return false;
-    if(!completedRealFunction(_getFunction(_environment,"cordiccos"),"cordiccos",Mcordiccos))return false;
-    if(!completedRealFunction(_getFunction(_environment,"sin"),"sin",Msin))return false;
-    if(!completedRealFunction(_getFunction(_environment,"cordicsin"),"cordicsin",Mcordicsin))return false;
-    if(!completedRealFunction(_getFunction(_environment,"tan"),"tan",Mtan))return false;
-    if(!completedRealFunction(_getFunction(_environment,"cosh"),"cosh",Mcosh))return false;
-    if(!completedRealFunction(_getFunction(_environment,"sinh"),"sinh",Msinh))return false;
-    if(!completedRealFunction(_getFunction(_environment,"tanh"),"tanh",Mtanh))return false;
-    if(!completedRealFunction(_getFunction(_environment,"sqrt"),"sqrt",Msqrt))return false;
-    if(!completedRealFunction(_getFunction(_environment,"log"),"log",Mlog))return false;
-    if(!completedRealFunction(_getFunction(_environment,"log10"),"log10",Mlog10))return false;
-    if(!completedRealFunction(_getFunction(_environment,"floor"),"floor",Mfloor))return false;
-    if(!completedRealFunction(_getFunction(_environment,"trunc"),"trunc",Mtrunc))return false;
-    if(!completedRealFunction(_getFunction(_environment,"round"),"round",Mround))return false;
-    if(!completedRealFunction(_getFunction(_environment,"ceil"),"ceil",Mceil))return false;
-    if(!completedRealFunction(_getFunction(_environment,"exp"),"exp",Mexp))return false;
-    if(!completedRealFunction(_getFunction(_environment,"dexp"),"dexp",Mdexp))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"cos"),"cos",Mcos))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"cordiccos"),"cordiccos",Mcordiccos))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"sin"),"sin",Msin))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"cordicsin"),"cordicsin",Mcordicsin))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"tan"),"tan",Mtan))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"cosh"),"cosh",Mcosh))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"sinh"),"sinh",Msinh))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"tanh"),"tanh",Mtanh))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"sqrt"),"sqrt",Msqrt))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"log"),"log",Mlog))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"log10"),"log10",Mlog10))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"floor"),"floor",Mfloor))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"trunc"),"trunc",Mtrunc))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"round"),"round",Mround))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"ceil"),"ceil",Mceil))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"exp"),"exp",Mexp))return false;
+    if(!completedFloatFunction(_getFunction(_environment,"dexp"),"dexp",Mdexp))return false;
 
     if(!completedStringStringFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
-    if(!completedRealRealFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
+    if(!completedFloatFloatFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
 
     if(!completedStringMapTokenFunction(_getFunction(_environment,"function"),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
     if(!completedValueFunction(_getFunction(_environment,"return"),"return",Mreturn))return false;

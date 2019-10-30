@@ -108,7 +108,7 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 */
 // once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
-// decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mreal, Mtext, Mlist or Mmap pointer)
+// decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mfloat, Mtext, Mlist or Mmap pointer)
 bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
 Mvalue* getValue(const Menvironment* const _environment,const char* const name);
 
@@ -119,7 +119,7 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable);
 /*
 // if you want to set a value you have to pass in a pointer to the contents
-bool setValueOfRealVariable(Mvariable* _variable,Mreal* _real);
+bool setValueOfRealVariable(Mvariable* _variable,Mfloat* _real);
 bool setValueOfIntegerVariable(Mvariable* _variable,Minteger* _integer);
 bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string);
 */
@@ -139,12 +139,12 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const funct
 bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction);
 bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedIntegerFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
-bool completedRealFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
+bool completedFloatFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);
 
 bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
-bool completedRealRealFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedFloatFloatFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 
 bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 bool completedValueValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);

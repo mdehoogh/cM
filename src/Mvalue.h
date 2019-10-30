@@ -13,7 +13,7 @@ typedef union Mvalueunion{
     Mbiginteger* _biginteger; // most convenient to immediately point to the Mbiginteger structure
     Mdecimal* _decimal; // no longer pointing to the mpd_t structure, as we're going to store the number of repeating decimals as well!!!
     Mrational* _rational;
-    Mreal* _real;
+    Mfloat* _float;
     Mtext* _text;
     struct Mlist* _list;
     struct Mmap* _map;
@@ -92,11 +92,11 @@ void free_map(Mmap* _map);
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 
 Mmap* _getMap(char *name);
-Mmap* _getRealMap(char* name,Mvalue* _realValue);
+Mmap* _getFloatMap(char* name,Mvalue* _floatValue);
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
 Mmap* _getListMap(char* name,Mvalue* _listValue);
 Mmap* _getStringStringMap(char* name1,char* name2);
-Mmap* _getRealRealMap(char* name1,char* name2);
+Mmap* _getFloatFloatMap(char* name1,char* name2);
 long long isMapUndefined(Mmap* map);
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
@@ -108,7 +108,7 @@ Mvalue* _getCharTextValue(char _c);
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure); // MDH@31MAY2019: we cannot use a big integer long here
 Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure);
-Mvalue* _getRealValue(long double ld);
+Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char* text,bool freeonfailure);
 Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
@@ -117,7 +117,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with al
 
 Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure);
 Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure);
-Mvalue* _getValueOfReal(Mreal* _real,bool freeonfailure);
+Mvalue* _getValueOfReal(Mfloat* _real,bool freeonfailure);
 Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure);
 Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure);
 

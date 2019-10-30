@@ -30,7 +30,7 @@ char const * const M_VERSION="0.1.0";
 char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
 
 // used externally
-//Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
+//Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
@@ -156,13 +156,13 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 
 // RATIONAL STUFF
 // long double helper functions for use with the delta of rationals
-long double realneg(Mreal* _real){return (realIsUndefined(_real)?M_LD_NAN:-_real->ld);}
+long double realneg(Mfloat* _real){return (floatIsUndefined(_real)?M_LD_NAN:-_real->ld);}
 
 /* MDH@19SEP2019: replaced by appropriate versions in Mrational.h/c
 // operators applied to rationals
 Mrational* _qmultiply(Mrational* _rational1,Mrational* _rational2){
 	if(!_rational1||!_rational2)return NULL;
-	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
+	bool delta1undefined=floatIsUndefined(_rational1->delta),delta2undefined=floatIsUndefined(_rational2->delta);
 	Mbiginteger *_num=_Imul(_rational1->num,_rational2->num),*_den=_Imul(_rational1->den,_rational2->den);
 	// pure rationals are easy
 	if(delta1undefined&&delta2undefined)return _getRational(_num,_den,M_LD_NAN,true,true);
@@ -173,7 +173,7 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 	if(!_rational1||!_rational2)return NULL;
 	// even if we have delta's we will always need these products
 	Mbiginteger *_num=_Imul(_rational1->num,_rational2->den),*_den=_Imul(_rational2->num,_rational1->den);
-	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
+	bool delta1undefined=floatIsUndefined(_rational1->delta),delta2undefined=floatIsUndefined(_rational2->delta);
 	// pure rationals are easy
 	if(delta1undefined&&delta2undefined){
 	    return _getRational(_num,_den,M_LD_NAN,true,true);
@@ -670,7 +670,7 @@ Mvalue* NAR_value=NULL;
 Mvalue* NAI_value=NULL;
 Mvalue* NULL_value=NULL; // the value containing the text to show when a value equals NULL
 
-long double getNAR(){return NAR_value->value._real->ld;}
+long double getNAR(){return NAR_value->value._float->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
 
 // conversion to decimal,  hex and binary
@@ -771,7 +771,7 @@ Mvalue* d(Mvalue* value){
 			case VT_BIGINTEGER:return _getDecimalValue(_getBigintegerDecimal(value->value._biginteger),true);
 			case VT_RATIONAL:return _getDecimalValue(_getRationalDecimal(value->value._rational),true);
 			case VT_DECIMAL:return value;
-			case VT_REAL: // TODO check whether somewhere I am converting a long double without using text
+			case VT_FLOAT: // TODO check whether somewhere I am converting a long double without using text
 			default:return _getDecimalValue(_getValueTextDecimal(value),true);
 		}
 	}
@@ -781,7 +781,7 @@ Mvalue* b(Mvalue* value){ // little-endian representation list to return
 	if(value){
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
-			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,true);
+			case VT_FLOAT:return getRealDecimalMapValue(value->value._float->ld,true);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
 			default:break;
 		}
@@ -793,7 +793,7 @@ Mvalue* B(Mvalue* value){ // big endian decimal representation list to return
 	if(value){
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
-			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,false);
+			case VT_FLOAT:return getRealDecimalMapValue(value->value._float->ld,false);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
 			default:break;
 		}
@@ -946,8 +946,8 @@ Mrational* _getValueRational(Mvalue* _value){
 			case VT_RATIONAL:
 				_rational=_getRationalCopy(_value->value._rational); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
 				break;
-			case VT_REAL:
-				_rational=_getLongDoubleRational(_value->value._real->ld,250); // TODO how many iterations at most???
+			case VT_FLOAT:
+				_rational=_getLongDoubleRational(_value->value._float->ld,250); // TODO how many iterations at most???
 				break;
 			case VT_LIST:
 				if(_value->value._list->numberOfElements>1)
@@ -966,7 +966,7 @@ Mrational* getValueRational(Mvalue* _value){
 }
 
 // MDH@09OCT2019: unpure rationals can be purified using _getPurifiedRational
-long double getReal(Mreal* _real){return(_real?_real->ld:M_LD_NAN);}
+long double getReal(Mfloat* _real){return(_real?_real->ld:M_LD_NAN);}
 Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){
 	Mrational* _purifiedRational=NULL;
 	if(pureRational){
@@ -987,7 +987,7 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){
 Mvalue* Q(Mvalue* _value){
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
-	if(_value->type==VT_REAL)return _getValueOfList(_getLongDoubleRationalList(_value->value._real->ld,250),true); // the intermediate results are stored in a list, and the last element will be the final result!!!
+	if(_value->type==VT_FLOAT)return _getValueOfList(_getLongDoubleRationalList(_value->value._float->ld,250),true); // the intermediate results are stored in a list, and the last element will be the final result!!!
 	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value),true); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
@@ -997,7 +997,7 @@ Mvalue* q(Mvalue* _value){
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL){
 		Mrational* rational=_value->value._rational;
-		if(realIsUndefinedOrZero(rational->delta))return _value;
+		if(floatIsUndefinedOrZero(rational->delta))return _value;
 		long double rationaldelta=getReal(rational->delta);
 		Mrational* _purifiedRational=NULL;
 		Mrational* _pureRational=_getRational(_getBigintegerCopy(rational->num),_getBigintegerCopy(rational->den),M_LD_NAN,true,true);
@@ -1009,7 +1009,7 @@ Mvalue* q(Mvalue* _value){
 			outputError("Failed to create a pure rational");
 		return _getRationalValue(_purifiedRational,true);
 	}
-	if(_value->type==VT_REAL)return _getRationalValue(_getLongDoubleRational(_value->value._real->ld,250),true); // forcefully free the _getLongDoubleRational if we failed to wrap it
+	if(_value->type==VT_FLOAT)return _getRationalValue(_getLongDoubleRational(_value->value._float->ld,250),true); // forcefully free the _getLongDoubleRational if we failed to wrap it
 	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value),true); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
@@ -1023,12 +1023,12 @@ Mvalue* r(Mvalue* _value){
 	if(_value){
 		if(amVerbose()){outputValue("Converting '",_value,"'");output(" of type %s to a real.\n",VALUETYPENAMES[_value->type]," to a real.\n");}
 		switch(_value->type){
-			case VT_INTEGER:_realValue=_getRealValue((long double)_value->value._integer->ll);break;
-			case VT_BIGINTEGER:_realValue=_getRealValue(mp_get_long_double(_value->value._biginteger));break;
-			case VT_DECIMAL:_realValue=_getRealValue(getDecimalLongDouble(_value->value._decimal));break;
-			case VT_RATIONAL:_realValue=_getRealValue(getRationalLongDouble(_value->value._rational));break;
-			case VT_REAL:_realValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
-			case VT_TEXT:_realValue=_getRealValue(_strtold(_value->value._text->_c,getNAR()));break;
+			case VT_INTEGER:_realValue=_getFloatValue((long double)_value->value._integer->ll);break;
+			case VT_BIGINTEGER:_realValue=_getFloatValue(mp_get_long_double(_value->value._biginteger));break;
+			case VT_DECIMAL:_realValue=_getFloatValue(getDecimalLongDouble(_value->value._decimal));break;
+			case VT_RATIONAL:_realValue=_getFloatValue(getRationalLongDouble(_value->value._rational));break;
+			case VT_FLOAT:_realValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
+			case VT_TEXT:_realValue=_getFloatValue(_strtold(_value->value._text->_c,getNAR()));break;
 			default:break;
 		}
 	}
@@ -1074,7 +1074,7 @@ Mvalue* type(Mvalue* _value){
 		case VT_BIGINTEGER:return _getTextValue("'I",false);
 		case VT_DECIMAL:return _getTextValue("'d",false);
 		case VT_RATIONAL:return _getTextValue("'q",false);
-		case VT_REAL:return _getTextValue("'r",false);
+		case VT_FLOAT:return _getTextValue("'r",false);
 		case VT_TEXT:return _getTextValue("'t",false);
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
@@ -1124,7 +1124,7 @@ Mvalue* Mreciprocal(Mvalue* value){
 	if(value)
 	switch(value->type){
 		case VT_LIST:return _functionAppliedToList(value->value._list,Mreciprocal);
-		case VT_REAL:return _getRealValue(1/value->value._real->ld); // TODO check what happens when the real equals 0
+		case VT_FLOAT:return _getFloatValue(1/value->value._float->ld); // TODO check what happens when the real equals 0
 		case VT_RATIONAL:return _getRationalValue(_getInverseRational(value->value._rational),true);
 		case VT_INTEGER:return _getRationalValue(_getRational(NULL,_getBiginteger(value->value._integer->ll),M_LD_NAN,true,true),true);
 		case VT_BIGINTEGER:return _getRationalValue(_getRational(NULL,value->value._biginteger,M_LD_NAN,true,false),true); // same as with VT_INTEGER but without freeing the to remain bound big integer
@@ -1151,7 +1151,7 @@ bool initEnvironment(){
 	if(decimalprecision==M_LL_INVALID)return false; // let's force starting with a default decimal context
 	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
 
-	NAR_value=_getRealValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
+	NAR_value=_getFloatValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
 
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
@@ -1182,7 +1182,7 @@ bool initEnvironment(){
 			if(!addVariable(_Menvironment,"NULL",VT_TOKEN,true)||!setValue(_Menvironment,"NULL",NULL_value)){
 				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
 			}
-			if(!NAR_value||!addVariable(_Menvironment,"NAR",VT_REAL,true)||!setValue(_Menvironment,"NAR",NAR_value)){
+			if(!NAR_value||!addVariable(_Menvironment,"NAR",VT_FLOAT,true)||!setValue(_Menvironment,"NAR",NAR_value)){
 				outputLine("WARNING: Failed to create, add or initialize Not-a-real constant NAR.");
 				////////return false;
 			}
@@ -1196,12 +1196,12 @@ bool initEnvironment(){
 				////////return false;
 			}*/
 			// create and add PI and E constants!!!
-			Mvalue* PI_value=_getRealValue(M_LD_PI);
+			Mvalue* PI_value=_getFloatValue(M_LD_PI);
 			if(!PI_value){
 				outputLine("ERROR: Failed to create PI.");
 				return false;
 			}
-			if(!addVariable(_Menvironment,"PI",VT_REAL,true)){
+			if(!addVariable(_Menvironment,"PI",VT_FLOAT,true)){
 				outputLine("ERROR: Failed to add PI.");
 				///////free_value(PI_value);
 				return false;
@@ -1211,13 +1211,13 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to initialize PI.");
 				return false;
 			}
-			Mvalue* E_value=_getRealValue(M_LD_E);
+			Mvalue* E_value=_getFloatValue(M_LD_E);
 			if(!E_value){
 				///////free_value(E_value);
 				outputLine("ERROR: Failed to create E.");
 				return false;
 			}
-			if(!addVariable(_Menvironment,"E",VT_REAL,true)){
+			if(!addVariable(_Menvironment,"E",VT_FLOAT,true)){
 				outputLine("ERROR: Failed to add E.");
 				return false;
 			}
@@ -2853,7 +2853,7 @@ Mvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
 		_value->type=valuetype;
 		switch(_value->type){
 			case VT_INTEGER:_value->value._integer=(Minteger*)calloc(1,sizeof(Minteger));break; // initialized to 0 I presume
-			case VT_REAL:_value->value._real=(Mreal*)calloc(1,sizeof(Mreal));break; // initialized to 0.0 I presume
+			case VT_FLOAT:_value->value._float=(Mfloat*)calloc(1,sizeof(Mfloat));break; // initialized to 0.0 I presume
 			case VT_TEXT:_value->value._text=(Mtext*)calloc(1,sizeof(Mtext));break;
 			case VT_LIST:_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
 			case VT_MAP:_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
@@ -3573,7 +3573,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
-			if(expressionToken->next&&expressionToken->next->type==VT_REAL){
+			if(expressionToken->next&&expressionToken->next->type==VT_FLOAT){
 				expressionToken=expressionToken->next;
 				// let's prepend the integer token text to the real (fraction) token text
 				string_prepend(string(expressionToken->prev->text),expressionToken->text);
@@ -3779,7 +3779,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getRationalValue(_rational));
 						*/
-						// replacing: assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
+						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
 						if(amDebugging())outputLine("Releasing decimal text.");
 						free_string(_realText);
 						if(amDebugging())outputLine("Decimal text released.");
@@ -3801,7 +3801,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
-				assignValue(&_valueReference->_value,_getRealValue(_strtold(_significantTokenText,getNAR())));
+				assignValue(&_valueReference->_value,_getFloatValue(_strtold(_significantTokenText,getNAR())));
 				///////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_DQSTRING:
@@ -4070,13 +4070,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_sumDecimal,true);
 	}
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Adding integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1+ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1+ld2:M_LD_NAN);
 	}
 	/* MDH@28OCT2019: either real already dealt with above
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_TEXT)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT||_value2->type==VT_TEXT)){
 		// if the second argument is text, convert it to a real or integer number
 		if(_value2->type==VT_TEXT){
 			// are we going to convert it to an integer or a real????
@@ -4085,13 +4085,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 			if(strchr(valueText,'.')!=NULL){ // a period 
 				////////if(strlen(_valueText)==1)return _value1; // if a single period no need to actually add it unless someone want to change an integer in a real????
 				////// we can use _strtold!!! long double ld=0;if(strlen(valueText)>1){char *endPtr=NULL;ld=strtold(valueText,&endPtr);if(endPtr==valueText){output("ERROR: Can't add '%s'.",valueText);return NULL;}} // failure
-				_value2=_getRealValue(_strtold(valueText,getNAR()));
+				_value2=_getFloatValue(_strtold(valueText,getNAR()));
 			}else{ // no period
 				_value2=_getIntegerValue(_strtoll(valueText,getNAI()));
 			}
 		}
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll);
-		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)+(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+		return _getFloatValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)+(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld));
 	}
 	*/
 	return NULL;
@@ -4166,15 +4166,15 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_differenceDecimal,true);
 	}
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Subtracting integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2:M_LD_NAN);
 	}
 	/* MDH@28OCT2019: now obsolete
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
-		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+		return _getFloatValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld));
 	}
 	*/
 	return NULL;
@@ -4247,10 +4247,10 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	}
 	*/
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
 	}
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
@@ -4277,7 +4277,7 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){
 	switch(valuetype){
 		case VT_INTEGER: return _getIntegerValue(1);
 		case VT_BIGINTEGER: return _getBigintegerValue(_getBiginteger(1),true);
-		case VT_REAL: return _getRealValue(1.0);
+		case VT_FLOAT: return _getFloatValue(1.0);
 		case VT_RATIONAL: return _getRationalValue(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),true);
 		case VT_DECIMAL: return _getDecimalValue(_getDecimal(__mpd(get_default_mpd_context(),1),M_DP,0,true),true);
 		default:break;
@@ -4299,7 +4299,7 @@ long double getRealPowerValue(long double base,Mvalue* _powerValue){
 					if(_powerValue->value._rational->den)power/=powl(mp_get_long_double(_powerValue->value._rational->den),power);
 					return powl(base,power);
 				}
-			case VT_REAL:return powl(base,_powerValue->value._real->ld);
+			case VT_FLOAT:return powl(base,_powerValue->value._float->ld);
 			default:break;
 		}
 	}
@@ -4319,7 +4319,7 @@ long double getRealValuePower(Mvalue* _baseValue,long double power){
 					if(_baseValue->value._rational->den)base/=powl(mp_get_long_double(_baseValue->value._rational->den),power);
 					return powl(base,power);
 				}
-			case VT_REAL:return powl(_baseValue->value._real->ld,power);
+			case VT_FLOAT:return powl(_baseValue->value._float->ld,power);
 			default:break;
 		}
 	}
@@ -4894,9 +4894,9 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	// MDH@26OCT2019: TODO same approach with any integer as in the other binary operators??????
 	// MDH@27OCT2019: let's deal with if either is a real first
 	// I suppose if the base or exponent is real, the result should also be real (because it will be approximate)
-	if(_value2->type==VT_REAL)return _getRealValue(getRealValuePower(_value1,_value2->value._real->ld));
+	if(_value2->type==VT_FLOAT)return _getFloatValue(getRealValuePower(_value1,_value2->value._float->ld));
 	// ASSERT exponent is NOT a real
-	if(_value1->type==VT_REAL)return _getRealValue(getRealPowerValue(_value1->value._real->ld,_value2));
+	if(_value1->type==VT_FLOAT)return _getFloatValue(getRealPowerValue(_value1->value._float->ld,_value2));
 	// ASSERT neither is real
 	// MDH@27OCT2019: typically for integers with an expoonent that is positive the result should also be integer
 	//                and we deal with that separatately
@@ -4974,7 +4974,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 								// instead of computing the power of the numerator we use the _remainder instead
 								Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
 								// if the root argument is rational, we should use pure big integer computations and have all rational approximations to the root
-								if(_rootArgumentValue->type==VT_RATIONAL&&realIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)) // a pure decimal
+								if(_rootArgumentValue->type==VT_RATIONAL&&floatIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)) // a pure decimal
 									// TODO if the base is not a pure rational, we could of course purify it
 									_rootValue=_getRationalValue(_getRationalBigintegerRootRational(_rootArgumentValue->value._rational,exponentDenominator),true);
 								else // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
@@ -5008,10 +5008,10 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 					}else // an integer rational, so no need to take the root at all!!!
 						_rootValue=_getBigintegerPowerValue(_value1,_positiveExponentNumerator); // that's all folks
 					// don't forget the delta (if any)
-					if(!realIsUndefinedOrZero(_exponentRational->delta)) // a defined delta
+					if(!floatIsUndefinedOrZero(_exponentRational->delta)) // a defined delta
 						// multiply the result with base to the power of delta
 						// TODO the base should determine what the type of the power computation should be???????
-						_returnValue=multiply(_rootValue,_getRealValue(getRealValuePower(_value1,getReal(_exponentRational->delta))));
+						_returnValue=multiply(_rootValue,_getFloatValue(getRealValuePower(_value1,getReal(_exponentRational->delta))));
 					else
 						_returnValue=_rootValue;
 					if(neg){free_biginteger(_positiveExponentNumerator);if(_returnValue)_returnValue=Mreciprocal(_returnValue);}
@@ -5074,8 +5074,8 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
 
 	// if both values are numeric (somehow) we can do the computation
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
-		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
+		(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
 		// if the epower exponent is zero _value1 is the result
 		// see above: if(isValueZero(_value2))return _value1;
 		if(_value2->type==VT_INTEGER){ // an integer exponent
@@ -5114,7 +5114,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 			}
 		}
 		return multiply(_value1,power(_getIntegerValue(10),_value2)); // temp. value like the power result and _getIntegerValue(10) will be garbage collected if not bound somewhere!!!
-		// replacing: return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld))));
+		// replacing: return _getFloatValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld))));
 	}
 	*/
 	return NULL;
@@ -5154,17 +5154,17 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_divideDecimal,true);
 	}
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1/ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1/ld2:M_LD_NAN);
 	}
 	/* replacing:
 	// always real divide
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld); // TODO casting to a long double is perhaps not the best way?
-		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld); // TODO casting to a long double is perhaps not the best way?
-		return _getRealValue(ld1/ld2);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld); // TODO casting to a long double is perhaps not the best way?
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld); // TODO casting to a long double is perhaps not the best way?
+		return _getFloatValue(ld1/ld2);
 	}
 	*/
 	return NULL;
@@ -5261,18 +5261,18 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_decimalInteger,true);
 	}
 	// MDH@28OCT2019: if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?truncl(ld1/ld2):M_LD_NAN); // same as divide, but applying truncl to the result (cutting off the fraction)
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?truncl(ld1/ld2):M_LD_NAN); // same as divide, but applying truncl to the result (cutting off the fraction)
 	}
 	/* MDH@28OCT2019: see above
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
 		// if both integer, use lldiv to perform the integer division
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot);
 		// at least one is real, perform floating point division, then trunc!!!
-		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
-		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld);
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld);
 		return _getIntegerValue(truncl(ld1/ld2));
 	}
 	*/
@@ -5282,7 +5282,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
-	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getRealValue(0));
+	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getFloatValue(0));
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _moduloBiginteger=NULL;
@@ -5369,17 +5369,17 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		return subtract(_value1,multiply(_value2,_getDecimalValue(_decimalInteger,true)));
 	}
 	// MDH@28OCT2019: if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Determining what's left after dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2*truncl(ld1/ld2):M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2*truncl(ld1/ld2):M_LD_NAN);
 	}
 	/* replacing:
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
 		// at least one is real, perform floating point division, then trunc!!!
-		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
-		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
-		return _getRealValue(ld1-ld2*truncl(ld1/ld2)); // what's left after subtracting the truncated value
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld);
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld);
+		return _getFloatValue(ld1-ld2*truncl(ld1/ld2)); // what's left after subtracting the truncated value
 	}
 	*/
 	return NULL;
@@ -5514,7 +5514,7 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 	///////////if(shiftleftinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,shiftleftinteger));
-	if(_value1->type==VT_REAL)return _getRealValue(ldShift(_value1->value._real->ld,shiftleftinteger));
+	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,shiftleftinteger));
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftleftBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift left
 		if(_shiftleftBiginteger){
@@ -5584,7 +5584,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 	/////////////if(shiftrightinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,-shiftrightinteger));
-	if(_value1->type==VT_REAL)return _getRealValue(ldShift(_value1->value._real->ld,-shiftrightinteger));
+	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,-shiftrightinteger));
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftrightBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift right
 		if(_shiftrightBiginteger){
@@ -5665,8 +5665,8 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return _getIntegerValue(M_LL_INVALID);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthan);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5714,8 +5714,8 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthan);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5763,8 +5763,8 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthanorequalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5812,8 +5812,8 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,unequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,unequalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5862,8 +5862,8 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){		Mbiginteger* _equaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5911,8 +5911,8 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthanorequalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -6418,7 +6418,7 @@ void outputValueColored(Mvalue* _value){
 				}
 			}
 			break;
-		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
+		case VT_FLOAT:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
 		case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
 		case VT_LIST:
 			// TODO not using _getListText() as defined in Mexecution

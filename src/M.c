@@ -18,8 +18,8 @@
 // Menvironment includes Mvalue includes Mexecution includes ...
 #include "Menvironment.h"
 
-void toStartOfPreviousLine(){oneLineUp();toStartOfLine();clearLine();toStartOfLine();}
-void toStartOfNextLine(){oneLineDown();toStartOfLine();}
+void toStartOfPreviousLine(){oneLineUp();} // MDH@30OCT2019: we do NOT clear that line anymore because we might be clearing user input text (which we do not want to)
+void toStartOfNextLine(){oneLineDown();}
 
 char const * const M_VERSION="0.1.0";
 
@@ -33,7 +33,7 @@ char const * const M_VERSION="0.1.0";
 char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
 
 // used externally
-//Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_REAL,VT_TEXT,VT_LIST,VT_MAP}
+//Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
@@ -159,13 +159,13 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 
 // RATIONAL STUFF
 // long double helper functions for use with the delta of rationals
-long double realneg(Mreal* _real){return (realIsUndefined(_real)?M_LD_NAN:-_real->ld);}
+long double realneg(Mfloat* _real){return (floatIsUndefined(_real)?M_LD_NAN:-_real->ld);}
 
 /* MDH@19SEP2019: replaced by appropriate versions in Mrational.h/c
 // operators applied to rationals
 Mrational* _qmultiply(Mrational* _rational1,Mrational* _rational2){
 	if(!_rational1||!_rational2)return NULL;
-	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
+	bool delta1undefined=floatIsUndefined(_rational1->delta),delta2undefined=floatIsUndefined(_rational2->delta);
 	Mbiginteger *_num=_Imul(_rational1->num,_rational2->num),*_den=_Imul(_rational1->den,_rational2->den);
 	// pure rationals are easy
 	if(delta1undefined&&delta2undefined)return _getRational(_num,_den,M_LD_NAN,true,true);
@@ -176,7 +176,7 @@ Mrational* _qdivide(Mrational* _rational1,Mrational* _rational2){
 	if(!_rational1||!_rational2)return NULL;
 	// even if we have delta's we will always need these products
 	Mbiginteger *_num=_Imul(_rational1->num,_rational2->den),*_den=_Imul(_rational2->num,_rational1->den);
-	bool delta1undefined=realIsUndefined(_rational1->delta),delta2undefined=realIsUndefined(_rational2->delta);
+	bool delta1undefined=floatIsUndefined(_rational1->delta),delta2undefined=floatIsUndefined(_rational2->delta);
 	// pure rationals are easy
 	if(delta1undefined&&delta2undefined){
 	    return _getRational(_num,_den,M_LD_NAN,true,true);
@@ -669,11 +669,11 @@ Mvalue* m2l(Mvalue* value){
 }
 // conversion functions
  // the value wrapper for not a real and not an integer...
-Mvalue* NAR_value=NULL;
+Mvalue* NAF_value=NULL;
 Mvalue* NAI_value=NULL;
 Mvalue* NULL_value=NULL; // the value containing the text to show when a value equals NULL
 
-long double getNAR(){return NAR_value->value._real->ld;}
+long double getNAR(){return NAF_value->value._float->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
 
 // conversion to decimal,  hex and binary
@@ -774,7 +774,7 @@ Mvalue* d(Mvalue* value){
 			case VT_BIGINTEGER:return _getDecimalValue(_getBigintegerDecimal(value->value._biginteger),true);
 			case VT_RATIONAL:return _getDecimalValue(_getRationalDecimal(value->value._rational),true);
 			case VT_DECIMAL:return value;
-			case VT_REAL: // TODO check whether somewhere I am converting a long double without using text
+			case VT_FLOAT: // TODO check whether somewhere I am converting a long double without using text
 			default:return _getDecimalValue(_getValueTextDecimal(value),true);
 		}
 	}
@@ -784,7 +784,7 @@ Mvalue* b(Mvalue* value){ // little-endian representation list to return
 	if(value){
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
-			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,true);
+			case VT_FLOAT:return getRealDecimalMapValue(value->value._float->ld,true);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
 			default:break;
 		}
@@ -796,7 +796,7 @@ Mvalue* B(Mvalue* value){ // big endian decimal representation list to return
 	if(value){
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
-			case VT_REAL:return getRealDecimalMapValue(value->value._real->ld,false);
+			case VT_FLOAT:return getRealDecimalMapValue(value->value._float->ld,false);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
 			default:break;
 		}
@@ -949,8 +949,8 @@ Mrational* _getValueRational(Mvalue* _value){
 			case VT_RATIONAL:
 				_rational=_getRationalCopy(_value->value._rational); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
 				break;
-			case VT_REAL:
-				_rational=_getLongDoubleRational(_value->value._real->ld,250); // TODO how many iterations at most???
+			case VT_FLOAT:
+				_rational=_getLongDoubleRational(_value->value._float->ld,250); // TODO how many iterations at most???
 				break;
 			case VT_LIST:
 				if(_value->value._list->numberOfElements>1)
@@ -969,7 +969,7 @@ Mrational* getValueRational(Mvalue* _value){
 }
 
 // MDH@09OCT2019: unpure rationals can be purified using _getPurifiedRational
-long double getReal(Mreal* _real){return(_real?_real->ld:M_LD_NAN);}
+long double getReal(Mfloat* _real){return(_real?_real->ld:M_LD_NAN);}
 Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){
 	Mrational* _purifiedRational=NULL;
 	if(pureRational){
@@ -990,7 +990,7 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){
 Mvalue* Q(Mvalue* _value){
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
-	if(_value->type==VT_REAL)return _getValueOfList(_getLongDoubleRationalList(_value->value._real->ld,250),true); // the intermediate results are stored in a list, and the last element will be the final result!!!
+	if(_value->type==VT_FLOAT)return _getValueOfList(_getLongDoubleRationalList(_value->value._float->ld,250),true); // the intermediate results are stored in a list, and the last element will be the final result!!!
 	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value),true); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
@@ -1000,7 +1000,7 @@ Mvalue* q(Mvalue* _value){
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL){
 		Mrational* rational=_value->value._rational;
-		if(realIsUndefinedOrZero(rational->delta))return _value;
+		if(floatIsUndefinedOrZero(rational->delta))return _value;
 		long double rationaldelta=getReal(rational->delta);
 		Mrational* _purifiedRational=NULL;
 		Mrational* _pureRational=_getRational(_getBigintegerCopy(rational->num),_getBigintegerCopy(rational->den),M_LD_NAN,true,true);
@@ -1012,7 +1012,7 @@ Mvalue* q(Mvalue* _value){
 			outputError("Failed to create a pure rational");
 		return _getRationalValue(_purifiedRational,true);
 	}
-	if(_value->type==VT_REAL)return _getRationalValue(_getLongDoubleRational(_value->value._real->ld,250),true); // forcefully free the _getLongDoubleRational if we failed to wrap it
+	if(_value->type==VT_FLOAT)return _getRationalValue(_getLongDoubleRational(_value->value._float->ld,250),true); // forcefully free the _getLongDoubleRational if we failed to wrap it
 	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value),true); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
@@ -1021,22 +1021,22 @@ Mvalue* q(Mvalue* _value){
 // convert to a real
 
 // TODO complete with conversion from big integer and rational
-Mvalue* r(Mvalue* _value){
-	Mvalue* _realValue=NAR_value;
+Mvalue* f(Mvalue* _value){
+	Mvalue* _floatValue=NAF_value;
 	if(_value){
-		if(amVerbose()){outputValue("Converting '",_value,"'");output(" of type %s to a real.\n",VALUETYPENAMES[_value->type]," to a real.\n");}
+		if(amVerbose()){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 		switch(_value->type){
-			case VT_INTEGER:_realValue=_getRealValue((long double)_value->value._integer->ll);break;
-			case VT_BIGINTEGER:_realValue=_getRealValue(mp_get_long_double(_value->value._biginteger));break;
-			case VT_DECIMAL:_realValue=_getRealValue(getDecimalLongDouble(_value->value._decimal));break;
-			case VT_RATIONAL:_realValue=_getRealValue(getRationalLongDouble(_value->value._rational));break;
-			case VT_REAL:_realValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
-			case VT_TEXT:_realValue=_getRealValue(_strtold(_value->value._text->_c,getNAR()));break;
+			case VT_INTEGER:_floatValue=_getFloatValue((long double)_value->value._integer->ll);break;
+			case VT_BIGINTEGER:_floatValue=_getFloatValue(mp_get_long_double(_value->value._biginteger));break;
+			case VT_DECIMAL:_floatValue=_getFloatValue(getDecimalLongDouble(_value->value._decimal));break;
+			case VT_RATIONAL:_floatValue=_getFloatValue(getRationalLongDouble(_value->value._rational));break;
+			case VT_FLOAT:_floatValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
+			case VT_TEXT:_floatValue=_getFloatValue(_strtold(_value->value._text->_c,getNAR()));break;
 			default:break;
 		}
 	}
-	if(amVerbose())outputValue("Converted to '",_realValue,"'.\n");
-	return _realValue;
+	if(amVerbose())outputValue("Converted to '",_floatValue,"'.\n");
+	return _floatValue;
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
 Mvalue* t(Mvalue* value,Mvalue* format){
@@ -1077,7 +1077,7 @@ Mvalue* type(Mvalue* _value){
 		case VT_BIGINTEGER:return _getTextValue("'I",false);
 		case VT_DECIMAL:return _getTextValue("'d",false);
 		case VT_RATIONAL:return _getTextValue("'q",false);
-		case VT_REAL:return _getTextValue("'r",false);
+		case VT_FLOAT:return _getTextValue("'r",false);
 		case VT_TEXT:return _getTextValue("'t",false);
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
@@ -1127,7 +1127,7 @@ Mvalue* Mreciprocal(Mvalue* value){
 	if(value)
 	switch(value->type){
 		case VT_LIST:return _functionAppliedToList(value->value._list,Mreciprocal);
-		case VT_REAL:return _getRealValue(1/value->value._real->ld); // TODO check what happens when the real equals 0
+		case VT_FLOAT:return _getFloatValue(1/value->value._float->ld); // TODO check what happens when the real equals 0
 		case VT_RATIONAL:return _getRationalValue(_getInverseRational(value->value._rational),true);
 		case VT_INTEGER:return _getRationalValue(_getRational(NULL,_getBiginteger(value->value._integer->ll),M_LD_NAN,true,true),true);
 		case VT_BIGINTEGER:return _getRationalValue(_getRational(NULL,value->value._biginteger,M_LD_NAN,true,false),true); // same as with VT_INTEGER but without freeing the to remain bound big integer
@@ -1243,7 +1243,7 @@ bool initEnvironment(){
 	if(decimalprecision==M_LL_INVALID)return false; // let's force starting with a default decimal context
 	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
 
-	NAR_value=_getRealValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
+	NAF_value=_getFloatValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
 
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
@@ -1274,8 +1274,8 @@ bool initEnvironment(){
 			if(!addVariable(_Menvironment,"NULL",VT_TOKEN,true)||!setValue(_Menvironment,"NULL",NULL_value)){
 				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
 			}
-			if(!NAR_value||!addVariable(_Menvironment,"NAR",VT_REAL,true)||!setValue(_Menvironment,"NAR",NAR_value)){
-				outputLine("WARNING: Failed to create, add or initialize Not-a-real constant NAR.");
+			if(!NAF_value||!addVariable(_Menvironment,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
+				outputLine("WARNING: Failed to create, add or initialize Not-a-float constant NAF.");
 				////////return false;
 			}
 			if(!NAI_value||!addVariable(_Menvironment,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
@@ -1288,12 +1288,12 @@ bool initEnvironment(){
 				////////return false;
 			}*/
 			// create and add PI and E constants!!!
-			Mvalue* PI_value=_getRealValue(M_LD_PI);
+			Mvalue* PI_value=_getFloatValue(M_LD_PI);
 			if(!PI_value){
 				outputLine("ERROR: Failed to create PI.");
 				return false;
 			}
-			if(!addVariable(_Menvironment,"PI",VT_REAL,true)){
+			if(!addVariable(_Menvironment,"PI",VT_FLOAT,true)){
 				outputLine("ERROR: Failed to add PI.");
 				///////free_value(PI_value);
 				return false;
@@ -1303,13 +1303,13 @@ bool initEnvironment(){
 				outputLine("ERROR: Failed to initialize PI.");
 				return false;
 			}
-			Mvalue* E_value=_getRealValue(M_LD_E);
+			Mvalue* E_value=_getFloatValue(M_LD_E);
 			if(!E_value){
 				///////free_value(E_value);
 				outputLine("ERROR: Failed to create E.");
 				return false;
 			}
-			if(!addVariable(_Menvironment,"E",VT_REAL,true)){
+			if(!addVariable(_Menvironment,"E",VT_FLOAT,true)){
 				outputLine("ERROR: Failed to add E.");
 				return false;
 			}
@@ -1367,10 +1367,10 @@ bool initEnvironment(){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return false;
 			}
-			// conversions 
+			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
 			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"I"),"I",I)
 					||!completedValueValueFunction(_getFunction(_Menvironment,"t"),"t",t)
-					||!completedValueFunction(_getFunction(_Menvironment,"r"),"r",r)
+					||!completedValueFunction(_getFunction(_Menvironment,"f"),"f",f)
 					||!completedValueFunction(_getFunction(_Menvironment,"q"),"q",q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),"Q",Q)
 					||!completedValueFunction(_getFunction(_Menvironment,"d"),"d",d)
 					||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)||!completedValueFunction(_getFunction(_Menvironment,"B"),"B",B)){
@@ -1741,8 +1741,7 @@ Mcommand* _getNewCommand(bool withFirstToken){
 }
 // MDH@28OCT2019: not needed here anymore... Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the sequence of tokens starting with _userInputCommand->_firstToken
 // MDH@02OCT2019: might need this in multiple places!!
-bool inIdentifierToken(Mcommand* command){
-	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
+bool inIdentifierToken(Mtoken* lastCommandToken){
 	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE:false);
 }
 
@@ -1750,7 +1749,7 @@ Mcommand* _userInputCommand=NULL; // the current input command
 /* MDH@28OCT2019 replacing: 
 Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the command input by the user
 */
-bool userInputCommandIdentifierContinuationIsDirty=false; // whether or not the identifier has changed
+bool userInputCommandIdentifierContinuationNeedsUpdating=false; // whether or not the identifier has changed
 char* _identifierContinuationCharacters=NULL; // the single text that we can continue the current identifier token with
 char getFirstIdentifierContinuationCharacter(){
 	inputInfo("%s","Determining the first identifier continuation character!");
@@ -1772,11 +1771,46 @@ void deleteIdentifierContinuation(){
 }
 // user input command specific
 void updateUserInputCommandIdentifierContinuation(){
-	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand);
+	// MDH@30OCT2019: simplified updating the identifier continuation a bit so wee do not need to be afraid that it won't work AND we no longer need the userInputCommandIdentifierContinuationNeedsUpdating flag!!!!
+	//                BUT right after a delete we should be allowed to set the flag so the continuation will be deleted and nothing more
+	//                OK, to make delete work, I have to check the NeedsUpdating flag which should be set to true when the token is set
+	deleteIdentifierContinuation();
+	// if currently in an identifier, we technically need updating the identifier continuation unless the NeedsUpdating flag has been turned off
+	bool canHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
+	if(canHaveAnIdentifierContinuation){ // theoretically we could have identifier continuation
+		if(userInputCommandIdentifierContinuationNeedsUpdating){ // not blocked
+			Mstring* _completionText=_getCompletion(string(_userInputCommand->_lastToken->text));
+			// need at least two characters (the type and something text behind it)
+			// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
+			if(_completionText){
+				if(string_length(_completionText)>1)
+				switch(string_char(_completionText,0)){
+					case 1:
+						{
+							_identifierContinuationCharacters=strdup(string(_completionText)+1);
+							if(!_identifierContinuationCharacters)inputError("Failed to create the identifier continuation");else if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
+						}
+						break;
+					case 2:
+						{
+							_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
+							if(_identifierContinuationOptionalCharacters)inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("No identifier continuation characters!");
+						}
+						break;
+				}
+				free_string(_completionText);
+			}else 
+			if(amVerbose())inputInfo("No identifier continuation.");
+		}
+	}
+	// by forcing the flag to be true AFTER each update, we ascertain that you can only block it once, AND there's no need actually to set it on every new token!!!!
+	userInputCommandIdentifierContinuationNeedsUpdating=true; // as long as we're in an identifier token, keep the 'dirty' flag true
+	/* replacing:
+	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
 	// get rid of the identifier continuation if we're can't have one or the identifier has supposedly changed
-	if(!couldHaveAnIdentifierContinuation)userInputCommandIdentifierContinuationIsDirty=false; // if we're not in an identifier token always consider the identifier to be unchanged
-	if(!couldHaveAnIdentifierContinuation||userInputCommandIdentifierContinuationIsDirty)deleteIdentifierContinuation();
-	if(userInputCommandIdentifierContinuationIsDirty){ // the identifier has supposedly changed, and we could have an identifier continuation update it
+	if(!couldHaveAnIdentifierContinuation)userInputCommandIdentifierContinuationNeedsUpdating=false; // if we're not in an identifier token always consider the identifier to be unchanged
+	if(!couldHaveAnIdentifierContinuation||userInputCommandIdentifierContinuationNeedsUpdating)deleteIdentifierContinuation();
+	if(userInputCommandIdentifierContinuationNeedsUpdating){ // the identifier has supposedly changed, and we could have an identifier continuation update it
 		Mstring* _completionText=_getCompletion(string(_userInputCommand->_lastToken->text));
 		// need at least two characters (the type and something text behind it)
 		// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
@@ -1786,19 +1820,21 @@ void updateUserInputCommandIdentifierContinuation(){
 				case 1:
 					{
 						_identifierContinuationCharacters=strdup(string(_completionText)+1);
-						if(!_identifierContinuationCharacters)inputError("Failed to create the identifier autocompletion text");
+						if(!_identifierContinuationCharacters)inputError("Failed to create the identifier continuation");else if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
 					}
 					break;
 				case 2:
 					{
 						_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
-						if(_identifierContinuationOptionalCharacters)inputInfo("Existing identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("Unable to show existing identifier continuation characters!");
+						if(_identifierContinuationOptionalCharacters)inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("No identifier continuation characters!");
 					}
 					break;
 			}
 			free_string(_completionText);
-		}
+		}else 
+		if(amVerbose())inputInfo("No identifier continuation.");
 	}
+	*/
 	if(amDebugging())inputInfo("User input command identifier continuation updated.");
 }/* VALIDATED */
 
@@ -2238,7 +2274,7 @@ bool updateImmediateFeedforwardTextOfUserInputCommand(){
 Mtoken* setLastUserInputCommandToken(Mtoken* lastUserInputCommandToken){
 	if(!_userInputCommand){inputError("BUG: No user input command");return NULL;}
 	_userInputCommand->_lastToken=lastUserInputCommandToken;
-	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
+	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(lastUserInputCommandToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
 	return _userInputCommand->_lastToken;
 }
 /*
@@ -2249,7 +2285,7 @@ Mtoken* setLastUserInputCommandToken(Mtoken* newLastCommandToken){
 	//// removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the last token immediate feed forward text.");
 	if(_userInputCommand)_userInputCommand->_lastToken=newLastCommandToken;else inputError("BUG: No user input command");
 	//// removing: if(!updateImmediateFeedforwardTextOfUserInputCommand())inputError("Failed to add the last token immediate feed forward text.");
-	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand);
+	userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(_userInputCommand);
 }
 */
 /*
@@ -2269,11 +2305,44 @@ Mstring* shellCommand=NULL;
 /// MDH@28OCT2019: replaced by _userInputCommand: Mtoken* _userInputCommand->_firstToken=NULL;
 
 // keeping track of both the cursor position and the total command length
-size_t getUserInputCursorPosition(){
+size_t getUserInputLength(){
 	return(inputMode==IM_COMMAND?(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));
 }
+
+// MDH@30OCT2019: for each user input line, keep track of the total number of characters written by the user
+typedef struct Muserinputline{
+	size_t offset,index; // the number of characters on previous lines and the line index
+	struct Muserinputline *_prev; // for accessing previous lines
+}Muserinputline;
+Muserinputline* _userinputline=NULL; // reference to the current user input line
+// call _userinputline() when starting a new line
+Muserinputline* __userinputline(){
+	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'L');
+	if(_newUserinputline){
+		_newUserinputline->_prev=_userinputline;
+		_newUserinputline->offset=getUserInputLength(); // number of characters in front of it
+		_newUserinputline->index=(_userinputline?_userinputline->index:0)+1; // count the lines
+		_userinputline=_newUserinputline;
+	}
+	return _newUserinputline;
+}
+// call free_userinputline() when starting a new user input command
+void free_userinputline(){
+	Muserinputline* prevUserinputline;
+	while(_userinputline){
+		prevUserinputline=_userinputline->_prev;
+		FREE(_userinputline,'L');
+		_userinputline=prevUserinputline;
+	}
+}
+void removeUserinputline(){
+	Muserinputline* prevUserinputline=_userinputline->_prev;
+	FREE(_userinputline,'L');
+	_userinputline=prevUserinputline;
+}
+// MDH@30OCT2019 END
 size_t getNumberOfSuggestedCharacters(){return(_suggestedText?string_length(_suggestedText):0);}
-size_t getCommandLength(){return getUserInputCursorPosition()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
+size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
 uint8_t promptLength=0;
 void showPrompt(){
@@ -2319,17 +2388,31 @@ void showPrompt(){
 	/////////storeCursor();
 	///////////inputMode=true; // expecting a command (until the option character is received)
 	/* MDH@26FEB2019: we do not need the following because that's taken care of in writeTokens(_userInputCommand->_firstToken) right after promptForUserInput()
-	getUserInputCursorPosition()=0; // starting at position 0
+	getUserInputLength()=0; // starting at position 0
 	*/
 }
 
+// MDH@30OCT2019: we'd like to be able to continue a command on the next line
+bool showContinuedPrompt(){
+	// ASSERT only to be called in command mode with _userInputCommand not NULL
+	if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
+	clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
+	outputChar('\n'); // move over to the next line
+	uint8_t blanks=promptLength;while(blanks>3){outputChar(' ');blanks--;}
+	resetOutputColor();
+	output(" = ");
+	return true;
+	/// can't call this here!!!! outputTokenColor(_userInputCommand->_lastToken);
+}
+// MDH@30OCT2019 END
 void promptForUserInput(){
+	free_userinputline();if(_userinputline)outputError("BUG: Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode();
 	resetOutputColor();
 	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
+	//////if(inputMode==IM_COMMAND)
 }
-
 /* The following ANSI escape sequences are currently supported.
  * If n and/or m are omitted, they default to 1.
  *   ESC [nA moves up n lines
@@ -2410,53 +2493,60 @@ void outputUserInputCommandTokenColor(){
 	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
 }
 void returnToUserInputCommandCursorPosition(){
-	moveCursorRight(promptLength+getUserInputCursorPosition());
+	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
+	toStartOfLine();
+	moveCursorRight(promptLength+getUserInputLength()-(_userinputline?_userinputline->offset:0)); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
 	outputUserInputCommandTokenColor();
 }
 
 // MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
 // MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
-
+// MDH@30OCT2019: if we let toInfoInputLine() return the number of lines it moved back we can pass that into toUserInputCursorPosition() to go down that number of lines
+size_t toInfoInputLine(){
+	size_t linesUp=0,lines=(_userinputline?_userinputline->index:0)+1;
+	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();return linesUp;} // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
+void toUserInputCursorPosition(size_t linesDown){while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();}
 void inputInfo(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
-		toStartOfPreviousLine();
+		size_t linesMovedUp=toInfoInputLine();
 		resetOutputColor(); // get the default output color!!
 		// NOTE we have to call vprintf here NOT printf!!!
 		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toStartOfNextLine();
-		returnToUserInputCommandCursorPosition();
+		toUserInputCursorPosition(linesMovedUp);
 	}
 }
 void inputError(const char* const fmt,...){
-	toStartOfPreviousLine();setColor(getErrorColor());setBackColor(getBackgroundColor());
-	va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-	toStartOfNextLine();returnToUserInputCommandCursorPosition();
+	if(fmt&&strlen(fmt)){ // we have a format
+		size_t linesMovedUp=toInfoInputLine();
+		setColor(getErrorColor());setBackColor(getBackgroundColor());
+		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+		toUserInputCursorPosition(linesMovedUp);
+	}
 }
-void clearInfo(){toStartOfPreviousLine();resetOutputColor();clearLine();toStartOfNextLine();returnToUserInputCommandCursorPosition();}
+void clearInfo(){toUserInputCursorPosition(toInfoInputLine());} // MDH@30OCT2019: toInfoInputLine() automatically clears the info input line!!!
 void inputInfoCommand(Mcommand* command){
-	toStartOfPreviousLine();
+	size_t linesMovedUp=toInfoInputLine();
 	resetOutputColor();
 	if(command){Mtoken* token=command->_firstToken;while(token){output("%s|",string(token->text));token=token->next;}}
-	toStartOfNextLine();
-	returnToUserInputCommandCursorPosition();
+	toUserInputCursorPosition(linesMovedUp);
 }
 
 void outputStatus(char inputChar,char inputCharType){
-	////////printf("[%u,%u]",getUserInputCursorPosition(),getCommandLength());
+	////////printf("[%u,%u]",getUserInputLength(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
-	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Manual feed forward: '%s' | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(_userInputCommand->_lastToken!=NULL?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),getUserInputCursorPosition(),getCommandLength(),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
+	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
+	inputInfo("Input character: %c(=0x%x) | Input character type: %c | Token type: %s | Cursor position: %zu | Command length: %zu | Manual feed forward: '%s' | Identifier continuation: '%s' | Feed forward: '%s'.",inputChar,inputChar,inputCharType,(_userInputCommand->_lastToken!=NULL?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),getUserInputLength(),getCommandLength(),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
-	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
+	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
 void outputDebugInfo(){
-	////////printf("[%u,%u]",getUserInputCursorPosition(),getCommandLength());
+	////////printf("[%u,%u]",getUserInputLength(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
-	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
-	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'.",getUserInputCursorPosition(),getCommandLength(),(_userInputCommand&&_userInputCommand->_lastToken?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
+	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
+	inputInfo("Cursor position: %zu | Command length: %zu | Token type: % s | Manual feed forward: '%s' | Identifier continuation: '%s' | Auto completion: '%s'.",getUserInputLength(),getCommandLength(),(_userInputCommand&&_userInputCommand->_lastToken?TOKENTYPE_STRING[_userInputCommand->_lastToken->type]:""),(_manualFeedforwardText?string(_manualFeedforwardText):""),(_identifierContinuationCharacters?_identifierContinuationCharacters:""),string(_separatedBehindCursorText));
 	free_string(_separatedBehindCursorText);
-	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputCursorPosition(),getCommandLength(),string(feedforwardText));
+	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
 
 // MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
@@ -3020,7 +3110,7 @@ Mvalue* getValueOfExpressionOfType(enum Mvaluetype valuetype){
 		_value->type=valuetype;
 		switch(_value->type){
 			case VT_INTEGER:_value->value._integer=(Minteger*)calloc(1,sizeof(Minteger));break; // initialized to 0 I presume
-			case VT_REAL:_value->value._real=(Mreal*)calloc(1,sizeof(Mreal));break; // initialized to 0.0 I presume
+			case VT_FLOAT:_value->value._float=(Mfloat*)calloc(1,sizeof(Mfloat));break; // initialized to 0.0 I presume
 			case VT_TEXT:_value->value._text=(Mtext*)calloc(1,sizeof(Mtext));break;
 			case VT_LIST:_value->value._list=(Mlist*)calloc(1,sizeof(Mlist));break;
 			case VT_MAP:_value->value._map=(Mmap*)calloc(1,sizeof(Mmap));break;
@@ -3740,7 +3830,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
-			if(expressionToken->next&&expressionToken->next->type==VT_REAL){
+			if(expressionToken->next&&expressionToken->next->type==VT_FLOAT){
 				expressionToken=expressionToken->next;
 				// let's prepend the integer token text to the real (fraction) token text
 				string_prepend(string(expressionToken->prev->text),expressionToken->text);
@@ -3946,7 +4036,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getRationalValue(_rational));
 						*/
-						// replacing: assignValue(&_valueReference->_value,_getRealValue(_strtold(string(pRealText),getNAR())));
+						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
 						if(amDebugging())outputLine("Releasing decimal text.");
 						free_string(_realText);
 						if(amDebugging())outputLine("Decimal text released.");
@@ -3968,7 +4058,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
-				assignValue(&_valueReference->_value,_getRealValue(_strtold(_significantTokenText,getNAR())));
+				assignValue(&_valueReference->_value,_getFloatValue(_strtold(_significantTokenText,getNAR())));
 				///////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_DQSTRING:
@@ -4237,13 +4327,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_sumDecimal,true);
 	}
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Adding integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1+ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1+ld2:M_LD_NAN);
 	}
 	/* MDH@28OCT2019: either real already dealt with above
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_TEXT)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT||_value2->type==VT_TEXT)){
 		// if the second argument is text, convert it to a real or integer number
 		if(_value2->type==VT_TEXT){
 			// are we going to convert it to an integer or a real????
@@ -4252,13 +4342,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 			if(strchr(valueText,'.')!=NULL){ // a period 
 				////////if(strlen(_valueText)==1)return _value1; // if a single period no need to actually add it unless someone want to change an integer in a real????
 				////// we can use _strtold!!! long double ld=0;if(strlen(valueText)>1){char *endPtr=NULL;ld=strtold(valueText,&endPtr);if(endPtr==valueText){output("ERROR: Can't add '%s'.",valueText);return NULL;}} // failure
-				_value2=_getRealValue(_strtold(valueText,getNAR()));
+				_value2=_getFloatValue(_strtold(valueText,getNAR()));
 			}else{ // no period
 				_value2=_getIntegerValue(_strtoll(valueText,getNAI()));
 			}
 		}
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll+_value2->value._integer->ll);
-		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)+(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+		return _getFloatValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)+(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld));
 	}
 	*/
 	return NULL;
@@ -4333,15 +4423,15 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_differenceDecimal,true);
 	}
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Subtracting integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2:M_LD_NAN);
 	}
 	/* MDH@28OCT2019: now obsolete
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll-_value2->value._integer->ll);
-		return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld));
+		return _getFloatValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)-(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld));
 	}
 	*/
 	return NULL;
@@ -4414,10 +4504,10 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 	}
 	*/
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
 	}
 	// if either is rational do a rational multiplication
 	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
@@ -4444,7 +4534,7 @@ Mvalue* _getValueOneOfType(Mvaluetype valuetype){
 	switch(valuetype){
 		case VT_INTEGER: return _getIntegerValue(1);
 		case VT_BIGINTEGER: return _getBigintegerValue(_getBiginteger(1),true);
-		case VT_REAL: return _getRealValue(1.0);
+		case VT_FLOAT: return _getFloatValue(1.0);
 		case VT_RATIONAL: return _getRationalValue(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),true);
 		case VT_DECIMAL: return _getDecimalValue(_getDecimal(__mpd(get_default_mpd_context(),1),M_DP,0,true),true);
 		default:break;
@@ -4466,13 +4556,13 @@ long double getRealPowerValue(long double base,Mvalue* _powerValue){
 					if(_powerValue->value._rational->den)power/=powl(mp_get_long_double(_powerValue->value._rational->den),power);
 					return powl(base,power);
 				}
-			case VT_REAL:return powl(base,_powerValue->value._real->ld);
+			case VT_FLOAT:return powl(base,_powerValue->value._float->ld);
 			default:break;
 		}
 	}
 	return M_LD_NAN; // uncomputable
 }
-long double getRealValuePower(Mvalue* _baseValue,long double power){
+long double getFloatValuePower(Mvalue* _baseValue,long double power){
 	// ASSERT assuming power does not equal 0
 	if(isLongDoubleUndefined(power)==M_FALSE){ // TODO might still be infinite though
 		if(_baseValue)
@@ -4486,7 +4576,7 @@ long double getRealValuePower(Mvalue* _baseValue,long double power){
 					if(_baseValue->value._rational->den)base/=powl(mp_get_long_double(_baseValue->value._rational->den),power);
 					return powl(base,power);
 				}
-			case VT_REAL:return powl(_baseValue->value._real->ld,power);
+			case VT_FLOAT:return powl(_baseValue->value._float->ld,power);
 			default:break;
 		}
 	}
@@ -5061,9 +5151,9 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 	// MDH@26OCT2019: TODO same approach with any integer as in the other binary operators??????
 	// MDH@27OCT2019: let's deal with if either is a real first
 	// I suppose if the base or exponent is real, the result should also be real (because it will be approximate)
-	if(_value2->type==VT_REAL)return _getRealValue(getRealValuePower(_value1,_value2->value._real->ld));
+	if(_value2->type==VT_FLOAT)return _getFloatValue(getFloatValuePower(_value1,_value2->value._float->ld));
 	// ASSERT exponent is NOT a real
-	if(_value1->type==VT_REAL)return _getRealValue(getRealPowerValue(_value1->value._real->ld,_value2));
+	if(_value1->type==VT_FLOAT)return _getFloatValue(getRealPowerValue(_value1->value._float->ld,_value2));
 	// ASSERT neither is real
 	// MDH@27OCT2019: typically for integers with an expoonent that is positive the result should also be integer
 	//                and we deal with that separatately
@@ -5141,7 +5231,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 								// instead of computing the power of the numerator we use the _remainder instead
 								Mvalue* _rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
 								// if the root argument is rational, we should use pure big integer computations and have all rational approximations to the root
-								if(_rootArgumentValue->type==VT_RATIONAL&&realIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)) // a pure decimal
+								if(_rootArgumentValue->type==VT_RATIONAL&&floatIsUndefinedOrZero(_rootArgumentValue->value._rational->delta)) // a pure decimal
 									// TODO if the base is not a pure rational, we could of course purify it
 									_rootValue=_getRationalValue(_getRationalBigintegerRootRational(_rootArgumentValue->value._rational,exponentDenominator),true);
 								else // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
@@ -5175,10 +5265,10 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 					}else // an integer rational, so no need to take the root at all!!!
 						_rootValue=_getBigintegerPowerValue(_value1,_positiveExponentNumerator); // that's all folks
 					// don't forget the delta (if any)
-					if(!realIsUndefinedOrZero(_exponentRational->delta)) // a defined delta
+					if(!floatIsUndefinedOrZero(_exponentRational->delta)) // a defined delta
 						// multiply the result with base to the power of delta
 						// TODO the base should determine what the type of the power computation should be???????
-						_returnValue=multiply(_rootValue,_getRealValue(getRealValuePower(_value1,getReal(_exponentRational->delta))));
+						_returnValue=multiply(_rootValue,_getFloatValue(getFloatValuePower(_value1,getReal(_exponentRational->delta))));
 					else
 						_returnValue=_rootValue;
 					if(neg){free_biginteger(_positiveExponentNumerator);if(_returnValue)_returnValue=Mreciprocal(_returnValue);}
@@ -5241,8 +5331,8 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,epower);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,epower);
 
 	// if both values are numeric (somehow) we can do the computation
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
-		(_value2->type==VT_INTEGER||_value2->type==VT_REAL||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
+		(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
 		// if the epower exponent is zero _value1 is the result
 		// see above: if(isValueZero(_value2))return _value1;
 		if(_value2->type==VT_INTEGER){ // an integer exponent
@@ -5281,7 +5371,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 			}
 		}
 		return multiply(_value1,power(_getIntegerValue(10),_value2)); // temp. value like the power result and _getIntegerValue(10) will be garbage collected if not bound somewhere!!!
-		// replacing: return _getRealValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld))));
+		// replacing: return _getFloatValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld*pow(10.,(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld))));
 	}
 	*/
 	return NULL;
@@ -5321,17 +5411,17 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_divideDecimal,true);
 	}
 	// if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1/ld2:M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1/ld2:M_LD_NAN);
 	}
 	/* replacing:
 	// always real divide
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
-		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld); // TODO casting to a long double is perhaps not the best way?
-		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld); // TODO casting to a long double is perhaps not the best way?
-		return _getRealValue(ld1/ld2);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld); // TODO casting to a long double is perhaps not the best way?
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld); // TODO casting to a long double is perhaps not the best way?
+		return _getFloatValue(ld1/ld2);
 	}
 	*/
 	return NULL;
@@ -5428,18 +5518,18 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		return _getDecimalValue(_decimalInteger,true);
 	}
 	// MDH@28OCT2019: if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?truncl(ld1/ld2):M_LD_NAN); // same as divide, but applying truncl to the result (cutting off the fraction)
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?truncl(ld1/ld2):M_LD_NAN); // same as divide, but applying truncl to the result (cutting off the fraction)
 	}
 	/* MDH@28OCT2019: see above
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
 		// if both integer, use lldiv to perform the integer division
 		if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(lldiv(_value1->value._integer->ll,_value2->value._integer->ll).quot);
 		// at least one is real, perform floating point division, then trunc!!!
-		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
-		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld);
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld);
 		return _getIntegerValue(truncl(ld1/ld2));
 	}
 	*/
@@ -5449,7 +5539,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
-	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getRealValue(0));
+	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getFloatValue(0));
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _moduloBiginteger=NULL;
@@ -5536,17 +5626,17 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		return subtract(_value1,multiply(_value2,_getDecimalValue(_decimalInteger,true)));
 	}
 	// MDH@28OCT2019: if either is a real
-	if(_value1->type==VT_REAL||_value2->type==VT_REAL){
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
 		if(amVerbose()){outputValue("Determining what's left after dividing (as) reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getRealValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2*truncl(ld1/ld2):M_LD_NAN);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1-ld2*truncl(ld1/ld2):M_LD_NAN);
 	}
 	/* replacing:
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL)){
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT)){
 		// at least one is real, perform floating point division, then trunc!!!
-		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld);
-		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld);
-		return _getRealValue(ld1-ld2*truncl(ld1/ld2)); // what's left after subtracting the truncated value
+		long double ld1=(_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld);
+		long double ld2=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld);
+		return _getFloatValue(ld1-ld2*truncl(ld1/ld2)); // what's left after subtracting the truncated value
 	}
 	*/
 	return NULL;
@@ -5681,7 +5771,7 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 	///////////if(shiftleftinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,shiftleftinteger));
-	if(_value1->type==VT_REAL)return _getRealValue(ldShift(_value1->value._real->ld,shiftleftinteger));
+	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,shiftleftinteger));
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftleftBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift left
 		if(_shiftleftBiginteger){
@@ -5751,7 +5841,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 	/////////////if(shiftrightinteger==0)return _value1; // return _value1 if no need to shift!!
 	// only need to check the value1 type now
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,-shiftrightinteger));
-	if(_value1->type==VT_REAL)return _getRealValue(ldShift(_value1->value._real->ld,-shiftrightinteger));
+	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,-shiftrightinteger));
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftrightBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift right
 		if(_shiftrightBiginteger){
@@ -5832,8 +5922,8 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return _getIntegerValue(M_LL_INVALID);
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthan);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5881,8 +5971,8 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthan);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthan);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5930,8 +6020,8 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthanorequalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -5979,8 +6069,8 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,unequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,unequalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -6029,8 +6119,8 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){		Mbiginteger* _equaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -6078,8 +6168,8 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthanorequalto);
-	if((_value1->type==VT_INTEGER||_value1->type==VT_REAL)&&(_value2->type==VT_INTEGER||_value2->type==VT_REAL))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._real->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._real->ld)?1:0);
+	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
+		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
@@ -6588,7 +6678,7 @@ void outputValueColored(Mvalue* _value){
 				}
 			}
 			break;
-		case VT_REAL:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
+		case VT_FLOAT:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
 		case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
 		case VT_LIST:
 			// TODO not using _getListText() as defined in Mexecution
@@ -6808,10 +6898,10 @@ void showPreviousCommandPage(){
 /*
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
 char* removedRestOfCommand(){
-	if(getUserInputCursorPosition()<getCommandLength()){
+	if(getUserInputLength()<getCommandLength()){
 		Mstring* restOfCommand=__string();
 		if(restOfCommand!=NULL){
-			uint16_t tokenPosition=getUserInputCursorPosition()-_userInputCommand->_lastToken->offset;
+			uint16_t tokenPosition=getUserInputLength()-_userInputCommand->_lastToken->offset;
 			if(tokenPosition)string_append(restOfCommand,string_remainder(_userInputCommand->_lastToken->text,tokenPosition));
 			string_setlength(_userInputCommand->_lastToken->text,tokenPosition); // the new length of the token (cutting off what's behind it)
 			// now to append the text in the rest of the tokens
@@ -6830,11 +6920,11 @@ char* removedRestOfCommand(){
 */
 /*
 void writeRestOfCommand(){ // writes rest of command assuming _userInputCommand->_lastToken is not NULL and we are to return to the current cursor position adterwards!!
-	uint16_t leftToWrite=getCommandLength()-getUserInputCursorPosition();
+	uint16_t leftToWrite=getCommandLength()-getUserInputLength();
 	if(leftToWrite>0){ // something left to write
 		// something of the current token to write?
-		if(getUserInputCursorPosition()>_userInputCommand->_lastToken->offset){ // part of current token to write
-			outputTokenColor(_userInputCommand->_lastToken);printf("%s",string_remainder(_userInputCommand->_lastToken->text,getUserInputCursorPosition()-_userInputCommand->_lastToken->offset));
+		if(getUserInputLength()>_userInputCommand->_lastToken->offset){ // part of current token to write
+			outputTokenColor(_userInputCommand->_lastToken);printf("%s",string_remainder(_userInputCommand->_lastToken->text,getUserInputLength()-_userInputCommand->_lastToken->offset));
 		}
 		// write the rest of the tokens
 		writeTokens(_userInputCommand->_lastToken->next);
@@ -6988,10 +7078,10 @@ void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
 	// replacing: restoreCursor();clearScreenFromCursor();
-	uint16_t cp=getUserInputCursorPosition();
-	while(cp--)backspace(); // MDH@24APR2019 replacing: while(getUserInputCursorPosition()>0){getUserInputCursorPosition()--;backspace();}
+	uint16_t cp=getUserInputLength();
+	while(cp--)backspace(); // MDH@24APR2019 replacing: while(getUserInputLength()>0){getUserInputLength()--;backspace();}
 	/*
-	if(getUserInputCursorPosition()>0){moveCursorLeft(getUserInputCursorPosition());getUserInputCursorPosition()=0;}
+	if(getUserInputLength()>0){moveCursorLeft(getUserInputLength());getUserInputLength()=0;}
 	clearScreenFromCursor();
 	*/
 	/* replacing:
@@ -7006,7 +7096,7 @@ void setUserInputCommand(Mcommand* command){
 	_userInputCommand=command;
 	// replacing: _userInputCommand->_lastToken=_userInputCommand->_firstToken=pCommand;
 	writeCommand(_userInputCommand);
-	userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
+	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=(_userInputCommand?inIdentifierToken(_userInputCommand->_lastToken):false); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
 	//////////writeSuggestedText(true);
 	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
 	////////// removing: determineCommandInitializations();
@@ -7026,7 +7116,7 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){
 	//                NOTE typically _userInputCommand will not be NULL when we're scrolling through the list of previous commands!!!!
 	if(_userInputCommand)setUserInputCommand(NULL); 
 	clearInfo();
-	// MDH@24APR2019 obsolete: getCommandLength()=getUserInputCursorPosition()=0; // do we need this????
+	// MDH@24APR2019 obsolete: getCommandLength()=getUserInputLength()=0; // do we need this????
 	// TODO do we need to do this: clear the behind cursor text (in any situation)
 	deleteAutocompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
 	if(commandIndex){
@@ -7111,7 +7201,7 @@ void createUserInputCommand(){
 	_userInputCommand=_getNewCommand(true);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand){
-		userInputCommandIdentifierContinuationIsDirty=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
+		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
 		updateLastTokenAutocompletionText(); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
 		if(amDebugging())inputInfo("New user input command created.");
 	}else
@@ -7199,12 +7289,12 @@ void copyUserInputCommand(){
 /**
  * setCommand() creates a new (empty) command (in _userInputCommand->_firstToken) and initializes it to the token in pNewCommand (the command pointed to by commandIndex)
  *              which is supposedly showing behind the cursor!!!
- * ASSUMPTION should only be called when at the prompt (getUserInputCursorPosition()=0) ready for starting or changing a command
+ * ASSUMPTION should only be called when at the prompt (getUserInputLength()=0) ready for starting or changing a command
  * setCommand() won't show the command anymore as we assume that any registered command passed in is already showing!!!
  */
 /*
 Mtoken* getCommand(){
-	return(commandIndex&&getUserInputCursorPosition()?commands[commandCount-commandIndex]:_userInputCommand->_firstToken);
+	return(commandIndex&&getUserInputLength()?commands[commandCount-commandIndex]:_userInputCommand->_firstToken);
 }
 void echoCommand(){
 	Mtoken* token=_userInputCommand->_firstToken;
@@ -7212,7 +7302,7 @@ void echoCommand(){
 	while(token){printf("%s",string(token->text));token=token->next;}
 }
 void setCommand(Mtoken* pNewCommand){
-	// ASSERT let's assume we're at the prompt (i.e. getUserInputCursorPosition()==0 and _userInputCommand->_firstToken==NULL)
+	// ASSERT let's assume we're at the prompt (i.e. getUserInputLength()==0 and _userInputCommand->_firstToken==NULL)
 	// NO we cannot assume that because there might be a command currently showing at the prompt
 	if(_userInputCommand->_firstToken){clearCommand();backToPrompt();} // if we have a command get rid of it and ascertain to be at the prompt!!
 	// the problem is that we do NOT want to actually change the new command, so we have to copy it somehow
@@ -7391,7 +7481,7 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 	clearScreenFromCursor(); // will clear what's behind the cursor
 	// MDH@14AUG2019: shouldn't we ALWAYS write the behind cursor text, because I think we should, and if we want do not want to see it we should delete it beforehand!!!!! which is much preferred over not showing it when it is still there!!!!!
 	// MDH@24APR2019 obsolete: getCommandLength()--; // decrement the total command length
-	if(getUserInputCursorPosition()){ // still something left of the command (that we might check for being a function or not)
+	if(getUserInputLength()){ // still something left of the command (that we might check for being a function or not)
 		// on screen as well please
 		// before writing the behind cursor text we're going to check whether the current token still is a function or variable
 		tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,true/*,false*/); // MDH@14AUG2019: no, not a suggested character (as called on the backspace user action)
@@ -7438,13 +7528,14 @@ void updateOnTokenCharacterRemoved(char removedCharacter){
 // MDH@01OCT2019: updating the type of an identifier token due to the removal of the last token character is now done in removeTokenCharacter() just as commandCharacterAccepted() does!!!
 //                also uint16_t behindCursor (as it is always called with constant value 1) removed as formal parameter, and endOfInput (typically true) added!!!
 char removedTokenCharacter(bool endOfInput){
+	// MDH@30OCT2019: ASSERT there's something to 'remove'
 	// MDH@03SEP2019: 
 	char tokenCharacterRemoved='\0';
 	if(_userInputCommand){ // should ALWAYS be the case
 		uint16_t tokenCharacterPosition;
 		// find the token that we should remove a character from (either the current token or the one in front of it (if all tokens are non-empty!))
 		while(_userInputCommand->_lastToken){
-			tokenCharacterPosition=string_length(_userInputCommand->_lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): getUserInputCursorPosition()-_userInputCommand->_lastToken->offset;
+			tokenCharacterPosition=string_length(_userInputCommand->_lastToken->text); // MDH@24APR2019 replacing (what is essentially the same): getUserInputLength()-_userInputCommand->_lastToken->offset;
 #ifdef __DEBUG__
 			printf("%d",tokenCharacterPosition);
 #endif
@@ -7454,13 +7545,22 @@ char removedTokenCharacter(bool endOfInput){
 #endif		
 			_userInputCommand->_lastToken=_userInputCommand->_lastToken->prev;
 		}
-		userInputCommandIdentifierContinuationIsDirty=inIdentifierToken(_userInputCommand); // MDH@02OCT2019: should be called whenever _userInputCommand->_lastToken changes...
+		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(_userInputCommand->_lastToken); // MDH@02OCT2019: should be called whenever _userInputCommand->_lastToken changes...
 		if(_userInputCommand->_lastToken)tokenCharacterRemoved=string_removed_char(_userInputCommand->_lastToken->text,tokenCharacterPosition-1);
 #ifdef __DEBUG__
 			outputChar(tokenCharacterRemoved);
 #endif
 		if(tokenCharacterRemoved){
-			if(endOfInput)moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
+			if(endOfInput){
+				// MDH@30OCT2019: with multiline user input it sometimes is a little harder than calling moveCursorLeft(1)
+				//                if the offset of the current user input line is beyond the total command length apparently we've 'removed' the last command character on the previous line
+				if(_userinputline&&_userinputline->offset>getUserInputLength()){
+					toStartOfLine();clearScreenFromCursor(); // clear this user input line and what's beyond it
+					removeUserinputline();
+					oneLineUp();toUserInputCursorPosition(0); // one line up and to the proper position (not sure what will happen to the suggested text though)
+				}else
+					moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
+			}
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//                HOWEVER we're assuming that we're dealing with an end of input situation
 			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)?removeToken():false);
@@ -7848,7 +7948,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputChar
 		lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 
 	/////if(amDebugging())inputInfo("I");
-	// append the typed character at getUserInputCursorPosition() minus current token offset in _userInputCommand->_lastToken->text
+	// append the typed character at getUserInputLength() minus current token offset in _userInputCommand->_lastToken->text
 	string_append_char(lastCommandToken->text,inputChar);
 
 	if(newTokenType<0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
@@ -7961,7 +8061,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		debugWrite("Command length after inserting %c: %zu.",inputChar,getCommandLength());
 	}
 
-	// MDH@24APR2019 obsolete: getUserInputCursorPosition()++; // increment the current cursor position
+	// MDH@24APR2019 obsolete: getUserInputLength()++; // increment the current cursor position
 	// MDH@07AUG2019: after a character is input by the user (or some other source) the identifier type will be checked...
 	//                BUT 
 	// MDH@01OCT2019: argument aSuggestedCharacter is no longer used in tokenCheckedForBeingAFunction and consequently by this function, so it is removed as argument and replaced by updateidentifiercontinuation (which we do need)
@@ -8039,7 +8139,7 @@ bool COMMAND_PROCESSOR_AVAILABLE=0;
 void clearShellCommand(){
 	string_setlength(_suggestedText,0);
 	string_setlength(shellCommand,0);
-	// MDH@24APR2019 obsolete: getUserInputCursorPosition()=0;
+	// MDH@24APR2019 obsolete: getUserInputLength()=0;
 }
 void executeShellCommand(){
 	// ASSERTION string_length(shellCommand) should be positive
@@ -8206,7 +8306,7 @@ int main(int argc, char **argv){
 			/////////////// if(_userInputCommand->_firstToken)clearCommand(); // TODO do we need this????
 			/* replacing:
 			if(_userInputCommand->_firstToken==NULL)if(!string_setlength(feedforwardText,0))output("??"); // TODO should we be loosing feedforwardText here????
-			getCommandLength()=getUserInputCursorPosition()=writeTokens(_userInputCommand->_firstToken);
+			getCommandLength()=getUserInputLength()=writeTokens(_userInputCommand->_firstToken);
 			*/
 			/////////outputStatus();
 		}
@@ -8218,7 +8318,7 @@ int main(int argc, char **argv){
 		while(_userInputCommand->_lastToken!=NULL){
 			outputToken(_userInputCommand->_lastToken);
 			// the cursor will move along with every printf()
-			getUserInputCursorPosition()+=string_length(_userInputCommand->_lastToken->text);
+			getUserInputLength()+=string_length(_userInputCommand->_lastToken->text);
 			_userInputCommand->_lastToken=_userInputCommand->_lastToken->next;
 		}
 		*/
@@ -8319,7 +8419,7 @@ int main(int argc, char **argv){
 			*/
 			////////printf("(%d)",inputCharType);
 
-			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE getUserInputCursorPosition() is only defined in the other two modes)
+			// if not in control mode, and the switch to control mode character is entered, switch to control mode if first character (NOTE getUserInputLength() is only defined in the other two modes)
 			// MDH@16APR2019: I want to use the Enter key (ASCII 13) to switch to the next mode, because the associated input character type is n which will ALWAYS break
 			//                in that case we do NOT need the o input character type!!!
 			if(inputCharType=='o'){
@@ -8328,7 +8428,7 @@ int main(int argc, char **argv){
 					break;
 				}
 				// not in control mode, go to control mode if first character on line
-				if(!getUserInputCursorPosition()){
+				if(!getUserInputLength()){
 					inputCharType=switchToControlMode(NULL);
 					break;
 				}
@@ -8341,7 +8441,20 @@ int main(int argc, char **argv){
 			// first the ones that will break in any input mode!!!!
 			if(inputCharType=='i')continue; // insignificant input character without specific purpose
 
-			if(inputCharType=='n')break; // end-of-line (CR of LF) character
+			if(inputCharType=='n'){ // end-of-line (CR of LF) character
+				// MDH@30OCT2019: if not in command mode or (in command mode) we do not have an input command or it is not valid
+				if(inputMode!=IM_COMMAND||!_userInputCommand||isAValidCommand(_userInputCommand,false))break;
+				// ASSERT in command mode with an invalid (i.e. unfinished) command
+				// ignore if at the start position on the line!!!
+				if(!_userinputline||getUserInputLength()>_userinputline->offset){
+					showContinuedPrompt();
+					showSuggestedText(); // we have to rewrite the suggested text though
+					outputTokenColor(_userInputCommand->_lastToken); // and show the right color
+				}else // at start of user input line, do not allow having empty user input lines!!!
+					beep();
+				continue;
+			}
+
 			if(inputCharType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
 
 			// from now on no continue's anymore, because at the end of the loop we want to check for inputCharType equaling o
@@ -8361,7 +8474,9 @@ int main(int argc, char **argv){
 						if(!getFirstManualFeedforwardCharacterRemoved())inputCharType=switchToControlMode("Failed to delete the first suggested character.");
 					}else
 					if(_identifierContinuationCharacters){
-						deleteIdentifierContinuation();
+						// MDH@30OCT2019: by blocking the subsequent update (the next time), we loose the identifier continuation automatically
+						userInputCommandIdentifierContinuationNeedsUpdating=false; // ascertain to block or not block accordingly (i.e. if we're in an identifier don't block, either wise block)
+						/// replacing: deleteIdentifierContinuation();
 						///////writeSuggestedText(false);
 					}else
 					if(_firstTokenautocompletiontext){ // replacing: string_length(feedforwardText)){ // something to delete
@@ -8372,7 +8487,7 @@ int main(int argc, char **argv){
 				if(inputCharType=='b'){ // backspace
 					///////debugWrite("BACKSPACE");
 					// something to remove?
-					if(getUserInputCursorPosition()) // TODO _userInputCommand->_firstToken should be NULL at the same time getCommandLength() becomes 0!!!
+					if(getUserInputLength()) // TODO _userInputCommand->_firstToken should be NULL at the same time getCommandLength() becomes 0!!!
 						removePreviousTokenCharacter();
 					else // nothing to remove
 						beep();
@@ -8578,7 +8693,7 @@ int main(int argc, char **argv){
 										beep();
 								}else
 								if(inputChar==68){ // left arrow
-									if(getUserInputCursorPosition()){
+									if(getUserInputLength()){
 										// TODO apparently _userInputCommand->_firstToken will still be NULL when we're scrolling through the list of previous commands...
 										// MDH@03SEP2019: BUG FIX forgot to make commandIndex 0 when copying the command (as copyUserInputCommand() itself does not seem to do that!!!)
 										if(commandIndex){commandIndex=0;copyUserInputCommand();} // will also set getCommandLength()!!!
@@ -8721,7 +8836,7 @@ int main(int argc, char **argv){
 			}else{ // Shell command input mode
 				// we still allow using certain 'special' characters for composing the command (much like we did with a command)
 				if(inputCharType=='b'){ // backspace
-					uint16_t cp=getUserInputCursorPosition();
+					uint16_t cp=getUserInputLength();
 					if(cp){
 						if(string_removed_char(shellCommand,cp-1)){
 							moveCursorLeft(1);
@@ -8796,12 +8911,12 @@ int main(int argc, char **argv){
 											////////writeSuggestedText(true);
 											inputCharType=switchToControlMode("Failed to accept the suggested characters.");
 										}else
-											string_insert_char(shellCommand,getUserInputCursorPosition(),newInputChar);
+											string_insert_char(shellCommand,getUserInputLength(),newInputChar);
 									}else
 										beep();
 								}else
 								if(inputChar==68){ // left arrow
-									uint16_t cp=getUserInputCursorPosition();
+									uint16_t cp=getUserInputLength();
 									if(cp){
 										bool success=false;
 										char c=string_removed_char(shellCommand,cp-1);
@@ -8822,7 +8937,7 @@ int main(int argc, char **argv){
 				}else{
 					string_append_char(shellCommand,inputChar);
 					outputChar(inputChar);
-					// MDH@24APR2019: getUserInputCursorPosition()++;
+					// MDH@24APR2019: getUserInputLength()++;
 				}
 			}
 			// if switched to control mode, inputCharType will be equal to 'o' and we break out of this input loop!!!
@@ -8861,14 +8976,14 @@ int main(int argc, char **argv){
 				Mtoken* _userInputCommand->_firstTokenToEvaluate=NULL; // this would be the command to register if we succeed in evaluating it!!!
 				if(_userInputCommand->_firstToken){ // a current command being edited
 					// MDH@22MAR2019: currently the first token is an EXPRESSION token
-					if(getUserInputCursorPosition()>string_length(_userInputCommand->_firstToken->text)){
+					if(getUserInputLength()>string_length(_userInputCommand->_firstToken->text)){
 						// finish the last token???
 						if(_userInputCommand->_lastToken->significantCharacterCount==0)_userInputCommand->_lastToken->significantCharacterCount=string_length(_userInputCommand->_lastToken->text);
 						_userInputCommand->_firstTokenToEvaluate=_userInputCommand->_firstToken; // but only when not at start of command!!!
 						if(amDebugging())outputTokenInfo();
 					}
 				}else // no command yet, although we might be looking at a previous command
-				if(commandIndex&&getUserInputCursorPosition()) // NOTE using getUserInputCursorPosition() is better than using amAcceptinghistorycommand() (causing it!!)
+				if(commandIndex&&getUserInputLength()) // NOTE using getUserInputLength() is better than using amAcceptinghistorycommand() (causing it!!)
 					_userInputCommand->_firstTokenToEvaluate=commands[commandCount-commandIndex];
 				*/
 

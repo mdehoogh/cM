@@ -172,7 +172,7 @@ mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * con
             }else{ // numerator and denominator computed
                 c->num=_num;
                 c->den=_den;
-                /////// not on pure rationals!!!! c->delta=_realdifference(a->delta,b->delta);
+                /////// not on pure rationals!!!! c->delta=_floatdifference(a->delta,b->delta);
                 if(!c->normalized)normalizeRational(c);
             }
         }
@@ -181,26 +181,26 @@ mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * con
     return status;
 }
 
-// for the computation of the sum of two Mreals
+// for the computation of the sum of two long doubles
 long double ldsum(long double ld1,long double ld2){
     // if either is M_LD_NAN return the other
     if(ld1==M_LD_NAN)return ld2;if(ld2==M_LD_NAN)return ld1;return ld1+ld2;
 }
-long double realsum(Mreal* _real1,Mreal* _real2){
-	if(!_real1&&!_real2)return M_LD_NAN; // both undefined
+long double floatsum(Mfloat* _float1,Mfloat* _float2){
+	if(!_float1&&!_float2)return M_LD_NAN; // both undefined
     // return the other if one is undefined
-	if(!_real1)return _real2->ld;
-	if(!_real2)return _real1->ld;
+	if(!_float1)return _float2->ld;
+	if(!_float2)return _float1->ld;
     // both are defined BUT then we still have the problem that either could be undefined
-    return ldsum(_real1->ld,_real2->ld);
+    return ldsum(_float1->ld,_float2->ld);
 }
-Mreal* _realsum(Mreal* r1,Mreal* r2){
+Mfloat* _floatsum(Mfloat* r1,Mfloat* r2){
     // if either real is defined a sum real is to be produced
     // NOTE _getReal ALWAYS returns a real (if possible) so even when M_LD_NAN is in it
-    if(realIsUndefinedOrZero(r2))return _getRealCopy(r1);
-    if(realIsUndefinedOrZero(r1))return _getRealCopy(r2);
+    if(floatIsUndefinedOrZero(r2))return _getFloatCopy(r1);
+    if(floatIsUndefinedOrZero(r1))return _getFloatCopy(r2);
     // ASSERT neither is undefined or zero
-    return _getReal(realsum(r1,r2));
+    return _getFloat(floatsum(r1,r2));
 }
 // for the computation of the difference of two reals
 long double lddifference(long double ld1,long double ld2){
@@ -208,36 +208,36 @@ long double lddifference(long double ld1,long double ld2){
     if(ld1==M_LD_NAN&&ld2==M_LD_NAN)return M_LD_NAN;
     if(ld1==M_LD_NAN)return -ld2;if(ld2==M_LD_NAN)return ld1;return ld1-ld2;
 }
-long double realdifference(Mreal* _real1,Mreal* _real2){
-	if(!_real1&&!_real2)return M_LD_NAN; // both undefined
+long double floatdifference(Mfloat* _float1,Mfloat* _float2){
+	if(!_float1&&!_float2)return M_LD_NAN; // both undefined
     // return the other if one is undefined
-	if(!_real1)return -_real2->ld; // return the NEGATED value of the second real
-	if(!_real2)return _real1->ld;
+	if(!_float1)return -_float2->ld; // return the NEGATED value of the second real
+	if(!_float2)return _float1->ld;
     // both are defined BUT then we still have the problem that either could be undefined
-    return lddifference(_real1->ld,_real2->ld);
+    return lddifference(_float1->ld,_float2->ld);
 }
-Mreal* _realdifference(Mreal* r1,Mreal* r2){
-    if(realIsUndefinedOrZero(r2))return _getRealCopy(r1);
-    if(realIsUndefinedOrZero(r1))return _getRealNeg(r2);
-    return _getReal(realdifference(r1,r2));
+Mfloat* _floatdifference(Mfloat* r1,Mfloat* r2){
+    if(floatIsUndefinedOrZero(r2))return _getFloatCopy(r1);
+    if(floatIsUndefinedOrZero(r1))return _getFloatNeg(r2);
+    return _getFloat(floatdifference(r1,r2));
 }
 // for the computation of the product of two reals (which is very simple)
 long double ldproduct(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld2==M_LD_NAN?M_LD_NAN:ld1*ld2);} // either undefined, product undefined
-long double realproduct(Mreal* r1,Mreal* r2){return(r1&&r2?ldproduct(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
-Mreal* _realproduct(Mreal* r1,Mreal* r2){return(r1||r2?_getReal(realproduct(r1,r2)):NULL);} // either undefined, product undefined
+long double floatproduct(Mfloat* r1,Mfloat* r2){return(r1&&r2?ldproduct(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
+Mfloat* _floatproduct(Mfloat* r1,Mfloat* r2){return(r1||r2?_getFloat(floatproduct(r1,r2)):NULL);} // either undefined, product undefined
 // for the computation of the quotient of two reals
 // NOTE if the second quotient is zero, we'd get infinity, so one should avoid this from happening, because then the quotient would be infinity!!!
 long double ldquotient(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld2==M_LD_NAN?M_LD_NAN:ld1/ld2);} // either undefined, quotient undefined
-long double realquotient(Mreal* r1,Mreal* r2){return(r1&&r2?ldquotient(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
-Mreal* _realquotient(Mreal* r1,Mreal* r2){return(r1||r2?_getReal(realquotient(r1,r2)):NULL);} // either undefined, product undefined
+long double floatquotient(Mfloat* r1,Mfloat* r2){return(r1&&r2?ldquotient(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
+Mfloat* _floatquotient(Mfloat* r1,Mfloat* r2){return(r1||r2?_getFloat(floatquotient(r1,r2)):NULL);} // either undefined, product undefined
 
 mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
-    ///////Mreal* _delta=NULL;
+    ///////Mfloat* _delta=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
     if(status==MP_OKAY)status=_bimul(a->den,b->den,&_den); // multiply denominators to become the result denominator
     if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-    ////// OOPS the deltas are handled by _getRationalSum!!!! if(status==MP_OKAY){_delta=_realsum(a->delta,b->delta);if(!_delta)if(a->delta||b->delta)status=MP_ERR;} // if we failed in adding the delta's error as well
+    ////// OOPS the deltas are handled by _getRationalSum!!!! if(status==MP_OKAY){_delta=_floatsum(a->delta,b->delta);if(!_delta)if(a->delta||b->delta)status=MP_ERR;} // if we failed in adding the delta's error as well
     if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num1); // multiply numerator of a with denominator of b for the plus term of the result numerator
     if(status==MP_OKAY)status=_bimul(a->den,b->num,&_num2); // multiply denominator of a with numerator of b for the min term of the result numerator
     if(status==MP_OKAY)status=_biadd(_num1,_num2,&_num); // add the numerator parts
@@ -250,7 +250,7 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
         ////outputLine("Freeing new numerator, denominator and delta!");
         if(_num)free_biginteger(_num);
         if(_den)free_biginteger(_den);
-        //////if(_delta)free_real(_delta);
+        //////if(_delta)free_float(_delta);
         ////outputLine("New numerator, denominator and delta freed!");
     }else{ // numerator and denominator computed
         ////outputBiginteger("Storing numerator '",_num,"'");outputBiginteger(" and denominator '",_den,"'.\n");
@@ -277,20 +277,20 @@ mp_err _qcopy(Mrational* const b,Mrational const * const a){
     if(status==MP_OKAY){
         // get copies of numerator, denominator and delta of the source
         Mbiginteger *_num=(a->num?_getBigintegerCopy(a->num):NULL),*_den=(a->den?_getBigintegerCopy(a->den):NULL);
-        Mreal* _delta=(a->delta?_getReal(a->delta->ld):NULL);
+        Mfloat* _delta=(a->delta?_getFloat(a->delta->ld):NULL);
         // if copying failed mark as error
         if(a->num&&!_num)status=MP_ERR;else if(a->den&&!_den)status=MP_ERR;else if(a->delta&&!_delta)status=MP_ERR;
         if(status==MP_OKAY){ // copies made successfully
             // move copies freeing all originals in the process
             if(b->num)free_biginteger(b->num);b->num=_num;
             if(b->den)free_biginteger(b->den);b->den=_den;
-            if(b->delta)free_real(b->delta);b->delta=_delta;
+            if(b->delta)free_float(b->delta);b->delta=_delta;
             b->normalized=a->normalized;
         }else{
             // free all copies if made
             if(_num)free_biginteger(_num);
             if(_den)free_biginteger(_den);
-            if(_delta)free_real(_delta);
+            if(_delta)free_float(_delta);
         }
     }
     return status;
@@ -308,7 +308,7 @@ mp_err _qcopy_bi(Mrational* const b,Mbiginteger const * const a){
             // move copies freeing all originals in the process
             if(b->num)free_biginteger(b->num);b->num=_num;
             if(b->den)free_biginteger(b->den);b->den=NULL;
-            if(b->delta)free_real(b->delta);b->delta=NULL;
+            if(b->delta)free_float(b->delta);b->delta=NULL;
             b->normalized=true;
         }else
             status=MP_ERR;
@@ -335,7 +335,7 @@ bool _qeq(Mrational* q1,Mrational* q2,mp_err *status){
 Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * const q2){
     Mrational* _pureRationalSum=NULL;
     if(q1&&q2){ // rationals defined
-        if(realIsUndefinedOrZero(q1->delta)&&realIsUndefinedOrZero(q2->delta)){ // both are pure
+        if(floatIsUndefinedOrZero(q1->delta)&&floatIsUndefinedOrZero(q2->delta)){ // both are pure
             _pureRationalSum=__rational();
             if(_pureRationalSum){
                 if(_qadd(_pureRationalSum,q1,q2)!=MP_OKAY){
@@ -356,7 +356,7 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
         mp_err status=_qadd(_rational,q1,q2);
         if(status==MP_OKAY){
             // compute the delta
-        	_rational->delta=_realsum(q1->delta,q2->delta);
+        	_rational->delta=_floatsum(q1->delta,q2->delta);
             // if failed to compute the delta mark error
             if(q1->delta&&q2->delta)if(!_rational->delta)status=MP_ERR;
         }
@@ -374,7 +374,7 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
         if(status==MP_OKAY){
             if(amVerbose()){outputRational("Difference '",_rational,"'.\n");}
             // compute the delta
-        	_rational->delta=_realdifference(q1->delta,q2->delta);
+        	_rational->delta=_floatdifference(q1->delta,q2->delta);
             // if failed to compute the delta mark error
             if(q1->delta&&q2->delta)if(!_rational->delta){outputError("Failed to compute the difference of two rational deltas");status=MP_ERR;}
         }else
@@ -390,7 +390,7 @@ long long qsign(Mrational* rational){
     if(!rational)return M_LL_INVALID;
     // assuming that the denominator is always positive we only have to consider the sign of (num/den)+delta=(num+den*delta/den), so the sign of num+den*delta
     // if delta is defined which is obviously not recommended at all
-    if(realIsUndefinedOrZero(rational->delta))return(isBigintegerZero(rational->num)?0:(mp_isneg(rational->num)?-1:1));
+    if(floatIsUndefinedOrZero(rational->delta))return(isBigintegerZero(rational->num)?0:(mp_isneg(rational->num)?-1:1));
     // convert num and den to doubles
     long double lddelta=rational->delta->ld,ldnum=mp_get_long_double(rational->num),ldden=(rational->den?mp_get_long_double(rational->den):1);
     long double ldsign=(ldnum-lddelta*ldden);
@@ -463,19 +463,19 @@ Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * cons
     if(_rational){
         mp_err status=_qmul(_rational,q1,q2);
         if(status==MP_OKAY){
-            // TODO switch over from using realIsUndefinedOrZero() to isRealUndefined() and isRealZero()
-        	bool delta1defined=!realIsUndefinedOrZero(q1->delta),delta2defined=!realIsUndefinedOrZero(q2->delta);
+            // TODO switch over from using floatIsUndefinedOrZero() to isFloatUndefined() and isFloatZero()
+        	bool delta1defined=!floatIsUndefinedOrZero(q1->delta),delta2defined=!floatIsUndefinedOrZero(q2->delta);
             // if at least one is defined, there will be a delta in the product
             if(delta1defined||delta2defined){
                 // the delta is either a single term or the sum of three terms
                 long double term1=(delta1defined?getLongDoubleRationalProduct(q1->delta->ld,q2):M_LD_NAN),term2=(delta2defined?getLongDoubleRationalProduct(q2->delta->ld,q1):M_LD_NAN);
                 if(term1!=M_LD_NAN&&term2!=M_LD_NAN) // both terms are defined
-                    _rational->delta=_getReal(term1+term2+ldproduct(q1->delta->ld,q2->delta->ld));
+                    _rational->delta=_getFloat(term1+term2+ldproduct(q1->delta->ld,q2->delta->ld));
                 else
                 if(term1!=M_LD_NAN) // term1 is defined
-                    _rational->delta=_getReal(term1);
+                    _rational->delta=_getFloat(term1);
                 else // term2 is defined
-                    _rational->delta=_getReal(term2);
+                    _rational->delta=_getFloat(term2);
                 // if failed to compute the delta mark error
                 if(q1->delta&&q2->delta)if(!_rational->delta)status=MP_ERR;
             }
@@ -491,7 +491,7 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
     if(_rational){
         mp_err status=_qdiv(_rational,q1,q2);
         if(status==MP_OKAY){
-        	bool delta1defined=!realIsUndefinedOrZero(q1->delta),delta2defined=!realIsUndefinedOrZero(q2->delta);
+        	bool delta1defined=!floatIsUndefinedOrZero(q1->delta),delta2defined=!floatIsUndefinedOrZero(q2->delta);
             // TODO if either delta is defined the new rational will also have a delta!!!
             if(delta2defined){
                  // the new delta is the quotient of (delta1-r*delta2) and the value of q2
@@ -500,10 +500,10 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
                  long double ldNumerator=lddifference(delta1defined?q1->delta->ld:0,getLongDoubleRationalProduct(q2->delta->ld,_rational));
                  long double ldDenominator=getRationalLongDouble(q2);
                  if(amVerbose())output("New rational quotient delta: numerator=%*Lf - denominator=%*Lf.\n",LDBL_DIG,ldNumerator,LDBL_DIG,ldDenominator);
-                _rational->delta=_getReal(ldquotient(ldNumerator,ldDenominator));
+                _rational->delta=_getFloat(ldquotient(ldNumerator,ldDenominator));
             }else
             if(delta1defined)
-                _rational->delta=_getReal(getLongDoubleRationalQuotient(q1->delta->ld,q2));
+                _rational->delta=_getFloat(getLongDoubleRationalQuotient(q1->delta->ld,q2));
         }else{
             free_rational(_rational);_rational=NULL;outputError("Failed to compute the quotient of two rationals");
         }
@@ -741,7 +741,7 @@ void free_rational(Mrational* _rational){
     if(_rational){
         if(_rational->num)free_biginteger(_rational->num);
         if(_rational->den)free_biginteger(_rational->den);
-        if(_rational->delta)free_real(_rational->delta);
+        if(_rational->delta)free_float(_rational->delta);
         free(_rational);
     }else
     if(amDebugging())outputLine("No rational to free!");
@@ -798,7 +798,7 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
     if(_rational){
         // get the delta in (for now we also store zero in a real i.e. the only requirement for delta is that it should be defined, i.e. not NaN or supernormal)
         if(!isLongDoubleUndefined(delta)){ // we need a delta
-            _rational->delta=_getReal(delta); // store the delta if a valid value
+            _rational->delta=_getFloat(delta); // store the delta if a valid value
             if(!_rational->delta){free_rational(_rational);_rational=NULL;outputError("Failed to create the rational delta");}
         }
         if(_rational){
@@ -897,7 +897,7 @@ Mrational* _getInverseRational(Mrational const * const _rational){
     if(!_rational){outputError("No rational to invert");return NULL;}
     Mrational* _inverseRational=NULL;
     // for now only allow inverting pure rationals!!! with a delta that is either undefined or considered zero (might still be subnormal though)!!!
-    if(isRealUndefined(_rational->delta)==M_TRUE||isRealZero(_rational->delta)==M_TRUE){
+    if(isFloatUndefined(_rational->delta)==M_TRUE||isFloatZero(_rational->delta)==M_TRUE){
         Mbiginteger *_inverseNumerator=(_rational->den?_getBigintegerCopy(_rational->den):_getBiginteger(1)),*_inverseDenominator=(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1)); // free on failure
         if(_inverseNumerator&&_inverseDenominator)_inverseRational=_getRational(_inverseNumerator,_inverseDenominator,M_LD_NAN,!_rational->normalized,false);
         if(!_inverseRational){free_biginteger(_inverseNumerator);free_biginteger(_inverseDenominator);outputError("Failed to create the inverse rational");}else if(_rational->normalized)_inverseRational->normalized=true; // nasty TODO check if this is correct
@@ -912,7 +912,7 @@ Mrational* _getInverseRational(Mrational const * const _rational){
 // rationals can equal zero or one but only when the delta value equals 0 (or is not defined which is the same)
 bool isRationalZero(Mrational* _rational){
     // if the rational does not have a num, the numerator equals 1, and obviously is NOT zero
-    return(_rational&&_rational->num?isBigintegerZero(_rational->num)&&realIsUndefinedOrZero(_rational->delta):false); // the delta needs to be undefined (i.e. zero)
+    return(_rational&&_rational->num?isBigintegerZero(_rational->num)&&floatIsUndefinedOrZero(_rational->delta):false); // the delta needs to be undefined (i.e. zero)
 }// VALIDATED 
 
 bool isRationalOne(Mrational* _rational){
@@ -1060,19 +1060,19 @@ long double getRationalLongDouble(const Mrational* const _rational){
         // it's easiest to turn the numerator big integer into a long double and add delta to it, and divide by the long double stored in the denominator
         // TODO find a better way to do this
         long double ldNumerator=mp_get_long_double(_rational->num); // NOTE also shortcuts when _rational->num equals 0 but we have to add the delta, so we have to do it this way
-        if(amVerbose())output("Rational numerator converted to real '%.*Lf'.\n",LDBL_DIG,ldNumerator);
+        if(amVerbose())output("Rational numerator converted to long double '%.*Lf'.\n",LDBL_DIG,ldNumerator);
         if(isLongDoubleUndefined(ldNumerator)==M_FALSE){ // not undefined i.e. supposedly defined (although it could still be infinity theoretically)
             // if we do NOT have a denominator (i.e. the denominator equals one we only need to add the delta (if any))
             if(!_rational->den){if(_rational->delta)ldNumerator+=_rational->delta->ld;return ldNumerator;}
             // ASSERT a denominator is present
             long double ldDenominator=mp_get_long_double(_rational->den);
-            if(isRealUndefined(_rational->delta)!=M_TRUE&&isRealZero(_rational->delta)!=M_TRUE)ldNumerator+=(ldDenominator*_rational->delta->ld); // if delta is NOT undefined and NOT zero, add the denominator multiplied by the delta to the numerator
+            if(isFloatUndefined(_rational->delta)!=M_TRUE&&isFloatZero(_rational->delta)!=M_TRUE)ldNumerator+=(ldDenominator*_rational->delta->ld); // if delta is NOT undefined and NOT zero, add the denominator multiplied by the delta to the numerator
             // a denominator which is not equal to 1
-            if(amVerbose())output("Rational denominator converted to real '%.*Lf'.\n",LDBL_DIG,ldDenominator);
+            if(amVerbose())output("Rational denominator converted to long double '%.*Lf'.\n",LDBL_DIG,ldDenominator);
             if(isLongDoubleUndefined(ldDenominator)!=M_TRUE&&isLongDoubleZero(ldDenominator)!=M_TRUE)return ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok but testing it just the same
-            if(amVerbose())outputError("Failed to convert a rational denominator to a real");
+            if(amVerbose())outputError("Failed to convert a rational denominator to a long double");
         }
-        if(amVerbose())outputError("Failed to convert a rational numerator to a real");
+        if(amVerbose())outputError("Failed to convert a rational numerator to a long double");
     }
     return M_LD_NAN; // if something went wrong
 }/* VALIDATED */
@@ -1085,11 +1085,11 @@ long double getUnpureRationalNumerator(Mbiginteger* numerator,Mbiginteger* denom
             // an 'unpure' (fake) rational, we're forced to use ld to compute the 'true' numerator
             if(denominator){ // the denominator isn't 1
                 long double ldDenominator=mp_get_long_double(denominator);
-                if(isLongDoubleUndefined(ldDenominator)==M_TRUE){outputError("Failed to convert a rational denominator to a real.");return false;}
+                if(isLongDoubleUndefined(ldDenominator)==M_TRUE){outputError("Failed to convert a rational denominator to a long double.");return false;}
                 if(isLongDoubleOne(ldDenominator)!=M_TRUE)ld*=ldDenominator; // if the denominator doesn't equal 1 multiply ld by it
             }
             long double ldNumerator=mp_get_long_double(numerator);
-            if(isLongDoubleUndefined(ldNumerator)==M_TRUE){outputError("Failed to convert a rational numerator to a real.");return false;}
+            if(isLongDoubleUndefined(ldNumerator)==M_TRUE){outputError("Failed to convert a rational numerator to a long double.");return false;}
             return ld+ldNumerator;
         }
     }
@@ -1109,7 +1109,7 @@ long long getRationalSign(Mrational const * const rational){
     // ASSERT if rational->num should always be defined (even if it equals 1), if it is not it is not a valid rational!!!!
     long long rationalSign=M_LL_INVALID;
     if(isRationalUndefined(rational)==M_FALSE){ // the rational is defined (so it is not NULL and has a non NULL numerator)
-        long double ld=getRealLongDouble(rational->delta);
+        long double ld=getFloatLongDouble(rational->delta);
         rationalSign=(isLongDoubleUndefined(ld)==M_TRUE?getBigintegerSign(rational->num):getLongDoubleSign(getUnpureRationalNumerator(rational->num,rational->den,ld)));
     }
     if(amVerbose()){outputRational("Sign of rational '",rational,"':");output("%lld.\n",rationalSign);}
@@ -1132,7 +1132,7 @@ long long isRationalOne(Mrational const * const rational){
     long long result=M_LL_INVALID;
     if(isRationalUndefined(rational)!=M_TRUE){
         if(amVerbose())outputRational("Checking if '",rational,"' equals one");
-        long double ld=getRealLongDouble(rational->delta);
+        long double ld=getFloatLongDouble(rational->delta);
         // without a delta, a rational equals 1 when the numerator and denominator are the same
         if(isLongDoubleUndefined(ld)!=M_TRUE&&isLongDoubleZero(ld)!=M_TRUE) // neither undefined, nor zero
             result=(isLongDoubleOne(getUnpureRationalNumerator(rational->num,rational->den,ld))?M_TRUE:M_FALSE);
