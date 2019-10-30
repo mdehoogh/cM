@@ -43,7 +43,7 @@ void outputErrorAndText(const char* const error,const char* const text);
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
 // VT_REF coming up next for storing (second-level) references (main variables are the first named values)
-typedef enum Mvaluetype {VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED=0,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 

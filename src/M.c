@@ -1070,6 +1070,7 @@ Mvalue* type(Mvalue* _value){
 	// every value should have a type text, even if NULL
 	if(_value)
 	switch(_value->type){
+		case VT_UNDEFINED:return _getTextValue("'-",false);
 		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that, so we can use t for text????
 		case VT_INTEGER:return _getTextValue("'i",false);
 		case VT_BIGINTEGER:return _getTextValue("'I",false);
@@ -1079,7 +1080,6 @@ Mvalue* type(Mvalue* _value){
 		case VT_TEXT:return _getTextValue("'t",false); // t for text
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
-		case VT_UNDEFINED:return _getTextValue("'u",false);
 		case VT_REFERENCE:return _getTextValue("'r",false); // r now short for reference, as changing real into float
 		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
@@ -1244,6 +1244,9 @@ bool initEnvironment(){
 	NAF_value=_getFloatValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
 
+	NULL_value=__value(); 
+	if(!NULL_value){outputError("Failed to initialize NULL.");return false;}
+
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
 	//                therefore it shouldn't be a token value 
 	/*
@@ -1269,7 +1272,7 @@ bool initEnvironment(){
 		if(environmentFunctionMap){
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
 			// MDH@29MAY2019: we've got (symbol) NULL
-			if(!addVariable(_Menvironment,"NULL",VT_TOKEN,true)||!setValue(_Menvironment,"NULL",NULL_value)){
+			if(!addVariable(_Menvironment,"NULL",VT_UNDEFINED,true)||!setValue(_Menvironment,"NULL",NULL_value)){
 				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
 			}
 			if(!NAF_value||!addVariable(_Menvironment,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
