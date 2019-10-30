@@ -18,9 +18,6 @@
 // Menvironment includes Mvalue includes Mexecution includes ...
 #include "Menvironment.h"
 
-void toStartOfPreviousLine(){oneLineUp();} // MDH@30OCT2019: we do NOT clear that line anymore because we might be clearing user input text (which we do not want to)
-void toStartOfNextLine(){oneLineDown();}
-
 char const * const M_VERSION="0.1.0";
 
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -35,15 +32,15 @@ char const * const M_BUILD="9";char const * const M_DATE="30 October 2019, 18:00
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
-const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","real","text","list","map"};
+const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference"};
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
 const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="function";
-const char* const MUTABLEVALUETYPECHARS="utibdqrslm"; // the characters associated with each of the value types
-const char* const IMMUTABLEVALUETYPECHARS="UTIBDQRSLM"; // the characters associated with each of the value types
+const char* const MUTABLEVALUETYPECHARS="utibdqfclmr"; // the characters associated with each of the value types
+const char* const IMMUTABLEVALUETYPECHARS="UTIBDQFCLMR"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 
 const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
@@ -1073,17 +1070,17 @@ Mvalue* type(Mvalue* _value){
 	// every value should have a type text, even if NULL
 	if(_value)
 	switch(_value->type){
-		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that????
+		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that, so we can use t for text????
 		case VT_INTEGER:return _getTextValue("'i",false);
 		case VT_BIGINTEGER:return _getTextValue("'I",false);
 		case VT_DECIMAL:return _getTextValue("'d",false);
 		case VT_RATIONAL:return _getTextValue("'q",false);
 		case VT_FLOAT:return _getTextValue("'f",false);
-		case VT_TEXT:return _getTextValue("'t",false);
+		case VT_TEXT:return _getTextValue("'t",false); // t for text
 		case VT_LIST:return _getTextValue("'l",false);
 		case VT_MAP:return _getTextValue("'m",false);
 		case VT_UNDEFINED:return _getTextValue("'u",false);
-		case VT_REFERENCE:return _getTextValue("'&",false); // TODO any better idea for a reference?????
+		case VT_REFERENCE:return _getTextValue("'r",false); // r now short for reference, as changing real into float
 		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
 	return _getTextValue("'",false);
@@ -2835,16 +2832,16 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
  "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+ */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
 {"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}="}, /* Baeru finished bin.op. */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }="}, /* Baeru finished bin.op. */ \
 {""    ,""    ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}" }, /* BAeRu assignable repeatable */ \
-{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,  ?:    ]{}" }, /* BaERu comp. (<>) bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* BAeru assignable bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]"   }, /* BAeRu assignable repeatable */ \
+{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,  ?:    ]"   }, /* BaERu comp. (<>) bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]"   }, /* BAeru assignable bin.op. */ \
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`@;! DS%()&*+- .>?:   [ { " }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`@;! DS%()&*+- .>?:   [ {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
@@ -4167,6 +4164,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator){
 	if(!_list1)return _list2;if(!_list2)return _list1;
+	// MDH@30OCT2019: ALWAYS apply the binary operator i.e. do NOT just return the value!!! (which makes perfect sense for equality / unequality)
+	//                TODO if the result equals NULL, should we then NOT add the given element?????
 	// ASSERT neither are NULL
 	Mlist* _result=_getListOfType(_list1->valuetype==_list2->valuetype?_list1->valuetype:VT_UNDEFINED); // TODO if the types are the same use that?
 	// elements with the same index are to be added and stored under that index
@@ -4181,15 +4180,15 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 				if(appendedToList(_result,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index))consumed1=consumed2=true;
 			}else
 			if(_listelement1->index<_listelement2->index){
-				if(appendedToList(_result,_listelement1->_value,_listelement1->index))consumed1=true;
+				if(appendedToList(_result,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
 			}else{
-				if(appendedToList(_result,_listelement2->_value,_listelement2->index))consumed2=true;
+				if(appendedToList(_result,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
 			}
 		}else
 		if(_listelement1){
-			if(appendedToList(_result,_listelement1->_value,_listelement1->index))consumed1=true;
+			if(appendedToList(_result,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
 		}else
-			if(appendedToList(_result,_listelement2->_value,_listelement2->index))consumed2=true;
+			if(appendedToList(_result,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
 		// done?????
 		if(!consumed1&&!consumed2)break; // if neither consumed done
 		if(consumed1)_listelement1=_listelement1->_next;
@@ -6076,7 +6075,8 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
-	if(!_value1||!_value2)return NULL;
+	if(!_value1&&!_value2)return _getIntegerValue(M_FALSE); // NULL == NULL
+	if(!_value1||!_value2)return _getIntegerValue(M_TRUE); // !NULL != NULL
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,unequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,unequalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
@@ -6125,7 +6125,8 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
-	if(!_value1||!_value2)return NULL;
+	if(!_value1&&!_value2)return _getIntegerValue(M_TRUE); // NULL == NULL
+	if(!_value1||!_value2)return _getIntegerValue(M_FALSE); // !NULL != NULL
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
