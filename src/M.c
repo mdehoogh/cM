@@ -2495,9 +2495,19 @@ void outputLastTokenChar(Mtoken* _token){
 // MDH@30APR2019: when a function returns to a variable and the other way round
 void reoutputToken(Mtoken* _token){
 	if(!_token)return;
+	size_t tokenLength=(_token->text?string_length(_token->text):0);
+	if(tokenLength==0)return; // shouldn't happen though
 	// MDH@31OCT2019: this is particularly hard if the token is written over several lines
-	moveCursorLeft(string_length(_token->text));
+	//                I solved this by making the newline character always end a token (by treating it as whitespace that effectively ends any current token)
+	//                but now we have the situation that the given token might be at the previous line, this is the case when the token was ended with a newline and we're now at the start of the next line
+	//                the situation is: we're at the end of the token and its type changed and we have to write it again and return to the current position
+	//                we might have consumed an assignment operator behind it returning us to this token which might be variable that could also be a function (?????)
+	//                the problem with writing the token is that it does not recognize the newline character at the end
+	bool tokenOnPreviousInputLine=(string_last_char(_token->text)==M_NEWLINE_CHARACTER);
+	if(tokenOnPreviousInputLine){oneLineUp();toStartOfLine();moveCursorRight(promptLength+(_userinputline->offset-(_userinputline->_prev?_userinputline->_prev->offset:0)));}
+	moveCursorLeft(tokenLength);
 	outputToken(_token); // back where we started (hopefully)
+	if(tokenOnPreviousInputLine){oneLineDown();toStartOfLine();moveCursorRight(promptLength+getUserInputLength()-_userinputline->offset);}
 }
 /**
  * freeToken() frees the memory @_userInputCommand->_lastToken points to and returns true on successfully removing the entire chain of tokens it points to
