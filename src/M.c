@@ -28,7 +28,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="6";char const * const M_DATE="26 October 2019, 20:20";
 //char const * const M_BUILD="7";char const * const M_DATE="27 October 2019, 12:00";
 //char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
-char const * const M_BUILD="9";char const * const M_DATE="30 October 2019, 18:00";
+//char const * const M_BUILD="9";char const * const M_DATE="30 October 2019, 18:00";
+char const * const M_BUILD="10";char const * const M_DATE="31 October 2019, 12:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -62,6 +63,9 @@ const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits
 long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
 
 const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
+
+const char M_WHITESPACE_CHARACTER=' '; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
+const char M_NEWLINE_CHARACTER='\\'; // MDH@31OCT2019: the character to request a newline with!!!
 
 // I guess we could allow the user to specify another eps value through the QEPS command line argument!!!
 
@@ -2328,13 +2332,16 @@ Muserinputline* __userinputline(){
 	return _newUserinputline;
 }
 // call free_userinputline() when starting a new user input command
-void free_userinputline(){
+size_t free_userinputline(){
+	size_t numberOfUserInputLines=0;
 	Muserinputline* prevUserinputline;
 	while(_userinputline){
+		numberOfUserInputLines++;
 		prevUserinputline=_userinputline->_prev;
 		FREE(_userinputline,'L');
 		_userinputline=prevUserinputline;
 	}
+	return numberOfUserInputLines;
 }
 void removeUserinputline(){
 	Muserinputline* prevUserinputline=_userinputline->_prev;
@@ -2463,11 +2470,21 @@ void outputTokenColor(Mtoken* _token){
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
 }
 size_t outputToken(Mtoken* _token){
-	if(!_token)return 0;
-	outputTokenColor(_token);
-	// if we allow comments in tokens we're in trouble!!!
-	output("%s",string(_token->text));
-	return string_length(_token->text);
+	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
+	if(numberOfCharactersToOutput>0){
+		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
+		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
+		char firstWhitespaceCharacter=(_token->significantCharacterCount>0?string_replacedchar(_token->text,'\0',_token->significantCharacterCount):'\0');
+		// if we allow comments in tokens we're in trouble!!!
+		outputTokenColor(_token);output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
+		// if there's whitespace text to start with write it in the default output color
+		if(firstWhitespaceCharacter){ // some whitespace left to write
+			string_setchar(_token->text,firstWhitespaceCharacter,_token->significantCharacterCount);
+			resetOutputColor();
+			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
+		}
+	}
+	return numberOfCharactersToOutput;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
 void outputLastTokenChar(Mtoken* _token){
@@ -2478,6 +2495,7 @@ void outputLastTokenChar(Mtoken* _token){
 // MDH@30APR2019: when a function returns to a variable and the other way round
 void reoutputToken(Mtoken* _token){
 	if(!_token)return;
+	// MDH@31OCT2019: this is particularly hard if the token is written over several lines
 	moveCursorLeft(string_length(_token->text));
 	outputToken(_token); // back where we started (hopefully)
 }
@@ -2768,8 +2786,15 @@ void reset(){
 // MDH@16APR2019: removing the o input character type (for switching explicitly to or from control mode), replacing it by n, so we can use the backtick for certain purposes...
 //                in certain languages it means evaluate this (or the result of a system command??????)
 //                furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
+// MDH@31OCT2019: let's use the backtick (`) as special whitespace character to use when one wants to insert a line break (i.e. continue the command on the next line)
+//                although this would mean that it would show up when writing the tokens
+//                we tried inserting a TT_WHITESPACE token with a backtick character (i.e. using ` as associated input character type) but ran into all kinds of problems so now we treat ` as W input character type
+//                so it is appended to the current token, we only need to get it displayed in another color
+//                ok, we're going to use \ for newline request character, so \ used to be % now becomes for type \ indicating a newline request (or escape character in a string!!!!)
+//                switched to using the blank to indicate a newline request (using \ is a bit clumsy, backtick goes back to being the backtick, although no idea what we can use it for)
+//                no we let \ be whitespace but we can turn it into a blank when it's a functional newline request
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
@@ -6636,19 +6661,22 @@ Mexpressionvalue* getFunctionValue(Mtoken* _offsetToken,char* functionName){
 
 Mstring* _getCommandText(bool color){
 	Mstring* commandText=__string();
-	Mtoken* pCommandToken=_userInputCommand->_firstToken; // TODO can we get rid of using commandcount-1 here????
-	while(pCommandToken){
+	Mtoken* commandToken=_userInputCommand->_firstToken; // TODO can we get rid of using commandcount-1 here????
+	while(commandToken){
 		// if we bump into a comment we're done!!!
-		if(pCommandToken->type==TT_COMMENT)break;
+		if(commandToken->type==TT_COMMENT)break;
 		// TODO there must be a better way to do the coloring!!!
-		if(color){string_append(commandText,ES"38;5;");string_append(commandText,getTokenColor(pCommandToken->type));string_append_char(commandText,'m');} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
-		string_append(commandText,string(pCommandToken->text));
+		if(color){string_append(commandText,ES"38;5;");string_append(commandText,getTokenColor(commandToken->type));string_append_char(commandText,'m');} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
+		// MDH@31OCT2019: for now decided NOT to show the whitespace inside the tokens (by replacing the first whitespace character with the end-of-string marker)
+		char firstWhitespaceTokenCharacter=(commandToken->significantCharacterCount>0?string_replacedchar(commandToken->text,'\0',commandToken->significantCharacterCount):'\0');
+		string_append(commandText,string(commandToken->text));
+		if(firstWhitespaceTokenCharacter)string_setchar(commandToken->text,firstWhitespaceTokenCharacter,commandToken->significantCharacterCount); // put first whitespace character (if any) back
 		// MDH@03MAY2019: place an asterisk in front of the type to indicate that expr is NOT null!!
 		if(amAssisting()){
 			if(color){string_append(commandText,ES"38;5;");string_append(commandText,getInfoColor());string_append_char(commandText,'m');}
-			string_append_char(commandText,'(');if(pCommandToken->expr)string_append_char(commandText,'*');string_append(commandText,TOKENTYPE_STRING[pCommandToken->type]);string_append(commandText,") ");
+			string_append_char(commandText,'(');if(commandToken->expr)string_append_char(commandText,'*');string_append(commandText,TOKENTYPE_STRING[commandToken->type]);string_append(commandText,") ");
 		}
-		pCommandToken=pCommandToken->next;
+		commandToken=commandToken->next;
 	}
 	if(color)if(!amAssisting()){string_append(commandText,ES"38;5;");string_append(commandText,getInfoColor());string_append_char(commandText,'m');} // reset to info color
 	return commandText;
@@ -6873,10 +6901,14 @@ void prepareForUserInput(){
 }
 
 // MDH@24APR2019: writeCommand() writes the command to evaluate, and sets _userInputCommand->_lastToken in the process
+// MDH@31OCT2019: there's a complication when the last character in the token is the newline character
 void writeCommand(Mcommand * const command){
 	Mtoken* token=(command?command->_firstToken:NULL);
 	while(token){
 		numberOfBehindPromptCharactersWritten+=outputToken(command->_lastToken=token);
+		// are we supposed to generate a newline?
+		// NOTE we're assuming there that a string can never end with this character which is also the text escape character (which requires another character following it)
+		if(string_last_char(command->_lastToken->text)==M_NEWLINE_CHARACTER)showContinuedPrompt();
 		token=token->next;
 	}
 }
@@ -7091,8 +7123,15 @@ void backToPrompt(){
 	// this will be more complicated if the command occupies multiple lines
 	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
 	// replacing: restoreCursor();clearScreenFromCursor();
+
+	// MDH@31OCT2019: with a clearScreenFromCursor() following it suffices to first move to the initial prompt line
+	size_t linesfreed=free_userinputline();
+	while(linesfreed>0){linesfreed--;oneLineUp();}
+	toStartOfLine();moveCursorRight(promptLength); // should now be at the right position for clearing
+	/* replacing:
 	uint16_t cp=getUserInputLength();
 	while(cp--)backspace(); // MDH@24APR2019 replacing: while(getUserInputLength()>0){getUserInputLength()--;backspace();}
+	*/
 	/*
 	if(getUserInputLength()>0){moveCursorLeft(getUserInputLength());getUserInputLength()=0;}
 	clearScreenFromCursor();
@@ -7480,6 +7519,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 // MDH@14AUG2019: cancelCommand() takes care of removing everything in the current command
 void cancelCommand(){ // in response to Ctrl-C or backspace on the first character
 	if(amVerbose())inputInfo("Cancelling the command.");
+	// MDH@31OCT2019: with a command now possibly covering multiple lines we have to do a little more than we did before but we can put that in backToPrompt()
 	backToPrompt();
 	clearScreenFromCursor(); // inserting doing this otherwise (in the case of backspace) we would apparently still see the behind cursor text
 	clearCommand();
@@ -7691,19 +7731,43 @@ void changeFunctionTokenToAVariable(bool endOfInput){
 //                NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
 //                NOTE we have to use the pointer to the last command token because if we used the last command token itself, we wouldn't be able to change the last command token!!!!
 //                NOTE instead we're returning the last command token (which will change if starting a new token!!!!)
-Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputCharacterType,bool endOfInput){
+Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput){
 	// determine the token type associated with the newly inputted character
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
 	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
 	if(!lastCommandToken){inputError("BUG: No last command token.");return NULL;}
 	if(amDebugging())inputInfo("Appending '%c'.",inputChar);
-	if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))inputCharacterType='R';
-	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
-	if(inputCharacterType=='W')if(lastCommandToken->type==TT_ERROR||lastCommandToken->type==TT_COMMENT||lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)inputCharacterType='w';
+	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
+	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
+	//                so it's actually best if we create a new token that points to the last non-whitespace command token
+	//                and we should not allow an R input character type to continue an operator like that on the previous line, or checking whether someone entered a whitespace where it's not an whitespace ending a token
+	Mtoken* lastNonwhitespaceCommandToken=lastCommandToken;while(lastNonwhitespaceCommandToken->type==TT_WHITESPACE)lastNonwhitespaceCommandToken=lastNonwhitespaceCommandToken->prev;
+	if(lastNonwhitespaceCommandToken==lastCommandToken){ // not behind a whitespace (newline) token
+	*/
+		if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))*inputCharacterType='R';
+		// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
+		// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
+		//                there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
+		if(*inputCharacterType=='W'){ // whitespace isn't always 'functional' whitespace (i.e. they can be part of the actual command)
+			if(lastCommandToken->type==TT_ERROR||lastCommandToken->type==TT_COMMENT||lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)*inputCharacterType='w';
+		}else
+		if(*inputCharacterType==' '){ // indicating a new line request (but not in a string)
+			if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING)*inputCharacterType='w';
+		}
+	/*
+	}
+	*/
 	int16_t newTokenType=0; // MDH@05JUN2019: we need newTokenType AFTER appending the last character allowed in a token (like q behind a integer or real)
-	if(inputCharacterType!='W'){ // only characters that are not whitespace can start a new token
-		newTokenType=nextTokenType(lastCommandToken->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+	if(*inputCharacterType!='W'){ // only characters that are not whitespace can start a new token
+		// MDH@31OCT2019: if we decide to always insert an empty TT_NEWLINE token on a backtick (`) newline character
+		//                we have to be careful here though because if we're in a TT_WHITESPACE (dummy) token, we should look at the one before that (so essentially any TT_WHITESPACE should end immediately)
+		if(*inputCharacterType=='`'){ // a (functional) new line request character
+			// not acceptable when not end of input or behind another new line token
+			if(!endOfInput||lastCommandToken->type==TT_WHITESPACE)return NULL;
+			newTokenType=TT_WHITESPACE;
+		}else // not the newline character (currently also `)
+			newTokenType=nextTokenType(lastCommandToken->type,*inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 #ifdef __DEBUG__
 	resetOutputColor();
 	printf("[%d+%c->%d]",_userInputCommand->_lastToken->type,inputCharacterType,newTokenType);
@@ -7717,7 +7781,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputChar
 				if(lastCommandToken->type==TT_FUNCTION){
 					// we should assume that the identifier represents a (new) variable (identifier)
 					changeFunctionTokenToAVariable(endOfInput);
-					newTokenType=nextTokenType(lastCommandToken->type,inputCharacterType);
+					newTokenType=nextTokenType(lastCommandToken->type,*inputCharacterType);
 				}
 				break;
 			case TT_END_OF_DQSTRING:
@@ -7747,7 +7811,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputChar
 			}
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
-			if(inputCharacterType=='='&&lastCommandToken->type==TT_ASSIGNMENT&&(lastCommandToken->prev->type==TT_BINARY_AeRu||lastCommandToken->prev->type==TT_BINARY_Aeru)){
+			if(*inputCharacterType=='='&&lastCommandToken->type==TT_ASSIGNMENT&&(lastCommandToken->prev->type==TT_BINARY_AeRu||lastCommandToken->prev->type==TT_BINARY_Aeru)){
 				newTokenType=TT_ERROR;
 				if(amVerbose())inputError("A shortcut operator assignment cannot change into an equality.");
 			}
@@ -7956,10 +8020,11 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char inputChar
 			/////// moved over to commandCharacterAccepted because it's definitely not part of an inline command (evaluated by Meval!!!) outputTokenColor(lastCommandToken);
 			/////if(amDebugging())inputInfo("H");
 		}
-	}else // a functional whitespace character, ends a current token!!
-	if(lastCommandToken->significantCharacterCount==0&&lastCommandToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
-		lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
-
+	}else{ // a functional whitespace character, ends a current token!!
+		if(lastCommandToken->significantCharacterCount==0&&lastCommandToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+			lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
+		if(inputChar==' ')inputChar=M_WHITESPACE_CHARACTER; // MDH@31OCT2019: so we can make the blanks visible!!
+	}
 	/////if(amDebugging())inputInfo("I");
 	// append the typed character at getUserInputLength() minus current token offset in _userInputCommand->_lastToken->text
 	string_append_char(lastCommandToken->text,inputChar);
@@ -7984,13 +8049,14 @@ Mvalue* Mevalfunction(Mvalue* value){
 			Mtoken* _lastEvalCommandToken=_evalCommandToken;
 			*/
 			uint32_t pos=0;
-			char evalInputChar;
+			char evalInputChar,evalInputCharType;
 			if(amVerbose())output("Parsing '");
 			Mtoken* newLastEvalCommandToken=NULL;
 			while(pos<string_length(_evalValueText)){
 				evalInputChar=string_char(_evalValueText,pos++);
 				if(amVerbose())outputChar(evalInputChar);
-				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,evalInputChar,INPUTCHARACTERTYPES[evalInputChar],false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
+				evalInputCharType=INPUTCHARACTERTYPES[evalInputChar];
+				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,evalInputChar,&evalInputCharType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
 				if(newLastEvalCommandToken!=_evalCommand->_lastToken)_evalCommand->_lastToken=newLastEvalCommandToken; // update our eval command's last token TODO do we need to test here????
 				if(!_evalCommand->_lastToken)break;
 			}
@@ -8020,7 +8086,7 @@ Mvalue* Mevalfunction(Mvalue* value){
 //       		  ASSERTION _userInputCommand->_firstToken and _userInputCommand->_lastToken are  NOT  NULL
 //                the endOfInput flag is used to indicate whether this is the end of the input
 //                the aSuggestedCharacter flag tells commandCharacterAccepted() that the input character came from feedforwardText (the feed forward), so it will in that case not alter feedforwardText (by removing the same character that was entered)
-bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
+bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
 	/////outputChar('1');
@@ -8060,6 +8126,17 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
 		_userInputCommand->_lastToken=newLastCommandToEvaluateToken;
 		outputUserInputCommandTokenColor();
+	}else{
+		// MDH@31OCT2019: show whitespace in the standard info color!!
+		if(_userInputCommand->_lastToken->significantCharacterCount>0){
+			resetOutputColor();
+			if(*inputCharacterType=='W'&&inputChar==M_NEWLINE_CHARACTER)*inputCharacterType=' '; // convert the newlinecharacter (which type should be W to the blank)
+		}
+		/*
+		if(string_last_char(_userInputCommand->_lastToken->text)=='`'&&_userInputCommand->_lastToken->type!=TT_DQSTRING&&_userInputCommand->_lastToken->type!=TT_SQSTRING){
+			resetOutputColor();
+		}
+		*/
 	}
 
 	/////if(amDebugging())inputInfo("J");
@@ -8070,7 +8147,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
 	
 	if(endOfInput){
-		//////if(amAssisting())output(":%c",inputCharacterType);
+		//////if(amAssisting())output(":%c",*inputCharacterType);
 		debugWrite("Command length after inserting %c: %zu.",inputChar,getCommandLength());
 	}
 
@@ -8141,7 +8218,7 @@ bool commandCharacterAccepted(char inputChar,char inputCharacterType,bool endOfI
 		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amDebugging())inputInfo("N");
 		debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
-		//////////if(!initializationsChanged)outputStatus(inputChar,inputCharacterType);
+		//////////if(!initializationsChanged)outputStatus(inputChar,*inputCharacterType);
 		/////if(amDebugging())inputInfo("O");
 	}
 	/////if(amDebugging())inputInfo("P");
@@ -8185,7 +8262,10 @@ char getFirstSuggestedCharacter(bool autogenerated){return(_identifierContinuati
 char getFirstSuggestedCharacterConsumed(char firstSuggestedCharacter,bool endOfInput){
 	// if the first suggested character is provided use that, otherwise get any
 	if(!firstSuggestedCharacter)firstSuggestedCharacter=getFirstSuggestedCharacter(false); // any first suggested character will do
-	if(firstSuggestedCharacter&&!commandCharacterAccepted(firstSuggestedCharacter,INPUTCHARACTERTYPES[firstSuggestedCharacter],endOfInput,true))firstSuggestedCharacter='\0';
+	if(firstSuggestedCharacter){
+		char firstSuggestedCharacterInputType=INPUTCHARACTERTYPES[firstSuggestedCharacter];
+		if(!commandCharacterAccepted(firstSuggestedCharacter,&firstSuggestedCharacterInputType,endOfInput,true))firstSuggestedCharacter='\0';
+	}
 	return firstSuggestedCharacter;
 }
 
@@ -8455,6 +8535,8 @@ int main(int argc, char **argv){
 			if(inputCharType=='i')continue; // insignificant input character without specific purpose
 
 			if(inputCharType=='n'){ // end-of-line (CR of LF) character
+				break; // MDH@31OCT2019: changed to using ` as newline character which is considered whitespace so it's appended to the end of a token and ends that token as well, so that a token cannot be split over two lines (which would be ackward)
+				/* replacing using it as a newline character:
 				// MDH@30OCT2019: if not in command mode or (in command mode) we do not have an input command or it is not valid
 				if(inputMode!=IM_COMMAND||!_userInputCommand||isAValidCommand(_userInputCommand,false))break;
 				// ASSERT in command mode with an invalid (i.e. unfinished) command
@@ -8466,6 +8548,7 @@ int main(int argc, char **argv){
 				}else // at start of user input line, do not allow having empty user input lines!!!
 					beep();
 				continue;
+				*/
 			}
 
 			if(inputCharType=='x')break; // eXit (Ctrl-C or Ctrl-Z) character
@@ -8556,7 +8639,7 @@ int main(int argc, char **argv){
 						if(numberOfIdentifierContinuationCharacters>0)numberOfCharactersToConsume=numberOfIdentifierContinuationCharacters;
 						else
 						if(numberOfManualFeedforwardCharacters>0)numberOfCharactersToConsume=numberOfManualFeedforwardCharacters;
-						char newInputChar='\0';
+						char newInputChar='\0',newInputCharType='\0';
 						size_t numberOfSuggestedCharactersAccepted=0;
 						while(numberOfSuggestedCharactersAccepted<numberOfCharactersToConsume){
 							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersAccepted);
@@ -8566,11 +8649,13 @@ int main(int argc, char **argv){
 							}
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
-							if(newInputChar!='#'&&!commandCharacterAccepted(newInputChar,INPUTCHARACTERTYPES[newInputChar],false,true)){
+							newInputCharType=INPUTCHARACTERTYPES[newInputChar];
+							if(newInputChar!='#'&&!commandCharacterAccepted(newInputChar,&newInputCharType,false,true)){
 								inputCharType=switchToControlMode("Failed to consume a suggested character.");
 								newInputChar='\0'; // to indicate some error occurred
 								break;
 							}
+							if(newInputCharType==' ')showContinuedPrompt(); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
 							numberOfSuggestedCharactersAccepted+=1;
 						}
 						// remove at most numberOfSuggestedCharactersAccepted from the suggested text
@@ -8685,7 +8770,11 @@ int main(int argc, char **argv){
 									if(string_length(_suggestedText)){
 										char c=string_char(_suggestedText,0);
 										if(c){
-											if(commandCharacterAccepted(c,INPUTCHARACTERTYPES[c],true,false)){
+											// MDH@31OCT2019: this might well be a newline character!!!
+											char suggestedInputCharType=INPUTCHARACTERTYPES[c];
+											if(commandCharacterAccepted(c,&suggestedInputCharType,true,false)){
+												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
+												if(inputCharType==' ')showContinuedPrompt(); // MDH@31OCT2019: we just consumed a newline (request) character
 												// where to remove it from????
 												// NOTE identifier continuation and immediate feed forward are redetermined automatically so do not need to be adjusted here
 												if(string_length(_manualFeedforwardText)){
@@ -8797,9 +8886,23 @@ int main(int argc, char **argv){
 					if(inputChar==getFirstSuggestedCharacter(true)){
 						char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed(inputChar,true);
 						if(firstSuggestedCharacterConsumed)removeFirstSuggestedCharacter(firstSuggestedCharacterConsumed,false);else inputCharType=switchToControlMode("Failed to accept the matching first suggested character.");
-					}else
-					if(!commandCharacterAccepted(inputChar,inputCharType,true,false))
-						inputCharType=switchToControlMode(_userInputCommand->_firstToken?"Failed to accept the character.":"Failed to create a new command.");
+					}else{
+						// MDH@31OCT2019: when the accepted character is the backtick in whitespace we should continue with the command on the next line
+						//                OOPS a backtick inside a string is also recognized as such which shouldn't happen
+						//                ALSO because the backtick will be visible it's probably better to insert an empty token for it of type TT_NEWLINE or something like that
+						//                it's probably best to check whether to accept a backtick here???? NOTE we could have backticks in commands read from files as well????
+						if(commandCharacterAccepted(inputChar,&inputCharType,true,false)){
+							if(inputCharType==' '){ // a newline request (whenever M_NEWLINE_CHARACTER is input at a functional position)
+								showContinuedPrompt();
+								//////////showSuggestedText(); // we have to rewrite the suggested text though
+								///////////outputTokenColor(_userInputCommand->_lastToken); // and show the right color
+							}
+						}else
+						if(inputCharType!='`') // not a new line request character
+							inputCharType=switchToControlMode(_userInputCommand->_firstToken?"Failed to accept the character.":"Failed to create a new command.");
+						else
+							inputError("New line request character not allowed here");
+					}
 					/*
 					// we need to have a token (to append the input character to) which initializes to _userInputCommand->_firstToken
 					if(_userInputCommand->_firstToken==NULL) // no first command token

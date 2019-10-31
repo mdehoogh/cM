@@ -89,6 +89,7 @@
 
 // MDH@30APR2019: inserted TT_NEW_VARIABLE to indicate a variable that does not yet exist (which means it cannot be compared with, and should be assigned first)
 // MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
+// MDH@31OCT2019: TT_WHITESPACE added which never should take part in any transition (so although it is a token type it is not counted in the number of (finishable) token types)
 #define NUMBER_OF_FINISHABLE_TOKEN_TYPES 26
 #define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
 // MDH@03MAY2019: TT_EXPRESSION is now the 'default' token type, so there's no need to set the token type on a new token
@@ -120,7 +121,8 @@
 		TOKENTYPE(TT_FUNCTION_CALL) \
 		TOKENTYPE(TT_END_OF_FUNCTION_CALL) \
 		TOKENTYPE(TT_COMMENT) \
-		TOKENTYPE(TT_ERROR)
+		TOKENTYPE(TT_ERROR) \
+        TOKENTYPE(TT_WHITESPACE)
 #define GENERATE_TOKENTYPE_ENUM(ENUM) ENUM,
 #define GENERATE_STRING(STRING) #STRING,
 typedef enum TOKENTYPE_ENUM {

@@ -333,7 +333,7 @@ void string_reverse(Mstring* const str){
 //                we will succeed if we have a function that will return the replaced character so we can put it back in again
 //                this method will NOT change str->length ever, meaning that if you forget to put the character back you're in trouble
 char string_replacedchar(Mstring * const str,char c,size_t pos){
-    if(!str||pos>=str->length)return '\0';
+    if(!str||pos>=str->length)return '\0'; // NOTE even though str->chars[str->length] might not be '\0' we're still returning '\0' in that case, as if it was there (otherwise we would have to write '\0' first as we do in string())
     char replacedchar=str->chars[pos];
     str->chars[pos]=c;
     return replacedchar;
