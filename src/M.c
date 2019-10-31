@@ -44,6 +44,13 @@ const char* const MUTABLEVALUETYPECHARS="utibdqfclmr"; // the characters associa
 const char* const IMMUTABLEVALUETYPECHARS="UTIBDQFCLMR"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 
+// MDH@31OCT2019: if the value of something equals the NULL value, this is the text to use to represent it, this is also the name of the NULL variable!!!
+//                alternatively we could use capital letters to denote the variable, and lowercase to denote the value (which makes sense I suppose)
+//                to prevent confusion it's best to use the same text for the value, otherwise they see 'null' as value and think they can use that to embed a NULL value!!!
+//                OK the NULL value is displayed in the normal foreground color whereas the variable is displayed in another color (see showValueColored() for the coloring)
+const char* const M_NULL_VALUE_TEXT_REPRESENTATION="NULL"; // the text to represent values that are undefined...
+const char* const M_NULL_VARIABLE_NAME="NULL";
+
 const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
 // it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
 const long long M_LL_MIN=LLONG_MIN+1;
@@ -1276,7 +1283,7 @@ bool initEnvironment(){
 		if(environmentFunctionMap){
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
 			// MDH@29MAY2019: we've got (symbol) NULL
-			if(!addVariable(_Menvironment,"NULL",VT_UNDEFINED,true)||!setValue(_Menvironment,"NULL",NULL_value)){
+			if(!addVariable(_Menvironment,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
 				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
 			}
 			if(!NAF_value||!addVariable(_Menvironment,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
@@ -2503,7 +2510,8 @@ void reoutputToken(Mtoken* _token){
 	//                the situation is: we're at the end of the token and its type changed and we have to write it again and return to the current position
 	//                we might have consumed an assignment operator behind it returning us to this token which might be variable that could also be a function (?????)
 	//                the problem with writing the token is that it does not recognize the newline character at the end
-	bool tokenOnPreviousInputLine=(string_last_char(_token->text)==M_NEWLINE_CHARACTER);
+	//                for safety reasons we look at _userinputline because if _userinputline is NULL there's no previous command input line
+	bool tokenOnPreviousInputLine=(_userinputline?(string_last_char(_token->text)==M_NEWLINE_CHARACTER):false);
 	if(tokenOnPreviousInputLine){oneLineUp();toStartOfLine();moveCursorRight(promptLength+(_userinputline->offset-(_userinputline->_prev?_userinputline->_prev->offset:0)));}
 	moveCursorLeft(tokenLength);
 	outputToken(_token); // back where we started (hopefully)
@@ -6703,7 +6711,8 @@ void clearCommand(){
 void outputValueColored(Mvalue* _value){
 	if(_value)
 	switch(_value->type){
-		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output(string(_value->value._token->text));break; // easy the token type determines the color to use!!!
+		case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_NULL_VALUE_TEXT_REPRESENTATION);break; // let's use the same color as for double quotes string (for now)
+		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
 		case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
 		case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
@@ -6733,6 +6742,7 @@ void outputValueColored(Mvalue* _value){
 		case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
 		case VT_LIST:
 			// TODO not using _getListText() as defined in Mexecution
+			/////////if(amVerbose())outputValue("List value '",_value,"'.");
 			outputChar('[');
 			Mlist* _list=_value->value._list;
 			if(_list&&_list->numberOfElements){

@@ -14,6 +14,7 @@ extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const ERROR_PREFIX;
+extern const char * const M_NULL_VALUE_TEXT_REPRESENTATION; // MDH@31OCT2019: the text to use to represent a value of type VT_UNDEFINED
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const long double LD_PI; // for Mfacd()
@@ -872,16 +873,16 @@ Mstring* _getListText(Mlist* _list){
             // increment listindex until it is equal to _listelement->index
             if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
             while(listindex<_listelement->index){listindex++;p=string_append_char(p,',');}
-            /////////p=appendull(p,_listelement->index);p=string_append_char(p,':');if(!p)break;
+            if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
 	        //////////outputChar('.');
 			_listelementValue=_listelement->_value;
-			if(_listelementValue){
+			/////if(_listelementValue){
 				Mstring* _listelementValueText=_getValueText(_listelementValue,false); // to be freed asap
 				if(_listelementValueText){
 					p=string_append(p,string(_listelementValueText));
 					free_string(_listelementValueText); // release AFTER copying over
 				}
-			}
+			/////}
 			_listelement=_listelement->_next;
 		}
 		p=string_append_char(p,']');
@@ -934,6 +935,10 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
 }/* VALIDATED */
 
 // MDH@24OCT2019: if you want the value representation or perhaps the name of a constant depends on whether name is defined
+/*
+static Mstring* _nullValueTextRepresentation=NULL;
+Mstring* _getNullValueTextRepresentation(){if(!_nullValueTextRepresentation)_nullValueTextRepresentation=_getString(M_NULL_VALUE_TEXT_REPRESENTATION);return _getNullValueTextRepresentation;}
+*/
 Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 	// NOTE whatever is returned should be freed
 	Mstring* valueText=NULL;
@@ -942,6 +947,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
         ////outputChar('+');
 		////output("TYPE: %d\n",_value->type);
 		switch(_value->type){
+            case VT_UNDEFINED:valueText=_getString(M_NULL_VALUE_TEXT_REPRESENTATION);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
             case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????
             case VT_DECIMAL:valueText=_getDecimalText(_value->value._decimal,false);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
