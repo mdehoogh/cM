@@ -4353,16 +4353,23 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		free_string(_valueText);
 		return _value;
 	}
-	// if either is a rational, compute the sum rational
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	// if either is a rational, compute the sum rational (NOTE or rationals disguised as decimals)
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
 		/////outputLine("Adding two rationals.");
 		Mrational* _sumRational=_getRationalSum(_rational1,_rational2); // _qsum replaced by _getRationalSum that takes the deltas into account as well
 		/////outputLine("Rationals added!");
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
 		outputLine("Rational copies released.");
-		if(!_sumRational)return NULL; // failed to create the sum for whatever reason
-		return _getRationalValue(_sumRational,true);
+		Mvalue* _sumValue=NULL;
+		if(_sumRational){
+			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
+				_sumValue=_getDecimalValue(_getRationalDecimal(_sumRational),true);
+				free_rational(_sumRational);
+			}else
+				_sumValue=_getRationalValue(_sumRational,true);
+		}
+		return _sumValue;
 	}
 	// if either is a decimal, compute the sum decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -4452,13 +4459,20 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		}
 		return _getBigintegerValue(_differenceBiginteger,true);
 	}
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
 		if(amVerbose()){outputRational("Computing the difference of rational '",_rational1,"'");outputRational(" and rational '",_rational2,"'.\n");}
 		Mrational* _differenceRational=_getRationalDifference(_rational1,_rational2); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
-		if(!_differenceRational)return NULL; // failed to create the sum for whatever reason
-		return _getRationalValue(_differenceRational,true);
+		Mvalue* _differenceValue=NULL;
+		if(_differenceRational){
+			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
+				_differenceValue=_getDecimalValue(_getRationalDecimal(_differenceRational),true);
+				free_rational(_differenceRational);
+			}else
+				_differenceValue=_getRationalValue(_differenceRational,true);
+		}
+		return _differenceValue;
 	}
 	// if either is a decimal, compute the difference decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -4549,20 +4563,21 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		return _getBigintegerValue(_productBiginteger,true);
 	}
 	*/
-	// if either is a real
-	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
-		if(amVerbose()){outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
-		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
-		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
-	}
 	// if either is rational do a rational multiplication
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		if(amVerbose()){outputValue("Multiplying rationals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		Mrational* _multiplicationRational=_getRationalProduct(_rational1,_rational2); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
+		Mrational* _productRational=_getRationalProduct(_rational1,_rational2); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
-		if(!_multiplicationRational)return NULL; // failed to create the sum for whatever reason
-		return _getRationalValue(_multiplicationRational,true);
+		Mvalue* _productValue=NULL;
+		if(_productRational){
+			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
+				_productValue=_getDecimalValue(_getRationalDecimal(_productRational),true);
+				free_rational(_productRational);
+			}else
+				_productValue=_getRationalValue(_productRational,true);
+		}
+		return _productValue;
 	}
 	// if either is a decimal, compute the product decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -4572,6 +4587,12 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_productDecimal)return NULL; // failed to create the sum for whatever reason
 		return _getDecimalValue(_productDecimal,true);
+	}
+	// if either is a real
+	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
+		if(amVerbose()){outputValue("Multiplying integer/reals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
+		long double ld1=getValueLongDouble(_value1),ld2=getValueLongDouble(_value2);
+		return _getFloatValue(isLongDoubleUndefined(ld1)==M_FALSE&&isLongDoubleUndefined(ld2)==M_FALSE?ld1*ld2:M_LD_NAN);
 	}
 	return NULL;
 }
@@ -5451,11 +5472,19 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 		return _getRationalValue(_rational,true); // when failing to bind _rational to a value, free it as well
 	}
 	// if one of them is a rational do a rational division
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		Mrational* _divisionRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		Mrational* _quotientRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
-		return _getRationalValue(_divisionRational,true);
+		Mvalue* _quotientValue=NULL;
+		if(_quotientRational){
+			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
+				_quotientValue=_getDecimalValue(_getRationalDecimal(_quotientRational),true);
+				free_rational(_quotientRational);
+			}else
+				_quotientValue=_getRationalValue(_quotientRational,true);
+		}
+		return _quotientValue;
 	}
 	// if either is a decimal, compute the quotient decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -5551,15 +5580,17 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 	}
 	*/
 	// MDH@28OCT2019: copied over from divide() and adjusted to return an integer
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		Mrational* _divisionRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		if(amVerbose()){outputRational("Determining the integer part of dividing rational '",_rational1,"'");outputRational(" by '",_rational2,"'.\n");}
+		Mrational* _quotientRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		if(amVerbose())outputRational("Quotient: '",_quotientRational,"'.\n");
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
 		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
-		if(!_divisionRational)return NULL;
-		Mbiginteger* _rationalInteger=_getRationalInteger(_divisionRational,true,true);
-		free_rational(_divisionRational); // only used for temporary storage of the division rational
+		if(!_quotientRational)return NULL;
+		Mbiginteger* _rationalInteger=_getRationalInteger(_quotientRational,true,true);
+		free_rational(_quotientRational); // only used for temporary storage of the division rational
 		return _getBigintegerValue(_rationalInteger,true);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -5657,15 +5688,17 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 	}
 	*/
 	// MDH@28OCT2019: copied over from integerdivide() and adjusted to return the remainder
-	if(_value1->type==VT_RATIONAL||_value2->type==VT_RATIONAL){
+	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		Mrational* _divisionRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		if(amVerbose()){outputRational("Determining the remainder of dividing rational '",_rational1,"'");outputRational(" by '",_rational2,"'.\n");}
+		Mrational* _quotientRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		if(amVerbose())outputRational("Quotient: '",_quotientRational,"'.\n");
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after dividing the two rationals we do not need the newly created rationals anymore
 		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
 		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
-		if(!_divisionRational)return NULL;
-		Mbiginteger* _rationalInteger=_getRationalInteger(_divisionRational,true,true);
-		free_rational(_divisionRational); // only used for temporary storage of the division rational
+		if(!_quotientRational)return NULL;
+		Mbiginteger* _rationalInteger=_getRationalInteger(_quotientRational,true,true);
+		free_rational(_quotientRational); // only used for temporary storage of the division rational
 		if(!_rationalInteger)return NULL;
 		return subtract(_value1,multiply(_value2,_getBigintegerValue(_rationalInteger,true))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
 	}

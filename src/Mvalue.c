@@ -1647,7 +1647,9 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){
 Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero){
     // TODO ignores delta for now
     if(_rational){
-        if(!_rational->num)return _getBiginteger(_rational->den?0:1); // if the numerator is undefined (i.e. equals 1), either return 0 or 1 (denominator 1)
+        if(!_rational->num)return NULL; // if the numerator is undefined, the rational is undefined!!!!
+        if(!_rational->den)return _getBigintegerCopy(_rational->num); // cannot get it much simpler if the rational already is integer
+        // ASSERT both numerator and denominator are NOT NULL
         bool neg=mp_isneg(_rational->num); // determine whether negative or not
         // get the absolute value of the numerator
         Mbiginteger* _absnum=__biginteger(); // to be freed asap
