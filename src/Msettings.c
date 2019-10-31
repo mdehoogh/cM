@@ -29,27 +29,30 @@ bool amAcceptinghistorycommand(){return acceptinghistorycommand;}
 // flags used in (interactive) session mode
 void setAssisting(bool newAssisting){
     assisting=newAssisting;
-    if(verbose)output("%s\n",(assisting?"Will assist!":"Will not assist!"));
+    output("\nWill %sassist!",(assisting?"":"not "));
 }
 void setDebugging(bool newDebugging){
     debugging=newDebugging;
-    if(verbose)output("%s\n",(debugging?"Will debug!":"Will not debug!"));
+    output("\nWill %sdebug!",(debugging?"":"not "));
 }
 void setMatchingparentheses(bool newMatchingparentheses){
     matchingparentheses=newMatchingparentheses;
-    if(verbose)output("%s\n",(matchingparentheses?"Will match parentheses!":"Will not match parentheses!"));
+    output("\nWill %smatch parentheses!",(matchingparentheses?"":"not"));
 }
 void setVerbose(bool newVerbose){
-    if(verbose)output("%s\n",(newVerbose?"Will be verbose!":"Will not be verbose!"));
     verbose=newVerbose;
+    output("\nWill %sbe verbose!",(verbose?"":"not "));
 }
 void setAcceptinghistorycommand(bool newAcceptinghistorycommand){
     acceptinghistorycommand=newAcceptinghistorycommand;
-    if(verbose)output("%s\nx",(acceptinghistorycommand?"Will use history command immediately!":"Will use history command as auto-completion!"));
+    output("\nWill use history command %s!",(acceptinghistorycommand?"immediately":"as auto-completion"));
 }
 
 // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
-void activateWrapmode(){outputControlText(wrapping?"?6l":"?7l");if(verbose)output(wrapping?"\nWill wrap!\n":"\nWill not wrap!\n");}
+void activateWrapmode(){
+    outputControlText(wrapping?"?6l":"?7l"); // 7h used to be 6l doesn't seem to work though
+    output("\nWill %s!",(wrapping?"wrap":"not wrap"));
+}
 // M settings
 void setWrapping(bool newWrapping){
 	wrapping=newWrapping;
