@@ -15,7 +15,6 @@ lib/*
 cdecimal-2.3/*
 
 libtommath-1.1.0/*
-libtommath.a
 libtommath/*.a
 libtommath/*.o
 
