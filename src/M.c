@@ -2826,7 +2826,7 @@ void reset(){
 //                switched to using the blank to indicate a newline request (using \ is a bit clumsy, backtick goes back to being the backtick, although no idea what we can use it for)
 //                no we let \ be whitespace but we can turn it into a blank when it's a functional newline request
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
@@ -8655,8 +8655,18 @@ int main(int argc, char **argv){
 					else // nothing to remove
 						beep();
 				}else
+				if(inputCharType=='h'){
+					if(_userInputCommand)
+						inputInfo("Press Enter to execute the command, Ctrl-C to clear the command, Ctrl-Z to exit M immediately.");
+					else
+						inputInfo("Use Ctrl-Z to exit M immediately, press the Enter key to switch to Control mode.");
+				}else
 				if(inputCharType=='c'){ // cancel command (Ctrl-C)
 					// replacing: if(_userInputCommand->_firstToken!=NULL){clearCommand();break;}beep(); 
+					if(!_userInputCommand){
+						inputInfo("Nothing to clear. (Use Ctrl-H for some help.)");
+						beep();
+					}else
 					if(_userInputCommand->_firstToken){
 						/////////if(amWrapping()())break; // if in amWrapping()() can't guarantee backspace() to move into the previous line which means just prompt again...
 						// MDH@03SEP2019: what to do when Ctrl-C is called on a previous command????? i.e. when _userInputCommand->_firstToken points to a previous command, I'd say that we should return to the current command
