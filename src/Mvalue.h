@@ -92,6 +92,7 @@ void free_map(Mmap* _map);
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 
 Mmap* _getMap(char *name);
+Mmap* _getMapCopy(Mmap const * const map);
 Mmap* _getFloatMap(char* name,Mvalue* _floatValue);
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
 Mmap* _getListMap(char* name,Mvalue* _listValue);
@@ -133,6 +134,7 @@ void free_value(Mvalue* _value);
 
 unsigned long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 void free_list(Mlist* _list);
+Mlist* _getListCopy(Mlist const * const _list);
 
 long long isListUndefined(Mlist* list);
 
@@ -180,7 +182,7 @@ long long isValueNull(Mvalue* value); // expose as well
 long long isValueUndefined(Mvalue* value); // expose as well
 
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
-void assignValue(Mvalue** _valueholder,Mvalue* const _value);
+void assignValue(Mvalue** _valueholder,Mvalue const * _value);
 
 Mvalue* __value(); // TODO expose __value()????? yes
 

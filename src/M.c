@@ -1413,6 +1413,20 @@ bool initEnvironment(){
 				outputError("Failed to register the sum and len list functions");
 				return false;
 			}
+			// MDH@01NOV2019: I have some generic list functions implemented
+			if(!completedValueFunction(_getFunction(_Menvironment,"empty"),"empty",Mempty)){
+				outputError("Failed to register the empty function");
+				return false;
+			}
+			if(!completedListFunction(_getFunction(_Menvironment,"pull"),"pull",Mpull)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
+				outputError("Failed to register the pull, pop, first and last function");
+				return false;
+			}
+			if(!completedListValueFunction(_getFunction(_Menvironment,"push"),"push",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"drop"),"drop",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"shove"),"shove",Mshove)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)){
+				outputError("Failed to register the push(=drop), shove and pop functions");
+				return false;
+			}
+
 			if(!completedValueFunction(_getFunction(_Menvironment,"tl"),"tl",Mtl)){
 				outputError("Failed to register the tl text function");
 				return false;

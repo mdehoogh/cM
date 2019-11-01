@@ -411,6 +411,63 @@ Mmap* _getMap(char *name){
     }
     return NULL;
 }/* VALIDATED */
+
+Mmap* _getMapCopy(Mmap const * const map){ // creates a 'deep' copy
+    if(map){
+        Mmap* _map=_getMapOfType(map->valuetype);
+        if(_map){
+            Mvariable *mapelementVariable,*_mapelementVariable=NULL;
+            Mmapelement *mapelement=map->_first,*_mapelement=NULL;
+            while(mapelement){
+                mapelementVariable=mapelement->_variable;
+                if(mapelementVariable){
+                    _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // new map element to hold a copy
+                    if(_mapelement){
+                        // create a variable with the same name and value as the variable in mapelement
+                        _mapelement->_variable=_getVariable(mapelementVariable->_name,mapelementVariable->valuetype,true);
+                        assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the vale over
+                        if(_map->_last)_map->_last->_next=_mapelement; // make the current last point to the new last
+                        _map->_last=_mapelement; // replace current last by the new last
+                        if(!_map->_first)_map->_first=_map->_last; // initialize first if necessary
+                        _map->numberOfElements++; // count one more
+                    }else
+                        output("%sFailed to copy map attribute '%s'.\n",ERROR_PREFIX,mapelementVariable->_name);
+                }
+                mapelement=mapelement->_next;
+            }
+            return _map;
+        }else
+            outputError("Failed to create a map");
+    }
+    return NULL;
+}
+Mlist* _getListCopy(Mlist const * const list){ // creates a 'deep' copy
+    if(list){
+        Mlist* _list=_getListOfType(list->valuetype);
+        if(_list){
+            Mlistelement *listelement=list->_first,*_listelement=NULL;
+            while(listelement){
+                _listelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l');
+                if(_listelement){
+                    // 'copy' the value over, here we have the same problem as with copying any other value: if the value to copy is composite (a list or a map) we should copy by value i.e. point to a new map or list and not to the original
+                    // technically we could let assignValue() take care of that 
+                    assignValue(&_listelement->_value,listelement->_value); // no need to 'copy' the value itself, we only need to make another (strong) reference to that value
+                    _listelement->index=listelement->index;
+                    if(_list->_last)_list->_last->_next=_listelement;
+                    _list->_last=_listelement;
+                    if(!_list->_first)_list->_first=_list->_last;
+                    _list->numberOfElements++;
+                }else 
+                    outputError("Failed to copy a list element");
+                listelement=listelement->_next;
+            }
+            return _list;
+        }else
+            outputError("Failed to create a list");
+    }
+    return NULL;
+}
+
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
     // NOTE wait with filling the single integer value map until we have all the ingredients
     if(name&&_integerValue){
@@ -1560,8 +1617,17 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
     return _iterationsList;
 }/* VALIDATED */
 
-void assignValue(Mvalue** _valueholder, Mvalue* const _value){
+void assignValue(Mvalue** _valueholder, Mvalue const * _value){
+    // ASSERT not a composite value (so like an end node)
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
+    // MDH@01NOV2019: it's a leap of faith to let assignValue() create copies of composite values i.e. instead of assigning _value to the *_valueholder we assign a new map or list value
+    if(_value){
+        // create a copy of the map or list and assign it to the value holder however it would then copy the map again, and that's not what should happen!!!
+        // NOTE the new map and list value get a reference count of 1 below as soon as they are bound to the value holder (as should be the case)
+        //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
+        if(_value->type==VT_MAP)_value=_getValueOfMap(_getMapCopy(_value->value._map),true);else
+        if(_value->type==VT_LIST)_value=_getValueOfList(_getListCopy(_value->value._list),true);
+    }
     *_valueholder=_value; // replace what's being pointed to
     if(*_valueholder)incrementReferenceCount(*_valueholder); // increment what it's pointing to now (if not NULL)
 }/* VALIDATED */
