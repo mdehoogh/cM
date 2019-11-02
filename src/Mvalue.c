@@ -20,10 +20,10 @@ extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as w
 extern const long double LD_PI; // for Mfacd()
 extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (default) decimal context
 
-void free_variable(Mvariable* _variable){
+void free_variable(Mvariable* _variable,bool weak){
     if(_variable){
         if(_variable->_name)free(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
-        if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
+        if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
         free(_variable);
     }
 }/* VALIDATED */
@@ -40,7 +40,7 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
     _variable->immutable=immutable;
     _variable->_name=_strdup(name); // create a dynamic pointer on the heap
     if(!_variable->_name){
-        free_variable(_variable);
+        free_variable(_variable,true);
         output("%sFailed to allocate memory to store name '%s' of the new variable.\n",ERROR_PREFIX,name);
         return NULL;
     }
@@ -71,29 +71,29 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
     return _variable;
 }/* VALIDATED */
 
-void free_listelement(Mlistelement* _listelement){
+void free_listelement(Mlistelement* _listelement,bool weak){
     if(_listelement){
-        if(_listelement->_next)free_listelement(_listelement->_next);
-        if(_listelement->_value)decrementReferenceCount(_listelement->_value); ///////// replacing: free_value(_listelement->_value);
+        if(_listelement->_next)free_listelement(_listelement->_next,weak);
+        if(!weak)if(_listelement->_value)decrementReferenceCount(_listelement->_value); ///////// replacing: free_value(_listelement->_value);
         free(_listelement);
     }
 }/* VALIDATED */
 void free_list(Mlist* _list){
     if(_list){
-        if(_list->_first)free_listelement(_list->_first);
+        if(_list->_first)free_listelement(_list->_first,_list->weak);
         free(_list);
     }
 }/* VALIDATED */
-void free_mapelement(Mmapelement* _mapelement){
+void free_mapelement(Mmapelement* _mapelement,bool weak){
     if(_mapelement){
-        if(_mapelement->_next)free_mapelement(_mapelement->_next);
-        if(_mapelement->_variable)free_variable(_mapelement->_variable);
+        if(_mapelement->_next)free_mapelement(_mapelement->_next,weak);
+        if(_mapelement->_variable)free_variable(_mapelement->_variable,weak);
         free(_mapelement);
     }
 }/* VALIDATED */
 void free_map(Mmap* _map){
     if(_map){
-        if(_map->_first)free_mapelement(_map->_first);
+        if(_map->_first)free_mapelement(_map->_first,_map->weak);
         free(_map);
     }
 }/* VALIDATED */
@@ -102,7 +102,9 @@ void free_map(Mmap* _map){
 void free_valuereference(Mvaluereference* _valuereference){
     if(_valuereference){
         if(_valuereference->_name){free(_valuereference->_name);_valuereference->_name=NULL;}
+        /* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
         if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
+        */
         if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
         free(_valuereference);
     }
@@ -314,17 +316,19 @@ Mvalue* _getCharTextValue(char _c){
     return _textValue;
 }/* VALIDATED */
 // we can force all listelements to have the same type????
-Mvalue* _getListValue(Mvaluetype listValuetype){
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak){
     Mlist* _list=(Mlist*)CALLOC(1,sizeof(Mlist),'L');
     if(!_list)return NULL;
+    _list->weak=weak;
     _list->valuetype=listValuetype; // register what type of elements this list should have
     Mvalue* _listvalue=__value();
     if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}else free_list(_list);
     return _listvalue;
 }/* VALIDATED */
-Mvalue* _getMapValue(Mvaluetype mapValuetype){
+Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){
     Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
     if(!_map)return NULL;
+    _map->weak=weak;
     _map->valuetype=mapValuetype;
     Mvalue* _mapvalue=__value();
     if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}else free_map(_map);
@@ -383,10 +387,10 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){
                     return _map;
                 }
                 outputError("Failed to create the float variable map");
-                free_mapelement(_mapelement);
+                free_mapelement(_mapelement,false);
             }else
                 outputError("Failed to create the float variable map element");
-            free_variable(_realVariable);
+            free_variable(_realVariable,false);
         }else
             outputError("Failed to create the float variable");
     }
@@ -405,9 +409,9 @@ Mmap* _getMap(char *name){
                 _map->numberOfElements=1;
                 return _map;
             }
-            free_mapelement(_mapelement);
+            free_mapelement(_mapelement,false);
         }
-        free_variable(_variable);
+        free_variable(_variable,false);
     }
     return NULL;
 }/* VALIDATED */
@@ -485,10 +489,10 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
                     return _map;
                 }
                 outputError("Failed to create the integer variable map");
-                free_mapelement(_mapelement);
+                free_mapelement(_mapelement,false);
             }else
                 outputError("Failed to create the integer variable map element");
-            free_variable(_integerVariable);
+            free_variable(_integerVariable,false);
         }else
             outputError("Failed to create the integer variable");
     }
@@ -518,8 +522,8 @@ Mmap* _getStringStringMap(char* name1,char* name2){
             }else
                 outputError("Failed to create both string map elements");
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1);
-            free_mapelement(_mapelement2);
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
         }else
             output("%sMap element attribute keys '%s' and '%s' undefined or the same.\n",ERROR_PREFIX,name1,name2);
     }else
@@ -547,8 +551,8 @@ Mmap* _getFloatFloatMap(char* name1,char* name2){
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1);
-            free_mapelement(_mapelement2);
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
         }
     }
     return NULL;
@@ -570,10 +574,10 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
                     return _map;
                 }
                 outputError("Failed to create the list variable map");
-                free_mapelement(_mapelement);
+                free_mapelement(_mapelement,false);
             }else
                 outputError("Failed to create the list variable map element");
-            free_variable(_listVariable);
+            free_variable(_listVariable,false);
        }else
             outputError("Failed to create the list variable");
     }
@@ -603,9 +607,9 @@ Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1);
-            free_mapelement(_mapelement2);
-            free_mapelement(_mapelement3);
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+            free_mapelement(_mapelement3,false);
         }
     }
     return NULL;
@@ -631,8 +635,8 @@ Mmap* _getTokenTokenMap(char* name1,char* name2){
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1);
-            free_mapelement(_mapelement2);
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
         }
     }
     return NULL;
@@ -661,9 +665,9 @@ Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1);
-            free_mapelement(_mapelement2);
-            free_mapelement(_mapelement3);
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+            free_mapelement(_mapelement3,false);
         }
     }
     return NULL;
@@ -692,9 +696,9 @@ Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1);
-            free_mapelement(_mapelement2);
-            free_mapelement(_mapelement3);
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+            free_mapelement(_mapelement3,false);
         }
     }
     return NULL;
@@ -727,10 +731,10 @@ Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1);
-            free_mapelement(_mapelement2);
-            free_mapelement(_mapelement3);
-            free_mapelement(_mapelement4);
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+            free_mapelement(_mapelement3,false);
+            free_mapelement(_mapelement4,false);
         }
     }
     return NULL;
@@ -808,7 +812,8 @@ unsigned long long appendedToList(Mlist * const _list,Mvalue const * const _valu
         _listelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l');
         if(!_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
     }
-    assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
+    // MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
+    if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
     // if replacing i.e. the index of _listelement matches index, we're done
     // if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
     if(_listelement->index!=index){ // insert or append
@@ -879,12 +884,13 @@ bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue
                     _map->_last=_mapelement;
                     _map->numberOfElements++;
                 }else{ // we have a map element BUT no variable, so no go
-                    free_mapelement(_mapelement);_mapelement=NULL;
+                    free_mapelement(_mapelement,false);_mapelement=NULL;
                 }
             }else
             if(amVerbose())outputError("Failed to create new map element");
         }
         if(_mapelement){
+            if(_map->weak)_mapelement->_variable->_value=_attributeValue;else // MDH@02NOB2019: if the map is weak assign directly!!
             assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
             return true;
         }
@@ -1211,7 +1217,7 @@ bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list){
             Mlistelement* _listelement=_list->_first;
             while(result&&_listelement){
                 // index and value of the list element are stored in a new list!!
-                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
+                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
                 if(!_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
                 Mlist* _maplistelement=_maplistelementValue->value._list;
                 // if we fail to construct the maplist element or to add it
@@ -1313,7 +1319,7 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map){
             Mmapelement* _mapelement=_map->_first;
             while(result&&_mapelement){
                // index and value of the list element are stored in a new list!!
-                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED);
+                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false);
                 Mlist* _maplistelement=(_maplistelementValue?_maplistelementValue->value._list:NULL);
                 if(_maplistelement){
                     // if we fail to construct the maplist element or to add it
@@ -1425,6 +1431,9 @@ Mdecimal* getValueDecimal(Mvalue* value){
 
 Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=CALLOC(1,sizeof(Mlist),'L');_list->valuetype=valuetype;return _list;}/* VALIDATED */
 Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=CALLOC(1,sizeof(Mmap),'M');_map->valuetype=valuetype;return _map;}/* VALIDATED */
+
+Mlist* listMadeWeak(Mlist* list){if(list)list->weak=true;return list;}
+Mmap* mapMadeWeak(Mmap* map){if(map)map->weak=true;return map;}
 
 long long getIntegerSign(long long integer){return(integer>0?1:(integer<0?-1:0));}
 long long getValueSign(Mvalue const * const value){
@@ -1625,8 +1634,14 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){
         // create a copy of the map or list and assign it to the value holder however it would then copy the map again, and that's not what should happen!!!
         // NOTE the new map and list value get a reference count of 1 below as soon as they are bound to the value holder (as should be the case)
         //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
-        if(_value->type==VT_MAP)_value=_getValueOfMap(_getMapCopy(_value->value._map),true);else
-        if(_value->type==VT_LIST)_value=_getValueOfList(_getListCopy(_value->value._list),true);
+        if(_value->type==VT_MAP){
+            if(amVerbose())outputValue("Copying map ",_value,".\n");
+            _value=_getValueOfMap(_getMapCopy(_value->value._map),true);
+        }else
+        if(_value->type==VT_LIST){
+            if(amVerbose())outputValue("Copying list ",_value,".\n");
+            _value=_getValueOfList(_getListCopy(_value->value._list),true);
+        }
     }
     *_valueholder=_value; // replace what's being pointed to
     if(*_valueholder)incrementReferenceCount(*_valueholder); // increment what it's pointing to now (if not NULL)

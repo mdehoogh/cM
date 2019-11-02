@@ -479,7 +479,7 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
                 }else
                     outputErrorAndText("No environment to add the newly created variable to",name);
                 // ASSERT failed to link the variable to the variable map!!
-                free_variable(_variable);
+                free_variable(_variable,true); // MDH@02NOV2019: no value yet assigned so we can pass in the weak flag
                 outputErrorAndText("Failed to link variable ",name);
             }else
                 outputErrorAndText("Failed to create variable ",name);
@@ -613,9 +613,9 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList){
     Mmap* _functionArgumentMap=NULL;
     if(_function&&_argumentList){
-        _functionArgumentMap=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+        _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC(1,sizeof(Mmap),'M')); // MDH@02NOV2019: force the map to be weak
         Mmap* functionParameterMap=_function->_parameterMap;
-        if(functionParameterMap){
+        if(_functionArgumentMap&&functionParameterMap){
             if(amVerbose())outputLine("Matching the function parameters!");
             Mmapelement* functionParameterMapelement=functionParameterMap->_first;
             Mlistelement* argumentListelement=_argumentList->_first;
@@ -624,16 +624,21 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
                 if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
                 _argumentmapelement->_variable=(Mvariable*)CALLOC(1,sizeof(Mvariable),'V');
-                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement);break;}
+                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true);break;}
                 // probably can't simply assign??? let's use _strdup then
                 _argumentmapelement->_variable->_name=_strdup(functionParameterMapelement->_variable->_name);
-                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement);break;}
+                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true);break;}
                 // associate the argument list element value (if available)
+                // MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)
+                //                we get a problem with functions like push() and shove() that try to adjust their argument
+                //                therefore we replace the call to assignValue() to a simple assignment
                 if(argumentListelement){
-                    assignValue(&_argumentmapelement->_variable->_value,argumentListelement->_value);
+                    _argumentmapelement->_variable->_value=argumentListelement->_value;
+                    // replacing: assignValue(&_argumentmapelement->_variable->_value,argumentListelement->_value);
                     argumentListelement=argumentListelement->_next;
                 }else // use the default!!!
-                    assignValue(&_argumentmapelement->_variable->_value,functionParameterMapelement->_variable->_value);
+                    _argumentmapelement->_variable->_value=functionParameterMapelement->_variable->_value;
+                    // replacing: assignValue(&_argumentmapelement->_variable->_value,functionParameterMapelement->_variable->_value);
                 // append to _argumentMap
                 if(_functionArgumentMap->_last)_functionArgumentMap->_last->_next=_argumentmapelement;else _functionArgumentMap->_first=_argumentmapelement;
                 _functionArgumentMap->_last=_argumentmapelement;
@@ -813,7 +818,7 @@ bool completedListFunction(Mfunction* const _function,const char* const function
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED));
+        _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED,false));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered list function '%s' completed.\n",functionName);
             return true;
@@ -827,7 +832,7 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=_getListMap("l",_getListValue(VT_TOKEN));
+        _function->_parameterMap=_getListMap("l",_getListValue(VT_TOKEN,false));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered token list function '%s' completed.\n",functionName);
             return true;

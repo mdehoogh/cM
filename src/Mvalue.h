@@ -60,6 +60,7 @@ typedef struct Mlist{
     Mvaluetype valuetype; // we can force a list to have elements of the same type
     Mlistelement* _first;
     Mlistelement* _last;
+    bool weak;
 }Mlist;
 
 typedef struct Mmapelement{
@@ -72,6 +73,7 @@ typedef struct Mmap{
     Mvaluetype valuetype; // the type all values in the map should have
     Mmapelement* _first;
     Mmapelement* _last;
+    bool weak;
 }Mmap;
 
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
@@ -111,8 +113,8 @@ Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure);
 Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char* text,bool freeonfailure);
-Mvalue* _getListValue(Mvaluetype listValuetype); // returning an empty list with all values to be of type listValuetype
-Mvalue* _getMapValue(Mvaluetype mapValuetype); // returning an empty map with all values to be of type mapValuetype
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak); // returning an empty list with all values to be of type listValuetype
+Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
@@ -124,6 +126,9 @@ Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure);
 
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mmap* _getMapOfType(Mvaluetype valuetype);
+
+Mlist* listMadeWeak(Mlist* list);
+Mmap* mapMadeWeak(Mmap* map);
 
 // MDH@02MAY2019: not allowed to call free_value from the outside
 bool decrementReferenceCount(Mvalue* _value);
@@ -190,9 +195,9 @@ size_t getNumberOfRemovedValues();
 unsigned long long getNumberOfValues();
 
 Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);
-void free_variable(Mvariable* _variable);
+void free_variable(Mvariable* _variable,bool weak);
 
-void free_mapelement(Mmapelement* _mapelement);
+void free_mapelement(Mmapelement* _mapelement,bool weak);
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);

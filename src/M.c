@@ -627,7 +627,7 @@ Mvalue* getResult(Mvalue* indexValue){
 Mvalue* l2m(Mvalue* value){
 	Mvalue* _mapValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_mapValue=_getMapValue(value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		_mapValue=_getMapValue(value->type,false); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!listAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _mapValue;
@@ -636,7 +636,7 @@ Mvalue* l2m(Mvalue* value){
 Mvalue* l2ml(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_maplistValue=_getListValue(VT_LIST); // a map list ALWAYS requires element of type VT_LIST
+		_maplistValue=_getListValue(VT_LIST,false); // a map list ALWAYS requires element of type VT_LIST
 		if(!listAppendedToMaplist(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _maplistValue;
@@ -645,7 +645,7 @@ Mvalue* l2ml(Mvalue* value){
 Mvalue* ml2l(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_maplistValue=_getListValue(value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		_maplistValue=_getListValue(value->type,false); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!maplistAppendedToList(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _maplistValue;
@@ -653,7 +653,7 @@ Mvalue* ml2l(Mvalue* value){
 Mvalue* ml2m(Mvalue* value){
 	Mvalue* _mapValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_mapValue=_getMapValue(value->type); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		_mapValue=_getMapValue(value->type,false); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!maplistAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _mapValue;
@@ -663,7 +663,7 @@ Mvalue* ml2m(Mvalue* value){
 Mvalue* m2ml(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_MAP){
-		_maplistValue=_getListValue(VT_LIST); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
+		_maplistValue=_getListValue(VT_LIST,false); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
 		if(!mapAppendedToMaplist(_maplistValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
 	return _maplistValue;
@@ -671,7 +671,7 @@ Mvalue* m2ml(Mvalue* value){
 Mvalue* m2l(Mvalue* value){
 	Mvalue* _listValue=NULL;
 	if(value&&value->type==VT_MAP){
-		_listValue=_getListValue(value->type);
+		_listValue=_getListValue(value->type,false);
 		if(!mapAppendedToList(_listValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
 	return _listValue;
@@ -1272,7 +1272,7 @@ bool initEnvironment(){
 	if(!DP_value)output("WARNING: Failed to initialize the decimal precision.");
 	*/
 
-	_resultListValue=_getListValue(VT_UNDEFINED); // ascertain to have a list value in which the results can be stored
+	_resultListValue=_getListValue(VT_UNDEFINED,true); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
 	_Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
@@ -3385,12 +3385,12 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 }
 
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
-Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate){
+Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
 	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
-	Mvalue* _listValue=_getListValue(VT_UNDEFINED); // replacing: getValueOfExpressionOfType(VT_LIST);
+	Mvalue* _listValue=_getListValue(VT_UNDEFINED,weak); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	if(!_list){output("Failed to create a list to return.\n");return NULL;}
 	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.\n");return NULL;}
@@ -3461,7 +3461,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 
 Mvalue* getValueOfMap(){
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // MDH@17JUL2019: one of five functions that use and advance the current expression token
-	Mvalue* _mapValue=_getMapValue(VT_UNDEFINED); // MDH@21MAY2019 for the same reason as above: replacing: getValueOfExpressionOfType(VT_MAP);
+	Mvalue* _mapValue=_getMapValue(VT_UNDEFINED,false); // MDH@21MAY2019 for the same reason as above: replacing: getValueOfExpressionOfType(VT_MAP);
 	Mmap* _map=_mapValue->value._map; // grab the map to fill
 	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
 	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
@@ -3626,7 +3626,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
 	Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
-	assignValue(&_valuereference->_value,_value);
+	_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
 	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	return _valuereference;
 }
@@ -3741,7 +3741,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 		}
 	}else{
 		if(amVerbose())outputValue("Returning referenced value: '",_valuereference->_value,"'.\n");
-		assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
+		referencedValue=_valuereference->_value; // MDH@02NOV2019 replacing: assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
 	}
 	///////if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
 	return referencedValue;
@@ -3812,7 +3812,8 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 							index=appendedToList(_value->value._list,_newValue,index);
 							// MDH@18OCT2019: why are we doing this????? i.e. is the value in the list still pointing somewhere??????
 							if(index>0){
-								if(indexorattributenameListelement)assignValue(&indexorattributenameListelement->_value,_getIntegerValue(index));
+								if(indexorattributenameListelement)
+								assignValue(&indexorattributenameListelement->_value,_getIntegerValue(index));
 							}else
 								result=false;	
 						}else
@@ -3826,7 +3827,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 		}else
 		if(setValue(getEnvironment(),_valuereference->_name,_newValue)){
 			// NOTE even if the value itself is NULL, its address is never NULL
-			assignValue(&_valuereference->_value,_newValue);
+			_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
 			result=true;
 			if(amVerbose())outputLine("Value set!");
 		}
@@ -3924,14 +3925,16 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						}
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=nextEnvironmentExpressionToken();
-						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate);
+						// MDH@02NOB2019: force the arguments value list to be weak
+						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate,true);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
 							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
-								functionCallArgumentList=_getListOfType(VT_UNDEFINED); // creating a list
+								// MDH@02NOV2019: making the list weak
+								functionCallArgumentList=listMadeWeak(_getListOfType(VT_UNDEFINED)); // creating a list
 								if(functionCallArgumentList&&!appendedToList(functionCallArgumentList,_functionArgumentsValue,M_LL_INVALID)){
 									outputError("Failed to create the to do expression list");
 									free_list(functionCallArgumentList);
@@ -3942,6 +3945,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							}else
 								functionCallArgumentList=_functionArgumentsValue->value._list; // use the wrapped list
 							// 2. get the arguments map
+							// MDH@02NOV2019 NOTE: this map will be weak as returned by _getFunctionArgumentMap!!
 							Mmap* _functionCallArgumentMap=_getFunctionArgumentMap(function,functionCallArgumentList); // assuming to have a list returned by getListExpressionValue()
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))free_list(functionCallArgumentList);
@@ -3970,11 +3974,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 								}
 							}
 							//////outputValue("Function call value '",functionCallValue,"'.\n");
-							assignValue(&_valueReference->_value,functionCallValue);
+							_valueReference->_value=functionCallValue; // MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,functionCallValue);
 							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
 							if(amVerbose()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputLine("Freeing the function argument map!");}
+							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
 							free_map(_functionCallArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerbose())outputLine("Function argument map freed!");
 						}else
@@ -4010,7 +4015,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
 					expressionToken=nextEnvironmentExpressionToken(); // MDH@16OCT2019: why was this commented out???????
 					if(amVerbose()){output("Extracting the indices.\n");}
-					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0); // typically allow for any number of indices (although perhaps we should check!!)
+					// MDH@02NOV2019 TODO should this be a weak or strong list????
+					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false); // typically allow for any number of indices (although perhaps we should check!!)
 					if(amVerbose()){output("XXXXXXX Index value of list '%s'",_valueReference->_name);outputValue("'",indexListValue,"'.\n");}
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					if(amVerbose()){if(expressionToken){output("End of list index token: ");outputToken(expressionToken);}else output("No end of list index token!");outputChar('\n');}
@@ -4024,6 +4030,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(indexListValue&&indexListValue->type==VT_LIST /*&&indexListValue->value._list->_first*/){ // a non-empty list
 						if(amVerbose())outputValue("Index id: '",indexListValue,"'.\n");
 						// MDH@15OCT2019: apparently there is enlisting too many: we can take the first element to unlist what we received BUT this must mean there's a mistake somewhere
+						// _valueReference->_itemid=indexListValue; // MDH@02NOV2019 replacing: 
 						assignValue(&_valueReference->_itemid,indexListValue); //////////// NOT SURE... indexListValue->value._list->_first->_value); // now storing the entire index/attribute name list
 						/* replacing (storing only the last index/attribute name):
 						Mlist* indexList=indexListValue->value._list;
@@ -4051,7 +4058,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(!_valueReference->_itemid){
 					if(amVerbose())output("Retrieving the value of '%s' when no item id was specified.\n",_valueReference->_name);
 					// MDH@18OCT2019: TODO this is dangerous?!
-					assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
+					_valueReference->_value=getValue(getEnvironment(),_valueReference->_name);
+					// MDH@02NOV2019: replacing: assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
 				}
 				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
 				break;
@@ -4105,10 +4113,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					Mbiginteger* _biginteger=__biginteger();
 					if(mp_read_radix(_biginteger,_significantTokenText,10)==MP_OKAY){
 						if(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT){
-              				assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
+							_valueReference->_value=_getIntegerValue(mp_get_i64(_biginteger));
+              				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
 							free_biginteger(_biginteger);
 						}else
-							assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
+							_valueReference->_value=_getBigintegerValue(_biginteger,true);
+							// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
 					}else{
 						free_biginteger(_biginteger);
 						outputErrorAndText("Failed to create the big integer to store integer ",_significantTokenText);
@@ -4116,16 +4126,18 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
-				assignValue(&_valueReference->_value,_getFloatValue(_strtold(_significantTokenText,getNAR())));
+				_valueReference->_value=_getFloatValue(_strtold(_significantTokenText,getNAR()));
+				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(_significantTokenText,getNAR())));
 				///////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_DQSTRING:
 			case TT_SQSTRING: // a string literal
-				assignValue(&_valueReference->_value,_getTextValue(_significantTokenText,false));
+				_valueReference->_value=_getTextValue(_significantTokenText,false);
+				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getTextValue(_significantTokenText,false));
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST: // a list literal
-				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0,0));
+				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false));
 				break;
 			case TT_MAP: // a map literal
 			{
@@ -4137,7 +4149,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
 			{
-				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0);
+				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0,false);
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose())outputLine("Going to wrap the list extracted!");
 				// well, actually, we need the first element of the list that is returned!!!
@@ -4160,7 +4172,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			uint16_t l=string_length(unaryOperators);
 			while(l>0&&_valueReference->_value){
 				/////////////decrementReferenceCount(_valueReference->_value);
-				assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
+				_valueReference->_value=applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value);
+				// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 			}
 			if(amVerbose())outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
@@ -6591,7 +6604,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(operatorprecedence>=nextoperatorprecedence){ // current operator has higher or the same precedence which means we can apply it
 					_result=applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_formulaelement->_operand),getReferencedValue(_formulaelement->_next->_operand));
 					// if we replace any value stored in the value reference of the first operand, we can reuse that formula element
-					assignValue(&(_formulaelement->_operand->_value),_result);
+					_formulaelement->_operand->_value=_result;
+					// MDH@02NOV2019 replacing: assignValue(&(_formulaelement->_operand->_value),_result);
 					// but because _result could be NULL we have to force _name to be NULL just in case 
 					if(_formulaelement->_operand->_name){free(_formulaelement->_operand->_name);_formulaelement->_operand->_name=NULL;}
 					// we need to point the formula operand to the next of the consumed formula element, so the consumed formula element won't be used again in computations
@@ -6641,7 +6655,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
 						// we have to be a bit careful here if the value reference uses an index id
 						// does the _value field already contain the current value of the variable, if so we may immediately use that here instead of getValue()
-						assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result));
+						_result=applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result);
+						// MDH@02NOV2019 replacing: assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result));
 						// replacing:	assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getValue(_Menvironment,_valuereference->_name),_result));
 					}
 					if(amVerbose())outputValue("Result to store in the value reference: '",_result,"'.\n");
@@ -6649,7 +6664,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					if(amVerbose())outputValue("Stored in the value reference: '",_valuereference->_value,"'.\n");
 					Mvalue* referencedValue=getReferencedValue(_valuereference);
 					if(amVerbose())outputValue("Referenced value to use as result: '",referencedValue,"'.\n");
-					assignValue(&_result,referencedValue); // should we do this???? well, in case the assignment failed!!!
+					// MDH@02NOV2019: we still didn't get a change to a list argument so here also we need to prevent copying the list/map
+					_result=referencedValue; // MDH@02NOV2019: replacing: assignValue(&_result,referencedValue); // should we do this???? well, in case the assignment failed!!!
 					/* replacing:
 					if(_valuereference->_itemid){
 						// TODO check whether all the items are of the right type!!!
@@ -6668,7 +6684,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 
 			// the expression value is the value of the first operand!!!
 			if(amVerbose()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
-			assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
+			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
 			if(amVerbose())outputLine("Freeing formula elements.");
