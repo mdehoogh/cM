@@ -141,6 +141,9 @@ unsigned long long appendedToList(Mlist* const _list,const Mvalue* const _value,
 void free_list(Mlist* _list);
 Mlist* _getListCopy(Mlist const * const _list);
 
+Mlist* _getListIndices(Mlist const * const _list);
+Mlist* _getMapAttributes(Mmap const * const _map);
+
 long long isListUndefined(Mlist* list);
 
 bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);

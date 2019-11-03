@@ -1393,8 +1393,12 @@ bool initEnvironment(){
 				outputError("Failed to register the type function");
 				return false;
 			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"keys"),"keys",Mkeys)){
+				outputError("Failed to register the keys function");
+				return false;
+			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),"neg",Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),"bnot",Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),"not",Mnot)){
-				outputError("Failed to register all unary functions");
+				outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return false;
 			}
 			if(!completedValueFunction(_getFunction(_Menvironment,"exists"),"exists",Mexists)||!completedValueFunction(_getFunction(_Menvironment,"scalar"),"scalar",Mscalar)||!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){

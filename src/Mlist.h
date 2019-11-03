@@ -2,6 +2,7 @@
 #include "Mvalue.h"
 
 Mvalue* Mempty(Mvalue* value); // will also work on a map though (TODO move over to functions.h/c I guess)
+Mvalue* Mkeys(Mvalue* value); // will also work on a map (although perhaps those are attributes)
 
 Mvalue* Mpush(Mvalue* listValue,Mvalue* value); // append a value to the list (also referred to as drop)
 Mvalue* Mshove(Mvalue* listValue,Mvalue* value); // prepend a value to a list

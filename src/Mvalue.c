@@ -325,6 +325,42 @@ Mvalue* _getListValue(Mvaluetype listValuetype,bool weak){
     if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}else free_list(_list);
     return _listvalue;
 }/* VALIDATED */
+Mlist* _getListIndices(Mlist const * const list){
+    Mlist* _list=_getListOfType(VT_INTEGER);
+    if(!_list)return NULL;
+    Mlistelement* listelement=list->_first;
+    while(listelement){
+        Mvalue* indexValue=_getIntegerValue(listelement->index);
+        if(appendedToList(_list,indexValue,M_LL_INVALID)==0){
+            // NO need to free indexValue because it is a Value!!!
+            outputError("Failed to append list element index");break;
+        }
+        listelement=listelement->_next;
+    }
+    return _list;
+}/* VALIDATED */
+Mlist* _getMapAttributes(Mmap const * const map){
+    Mlist* _list=_getListOfType(VT_TEXT);
+    if(!_list)return NULL;
+    Mmapelement* mapelement=map->_first;
+    while(mapelement){
+        // I guess we'll have to duplicate the attribute name because it will be wrapped inside a Value
+        // this is a bit of an issue because typically text should be enquoted
+        Mstring* _attributeName=_getString("'");
+        if(!_attributeName){outputError("Failed to duplicate a map attribute name");break;}
+        string_append(_attributeName,mapelement->_variable->_name); // append the attribute name
+        Mvalue* attributeValue=_getTextValue(string(_attributeName),false);
+        free_string(_attributeName);
+        if(!attributeValue){outputError("Failed to store a map attribute name");break;}
+        if(appendedToList(_list,attributeValue,M_LL_INVALID)==0){
+            // NO need to free indexValue because it is a Value!!!
+            outputError("Failed to append map attribute name");break;
+        }
+        mapelement=mapelement->_next;
+    }
+    return _list;
+}
+
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){
     Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
     if(!_map)return NULL;

@@ -14,6 +14,15 @@ Mvalue* Mempty(Mvalue* value){
     }
     return _getIntegerValue(result);
 }
+Mvalue* Mkeys(Mvalue* value){
+    if(value)
+    switch(value->type){
+        case VT_MAP:return _getValueOfList(_getMapAttributes(value->value._map),true);
+        case VT_LIST:return _getValueOfList(_getListIndices(value->value._list),true);
+        default:break;
+    }
+    return NULL;
+}
 
 // TODO check whether the list is immutable????
 // how about returning true on success and false on failure
