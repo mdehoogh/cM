@@ -14,7 +14,7 @@
 #include "Menvironment.h"
 
 // externally (in M.c) defined constants
-extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX;
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE;
 extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
@@ -276,7 +276,7 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
                 if(showquotes)p=string_append_char(p,'\'');
                 p=string_append(p,_mapVariable->_name);
                 if(showquotes)p=string_append_char(p,'\'');
-                if(showmissings||!isValueUndefined(_mapVariable->_value)){
+                if(showmissings||isValueUndefined(_mapVariable->_value)!=M_TRUE){
                     /////output("%s",string(p));
                     p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
                     // MDH@24OCT2019: here we deviate from _getMapText() (see Mvalue.h/c) in that we try to find a constant with the same value (like PI or E or NULL)
@@ -500,7 +500,8 @@ bool setValue(const Menvironment* const _environment,const char* const name,cons
         if(!variable->_value||!variable->immutable){
             if(amVerbose())output("Variable '%s' to set.\n",variable->_name);
             // _value needs to be of the right type
-            if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type){
+            // MDH@03NOV2019: unless it's null (i.e. the type of _value->type is VT_UNDEFINED)
+            if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type||_value->type==VT_UNDEFINED){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
                 if(amVerbose()){
@@ -710,6 +711,8 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
  */
 Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
     // check the types first, both should be strings
+    if(!_variableName){outputError("Undefined settype() variable name");return NULL;}
+    if(!_valuetype){outputError("Undefined settype() value type");return NULL;}
     if(_variableName->type==VT_TEXT&&_valuetype->type==VT_TEXT){
         char* variableName=_variableName->value._text->_c; // ignoring the presuffix exactly as we need to!!!
         if(strlen(variableName)){
@@ -717,19 +720,39 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
             bool immutable=false;
             Mvaluetype valuetype=VT_UNDEFINED;
             switch(_valuetype->value._text->_c[0]){ // use the first character (which will be '\0' if the default value is used!!!)
+                case 'U':
+                    immutable=true;
+                case 'u':
+                    valuetype=VT_UNDEFINED;
+                    break;
                 case 'I':
                     immutable=true;
                 case 'i':
                     valuetype=VT_INTEGER;
                     break;
-                case 'R':
+                case 'D':
                     immutable=true;
-                case 'r':
+                case 'd':
+                    valuetype=VT_DECIMAL;
+                    break;
+                case 'Q':case 'R':
+                    immutable=true;
+                case 'q':case 'r':
+                    valuetype=VT_RATIONAL;
+                    break;
+                case 'B':
+                    immutable=true;
+                case 'b':
+                    valuetype=VT_BIGINTEGER;
+                    break;
+                case 'F':
+                    immutable=true;
+                case 'f':
                     valuetype=VT_FLOAT;
                     break;
-                case 'S':
+                case 'T':
                     immutable=true;
-                case 's':
+                case 't':
                     valuetype=VT_TEXT;
                     break;
                 case 'L':
@@ -743,22 +766,40 @@ Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
                     valuetype=VT_MAP;
                     break;
             }
-            if(containsVariable(_executionEnvironment,variableName)||addVariable(_executionEnvironment,variableName,valuetype,immutable)){
+            // if valuetype2 is defined that type defines the top-level type
+            char originalvaluetype=(containsVariable(_executionEnvironment,variableName)?'!':'?');
+            if(originalvaluetype=='?'&&!addVariable(_executionEnvironment,variableName,valuetype,immutable))originalvaluetype='\0';
+            if(originalvaluetype){
                 Mvariable* _variable=getVariable(_executionEnvironment,variableName,false); // should exist
                 if(_variable){
+                    // MDH@03NOV2019: we want to return the original type
+                    /*
+                    if(originalvaluetype=='!') // already existed!!!
+                        originalvaluetype=(_variable->immutable?IMMUTABLEVALUETYPECHARS[_variable->valuetype]:MUTABLEVALUETYPECHARS[_variable->valuetype]);
+                    */
                     // you can change the value type if the current value is (still) NULL or when it is mutable...
                     if(valuetype!=_variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
-                        if(!_variable->immutable||!_variable->_value){
+                        // intended change of value type not allowed when the value is not NULL 
+                        if(isValueUndefined(_variable->_value)!=M_TRUE)
+                            outputError("Unable to change the value type when the value is defined");
+                        else
+                        if(_variable->immutable)
+                            outputError("Unable to change the value type when the variable is immutable");
+                        else{
+                            _variable->immutable=immutable;
                             _variable->valuetype=valuetype; // update the value type
-                            assignValue(&_variable->_value,NULL); // clear the value (might already be the case but won't harm either)
+                            ////////assignValue(&_variable->_value,NULL); // clear the value (might already be the case but won't harm either)
                         }
-                    }
+                    }else // no change in value type, so allowed to toggle the mutability...
+                        _variable->immutable=immutable;
                     // return the value type as text, which means we need to wrap the value type character
                     return _getCharTextValue(_variable->immutable?IMMUTABLEVALUETYPECHARS[_variable->valuetype]:MUTABLEVALUETYPECHARS[_variable->valuetype]);
                 }
-            }
+            }else 
+                outputError("Failed to add the variable to set the type of");
         }
-    }
+    }else 
+        outputError("Both arguments to settype() should be text, the fist argument a variable name, the second its value type");
     return NULL;
 }/* VALIDATED */
 

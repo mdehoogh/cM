@@ -12,3 +12,5 @@ Mvalue* Mpull(Mvalue* listValue); // remove and return the first value
 
 Mvalue* Mfirst(Mvalue* listValue); // return the first value
 Mvalue* Mlast(Mvalue* listValue); // return the last value
+
+Mvalue* Msamplestatistics(Mvalue* listValue);

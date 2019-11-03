@@ -40,8 +40,8 @@ const char* const FORFUNCTION_NAME="for";
 const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
 const char* const DEFINEUSERFUNCTION_NAME="function";
-const char* const MUTABLEVALUETYPECHARS="utibdqfclmr"; // the characters associated with each of the value types
-const char* const IMMUTABLEVALUETYPECHARS="UTIBDQFCLMR"; // the characters associated with each of the value types
+const char* const MUTABLEVALUETYPECHARS="uoibdqftlmr"; // the characters associated with each of the value types
+const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 
 // MDH@31OCT2019: if the value of something equals the NULL value, this is the text to use to represent it, this is also the name of the NULL variable!!!
@@ -1079,12 +1079,17 @@ Mvalue* t(Mvalue* value,Mvalue* format){
 // the type of a value
 Mvalue* type(Mvalue* _value){
 	// every value should have a type text, even if NULL
+	// MDH@03NOV2019: actually _value should be the name of a variable because it not we cannot determine whether or not
+	//                the variable is mutable, that's why settype() requires the name of the variable (as text)
+	char result[3]="' ";
 	if(_value)
+	result[1]=MUTABLEVALUETYPECHARS[_value->type];
+	/* ewplacing:
 	switch(_value->type){
-		case VT_UNDEFINED:return _getTextValue("'-",false);
+		case VT_UNDEFINED:result[1]='-';break;
 		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that, so we can use t for text????
 		case VT_INTEGER:return _getTextValue("'i",false);
-		case VT_BIGINTEGER:return _getTextValue("'I",false);
+		case VT_BIGINTEGER:return _getTextValue("'b",false);
 		case VT_DECIMAL:return _getTextValue("'d",false);
 		case VT_RATIONAL:return _getTextValue("'q",false);
 		case VT_FLOAT:return _getTextValue("'f",false);
@@ -1094,7 +1099,8 @@ Mvalue* type(Mvalue* _value){
 		case VT_REFERENCE:return _getTextValue("'r",false); // r now short for reference, as changing real into float
 		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
-	return _getTextValue("'",false);
+	*/
+	return _getTextValue(result,false);
 }
 
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);

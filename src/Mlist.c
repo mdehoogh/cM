@@ -80,3 +80,22 @@ Mvalue* Mfirst(Mvalue* listValue){ // return the first value
 Mvalue* Mlast(Mvalue* listValue){ // return the last value
     return(listValue&&listValue->type==VT_LIST&&listValue->value._list&&listValue->value._list->_last?listValue->value._list->_last->_value:NULL);
 }
+
+// MDH@03NOV2019: allowing computing sample statistics on lists with values of the same (numeric) scalar type 
+Mvalue* Msamplestatistics(Mvalue* listValue){
+    if(listValue){
+        if(listValue->type==VT_INTEGER||listValue->type==VT_BIGINTEGER){
+
+        }else
+        if(listValue->type==VT_RATIONAL){
+
+        }else
+        if(listValue->type==VT_DECIMAL){
+        }else
+        if(listValue->type==VT_FLOAT){
+
+        }
+    }else 
+        outputError("No sample list to compute statistics of");
+    return NULL;
+}

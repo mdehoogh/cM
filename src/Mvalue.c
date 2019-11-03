@@ -1569,7 +1569,7 @@ long long isValueNull(Mvalue* value){
 long long isValueUndefined(Mvalue* value){
     long long result=M_LL_INVALID;
     // values that are considered NULL are also undefined (even if value is NULL)
-    if(isValueNull(value)==M_FALSE)
+    if(value) // we have to check the value
     switch(value->type){
         case VT_INTEGER:result=isIntegerUndefined(value->value._integer);break; // replacing: value->value._integer->ll==M_LL_INVALID;
         case VT_FLOAT:result=isFloatUndefined(value->value._float);break; // replacing: return ldIsNaN(value->value._float->ld);
