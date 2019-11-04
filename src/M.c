@@ -29,7 +29,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="7";char const * const M_DATE="27 October 2019, 12:00";
 //char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
 //char const * const M_BUILD="9";char const * const M_DATE="30 October 2019, 18:00";
-char const * const M_BUILD="10";char const * const M_DATE="31 October 2019, 12:00";
+//char const * const M_BUILD="10";char const * const M_DATE="31 October 2019, 12:00";
+char const * const M_BUILD="11";char const * const M_DATE="4 November 2019, 22:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -1076,33 +1077,6 @@ Mvalue* t(Mvalue* value,Mvalue* format){
 	return result;
 }
 
-// the type of a value
-Mvalue* type(Mvalue* _value){
-	// every value should have a type text, even if NULL
-	// MDH@03NOV2019: actually _value should be the name of a variable because it not we cannot determine whether or not
-	//                the variable is mutable, that's why settype() requires the name of the variable (as text)
-	char result[3]="' ";
-	if(_value)
-	result[1]=MUTABLEVALUETYPECHARS[_value->type];
-	/* ewplacing:
-	switch(_value->type){
-		case VT_UNDEFINED:result[1]='-';break;
-		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that, so we can use t for text????
-		case VT_INTEGER:return _getTextValue("'i",false);
-		case VT_BIGINTEGER:return _getTextValue("'b",false);
-		case VT_DECIMAL:return _getTextValue("'d",false);
-		case VT_RATIONAL:return _getTextValue("'q",false);
-		case VT_FLOAT:return _getTextValue("'f",false);
-		case VT_TEXT:return _getTextValue("'t",false); // t for text
-		case VT_LIST:return _getTextValue("'l",false);
-		case VT_MAP:return _getTextValue("'m",false);
-		case VT_REFERENCE:return _getTextValue("'r",false); // r now short for reference, as changing real into float
-		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
-	}
-	*/
-	return _getTextValue(result,false);
-}
-
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
     if(_value){
@@ -1395,10 +1369,12 @@ bool initEnvironment(){
 				outputError("Failed to register value type conversion functions");
 				return false;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"type"),"type",type)){
+			/* MDH@04NOV2019: moved over to Menvironment.h/c
+			if(!completedValueFunction(_getFunction(_Menvironment,"type"),"type",Mtype)){
 				outputError("Failed to register the type function");
 				return false;
 			}
+			*/
 			if(!completedValueFunction(_getFunction(_Menvironment,"keys"),"keys",Mkeys)){
 				outputError("Failed to register the keys function");
 				return false;
@@ -2858,7 +2834,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
 {";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (     .   LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
 {";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \

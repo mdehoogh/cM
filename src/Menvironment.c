@@ -710,6 +710,53 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
 // END FUNCTION STUFF
 
 // the internal functions
+// helpers for Mtype()
+char getValueTypeCharacter(Mvaluetype valuetype,bool immutable){
+	return(immutable?IMMUTABLEVALUETYPECHARS[valuetype]:MUTABLEVALUETYPECHARS[valuetype]);
+}
+bool isValueImmutable(Mvalue* value){
+	bool result=false;
+	if(value){
+		if(value->type==VT_MAP)result=value->value._map->immutable;else
+		if(value->type==VT_LIST)result=value->value._list->immutable;
+	}
+	return result;
+}
+/**
+ * \brief returns the (text representation of) type and immutable flag of \p value
+ * \p value the value of which to return the text representing the type and immutable flag
+ */
+Mvalue* Mtype(Mvalue* _value){
+	// every value should have a type text, even if NULL
+	// MDH@03NOV2019: actually _value should be the name of a variable because it not we cannot determine whether or not
+	//                the variable is mutable, that's why settype() requires the name of the variable (as text)
+	char result[3]="' ";
+	if(_value){
+		if(_value->type==VT_REFERENCE){ // a variabler reference
+			Mvariable* referencedVariable=_value->value._reference->variable;
+			// NOTE for any reference we return not 'r' but the type of the referenced variable (which we wouldn't have access to otherwise)
+			if(referencedVariable)result[1]=getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable);
+		}else // a non-reference type
+			result[1]=getValueTypeCharacter(_value->type,isValueImmutable(_value));
+	}
+	/* ewplacing:
+	switch(_value->type){
+		case VT_UNDEFINED:result[1]='-';break;
+		case VT_TOKEN:return _getTextValue("'T",false); // can we find another character for that, so we can use t for text????
+		case VT_INTEGER:return _getTextValue("'i",false);
+		case VT_BIGINTEGER:return _getTextValue("'b",false);
+		case VT_DECIMAL:return _getTextValue("'d",false);
+		case VT_RATIONAL:return _getTextValue("'q",false);
+		case VT_FLOAT:return _getTextValue("'f",false);
+		case VT_TEXT:return _getTextValue("'t",false); // t for text
+		case VT_LIST:return _getTextValue("'l",false);
+		case VT_MAP:return _getTextValue("'m",false);
+		case VT_REFERENCE:return _getTextValue("'r",false); // r now short for reference, as changing real into float
+		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
+	}
+	*/
+	return _getTextValue(result,false);
+}
 /**
  * \brief to set the type and immutable flag of a variable or composite value
  */
@@ -777,7 +824,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
             if(variable)variable->immutable=(immutable==M_TRUE);else if(value->type==VT_LIST)value->value._list->immutable=(immutable==M_TRUE);else value->value._map->immutable=(immutable==M_TRUE);
         }
     }
-    return NULL;
+    return Mtype(value);
 }/* INVALIDATED */
 
 bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction){
@@ -1103,6 +1150,7 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedFloatFunction(_getFunction(_environment,"exp"),"exp",Mexp))return false;
     if(!completedFloatFunction(_getFunction(_environment,"dexp"),"dexp",Mdexp))return false;
     // MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag
+    if(!completedValueFunction(_getFunction(_environment,"type"),"type",Mtype))return false;
     if(!completedValueTextValueFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
     if(!completedFloatFloatFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
 
