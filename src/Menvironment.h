@@ -86,14 +86,14 @@ uint32_t getNumberOfVariables(Menvironment const * const _environment);
 Mstring* _getVariableNames(Menvironment const * const _environment,char const * const sep); // NOTE the _ indicates that the caller should free whatever is returned!!!
 /* replacing:
 Mvariable* getNewVariable(Menvironment* _environment,const char* name);
-Mvariable* getVariable(Menvironment* _environment,const char* name);
 */
+Mvariable* getVariable(Menvironment const * const _environment,char const * const name,bool verbose); // we need to be able to do this in M.c
 Mvalue* Mexists(Mvalue* _value);
 bool containsVariable(const Menvironment* const _environment,const char* const name);
 Mvaluetype getVariableType(const Menvironment* const _environment,const char* const name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
 Mvaluetype getVariableValueType(const Menvironment* const _environment,const char* const name); // same as getVariableType() if a type is defined for the given variable
 
-Mstring* _getCompletion(const char* const name); // returns the remainder of variables/functions shared by all variables/functions that start with name, if not shared by all variables/functions all first continuation characters are returned
+Mstring* _getCompletion(const char* const name,bool functionidentifiersaswell); // returns the remainder of variables/functions shared by all variables/functions that start with name, if not shared by all variables/functions all first continuation characters are returned
 
 // write access
 bool setVariableType(Menvironment const * const _environment,char const * const name,Mvaluetype valuetype); // NOTE changing the type is dangerous as it will clear the value if the value is not of the right type

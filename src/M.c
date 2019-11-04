@@ -1777,8 +1777,9 @@ Mcommand* _getNewCommand(bool withFirstToken){
 }
 // MDH@28OCT2019: not needed here anymore... Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the sequence of tokens starting with _userInputCommand->_firstToken
 // MDH@02OCT2019: might need this in multiple places!!
+// MDH@04NOV2019: added TT_REFERENCE tokens as well
 bool inIdentifierToken(Mtoken* lastCommandToken){
-	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE:false);
+	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE||lastCommandToken->type==TT_REFERENCE:false);
 }
 
 Mcommand* _userInputCommand=NULL; // the current input command
@@ -1806,73 +1807,6 @@ void deleteIdentifierContinuation(){
 	if(_identifierContinuationCharacters){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
 }
 // user input command specific
-void updateUserInputCommandIdentifierContinuation(){
-	// MDH@30OCT2019: simplified updating the identifier continuation a bit so wee do not need to be afraid that it won't work AND we no longer need the userInputCommandIdentifierContinuationNeedsUpdating flag!!!!
-	//                BUT right after a delete we should be allowed to set the flag so the continuation will be deleted and nothing more
-	//                OK, to make delete work, I have to check the NeedsUpdating flag which should be set to true when the token is set
-	deleteIdentifierContinuation();
-	// if currently in an identifier, we technically need updating the identifier continuation unless the NeedsUpdating flag has been turned off
-	bool canHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
-	if(canHaveAnIdentifierContinuation){ // theoretically we could have identifier continuation
-		if(userInputCommandIdentifierContinuationNeedsUpdating){ // not blocked
-			Mstring* _completionText=_getCompletion(string(_userInputCommand->_lastToken->text));
-			// need at least two characters (the type and something text behind it)
-			// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
-			if(_completionText){
-				if(string_length(_completionText)>1)
-				switch(string_char(_completionText,0)){
-					case 1:
-						{
-							_identifierContinuationCharacters=strdup(string(_completionText)+1);
-							if(!_identifierContinuationCharacters)inputError("Failed to create the identifier continuation");else if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
-						}
-						break;
-					case 2:
-						{
-							_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
-							if(_identifierContinuationOptionalCharacters)inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("No identifier continuation characters!");
-						}
-						break;
-				}
-				free_string(_completionText);
-			}else 
-			if(amVerbose())inputInfo("No identifier continuation.");
-		}
-	}
-	// by forcing the flag to be true AFTER each update, we ascertain that you can only block it once, AND there's no need actually to set it on every new token!!!!
-	userInputCommandIdentifierContinuationNeedsUpdating=true; // as long as we're in an identifier token, keep the 'dirty' flag true
-	/* replacing:
-	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
-	// get rid of the identifier continuation if we're can't have one or the identifier has supposedly changed
-	if(!couldHaveAnIdentifierContinuation)userInputCommandIdentifierContinuationNeedsUpdating=false; // if we're not in an identifier token always consider the identifier to be unchanged
-	if(!couldHaveAnIdentifierContinuation||userInputCommandIdentifierContinuationNeedsUpdating)deleteIdentifierContinuation();
-	if(userInputCommandIdentifierContinuationNeedsUpdating){ // the identifier has supposedly changed, and we could have an identifier continuation update it
-		Mstring* _completionText=_getCompletion(string(_userInputCommand->_lastToken->text));
-		// need at least two characters (the type and something text behind it)
-		// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
-		if(_completionText){
-			if(string_length(_completionText)>1)
-			switch(string_char(_completionText,0)){
-				case 1:
-					{
-						_identifierContinuationCharacters=strdup(string(_completionText)+1);
-						if(!_identifierContinuationCharacters)inputError("Failed to create the identifier continuation");else if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
-					}
-					break;
-				case 2:
-					{
-						_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
-						if(_identifierContinuationOptionalCharacters)inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("No identifier continuation characters!");
-					}
-					break;
-			}
-			free_string(_completionText);
-		}else 
-		if(amVerbose())inputInfo("No identifier continuation.");
-	}
-	*/
-	if(amDebugging())inputInfo("User input command identifier continuation updated.");
-}/* VALIDATED */
 
 // MDH@20SEP2019: we used to keep track of the behind cursor text, in a single Mstring instance, but because we also want to be able to add variable completion we keep a sequence of char* 
 //                each feed forward char* is associated with a single token, and if that token is removed so should the associated feed forward
@@ -2006,7 +1940,7 @@ char* _getLastTokenAutoCompletionText(){
 		// MDH@03OCT2019: case TT_SQSTRING:tokenFeedforwardText="'";break; // TODO using ' for the double quoted string might change in the future and we'd be in trouble then
 		case TT_TERNARY_aeru:break;
 		case TT_UNARY:break;
-		case TT_VARIABLE:
+		case TT_VARIABLE:case TT_REFERENCE:
 		default:break;
 	}
 	return strdup(tokenAutoCompletionText); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
@@ -2473,11 +2407,11 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
 // the list of token type ids in the corresponding order!!!
-const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,0b1000000,0b11111111};
+const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,0b1000000,0b11111111};
 
 const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
 	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
-	///////printf("(%d)",tokentype_id);
+	////////output("(%d)",tokentype_id);
 	switch(tokentype_id>>6){
 		case 0: // value token
 			return getValueTokenColor(tokentype_id);
@@ -2756,7 +2690,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 		pNewToken->text=__string();
 		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
 		if(!pNewToken->text){
-			inputError("%sFailed to initialize the new token.",ERROR_PREFIX);
+			inputError("Failed to initialize the new token.");
 			pNewToken->type=TT_ERROR; 
 		}
 		if(amDebugging())inputInfo("New token text initialized."); // TODOhow about 
@@ -2835,8 +2769,10 @@ void reset(){
 //                ok, we're going to use \ for newline request character, so \ used to be % now becomes for type \ indicating a newline request (or escape character in a string!!!!)
 //                switched to using the blank to indicate a newline request (using \ is a bit clumsy, backtick goes back to being the backtick, although no idea what we can use it for)
 //                no we let \ be whitespace but we can turn it into a blank when it's a functional newline request
+// MDH@04NOV2019: in order to be able to pass value references (i.e. variables) to a function we define @ as the redirection operator so that not the value but the value reference is returned (unresolved)
+//                by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?@LLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // now we define all the state transitions i.e. what input character types result in which new token type
@@ -2852,7 +2788,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
      E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
-char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","q","q","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","q","q","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
@@ -2898,35 +2834,37 @@ char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","",
 //                inserting macro's should also be possible somehow...
 // MDH@05AUG2019: it's a pity that I need to allow a , behind a new variable in order to allow that when a do function call executes code after initializing these variables that are not yet recognized as created
 //                we can solve this by remembering ALL variables when they are created in every expression that is tokenized, this would be possible by creating a tokenizing environment where we remember all created variables in in the tokenizing process
+// MDH@04NOV2019: the reference token type added, so we can pass references to functions wrapped inside a value
 /*
- "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","VAR" ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
+ "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","REF" ,"VAR"  ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
 const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
-{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ] }="}, /* Baeru finished bin.op. */ \
-{""    ,""    ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`@;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; CDS% )&*  , >?:    ]"   }, /* BAeRu assignable repeatable */ \
-{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  ,  ?:    ]"   }, /* BaERu comp. (<>) bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]"   }, /* BAeru assignable bin.op. */ \
-{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
-{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,"LEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`@;! DS%()&*+- .>?:   [ {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`@; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
-{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
-{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
-{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
-{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
-{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
-{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
-{";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
-{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`@;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
-{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"LE"  ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"`@; C  %&  *    >?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
-{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`@   DS  (     .   L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
+{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ] }="}, /* Baeru finished bin.op. */ \
+{""    ,""    ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`R;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; CDS% )&*  , >?:    ]"   }, /* BAeRu assignable repeatable */ \
+{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  ,  ?:    ]"   }, /* BaERu comp. (<>) bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]"   }, /* BAeru assignable bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,"LEN.",""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
+{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN." ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`R;! DS%()&*+- .>?:   [ {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
+{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
+{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (     .  :LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
+{";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`R;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %&  *    >?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (     .   L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
 };
 
 /* MDH@11AUG2019: NOT doing the following anymore, instead we store the identifier information in the tokens themselves
@@ -3079,7 +3017,7 @@ bool isOneCharacterTokenType(uint8_t tokenType){
 
 // keep track of the state of entering a command
 // MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
-bool removeToken(){		
+bool removeToken(){	
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
 	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
 	// ASSERT _userInputCommand->_lastToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
@@ -3094,6 +3032,111 @@ bool removeToken(){
 	_userInputCommand->_lastToken->next=NULL;
 	return true;
 }
+
+// MDH@04NOV2019: moved from line 1800 or so over here as it calls removeToken() and we do not like to have to use prototypes TODO remove all prototype() definitions
+void updateUserInputCommandIdentifierContinuation(){
+	// MDH@30OCT2019: simplified updating the identifier continuation a bit so wee do not need to be afraid that it won't work AND we no longer need the userInputCommandIdentifierContinuationNeedsUpdating flag!!!!
+	//                BUT right after a delete we should be allowed to set the flag so the continuation will be deleted and nothing more
+	//                OK, to make delete work, I have to check the NeedsUpdating flag which should be set to true when the token is set
+	deleteIdentifierContinuation();
+	// if currently in an identifier, we technically need updating the identifier continuation unless the NeedsUpdating flag has been turned off
+	bool canHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
+	if(canHaveAnIdentifierContinuation){ // theoretically we could have identifier continuation
+		if(userInputCommandIdentifierContinuationNeedsUpdating){ // not blocked
+			// MDH@04NOV2019: if inside a reference, skip the reference 'operator' at the start of the reference when requesting completion text
+			Mstring* _completionText=(_userInputCommand->_lastToken->type!=TT_REFERENCE?_getCompletion(string(_userInputCommand->_lastToken->text),true):_getCompletion(string_remainder(_userInputCommand->_lastToken->text,1),false));
+			// need at least two characters (the type and something text behind it)
+			// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
+			if(_completionText){
+				if(string_length(_completionText)>1){
+					switch(string_char(_completionText,0)){
+						case 1:
+							_identifierContinuationCharacters=strdup(string(_completionText)+1);
+							if(!_identifierContinuationCharacters)inputError("Failed to create the identifier continuation");else if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
+							break;
+						case 2:
+							_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
+							if(_identifierContinuationOptionalCharacters)inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("No identifier continuation characters!");
+							break;
+					}
+				}else{
+					if(_userInputCommand->_lastToken->type==TT_REFERENCE){
+						// MDH@04NOV2019: if we mark the entire reference token as error, we're going to have problems recovering it, so it would make sense to mark the character that caused not having a completion text anymore as erroneous
+						//                so we should cut off that last character and put it in an error token, ready to be removed again
+						size_t lastTokenLength=string_length(_userInputCommand->_lastToken->text);
+						if(lastTokenLength>1){ // at least one character of the existing variable present in the reference
+							char c=string_last_char(_userInputCommand->_lastToken->text); // get the last character (to mark as erroneous)
+							if(c){ // we've got the character that is responsible for not getting a completion text anymore
+								if(!containsVariable(NULL,string_remainder(_userInputCommand->_lastToken->text,1))){ // not already complete TODO perhaps there's a better way to compose the completion text in this case in _getCompletion()
+									// let's do something like a backspace but without moving the cursor on the screen
+									// replacing the last character with a blank is another option????
+									if(string_setlength(_userInputCommand->_lastToken->text,lastTokenLength-1)){ // managed to 'cut off' c (although it's still there, because when you set the length only ->length is adjusted nothing yet to the text itself)
+										Mtoken* _errorToken=_getNewCommandToken(_userInputCommand->_lastToken,TT_ERROR); // by passing in NULL all the complicated stuff is not happening!!!
+										if(_errorToken){
+											_userInputCommand->_lastToken=_errorToken; // update the last token assuming we will succeed in doing what needs doing
+											if(!string_append_char(_errorToken->text,c)){
+												if(removeToken())
+													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
+												else
+													inputError("BUG: Failed to undo failing to mark the last character as erroneous.");
+											}else
+												reoutputToken(_errorToken);
+										}else
+											inputError("The supposed reference can never become an existing variable reference.");
+										// if we failed to create the error token, we have to append the removed character again (should be no problem because Mstring does not reduce the memory when deleting characters from the end)
+										if(_errorToken!=_userInputCommand->_lastToken){
+											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength)){inputError("BUG: Couldn't undo the adjustments made to an erroneous reference.");}
+										}
+									}else
+										inputError("Failed to retrieve the last (erroneous) character in a variable reference.");
+								}else
+								// if(amVerbose())
+								inputInfo("Reference complete!");
+							}else
+								inputError("BUG: Last character in reference vanished.");
+						}else
+							inputError("There is no existing variable that can be referenced anymore.");
+					}
+				}
+				free_string(_completionText);
+			}else 
+			if(amVerbose())inputInfo("No identifier continuation.");
+		}
+	}
+	// by forcing the flag to be true AFTER each update, we ascertain that you can only block it once, AND there's no need actually to set it on every new token!!!!
+	userInputCommandIdentifierContinuationNeedsUpdating=true; // as long as we're in an identifier token, keep the 'dirty' flag true
+	/* replacing:
+	bool couldHaveAnIdentifierContinuation=inIdentifierToken(_userInputCommand?_userInputCommand->_lastToken:NULL);
+	// get rid of the identifier continuation if we're can't have one or the identifier has supposedly changed
+	if(!couldHaveAnIdentifierContinuation)userInputCommandIdentifierContinuationNeedsUpdating=false; // if we're not in an identifier token always consider the identifier to be unchanged
+	if(!couldHaveAnIdentifierContinuation||userInputCommandIdentifierContinuationNeedsUpdating)deleteIdentifierContinuation();
+	if(userInputCommandIdentifierContinuationNeedsUpdating){ // the identifier has supposedly changed, and we could have an identifier continuation update it
+		Mstring* _completionText=_getCompletion(string(_userInputCommand->_lastToken->text));
+		// need at least two characters (the type and something text behind it)
+		// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
+		if(_completionText){
+			if(string_length(_completionText)>1)
+			switch(string_char(_completionText,0)){
+				case 1:
+					{
+						_identifierContinuationCharacters=strdup(string(_completionText)+1);
+						if(!_identifierContinuationCharacters)inputError("Failed to create the identifier continuation");else if(amVerbose())inputInfo("Identifier continuation: '%s'.",_identifierContinuationCharacters);
+					}
+					break;
+				case 2:
+					{
+						_identifierContinuationOptionalCharacters=strdup(string(_completionText)+1);
+						if(_identifierContinuationOptionalCharacters)inputInfo("Identifier continuation characters: %s.",_identifierContinuationOptionalCharacters);else inputError("No identifier continuation characters!");
+					}
+					break;
+			}
+			free_string(_completionText);
+		}else 
+		if(amVerbose())inputInfo("No identifier continuation.");
+	}
+	*/
+	if(amDebugging())inputInfo("User input command identifier continuation updated.");
+}/* VALIDATED */
 
 // HERE THE EVALUATION OF EXPRESSIONS TAKE PLACE
 /* MDH@21MAY2019: every Mvalue* should be created on the value stack and never elsewhere, every assignment to an Mvalue should be done using assignValue() and never using =
@@ -3669,83 +3712,90 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	if(!_valuereference->_value){ // not an actual (preset) value
 		// if we do NOT have a name it's a literal
 		if(_valuereference->_name){
-			// if there is no itemid we simply return the 'entire' value of the given variable
-			Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
-			if(amVerbose()){output("Current value of referenced variable '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
-			// if we have index/attribute names we have to get the final subvalue
-			if(_valuereference->_itemid){
-				if(amVerbose()){output("Item id of indexed variable '%s'",_valuereference->_name);outputValue(": '",_valuereference->_itemid,"'.\n");}
-				Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
-				// empty lists should also return the full element, so only something to do when we actually have list elements!!!
-				if(_itemidlist->_first){
-					// let's get the first index/attribute name
-					Mlistelement* indexorattributenameListelement=_itemidlist->_first;
-					Mvalue* indexorattributenameListelementValue;
-					while(indexorattributenameListelement){
-						indexorattributenameListelementValue=indexorattributenameListelement->_value;
-						// after extracting the value increment indexorattributenameListelement, so we can use continue
-						indexorattributenameListelement=indexorattributenameListelement->_next;
-						// if no value is defined, it is ignored TODO should we????
-						if(indexorattributenameListelementValue){
-							if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
-							// if we are accessing a map we have to ascertain that the attribute name in a string
-							if(_value->type==VT_MAP){
-								Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
-								if(attributenameText){
-									referencedValue=getValueOfAttribute(_value->value._map,string(attributenameText));		
-									free_string(attributenameText);
-									continue;	
-								}
-								output("%s",ERROR_PREFIX);
-								outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
-							}
-							if(_value->type==VT_LIST){
-								// MDH@17OCT2019: how about allowing an index to be a list of indices????
-								long long index;
-								if(indexorattributenameListelementValue->type==VT_LIST){
-									// we'll be returning a list value
-									Mlist* _referencedValueList=_getListOfType(_value->value._list->valuetype);
-									Mlist* indexelementList=indexorattributenameListelementValue->value._list;
-									Mlistelement* indexelementListelement=indexelementList->_first;
-									Mvalue* valueAtIndex;
-									while(indexelementListelement){
-										index=getValueInteger(indexelementListelement->_value);
-										valueAtIndex=(index!=0&&index!=M_LL_INVALID?getValueAtIndex(_value->value._list,index):NULL);
-										// OOPS can't append with 0 anymore, because 0 will do prepending
-										if(appendedToList(_referencedValueList,valueAtIndex,M_LL_INVALID)==0)break;
-										indexelementListelement=indexelementListelement->_next;
+			// MDH@04NOV2019: now that we've added the TT_REFERENCE token, the name may start with @ to indicate a variable reference
+			if(_valuereference->_name[0]=='@'){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
+				// I suppose we need to wrap a copy unless we make a separate reference thing where we store the name of the variable which could just be an Mstring?????
+				Mvariable* variable=getVariable(NULL,&_valuereference->_name[1],false);
+				if(variable)referencedValue=_getReferenceValue(_getReference(variable),true);else output("%sReferenced variable '%s' vanished.\n",ERROR_PREFIX,_valuereference->_name[1]);
+			}else{ // a non-referenced variable which means we are supposed to return the value of the variable
+				// if there is no itemid we simply return the 'entire' value of the given variable
+				Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
+				if(amVerbose()){output("Current value of referenced variable '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
+				// if we have index/attribute names we have to get the final subvalue
+				if(_valuereference->_itemid){
+					if(amVerbose()){output("Item id of indexed variable '%s'",_valuereference->_name);outputValue(": '",_valuereference->_itemid,"'.\n");}
+					Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
+					// empty lists should also return the full element, so only something to do when we actually have list elements!!!
+					if(_itemidlist->_first){
+						// let's get the first index/attribute name
+						Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+						Mvalue* indexorattributenameListelementValue;
+						while(indexorattributenameListelement){
+							indexorattributenameListelementValue=indexorattributenameListelement->_value;
+							// after extracting the value increment indexorattributenameListelement, so we can use continue
+							indexorattributenameListelement=indexorattributenameListelement->_next;
+							// if no value is defined, it is ignored TODO should we????
+							if(indexorattributenameListelementValue){
+								if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
+								// if we are accessing a map we have to ascertain that the attribute name in a string
+								if(_value->type==VT_MAP){
+									Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
+									if(attributenameText){
+										referencedValue=getValueOfAttribute(_value->value._map,string(attributenameText));		
+										free_string(attributenameText);
+										continue;	
 									}
-									referencedValue=_getValueOfList(_referencedValueList,true);
+									output("%s",ERROR_PREFIX);
+									outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
+								}
+								if(_value->type==VT_LIST){
+									// MDH@17OCT2019: how about allowing an index to be a list of indices????
+									long long index;
+									if(indexorattributenameListelementValue->type==VT_LIST){
+										// we'll be returning a list value
+										Mlist* _referencedValueList=_getListOfType(_value->value._list->valuetype);
+										Mlist* indexelementList=indexorattributenameListelementValue->value._list;
+										Mlistelement* indexelementListelement=indexelementList->_first;
+										Mvalue* valueAtIndex;
+										while(indexelementListelement){
+											index=getValueInteger(indexelementListelement->_value);
+											valueAtIndex=(index!=0&&index!=M_LL_INVALID?getValueAtIndex(_value->value._list,index):NULL);
+											// OOPS can't append with 0 anymore, because 0 will do prepending
+											if(appendedToList(_referencedValueList,valueAtIndex,M_LL_INVALID)==0)break;
+											indexelementListelement=indexelementListelement->_next;
+										}
+										referencedValue=_getValueOfList(_referencedValueList,true);
+									}else{
+										// try to convert the index value into a positive integer
+										long long index=getValueInteger(indexorattributenameListelementValue);
+										if(index!=0&&index!=M_LL_INVALID){
+											referencedValue=getValueAtIndex(_value->value._list,index);
+											continue;
+										}
+										if(index){
+											output("%s",ERROR_PREFIX);
+											outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
+										}else
+											outputError("A zero index is not allowed");
+									}
+								}
+								// neither a list nor a map, so nothing to return!!!
+								////////////////////////return NULL;
+								/* replacing:
+								// check the validity of the index or attribute name against the current value
+								if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
+								if(indexorattributenameListelementValue->type==VT_INTEGER){
+									if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
+									_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
 								}else{
-									// try to convert the index value into a positive integer
-									long long index=getValueInteger(indexorattributenameListelementValue);
-									if(index!=0&&index!=M_LL_INVALID){
-										referencedValue=getValueAtIndex(_value->value._list,index);
-										continue;
-									}
-									if(index){
-										output("%s",ERROR_PREFIX);
-										outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
-									}else
-										outputError("A zero index is not allowed");
+									if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
+									_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
 								}
+								*/
 							}
-							// neither a list nor a map, so nothing to return!!!
-							////////////////////////return NULL;
-							/* replacing:
-							// check the validity of the index or attribute name against the current value
-							if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
-							if(indexorattributenameListelementValue->type==VT_INTEGER){
-								if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
-								_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
-							}else{
-								if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
-								_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
-							}
-							*/
 						}
+						if(amVerbose())outputValue("Value of indexed variable: '",_value,"'.\n");
 					}
-					if(amVerbose())outputValue("Value of indexed variable: '",_value,"'.\n");
 				}
 			}
 		}
@@ -4073,6 +4123,14 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
 				break;
+			case TT_REFERENCE:
+				// MDH@04NOV2019: a reference is an interesting little bugger which we unfortunately need for certain function calls like settype()
+				//                for now we only allow referencing FULL variables i.e. not parts of variables like array or map elements although that seems to be a straightforward extension
+				//                so it's much similar to an unindexed variable at the moment
+				//                for now the only thing we're going to do is store the name of the reference (i.e. starting with @) (without value) so that whoever uses it will know how to resolve it!!!
+				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
+				if(amVerbose())output("Value reference referenced variable name: '%s'.\n",_valueReference->_name);
+				break;			
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				// MDH@20JUN2019: some error in the following part because every now and then we get a segmentation fault!!!!
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
@@ -6848,6 +6906,13 @@ void outputValueColored(Mvalue* _value){
 			}
 			outputChar('}');
 			break;
+		case VT_REFERENCE:
+			outputChar('@');
+            if(_value->value._reference){
+                 output("%s",_value->value._reference->variable->_name);
+				 outputChar(':');
+                 output("%zu",_value->value._reference->referenceindex);
+			}
 		default:
 			break;
 	}
@@ -7208,6 +7273,7 @@ void hideSuggestedText(){
 void updateLastTokenAutocompletionText(){
 	// MDH@27SEP2019: updating the identifier continuation now moved to writeSuggestedText(true), so JIT update
 	setLastTokenAutocompletionText(_getLastTokenAutoCompletionText()); // MDH@24SEP2019: the bool forces setting the identifier continuation characters when available, so we can show them to the user
+	inputInfo("Last token auto completion text updated.");
 }
 
 void backToPrompt(){
@@ -7838,7 +7904,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	Mtoken* lastNonwhitespaceCommandToken=lastCommandToken;while(lastNonwhitespaceCommandToken->type==TT_WHITESPACE)lastNonwhitespaceCommandToken=lastNonwhitespaceCommandToken->prev;
 	if(lastNonwhitespaceCommandToken==lastCommandToken){ // not behind a whitespace (newline) token
 	*/
-		if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))*inputCharacterType='R';
+		if((TOKENTYPE_IDS[lastCommandToken->type]&0x62)==0x62)if(inputChar==string_char(lastCommandToken->text,0))*inputCharacterType='r'; // MDH@04NOV2019: changed into lowercase r as we're now using R for token of type reference!!!
 		// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
 		// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
 		//                there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
@@ -7954,7 +8020,8 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			/////if(amDebugging())inputInfo("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
-			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
+			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType/*,endOfInput*/);
+			if(endOfInput)updateLastTokenAutocompletionText();
 			if(!lastCommandToken)return NULL;
 			/* replacing:
 			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,newTokenType);
@@ -8121,6 +8188,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	/////if(amDebugging())inputInfo("I");
 	// append the typed character at getUserInputLength() minus current token offset in _userInputCommand->_lastToken->text
 	string_append_char(lastCommandToken->text,inputChar);
+	/////if(amDebugging())inputInfo("J");
 
 	if(newTokenType<0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 

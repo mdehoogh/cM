@@ -326,15 +326,15 @@ size_t getNumberOfMatchingCharacters(char const * s1,char const * s2){
     size_t result=0;if(s1&&s2){while(*s1&&*s2&&*s1==*s2){result++;s1++;s2++;}}return result;
 }
 // MDH@24SEP2019: because I decided to return either a completion text, or all characters available to obtain an existing variable/function, I return an Mstring* not a char* anymore with the first character either 1 or 2
-Mstring* _getCompletion(char const * const name){
+// MDH@04NOV2019: with references it is possible that the length of \p name is 0, so I change l>0 into l>=0 (forcing l to -1 when name is NULL)
+Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
     Mstring* _completion=__string(); // this result will start with '\0' indicating that there is no completion or characters from available variables/functions
     if(_completion){
         size_t completionlength=0; // the number of characters to be copied of completion (which will point to the first character in the completion string)
-        int l=(name?strlen(name):0);
-        if(l>0){
+        int l=(name?strlen(name):-1);
+        if(l>=0){
             unsigned char completiontype=1; // the completion type (either 1 or 2)
-            string_append_char(_completion,completiontype);
-            if(_completion){ // completion type appended!!!
+            if(string_append_char(_completion,completiontype)){ // completion type appended!!!
                 // check all active environments
                 char* completion=NULL; // the current completion string
                 Menvironment* _environment=_executionEnvironment;
@@ -366,7 +366,7 @@ Mstring* _getCompletion(char const * const name){
                                                     // if either fails we set the completion type to 0 otherwise to 2
                                                     if(!string_append_char(_completion,completion[0])||!string_append_char(_completion,*(variablename+l)))completiontype=0;else completiontype=2;
                                                     completion=NULL; // don't need completion anymore
-                                                    break;
+                                                    // MDH@04NOV2019 don't think we should break here!!!: break;
                                                 }
                                             }else{
                                                 completion=variablename+l; // point to the first character after name
@@ -376,6 +376,7 @@ Mstring* _getCompletion(char const * const name){
                                             // don't add twice!!!
                                             if(string_find(_completion,(*(variablename+l)))<0)if(!string_append_char(_completion,*(variablename+l)))completiontype=0;               
                                         }
+                                        if(completiontype==0)break; // something went wrong
                                     }
                                 }
                             }
@@ -383,47 +384,50 @@ Mstring* _getCompletion(char const * const name){
                         }
                         if(completiontype==0)break; // OOPS apparently contradictory continuations
                     }
-                    // check functions
-                    Mfunctionmap* functionMap=_environment->_functionMap;
-                    if(functionMap){
-                        size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,fnl;
-                        char *functionname;
-                        // as long as variable is defined, and the variable's name is not equal to the given name, continue
-                        // NOTE all variables that match should have the same characters behind the name part in order to be considered a valid completion
-                        Mfunctionmapelement* functionMapelement=functionMap->_first;
-                        while(functionMapelement){
-                            functionname=string(functionMapelement->_name); // TODO why is the function name an Mstring and not simply char*
-                            fnl=(functionname?strlen(functionname):0);
-                            if(fnl>l){ // the variable name is larger then name is
-                                numberOfMatchingCharacters=getNumberOfMatchingCharacters(name,functionname);
-                                // wait a minute, we cannot have more than l matching characters
-                                if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
-                                    if(completiontype==1){
-                                        if(completion){
-                                            numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(functionname+l,completion);
-                                            if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
-                                            if(completionlength==0){ // too bad: no matching characters with the current completion, meaning that the first continuation characters do not match, so that no continuation can be returned
-                                                // we should return the initial characters available
-                                                // the first character in the completion we had so far is appended to _completion
-                                                // the first character in the functionname as well
-                                                // if either fails we set the completion type to 0 otherwise to 2
-                                                if(!string_append_char(_completion,completion[0])||!string_append_char(_completion,*(functionname+l)))completiontype=0;else completiontype=2;
-                                                completion=NULL; // don't need completion anymore
-                                                break;
+                    if(functionidentifiersaswell){
+                        // check functions
+                        Mfunctionmap* functionMap=_environment->_functionMap;
+                        if(functionMap){
+                            size_t numberOfMatchingCharacters,numberOfMatchingCompletionCharacters,fnl;
+                            char *functionname;
+                            // as long as variable is defined, and the variable's name is not equal to the given name, continue
+                            // NOTE all variables that match should have the same characters behind the name part in order to be considered a valid completion
+                            Mfunctionmapelement* functionMapelement=functionMap->_first;
+                            while(functionMapelement){
+                                functionname=string(functionMapelement->_name); // TODO why is the function name an Mstring and not simply char*
+                                fnl=(functionname?strlen(functionname):0);
+                                if(fnl>l){ // the variable name is larger then name is
+                                    numberOfMatchingCharacters=getNumberOfMatchingCharacters(name,functionname);
+                                    // wait a minute, we cannot have more than l matching characters
+                                    if(numberOfMatchingCharacters==l){ // all characters in name match (at the beginning)
+                                        if(completiontype==1){
+                                            if(completion){
+                                                numberOfMatchingCompletionCharacters=getNumberOfMatchingCharacters(functionname+l,completion);
+                                                if(numberOfMatchingCompletionCharacters<completionlength)completionlength=numberOfMatchingCompletionCharacters;
+                                                if(completionlength==0){ // too bad: no matching characters with the current completion, meaning that the first continuation characters do not match, so that no continuation can be returned
+                                                    // we should return the initial characters available
+                                                    // the first character in the completion we had so far is appended to _completion
+                                                    // the first character in the functionname as well
+                                                    // if either fails we set the completion type to 0 otherwise to 2
+                                                    if(!string_append_char(_completion,completion[0])||!string_append_char(_completion,*(functionname+l)))completiontype=0;else completiontype=2;
+                                                    completion=NULL; // don't need completion anymore
+                                                    // MDH@04NOV2019 don't think we should break here!!!: break;
+                                                }
+                                            }else{
+                                                completion=functionname+l; // point to the first character after name
+                                                completionlength=fnl-l; // use all following characters
                                             }
-                                        }else{
-                                            completion=functionname+l; // point to the first character after name
-                                            completionlength=fnl-l; // use all following characters
+                                        }else{ // completiontype==2
+                                            // don't add twice!!!
+                                            if(string_find(_completion,(*(functionname+l)))<0)if(!string_append_char(_completion,*(functionname+l)))completiontype=0;               
                                         }
-                                    }else{ // completiontype==2
-                                        // don't add twice!!!
-                                        if(string_find(_completion,(*(functionname+l)))<0)if(!string_append_char(_completion,*(functionname+l)))completiontype=0;               
+                                        if(completiontype==0)break; // something went wrong
                                     }
                                 }
+                                functionMapelement=functionMapelement->_next;
                             }
-                            functionMapelement=functionMapelement->_next;
+                            if(completiontype==0)break; // OOPS apparently some error
                         }
-                        if(completiontype==0)break; // OOPS apparently some error
                     }
                     // and check the parent as well
                     _environment=_environment->_parent;
@@ -707,101 +711,74 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
 
 // the internal functions
 /**
- * Msettype() to set the (value) type of a variable
+ * \brief to set the type and immutable flag of a variable or composite value
  */
-Mvalue* Msettype(Mvalue* _variableName,Mvalue* _valuetype){
+Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
     // check the types first, both should be strings
-    if(!_variableName){outputError("Undefined settype() variable name");return NULL;}
-    if(!_valuetype){outputError("Undefined settype() value type");return NULL;}
-    if(_variableName->type==VT_TEXT&&_valuetype->type==VT_TEXT){
-        char* variableName=_variableName->value._text->_c; // ignoring the presuffix exactly as we need to!!!
-        if(strlen(variableName)){
-            // get the value type, we can use uppercase to indicate an immutable (constant) variable?????
-            bool immutable=false;
-            Mvaluetype valuetype=VT_UNDEFINED;
-            switch(_valuetype->value._text->_c[0]){ // use the first character (which will be '\0' if the default value is used!!!)
-                case 'U':
-                    immutable=true;
-                case 'u':
-                    valuetype=VT_UNDEFINED;
+    Mvariable* variable=NULL;
+    bool valuetypeSpecified=(valuetypeValue&&valuetypeValue->type==VT_TEXT);
+    // TODO should we force value type to be text???? for now yes
+    if(value&&(valuetypeSpecified||immutableValue)){
+        switch(value->type){
+            case VT_MAP:case VT_LIST:break;
+            case VT_REFERENCE:
+                {
+                    variable=value->value._reference->variable;
+                    // it's best NOT to create the variable if it does not yet exist although we could
+                    if(!variable){output("%s",ERROR_PREFIX);outputValue("Cannot set the type of non-existing variable '",value,"'.\n");return NULL;}
                     break;
-                case 'I':
-                    immutable=true;
-                case 'i':
-                    valuetype=VT_INTEGER;
-                    break;
-                case 'D':
-                    immutable=true;
-                case 'd':
-                    valuetype=VT_DECIMAL;
-                    break;
-                case 'Q':case 'R':
-                    immutable=true;
-                case 'q':case 'r':
-                    valuetype=VT_RATIONAL;
-                    break;
-                case 'B':
-                    immutable=true;
-                case 'b':
-                    valuetype=VT_BIGINTEGER;
-                    break;
-                case 'F':
-                    immutable=true;
-                case 'f':
-                    valuetype=VT_FLOAT;
-                    break;
-                case 'T':
-                    immutable=true;
-                case 't':
-                    valuetype=VT_TEXT;
-                    break;
-                case 'L':
-                    immutable=true;
-                case 'l':
-                    valuetype=VT_LIST;
-                    break;
-                case 'M':
-                    immutable=true;
-                case 'm':
-                    valuetype=VT_MAP;
-                    break;
-            }
-            // if valuetype2 is defined that type defines the top-level type
-            char originalvaluetype=(containsVariable(_executionEnvironment,variableName)?'!':'?');
-            if(originalvaluetype=='?'&&!addVariable(_executionEnvironment,variableName,valuetype,immutable))originalvaluetype='\0';
-            if(originalvaluetype){
-                Mvariable* _variable=getVariable(_executionEnvironment,variableName,false); // should exist
-                if(_variable){
-                    // MDH@03NOV2019: we want to return the original type
-                    /*
-                    if(originalvaluetype=='!') // already existed!!!
-                        originalvaluetype=(_variable->immutable?IMMUTABLEVALUETYPECHARS[_variable->valuetype]:MUTABLEVALUETYPECHARS[_variable->valuetype]);
-                    */
-                    // you can change the value type if the current value is (still) NULL or when it is mutable...
-                    if(valuetype!=_variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
-                        // intended change of value type not allowed when the value is not NULL 
-                        if(isValueUndefined(_variable->_value)!=M_TRUE)
-                            outputError("Unable to change the value type when the value is defined");
-                        else
-                        if(_variable->immutable)
-                            outputError("Unable to change the value type when the variable is immutable");
-                        else{
-                            _variable->immutable=immutable;
-                            _variable->valuetype=valuetype; // update the value type
-                            ////////assignValue(&_variable->_value,NULL); // clear the value (might already be the case but won't harm either)
-                        }
-                    }else // no change in value type, so allowed to toggle the mutability...
-                        _variable->immutable=immutable;
-                    // return the value type as text, which means we need to wrap the value type character
-                    return _getCharTextValue(_variable->immutable?IMMUTABLEVALUETYPECHARS[_variable->valuetype]:MUTABLEVALUETYPECHARS[_variable->valuetype]);
                 }
-            }else 
-                outputError("Failed to add the variable to set the type of");
+            default:outputError("Can not set the type of values that are scalar or text (representing the name of a variable)");return NULL;
         }
-    }else 
-        outputError("Both arguments to settype() should be text, the fist argument a variable name, the second its value type");
+        // set the valuetype
+        // no longer allowing uppercase to be used as a shortcut to immutability?????? yes, we can still do that
+        long long immutable=M_LL_INVALID; // whether we should change the immutable flag
+        Mvaluetype valuetype=VT_UNDEFINED;
+        if(valuetypeSpecified){ // a value type defined
+            switch(valuetypeValue->value._text->_c[0]){ // use the first character (which will be '\0' if the default value is used!!!)
+                case 'U':immutable=M_TRUE;
+                case 'u':valuetype=VT_UNDEFINED;break;
+                case 'I':immutable=M_TRUE;
+                case 'i':valuetype=VT_INTEGER;break;
+                case 'D':immutable=M_TRUE;
+                case 'd':valuetype=VT_DECIMAL;break;
+                case 'Q':case 'R':immutable=M_TRUE;
+                case 'q':case 'r':valuetype=VT_RATIONAL;break;
+                case 'B':immutable=M_TRUE;
+                case 'b':valuetype=VT_BIGINTEGER;break;
+                case 'F':immutable=M_TRUE;
+                case 'f':valuetype=VT_FLOAT;break;
+                case 'T':immutable=M_TRUE;
+                case 't':valuetype=VT_TEXT;break;
+                case 'L':immutable=M_TRUE;
+                case 'l':valuetype=VT_LIST;break;
+                case 'M':immutable=M_TRUE;
+                case 'm':valuetype=VT_MAP;break;
+                default:outputError("Unrecognized value type");return NULL;
+            }
+        }
+        // if a third argument is specified it takes precedence over what the second argument says
+        if(immutableValue)immutable=isValueOne(immutableValue); // accepting all values that represent 1 to be considered true
+        if(valuetypeSpecified){
+            if(variable){
+                if(valuetype!=variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
+                    // you cannot change the type of a variable that its current value is not (unless the value is undefined or the type of the value is undefined)
+                    if(variable->_value&&variable->_value->type!=valuetype&&variable->_value->type!=VT_UNDEFINED){
+                        output("%sUnable to change the value type of %s to '%c' when its value is of type '%c'.\n",ERROR_PREFIX,variable->_name,MUTABLEVALUETYPECHARS[valuetype],MUTABLEVALUETYPECHARS[variable->_value->type]);
+                        return NULL;
+                    }
+                    variable->valuetype=valuetype; // update the value type
+                }
+                if(immutable!=M_LL_INVALID)variable->immutable=(immutable==M_TRUE);
+            }else
+            if(value->type==VT_LIST)value->value._list->valuetype=valuetype;else value->value._map->valuetype=valuetype;
+        }
+        if(immutable!=M_LL_INVALID){
+            if(variable)variable->immutable=(immutable==M_TRUE);else if(value->type==VT_LIST)value->value._list->immutable=(immutable==M_TRUE);else value->value._map->immutable=(immutable==M_TRUE);
+        }
+    }
     return NULL;
-}/* VALIDATED */
+}/* INVALIDATED */
 
 bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction){
     if(_function){
@@ -918,6 +895,19 @@ bool completedStringMapTokenFunction(Mfunction* const _function,const char* cons
             return true;
         }
         output("%sFailed to register string map list argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedValueTextValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=_getStringMapTokenMap("variable name, list or map","value type","immutable");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register a value text value argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1112,8 +1102,8 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedFloatFunction(_getFunction(_environment,"ceil"),"ceil",Mceil))return false;
     if(!completedFloatFunction(_getFunction(_environment,"exp"),"exp",Mexp))return false;
     if(!completedFloatFunction(_getFunction(_environment,"dexp"),"dexp",Mdexp))return false;
-
-    if(!completedStringStringFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
+    // MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag
+    if(!completedValueTextValueFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
     if(!completedFloatFloatFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
 
     if(!completedStringMapTokenFunction(_getFunction(_environment,"function"),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;

@@ -6,7 +6,8 @@
 
 struct Mlist;
 struct Mmap;
-struct Mvaluereference; // MDH@26OCT2019: being able to store a value reference in a value coming up next...
+struct Mreference;
+// MDH@04NOV2019: we need a variable reference not a value reference as used in M.c, so I've introduced Mreference in Mexecution.c instead!!!! struct Mvaluereference; // MDH@26OCT2019: being able to store a value reference in a value coming up next...
 typedef union Mvalueunion{
     Mtoken* _token;
     Minteger* _integer;
@@ -17,7 +18,7 @@ typedef union Mvalueunion{
     Mtext* _text;
     struct Mlist* _list;
     struct Mmap* _map;
-    struct Mvaluereference* _reference;
+    struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
     //////////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
@@ -42,10 +43,19 @@ void free_valuereference(Mvaluereference* _valuereference);
 // a variable is a named value of a certain value type
 typedef struct Mvariable{
     char* _name;
-    bool immutable; // whether or not mutable
     Mvaluetype valuetype; // MDH@01MAY2019: fixed type variables can only be assigned once, after that any value that is assigned to it has to have the same type as the first value
     Mvalue* _value;
+    size_t referencecount; // MDH@04NOV2019: keep track of all its references
+    bool immutable:1; // whether or not mutable
 }Mvariable;
+
+typedef struct Mreference{
+    Mvariable* variable;
+    size_t referenceindex;
+}Mreference;
+
+Mreference* _getReference(Mvariable* variable);
+void free_reference(Mreference* reference);
 
 typedef struct Mlistelement{
     unsigned long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
@@ -60,7 +70,8 @@ typedef struct Mlist{
     Mvaluetype valuetype; // we can force a list to have elements of the same type
     Mlistelement* _first;
     Mlistelement* _last;
-    bool weak;
+    bool weak:1;
+    bool immutable:1;
 }Mlist;
 
 typedef struct Mmapelement{
@@ -73,7 +84,8 @@ typedef struct Mmap{
     Mvaluetype valuetype; // the type all values in the map should have
     Mmapelement* _first;
     Mmapelement* _last;
-    bool weak;
+    bool weak:1;
+    bool immutable:1;
 }Mmap;
 
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
@@ -105,9 +117,12 @@ long long isMapUndefined(Mmap* map);
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 // data wrappers
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
+// and allow asking for a reference value wrapper
 Mvalue* _getIntegerValue(long long ll);
 Mvalue* _getCharTextValue(char _c);
+
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
+Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure); // MDH@31MAY2019: we cannot use a big integer long here
 Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure);

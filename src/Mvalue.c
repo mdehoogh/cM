@@ -126,7 +126,7 @@ void free_value(Mvalue* _value){
             case VT_TEXT:if(_value->value._text)free_text(_value->value._text);break;
             case VT_LIST:if(_value->value._list)free_list(_value->value._list);break;
             case VT_MAP:if(_value->value._map)free_map(_value->value._map);break;
-            case VT_REFERENCE:if(_value->value._reference)free_valuereference(_value->value._reference);break; // MDH@26OCT2019
+            case VT_REFERENCE:if(_value->value._reference)free_reference(_value->value._reference);break; // MDH@04NOV2019: decrement the reference count to the variable
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         if(amVerbose())output("Type-specific value freed.\n");
@@ -261,6 +261,21 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
     return _userfunctionValue;
 }// VALIDATED 
 */
+// MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
+Mreference* _getReference(Mvariable* variable){
+    Mreference* _reference=(variable?CALLOC(1,sizeof(Mreference),'R'):NULL);
+    if(_reference){_reference->variable=variable;_reference->referenceindex=(++variable->referencecount);}
+    return _reference;
+}
+void free_reference(Mreference* reference){
+    if(reference){reference->variable->referencecount--;FREE(reference,'R');}
+}
+Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure){
+    if(!_reference){outputLine("No reference to wrap.");return NULL;}
+    Mvalue* _referenceValue=__value();
+    if(_referenceValue){_referenceValue->type=VT_REFERENCE;_referenceValue->value._reference=_reference;}else if(freeonfailure)free_reference(_reference);
+    return _referenceValue;
+}
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     if(!_decimal){outputLine("No decimal to wrap.");return NULL;}
     Mvalue* _decimalValue=__value();
@@ -1075,6 +1090,14 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                     valueText=__string();
                     if(valueText){
                         Mstring* p=valueText;
+                        p=string_append_char(p,'@');
+                        if(_value->value._reference){
+                            p=string_append(p,_value->value._reference->variable->_name);
+                            // append the reference index so we know which one it is
+                            p=string_append_char(p,':');
+                            p=appendll(p,_value->value._reference->referenceindex);
+                        }
+                        /* replacing:
                         if(_value->value._reference->_name)p=string_append(p,_value->value._reference->_name);
                         if(_value->value._reference->_itemid){
                             p=string_append_char(p,'[');
@@ -1087,6 +1110,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                             Mstring* _valueText=_getValueText(_value->value._reference->_value,dequoted);
                             if(_valueText){p=string_append(p,string(_valueText));free_string(_valueText);}
                         }
+                        */
                         if(!p){free_string(valueText);valueText=NULL;}
                     }
                 }
@@ -1581,7 +1605,7 @@ long long isValueUndefined(Mvalue* value){
         case VT_MAP:result=isMapUndefined(value->value._map);break; ////Mlen(_value)==0;
         case VT_TOKEN:result=isTokenUndefined(value->value._token);break; /////string_length(_value->value._token->text)==0;
         case VT_UNDEFINED:result=M_TRUE;break;
-        case VT_REFERENCE:result=isReferenceUndefined(value->value._reference);break;
+        case VT_REFERENCE:result=(value->value._reference?M_FALSE:M_TRUE);break;
     }
     return result;
 }/* VALIDATED */
