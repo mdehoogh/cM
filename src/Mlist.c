@@ -219,7 +219,7 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){
         }
         if(integer!=M_LL_INVALID){ // at least one valid integer in the list
             long long count=1,minimumindex=listelement->index,maximumindex=listelement->index; // counting the missings and the number of sample values (that are NOT missing)
-            long long sum=integer,sumofsquares=sum*sum,mode=integer,minimum=integer,maximum=integer;
+            long long sum=integer,squaressum=sum*sum,mode=integer,minimum=integer,maximum=integer;
             while(listelement->_next){
                 listelement=listelement->_next;
                 if(listelement->_value&&listelement->_value->type==VT_INTEGER){
@@ -227,7 +227,7 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){
                     if(integer!=M_LL_INVALID){
                         count++;
                         sum+=integer;
-                        sumofsquares+=(integer*integer);
+                        squaressum+=(integer*integer);
                         if(integer<minimum){minimum=integer;minimumindex=listelement->index;}
                         if(integer>maximum){maximum=integer;maximumindex=listelement->index;}
                     }else errors++;
@@ -236,11 +236,32 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){
             // ready to compose the map elements
             appendedToMap(_statisticsMap,"count",_getIntegerValue(count));
             appendedToMap(_statisticsMap,"sum",_getIntegerValue(sum));
-            appendedToMap(_statisticsMap,"sumofsquares",_getIntegerValue(sumofsquares));
+            appendedToMap(_statisticsMap,"squaressum",_getIntegerValue(squaressum));
             appendedToMap(_statisticsMap,"minimum",_getIntegerValue(minimum));
             appendedToMap(_statisticsMap,"maximum",_getIntegerValue(maximum));
             appendedToMap(_statisticsMap,"minimumindex",_getIntegerValue(minimumindex));
             appendedToMap(_statisticsMap,"maximumindex",_getIntegerValue(maximumindex));
+            // with these values we are able to compute the mean and the variance and the standard deviation
+            if(count>0){
+                Mrational* _mean=_getRational(_getBiginteger(sum),_getBiginteger(count),M_LD_NAN,true,true);
+                if(_mean)appendedToMap(_statisticsMap,"mean",_getRationalValue(_mean,true));
+                // the sum of squared deviations (of sum of squares) is defined as squaressum-(sum*sum)/count
+                Mrational* _squaressum=_getRational(_getBiginteger(squaressum),NULL,M_LD_NAN,false,true);
+                if(_squaressum){
+                    // I need to subtract another rational
+                    Mbiginteger* squaredsum=__biginteger();
+                    if(mp_sqr(_getBiginteger(sum),squaredsum)==MP_OKAY){
+                        Mrational* _tosubtract=_getRational(squaredsum,_getBiginteger(count),M_LD_NAN,false,true);
+                        if(_tosubtract){
+                            Mrational* _sumofsquares=_getRationalDifference(_sumofsquares,_tosubtract);
+                            appendedToMap(_statisticsMap,"sumofsquares",_getRationalValue(_sumofsquares,true));
+                            // next to divide by the count minus 1 to give us the variance
+
+                        }                       
+                    }
+                }else 
+                    outputError("Failed to initialize the sum of squares");
+            }
         }
         appendedToMap(_statisticsMap,"missings",_getIntegerValue(missings));
         appendedToMap(_statisticsMap,"errors",_getIntegerValue(errors));
