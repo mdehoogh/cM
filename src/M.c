@@ -30,7 +30,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="8";char const * const M_DATE="28 October 2019, 18:00";
 //char const * const M_BUILD="9";char const * const M_DATE="30 October 2019, 18:00";
 //char const * const M_BUILD="10";char const * const M_DATE="31 October 2019, 12:00";
-char const * const M_BUILD="11";char const * const M_DATE="4 November 2019, 22:00";
+//char const * const M_BUILD="11";char const * const M_DATE="4 November 2019, 22:00";
+char const * const M_BUILD="12";char const * const M_DATE="5 November 2019, 18:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -44,6 +45,7 @@ const char* const DEFINEUSERFUNCTION_NAME="function";
 const char* const MUTABLEVALUETYPECHARS="uoibdqftlmr"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
+const char* const BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
 
 // MDH@31OCT2019: if the value of something equals the NULL value, this is the text to use to represent it, this is also the name of the NULL variable!!!
 //                alternatively we could use capital letters to denote the variable, and lowercase to denote the value (which makes sense I suppose)
@@ -281,7 +283,7 @@ long long getDP(){
 	if(!M_DECIMALCONTEXT)M_DECIMALCONTEXT=_getDecimalcontext(M_DP); // _decimalContext won't be created until it's actually needed (so other decimal contexts might be created before!!!!!)
 	// better to get it directly out of the _decimalContext (as that holds the actual decimal context being used)
 	long long dp=(M_DECIMALCONTEXT?M_DECIMALCONTEXT->mpd_context->prec:M_LL_INVALID); // replacing: long long dp=(DP_value?DP_value->value._integer->ll:M_LL_INVALID);
-	if(dp==M_LL_INVALID)outputLine("BUG: No default decimal context active!");
+	if(dp==M_LL_INVALID)outputBug("No default decimal context active!");
 	return dp;
 }
 // MDH@18OCT2019: if someone wants to know about the decimal context
@@ -1242,7 +1244,7 @@ bool initEnvironment(){
 	//                therefore it shouldn't be a token value 
 	/*
 	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
-	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputError("BUG: Failed to create NULL value!");
+	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputBug("Failed to create NULL value!");
 	*/
 
 	// either set the DP_value to 0 (failed to get a decimal context somehow)
@@ -1404,12 +1406,16 @@ bool initEnvironment(){
 				outputError("Failed to register the empty function");
 				return false;
 			}
-			if(!completedListFunction(_getFunction(_Menvironment,"pull"),"pull",Mpull)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
-				outputError("Failed to register the pull, pop, first and last function");
+			if(!completedListFunction(_getFunction(_Menvironment,"statistics"),"statistics",Mstats)||!completedListFunction(_getFunction(_Menvironment,"pull"),"pull",Mpull)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
+				outputError("Failed to register the statistics, pull, pop, first and last list functions");
 				return false;
 			}
-			if(!completedListValueFunction(_getFunction(_Menvironment,"push"),"push",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"drop"),"drop",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"shove"),"shove",Mshove)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)){
-				outputError("Failed to register the push(=drop), shove and pop functions");
+			if(!completedListValueFunction(_getFunction(_Menvironment,"removed"),"removed",Mremoved)||!completedListValueFunction(_getFunction(_Menvironment,"push"),"push",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"drop"),"drop",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"shove"),"shove",Mshove)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)){
+				outputError("Failed to register the push(=drop), pop, shove and removed functions");
+				return false;
+			}
+			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,"find"),"find",Mfind)){
+				outputError("Failed to register the find function");
 				return false;
 			}
 
@@ -2218,7 +2224,7 @@ bool updateImmediateFeedforwardTextOfUserInputCommand(){
 */
 // the following functions are user input command specific
 Mtoken* setLastUserInputCommandToken(Mtoken* lastUserInputCommandToken){
-	if(!_userInputCommand){inputError("BUG: No user input command");return NULL;}
+	if(!_userInputCommand){inputError("%sNo user input command.",BUG_PREFIX);return NULL;}
 	_userInputCommand->_lastToken=lastUserInputCommandToken;
 	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(lastUserInputCommandToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
 	return _userInputCommand->_lastToken;
@@ -2355,7 +2361,7 @@ bool showContinuedPrompt(){
 }
 // MDH@30OCT2019 END
 void promptForUserInput(){
-	free_userinputline();if(_userinputline)outputError("BUG: Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
+	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode();
 	resetOutputColor();
 	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
@@ -3054,14 +3060,14 @@ void updateUserInputCommandIdentifierContinuation(){
 												if(removeToken())
 													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
 												else
-													inputError("BUG: Failed to undo failing to mark the last character as erroneous.");
+													inputError("%sFailed to undo failing to mark the last character as erroneous.",BUG_PREFIX);
 											}else
 												reoutputToken(_errorToken);
 										}else
 											inputError("The supposed reference can never become an existing variable reference.");
 										// if we failed to create the error token, we have to append the removed character again (should be no problem because Mstring does not reduce the memory when deleting characters from the end)
 										if(_errorToken!=_userInputCommand->_lastToken){
-											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength)){inputError("BUG: Couldn't undo the adjustments made to an erroneous reference.");}
+											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength)){inputError("%sCouldn't undo the adjustments made to an erroneous reference.",BUG_PREFIX);}
 										}
 									}else
 										inputError("Failed to retrieve the last (erroneous) character in a variable reference.");
@@ -3069,7 +3075,7 @@ void updateUserInputCommandIdentifierContinuation(){
 								// if(amVerbose())
 								inputInfo("Reference complete!");
 							}else
-								inputError("BUG: Last character in reference vanished.");
+								inputError("%sLast character in reference vanished.",BUG_PREFIX);
 						}else
 							inputError("There is no existing variable that can be referenced anymore.");
 					}
@@ -3971,7 +3977,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
 								// MDH@02NOV2019: making the list weak
 								functionCallArgumentList=listMadeWeak(_getListOfType(VT_UNDEFINED)); // creating a list
-								if(functionCallArgumentList&&!appendedToList(functionCallArgumentList,_functionArgumentsValue,M_LL_INVALID)){
+								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,_functionArgumentsValue,M_LL_INVALID)<=0){
 									outputError("Failed to create the to do expression list");
 									free_list(functionCallArgumentList);
 									functionCallArgumentList=NULL; // so nothing will get done!!
@@ -7447,7 +7453,7 @@ void copyUserInputCommand(){
 				// move back until we find the token referenced (and we should find it)
 				while(referencedToken!=_tokenToCopy->expr){referencedToken=referencedToken->prev;newReferencedToken=newReferencedToken->prev;}
 				// ASSERT referencedToken now equals the token in the original command being referenced (which could be itself obviously), and newReferencedToken is a token in the new user input command that should be pointed to!!!
-				if(newReferencedToken)_newUserInputCommand->_lastToken->expr=newReferencedToken;else inputError("BUG: Failed to synchronize a token reference.");
+				if(newReferencedToken)_newUserInputCommand->_lastToken->expr=newReferencedToken;else inputError("%sFailed to synchronize a token reference.",BUG_PREFIX);
 			}else // nothing pointed to, so just in case
 				_newUserInputCommand->_lastToken->expr=NULL;
 			// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
@@ -7756,7 +7762,7 @@ char removedTokenCharacter(bool endOfInput){
 			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,endOfInput);
 		}
 	}else
-		inputInfo("BUG: No command to remove characters from!");
+		inputInfo("%sNo command to remove characters from!",BUG_PREFIX);
 	return tokenCharacterRemoved;
 }
 
@@ -7871,7 +7877,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
 	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
-	if(!lastCommandToken){inputError("BUG: No last command token.");return NULL;}
+	if(!lastCommandToken){inputError("%sNo last command token.",BUG_PREFIX);return NULL;}
 	if(amDebugging())inputInfo("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
@@ -8235,7 +8241,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 		copyUserInputCommand();
 	/////outputChar('2');
 	// if _userInputCommand->_lastToken is now NULL something went wrong (in copyUserInputCommand or createUserInputCommand most likely)
-	if(!_userInputCommand){inputError("BUG: No user input command.");return false;}
+	if(!_userInputCommand){inputError("%sNo user input command.",BUG_PREFIX);return false;}
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	/////outputChar('3');
 	clearInfo();

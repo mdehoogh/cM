@@ -152,7 +152,8 @@ bool incrementReferenceCount(Mvalue* _value);
 void free_value(Mvalue* _value);
 //////////Mstring* appendld(Mstring* mstr,long double ld);
 
-unsigned long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+/*unsigned */long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+
 void free_list(Mlist* _list);
 Mlist* _getListCopy(Mlist const * const _list);
 
@@ -161,7 +162,7 @@ Mlist* _getMapAttributes(Mmap const * const _map);
 
 long long isListUndefined(Mlist* list);
 
-bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);
+long long appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);
 
 long double getValueLongDouble(Mvalue const * const _value);
 Mbiginteger* _getValueBiginteger(Mvalue const * const _value); // converts a value to a big integer (if possible)
@@ -185,6 +186,7 @@ Mmap* _getTokenTokenMap(char* name1,char* name2);
 Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
+Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
@@ -216,6 +218,7 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);
 void free_variable(Mvariable* _variable,bool weak);
 
 void free_mapelement(Mmapelement* _mapelement,bool weak);
+void free_listelement(Mlistelement* _listelement,bool weak);
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
@@ -237,3 +240,5 @@ Mdecimal* _getValueDecimal(Mvalue* _value);
 Mdecimal* getValueDecimal(Mvalue* _value);
 
 Mdecimal* _getValueTextDecimal(Mvalue* value); // MDH@09OCT2019: delegates to _getTextDecimal() in Mdecimal.h/c, guarantees to return a new decimal from parsing the value text representation (unless the value wraps a decimal itself)
+
+bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2); //MDH@05NOV2019: moved over from Menvironment.h/c as we need it in Mlist's find() function

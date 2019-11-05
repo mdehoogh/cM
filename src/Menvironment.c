@@ -21,6 +21,7 @@ extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with ea
 extern const char* const ERROR_PREFIX;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
+extern const char * const VALUETYPENAMES[];
 
 void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
     if(_expressionlistelement){
@@ -116,10 +117,10 @@ bool pushExecutionEnvironment(Menvironment* _environment){
     return true;
 }/* VALIDATED */
 void popExecutionEnvironment(){
-    if(!_executionEnvironment){outputLine("BUG: No environment left to pop!");return;} // nothing to pop
+    if(!_executionEnvironment){outputBug("No environment left to pop!");return;} // nothing to pop
     // NOTE only execution environments that have a parent can be popped!!!
     Menvironment* _previousExecutionEnvironment=_executionEnvironment->_execution;
-    if(!_previousExecutionEnvironment){outputLine("BUG: Can't pop top-most environment!");return;}
+    if(!_previousExecutionEnvironment){outputBug("Can't pop top-most environment!");return;}
     free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     _executionEnvironment=_previousExecutionEnvironment;
     if(amVerbose())outputEnvironmentName();
@@ -211,28 +212,6 @@ Mvariable* getVariable(Menvironment const * const _environment,char const * cons
 }/* VALIDATED */
 bool containsVariable(Menvironment const * const _environment,char const * const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
 
-// MDH@24OCT2019: when representing variable values the value might match the value of a constant in which case we use the name of that constant variable instead (which is like a symbol)
-//                obviously the type of the value should match as well
-bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
-    if(!value1&&!value2)return false; // if both NULL not considered to be the same
-    if(value1==value2)return true; // the same value pointed to
-    if(!value1||!value2)return false; // if either is NULL, not the same of course
-    // ASSERT both not NULL
-    if(value1->type==value2->type) // if the types are different definitely not the same
-    switch(value1->type){
-        case VT_INTEGER:return(value1->value._integer->ll==value2->value._integer->ll);
-        case VT_FLOAT:return(areFloatsEqual(value1->value._float,value2->value._float)); // MDH@25OCT2019: replacing ldEqual() with a call to areFloatsEqual()
-        case VT_BIGINTEGER:return(mp_cmp(value1->value._biginteger,value2->value._biginteger)==MP_EQ);
-        case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
-        case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
-        case VT_LIST:case VT_MAP:break;
-        case VT_DECIMAL:case VT_RATIONAL:break;
-        case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
-        case VT_REFERENCE: // TODO this might be hard
-            break;
-    }
-    return false;
-}
 char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value){
     if(!value)return NULL; // forget about NULL
     // input valid
@@ -615,6 +594,7 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
     return NULL;
 }// VALIDATED
 */
+// MDH@05NOV2019: if there are missing elements in _argumentList (what we allow now), there should be an associated map element with value NULL
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList){
     Mmap* _functionArgumentMap=NULL;
     if(_function&&_argumentList){
@@ -623,8 +603,12 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
         if(_functionArgumentMap&&functionParameterMap){
             if(amVerbose())outputLine("Matching the function parameters!");
             Mmapelement* functionParameterMapelement=functionParameterMap->_first;
+            unsigned long long argumentindex=0; // MDH@05NOV2019: because _argumentList could be sparse, i.e. have missing elements, we use an index that is used to find the argument list element with that index!!!
             Mlistelement* argumentListelement=_argumentList->_first;
             while(functionParameterMapelement){
+                argumentindex++; // the index of the argument we need
+                // if the current list element has an index below the one we need, get the next argument list element until we have found one with an index at least equal to argument index
+                while(argumentListelement&&argumentListelement->index<argumentindex)argumentListelement=argumentListelement->_next;
                 Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
                 if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
@@ -637,10 +621,10 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
                 // MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)
                 //                we get a problem with functions like push() and shove() that try to adjust their argument
                 //                therefore we replace the call to assignValue() to a simple assignment
-                if(argumentListelement){
+                if(argumentListelement&&argumentListelement->index==argumentindex){ // we have an argument list element to use
                     _argumentmapelement->_variable->_value=argumentListelement->_value;
                     // replacing: assignValue(&_argumentmapelement->_variable->_value,argumentListelement->_value);
-                    argumentListelement=argumentListelement->_next;
+                    // MDH@05NOV2019: no need to do the following anymore, because we incrementing the argument list element at the start of the loop; removing: argumentListelement=argumentListelement->_next;
                 }else // use the default!!!
                     _argumentmapelement->_variable->_value=functionParameterMapelement->_variable->_value;
                     // replacing: assignValue(&_argumentmapelement->_variable->_value,functionParameterMapelement->_variable->_value);
@@ -710,12 +694,26 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
 // END FUNCTION STUFF
 
 // the internal functions
-// helpers for Mtype()
+// helper functions for Mtype()
+// NOTE these three functions should always be used to convert between a character and a value type
+// TODO in time these essential methods might be moved to Mexecution.c/h
 char getValueTypeCharacter(Mvaluetype valuetype,bool immutable){
 	return(immutable?IMMUTABLEVALUETYPECHARS[valuetype]:MUTABLEVALUETYPECHARS[valuetype]);
 }
+Mvaluetype getCharacterOfMutableValueType(char valuetypechar){
+    // ASSERT valuetypechar should represent the character associated with the mutable value type
+    char* p=strchr(MUTABLEVALUETYPECHARS,valuetypechar);
+    return (Mvaluetype)(p-MUTABLEVALUETYPECHARS);
+}
+char getMutableValueTypeCharacter(char valuetypechar){
+    char* p=strchr(MUTABLEVALUETYPECHARS,valuetypechar);
+    if(p)return valuetypechar;
+    p=strchr(IMMUTABLEVALUETYPECHARS,valuetypechar);
+    if(p)return MUTABLEVALUETYPECHARS[p-IMMUTABLEVALUETYPECHARS]; // NOTE I can determine the index (position) in the array by subtracting the start pointer (representing 0)!
+    return '\0';
+}
 bool isValueImmutable(Mvalue* value){
-	bool result=false;
+	bool result=true; // by default any value is immutable
 	if(value){
 		if(value->type==VT_MAP)result=value->value._map->immutable;else
 		if(value->type==VT_LIST)result=value->value._list->immutable;
@@ -726,18 +724,28 @@ bool isValueImmutable(Mvalue* value){
  * \brief returns the (text representation of) type and immutable flag of \p value
  * \p value the value of which to return the text representing the type and immutable flag
  */
-Mvalue* Mtype(Mvalue* _value){
+Mvalue* Mtype(Mvalue* value){
 	// every value should have a type text, even if NULL
 	// MDH@03NOV2019: actually _value should be the name of a variable because it not we cannot determine whether or not
 	//                the variable is mutable, that's why settype() requires the name of the variable (as text)
-	char result[3]="' ";
-	if(_value){
-		if(_value->type==VT_REFERENCE){ // a variabler reference
-			Mvariable* referencedVariable=_value->value._reference->variable;
+	char result[4]="'\0\0"; // this means that all characters (except the first) are '\0', so we won't have to append an end-of-text character!!! 
+	if(value){
+		if(value->type==VT_REFERENCE){ // a variabler reference
+			Mvariable* referencedVariable=value->value._reference->variable;
 			// NOTE for any reference we return not 'r' but the type of the referenced variable (which we wouldn't have access to otherwise)
 			if(referencedVariable)result[1]=getValueTypeCharacter(referencedVariable->valuetype,referencedVariable->immutable);
-		}else // a non-reference type
-			result[1]=getValueTypeCharacter(_value->type,isValueImmutable(_value));
+		}else{ // a non-reference type
+            // MDH@05NOV2019: composite values (maps and lists) also have an element (value) type, and also have an immutable flags
+            //                i.e. noncomposite values are immutable by definition
+            //                in essence the immutability pertains to the map or list, so yes 
+			result[1]=getValueTypeCharacter(value->type,isValueImmutable(value));
+            if(value->type==VT_LIST){
+                result[2]=getValueTypeCharacter(value->value._list->valuetype,false);
+            }else
+            if(value->type==VT_MAP){
+                result[2]=getValueTypeCharacter(value->value._map->valuetype,false);
+            }
+        }
 	}
 	/* ewplacing:
 	switch(_value->type){
@@ -757,13 +765,46 @@ Mvalue* Mtype(Mvalue* _value){
 	*/
 	return _getTextValue(result,false);
 }
+
+bool allListElementsAreOfType(Mlist* list,Mvaluetype valuetype){
+    // ASSERT list must NOT be NULL
+    if(list)
+    if(valuetype!=VT_UNDEFINED){ // a specific type requested
+        Mlistelement* listelement=list->_first;
+        while(listelement){
+            // allowing list element with value NULL or value type VT_UNDEFINED no matter what
+            if(listelement->_value)if(listelement->_value->type!=VT_UNDEFINED&&listelement->_value->type!=valuetype)return false;
+            listelement=listelement->_next;
+        }
+    }
+    return true;
+}
+bool allMapAttributesAreOfType(Mmap* map,Mvaluetype valuetype){
+    // ASSERT map must NOT be NULL
+    if(map)
+    if(valuetype!=VT_UNDEFINED){ // a specific type requested
+        Mmapelement* mapelement=map->_first;
+        Mvalue* attributeValue;
+        Mvariable* attribute;
+        while(mapelement){
+            // allowing map attribute with value NULL or value type VT_UNDEFINED no matter what
+            attribute=mapelement->_variable;
+            if(attribute&&attribute->valuetype!=VT_UNDEFINED&&attribute->valuetype!=valuetype)return false; // TODO do we need this as well??? Can't remember why we are storing map values like this (through a variable!!!!)
+            attributeValue=(attribute?attribute->_value:NULL);
+            // TODO should we check the value type of the given variable as well?????
+            if(attributeValue)if(attributeValue->type!=VT_UNDEFINED&&attributeValue->type!=valuetype)return false;
+            mapelement=mapelement->_next;
+        }
+    }
+    return true;
+}
 /**
  * \brief to set the type and immutable flag of a variable or composite value
  */
 Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
     // check the types first, both should be strings
     Mvariable* variable=NULL;
-    bool valuetypeSpecified=(valuetypeValue&&valuetypeValue->type==VT_TEXT);
+    bool valuetypeSpecified=(valuetypeValue&&valuetypeValue->type==VT_TEXT&&strlen(valuetypeValue->value._text->_c)>0); // the value type is specified (and there is at least one character), if not specified will NOT change the value type
     // TODO should we force value type to be text???? for now yes
     if(value&&(valuetypeSpecified||immutableValue)){
         switch(value->type){
@@ -772,7 +813,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
                 {
                     variable=value->value._reference->variable;
                     // it's best NOT to create the variable if it does not yet exist although we could
-                    if(!variable){output("%s",ERROR_PREFIX);outputValue("Cannot set the type of non-existing variable '",value,"'.\n");return NULL;}
+                    if(!variable){output("%s",ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");return NULL;}
                     break;
                 }
             default:outputError("Can not set the type of values that are scalar or text (representing the name of a variable)");return NULL;
@@ -782,7 +823,14 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
         long long immutable=M_LL_INVALID; // whether we should change the immutable flag
         Mvaluetype valuetype=VT_UNDEFINED;
         if(valuetypeSpecified){ // a value type defined
-            switch(valuetypeValue->value._text->_c[0]){ // use the first character (which will be '\0' if the default value is used!!!)
+            // we should locate the character in either MUTABLE
+            char valuetypechar=valuetypeValue->value._text->_c[0];
+            char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
+            if(!mutablevaluetypechar){output("%s",ERROR_PREFIX);outputValue("Invalid value type specification '",valuetypeValue,"'.\n");return NULL;}
+            immutable=(mutablevaluetypechar==valuetypechar?M_FALSE:M_TRUE); // if the same we received the mutable variant
+            valuetype=getCharacterOfMutableValueType(mutablevaluetypechar);
+            /* replacing (which we would need to change whenever (IM)MUTABLEVALUETYPECHARS would change, which of course is easy to forget):
+            switch(valuetypechar){ // use the first character (which will be '\0' if the default value is used!!!)
                 case 'U':immutable=M_TRUE;
                 case 'u':valuetype=VT_UNDEFINED;break;
                 case 'I':immutable=M_TRUE;
@@ -803,9 +851,11 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
                 case 'm':valuetype=VT_MAP;break;
                 default:outputError("Unrecognized value type");return NULL;
             }
+            */
         }
         // if a third argument is specified it takes precedence over what the second argument says
         if(immutableValue)immutable=isValueOne(immutableValue); // accepting all values that represent 1 to be considered true
+        // only change the type when a (valid) value type was specified
         if(valuetypeSpecified){
             if(variable){
                 if(valuetype!=variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
@@ -816,12 +866,45 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
                     }
                     variable->valuetype=valuetype; // update the value type
                 }
-                if(immutable!=M_LL_INVALID)variable->immutable=(immutable==M_TRUE);
-            }else
-            if(value->type==VT_LIST)value->value._list->valuetype=valuetype;else value->value._map->valuetype=valuetype;
+                // see below: if(immutable!=M_LL_INVALID)variable->immutable=(immutable==M_TRUE);
+            }else{
+                // MDH@05NOV2019: only allow the change of the valuetype of list/map elements if all the current values in the list are already of that type (or of a supertype)
+                if(value->type==VT_LIST){
+                    // if changing to a more strict type (it is always possible to return to the VT_UNDEFINED type)
+                    if(value->value._list->valuetype!=valuetype){
+                        if(allListElementsAreOfType(value->value._list,valuetype))
+                            value->value._list->valuetype=valuetype;
+                        else
+                            outputError("Unable to change the list value type: not all current elements are of the new type");
+                    }else 
+                    if(amVerbose())output("The list is already of the requested value type.");
+                }else
+                if(value->type==VT_MAP){
+                    if(value->value._map->valuetype!=valuetype){
+                        if(allMapAttributesAreOfType(value->value._map,valuetype))
+                            value->value._map->valuetype=valuetype;
+                        else
+                            outputError("Unable to change the map value type: not all current attributes are of the new type");
+                    }else 
+                    if(amVerbose())output("The map is already of the requested type.");
+                }
+            }
         }
         if(immutable!=M_LL_INVALID){
-            if(variable)variable->immutable=(immutable==M_TRUE);else if(value->type==VT_LIST)value->value._list->immutable=(immutable==M_TRUE);else value->value._map->immutable=(immutable==M_TRUE);
+            bool immutableflag=(immutable==M_TRUE);
+            if(variable){
+                variable->immutable=immutableflag;
+                if(amVerbose())output("Variable '%s' is now %smutable.\n",(variable->immutable?"im":""));
+            }else
+            if(value->type==VT_LIST){
+                value->value._list->immutable=immutableflag;
+                if(amVerbose())output("List '%s' is now %smutable.\n",(value->value._list->immutable?"im":""));
+            }else
+            if(value->type==VT_MAP){
+                value->value._map->immutable=immutableflag;
+                if(amVerbose())output("List '%s' is now %smutable.\n",(value->value._list->immutable?"im":""));
+            }else
+            if(amVerbose())output("%sUnable to change the mutability of a value of type %s.\n",ERROR_PREFIX,VALUETYPENAMES[value->type]);
         }
     }
     return Mtype(value);
@@ -994,6 +1077,19 @@ bool completedListValueFunction(Mfunction* const _function,const char* const fun
             return true;
         }
         output("%sFailed to register list value function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=_getListValueIntegerMap("list to search","value to find","maximum number of elements");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register list value integer function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */

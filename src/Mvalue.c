@@ -754,6 +754,37 @@ Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){
     }
     return NULL;
 }/* VALIDATED */
+Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){
+    if(name1&&name2&&name3){
+        if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2&&_mapelement3){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_LIST,true); // must be a list
+                    _mapelement2->_variable=_getVariable(name2,VT_UNDEFINED,true); // any value will do
+                    _mapelement3->_variable=_getVariable(name3,VT_INTEGER,true); // must be an integer
+                    if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
+                        _map->_last=_mapelement3;
+                        _map->numberOfElements=3;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the three map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+            free_mapelement(_mapelement3,false);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4){
     if(name1&&name2&&name3&&name4){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
@@ -833,15 +864,24 @@ void checkList(Mlist* _list){
 // MDH@02JUN2019: check (and correct) prepending
 // MDH@17OCT2019: passing in 0 should NOT do appending but prepending (use index len(l)+1 for appending!!!!!!)
 //                OOPS we used to use 0 to force an append, so we now use M_LL_INVALID to force that!!!!
-unsigned long long appendedToList(Mlist * const _list,Mvalue const * const _value,long long index){
-    if(!_list){outputError("No list to append to");return 0;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
+// MDH@05NOV2019: originally we returned 0 on failure and an unsigned result (leaving only 0 as possible return value), but by allowing to return negative values as well we can distinguish different types of failures
+//                e.g. returning a negative value if we fail to insert the given element
+//                NOTE: index==0 means prepend, index==M_LL_INVALID means append, index<0 means insert from the back (i.e. relative to the maximum index)
+//                TODO: determine the situations where we want to return either M_LL_INVALID or 0 or a negative value to indicate failure
+//                DOING: I suppose returning M_LL_INVALID when there's something wrong with the input, 0 when unable to comply somehow (e.g. when the list is immutable)
+/*unsigned*/ long long appendedToList(Mlist * const _list,Mvalue const * const _value,long long index){
+    if(!_list){outputError("No list to append to");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
+    if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
+    // MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
+    if(_value&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)if(_value->type!=_list->valuetype){output("%s",ERROR_PREFIX);outputValue("Unable to add '",_value,"' to a list: it is of the wrong type.");return 0;}
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     // MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
-    if(index==M_LL_INVALID)index=lastindex+1; // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
+    // MDH@05NOV2019: if supposed to append the value, and the current last index is already equal to the maximum possible index, we consider the list to be full
+    if(index==M_LL_INVALID){if(lastindex==M_LL_MAX){outputError("Unable to append to a list: it is full");return 0;};index=lastindex+1;} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
     if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
     // MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
-    if(index<0){output("%sIndex %lld of (new) list element too small.\n",ERROR_PREFIX,index);return 0;} // MDH@17OCT2019: can't return negative value!!!
+    if(index<0){output("%sIndex %lld of (new) list element too small.\n",ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
     if(amVerbose())outputValue((index>0?"Appending '":"Prepending '"),_value,"' to a list.\n");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
@@ -850,7 +890,7 @@ unsigned long long appendedToList(Mlist * const _list,Mvalue const * const _valu
         // NOTE testing _listelement is just a fail-safe as that should never happen
         while(index>_listelement->index){
             _prevListelement=_listelement;
-            if(!_listelement->_next){outputValue("\nBUG: Index of list element '",_listelement->_value,"' probably out of order.");return 0;}
+            if(!_listelement->_next){output("BUG: Index (%llu) ",_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
             _listelement=_listelement->_next;
         }
         // if we're going to insert there will be a successor
@@ -921,32 +961,44 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index){
 
 // MAP STUFF
 // MDH@24MAY2019: if already in the map should replace the current value
-bool appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue){
-    if(_map&&attributeName){
-        if(amVerbose()){output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
-        Mmapelement* _mapelement=_map->_first;
-        while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
-        if(!_mapelement){ // not found
-            _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
-            if(_mapelement){
-                _mapelement->_variable=_getVariable(attributeName,VT_UNDEFINED,false);
-                if(_mapelement->_variable){ // the variable was created so attach in map
-                    if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
-                    _map->_last=_mapelement;
-                    _map->numberOfElements++;
-                }else{ // we have a map element BUT no variable, so no go
-                    free_mapelement(_mapelement,false);_mapelement=NULL;
+long long appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue){
+    long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
+    if(result!=M_LL_INVALID){
+        if(!_map->immutable){ // the map is mutable
+            // MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
+            if(!_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
+                if(amVerbose()){output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
+                Mmapelement* _mapelement=_map->_first;
+                while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+                if(!_mapelement){ // not found
+                    _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
+                    if(_mapelement){
+                        _mapelement->_variable=_getVariable(attributeName,VT_UNDEFINED,false); // TODO why would this 'variable' be mutable, and allowing all values????
+                        if(_mapelement->_variable){ // the variable was created so attach in map
+                            if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
+                            _map->_last=_mapelement;
+                            _map->numberOfElements++;
+                            result=M_TRUE; // success
+                        }else{ // we have a map element BUT no variable, so no go
+                            free_mapelement(_mapelement,false);_mapelement=NULL;
+                            outputError("Failed to create a new attribute");
+                        }
+                    }else
+                        outputError("Failed to create new map element");
                 }
-            }else
-            if(amVerbose())outputError("Failed to create new map element");
-        }
-        if(_mapelement){
-            if(_map->weak)_mapelement->_variable->_value=_attributeValue;else // MDH@02NOB2019: if the map is weak assign directly!!
-            assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
-            return true;
-        }
-    }
-    return false;
+                if(_mapelement){
+                    if(_map->weak)_mapelement->_variable->_value=_attributeValue;else // MDH@02NOB2019: if the map is weak assign directly!!
+                    assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
+                    result=M_TRUE;
+                }
+            }else{
+                output("%s",ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a list: it is of the wrong type.\n");
+            }
+        }else 
+            outputError("Unable to change the map: it is immutable");
+    }else
+        outputError("No map or atribute name specified");
+    return result;
 }/* VALIDATED */
 
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
@@ -1890,3 +1942,26 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){
 
 long long isListUndefined(Mlist* list){return(list?M_FALSE:M_TRUE);}
 long long isMapUndefined(Mmap* map){return(map?M_FALSE:M_TRUE);}
+
+// MDH@24OCT2019: when representing variable values the value might match the value of a constant in which case we use the name of that constant variable instead (which is like a symbol)
+//                obviously the type of the value should match as well
+bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
+    if(!value1&&!value2)return false; // if both NULL not considered to be the same
+    if(value1==value2)return true; // the same value pointed to
+    if(!value1||!value2)return false; // if either is NULL, not the same of course
+    // ASSERT both not NULL
+    if(value1->type==value2->type) // if the types are different definitely not the same
+    switch(value1->type){
+        case VT_INTEGER:return(value1->value._integer->ll==value2->value._integer->ll);
+        case VT_FLOAT:return(areFloatsEqual(value1->value._float,value2->value._float)); // MDH@25OCT2019: replacing ldEqual() with a call to areFloatsEqual()
+        case VT_BIGINTEGER:return(mp_cmp(value1->value._biginteger,value2->value._biginteger)==MP_EQ);
+        case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
+        case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
+        case VT_LIST:case VT_MAP:break;
+        case VT_DECIMAL:case VT_RATIONAL:break;
+        case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
+        case VT_REFERENCE: // TODO this might be hard
+            break;
+    }
+    return false;
+}

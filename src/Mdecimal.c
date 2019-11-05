@@ -2498,7 +2498,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 									mpd_qsqrt(_cosine,_cosine,mpd_context,&status);
 								}else{
 									status=0xFFFFFFFF;
-									output("BUG: Invalid squared sine computed.\n"); // TODO do something better with bugs!!!
+									outputBug("Invalid squared sine computed."); // TODO do something better with bugs!!!
 								}
 							}
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // approximate with two additional digits

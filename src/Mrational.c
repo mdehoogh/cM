@@ -751,7 +751,7 @@ void free_rational(Mrational* _rational){
 void normalizeRational(Mrational* rational){
     if(!rational)return;
     // checking on the validity of the flag (which would actually be a bug)
-    if(!rational->normalized&&!rational->den){output("BUG: Normalized flag of rational not set although the denominator equals 1; flag set.\n");rational->normalized=true;}
+    if(!rational->normalized&&!rational->den){outputBug("Normalized flag of rational not set although the denominator equals 1; flag set");rational->normalized=true;}
     if(rational->normalized)return; // apparently already normalized
     // normalization means dividing by the gcd unless the gcd is one
     Mbiginteger* _gcd=__biginteger(); // to be freed in all cases!
@@ -781,8 +781,8 @@ void normalizeRational(Mrational* rational){
 //                as it does not know whether _numerator or _denominator should be released on failure
 Mrational* __rational(){
     Mrational* _rational=(Mrational*)CALLOC(1,sizeof(Mrational),'R');
-    if(!_rational)outputError("Failed to create a rational");
-    if(_rational->num||_rational->den||_rational->delta)outputLine("BUG: New rational numerator and/or denominator and/or delta not considered undefined.");
+    if(!_rational)outputMemoryError("Failed to create a rational");
+    if(_rational->num||_rational->den||_rational->delta)outputBug("New rational numerator, denominator and delta not all considered undefined");
     return _rational;
 }/* VALIDATED */
 

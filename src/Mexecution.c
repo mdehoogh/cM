@@ -22,12 +22,29 @@
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
-extern const char* const ERROR_PREFIX;
+extern const char* const ERROR_PREFIX,BUG_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const mpd_context_t* _decimalContext;
 
-void outputError(const char* const error){if(error)output("%s%s.\n",ERROR_PREFIX,error);}
-void outputErrorAndText(const char* const error,const char* const text){if(error)output("%s%s",ERROR_PREFIX,error);if(text)output(text);output(".\n");}
+void outputError(char const * const error){
+    if(!error)return;
+    size_t l=strlen(error);
+    if(l==0)return;
+    output("%s%s",ERROR_PREFIX,error);
+    l--;if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    outputChar('\n');
+    // replacing: if(error)output("%s%s.\n",ERROR_PREFIX,error);
+}
+void outputMemoryError(char const * const memoryerror){if(memoryerror)output("%s. Probable cause: out of memory!\n",memoryerror);}
+void outputBug(char const * const bug){
+    if(!bug)return;
+    size_t l=strlen(bug);
+    if(l==0)return;
+    output("%s%s",BUG_PREFIX,bug);
+    l--;if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
+    outputChar('\n');
+} // MDH@05NOV2019: might come in handy to be able to report bugs
+void outputErrorAndText(char const * const error,char const * const text){if(error)output("%s%s",ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
 static int8_t littleEndian=-1;
 // NOTE force execution immediately (don't think this is working)
