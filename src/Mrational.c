@@ -511,6 +511,23 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
         outputError("Failed to create the rational for storing the quotient of two rationals.");
     return _rational;
 }
+// MDH@05NOV2019: if we want to divide a rational by a big integer
+Mrational* _getRationalBigintegerQuotient(Mrational const * const q,Mbiginteger const * const b){
+    Mrational* _rationalBigintegerQuotient=NULL;
+    if(b&&!isBigintegerZero(b)){
+        Mbiginteger* _newnum=_getBigintegerCopy(b);
+        if(_newnum){
+            if(!q->den||mp_mul(_newnum,q->den,_newnum)==MP_OKAY){
+                long double newdelta=M_LD_NAN,qdelta=getFloatLongDouble(q->delta);
+                if(qdelta!=M_LD_NAN)newdelta=qdelta/mp_get_long_double(b);
+                _rationalBigintegerQuotient=_getRational(_getBigintegerCopy(q->num),_newnum,newdelta,true,true);
+            }else
+                outputError("Failed to multiply two big integers");
+        }else 
+            outputError("Failed to copy a big integer");
+    }
+    return _rationalBigintegerQuotient;
+}
 
 // MDH@18SEP2019: rational version of _dsinorcos (which itself is not used to compute the decimal sine/cosine)
 //                the main problem here is that there will never be convergence because there is no precision given

@@ -33,6 +33,8 @@ Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * c
 Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * const q2);
 Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * const q2);
 
+Mrational* _getRationalBigintegerQuotient(Mrational const * const q,Mbiginteger const * const b);
+
 Mrational* _qsinorcos(Mrational const * const x,bool sin);
 
 // getting the sign (M_POSITIVE, M_NEGATIVE, M_ZERO or M_LL_INVALID)

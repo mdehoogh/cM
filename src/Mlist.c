@@ -243,24 +243,40 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){
             appendedToMap(_statisticsMap,"maximumindex",_getIntegerValue(maximumindex));
             // with these values we are able to compute the mean and the variance and the standard deviation
             if(count>0){
-                Mrational* _mean=_getRational(_getBiginteger(sum),_getBiginteger(count),M_LD_NAN,true,true);
-                if(_mean)appendedToMap(_statisticsMap,"mean",_getRationalValue(_mean,true));
-                // the sum of squared deviations (of sum of squares) is defined as squaressum-(sum*sum)/count
-                Mrational* _squaressum=_getRational(_getBiginteger(squaressum),NULL,M_LD_NAN,false,true);
-                if(_squaressum){
-                    // I need to subtract another rational
-                    Mbiginteger* squaredsum=__biginteger();
-                    if(mp_sqr(_getBiginteger(sum),squaredsum)==MP_OKAY){
-                        Mrational* _tosubtract=_getRational(squaredsum,_getBiginteger(count),M_LD_NAN,false,true);
-                        if(_tosubtract){
-                            Mrational* _sumofsquares=_getRationalDifference(_sumofsquares,_tosubtract);
-                            appendedToMap(_statisticsMap,"sumofsquares",_getRationalValue(_sumofsquares,true));
-                            // next to divide by the count minus 1 to give us the variance
-
-                        }                       
-                    }
+                // we need big integers of all the relevant values
+                Mbiginteger *_count=_getBiginteger(count),*_sum=_getBiginteger(sum),*_squaressum=_getBiginteger(squaressum);
+                if(_count&&_sum&&_squaressum){
+                    Mrational* _mean=_getRational(_getBigintegerCopy(_sum),_getBigintegerCopy(_count),M_LD_NAN,true,true);
+                    if(_mean)appendedToMap(_statisticsMap,"mean",_getRationalValue(_mean,true));
+                    // the sum of squared deviations (of sum of squares) is defined as squaressum-(sum*sum)/count
+                    Mrational* _squaressumRational=_getRational(_getBigintegerCopy(_squaressum),NULL,M_LD_NAN,false,true);
+                    if(_squaressumRational){
+                        // I need to subtract another rational
+                        Mbiginteger* _squaredsum=__biginteger();
+                        if(_squaredsum){
+                            if(mp_sqr(_sum,_squaredsum)==MP_OKAY){
+                                Mrational* _tosubtract=_getRational(_getBigintegerCopy(_squaredsum),_getBigintegerCopy(_count),M_LD_NAN,false,true);
+                                if(_tosubtract){
+                                    Mrational* _sumofsquaresRational=_getRationalDifference(_squaressumRational,_tosubtract);
+                                    appendedToMap(_statisticsMap,"sumofsquares",_getRationalValue(_sumofsquaresRational,true));
+                                    // next to divide by the count minus 1 to give us the variance
+                                    Mbiginteger* _countminus1=_getBigintegerCopy(_count);
+                                    if(_countminus1&&mp_decr(_countminus1)==MP_OKAY){
+                                        Mrational* _varianceRational=_getRationalBigintegerQuotient(_sumofsquaresRational,_countminus1);
+                                        if(_varianceRational){
+                                            appendedToMap(_statisticsMap,"variance",_getRationalValue(_varianceRational,true));
+                                            // and finally the standard deviation
+                                        }
+                                    }
+                                }                       
+                            }
+                            free_biginteger(_squaredsum);
+                        }
+                    }else 
+                        outputError("Failed to initialize the sum of squares");
                 }else 
-                    outputError("Failed to initialize the sum of squares");
+                    outputMemoryError("Failed to store the sample size and/or sum in a big integer");
+                free_biginteger(_sum);free_biginteger(_count);free_biginteger(_squaressum);
             }
         }
         appendedToMap(_statisticsMap,"missings",_getIntegerValue(missings));
