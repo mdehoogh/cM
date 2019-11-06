@@ -31,7 +31,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="9";char const * const M_DATE="30 October 2019, 18:00";
 //char const * const M_BUILD="10";char const * const M_DATE="31 October 2019, 12:00";
 //char const * const M_BUILD="11";char const * const M_DATE="4 November 2019, 22:00";
-char const * const M_BUILD="12";char const * const M_DATE="5 November 2019, 18:00";
+//char const * const M_BUILD="12";char const * const M_DATE="5 November 2019, 18:00";
+char const * const M_BUILD="14";char const * const M_DATE="6 November 2019, 16:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -53,6 +54,8 @@ const char* const BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
 //                OK the NULL value is displayed in the normal foreground color whereas the variable is displayed in another color (see showValueColored() for the coloring)
 const char* const M_NULL_VALUE_TEXT_REPRESENTATION="NULL"; // the text to represent values that are undefined...
 const char* const M_NULL_VARIABLE_NAME="NULL";
+const char* const M_UNDEFINED_VALUE_TEXT_REPRESENTATION="UNDEFINED"; // the text to represent values that are undefined...
+const char* const M_UNDEFINED_VARIABLE_NAME="UNDEFINED";
 
 const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
 // it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
@@ -684,6 +687,7 @@ Mvalue* m2l(Mvalue* value){
 Mvalue* NAF_value=NULL;
 Mvalue* NAI_value=NULL;
 Mvalue* NULL_value=NULL; // the value containing the text to show when a value equals NULL
+Mvalue* UNDEFINED_value=NULL; // the value containing the text to show when a value equals UNDEFINED
 
 long double getNAR(){return NAF_value->value._float->ld;}
 long long getNAI(){return NAI_value->value._integer->ll;}
@@ -1220,237 +1224,14 @@ Mvalue* Mfibonacci(Mvalue* value){
 Menvironment* _Menvironment; // this is the root (M) environment
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
-// some prototypes we need in initEnvironment()
+/* some prototypes we need in initEnvironment()
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType);
 Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue);
 Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue);
 Mvalue* Mdofunction(Mvalue* _doTokenValue);
 Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _forbodyTokenValue);
 Mvalue* Mevalfunction(Mvalue* value);
-
-bool initEnvironment(){
-
-	long long decimalprecision=getDP();
-	if(decimalprecision==M_LL_INVALID)return false; // let's force starting with a default decimal context
-	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
-
-	NAF_value=_getFloatValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
-	NAI_value=_getIntegerValue(M_LL_INVALID);
-
-	NULL_value=__value(); 
-	if(!NULL_value){outputError("Failed to initialize NULL.");return false;}
-
-	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
-	//                therefore it shouldn't be a token value 
-	/*
-	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
-	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputBug("Failed to create NULL value!");
-	*/
-
-	// either set the DP_value to 0 (failed to get a decimal context somehow)
-	/* MDH@20JUN2019: no need for DP_value anymore (as setdp() return _decimalContext->prec now): 
-	_decimalContext=get_mpd_context(M_DP); // initialize the application-wide decimal context with precision M_DP
-	assignValue(DP_value,_getIntegerValue(_decimalContext?_decimalContext->prec:0L));
-	if(!DP_value)output("WARNING: Failed to initialize the decimal precision.");
-	*/
-
-	_resultListValue=_getListValue(VT_UNDEFINED,true); // ascertain to have a list value in which the results can be stored
-	// ESSENTIAL not to loose this list immediately!!!
-	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
-	_Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
-	if(_Menvironment){
-		_Menvironment->_name=_strdup("M"); // TODO why make a dynamic copy???
-		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
-		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'M');
-		if(environmentFunctionMap){
-			// TODO should we allow assigning to NULL by defining NULL as a variable??????
-			// MDH@29MAY2019: we've got (symbol) NULL
-			if(!addVariable(_Menvironment,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
-				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
-			}
-			if(!NAF_value||!addVariable(_Menvironment,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
-				outputLine("WARNING: Failed to create, add or initialize Not-a-float constant NAF.");
-				////////return false;
-			}
-			if(!NAI_value||!addVariable(_Menvironment,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
-				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
-				////////return false;
-			}
-			/* MDH@13JUN2019: allow user to change the decimal precision
-			if(!DP_value||!addVariable(_Menvironment,"$decimalprecision",VT_INTEGER,false)||!setValue(_Menvironment,"$decimalprecision",DP_value)){
-				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
-				////////return false;
-			}*/
-			// create and add PI and E constants!!!
-			Mvalue* PI_value=_getFloatValue(M_LD_PI);
-			if(!PI_value){
-				outputLine("ERROR: Failed to create PI.");
-				return false;
-			}
-			if(!addVariable(_Menvironment,"PI",VT_FLOAT,true)){
-				outputLine("ERROR: Failed to add PI.");
-				///////free_value(PI_value);
-				return false;
-			}
-			if(!setValue(_Menvironment,"PI",PI_value)){
-				////////free_value(PI_value);
-				outputLine("ERROR: Failed to initialize PI.");
-				return false;
-			}
-			Mvalue* E_value=_getFloatValue(M_LD_E);
-			if(!E_value){
-				///////free_value(E_value);
-				outputLine("ERROR: Failed to create E.");
-				return false;
-			}
-			if(!addVariable(_Menvironment,"E",VT_FLOAT,true)){
-				outputLine("ERROR: Failed to add E.");
-				return false;
-			}
-			if(!setValue(_Menvironment,"E",E_value)){
-				//////free_value(E_value);
-				outputLine("ERROR: Failed to initialize E.");
-				return false;
-			}
-			/*
-			// we're going to store all commands in a list called M
-			Mvalue* Mvalue=_getListValue(VT_UNDEFINED);
-			if(!M_value){
-				outputLine("ERROR: Failed to create the M result list.");
-				return false;
-			}
-			if(!addVariable(_Menvironment,"M",VT_LIST,true)){
-				outputLine("ERROR: Failed to add the M result list.");
-				return false;
-			}
-			if(!setValue(_Menvironment,"M",M_value)){
-				outputLine("ERROR: Failed to initialize the M result list.");
-				return false;
-			}
-			*/
-			_Menvironment->_functionMap=environmentFunctionMap;
-			// register if, while and for special functions
-		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
-		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
-		    if(!completedTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
-			// MDH@05AUG2019: the do function has a single token to process
-		    if(!completedTokenListFunction(_getFunction(_Menvironment,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
-		    if(!completedValueFunction(_getFunction(_Menvironment,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
-
-			if(!registerInternalFunctions(_Menvironment)){
-				outputError("Failed to register all internal functions");
-				return false;
-			}
-			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
-			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),"M",getResult)){
-				outputError("Failed to register function M (for requesting previous results)");
-				return false;
-			}
-			/*
-			if(!completedFunction(_getFunction(_Menvironment,"ml"),ml)){
-				outputLine("ERROR: Failed to register map list (constructor) function.");
-				return false;
-			}
-			*/
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)||!completedIntegerFunction(_getFunction(_Menvironment,"getdc"),"getdc",getdc)||!completedIntegerFunction(_getFunction(_Menvironment,"getdp"),"getdp",getdp)){
-				outputError("Failed to register the setdp, getdc and getdp functions");
-				return false;
-			}
-			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),"pi$q",pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),"pi$ql",pi_ql)||!completedIntegerFunction(_getFunction(_Menvironment,"pi"),"pi",pi_d)){
-				outputError("Failed to register the pi, pi$q and pi$ql functions");
-				return false;
-			}
-			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
-			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"I"),"I",I)
-					||!completedValueValueFunction(_getFunction(_Menvironment,"t"),"t",t)
-					||!completedValueFunction(_getFunction(_Menvironment,"f"),"f",f)
-					||!completedValueFunction(_getFunction(_Menvironment,"q"),"q",q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),"Q",Q)
-					||!completedValueFunction(_getFunction(_Menvironment,"d"),"d",d)
-					||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)||!completedValueFunction(_getFunction(_Menvironment,"B"),"B",B)){
-				outputError("Failed to register value type conversion functions");
-				return false;
-			}
-			/* MDH@04NOV2019: moved over to Menvironment.h/c
-			if(!completedValueFunction(_getFunction(_Menvironment,"type"),"type",Mtype)){
-				outputError("Failed to register the type function");
-				return false;
-			}
-			*/
-			if(!completedValueFunction(_getFunction(_Menvironment,"keys"),"keys",Mkeys)){
-				outputError("Failed to register the keys function");
-				return false;
-			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),"neg",Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),"bnot",Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),"not",Mnot)){
-				outputError("Failed to register all unary (neg, bnot, and not) functions");
-				return false;
-			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"exists"),"exists",Mexists)||!completedValueFunction(_getFunction(_Menvironment,"scalar"),"scalar",Mscalar)||!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
-				outputError("Failed to register the exists, scalar, null and undefined functions");
-				return false;
-			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"sign"),"sign",Msign)){
-				outputError("Failed to register the sign function");
-				return false;
-			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
-				outputError("Failed to register the zero, positive and negative functions");
-				return false;
-			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),"sum",Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),"len",Mlen)){
-				outputError("Failed to register the sum and len list functions");
-				return false;
-			}
-			// MDH@01NOV2019: I have some generic list functions implemented
-			if(!completedValueFunction(_getFunction(_Menvironment,"empty"),"empty",Mempty)){
-				outputError("Failed to register the empty function");
-				return false;
-			}
-			if(!completedListFunction(_getFunction(_Menvironment,"statistics"),"statistics",Mstats)||!completedListFunction(_getFunction(_Menvironment,"pull"),"pull",Mpull)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
-				outputError("Failed to register the statistics, pull, pop, first and last list functions");
-				return false;
-			}
-			if(!completedListValueFunction(_getFunction(_Menvironment,"removed"),"removed",Mremoved)||!completedListValueFunction(_getFunction(_Menvironment,"push"),"push",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"drop"),"drop",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"shove"),"shove",Mshove)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)){
-				outputError("Failed to register the push(=drop), pop, shove and removed functions");
-				return false;
-			}
-			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,"find"),"find",Mfind)){
-				outputError("Failed to register the find function");
-				return false;
-			}
-
-			if(!completedValueFunction(_getFunction(_Menvironment,"tl"),"tl",Mtl)){
-				outputError("Failed to register the tl text function");
-				return false;
-			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),"fac",Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),"facd",Mfacd)){
-				outputError("Failed to register the fac and facd function");
-				return false;
-			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"reciprocal"),"reciprocal",Mreciprocal)||!completedValueFunction(_getFunction(_Menvironment,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
-				outputError("Failed to register the reciprocal and fibonacci function");
-				return false;
-			}
-			if(!completedValueValueFunction(_getFunction(_Menvironment,"concat"),"concat",Mconcat)){
-				outputError("Failed to register the concat function");
-				return false;
-			}
-			// register list conversions
-			if(!completedListFunction(_getFunction(_Menvironment,"l2m"),"l2m",l2m)||!completedListFunction(_getFunction(_Menvironment,"l2ml"),"l2ml",l2ml)||!completedListFunction(_getFunction(_Menvironment,"ml2l"),"ml2l",ml2l)||!completedListFunction(_getFunction(_Menvironment,"ml2m"),"ml2m",ml2m)){
-				outputError("Failed to register list conversion functions");
-				return false;
-			}
-			// register map conversions
-			if(!completedListFunction(_getFunction(_Menvironment,"m2ml"),"m2ml",m2ml)||!completedListFunction(_getFunction(_Menvironment,"m2l"),"m2l",m2l)){
-				outputError("Failed to register map conversion functions");
-				return false;
-			}
-		}
-	}
-	if(pushExecutionEnvironment(_Menvironment))return true;
-	outputError("Failed to activate the M environment");
-	return false;
-}
+*/
 
 // user interaction stuff
 #include "Msession.h"
@@ -6383,11 +6164,11 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 // end comparison operator implementation
 
 // MDH@18OCT2019: we can get the range of integers between two values
-Mvalue* integerrange(Mvalue* _value1,Mvalue* _value2){
+Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_MAP||_value2->type==VT_MAP)return NULL; // neither operand can be a map for sure
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerrange);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerrange);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mrange);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange);
 	// now we're dealing with scalars
 	Mvalue* upValue=smallerthanorequalto(_value1,_value2); // the direction we'll be going
 	if(upValue&&upValue->type==VT_INTEGER){
@@ -6452,7 +6233,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));break;
 			case '!' :result=unequalto(_value1,_value2);break;
 			case '=' :result=equalto(_value1,_value2);break;
-			case ':' :result=integerrange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
+			case ':' :result=Mrange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:output("%sUnknown binary operator '%s'.\n",ERROR_PREFIX,operator);
 		}
 		if(amVerbose()){if(result)outputValue("Result of applying binary operator: '",result,"'.\n");else outputLine("No result!");}
@@ -6822,9 +6603,9 @@ void clearCommand(){
 	*/
 }
 void outputValueColored(Mvalue* _value){
-	if(_value)
+	if(!_value){outputTokenTypeColor(TT_DQSTRING);output("%s",M_NULL_VALUE_TEXT_REPRESENTATION);return;} // TODO what color should we use????
 	switch(_value->type){
-		case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_NULL_VALUE_TEXT_REPRESENTATION);break; // let's use the same color as for double quotes string (for now)
+		case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_UNDEFINED_VALUE_TEXT_REPRESENTATION);break; // let's use the same color as for double quotes string (for now)
 		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
 		case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
@@ -8416,6 +8197,240 @@ void removeFirstSuggestedCharacter(char firstSuggestedCharacter,bool consumed){
 	if(!_identifierContinuationCharacters||strlen(_identifierContinuationCharacters)==0){ // a feed forward text character was consumed
 		deleteFirstAutocompletionCharacter(firstSuggestedCharacter,consumed);
 	}
+}
+
+bool initEnvironment(){
+
+	long long decimalprecision=getDP();
+	if(decimalprecision==M_LL_INVALID)return false; // let's force starting with a default decimal context
+	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
+
+	NAF_value=_getFloatValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
+	NAI_value=_getIntegerValue(M_LL_INVALID);
+
+	// MDH@06NOV2019: NULL_value remains NULL for ever...
+	UNDEFINED_value=__value();
+	if(!UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
+
+	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
+	//                therefore it shouldn't be a token value 
+	/*
+	NULL_value=_getValueOfToken(_getToken(NULL,TT_SQSTRING),true);
+	if(NULL_value)NULL_value->value._token->text=__string("NULL");else outputBug("Failed to create NULL value!");
+	*/
+
+	// either set the DP_value to 0 (failed to get a decimal context somehow)
+	/* MDH@20JUN2019: no need for DP_value anymore (as setdp() return _decimalContext->prec now): 
+	_decimalContext=get_mpd_context(M_DP); // initialize the application-wide decimal context with precision M_DP
+	assignValue(DP_value,_getIntegerValue(_decimalContext?_decimalContext->prec:0L));
+	if(!DP_value)output("WARNING: Failed to initialize the decimal precision.");
+	*/
+
+	_resultListValue=_getListValue(VT_UNDEFINED,true); // ascertain to have a list value in which the results can be stored
+	// ESSENTIAL not to loose this list immediately!!!
+	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
+	_Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
+	if(_Menvironment){
+		_Menvironment->_name=_strdup("M"); // TODO why make a dynamic copy???
+		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
+		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'M');
+		if(environmentFunctionMap){
+			// TODO should we allow assigning to NULL by defining NULL as a variable??????
+			// MDH@29MAY2019: we've got (symbol) NULL
+			// MDH@06NOV2019: the NULL constant will have value NULL forever
+			if(!addVariable(_Menvironment,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
+				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
+			}
+			// MDH@06NOV2019: whereas the UNDEFINED constant will be a non-NULL value of type VT_UNDEFINED (of which we do not need to set the value at all)
+			if(!addVariable(_Menvironment,M_UNDEFINED_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_UNDEFINED_VARIABLE_NAME,UNDEFINED_value)){
+				outputLine("WARNING: Failed to create, add or initialize constant UNDEFINED.");
+			}
+			if(!NAF_value||!addVariable(_Menvironment,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
+				outputLine("WARNING: Failed to create, add or initialize Not-a-float constant NAF.");
+				////////return false;
+			}
+			if(!NAI_value||!addVariable(_Menvironment,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
+				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
+				////////return false;
+			}
+			/* MDH@13JUN2019: allow user to change the decimal precision
+			if(!DP_value||!addVariable(_Menvironment,"$decimalprecision",VT_INTEGER,false)||!setValue(_Menvironment,"$decimalprecision",DP_value)){
+				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
+				////////return false;
+			}*/
+			// create and add PI and E constants!!!
+			Mvalue* PI_value=_getFloatValue(M_LD_PI);
+			if(!PI_value){
+				outputLine("ERROR: Failed to create PI.");
+				return false;
+			}
+			if(!addVariable(_Menvironment,"PI",VT_FLOAT,true)){
+				outputLine("ERROR: Failed to add PI.");
+				///////free_value(PI_value);
+				return false;
+			}
+			if(!setValue(_Menvironment,"PI",PI_value)){
+				////////free_value(PI_value);
+				outputLine("ERROR: Failed to initialize PI.");
+				return false;
+			}
+			Mvalue* E_value=_getFloatValue(M_LD_E);
+			if(!E_value){
+				///////free_value(E_value);
+				outputLine("ERROR: Failed to create E.");
+				return false;
+			}
+			if(!addVariable(_Menvironment,"E",VT_FLOAT,true)){
+				outputLine("ERROR: Failed to add E.");
+				return false;
+			}
+			if(!setValue(_Menvironment,"E",E_value)){
+				//////free_value(E_value);
+				outputLine("ERROR: Failed to initialize E.");
+				return false;
+			}
+			/*
+			// we're going to store all commands in a list called M
+			Mvalue* Mvalue=_getListValue(VT_UNDEFINED);
+			if(!M_value){
+				outputLine("ERROR: Failed to create the M result list.");
+				return false;
+			}
+			if(!addVariable(_Menvironment,"M",VT_LIST,true)){
+				outputLine("ERROR: Failed to add the M result list.");
+				return false;
+			}
+			if(!setValue(_Menvironment,"M",M_value)){
+				outputLine("ERROR: Failed to initialize the M result list.");
+				return false;
+			}
+			*/
+			_Menvironment->_functionMap=environmentFunctionMap;
+			// register if, while and for special functions
+		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
+		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
+		    if(!completedTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
+			// MDH@05AUG2019: the do function has a single token to process
+		    if(!completedTokenListFunction(_getFunction(_Menvironment,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
+		    if(!completedValueFunction(_getFunction(_Menvironment,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
+
+			if(!registerInternalFunctions(_Menvironment)){
+				outputError("Failed to register all internal functions");
+				return false;
+			}
+			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
+			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),"M",getResult)){
+				outputError("Failed to register function M (for requesting previous results)");
+				return false;
+			}
+			/*
+			if(!completedFunction(_getFunction(_Menvironment,"ml"),ml)){
+				outputLine("ERROR: Failed to register map list (constructor) function.");
+				return false;
+			}
+			*/
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)||!completedIntegerFunction(_getFunction(_Menvironment,"getdc"),"getdc",getdc)||!completedIntegerFunction(_getFunction(_Menvironment,"getdp"),"getdp",getdp)){
+				outputError("Failed to register the setdp, getdc and getdp functions");
+				return false;
+			}
+			// pi() functions (decimal and rational)
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),"pi$q",pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),"pi$ql",pi_ql)||!completedIntegerFunction(_getFunction(_Menvironment,"pi"),"pi",pi_d)){
+				outputError("Failed to register the pi, pi$q and pi$ql functions");
+				return false;
+			}
+			if(!completedValueValueFunction(_getFunction(_Menvironment,"range"),"range",Mrange)){
+				outputError("Failed to register the range function");
+				return false;
+			}
+			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
+			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"I"),"I",I)
+					||!completedValueValueFunction(_getFunction(_Menvironment,"t"),"t",t)
+					||!completedValueFunction(_getFunction(_Menvironment,"f"),"f",f)
+					||!completedValueFunction(_getFunction(_Menvironment,"q"),"q",q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),"Q",Q)
+					||!completedValueFunction(_getFunction(_Menvironment,"d"),"d",d)
+					||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)||!completedValueFunction(_getFunction(_Menvironment,"B"),"B",B)){
+				outputError("Failed to register value type conversion functions");
+				return false;
+			}
+			/* MDH@04NOV2019: moved over to Menvironment.h/c
+			if(!completedValueFunction(_getFunction(_Menvironment,"type"),"type",Mtype)){
+				outputError("Failed to register the type function");
+				return false;
+			}
+			*/
+			if(!completedValueFunction(_getFunction(_Menvironment,"keys"),"keys",Mkeys)){
+				outputError("Failed to register the keys function");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),"neg",Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),"bnot",Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),"not",Mnot)){
+				outputError("Failed to register all unary (neg, bnot, and not) functions");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"exists"),"exists",Mexists)||!completedValueFunction(_getFunction(_Menvironment,"scalar"),"scalar",Mscalar)||!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
+				outputError("Failed to register the exists, scalar, null and undefined functions");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"sign"),"sign",Msign)){
+				outputError("Failed to register the sign function");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
+				outputError("Failed to register the zero, positive and negative functions");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),"sum",Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),"len",Mlen)){
+				outputError("Failed to register the sum and len list functions");
+				return false;
+			}
+			// MDH@01NOV2019: I have some generic list functions implemented
+			if(!completedValueFunction(_getFunction(_Menvironment,"empty"),"empty",Mempty)){
+				outputError("Failed to register the empty function");
+				return false;
+			}
+			if(!completedListFunction(_getFunction(_Menvironment,"statistics"),"statistics",Mstats)||!completedListFunction(_getFunction(_Menvironment,"pull"),"pull",Mpull)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
+				outputError("Failed to register the statistics, pull, pop, first and last list functions");
+				return false;
+			}
+			if(!completedListValueFunction(_getFunction(_Menvironment,"removed"),"removed",Mremoved)||!completedListValueFunction(_getFunction(_Menvironment,"push"),"push",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"drop"),"drop",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"shove"),"shove",Mshove)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)){
+				outputError("Failed to register the push(=drop), pop, shove and removed functions");
+				return false;
+			}
+			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,"find"),"find",Mfind)){
+				outputError("Failed to register the find function");
+				return false;
+			}
+
+			if(!completedValueFunction(_getFunction(_Menvironment,"tl"),"tl",Mtl)){
+				outputError("Failed to register the tl text function");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),"fac",Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),"facd",Mfacd)){
+				outputError("Failed to register the fac and facd function");
+				return false;
+			}
+			if(!completedValueFunction(_getFunction(_Menvironment,"reciprocal"),"reciprocal",Mreciprocal)||!completedValueFunction(_getFunction(_Menvironment,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
+				outputError("Failed to register the reciprocal and fibonacci function");
+				return false;
+			}
+			if(!completedValueValueFunction(_getFunction(_Menvironment,"concat"),"concat",Mconcat)){
+				outputError("Failed to register the concat function");
+				return false;
+			}
+			// register list conversions
+			if(!completedListFunction(_getFunction(_Menvironment,"l2m"),"l2m",l2m)||!completedListFunction(_getFunction(_Menvironment,"l2ml"),"l2ml",l2ml)||!completedListFunction(_getFunction(_Menvironment,"ml2l"),"ml2l",ml2l)||!completedListFunction(_getFunction(_Menvironment,"ml2m"),"ml2m",ml2m)){
+				outputError("Failed to register list conversion functions");
+				return false;
+			}
+			// register map conversions
+			if(!completedListFunction(_getFunction(_Menvironment,"m2ml"),"m2ml",m2ml)||!completedListFunction(_getFunction(_Menvironment,"m2l"),"m2l",m2l)){
+				outputError("Failed to register map conversion functions");
+				return false;
+			}
+		}
+	}
+	if(pushExecutionEnvironment(_Menvironment))return true;
+	outputError("Failed to activate the M environment");
+	return false;
 }
 
 int main(int argc, char **argv){
