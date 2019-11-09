@@ -51,7 +51,7 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
 Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2);
 
 // compute an decimal approximation to pi which we can then store in the given decimal context unless it's already in there of course
-Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext);
+Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable);
 
 mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const x);
 

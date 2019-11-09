@@ -989,6 +989,20 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
     }
     return false;
 }/* VALIDATED */
+bool completedIntegerBooleanFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
+        _function->_parameterMap=_getIntegerBooleanMap("number of decimals","compute sine table");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered integer boolean function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register integer boolean argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* NOT VALIDATED */
 bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
     if(_function){
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;

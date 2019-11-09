@@ -550,6 +550,38 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
     }
     return NULL;
 }/* VALIDATED */
+Mmap* _getIntegerBooleanMap(char* name1,char* name2){
+    if(name1&&name2){
+        if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_INTEGER,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_INTEGER,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _map->_last=_mapelement2;
+                        _map->numberOfElements=2;
+                        return _map;
+                    }
+                    outputError("Failed to create both map element variables");
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }else
+                    outputError("Failed to create a map");
+            }else
+                outputError("Failed to create both integer map elements");
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+        }else
+            output("%sMap element attribute keys '%s' and '%s' undefined or the same.\n",ERROR_PREFIX,name1,name2);
+    }else
+        outputError("Not both map element attribute keys defined");
+    return NULL;
+}/* VALIDATED */
 Mmap* _getStringStringMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){

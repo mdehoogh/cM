@@ -187,6 +187,7 @@ Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
+Mmap* _getIntegerBooleanMap(char* name1,char* name2);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name

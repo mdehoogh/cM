@@ -32,7 +32,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="10";char const * const M_DATE="31 October 2019, 12:00";
 //char const * const M_BUILD="11";char const * const M_DATE="4 November 2019, 22:00";
 //char const * const M_BUILD="12";char const * const M_DATE="5 November 2019, 18:00";
-char const * const M_BUILD="14";char const * const M_DATE="6 November 2019, 16:00";
+//char const * const M_BUILD="14";char const * const M_DATE="6 November 2019, 16:00";
+char const * const M_BUILD="15";char const * const M_DATE="9 November 2019, 22:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -103,13 +104,13 @@ void debugWrite(const char* fmt,...){
 		fputc('\n',debugfile); // start with a single empty line (separating the sessions)
 	}
 	if(debugfile){
-    va_list args;
-    va_start(args,fmt);
+    	va_list args;
+    	va_start(args,fmt);
 		writeTimestamp(debugfile);		
-    vfprintf(debugfile,fmt,args);
-    fputc('\n',debugfile);
-    fflush(debugfile);
-    va_end(args);
+    	vfprintf(debugfile,fmt,args);
+    	fputc('\n',debugfile);
+    	fflush(debugfile);
+    	va_end(args);
 	}
 }
 
@@ -609,11 +610,22 @@ for i in range(10000):
 for i in range(10000):
     y = pi(decimal, 28)
  */
-Mvalue* pi_d(Mvalue* value){
+Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){
 	// _value should be a positive integer defining the required precision
 	if(amVerbose())output("Computing pi using decimals.\n");
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
-	return _getDecimalValue(pi_decimal(value&&value->type==VT_INTEGER?_getDecimalcontext(value->value._integer->ll):NULL),true);
+	long long numberOfRequestedDecimals=getValueInteger(value);
+	if(numberOfRequestedDecimals==M_LL_INVALID){
+		output("%s",ERROR_PREFIX);
+		outputValue("Argument '",value,"' to the pi() function should denote a valid small integer, which it does not.\n");
+		return NULL;
+	}
+	if(numberOfRequestedDecimals<6){
+		output("%sNumber of requested decimals to compute pi (%lld) should at least equal 6, which it does not.\n",ERROR_PREFIX,numberOfRequestedDecimals);
+		return NULL;
+	}
+	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
+	return _getDecimalValue(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)!=M_TRUE),true);
 }
 
 // how about storing all results here?????? instead of in the root environment????
@@ -8334,7 +8346,7 @@ bool initEnvironment(){
 				return false;
 			}
 			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),"pi$q",pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),"pi$ql",pi_ql)||!completedIntegerFunction(_getFunction(_Menvironment,"pi"),"pi",pi_d)){
+			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),"pi$q",pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),"pi$ql",pi_ql)||!completedIntegerBooleanFunction(_getFunction(_Menvironment,"pi"),"pi",Mpi)){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return false;
 			}
