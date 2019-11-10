@@ -435,15 +435,19 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 // MDH@09AUG2019: we allow checking the current environment only when _environment is NULL
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
-    if(name){ // input valid
+    if(name&&strlen(name)>0){ // input valid
         _variable=getVariable(_environment,name,false);
         if(!_variable){ // non-existing...
             if(amVerbose())output("Variable '%s' to be created.\n",name);
             _variable=_getVariable(name,valuetype,immutable); // creates the variable, free when not bound
-            if(amVerbose())output("Variable '%s' created.\n",name);
             if(_variable){
+                if(amVerbose())output("Variable '%s' created.\n",name);
                 // get a reference to the environment to which variable map we should be appending...
                 Menvironment* environment=(_environment?_environment:_executionEnvironment);
+                // MDH@10NOV2019: because we now allow immutable environment variable maps, the environment to add the variable to
+                //                is the first one up of which the variable map is not immutable...
+                //                TODO check whether to use _execution or _parent (I suppose we should move up the execution chain)
+                while(environment&&(!environment->_variableMap||environment->_variableMap->immutable))environment=environment->_execution;
                 if(environment){
                     if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
                     Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'V');
@@ -460,7 +464,7 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
                     }
                     outputErrorAndText("Failed to create a new map element for variable ",name);
                 }else
-                    outputErrorAndText("No environment to add the newly created variable to",name);
+                    output("%sNo environment to add newly created variable %s to.\n",ERROR_PREFIX,name);
                 // ASSERT failed to link the variable to the variable map!!
                 free_variable(_variable,true); // MDH@02NOV2019: no value yet assigned so we can pass in the weak flag
                 outputErrorAndText("Failed to link variable ",name);

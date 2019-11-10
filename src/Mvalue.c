@@ -11,6 +11,7 @@
 #include "Mvalue.h"
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
+extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const ERROR_PREFIX;
@@ -114,7 +115,7 @@ void free_valuereference(Mvaluereference* _valuereference){
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
-        if(amVerbose())output("Value of type %u to free.\n",_value->type);
+        if(amVerbose()){outputValue("Value '",_value,"'");output(" of type %s to free.\n",VALUETYPENAMES[_value->type]);}
         // I do not need to free the value itself, only the pointers inside it
         switch(_value->type){
             case VT_UNDEFINED:break;
@@ -1065,7 +1066,7 @@ Mstring* _getListText(Mlist* _list){
 		p=string_append_char(p,'['); // switch to using p in appends
 		/////////size_t l=_list->numberOfElements;
         unsigned long long listindex=1;
-		Mlistelement* _listelement=_list->_first;
+		Mlistelement* _listelement=(_list?_list->_first:NULL);
 		Mvalue* _listelementValue;
 		while(p&&_listelement){
             ///////outputChar('$');
@@ -1098,7 +1099,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
         if(amDebugging())p=string_append_char(p,'m');
         if(showcurlybraces)p=string_append_char(p,'{');
 		//////output("%s",string(p));
-		Mmapelement* _mapelement=_map->_first;
+		Mmapelement* _mapelement=(_map?_map->_first:NULL);
 		while(p&&_mapelement){
 			//////output("%s","start");
 			Mvariable* _mapVariable=_mapelement->_variable;

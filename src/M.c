@@ -3138,12 +3138,16 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){
 	}
 	return _result;
 }
-Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _forbodyTokenValue){
+Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue){
 	Mvalue* _result=NULL;
 	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
 		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
 		(!_incrementTokenValue||_incrementTokenValue->type==VT_TOKEN)&&
-		(_forbodyTokenValue&&_forbodyTokenValue->type==VT_TOKEN)){
+		(_bodyTokenValue&&_bodyTokenValue->type==VT_TOKEN)){
+		outputValue("Initialization: ",_initializationTokenValue,".\n");
+		outputValue("Condition: ",_conditionTokenValue,".\n");
+		outputValue("Increment: ",_incrementTokenValue,".\n");
+		outputValue("Body: ",_bodyTokenValue,".\n");
 		Menvironment* _forEnvironment=__environment();
 		if(_forEnvironment){
 			_forEnvironment->_name=_strdup("for loop");
@@ -3158,41 +3162,65 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 						// any map is used to initialize as local variables (just like we did in defining functions)
 						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
 						// although perhaps we should exclude using $ and _ well especially _
+						// MDH@08NOV2019: a list is also allowed actually anything
 						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,initializationValue->value._map)){
 							outputError("Failed to initialize the for loop local variables");
 							forEnvironmentInitialized=false;
 						}
 					}
 					if(forEnvironmentInitialized){
+						_forEnvironment->_variableMap->immutable=true; // MDH@10NOV2019: lock the variable map
 						Mvalue *_forBodyValue=NULL,*_forIncrementValue=NULL;
 						while(true){
 							// evaluate the condition
 							_forEnvironment->expressionToken=_conditionTokenValue->value._token;
+							output("Condition: ");
+							Mtoken* token=_forEnvironment->expressionToken;while(token){outputToken(token);token=token->next;}
+							outputChar('\n');resetOutputColor();
 							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
-							if(isValueZero(_conditionValue)==M_TRUE)break; // condition evaluates to zero
+							outputValue("For loop condition value: '",_conditionValue,"'.\n");
+							if(amVerbose()){
+								outputVariables(); // let's see what we got (in the currently executing (for) environment)
+								char inputChar;
+								if(!inputCharRead(&inputChar))break;
+							}
+							// a for loop should continue unless the condition value is zero or undefined
+							if(isValueZero(_conditionValue)!=M_FALSE)break; // condition evaluates to zero or is undefined
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
 							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
 							if(amVerbose()){
 								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
 								outputValue(" evaluates to '",_conditionValue,"'.\n");
 							}
-							if(_forbodyTokenValue){
+							if(_bodyTokenValue){
 								// evaluate the for body
-								_forEnvironment->expressionToken=_forbodyTokenValue->value._token;
+								_forEnvironment->expressionToken=_bodyTokenValue->value._token;
+								output("Body: ");
+								Mtoken* token=_forEnvironment->expressionToken;
+								while(token){outputToken(token);token=token->next;}
+								outputChar('\n');resetOutputColor();
 								_forBodyValue=getValueOfExpression("for loop",'l',(TokenType[]){},0);
-								if(amVerbose()){
+								//if(amVerbose()){
 									outputValue("For loop body in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
-								}
+								//}
 							}
 							if(_incrementTokenValue){
 								// evaluate the increment
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
+								output("Increment: ");
+								Mtoken* token=_forEnvironment->expressionToken;
+								while(token){outputToken(token);token=token->next;}
+								outputChar('\n');resetOutputColor();
 								_forIncrementValue=getValueOfExpression("for increment",'i',(TokenType[]){},0);
-								if(amVerbose()){
+								//if(amVerbose()){
 									outputValue("For loop increment in iteration #",getValue(_forEnvironment,"_"),NULL);
-									outputValue(" evaluates to '",_forBodyValue,"'.\n");
-								}
+									outputValue(" evaluates to '",_forIncrementValue,"'.\n");
+								//}
+								//if(amVerbose()){
+									char inputChar;
+									if(!inputCharRead(&inputChar))break;
+								//}
 							}
 						}
 						_result=getValue(_forEnvironment,"$"); // get the result
@@ -3423,9 +3451,8 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				return (*_function->functionunion.fourArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
 																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
 																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL)
-																		,(_fourthArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL));
+																		,(_fourthArgumentmapelement?_fourthArgumentmapelement->_variable->_value:NULL));
 			}
-
 	}
 	return NULL;
 }
@@ -3764,7 +3791,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate,true);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
-							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
+							/////if(amVerbose())
+								outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
+							char c;inputCharRead(&c);
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
@@ -3782,6 +3811,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// 2. get the arguments map
 							// MDH@02NOV2019 NOTE: this map will be weak as returned by _getFunctionArgumentMap!!
 							Mmap* _functionCallArgumentMap=_getFunctionArgumentMap(function,functionCallArgumentList); // assuming to have a list returned by getListExpressionValue()
+							outputValue("Function argument map: ",_getValueOfMap(_functionCallArgumentMap,false),".\n");
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))free_list(functionCallArgumentList);
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
