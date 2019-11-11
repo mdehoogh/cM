@@ -1,9 +1,10 @@
+#include <stdint.h>
+#include <inttypes.h>
+
 #include "Mcolors.h"
 
 #include "Mconstants.h"
 #include "Moutput.h"
-
-#include <inttypes.h>
 
 // MDH@16APR2019: let's define the standard colors and high-itensity colors which are dark and light versions
 const char BLACK[]="0";

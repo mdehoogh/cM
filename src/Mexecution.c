@@ -8,6 +8,7 @@
  *   5. prefix the function name with _ if it returns a dynamically allocated pointer whose ownerships transfers to the caller
  *   6. prefix a function validated with the validated comment: VALIDATED@<timestamp>
  */
+#include <stdint.h>
 #include <limits.h>
 #include <math.h>
 

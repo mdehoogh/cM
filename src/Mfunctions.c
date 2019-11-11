@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #include "Msettings.h"
 #include "Moutput.h"
 #include "Msession.h"

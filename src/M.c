@@ -1,12 +1,13 @@
 // remove the line below when not in debug mode
 /////#define __DEBUG__
-
+#include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <time.h>
 #include <limits.h>
 

@@ -2,7 +2,7 @@
  * MDH@02MAY2019:
  * - interactive session stuff
  */
-
+#include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <termios.h>

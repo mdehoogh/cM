@@ -1,6 +1,7 @@
 /**
  * MDH@24JUN2019: everything that deals with Menvironments
  */
+#include <stdint.h>
 #include <limits.h>
 #include <math.h>
 
