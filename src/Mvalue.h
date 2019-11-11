@@ -218,8 +218,8 @@ unsigned long long getNumberOfValues();
 Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);
 void free_variable(Mvariable* _variable,bool weak);
 
-void free_mapelement(Mmapelement* _mapelement,bool weak);
-void free_listelement(Mlistelement* _listelement,bool weak);
+bool free_mapelement(Mmapelement* _mapelement,bool weak);
+bool free_listelement(Mlistelement* _listelement,bool weak);
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);

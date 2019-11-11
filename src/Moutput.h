@@ -11,5 +11,7 @@ size_t output(const char *fmt,...);
 // convenience methods delegating to output() so all output (to stdout by default) goes through function output()
 void outputChar(char c); // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
 
+void newline();
+
 // all output to the display has to go through output!!
 void outputControlText(char* s);

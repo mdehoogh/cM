@@ -33,7 +33,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="11";char const * const M_DATE="4 November 2019, 22:00";
 //char const * const M_BUILD="12";char const * const M_DATE="5 November 2019, 18:00";
 //char const * const M_BUILD="14";char const * const M_DATE="6 November 2019, 16:00";
-char const * const M_BUILD="15";char const * const M_DATE="9 November 2019, 22:00";
+//char const * const M_BUILD="15";char const * const M_DATE="9 November 2019, 22:00";
+char const * const M_BUILD="16";char const * const M_DATE="11 November 2019, 14:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -47,6 +48,7 @@ const char* const DEFINEUSERFUNCTION_NAME="function";
 const char* const MUTABLEVALUETYPECHARS="uoibdqftlmr"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters associated with each of the value types
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
+const char* const WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
 
 // MDH@31OCT2019: if the value of something equals the NULL value, this is the text to use to represent it, this is also the name of the NULL variable!!!
@@ -625,7 +627,8 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){
 		return NULL;
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
-	return _getDecimalValue(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)!=M_TRUE),true);
+	// CORRECTION by default should NOT compute the sine table (to speed up computing pi)
+	return _getDecimalValue(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),true);
 }
 
 // how about storing all results here?????? instead of in the root environment????
@@ -3144,10 +3147,13 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
 		(!_incrementTokenValue||_incrementTokenValue->type==VT_TOKEN)&&
 		(_bodyTokenValue&&_bodyTokenValue->type==VT_TOKEN)){
-		outputValue("Initialization: ",_initializationTokenValue,".\n");
-		outputValue("Condition: ",_conditionTokenValue,".\n");
-		outputValue("Increment: ",_incrementTokenValue,".\n");
-		outputValue("Body: ",_bodyTokenValue,".\n");
+		if(amVerbose()){
+			output("For loop:");
+			outputValue(" Initialization=",_initializationTokenValue,NULL);
+			outputValue(" Condition=",_conditionTokenValue,NULL);
+			outputValue(" Increment=",_incrementTokenValue,NULL);
+			outputValue(" Body=",_bodyTokenValue,"\n");
+		}
 		Menvironment* _forEnvironment=__environment();
 		if(_forEnvironment){
 			_forEnvironment->_name=_strdup("for loop");
@@ -3172,70 +3178,83 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 						_forEnvironment->_variableMap->immutable=true; // MDH@10NOV2019: lock the variable map
 						Mvalue *_forBodyValue=NULL,*_forIncrementValue=NULL;
 						while(true){
-							// evaluate the condition
-							_forEnvironment->expressionToken=_conditionTokenValue->value._token;
-							output("Condition: ");
-							Mtoken* token=_forEnvironment->expressionToken;while(token){outputToken(token);token=token->next;}
-							outputChar('\n');resetOutputColor();
-							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
-							outputValue("For loop condition value: '",_conditionValue,"'.\n");
-							if(amVerbose()){
+							/*
 								outputVariables(); // let's see what we got (in the currently executing (for) environment)
 								char inputChar;
 								if(!inputCharRead(&inputChar))break;
-							}
+							*/
+							// evaluate the condition
+							_forEnvironment->expressionToken=_conditionTokenValue->value._token;
+							/*
+							output("Condition: ");
+							Mtoken* token=_forEnvironment->expressionToken;while(token){outputToken(token);token=token->next;}
+							outputChar('\n');resetOutputColor();
+							*/
+							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
+							if(amVerbose()&&amDebugging())outputValue("For loop condition value: '",_conditionValue,"'.\n");
 							// a for loop should continue unless the condition value is zero or undefined
 							if(isValueZero(_conditionValue)!=M_FALSE)break; // condition evaluates to zero or is undefined
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
 							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
-							if(amVerbose()){
+							if(amVerbose()&&amDebugging()){
 								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
 								outputValue(" evaluates to '",_conditionValue,"'.\n");
 							}
 							if(_bodyTokenValue){
 								// evaluate the for body
 								_forEnvironment->expressionToken=_bodyTokenValue->value._token;
+								/*
 								output("Body: ");
-								Mtoken* token=_forEnvironment->expressionToken;
-								while(token){outputToken(token);token=token->next;}
-								outputChar('\n');resetOutputColor();
+								Mtoken* token=_forEnvironment->expressionToken;while(token){outputToken(token);token=token->next;}
+								newline();resetOutputColor();
+								*/
 								_forBodyValue=getValueOfExpression("for loop",'l',(TokenType[]){},0);
-								//if(amVerbose()){
+								if(amVerbose()&&amDebugging()){
 									outputValue("For loop body in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
-								//}
+								}
 							}
 							if(_incrementTokenValue){
 								// evaluate the increment
 								_forEnvironment->expressionToken=_incrementTokenValue->value._token;
+								/*
 								output("Increment: ");
 								Mtoken* token=_forEnvironment->expressionToken;
 								while(token){outputToken(token);token=token->next;}
-								outputChar('\n');resetOutputColor();
+								newline();resetOutputColor();
+								*/
 								_forIncrementValue=getValueOfExpression("for increment",'i',(TokenType[]){},0);
-								//if(amVerbose()){
+								if(amVerbose()&&amDebugging()){
 									outputValue("For loop increment in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forIncrementValue,"'.\n");
-								//}
-								//if(amVerbose()){
+								}
+								/*
 									char inputChar;
 									if(!inputCharRead(&inputChar))break;
-								//}
+								*/
 							}
 						}
 						_result=getValue(_forEnvironment,"$"); // get the result
-						if(!_result)_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
+						if(!_result){
+							_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
+							if(amVerbose()&&amDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
+						}else
+						if(amVerbose()&&amDebugging())outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
+					if(amVerbose()&&amDebugging())outputLine("For loop environment popped.");
 				}else{
 					outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
 				}
 			}else
-				output("Failed to add or initialize the for loop result and counter local variables $ and _.\n",ERROR_PREFIX);
-			if(!forEnvironmentInitialized)free_environment(_forEnvironment); // have to free the environment myself
+				output("%sFailed to add or initialize the for loop result and counter local variables $ and _.\n",ERROR_PREFIX);
+			if(!forEnvironmentInitialized){
+				free_environment(_forEnvironment); // have to free the environment myself
+				if(amVerbose())outputLine("Uninitialized for loop environment discarded!");
+			}
 		}else
-			outputError("Failed to create the for execution environment");
+			outputError("Failed to create the for loop execution environment");
 	}
 	return _result;
 }
@@ -3791,9 +3810,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate,true);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
-							/////if(amVerbose())
-								outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
-							char c;inputCharRead(&c);
+							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
+							if(amVerbose()){char c;output("Press any key to continue...");inputCharRead(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
@@ -3811,7 +3829,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// 2. get the arguments map
 							// MDH@02NOV2019 NOTE: this map will be weak as returned by _getFunctionArgumentMap!!
 							Mmap* _functionCallArgumentMap=_getFunctionArgumentMap(function,functionCallArgumentList); // assuming to have a list returned by getListExpressionValue()
+							/* MDH@11NOV2019 OOPS: can't wrap the function call argument map here, free it, and have it freed later on again by the garbage collector!!!!
 							outputValue("Function argument map: ",_getValueOfMap(_functionCallArgumentMap,false),".\n");
+							*/
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))free_list(functionCallArgumentList);
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
@@ -3958,7 +3978,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
 						free(_realSignificantTokenText); // freed!!!
 						if(amDebugging())output("Real part string length: %u.\n",l);
-						if(getDP()<l)output("WARNING: More decimals present in literal than expected. Rounding may occur.\n");
+						if(getDP()<l)outputWarning("More decimals present in literal than expected. Rounding may occur.");
 						if(amDebugging())outputLine("Decimal precision checked!");
 						Mdecimal* _decimal=__decimal(get_default_mpd_context(),0,0);
 						if(amDebugging())outputLine("Decimal created!");
@@ -4231,7 +4251,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 			long long llsum=getBigintegerInteger(_sumBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llsum!=M_LL_INVALID){free_biginteger(_sumBiginteger);return _getIntegerValue(llsum);}
-			output("WARNING: Small integer sum out of range, will continue using big integer sum.\n");
+			outputWarning("Small integer sum out of range, will continue using big integer sum.");
 		}
 		return _getBigintegerValue(_sumBiginteger,true);
 	}
@@ -4355,7 +4375,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 			long long llsum=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llsum!=M_LL_INVALID){free_biginteger(_differenceBiginteger);return _getIntegerValue(llsum);}
-			output("WARNING: Small integer difference out of range, will continue using big integer difference.\n");
+			outputWarning("Small integer difference out of range, will continue using big integer difference.");
 		}
 		return _getBigintegerValue(_differenceBiginteger,true);
 	}
@@ -4434,7 +4454,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 			long long llproduct=getBigintegerInteger(_productBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llproduct!=M_LL_INVALID){free_biginteger(_productBiginteger);return _getIntegerValue(llproduct);}
-			output("WARNING: Small integer product out of range, will continue using big integer product.\n");
+			outputWarning("Small integer product out of range, will continue using big integer product.");
 		}
 		return _getBigintegerValue(_productBiginteger,true);
 	}
@@ -4921,7 +4941,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										output(".\n");
 										if(decimalprecisionreached)break; // decimal precision reached
 
-										output("\t%s...","Press Ctrl-C to stop, or any other key to continue");inputCharRead(&c);outputChar('\n'); // wait for any key
+										output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");inputCharRead(&c);outputChar('\n'); // wait for any key
 										if(c==3)break;
 
 										if(mp_copy(_nextpk,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
@@ -5151,7 +5171,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 			long long llpower=getBigintegerInteger(_powerBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llpower!=M_LL_INVALID){free_biginteger(_powerBiginteger);return _getIntegerValue(llpower);}
-			output("WARNING: Small integer power out of range, will continue using big integer power.\n");
+			outputWarning("Small integer power out of range, will continue using big integer power.");
 		}
 		return _getBigintegerValue(_powerBiginteger,true);
 	}
@@ -5446,7 +5466,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 			long long llintegerquotient=getBigintegerInteger(_integerquotientBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llintegerquotient!=M_LL_INVALID){free_biginteger(_integerquotientBiginteger);return _getIntegerValue(llintegerquotient);}
-			output("WARNING: Small integer integer quotient out of range, will continue using big integer integer quotient.\n");
+			outputWarning("Small integer integer quotient out of range, will continue using big integer integer quotient.");
 		}
 		return _getBigintegerValue(_integerquotientBiginteger,true);
 	}
@@ -5557,7 +5577,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 			long long llmodulo=getBigintegerInteger(_moduloBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llmodulo!=M_LL_INVALID){free_biginteger(_moduloBiginteger);return _getIntegerValue(llmodulo);}
-			output("WARNING: Small integer quotient remainder out of range, will continue using big integer quotient remainder.\n");
+			outputWarning("Small integer quotient remainder out of range, will continue using big integer quotient remainder.");
 		}
 		return _getBigintegerValue(_moduloBiginteger,true);
 	}
@@ -6226,7 +6246,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 					if(amVerbose()){
 						Mvalue* lastIntegerrangeValue=(up?Mfloor(_value2):Mceil(_value2));
 						outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
-						char c;output("Press Ctrl-C to stop or any other key to continue...");inputCharRead(&c);if(c==3)return NULL;
+						char c;output("%s...","Press Ctrl-C to stop or any other key to continue");inputCharRead(&c);if(c==3)return NULL;
 					}
 					Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
 					Mvalue* inrangeValue;
@@ -6645,7 +6665,7 @@ void clearCommand(){
 	*/
 }
 void outputValueColored(Mvalue* _value){
-	if(!_value){outputTokenTypeColor(TT_DQSTRING);output("%s",M_NULL_VALUE_TEXT_REPRESENTATION);return;} // TODO what color should we use????
+	if(!_value){outputTokenTypeColor(TT_DQSTRING);output("%s\n",M_NULL_VALUE_TEXT_REPRESENTATION);return;} // TODO what color should we use????
 	switch(_value->type){
 		case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_UNDEFINED_VALUE_TEXT_REPRESENTATION);break; // let's use the same color as for double quotes string (for now)
 		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
@@ -6721,6 +6741,7 @@ void outputValueColored(Mvalue* _value){
 		default:
 			break;
 	}
+	newline();
 	resetOutputColor();
 }
 
@@ -6738,7 +6759,7 @@ void unfinishToken(Mtoken* lastCommandToken){
 bool isAValidCommand(Mcommand* command,bool report){
 
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(!command->_firstToken){if(report)outputError("Undefined command");return false;}
+	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return false;}
 	
 	Mtoken* lastCommandToken=command->_lastToken;
 	if(!lastCommandToken){if(report)outputError("Unfinished command");return false;}
@@ -6841,12 +6862,14 @@ bool evaluateCommand(){
 	clock_t then=clock();
 	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
-	long long elapsed=(clock()-then)/1000;if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
+	long long elapsed=(clock()-then)/1000;
 	// output the commandText
 	output("%s = ",string(commandText));
 	// if the result is a null value, show the NULL_value
 	outputValueColored(isValueNull(_commandExpressionValue)?NULL_value:_commandExpressionValue);
 	
+	if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
+
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputLine("Result released!"); // TODO do we need to do this?????
 
 	///////if(amVerbose())outputLine("Command to release!");
@@ -8270,7 +8293,7 @@ bool initEnvironment(){
 
 	_resultListValue=_getListValue(VT_UNDEFINED,true); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
-	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputLine("WARNING: Failing to create the results list. The results will not be available through the M function!");
+	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputWarning("Failing to create the results list. The results will not be available through the M function!");
 	_Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
 		_Menvironment->_name=_strdup("M"); // TODO why make a dynamic copy???
@@ -8281,18 +8304,18 @@ bool initEnvironment(){
 			// MDH@29MAY2019: we've got (symbol) NULL
 			// MDH@06NOV2019: the NULL constant will have value NULL forever
 			if(!addVariable(_Menvironment,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
-				outputLine("WARNING: Failed to create, add or initialize constant NULL.");
+				outputWarning("Failed to create, add or initialize constant NULL.");
 			}
 			// MDH@06NOV2019: whereas the UNDEFINED constant will be a non-NULL value of type VT_UNDEFINED (of which we do not need to set the value at all)
 			if(!addVariable(_Menvironment,M_UNDEFINED_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_UNDEFINED_VARIABLE_NAME,UNDEFINED_value)){
-				outputLine("WARNING: Failed to create, add or initialize constant UNDEFINED.");
+				outputWarning("Failed to create, add or initialize constant UNDEFINED.");
 			}
 			if(!NAF_value||!addVariable(_Menvironment,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
-				outputLine("WARNING: Failed to create, add or initialize Not-a-float constant NAF.");
+				outputWarning("Failed to create, add or initialize Not-a-float constant NAF.");
 				////////return false;
 			}
 			if(!NAI_value||!addVariable(_Menvironment,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
-				outputLine("WARNING: Failed to create, add or initialize Not-an-integer default NAI.");
+				outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
 			/* MDH@13JUN2019: allow user to change the decimal precision
@@ -8303,32 +8326,32 @@ bool initEnvironment(){
 			// create and add PI and E constants!!!
 			Mvalue* PI_value=_getFloatValue(M_LD_PI);
 			if(!PI_value){
-				outputLine("ERROR: Failed to create PI.");
+				outputError("Failed to create PI");
 				return false;
 			}
 			if(!addVariable(_Menvironment,"PI",VT_FLOAT,true)){
-				outputLine("ERROR: Failed to add PI.");
+				outputError("Failed to add PI");
 				///////free_value(PI_value);
 				return false;
 			}
 			if(!setValue(_Menvironment,"PI",PI_value)){
 				////////free_value(PI_value);
-				outputLine("ERROR: Failed to initialize PI.");
+				outputError("Failed to initialize PI");
 				return false;
 			}
 			Mvalue* E_value=_getFloatValue(M_LD_E);
 			if(!E_value){
 				///////free_value(E_value);
-				outputLine("ERROR: Failed to create E.");
+				outputError("Failed to create E");
 				return false;
 			}
 			if(!addVariable(_Menvironment,"E",VT_FLOAT,true)){
-				outputLine("ERROR: Failed to add E.");
+				outputError("Failed to add E");
 				return false;
 			}
 			if(!setValue(_Menvironment,"E",E_value)){
 				//////free_value(E_value);
-				outputLine("ERROR: Failed to initialize E.");
+				outputError("Failed to initialize E");
 				return false;
 			}
 			/*
@@ -8540,6 +8563,7 @@ int main(int argc, char **argv){
 		resetOutputColor();
 		exit(1);
 	}
+	// MDH@11NOV2019: at this point getNumberOfValues() still represents the actual number of remembered values (before values are removed from it)
 	if(amVerbose())output("M environment initialized with %llu predefined values.\n",getNumberOfValues());
 
 	Mstring* predefinedVariableNames=_getVariableNames(getEnvironment(),", ");
@@ -9319,7 +9343,7 @@ int main(int argc, char **argv){
 					size_t mark=allocationmark();
 					if(amVerbose())output("Mark: %zu.\n",mark);
 					bool commandEvaluated=evaluateCommand();
-					outputChar('\n');
+					newline();
 					if(mark>0){
 						if(amVerbose())output("Left after unmarking: %zu.\n",unmarkallocation(mark));
 						allocationreport(1); //syncallocations(); // will also do allocationreport(1)

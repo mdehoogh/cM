@@ -18,5 +18,7 @@ size_t output(const char *fmt,...){va_list args;va_start(args,fmt);int result=vp
 // convenience methods delegating to output() so all output (to stdout by default) goes through function output()
 void outputChar(char c){output("%c",c);} // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
 
+void newline(){outputChar('\n');}
+
 // all output to the display has to go through output!!
 void outputControlText(char* s){output(ES"%s",s);}

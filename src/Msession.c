@@ -59,7 +59,7 @@ int kbhit(){
 int getch(){
 	// ASSERT assume in one-character-at-a-time-mode!!!
     int r;unsigned char c;
-    if ((r=read(STDIN_FILENO,&c,sizeof(c)))<0)return r;
+    if ((r=read(STDIN_FILENO,&c,sizeof(c)))>0)return r; // MDH@11NOV2019: changed <0 into >0 which makes more sense considering how inputCharRead() is implemented!!!
     return c;
 }
 

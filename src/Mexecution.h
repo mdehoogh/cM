@@ -38,6 +38,7 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 void outputError(char const * const error);
+void outputWarning(char const * const warning);
 void outputErrorAndText(char const * const error,char const * const text);
 // MDH@05NOV2019: some special error reporting (typically bugs and out of memory problems)
 void outputMemoryError(char const * const memoryerror);

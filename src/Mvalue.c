@@ -73,29 +73,47 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
     return _variable;
 }/* VALIDATED */
 
-void free_listelement(Mlistelement* _listelement,bool weak){
+bool free_listelement(Mlistelement* _listelement,bool weak){
     if(_listelement){
-        if(_listelement->_next)free_listelement(_listelement->_next,weak);
-        if(!weak)if(_listelement->_value)decrementReferenceCount(_listelement->_value); ///////// replacing: free_value(_listelement->_value);
+        if(_listelement->_next){free_listelement(_listelement->_next,weak);_listelement->_next=NULL;}
+        if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
         free(_listelement);
+        return true;
     }
+    return false;
 }/* VALIDATED */
 void free_list(Mlist* _list){
     if(_list){
-        if(_list->_first)free_listelement(_list->_first,_list->weak);
+        if(_list->_first){free_listelement(_list->_first,_list->weak);_list->_first=NULL;}
         free(_list);
     }
 }/* VALIDATED */
-void free_mapelement(Mmapelement* _mapelement,bool weak){
+bool free_mapelement(Mmapelement* _mapelement,bool weak){
     if(_mapelement){
-        if(_mapelement->_next)free_mapelement(_mapelement->_next,weak);
-        if(_mapelement->_variable)free_variable(_mapelement->_variable,weak);
+        if(amVerbose()&&amDebugging())output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
+        if(_mapelement->_next){
+            if(!free_mapelement(_mapelement->_next,weak))outputError("Failed to free a map element!");//////else outputLine("Next map element freed!");
+            _mapelement->_next=NULL;
+        }
+        if(_mapelement->_variable){
+            if(_mapelement->_variable->_name){
+                if(amVerbose()&&amDebugging())output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
+            }else
+                outputWarning("Unnamed map attribute!");
+            free_variable(_mapelement->_variable,weak);
+            _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
+        }else
+            outputWarning("No map attribute to free!");
         free(_mapelement);
+        if(amVerbose()&&amDebugging())outputLine("\tMap element freed!");
+        return true;
     }
+    return false;
 }/* VALIDATED */
 void free_map(Mmap* _map){
     if(_map){
-        if(_map->_first)free_mapelement(_map->_first,_map->weak);
+        if(amDebugging()&&amVerbose())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
+        if(_map->_first){free_mapelement(_map->_first,_map->weak);_map->_first=NULL;}else outputLine("No map attributes to free!");
         free(_map);
     }
 }/* VALIDATED */
@@ -115,34 +133,36 @@ void free_valuereference(Mvaluereference* _valuereference){
 // MDH@01MAY2019: 'local' function for freeing a value
 void free_value(Mvalue* _value){
     if(_value){
-        if(amVerbose()){outputValue("Value '",_value,"'");output(" of type %s to free.\n",VALUETYPENAMES[_value->type]);}
+        //////if(amVerbose()){output("Value of type '%s'",VALUETYPENAMES[_value->type]);outputValue(" to free: '",_value,"'.\n");}
         // I do not need to free the value itself, only the pointers inside it
         switch(_value->type){
             case VT_UNDEFINED:break;
-            case VT_TOKEN:if(_value->value._token)free_token(_value->value._token);break;
-            case VT_INTEGER:if(_value->value._integer)free_integer(_value->value._integer);break;
-            case VT_BIGINTEGER:if(_value->value._biginteger)free_biginteger(_value->value._biginteger);break;
-            case VT_DECIMAL:if(_value->value._decimal)free_decimal(_value->value._decimal);break;
-            case VT_RATIONAL:if(_value->value._rational)free_rational(_value->value._rational);break;
-            case VT_FLOAT:if(_value->value._float)free_float(_value->value._float);break;
-            case VT_TEXT:if(_value->value._text)free_text(_value->value._text);break;
-            case VT_LIST:if(_value->value._list)free_list(_value->value._list);break;
-            case VT_MAP:if(_value->value._map)free_map(_value->value._map);break;
-            case VT_REFERENCE:if(_value->value._reference)free_reference(_value->value._reference);break; // MDH@04NOV2019: decrement the reference count to the variable
+            case VT_TOKEN:if(_value->value._token){free_token(_value->value._token);_value->value._token=NULL;}break;
+            case VT_INTEGER:if(_value->value._integer){free_integer(_value->value._integer);_value->value._integer=NULL;}break;
+            case VT_BIGINTEGER:if(_value->value._biginteger){free_biginteger(_value->value._biginteger);_value->value._biginteger=NULL;}break;
+            case VT_DECIMAL:if(_value->value._decimal){free_decimal(_value->value._decimal);_value->value._decimal=NULL;}break;
+            case VT_RATIONAL:if(_value->value._rational){free_rational(_value->value._rational);_value->value._rational=NULL;}break;
+            case VT_FLOAT:if(_value->value._float){free_float(_value->value._float);_value->value._float=NULL;}break;
+            case VT_TEXT:if(_value->value._text){free_text(_value->value._text);_value->value._text=NULL;}break;
+            case VT_LIST:if(_value->value._list){free_list(_value->value._list);_value->value._list=NULL;}break;
+            case VT_MAP:if(_value->value._map){free_map(_value->value._map);_value->value._map=NULL;}break;
+            case VT_REFERENCE:if(_value->value._reference){free_reference(_value->value._reference);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
-        if(amVerbose())output("Type-specific value freed.\n");
-        free(_value);
+        FREE(_value,'V');
+        if(amVerbose())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
     }else
         output("BUG: No value to free!\n");
 }/* VALIDATED */
 
 // manage a list of created values
+// if we make a map out of it, we can annote the value with a name????
 Mlist* _valueList=NULL;
-Mvalue* __value(){
+Mvalue* __value(char const * const descriptor){
     Mvalue* _value=NULL;
     if(!_valueList)_valueList=(Mlist*)CALLOC(1,sizeof(Mlist),'X');
     if(_valueList){
+        _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
         Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'x'); // both pointers NULL
         if(_valueListelement){
             _value=(Mvalue*)CALLOC(1,sizeof(Mvalue),'V');
@@ -152,11 +172,14 @@ Mvalue* __value(){
                 if(_valueList->_last)_valueList->_last->_next=_valueListelement;else _valueList->_first=_valueListelement;
                 _valueList->_last=_valueListelement;
                 _valueList->numberOfElements++;
+                // MDH@11NOV2019: by remembering the number of elements as index, removing intermediate elements will NOT prevent informing about what element was removed!!!
+                _valueListelement->index=_valueList->numberOfElements;
+                if(descriptor)if(amVerbose())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
             }else // couldn't get a new value, so free the value list element immediately
-                free(_valueListelement);
+                FREE(_valueListelement,'x');
         }
     }
-    if(!_value)if(amVerbose())outputLine("ERROR: Failed to create value!");
+    if(!_value)if(amVerbose())outputError("Failed to create value!");
     return _value;
 }/* VALIDATED */
 
@@ -169,15 +192,15 @@ size_t getNumberOfRemovedValues(){
     unsigned long long tofree=0,removed=0;
     if(_valueList){
         Mlistelement* _valueListelement=_valueList->_first;
-        if(showDebugInfo)output("Number of values to check: %llu.\n",_valueList->numberOfElements);
+        if(showDebugInfo)output("Maximum index of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
         unsigned long long checked=0;
         while(_valueListelement){
             checked++;
-            if(showDebugInfo)output("Checking value #%llu.",checked);
+            if(showDebugInfo)output("Checking value #%llu with id %llu.\n",checked,_valueListelement->index);
             if(_valueListelement->_value){
                 if(showDebugInfo)outputLine("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
-                    if(showDebugInfo)output("About to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+                    if(showDebugInfo)output("\tAbout to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                     free_value(_valueListelement->_value);
                     _valueListelement->_value=NULL; // just in case
                     tofree++;
@@ -204,7 +227,9 @@ size_t getNumberOfRemovedValues(){
                 }else{ // this one is to be removed
                     removed++;
                     // let's be careful here!!!
-                    if(_valueList->numberOfElements)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
+                    /* MDH@11NOV2019: let's decide NOT to decrement numberOfElements meaning that we NOW use numberOfElements to always have a unique index for every value ever added to it!!!
+                    if(_valueList->numberOfElements>0)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
+                    */
                     free(_valueListelement);
                 }
                 // next to check!!!
@@ -274,20 +299,20 @@ void free_reference(Mreference* reference){
 }
 Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure){
     if(!_reference){outputLine("No reference to wrap.");return NULL;}
-    Mvalue* _referenceValue=__value();
+    Mvalue* _referenceValue=__value("reference");
     if(_referenceValue){_referenceValue->type=VT_REFERENCE;_referenceValue->value._reference=_reference;}else if(freeonfailure)free_reference(_reference);
     return _referenceValue;
 }
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     if(!_decimal){outputLine("No decimal to wrap.");return NULL;}
-    Mvalue* _decimalValue=__value();
+    Mvalue* _decimalValue=__value("decimal");
     //////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
     if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
     return _decimalValue;
 }/* VALIDATED */
 Mvalue* _getIntegerValue(long long ll){
     if(amVerbose())output("Wrapping integer '%lld'.\n",ll);
-    Mvalue* _integerValue=__value();
+    Mvalue* _integerValue=__value("integer");
     if(_integerValue){
         _integerValue->value._integer=_getInteger(ll);
         if(!_integerValue->value._integer){free_value(_integerValue);_integerValue=NULL;}else _integerValue->type=VT_INTEGER;
@@ -295,7 +320,7 @@ Mvalue* _getIntegerValue(long long ll){
     return _integerValue;
 }/* VALIDATED */
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
-    Mvalue* _bigintegerValue=(_biginteger?__value():NULL);
+    Mvalue* _bigintegerValue=(_biginteger?__value("biginteger"):NULL);
     if(_bigintegerValue){
         _bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;
     }else
@@ -308,7 +333,7 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
 }/* VALIDATED */
 Mvalue* _getFloatValue(long double ld){
     if(amVerbose())output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
-    Mvalue* _floatValue=__value();
+    Mvalue* _floatValue=__value("long double");
     if(_floatValue){
         _floatValue->value._float=_getFloat(ld);
         if(!_floatValue->value._float){free_value(_floatValue);_floatValue=NULL;}else _floatValue->type=VT_FLOAT;
@@ -320,7 +345,7 @@ Mvalue* _getTextValue(char* _s,bool freeonfailure){
     Mvalue* _textValue=NULL; // the result, when NULL check freeonfailure
     Mtext* _text=_getText(_s); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
     if(_text){
-        _textValue=__value();
+        _textValue=__value("text");
         if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}else free_text(_text); // always free the Mtext if it is not bound!!!
     }
     if(!_textValue)if(freeonfailure)free(_s);
@@ -328,7 +353,7 @@ Mvalue* _getTextValue(char* _s,bool freeonfailure){
 }/* VALIDATED */
 Mvalue* _getCharTextValue(char _c){
     Mtext* _text=(_c?_getCharText(_c):NULL); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
-    Mvalue* _textValue=(_text?__value():NULL);
+    Mvalue* _textValue=(_text?__value("char"):NULL);
     if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}else if(_text)free_text(_text); // ah do NOT forget to free _text if we haven't been able to create a value!!
     return _textValue;
 }/* VALIDATED */
@@ -338,7 +363,7 @@ Mvalue* _getListValue(Mvaluetype listValuetype,bool weak){
     if(!_list)return NULL;
     _list->weak=weak;
     _list->valuetype=listValuetype; // register what type of elements this list should have
-    Mvalue* _listvalue=__value();
+    Mvalue* _listvalue=__value(weak?"weak list":"strong list");
     if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}else free_list(_list);
     return _listvalue;
 }/* VALIDATED */
@@ -383,7 +408,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){
     if(!_map)return NULL;
     _map->weak=weak;
     _map->valuetype=mapValuetype;
-    Mvalue* _mapvalue=__value();
+    Mvalue* _mapvalue=__value(weak?"weak map":"strong map");
     if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=_map;}else free_map(_map);
     return _mapvalue;
 }/* VALIDATED */
@@ -391,25 +416,25 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){
 // some other wrappers
 Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure){
     if(!_integer)return NULL;
-    Mvalue* _value=__value();
+    Mvalue* _value=__value("integer");
     if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfFloat(Mfloat* _float,bool freeonfailure){
     if(!_float)return NULL;
-    Mvalue* _value=__value();
+    Mvalue* _value=__value("float");
     if(_value){_value->type=VT_FLOAT;_value->value._float=_float;}else if(freeonfailure)free_float(_float);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){
     if(!_map)return NULL;
-    Mvalue* _value=__value();
+    Mvalue* _value=__value("map");
     if(_value){_value->type=VT_MAP;_value->value._map=_map;}else if(freeonfailure)free_map(_map);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){
     if(!_token)return NULL;
-    Mvalue* _value=__value();
+    Mvalue* _value=__value("token");
     if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);
     return _value;
 }/* VALIDATED */
@@ -456,13 +481,13 @@ Mmap* _getMap(char *name){
         if(_mapelement){
             Mmap* _map=CALLOC(1,sizeof(Mmap),'M');
             if(_map){
+                _map->numberOfElements=1;
                 _mapelement->_variable=_variable;
                 _map->_first=_mapelement;
                 _map->_last=_mapelement;
-                _map->numberOfElements=1;
                 return _map;
             }
-            free_mapelement(_mapelement,false);
+            FREE(_mapelement,'m'); // MDH@11NOV2019: no need to call free_mapelement() 
         }
         free_variable(_variable,false);
     }
@@ -860,7 +885,7 @@ Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name
 // LIST STUFF
 Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure){
     if(!_list)return NULL;
-    Mvalue* _value=__value();
+    Mvalue* _value=__value(_list->weak?"weak list":"strong list");
     if(_value){_value->type=VT_LIST;_value->value._list=_list;}else if(freeonfailure)free_list(_list);
     return _value;
 }/* VALIDATED */
@@ -1021,8 +1046,10 @@ long long appendedToMap(Mmap* const _map,const char* const attributeName,const M
                         outputError("Failed to create new map element");
                 }
                 if(_mapelement){
-                    if(_map->weak)_mapelement->_variable->_value=_attributeValue;else // MDH@02NOB2019: if the map is weak assign directly!!
-                    assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
+                    if(_map->weak)
+                        _mapelement->_variable->_value=_attributeValue;
+                    else // MDH@02NOB2019: if the map is weak assign directly!!
+                        assignValue(&_mapelement->_variable->_value,_attributeValue); // replace the current attribute value with the new value
                     result=M_TRUE;
                 }
             }else{
@@ -1051,7 +1078,7 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
 
 Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){
     if(!_rational)return NULL;
-    Mvalue* _value=__value();
+    Mvalue* _value=__value("rational");
     if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);
     return _value;
 }/* VALIDATED */
@@ -1122,7 +1149,8 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
                 }
             }
 			_mapelement=_mapelement->_next;
-			if(_mapelement)p=string_append(p,", "); // only when there's a next map element to process
+			if(!_mapelement)break;
+            p=string_append(p,", "); // only when there's a next map element to process
 			////output("%s","next");
 		}
 		//////output("%s(%d)",string(p),string_length(p));

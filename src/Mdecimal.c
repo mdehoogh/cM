@@ -786,10 +786,10 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 		mpd_t *d8=__mpd(mpd_context,8),*d32=__mpd(mpd_context,32);
 #endif
 		if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
-		if(amVerbose())output("Initial decimals created!\n");
+		if(amVerbose())outputLine("\tInitial helper decimals created!");
 		unsigned long long iter=0;
 		if(amVerbose()){
-			output("Iteration %u:",iter);
+			output("\tIteration %u:",iter);
 #ifdef __ADEBUG__
 			char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
 			char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
@@ -807,12 +807,14 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
 			char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
 #endif
-			outputChar('\n');
+			newline();
 		}
 		clock_t now=0,then=(!amVerbose()?clock():-1); // if not running verbose, show number of iterations executed per second
-		long long iterthen=iter,milliseconds=0; // report every second
+		long long iterthen=iter,seconds=0; // report every second
 		int cmp;
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
+		if(then>=0)output("Iterations per second (abort by pressing any key):");
+		bool interrupted=false;
 		while(!mpd_error(mpd_context)){
 			///// doesn't work I think!!! if(kbhit()!=0)break;
 			iter++;
@@ -820,13 +822,14 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			if(then>=0){
 				now=clock();
 				if(now>=0){
-					if(now-then>=1000){
+					if(now-then>=1000000){
 						then=now;
-						milliseconds++;
-						output("Number of iterations of computing pi performed after %lld milliseconds: %lld.\n",milliseconds,iter);
+						seconds++;
+						output(" %lld",iter-iterthen);
+						if(kbhit()>0){interrupted=true;newline();outputError("Not all decimals of pi reported guaranteed to be correct, as its computation was interrupted by the user!");break;} // MDH@11NOV2019: allow breaking
+						iterthen=iter;
 					}/*else outputChar('.');*/
-				}else
-				if(iter%1000==0)output("Number of iterations executed: %lld.\n",iter);
+				}
 			}
 #ifdef __ADEBUG__
 			//if(amVerbose())output("Iteration: %lld: ",iter);
@@ -867,9 +870,9 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			//if(amVerbose())output("Iteration: %lld: ",iter);
 			cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
 			//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
-			if(!cmp){if(amVerbose())output("Done!\n");break;}
+			if(!cmp){if(amVerbose())output("\tDone!\n");break;}
 			//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
-			if(cmp==INT_MAX){output("Something went wrong!\n");break;}
+			if(cmp==INT_MAX){outputError("Something went wrong!");break;}
 			//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
 			mpd_copy(lasts,s,mpd_context); // lasts = s
 			//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
@@ -904,42 +907,42 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			}
 #endif
 		}
-		output("Number of iterations to compute pi to %lld decimals: %lld.\n",mpd_context->prec,iter);
-		if(mpd_context){
-			// store pi, pi/2 and pi/4 in the decimal context (all or none) BEFORE readjusting the precision i.e. if no error occurred
-			if(!mpd_error(mpd_context)){
-				mpd_t *_pi=get_mpd_copy(mpd_context,s);
-				if(_pi){
-					uint32_t status=0;
-					// MDH@05AUG2019: it's relatively simple to compute the sin/cosine of angles like 15, 30, 45, 60, 75 so we can start with storing multiples of pi/12 which of course include all we need!!!
-					//                how about storing the sine and cosines of these values along with these predefined angles?????
-					mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
-					if(_pidiv2&&_pidiv4&&_pimul2){
-						mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
-						mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
-						mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
-					}else // _pi not bound in decimalcontext, so free
-						status=0xFFFFFFFF;
-
-					if((status&0xEFBF)==0){
-						decimalcontext->pi=_pi;
-						decimalcontext->pidiv2=_pidiv2;
-						decimalcontext->pidiv4=_pidiv4;
-						decimalcontext->pimul2=_pimul2;
-					}else{
-						free_mpd(_pimul2);
-						free_mpd(_pi);
-						free_mpd(_pidiv2);
-						free_mpd(_pidiv4);
+		if(!interrupted){
+			if(then>=0)if(!interrupted){outputChar('.');newline();}
+			//output("Number of iterations to compute pi to %lld decimals: %lld.\n",mpd_context->prec,iter);
+			if(mpd_context){
+				// store pi, pi/2 and pi/4 in the decimal context (all or none) BEFORE readjusting the precision i.e. if no error occurred
+				if(!mpd_error(mpd_context)){
+					mpd_t *_pi=get_mpd_copy(mpd_context,s);
+					if(_pi){
+						uint32_t status=0;
+						// MDH@05AUG2019: it's relatively simple to compute the sin/cosine of angles like 15, 30, 45, 60, 75 so we can start with storing multiples of pi/12 which of course include all we need!!!
+						//                how about storing the sine and cosines of these values along with these predefined angles?????
+						mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
+						if(_pidiv2&&_pidiv4&&_pimul2){
+							mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
+							mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
+							mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
+						}else // _pi not bound in decimalcontext, so free
+							status=0xFFFFFFFF;
+						if((status&0xEFBF)==0){
+							decimalcontext->pi=_pi;
+							decimalcontext->pidiv2=_pidiv2;
+							decimalcontext->pidiv4=_pidiv4;
+							decimalcontext->pimul2=_pimul2;
+						}else{
+							free_mpd(_pimul2);
+							free_mpd(_pi);
+							free_mpd(_pidiv2);
+							free_mpd(_pidiv4);
+						}
 					}
 				}
-
-				if(!decimalcontext->pi)
-					outputError("Failed to store the decimal approximation of pi in the decimal context");
-
 			}
 		}
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+		// MDH@11NOV2019: if we actually failed to store pi (when it was computed uninterrupted to start with!)
+		if(!decimalcontext->pi)outputError("Failed to store the decimal approximation of pi in the decimal context");else outputLine("The decimal approximation of pi was stored in the decimal context.");
 		// TODO should I mpd_finalize the pi values stored? or for now leave them unrounded?????????
 
 		// get rid of all the decimals we used
