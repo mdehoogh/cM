@@ -98,11 +98,22 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
             ///////////output("Decimal rep: '%s'.\n",_decimalRep);
             if(_decimalChars){
                 _p=string_append(_p,_decimalChars);
-                free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
-                if(_p)if(_decimal->repeating){
-                    _p=string_insert_char(_p,string_length(_p)-_decimal->repeating,'[');
-                    if(_p&&!fixedpoint)_p=string_append_char(_p,']');
+                if(_p){
+					if(_decimal->repeating){
+                    	_p=string_insert_char(_p,string_length(_p)-_decimal->repeating,'[');
+                    	if(_p&&!fixedpoint)_p=string_append_char(_p,']');
+					}else{
+						// if there's a period in _p, and no 'e' we can insert a blank every 50 decimals
+						char* _period=strchr(_decimalChars,'.');
+						if(_period){
+							if(!strchr(_decimalChars,'e')){
+								size_t periodpos=(_period-_decimalChars); // index position of the period
+								while(periodpos+51<string_length(_p)){string_insert_char(_p,periodpos+51,' ');periodpos+=51;}
+							}
+						}
+					}
                 }
+                free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
             }else
                 _p=NULL;
             if(!_p){free_string(_decimalText);_decimalText=NULL;}
@@ -774,7 +785,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 	if(!decimalcontext->pi){
 
 		//if(amVerbose())
-		output("Computing pi to %lld decimals.\n",decimalprecision);
+		output("Computing %lld decimal digits of pi.\n",decimalprecision);
 
 		// initialize the variables we need for the iterations
 #ifdef __ADEBUG__
@@ -814,6 +825,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 		long long iterthen=iter,seconds=0; // report every second
 		int cmp;
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
+		outputLine("In the approximation two additional decimal digits will be computed after which rounding will be applied cutting off the two extra decimals.");
 		if(then>=0)output("Iterations per second (abort by pressing any key):");
 		bool interrupted=false;
 		while(!mpd_error(mpd_context)){
@@ -908,6 +920,12 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			}
 #endif
 		}
+		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+		uint32_t status=0;
+		mpd_qfinalize(s,mpd_context,&status);
+		if((status&0xEFBF)!=0){
+			outputError("Failed to finalize pi");
+		}else
 		if(!interrupted){
 			if(then>=0)if(!interrupted){outputChar('.');newline();}
 			//output("Number of iterations to compute pi to %lld decimals: %lld.\n",mpd_context->prec,iter);
@@ -916,7 +934,6 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 				if(!mpd_error(mpd_context)){
 					mpd_t *_pi=get_mpd_copy(mpd_context,s);
 					if(_pi){
-						uint32_t status=0;
 						// MDH@05AUG2019: it's relatively simple to compute the sin/cosine of angles like 15, 30, 45, 60, 75 so we can start with storing multiples of pi/12 which of course include all we need!!!
 						//                how about storing the sine and cosines of these values along with these predefined angles?????
 						mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
@@ -941,9 +958,11 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 				}
 			}
 		}
-		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
 		// MDH@11NOV2019: if we actually failed to store pi (when it was computed uninterrupted to start with!)
-		if(!decimalcontext->pi)outputError("Failed to store the decimal approximation of pi in the decimal context");else outputLine("The decimal approximation of pi was stored in the decimal context.");
+		if(!decimalcontext->pi)
+			outputError("Failed to store the decimal approximation of pi in the decimal context");
+		else
+			outputLine("The decimal approximation of pi was stored in the decimal context.");
 		// TODO should I mpd_finalize the pi values stored? or for now leave them unrounded?????????
 
 		// get rid of all the decimals we used
