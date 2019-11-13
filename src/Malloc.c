@@ -12,7 +12,7 @@ struct{
 // you HAVE to call this method to be able to register allocations
 bool allocationrecordinginitialized(){
     allocationtypes.l=0;
-#ifdef __ADEBUG__
+#ifndef __PRODUCTION__
     allocationtypes.chars=malloc(16); // starting out with one block
 #else
     allocationtypes.chars=NULL;
@@ -23,7 +23,7 @@ bool allocationrecordinginitialized(){
 
 size_t addallocationtype(char allocationtype){
     if(!allocationtype)return 0; // force using allocationtype to prevent unused-parameter warning
-#ifdef __ADEBUG__
+#ifndef __PRODUCTION__
     // increase size if necessary
     if(allocationtypes.chars&&!(allocationtypes.l&0xF))allocationtypes.chars=realloc(allocationtypes.chars,(allocationtypes.l+16)); // add a 'block' if now full
     if(!allocationtypes.chars)return 0;
@@ -41,7 +41,7 @@ size_t allocationmark(){return addallocationtype(' ');}
 size_t unmarkallocation(size_t mark){
     if(!allocationtypes.chars){printf("No allocation recording!\n");return 0;}
     if(mark==0){printf("No mark!\n");return 0;}
-#ifdef __ADEBUG__
+#ifndef __PRODUCTION__
     if(mark>allocationtypes.l){printf("Mark %zu too large.\n",mark);return 0;}
     if(allocationtypes.chars[mark-1]!=' '){printf("No mark at position %zu!\n",mark);return 0;}
     allocationtypes.l=mark-1;
@@ -50,7 +50,7 @@ size_t unmarkallocation(size_t mark){
 }
 void allocationreport(size_t mark){
     if(mark==0||allocationtypes.chars==NULL)return;
-#ifdef __ADEBUG__
+#ifndef __PRODUCTION__
     printf("%s","Allocations: '");
     size_t pos=mark-1;
     while(pos<allocationtypes.l)printf("%c",allocationtypes.chars[pos++]);
@@ -59,14 +59,14 @@ void allocationreport(size_t mark){
 #endif
 }
 void syncallocations(){
-#ifdef __ADEBUG__
+#ifndef __PRODUCTION__
     if(!allocationtypes.chars)return;
     while(allocationtypes.l>0){if(allocationtypes.chars[allocationtypes.l-1]!='.')break;allocationtypes.l--;}
     allocationreport(1);
 #endif
 }
 
-#ifdef __ADEBUG__
+#ifndef __PRODUCTION__
 void* Mmalloc(size_t size,char type){
     void* ptr=malloc(size);
     if(ptr)addallocationtype(type);

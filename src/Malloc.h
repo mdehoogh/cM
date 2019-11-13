@@ -10,7 +10,9 @@ size_t unmarkallocation(size_t mark);
 void allocationreport(size_t mark); // report on the current allocation status
 void syncallocations();
 
-#ifdef __ADEBUG__
+// changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
+// i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign
+#ifndef __PRODUCTION__
 void* Mmalloc(size_t size,char type);
 void* Mcalloc(size_t nitems,size_t size,char type);
 void Mfree(void* ptr,char type);
