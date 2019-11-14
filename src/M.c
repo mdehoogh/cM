@@ -3549,34 +3549,34 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					// I suppose we need to wrap a copy unless we make a separate reference thing where we store the name of the variable which could just be an Mstring?????
 					Mvariable* variable=getVariable(NULL,&_valuereference->_name[1],false);
 					if(variable)referencedValue=_getReferenceValue(_getReference(variable),true);else output("%sReferenced variable '%s' vanished.\n",ERROR_PREFIX,_valuereference->_name[1]);
-				}else{ // a non-referenced variable which means we are supposed to return the value of the variable
+				}else // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
-					Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
-				}
+					referencedValue=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
 			}
 		}
-		if(referencedValue){
+		// only composite values can be indexex...
+		if(referencedValue&&(referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
 			if(amVerbose()){
 				///////output("Current value of referenced variable '%s': ",_valuereference->_name);
 				outputValue("Top level value reference: '",referencedValue,"'.\n");
 			}
 			// MDH@14NOV2019: ANY value that evaluates to a list or map can be further indexed
 			// if we have index/attribute names we have to get the final subvalue
-			Mvalue* itemidsValue=_valuereference->_itemid;
-			if(itemidsValue&&itemidsValue->type==VT_LIST){
+			Mvalue* itemidListValue=_valuereference->_itemid;
+			if(itemidListValue&&itemidListValue->type==VT_LIST){
 				if(amVerbose()){
 					/////////output("Item id(s) of indexed variable '%s'",_valuereference->_name);
-					outputValue("Item id(s): '",itemidsValue,"'.\n");
+					outputValue("Item id(s): '",itemidListValue,"'.\n");
 				}
-				Mlist* _itemidlist=itemidsValue->value._list; // let's assume that is it always a list
+				Mlist* _itemidList=itemidListValue->value._list; // let's assume that is it always a list
 				// empty lists should also return the full element, so only something to do when we actually have list elements!!!
-				if(_itemidlist&&_itemidlist->_first){
+				if(_itemidList&&_itemidList->_first){
 					// let's get the first index/attribute name
-					Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+					Mlistelement* indexorattributenameListelement=_itemidList->_first;
 					Mvalue* indexorattributenameListelementValue;
 					unsigned long long index=0;
 					// MDH@14NOV2019: we need a _value as well of type list or map as well, otherwise there's definitely nothing left to index!!!
-					while(referencedValue&&(referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)&&indexorattributenameListelement){
+					while(referencedValue&&indexorattributenameListelement){
 						index++;
 						indexorattributenameListelementValue=indexorattributenameListelement->_value;
 						if(amVerbose()){output("Determining the value at index element #%llu ",index);outputValue(" with value '",indexorattributenameListelementValue,"'.\n");}
@@ -3595,7 +3595,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 								}
 								output("%s",ERROR_PREFIX);
 								outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
-							}
+							}else
 							if(referencedValue->type==VT_LIST){
 								// MDH@17OCT2019: how about allowing an index to be a list of indices????
 								long long index;
@@ -3626,7 +3626,13 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 									}else
 										outputError("A zero index is not allowed");
 								}
+							}else{
+								output("%s",ERROR_PREFIX);
+								outputValue("'",referencedValue,"' cannot be indexed.\n");
+								referencedValue=NULL; // prevent further use TODO does this make sense?
+								break;
 							}
+							
 							// neither a list nor a map, so nothing to return!!!
 							////////////////////////return NULL;
 							/* replacing:
@@ -3966,7 +3972,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// TODO as a side-effect getReferencedValue() will bind the added value to the value reference (as result) BUT I don't think that is how it should be!!! no the assignment takes care of that
 				if(!_valueReference->_itemid){
 					if(amVerbose())output("Retrieving the value of '%s' when no item id was specified.\n",_valueReference->_name);
-					// MDH@18OCT2019: TODO this is dangerous?!
+					// MDH@18OCT2019: TODO this is dangerous?! MDH@14NOV2019: we could wait until the value is actually requested
 					_valueReference->_value=getValue(getEnvironment(),_valueReference->_name);
 					// MDH@02NOV2019: replacing: assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
 				}
@@ -4082,7 +4088,15 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 		}
 		if(_significantTokenText)free(_significantTokenText); // free the (duplicated significant) token text
-		if(amVerbose()){if(_valueReference&&_valueReference->_value)outputValue("Value: `",_valueReference->_value,"`.\n");else output("No result!\n");}
+		if(amVerbose()){
+			if(_valueReference){
+				outputLine("Extracted reference:");
+				if(_valueReference->_name)output("\tName: '%s'.\n",_valueReference->_name);else outputLine("\tNo name!");
+				if(_valueReference->_value)outputValue("\tValue: '",_valueReference->_value,"'.\n");else outputLine("\tNo value referenced!");
+				if(_valueReference->_itemid)outputValue("\tIndex ids: ",_valueReference->_itemid,"'.\n");else outputLine("\tNo item ids.");
+			}else
+				outputLine("No value reference!");
+		}
 		// apply the unary operators (backwards)
 		if(unaryOperators){
 			if(amVerbose())output("Applying unary operators: '%s'.\n",string(unaryOperators));
@@ -6269,8 +6283,12 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 				if(integerrangeValue){
 					if(amVerbose()){
 						Mvalue* lastIntegerrangeValue=(up?Mfloor(_value2):Mceil(_value2));
-						outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
+						if(amVerbose()&&amDebugging())
+						{
+						outputValue("Determining the integers in [",integerrangeValue,",");
+						outputValue(NULL,lastIntegerrangeValue,"].\n");
 						char c;output("%s...","Press Ctrl-C to stop or any other key to continue");inputCharRead(&c);if(c==3)return NULL;
+						}
 					}
 					Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
 					Mvalue* inrangeValue;
@@ -6444,25 +6462,18 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			//                this can be done any number of times
 
 			// NOTE some binary operators are stored in a couple of tokens!!!
-			if(expressionToken)
+			if(expressionToken){
 				if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)
 					expressionToken=nextEnvironmentExpressionToken();
-
-			// MDH@16MAY2019: can't end an expression with an operator BRO'
-			if(expressionToken){
-				if(amVerbose())output("Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-				endTokenTypeIndex=endTokenTypeCount;
-				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
-				if(endTokenTypeIndex){
-					if(amVerbose())outputLine("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
-					break;
-				}
-				if(amVerbose())outputLine(" NO");
-
 				// MDH@14NOV2019: this is the first possible place where we should be aware of further indexing
 				//                TODO alternatively we could move this functionality to getValueReference()!!
 				//                TODO this also means that we can have an index on a value (not per se a variable)
+				//                TODO are we allowing indexing strings as well??????
+				if(amVerbose()&&amDebugging())
+				{output("Possible augmented list item ids expression token");outputToken(expressionToken);outputChar('\n');}
 				while(expressionToken&&expressionToken->type==TT_LIST){
+					if(amVerbose()&&amDebugging())
+					{output("First augmented item id(s) token");outputToken(expressionToken);outputChar('\n');}
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
 						// we should append the indices to the index_id
@@ -6482,9 +6493,28 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 							// indexListValue will be removed by the garbage collector
 						}else // no item id yet, so the same way as is done before set _itemid to the index list value
 							assignValue(&operandValueReference->_itemid,indexListValue);
+						if(amVerbose()&&amDebugging())
+							outputValue("Augmented item ids: ",operandValueReference->_itemid,".\n");
 					}
+					/*
+					expressionToken=getEnvironmentExpressionToken();
+					output("Expression token");outputToken(expressionToken);outputChar('\n');
+					if(!expressionToken->next)break; // TODO don't like this!!!
+					*/
 					expressionToken=nextEnvironmentExpressionToken();
 				}
+			}
+
+			// MDH@16MAY2019: can't end an expression with an operator BRO'
+			if(expressionToken){
+				if(amVerbose())output("Does '%s' of type '%s' end the expression? ",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+				endTokenTypeIndex=endTokenTypeCount;
+				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
+				if(endTokenTypeIndex){
+					if(amVerbose())outputLine("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
+					break;
+				}
+				if(amVerbose())outputLine(" NO");
 
 				if(amVerbose())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
@@ -6721,83 +6751,86 @@ void clearCommand(){
 	*/
 }
 void outputValueColored(Mvalue* _value){
-	if(!_value){outputTokenTypeColor(TT_DQSTRING);output("%s\n",M_NULL_VALUE_TEXT_REPRESENTATION);return;} // TODO what color should we use????
-	switch(_value->type){
-		case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_UNDEFINED_VALUE_TEXT_REPRESENTATION);break; // let's use the same color as for double quotes string (for now)
-		case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
-		case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
-		case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
-		case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
-		case VT_RATIONAL:
-			if(_value->value._rational){
-				output("(");
-				outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
-				output("/");outputTokenTypeColor(TT_INTEGER);
-				if(_value->value._rational->den)outputBiginteger(NULL,_value->value._rational->den,NULL);else outputChar('1'); // a missing denominator means it's equal to 1
-				resetOutputColor();
-				output(")");
-				if(_value->value._rational->delta){
-					outputTokenTypeColor(TT_REAL);
-					if(_value->value._rational->delta->ld>=0)output("+");
-					Mstring* _realValueText=__string();
-					if(_realValueText){
-						appendld(_realValueText,_value->value._rational->delta->ld);
-						output("%s",string(_realValueText));
-						free_string(_realValueText);
-					}
-					// replacing:	output("%.*Lf",LDBL_DIG,_value->value._rational->delta->ld);
+	if(_value){
+		switch(_value->type){
+			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_UNDEFINED_VALUE_TEXT_REPRESENTATION);break; // let's use the same color as for double quotes string (for now)
+			case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
+			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
+			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
+			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
+			case VT_RATIONAL:
+				if(_value->value._rational){
+					output("(");
+					outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
+					output("/");outputTokenTypeColor(TT_INTEGER);
+					if(_value->value._rational->den)outputBiginteger(NULL,_value->value._rational->den,NULL);else outputChar('1'); // a missing denominator means it's equal to 1
 					resetOutputColor();
+					output(")");
+					if(_value->value._rational->delta){
+						outputTokenTypeColor(TT_REAL);
+						if(_value->value._rational->delta->ld>=0)output("+");
+						Mstring* _realValueText=__string();
+						if(_realValueText){
+							appendld(_realValueText,_value->value._rational->delta->ld);
+							output("%s",string(_realValueText));
+							free_string(_realValueText);
+						}
+						// replacing:	output("%.*Lf",LDBL_DIG,_value->value._rational->delta->ld);
+						resetOutputColor();
+					}
 				}
-			}
-			break;
-		case VT_FLOAT:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
-		case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
-		case VT_LIST:
-			// TODO not using _getListText() as defined in Mexecution
-			/////////if(amVerbose())outputValue("List value '",_value,"'.");
-			outputChar('[');
-			Mlist* _list=_value->value._list;
-			if(_list&&_list->numberOfElements){
-				Mlistelement* _listelement=_list->_first;
-				unsigned long long listitemindex=1;
-				while(_listelement){
-					if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;outputChar(',');} // missing elements
-					outputValueColored(_listelement->_value);
-					_listelement=_listelement->_next;
+				break;
+			case VT_FLOAT:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
+			case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
+			case VT_LIST:
+				// TODO not using _getListText() as defined in Mexecution
+				/////////if(amVerbose())outputValue("List value '",_value,"'.");
+				outputChar('[');
+				Mlist* _list=_value->value._list;
+				if(_list&&_list->numberOfElements){
+					Mlistelement* _listelement=_list->_first;
+					unsigned long long listitemindex=1;
+					while(_listelement){
+						if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;outputChar(',');} // missing elements
+						outputValueColored(_listelement->_value);
+						_listelement=_listelement->_next;
+					}
 				}
-			}
-			outputChar(']');
-			break;
-		case VT_MAP:
-			outputChar('{');
-			Mmap* _map=_value->value._map;
-			if(_map&&_map->numberOfElements){
-				Mvariable* _mapelementvariable;
-				Mmapelement* _mapelement=_map->_first;
-				while(_mapelement){
-					_mapelementvariable=_mapelement->_variable;
-					// TODO are we coloring the name?????
-					// quoting the name to indicate it is alphanumeric!!
-					output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
-					outputValueColored(_mapelementvariable->_value);
-					if(!_mapelement->_next)break;
-					outputChar(',');
-					_mapelement=_mapelement->_next;
+				outputChar(']');
+				break;
+			case VT_MAP:
+				outputChar('{');
+				Mmap* _map=_value->value._map;
+				if(_map&&_map->numberOfElements){
+					Mvariable* _mapelementvariable;
+					Mmapelement* _mapelement=_map->_first;
+					while(_mapelement){
+						_mapelementvariable=_mapelement->_variable;
+						// TODO are we coloring the name?????
+						// quoting the name to indicate it is alphanumeric!!
+						output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
+						outputValueColored(_mapelementvariable->_value);
+						if(!_mapelement->_next)break;
+						outputChar(',');
+						_mapelement=_mapelement->_next;
+					}
 				}
-			}
-			outputChar('}');
-			break;
-		case VT_REFERENCE:
-			outputChar('@');
-            if(_value->value._reference){
-                 output("%s",_value->value._reference->variable->_name);
-				 outputChar(':');
-                 output("%zu",_value->value._reference->referenceindex);
-			}
-		default:
-			break;
-	}
-	///////newline();
+				outputChar('}');
+				break;
+			case VT_REFERENCE:
+				outputChar('@');
+				if(_value->value._reference){
+					output("%s",_value->value._reference->variable->_name);
+					outputChar(':');
+					output("%zu",_value->value._reference->referenceindex);
+				}
+			default:
+				break;
+		}
+	}else{
+		outputTokenTypeColor(TT_DQSTRING);
+		output("%s",M_NULL_VALUE_TEXT_REPRESENTATION);
+	} // TODO what color should we use????
 	resetOutputColor();
 }
 
@@ -6925,7 +6958,8 @@ bool evaluateCommand(Mvalue* *resultValue){
 	output("%s = ",string(commandText));
 	// if the result is a null value, show the NULL_value
 	outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);
-	newline();
+	newline(); // outputValueColored() doesn't do that!!
+	///// outputValueColored() does do this (and should): resetOutputColor();
 	if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
 
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputLine("Result released!"); // TODO do we need to do this?????
