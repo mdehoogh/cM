@@ -87,7 +87,7 @@ void Mfree(void* ptr,char type){
     if(allocationtypes.l==0){printf("Nothing allocated to free.\n");return;}
     size_t pos=allocationtypes.l-1;
     while(1){
-        if(allocationtypes.chars[pos]==' '){printf("Allocation of type '%c' not encountered.\n",type);break;}
+        if(allocationtypes.chars[pos]==' '){/*printf("Allocation of type '%c' not encountered.\n",type);*/break;}
         if(allocationtypes.chars[pos]==type){allocationtypes.chars[pos]='.';break;}
         if(pos==0)break;
         pos--;

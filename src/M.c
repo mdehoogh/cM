@@ -35,11 +35,14 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="12";char const * const M_DATE="5 November 2019, 18:00";
 //char const * const M_BUILD="14";char const * const M_DATE="6 November 2019, 16:00";
 //char const * const M_BUILD="15";char const * const M_DATE="9 November 2019, 22:00";
-char const * const M_BUILD="16";char const * const M_DATE="11 November 2019, 14:00";
+//char const * const M_BUILD="16";char const * const M_DATE="11 November 2019, 14:00";
+char const * const M_BUILD="17";char const * const M_DATE="14 November 2019, 12:00"; // adding the M variable and function 
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference"};
+const char* const M_VARIABLE_NAME="M"; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
+const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function for getting previous results
 const char* const IFFUNCTION_NAME="if";
 const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
@@ -51,6 +54,9 @@ const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters assoc
 const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
 const char* const BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
+
+const char* M_HIDDEN_VARIABLE_NAMES[]={"M","?","_"}; // MDH@14NOV2019: the variable names not to show when the variables are shown (with their current value)
+const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES=3;// MDH@14NOV2019: yes, three of them
 
 // MDH@31OCT2019: if the value of something equals the NULL value, this is the text to use to represent it, this is also the name of the NULL variable!!!
 //                alternatively we could use capital letters to denote the variable, and lowercase to denote the value (which makes sense I suppose)
@@ -631,7 +637,7 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){
 	// CORRECTION by default should NOT compute the sine table (to speed up computing pi)
 	return _getDecimalValue(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),true);
 }
-
+/* MDH@14NOV2019: replaced by the M variable and M function
 // how about storing all results here?????? instead of in the root environment????
 Mvalue* _resultListValue=NULL; // were the results are being kept
 // the function that is used to return a specific result value
@@ -641,7 +647,7 @@ Mvalue* getResult(Mvalue* indexValue){
 	long long indexValueInteger=getValueInteger(indexValue); // NOTE all index values should be positive!!!
 	return (indexValueInteger>0?getValueAtIndex(_resultListValue->value._list,indexValueInteger):NULL); // TODO are we calling getResult anywhere????
 }
-
+*/
 // LIST CONVERSIONS
 ////////Mvalue* ml(Menvironment* _executionEnvironment){return _getListValue(VT_LIST);} // a list that may only contain list elements is acceptable as map list!!
 
@@ -1317,7 +1323,7 @@ void outputFunctions(){
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
 	// MDH@24OCT2019: now using _getVariableMapText() instead of _getMapText() because the former is environment aware and can show the symbols with the same value (if any)
-	Mstring* _variablesText=_getVariableMapText(getEnvironment(),false,false,true);
+	Mstring* _variablesText=_getVariableMapText(getEnvironment(),false,false,true,false); // do NOT show the hidden variables!!!
 	output("\nVariables: %s.\n",string(_variablesText));
 	free_string(_variablesText);
 }/* VALIDATED */
@@ -3526,106 +3532,113 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 	if(suffix)output("%s",suffix);
 }
 // two essential methods for getting and setting referenced values
+// MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	// _itemid now represents the entire list of index/attribute name combinations
-	if(!_valuereference)return NULL;
-	Mvalue* referencedValue=NULL;
+	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
 	///////if(amVerbose())outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
-	if(!_valuereference->_value){ // not an actual (preset) value
-		// if we do NOT have a name it's a literal
-		if(_valuereference->_name){
-			// MDH@04NOV2019: now that we've added the TT_REFERENCE token, the name may start with @ to indicate a variable reference
-			if(_valuereference->_name[0]=='@'){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
-				// I suppose we need to wrap a copy unless we make a separate reference thing where we store the name of the variable which could just be an Mstring?????
-				Mvariable* variable=getVariable(NULL,&_valuereference->_name[1],false);
-				if(variable)referencedValue=_getReferenceValue(_getReference(variable),true);else output("%sReferenced variable '%s' vanished.\n",ERROR_PREFIX,_valuereference->_name[1]);
-			}else{ // a non-referenced variable which means we are supposed to return the value of the variable
-				// if there is no itemid we simply return the 'entire' value of the given variable
-				Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
-				if(amVerbose()){output("Current value of referenced variable '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
-				// if we have index/attribute names we have to get the final subvalue
-				if(_valuereference->_itemid){
-					if(amVerbose()){output("Item id of indexed variable '%s'",_valuereference->_name);outputValue(": '",_valuereference->_itemid,"'.\n");}
-					Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
-					// empty lists should also return the full element, so only something to do when we actually have list elements!!!
-					if(_itemidlist->_first){
-						// let's get the first index/attribute name
-						Mlistelement* indexorattributenameListelement=_itemidlist->_first;
-						Mvalue* indexorattributenameListelementValue;
-						while(indexorattributenameListelement){
-							indexorattributenameListelementValue=indexorattributenameListelement->_value;
-							// after extracting the value increment indexorattributenameListelement, so we can use continue
-							indexorattributenameListelement=indexorattributenameListelement->_next;
-							// if no value is defined, it is ignored TODO should we????
-							if(indexorattributenameListelementValue){
-								if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
-								// if we are accessing a map we have to ascertain that the attribute name in a string
-								if(_value->type==VT_MAP){
-									Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
-									if(attributenameText){
-										referencedValue=getValueOfAttribute(_value->value._map,string(attributenameText));		
-										free_string(attributenameText);
-										continue;	
-									}
-									output("%s",ERROR_PREFIX);
-									outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
-								}
-								if(_value->type==VT_LIST){
-									// MDH@17OCT2019: how about allowing an index to be a list of indices????
-									long long index;
-									if(indexorattributenameListelementValue->type==VT_LIST){
-										// we'll be returning a list value
-										Mlist* _referencedValueList=_getListOfType(_value->value._list->valuetype);
-										Mlist* indexelementList=indexorattributenameListelementValue->value._list;
-										Mlistelement* indexelementListelement=indexelementList->_first;
-										Mvalue* valueAtIndex;
-										while(indexelementListelement){
-											index=getValueInteger(indexelementListelement->_value);
-											valueAtIndex=(index!=0&&index!=M_LL_INVALID?getValueAtIndex(_value->value._list,index):NULL);
-											// OOPS can't append with 0 anymore, because 0 will do prepending
-											if(appendedToList(_referencedValueList,valueAtIndex,M_LL_INVALID)==0)break;
-											indexelementListelement=indexelementListelement->_next;
+	if(_valuereference){
+		referencedValue=_valuereference->_value; // if we do not have a name and and item id that's what we will return
+		// MDH@02NOV2019 replacing: assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
+		if(!referencedValue){ // no actual referenced value stored (BUT that could actually be the value to return)
+			// if we do NOT have a name it's a literal
+			if(_valuereference->_name){
+				// MDH@04NOV2019: now that we've added the TT_REFERENCE token, the name may start with @ to indicate a variable reference
+				if(_valuereference->_name[0]=='@'){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
+					// I suppose we need to wrap a copy unless we make a separate reference thing where we store the name of the variable which could just be an Mstring?????
+					Mvariable* variable=getVariable(NULL,&_valuereference->_name[1],false);
+					if(variable)referencedValue=_getReferenceValue(_getReference(variable),true);else output("%sReferenced variable '%s' vanished.\n",ERROR_PREFIX,_valuereference->_name[1]);
+				}else{ // a non-referenced variable which means we are supposed to return the value of the variable
+					// if there is no itemid we simply return the 'entire' value of the given variable
+					Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
+					if(amVerbose()){output("Current value of referenced variable '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
+					// if we have index/attribute names we have to get the final subvalue
+					if(_valuereference->_itemid){
+						if(amVerbose()){output("Item id of indexed variable '%s'",_valuereference->_name);outputValue(": '",_valuereference->_itemid,"'.\n");}
+						Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
+						// empty lists should also return the full element, so only something to do when we actually have list elements!!!
+						if(_itemidlist&&_itemidlist->_first){
+							// let's get the first index/attribute name
+							Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+							Mvalue* indexorattributenameListelementValue;
+							unsigned long long index=0;
+							// MDH@14NOV2019: we need a _value as well, otherwise there's definitely nothing left to index!!!
+							while(_value&&indexorattributenameListelement){
+								index++;
+								indexorattributenameListelementValue=indexorattributenameListelement->_value;
+								if(amVerbose()){output("Determining the value at index element #%llu ",index);outputValue(" with value '",indexorattributenameListelementValue,"'.\n");}
+								// after extracting the value increment indexorattributenameListelement, so we can use continue
+								indexorattributenameListelement=indexorattributenameListelement->_next;
+								// if no value is defined, it is ignored TODO should we????
+								if(indexorattributenameListelementValue){
+									if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
+									// if we are accessing a map we have to ascertain that the attribute name in a string
+									if(_value->type==VT_MAP){
+										Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
+										if(attributenameText){
+											_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
+											free_string(attributenameText);
+											continue;	
 										}
-										referencedValue=_getValueOfList(_referencedValueList,true);
+										output("%s",ERROR_PREFIX);
+										outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
+									}
+									if(_value->type==VT_LIST){
+										// MDH@17OCT2019: how about allowing an index to be a list of indices????
+										long long index;
+										if(indexorattributenameListelementValue->type==VT_LIST){
+											// we'll be returning a list value
+											Mlist* _referencedValueList=_getListOfType(_value->value._list->valuetype);
+											Mlist* indexelementList=indexorattributenameListelementValue->value._list;
+											Mlistelement* indexelementListelement=indexelementList->_first;
+											Mvalue* valueAtIndex;
+											while(indexelementListelement){
+												index=getValueInteger(indexelementListelement->_value);
+												valueAtIndex=(index!=0&&index!=M_LL_INVALID?getValueAtIndex(_value->value._list,index):NULL);
+												// OOPS can't append with 0 anymore, because 0 will do prepending
+												if(appendedToList(_referencedValueList,valueAtIndex,M_LL_INVALID)==0)break;
+												indexelementListelement=indexelementListelement->_next;
+											}
+											_value=_getValueOfList(_referencedValueList,true);
+										}else{
+											// try to convert the index value into a positive integer
+											long long index=getValueInteger(indexorattributenameListelementValue);
+											if(index!=0&&index!=M_LL_INVALID){
+												_value=getValueAtIndex(_value->value._list,index);
+												continue;
+											}
+											if(index){
+												output("%s",ERROR_PREFIX);
+												outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
+											}else
+												outputError("A zero index is not allowed");
+										}
+									}
+									// neither a list nor a map, so nothing to return!!!
+									////////////////////////return NULL;
+									/* replacing:
+									// check the validity of the index or attribute name against the current value
+									if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
+									if(indexorattributenameListelementValue->type==VT_INTEGER){
+										if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
+										_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
 									}else{
-										// try to convert the index value into a positive integer
-										long long index=getValueInteger(indexorattributenameListelementValue);
-										if(index!=0&&index!=M_LL_INVALID){
-											referencedValue=getValueAtIndex(_value->value._list,index);
-											continue;
-										}
-										if(index){
-											output("%s",ERROR_PREFIX);
-											outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
-										}else
-											outputError("A zero index is not allowed");
+										if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
+										_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
 									}
+									*/
 								}
-								// neither a list nor a map, so nothing to return!!!
-								////////////////////////return NULL;
-								/* replacing:
-								// check the validity of the index or attribute name against the current value
-								if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
-								if(indexorattributenameListelementValue->type==VT_INTEGER){
-									if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
-									_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
-								}else{
-									if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
-									_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
-								}
-								*/
 							}
+							referencedValue=_value;
+							/////// see below: if(amVerbose())outputValue("Value of indexed variable: '",_value,"'.\n");
 						}
-						if(amVerbose())outputValue("Value of indexed variable: '",_value,"'.\n");
 					}
 				}
 			}
 		}
-	}else{
+		///////if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
 		if(amVerbose())outputValue("Returning referenced value: '",_valuereference->_value,"'.\n");
-		referencedValue=_valuereference->_value; // MDH@02NOV2019 replacing: assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
 	}
-	///////if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
@@ -3782,14 +3795,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		switch(expressionToken->type){
 			case TT_FUNCTION:
 				{
-					if(amVerbose())output("Call of function '%s'.\n",_significantTokenText);
 					Mfunction* function=getFunction(getEnvironment(),_significantTokenText); // get the function associated with the name of the function
 					if(function){
 						// MDH@17JUL2019: we know the function and when the name is one of the special functions
 						//                like 'function' to define a function we know not to evaluate the third argument!!
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
 						// MDH@25JUL2019: adding if, while and for functions
-						unsigned long long numberOfFunctionParameters=function->_parameterMap->numberOfElements,numberOfElementsToNotEvaluate=0;
+						unsigned long long numberOfFunctionParameters=(function->_parameterMap?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
 						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
 							if(amVerbose())outputLine("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=1;		
@@ -3805,6 +3817,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
 							numberOfFunctionParameters=LLONG_MAX; // replacing 1 with the actual number of parameters we allow for the function
 						}
+						if(amVerbose())output("Call of function '%s' that takes %llu arguments.\n",_significantTokenText,numberOfFunctionParameters);
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=nextEnvironmentExpressionToken();
 						// MDH@02NOB2019: force the arguments value list to be weak
@@ -6706,7 +6719,7 @@ void outputValueColored(Mvalue* _value){
 				Mlistelement* _listelement=_list->_first;
 				unsigned long long listitemindex=1;
 				while(_listelement){
-					if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;output(",");} // missing elements
+					if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;outputChar(',');} // missing elements
 					outputValueColored(_listelement->_value);
 					_listelement=_listelement->_next;
 				}
@@ -6742,7 +6755,7 @@ void outputValueColored(Mvalue* _value){
 		default:
 			break;
 	}
-	newline();
+	///////newline();
 	resetOutputColor();
 }
 
@@ -6850,7 +6863,9 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 }
 
 // anything the user types is a sequence of tokens which we can store in a linked list
-bool evaluateCommand(){
+// MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
+//                instead of returning a bool we could return the command text (or NULL if failing to do so????)
+bool evaluateCommand(Mvalue* *resultValue){
 	
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 	if(!isAValidCommand(_userInputCommand,true))return false;
@@ -6861,14 +6876,14 @@ bool evaluateCommand(){
 	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
 	getEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
 	clock_t then=clock();
-	Mvalue* _commandExpressionValue=getValueOfExpression("command",'e',(TokenType[]){},0);
+	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
 	long long elapsed=(clock()-then)/1000;
 	// output the commandText
 	output("%s = ",string(commandText));
 	// if the result is a null value, show the NULL_value
-	outputValueColored(isValueNull(_commandExpressionValue)?NULL_value:_commandExpressionValue);
-	
+	outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);
+	newline();
 	if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
 
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputLine("Result released!"); // TODO do we need to do this?????
@@ -8265,11 +8280,59 @@ void removeFirstSuggestedCharacter(char firstSuggestedCharacter,bool consumed){
 	}
 }
 
+// MDH@14NOV2019: we want to keep a list of evaluated commands inside the main M environment
+//                then the user can use variable M to get at the stored commands, and the M function to get results
+Mvalue* M_value=NULL; // where the list of evaluated commands is to be stored 
+// the M function (full name MM or perhaps MMfunction) allows one to use a previous result in a command
+Mvalue* MM(Mvalue* indexValue){
+	Mvalue* resultValue=NULL;
+	Mlist* M_list=(M_value&&M_value->type==VT_LIST?M_value->value._list:NULL);
+	if(M_list){
+		// because the command and result are prepended to the M_value list, the index identifies how far to go back
+		long long index=(indexValue?getValueInteger(indexValue):-1); // if no index value is specified (e.g. when user called M() without argument), index 1 is used
+		Mvalue* commandresultValue=getValueAtIndex(M_list,index); // get the commandresult value stored at the given index!!
+		if(commandresultValue&&commandresultValue->type==VT_LIST&&commandresultValue->value._list->_last)resultValue=commandresultValue->value._list->_last->_value;
+	}
+	return resultValue;
+}
+// MDH@14NOV2019 instead of storing the command itself (which would result in a memory security risk we store the command text instead, that way we can still grab it and evaluate it)
+bool registerCommandEvaluation(char* commandText,Mvalue* evaluationresultValue,long long commandIndex){
+	// prepend a list containing the command and the result to the list wrapped in M_value
+	if(M_value){
+		Mlist* M_list=(M_value->type==VT_LIST?M_value->value._list:NULL);
+		if(M_list){
+			Mvalue* commandresultValue=_getMapValue(VT_UNDEFINED,false); // now storing the command and its value in a map, not a list anymore
+			if(commandresultValue){
+				// NOTE we're wrapping the first token of the command into a value which is dangerous because when the list is freed, the token shouldn't!!
+				//      so theoretically that value is weak, whereas the evaluation result is strong
+				// TODO find a way to fix this!!!
+				if(appendedToMap(commandresultValue->value._map,"c",_getTextValue(commandText,false))>0
+					&&appendedToMap(commandresultValue->value._map,"v",evaluationresultValue)>0
+					&&appendedToList(M_list,commandresultValue,commandIndex)>0)
+					return true;
+			}
+		}
+		outputError("Failed to remember the command and its result value.");
+	}
+	return false;
+}
+
+Mvalue* Mvariables(){
+	if(amVerbose())outputLine("Getting the variables!");
+	// returning the names of the local variables (including the hidden ones)
+	// NOTE _getVariableNamesMap() always requires a non NULL environment to start with
+	return _getValueOfMap(_getVariableNamesMap(getEnvironment()),true);
+}
+
 bool initEnvironment(){
 
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return false; // let's force starting with a default decimal context
 	output("Default decimal precision: %llu. Call setdp() to change it.\n",decimalprecision);
+
+	// we're gonna need a list to store lists of command and result pairs
+	M_value=_getListValue(VT_MAP,false);
+	if(!M_value)outputWarning("Failed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!");
 
 	NAF_value=_getFloatValue(M_LD_NAN); // NaN is defined in Mexecution.h as 0.0/0.0 (as a constant)
 	NAI_value=_getIntegerValue(M_LL_INVALID);
@@ -8291,16 +8354,29 @@ bool initEnvironment(){
 	assignValue(DP_value,_getIntegerValue(_decimalContext?_decimalContext->prec:0L));
 	if(!DP_value)output("WARNING: Failed to initialize the decimal precision.");
 	*/
-
+	/* MDH@14NOV2019: using M for storing both the command (text) and the result (at that moment)
 	_resultListValue=_getListValue(VT_UNDEFINED,true); // ascertain to have a list value in which the results can be stored
 	// ESSENTIAL not to loose this list immediately!!!
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputWarning("Failing to create the results list. The results will not be available through the M function!");
+	*/
+
 	_Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
 		_Menvironment->_name=_strdup("M"); // TODO why make a dynamic copy???
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'M');
 		if(environmentFunctionMap){
+
+			// MDH@14NOV2019: typically M is created as an immutable variable BUT of course I can change the assigned M_value myself directly but the user can't!!
+			//                NOTE if we would have used setValue to set M to M_value it would copy the list that M_value holds instead of using M_value itself, setVariable won't do that
+			if(M_value){
+				if(!addVariable(_Menvironment,M_VARIABLE_NAME,VT_LIST,true)||!setVariable(_Menvironment,M_VARIABLE_NAME,M_value)){
+					outputWarning("Failed to create, add or initialize M.");
+				}
+				// if M_value wasn't bound to the M variable, it's memory will be freed by the garbage collector, by setting M_value to NULL we know we do not need to update the wrapped list
+				if(M_value->count==0){M_value=NULL;output("%sFailed to initialize %s.\n",ERROR_PREFIX,M_VARIABLE_NAME);}
+			}
+
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
 			// MDH@29MAY2019: we've got (symbol) NULL
 			// MDH@06NOV2019: the NULL constant will have value NULL forever
@@ -8372,6 +8448,18 @@ bool initEnvironment(){
 			}
 			*/
 			_Menvironment->_functionMap=environmentFunctionMap;
+
+			// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
+			if(M_value){
+				if(!completedValueFunction(_getFunction(_Menvironment,MFUNCTION_NAME),MFUNCTION_NAME,MM))
+					output("%sFailed to register function %s.",ERROR_PREFIX,MFUNCTION_NAME);
+				else 
+					output("Function %s registered.\n",MFUNCTION_NAME);
+			}
+
+			if(!completedFunction(_getFunction(_Menvironment,"variables"),"variables",Mvariables))
+				outputWarning("Failed to register the variables() function.");
+
 			// register if, while and for special functions
 		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
 		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
@@ -8384,11 +8472,13 @@ bool initEnvironment(){
 				outputError("Failed to register all internal functions");
 				return false;
 			}
+			/* MDH@14NOV2019: replaced by the M variable and M function
 			// additional functions some of which need to know the root environment, I suppose a function should have access to its environment?????
 			if(_resultListValue&&!completedIntegerFunction(_getFunction(_Menvironment,"M"),"M",getResult)){
 				outputError("Failed to register function M (for requesting previous results)");
 				return false;
 			}
+			*/
 			/*
 			if(!completedFunction(_getFunction(_Menvironment,"ml"),ml)){
 				outputLine("ERROR: Failed to register map list (constructor) function.");
@@ -9343,21 +9433,23 @@ int main(int argc, char **argv){
 					if(amVerbose())outputCommandInfo(_userInputCommand);
 					size_t mark=allocationmark();
 					if(amVerbose())output("Mark: %zu.\n",mark);
-					bool commandEvaluated=evaluateCommand();
+					Mvalue* userInputCommandResultValue=NULL;
+					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
 					newline();
 					if(mark>0){
 						if(amVerbose())output("Left after unmarking: %zu.\n",unmarkallocation(mark));
-						allocationreport(1); //syncallocations(); // will also do allocationreport(1)
+						if(amDebugging())allocationreport(1); //syncallocations(); // will also do allocationreport(1)
 					}else
 					if(amVerbose())outputLine("No allocations to unmark.");
+					// TODO the next part should be improved, as it is getting a bit messy
+					Mstring* _userInputCommandText=_getCommandText(false); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
 					if(!commandEvaluated){
-						Mstring* commandText=_getCommandText(false);
-						if(!string_length(commandText)){
+						if(!string_length(_userInputCommandText)){
 							clearCommand();
 							outputLine("Nothing to evaluate!");
 						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
 							outputLine("Please complete, correct or cancel the command.");
-						free_string(commandText);
+						free_string(_userInputCommandText); // freed!
 						continue;
 					}
 					resetOutputColor();
@@ -9371,8 +9463,18 @@ int main(int argc, char **argv){
 							outputError("Failed to register the command! Probable cause: out of memory");
 						}else
 							outputError("Failed to register the command again! Probable cause: out of memory");
-					}else
-					if(amVerbose())outputLine("Command registered!");
+					}else{
+						if(amVerbose())outputLine("Command registered!");
+						if(M_value){
+							// perhaps we should store the command text not the command itself?????
+							// NOTE prepend a single quote is essential to get the text enquoted!!!
+							if(!string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
+								outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
+							else
+							if(amVerbose())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
+						}
+					}
+					free_string(_userInputCommandText); // MDH@14NOV2019: freed
 
 					// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
 					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command

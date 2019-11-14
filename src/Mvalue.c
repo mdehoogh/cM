@@ -31,7 +31,8 @@ void free_variable(Mvariable* _variable,bool weak){
     }
 }/* VALIDATED */
 Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
-    if(!name||!strlen(name)){
+    // MDH@14NOV2019: maps might have attributes with no name (i.e. the empty string)
+    if(!name){
         outputError("No variable name defined");
         return NULL;
     }
@@ -475,7 +476,7 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){
     }
     return NULL;
 }/* VALIDATED */
-Mmap* _getMap(char *name){
+Mmap* _getMap(char* name){
     Mvariable* _variable=_getVariable(name,VT_UNDEFINED,true);
     if(_variable){
         Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
@@ -1064,7 +1065,8 @@ long long appendedToMap(Mmap* const _map,const char* const attributeName,const M
 }/* VALIDATED */
 
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
-    if(_map&&attributeName&&strlen(attributeName)){
+    // MDH@14NOV2019: there's no reason why the map couldn't have an attribute with an empty name!!!!
+    if(_map&&attributeName){
         Mmapelement* _mapelement=_map->_first;
         if(_mapelement){            
             // keep looking until there is a match

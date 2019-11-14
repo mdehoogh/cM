@@ -110,11 +110,17 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
 // decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mfloat, Mtext, Mlist or Mmap pointer)
 bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
+
+// MDH@14NOV2019: same as setValue but does not use assignValue (which will copy the value passed in)
+bool setVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
+
 Mvalue* getValue(const Menvironment* const _environment,const char* const name);
 
 char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value); // MDH@24OCT2019: if we want to find a constant with the same value we can use that as a 'symbol'
 // MDH@24OCT2019: if we want to see the variables in an environment vall getVariableMapText(), which will also represent values by the names of constants with the same value (representing symbols)
-Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings);
+Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenfiles);
+
+Mmap* _getVariableNamesMap(Menvironment* environment); // MDH@14NOV2019: returns a map with the names of all local variables (in attribute '') and the names of the variables in the parent environment with the name of the parent environment!
 
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable);
 /*

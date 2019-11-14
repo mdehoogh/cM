@@ -16,12 +16,15 @@
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE;
+extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
+extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
+extern const char * const M_HIDDEN_VARIABLE_NAMES[]; // MDH@14NOV2019: the name of the M variables to NOT return when requesting the variable map text!!!
+extern const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES;
+// TODO make the following variables start with M_
 extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* const ERROR_PREFIX;
-extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
-extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const char * const VALUETYPENAMES[];
 
 void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
@@ -192,6 +195,56 @@ Mstring* _getVariableNames(const Menvironment* const _environment,const char* co
     return _variableNames;
 }/* VALIDATED */
 
+// MDH@14NOV2019: what if someone asks for a list of variable names???
+//                how about prefixing the name of the variable with the name of the environment it is part of???
+Mlist* _getVariableNamesList(Menvironment* environment){
+    Mlist* _variableNamesList=NULL;
+    if(environment){
+        _variableNamesList=_getListOfType(VT_TEXT);
+        if(_variableNamesList){
+            if(environment->_variableMap){
+                if(amVerbose())output("Creating the list of variable names of '%s'.\n",environment->_name);
+                Mmapelement* variableMapelement=environment->_variableMap->_first;
+                while(variableMapelement){
+                    if(variableMapelement->_variable){
+                        Mstring* variableNameText=_getString("'");
+                        if(variableNameText){
+                            if(string_append(variableNameText,variableMapelement->_variable->_name))
+                                appendedToList(_variableNamesList,_getTextValue(string(variableNameText),false),M_LL_INVALID);
+                            free_string(variableNameText);
+                        }
+                    }
+                    variableMapelement=variableMapelement->_next;
+                }
+            }
+        }
+    }
+    return _variableNamesList;
+}
+Mmap* _getVariableNamesMap(Menvironment* environment){
+    // how about returning for each environment that is active an attribute in a map?
+    // first get the map of the parent
+    Mmap* _variableNamesMap=(environment?_getMapOfType(VT_UNDEFINED):NULL);
+    if(_variableNamesMap){
+        // storing the local variables in a list that we're going to store in an attribute with name ''
+        Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment),true);
+        if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,"",_localVariableNamesListValue)){
+            /// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
+            output("%sFailed to register the local variable names of '%s'.\n",ERROR_PREFIX,environment->_name);
+        }
+        if(environment->_parent){
+            // determine the variable names map of the parent environment and wrap it
+            Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(environment->_parent),true);
+            // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
+            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,environment->_parent->_name,_parentVariableNamesMapValue)){
+                /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
+                output("%sFailed to register the variable names of the parent of '%s'.\n",ERROR_PREFIX,environment->_name);
+            }
+        }
+    }
+    return _variableNamesMap;
+}
+
 // MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
 Mvariable* getVariable(Menvironment const * const _environment,char const * const name, bool verbose){
     if(!name){outputError("No variable name specified");return NULL;}
@@ -239,7 +292,7 @@ char* getConstantWithValue(Menvironment const * const environment,char * name,Mv
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (environment&&environment->_parent?getConstantWithValue(environment->_parent,name,value):NULL);
 }
-Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings){
+Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenvariablevalues){
     Mmap* map=(environment?environment->_variableMap:_executionEnvironment->_variableMap);
 	Mstring* result=(map?__string():NULL);
     if(result){
@@ -250,28 +303,39 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
 		Mmapelement* _mapelement=map->_first;
 		while(p&&_mapelement){
 			//////output("%s","start");
+            bool hidevalue;
 			Mvariable* _mapVariable=_mapelement->_variable;
 			if(_mapVariable){
-                // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
+                // let's always show the name
                 if(showquotes)p=string_append_char(p,'\'');
                 p=string_append(p,_mapVariable->_name);
                 if(showquotes)p=string_append_char(p,'\'');
-                if(showmissings||isValueUndefined(_mapVariable->_value)!=M_TRUE){
-                    /////output("%s",string(p));
-                    p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
-                    // MDH@24OCT2019: here we deviate from _getMapText() (see Mvalue.h/c) in that we try to find a constant with the same value (like PI or E or NULL)
-                    char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name,_mapVariable->_value);
-                    if(!constantWithValue){ // not a 'symbolic' value
+                // 
+                hidevalue=!showhiddenvariablevalues;
+                if(hidevalue){ // check if truely a variable to hide
+                    long long hiddenvariableindex=M_NUMBER_OF_HIDDEN_VARIABLES;
+                    while(--hiddenvariableindex>=0&&strcmp(M_HIDDEN_VARIABLE_NAMES[hiddenvariableindex],_mapVariable->_name)!=0);
+                    if(hiddenvariableindex<0)hidevalue=false; // not a hidden variable
+                }
+                if(!hidevalue){
+                    // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
+                    if(showmissings||isValueUndefined(_mapVariable->_value)!=M_TRUE){
                         /////output("%s",string(p));
-                        Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
-                        /////output("Map element: %s",string(p));
-                        // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
-                        if(_mapelementValueText){
-                            p=string_append(p,string(_mapelementValueText)); // append 
-                            free_string(_mapelementValueText); // release AFTER copying over
-                        }
-                    }else // a 'symbolic' value
-                        p=string_append(p,constantWithValue);
+                        p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+                        // MDH@24OCT2019: here we deviate from _getMapText() (see Mvalue.h/c) in that we try to find a constant with the same value (like PI or E or NULL)
+                        char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name,_mapVariable->_value);
+                        if(!constantWithValue){ // not a 'symbolic' value
+                            /////output("%s",string(p));
+                            Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
+                            /////output("Map element: %s",string(p));
+                            // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
+                            if(_mapelementValueText){
+                                p=string_append(p,string(_mapelementValueText)); // append 
+                                free_string(_mapelementValueText); // release AFTER copying over
+                            }
+                        }else // a 'symbolic' value
+                            p=string_append(p,constantWithValue);
+                    }
                 }
             }
 			_mapelement=_mapelement->_next;
@@ -508,6 +572,39 @@ bool setValue(const Menvironment* const _environment,const char* const name,cons
             output("%sCannot set the value of variable `%s`: it is not mutable!\n",ERROR_PREFIX,name);
     }else
         output("%sCannot set the value of variable `%s`: it is unknown.\n",ERROR_PREFIX,name);
+    return false;
+}/* VALIDATED */
+
+// MDH@14NOV2019: sometimes we need a setValue that does not use assignValue() because we do not want to copy the (composite) value passed in
+bool setVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
+    // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
+    if(!name||strlen(name)==0){outputError("No variable specified to set the value of");return false;}
+    Mvariable* variable=getVariable(_environment,name,amVerbose());
+    if(variable){
+        if(!variable->_value||!variable->immutable){
+            if(amVerbose())output("Variable '%s' to set.\n",variable->_name);
+            // _value needs to be of the right type
+            // MDH@03NOV2019: unless it's null (i.e. the type of _value->type is VT_UNDEFINED)
+            if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type||_value->type==VT_UNDEFINED){
+                if(variable->_value)decrementReferenceCount(variable->_value); // decrement the reference count on the current value
+                variable->_value=_value;
+                if(variable->_value)incrementReferenceCount(variable->_value);
+                if(amVerbose()){
+                    Mstring* _valueText=_getValueText(variable->_value,false);
+                    if(_valueText){
+                        output("Value '%s' (reference count: %zd) assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
+                        free_string(_valueText);
+                    }else
+                    if(variable->_value)
+                        outputError("No value text!");
+                }
+                return true; // releasing the value is my responsibility now...
+            }
+            output("%sCannot set variable '%s': the new value is of the wrong type.\n",ERROR_PREFIX,name);
+        }else
+            output("%sCannot set variable '%s': it is not mutable!\n",ERROR_PREFIX,name);
+    }else
+        output("%sCannot set variable '%s': it is unknown to '%s'.\n",ERROR_PREFIX,name,(_environment?_environment:_executionEnvironment)->_name);
     return false;
 }/* VALIDATED */
 
