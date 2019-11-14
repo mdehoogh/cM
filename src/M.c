@@ -3540,6 +3540,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	if(_valuereference){
 		referencedValue=_valuereference->_value; // if we do not have a name and and item id that's what we will return
 		// MDH@02NOV2019 replacing: assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
+		// MDH@14NOV2019: if no referened value is available we should use the name to obtain the value of the top level referenced value
 		if(!referencedValue){ // no actual referenced value stored (BUT that could actually be the value to return)
 			// if we do NOT have a name it's a literal
 			if(_valuereference->_name){
@@ -3551,93 +3552,102 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 				}else{ // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
 					Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
-					if(amVerbose()){output("Current value of referenced variable '%s': ",_valuereference->_name);outputValue("'",_value,"'.\n");}
-					// if we have index/attribute names we have to get the final subvalue
-					if(_valuereference->_itemid){
-						if(amVerbose()){output("Item id of indexed variable '%s'",_valuereference->_name);outputValue(": '",_valuereference->_itemid,"'.\n");}
-						Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
-						// empty lists should also return the full element, so only something to do when we actually have list elements!!!
-						if(_itemidlist&&_itemidlist->_first){
-							// let's get the first index/attribute name
-							Mlistelement* indexorattributenameListelement=_itemidlist->_first;
-							Mvalue* indexorattributenameListelementValue;
-							unsigned long long index=0;
-							// MDH@14NOV2019: we need a _value as well, otherwise there's definitely nothing left to index!!!
-							while(_value&&indexorattributenameListelement){
-								index++;
-								indexorattributenameListelementValue=indexorattributenameListelement->_value;
-								if(amVerbose()){output("Determining the value at index element #%llu ",index);outputValue(" with value '",indexorattributenameListelementValue,"'.\n");}
-								// after extracting the value increment indexorattributenameListelement, so we can use continue
-								indexorattributenameListelement=indexorattributenameListelement->_next;
-								// if no value is defined, it is ignored TODO should we????
-								if(indexorattributenameListelementValue){
-									if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
-									// if we are accessing a map we have to ascertain that the attribute name in a string
-									if(_value->type==VT_MAP){
-										Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
-										if(attributenameText){
-											_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
-											free_string(attributenameText);
-											continue;	
-										}
+				}
+			}
+		}
+		if(referencedValue){
+			if(amVerbose()){
+				///////output("Current value of referenced variable '%s': ",_valuereference->_name);
+				outputValue("Top level value reference: '",referencedValue,"'.\n");
+			}
+			// MDH@14NOV2019: ANY value that evaluates to a list or map can be further indexed
+			// if we have index/attribute names we have to get the final subvalue
+			Mvalue* itemidsValue=_valuereference->_itemid;
+			if(itemidsValue&&itemidsValue->type==VT_LIST){
+				if(amVerbose()){
+					/////////output("Item id(s) of indexed variable '%s'",_valuereference->_name);
+					outputValue("Item id(s): '",itemidsValue,"'.\n");
+				}
+				Mlist* _itemidlist=itemidsValue->value._list; // let's assume that is it always a list
+				// empty lists should also return the full element, so only something to do when we actually have list elements!!!
+				if(_itemidlist&&_itemidlist->_first){
+					// let's get the first index/attribute name
+					Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+					Mvalue* indexorattributenameListelementValue;
+					unsigned long long index=0;
+					// MDH@14NOV2019: we need a _value as well of type list or map as well, otherwise there's definitely nothing left to index!!!
+					while(referencedValue&&(referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)&&indexorattributenameListelement){
+						index++;
+						indexorattributenameListelementValue=indexorattributenameListelement->_value;
+						if(amVerbose()){output("Determining the value at index element #%llu ",index);outputValue(" with value '",indexorattributenameListelementValue,"'.\n");}
+						// after extracting the value increment indexorattributenameListelement, so we can use continue
+						indexorattributenameListelement=indexorattributenameListelement->_next;
+						// if no value is defined, it is ignored TODO should we????
+						if(indexorattributenameListelementValue){
+							if(amVerbose())outputValue("Index or attribute list element value: '",indexorattributenameListelementValue,"'.\n");
+							// if we are accessing a map we have to ascertain that the attribute name in a string
+							if(referencedValue->type==VT_MAP){
+								Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
+								if(attributenameText){
+									referencedValue=getValueOfAttribute(referencedValue->value._map,string(attributenameText));		
+									free_string(attributenameText);
+									continue;	
+								}
+								output("%s",ERROR_PREFIX);
+								outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
+							}
+							if(referencedValue->type==VT_LIST){
+								// MDH@17OCT2019: how about allowing an index to be a list of indices????
+								long long index;
+								if(indexorattributenameListelementValue->type==VT_LIST){
+									// we'll be returning a list value
+									Mlist* _referencedValueList=_getListOfType(referencedValue->value._list->valuetype);
+									Mlist* indexelementList=indexorattributenameListelementValue->value._list;
+									Mlistelement* indexelementListelement=indexelementList->_first;
+									Mvalue* valueAtIndex;
+									while(indexelementListelement){
+										index=getValueInteger(indexelementListelement->_value);
+										valueAtIndex=(index!=0&&index!=M_LL_INVALID?getValueAtIndex(referencedValue->value._list,index):NULL);
+										// OOPS can't append with 0 anymore, because 0 will do prepending
+										if(appendedToList(_referencedValueList,valueAtIndex,M_LL_INVALID)==0)break;
+										indexelementListelement=indexelementListelement->_next;
+									}
+									referencedValue=_getValueOfList(_referencedValueList,true);
+								}else{
+									// try to convert the index value into a positive integer
+									long long index=getValueInteger(indexorattributenameListelementValue);
+									if(index!=0&&index!=M_LL_INVALID){
+										referencedValue=getValueAtIndex(referencedValue->value._list,index);
+										continue;
+									}
+									if(index){
 										output("%s",ERROR_PREFIX);
-										outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
-									}
-									if(_value->type==VT_LIST){
-										// MDH@17OCT2019: how about allowing an index to be a list of indices????
-										long long index;
-										if(indexorattributenameListelementValue->type==VT_LIST){
-											// we'll be returning a list value
-											Mlist* _referencedValueList=_getListOfType(_value->value._list->valuetype);
-											Mlist* indexelementList=indexorattributenameListelementValue->value._list;
-											Mlistelement* indexelementListelement=indexelementList->_first;
-											Mvalue* valueAtIndex;
-											while(indexelementListelement){
-												index=getValueInteger(indexelementListelement->_value);
-												valueAtIndex=(index!=0&&index!=M_LL_INVALID?getValueAtIndex(_value->value._list,index):NULL);
-												// OOPS can't append with 0 anymore, because 0 will do prepending
-												if(appendedToList(_referencedValueList,valueAtIndex,M_LL_INVALID)==0)break;
-												indexelementListelement=indexelementListelement->_next;
-											}
-											_value=_getValueOfList(_referencedValueList,true);
-										}else{
-											// try to convert the index value into a positive integer
-											long long index=getValueInteger(indexorattributenameListelementValue);
-											if(index!=0&&index!=M_LL_INVALID){
-												_value=getValueAtIndex(_value->value._list,index);
-												continue;
-											}
-											if(index){
-												output("%s",ERROR_PREFIX);
-												outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
-											}else
-												outputError("A zero index is not allowed");
-										}
-									}
-									// neither a list nor a map, so nothing to return!!!
-									////////////////////////return NULL;
-									/* replacing:
-									// check the validity of the index or attribute name against the current value
-									if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
-									if(indexorattributenameListelementValue->type==VT_INTEGER){
-										if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
-										_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
-									}else{
-										if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
-										_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
-									}
-									*/
+										outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
+									}else
+										outputError("A zero index is not allowed");
 								}
 							}
-							referencedValue=_value;
-							/////// see below: if(amVerbose())outputValue("Value of indexed variable: '",_value,"'.\n");
+							// neither a list nor a map, so nothing to return!!!
+							////////////////////////return NULL;
+							/* replacing:
+							// check the validity of the index or attribute name against the current value
+							if(indexorattributenameListelementValue->type!=VT_INTEGER&&indexorattributenameListelementValue->type!=VT_TEXT){outputValue("\nAssumed index/attribute name '",indexorattributenameListelementValue,"' not an integer/string.");return NULL;}
+							if(indexorattributenameListelementValue->type==VT_INTEGER){
+								if(_value->type!=VT_LIST){outputValue("ERROR: Value '",_value,"' not a list.");return NULL;}
+								_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue);
+							}else{
+								if(_value->type!=VT_MAP){outputValue("ERROR: Value '",_value,"' not a map.");return NULL;}
+								_value=getValueOfAttribute(_value->value._map,indexorattributenameListelementValue);
+							}
+							*/
 						}
 					}
+					/////// see below: if(amVerbose())outputValue("Value of indexed variable: '",_value,"'.\n");
 				}
 			}
 		}
 		///////if(amVerbose()){outputValuereference("ZZZZZZZ Value of value reference '",_valuereference,"'");outputValue(": '",referencedValue,"'.\n");}
-		if(amVerbose())outputValue("Returning referenced value: '",_valuereference->_value,"'.\n");
+		if(amVerbose())outputValue("Returning referenced value: '",referencedValue,"'.\n");
 	}
 	return referencedValue;
 }
@@ -6414,6 +6424,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 
 		while(expressionToken){
+			
 			if(amVerbose())output("getValueOfExpression() processing %s expression token '%s' of type %s.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 			// does this token end the expression????
 			endTokenTypeIndex=endTokenTypeCount;
@@ -6428,6 +6439,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the next token(s) should be a binary operator
+			// MDH@14NOV2019: we now also allow continued indexing i.e. an operand (value) that evaluates somehow to a list or map
+			//                which means that what follows would be another list that should be appended to the item id of the value reference
+			//                this can be done any number of times
+
 			// NOTE some binary operators are stored in a couple of tokens!!!
 			if(expressionToken)
 				if(expressionToken->type==TT_END_OF_DQSTRING||expressionToken->type==TT_END_OF_SQSTRING)
@@ -6443,6 +6458,33 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					break;
 				}
 				if(amVerbose())outputLine(" NO");
+
+				// MDH@14NOV2019: this is the first possible place where we should be aware of further indexing
+				//                TODO alternatively we could move this functionality to getValueReference()!!
+				//                TODO this also means that we can have an index on a value (not per se a variable)
+				while(expressionToken&&expressionToken->type==TT_LIST){
+					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
+					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
+						// we should append the indices to the index_id
+						Mvaluereference* operandValueReference=_formulaelement->_operand;
+						if(operandValueReference->_itemid){ // there are already indices defined, so we should append the additional list items
+							Mlist* itemIdsList=(operandValueReference->_itemid->type==VT_LIST?operandValueReference->_itemid->value._list:NULL);
+							if(itemIdsList){
+								Mlist* newItemIdsList=indexListValue->value._list;
+								Mlistelement* newItemIdListElement=newItemIdsList->_first;
+								while(newItemIdListElement){
+									if(!appendedToList(itemIdsList,newItemIdListElement->_value,M_LL_INVALID))
+										outputError("Failed to append augmented item id.");
+									newItemIdListElement=newItemIdListElement->_next;
+								}
+							}else 
+								outputBug("Item ids not a list.");
+							// indexListValue will be removed by the garbage collector
+						}else // no item id yet, so the same way as is done before set _itemid to the index list value
+							assignValue(&operandValueReference->_itemid,indexListValue);
+					}
+					expressionToken=nextEnvironmentExpressionToken();
+				}
 
 				if(amVerbose())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
