@@ -19,7 +19,9 @@
 // Menvironment includes Mvalue includes Mexecution includes ...
 #include "Menvironment.h"
 
-char const * const M_VERSION="0.1.0";
+char const * const M_VERSION="0.1.1";
+
+char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
 
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
 //char const * const M_BUILD="2";char const * const M_DATE="22 October 2019, 12:00";
@@ -37,7 +39,7 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="15";char const * const M_DATE="9 November 2019, 22:00";
 //char const * const M_BUILD="16";char const * const M_DATE="11 November 2019, 14:00";
 //char const * const M_BUILD="17";char const * const M_DATE="14 November 2019, 21:00"; // adding the M variable and M() and variables() function 
-char const * const M_BUILD="18";char const * const M_DATE="15 November 2019, 14:00"; // keeping track of the amount of memory used by the 'managed' (M) types
+//char const * const M_BUILD="18";char const * const M_DATE="15 November 2019, 14:00"; // keeping track of the amount of memory used by the 'managed' (M) types
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
