@@ -13,11 +13,11 @@
 
 /** Create a String */
 Mstring* __string(){
-    Mstring* ans=CALLOC(1,sizeof *ans,'s');
+    Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
-        ans->chars=MALLOC(BLOCK_SIZE*sizeof *(ans->chars),'c');
-        if(!ans->chars){FREE(ans,'s');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
+        ans->chars=MALLOC(BLOCK_SIZE*sizeof *(ans->chars),'"'); // changed type 's' to '"' to prevent the check for size...
+        if(!ans->chars){FREE(ans,'"');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
         // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
 #ifdef __DEBUGGING__
@@ -28,18 +28,18 @@ Mstring* __string(){
 
 Mstring* _getString(const char* const s){
     if(!s)return NULL;
-    Mstring* ans=CALLOC(1,sizeof *ans,'s');
+    Mstring* ans=CALLOC(1,sizeof *ans,'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
-        ans->chars=MALLOC((++ans->blocks)*BLOCK_SIZE,'c'); // here we increment ans->blocks (as we must)
+        ans->chars=MALLOC((++ans->blocks)*BLOCK_SIZE,'"'); // here we increment ans->blocks (as we must)
         if(ans->chars){
             //////////////strcpy(ans->chars,s);ans->length=l; // also copies the ending '\0' over but memcpy() does not have to check for '\0' so we use memcpy()
             ans->length=l; // MDH@21JUN2019: no need to copy '\0' at the end!!! replacing: ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
             memcpy(ans->chars,s,ans->length); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
         }else{ // failure
-            FREE(ans,'s');ans=NULL;
+            FREE(ans,'S');ans=NULL;
         }
     }
 #ifdef __DEBUGGING__
@@ -78,19 +78,12 @@ Mstring* _stringCopy(Mstring* const src,size_t length){
 /** 
  * Free the memory associated with a String
  */
-void free_string(Mstring* str){if(str){if(str->chars)FREE(str->chars,'c');FREE(str,'s');}}
+void free_string(Mstring* str){if(str){if(str->chars)FREE(str->chars,'s');FREE(str,'S');}}
+
+size_t string_length(Mstring const * const str){return(str?str->length:0);}
 
 /** Is the String empty? */
-bool string_empty(const Mstring* const str){
-    return(!str||!str->length); // MDH@21JUN2019 replacing: chars[0]=='\0'); // MDH@25APR2019: checking the first character probably is easiest
-    /* replacing:
-    if(str==NULL)return true;
-    if(str->length==0)return true;
-    return false;
-    */
-}
-
-size_t string_length(const Mstring* const str){return(str?str->length:0);}
+bool string_empty(Mstring const * const str){return(string_length(str)==0);}
 
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
 Mstring* string_setlength(Mstring* const str,size_t length){
@@ -101,7 +94,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
         // if we do not have enough blocks ascertain to have enough...
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
-            char* new_str=realloc(str->chars,BLOCK_SIZE*blocks*sizeof *(str->chars));
+            char* new_str=REALLOC(str->chars,BLOCK_SIZE*blocks*sizeof *(str->chars),'"');
             if (!new_str)return NULL; // failure!!
             str->chars=new_str;
             str->blocks=blocks;
@@ -189,7 +182,7 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
                 // do we need to get another block?    
                 if(l==str->blocks*BLOCK_SIZE){
                     /////////printf("Realloc string_insert_char().\n");
-                    char *new_str=realloc(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars));
+                    char *new_str=REALLOC(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars),'"');
                     if (new_str==NULL)return NULL;
                     ++(str->blocks);
                     ////// can't know the size of what new_str points to!!! printf("YY%lu-%dYY",sizeof(new_str),str->blocks);
@@ -215,19 +208,21 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
  */
 Mstring* string_append_char(Mstring* const str,char c){
     if(str!=NULL){
-        size_t l=str->length+1;
-        /////printf("{%hu-%d}",l,str->blocks);
-        if(l==str->blocks*BLOCK_SIZE){
-            //////////////printf("Realloc string_append_char().\n");
-            char *new_str=realloc(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars));
-            if (!new_str)return NULL; // failure!!
-            ++(str->blocks);
-            ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);
-            str->chars=new_str;
+        if(c){ // MDH@15NOV2019: appending '\0' makes no sense does it??????
+            size_t l=str->length+1;
+            /////printf("{%hu-%d}",l,str->blocks);
+            if(l==str->blocks*BLOCK_SIZE){
+                //////////////printf("Realloc string_append_char().\n");
+                char *new_str=REALLOC(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars),'"');
+                if (!new_str)return NULL; // failure!!
+                ++(str->blocks);
+                ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);
+                str->chars=new_str;
+            }
+            if(l>=str->blocks*BLOCK_SIZE)return NULL;
+            str->chars[str->length]=c;
+            ++(str->length);
         }
-        if(l>=str->blocks*BLOCK_SIZE)return NULL;
-        str->chars[str->length]=c;
-        ++(str->length);
         // MDH@21JUN2019 removing: str->chars[str->length]='\0';
     }
     return str;

@@ -128,11 +128,12 @@ void free_biginteger(Mbiginteger* biginteger){
     if(biginteger){
         if(amDebugging())outputLine("Freeing a big integer."); // TODO can we display the value?
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
+        FREE(biginteger,'B'); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
     }else
     if(amVerbose())outputLine("No big integer to free!");
 }/* VALIDATED */
 Mbiginteger* __biginteger(){
-    Mbiginteger* biginteger=(Mbiginteger*)malloc(sizeof(mp_int));
+    Mbiginteger* biginteger=(Mbiginteger*)CALLOC(1,sizeof(Mbiginteger),'B');
     if(biginteger&&mp_init(biginteger)!=MP_OKAY){free_biginteger(biginteger);biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
     return biginteger;
 }/* VALIDATED */
@@ -247,22 +248,23 @@ Mrational* _getLongDoubleRational(long double ld){
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
 void free_text(Mtext* _text){
+    // MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
     if(_text){
-        free(_text); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
+        FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
     }else
     if(amDebugging())outputLine("No text to free!");
 }/* VALIDATED */
 void free_integer(Minteger* _integer){
     if(_integer){
         if(amVerbose())output("Freeing integer %llu.\n",_integer->ll);
-        free(_integer);
+        FREE(_integer,'I');
     }else
     if(amDebugging())outputLine("No integer to free!");
 }/* VALIDATED */
 void free_float(Mfloat* _float){
     if(_float){
         if(amVerbose())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
-        free(_float);
+        FREE(_float,'F');
     }else
     if(amDebugging())outputLine("No real to free!");
 }/* VALIDATED */
@@ -271,7 +273,7 @@ void free_float(Mfloat* _float){
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
 Minteger* _getInteger(long long ll){
-    Minteger* _integer=MALLOC(sizeof(Minteger),'i');
+    Minteger* _integer=MALLOC(sizeof(Minteger),'I');
     if(_integer)_integer->ll=ll;
     return _integer;
 }/* VALIDATED */
@@ -287,7 +289,7 @@ Mbiginteger*__biginteger(z_t zt){
 long double getFloatLongDouble(Mfloat const * const _float){return(_float?_float->ld:M_LD_NAN);}
 
 Mfloat* _getFloat(long double ld){
-    Mfloat* _float=MALLOC(sizeof(Mfloat),'R');
+    Mfloat* _float=MALLOC(sizeof(Mfloat),'F');
     if(_float)_float->ld=ld;
     return _float;
 }/* VALIDATED */

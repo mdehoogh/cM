@@ -122,6 +122,8 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
 
 Mmap* _getVariableNamesMap(Menvironment* environment); // MDH@14NOV2019: returns a map with the names of all local variables (in attribute '') and the names of the variables in the parent environment with the name of the parent environment!
 
+Mmap* _getValuesMap(Mvalue* variableNamesMapValue);
+
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable);
 /*
 // if you want to set a value you have to pass in a pointer to the contents

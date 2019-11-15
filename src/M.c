@@ -36,7 +36,8 @@ char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="14";char const * const M_DATE="6 November 2019, 16:00";
 //char const * const M_BUILD="15";char const * const M_DATE="9 November 2019, 22:00";
 //char const * const M_BUILD="16";char const * const M_DATE="11 November 2019, 14:00";
-char const * const M_BUILD="17";char const * const M_DATE="14 November 2019, 21:00"; // adding the M variable and M() and variables() function 
+//char const * const M_BUILD="17";char const * const M_DATE="14 November 2019, 21:00"; // adding the M variable and M() and variables() function 
+char const * const M_BUILD="18";char const * const M_DATE="15 November 2019, 14:00"; // keeping track of the amount of memory used by the 'managed' (M) types
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
@@ -1372,7 +1373,7 @@ FunctionBodyRequest* requestBodyOfFunction(char* functionName){
 			return NULL;
 		}
 		if(amVerbose())output("The body of function '%s' being requested.\n",functionName);
-		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'B');
+		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'G');
 		if(_functionBodyRequest){
 			_functionBodyRequest->functionName=functionName;
 			if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
@@ -1451,7 +1452,7 @@ FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL;
 bool createFunctionBodyInput(const FunctionBodyRequest* const _firstFunctionBodyRequest){
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'I'); // free if not bound
+	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'H'); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getEnvironment(),_firstFunctionBodyRequest->functionName);
 	if(function&&function->type==FT_USER){
@@ -1469,7 +1470,7 @@ bool createFunctionBodyInput(const FunctionBodyRequest* const _firstFunctionBody
 		outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
-	free(_currentFunctionBodyInput);
+	FREE(_currentFunctionBodyInput,'H');
 	return false;
 }
 bool startFunctionBodyInput(){
@@ -1542,7 +1543,7 @@ void free_command(Mcommand* _command){
 }
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
 Mcommand* _getNewCommand(bool withFirstToken){
-	Mcommand* _command=CALLOC(1,sizeof(Mcommand),'C');
+	Mcommand* _command=CALLOC(1,sizeof(Mcommand),'K');
 	if(_command){
 		if(amDebugging())inputInfo("New command created.");
 		if(withFirstToken){
@@ -1552,7 +1553,7 @@ Mcommand* _getNewCommand(bool withFirstToken){
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
-				FREE(_command,'C');_command=NULL;
+				FREE(_command,'K');_command=NULL;
 				if(amDebugging())inputError("Failed to create the first command token.");
 			}
 		}
@@ -1735,7 +1736,7 @@ void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext)
 	if(!_autocompletiontext)return;
 	if(_autocompletiontext->_next)free_tokenautocompletiontext(_autocompletiontext->_next);
 	if(_autocompletiontext->_text)free(_autocompletiontext->_text);
-	FREE(_autocompletiontext,'F');
+	FREE(_autocompletiontext,'J');
 }
 
 // MDH@04OCT2019: if we remember the immediate feed forward token we can determine whether or not we need to remove the associated feed forward text
@@ -1781,7 +1782,7 @@ void setLastTokenAutocompletionText(char* _text){
 	}else{ // not present yet, so add (i.e. prepend!!)
 		if(strlen(_text)>0){
 			if(amDebugging())inputInfo("Prepending auto completion text '%s' of token '%s' with offset %zu.",_text,string(_userInputCommand->_lastToken->text),_userInputCommand->_lastToken->offset);
-			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'F');
+			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'J');
 			if(_tokenautocompletiontext){
 				deleteAutocompletionText(); // I guess this is a bit confusing
 				_tokenautocompletiontext->_text=_text; // and bound
@@ -1968,7 +1969,7 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 			result=_lastConsumedAutocompletiontext;
 		}else{
 			// TODO for now always use an anonymous (nontoken) prepend
-			Mtokenautocompletiontext* autocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'F');
+			Mtokenautocompletiontext* autocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'J');
 			if(autocompletiontext){
 				Mstring* _string=__string(); // free asap
 				if(_string){
@@ -2072,7 +2073,7 @@ typedef struct Muserinputline{
 Muserinputline* _userinputline=NULL; // reference to the current user input line
 // call _userinputline() when starting a new line
 Muserinputline* __userinputline(){
-	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'L');
+	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'N');
 	if(_newUserinputline){
 		_newUserinputline->_prev=_userinputline;
 		_newUserinputline->offset=getUserInputLength(); // number of characters in front of it
@@ -2088,14 +2089,14 @@ size_t free_userinputline(){
 	while(_userinputline){
 		numberOfUserInputLines++;
 		prevUserinputline=_userinputline->_prev;
-		FREE(_userinputline,'L');
+		FREE(_userinputline,'N');
 		_userinputline=prevUserinputline;
 	}
 	return numberOfUserInputLines;
 }
 void removeUserinputline(){
 	Muserinputline* prevUserinputline=_userinputline->_prev;
-	FREE(_userinputline,'L');
+	FREE(_userinputline,'N');
 	_userinputline=prevUserinputline;
 }
 // MDH@30OCT2019 END
@@ -3506,7 +3507,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
  */
 Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
-	Mvaluereference* _valuereference=(Mvaluereference*)calloc(1,sizeof(Mvaluereference));
+	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'@');
 	_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
 	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	return _valuereference;
@@ -3796,7 +3797,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	if(expressionToken){
 		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-		_valueReference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'R');
+		_valueReference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'@');
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
@@ -6436,7 +6437,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		}
 		
 		Mvaluereference* _valuereference;
-		Mformulaelement* formula=CALLOC(1,sizeof(Mformulaelement),'F');
+		Mformulaelement* formula=CALLOC(1,sizeof(Mformulaelement),'p');
 		Mformulaelement* _formulaelement=formula;
 
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
@@ -6531,7 +6532,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
 				if(amVerbose())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
-				_formulaelement->_next=(Mformulaelement*)CALLOC(1,sizeof(Mformulaelement),'f');
+				_formulaelement->_next=(Mformulaelement*)CALLOC(1,sizeof(Mformulaelement),'p');
 				_formulaelement=_formulaelement->_next;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
@@ -6595,7 +6596,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					free_string(_formulaelement->_operator);_formulaelement->_operator=nextformulaelement->_operator;
 					// can't reach the consumed formula element anymore, so release whatever it contains (except for the operator which we have retained)
 					free_valuereference(nextformulaelement->_operand); // free the consumed operand
-					FREE(nextformulaelement,'F'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+					FREE(nextformulaelement,'p'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
 					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
 					// is there a formula element in front of it that has not yet been applied?????
@@ -8399,6 +8400,10 @@ Mvalue* Mvariables(){
 	// NOTE _getVariableNamesMap() always requires a non NULL environment to start with
 	return _getValueOfMap(_getVariableNamesMap(getEnvironment()),true);
 }
+// MDH@15NOV2019: returning value counts (per value type), passing in a list of variable names
+Mvalue* Mvalues(Mvalue* variableNamesValue){
+	return _getValueOfMap(_getValuesMap(variableNamesValue),true);
+}
 
 bool initEnvironment(){
 
@@ -8440,7 +8445,7 @@ bool initEnvironment(){
 	if(_Menvironment){
 		_Menvironment->_name=_strdup("M"); // TODO why make a dynamic copy???
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
-		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'M');
+		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'W');
 		if(environmentFunctionMap){
 
 			// MDH@14NOV2019: typically M is created as an immutable variable BUT of course I can change the assigned M_value myself directly but the user can't!!
@@ -8534,7 +8539,9 @@ bool initEnvironment(){
 			}
 
 			if(!completedFunction(_getFunction(_Menvironment,"variables"),"variables",Mvariables))
-				outputWarning("Failed to register the variables() function.");
+				outputWarning("Failed to register the variables() function");
+			if(!completedValueFunction(_getFunction(_Menvironment,"values"),"values",Mvalues))
+				outputWarning("Failed to register the values() function");
 
 			// register if, while and for special functions
 		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
@@ -8763,7 +8770,7 @@ int main(int argc, char **argv){
 	outputLine("In any mode press the Enter key on an empty line to switch modes.");
 
 	// let's mark the allocations BEFORE we start looping
-	addallocationtype('!');
+	addallocation('!',0,0);
 
 	while(1){ // command loop
 

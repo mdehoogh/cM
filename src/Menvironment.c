@@ -244,6 +244,48 @@ Mmap* _getVariableNamesMap(Menvironment* environment){
     }
     return _variableNamesMap;
 }
+Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
+    Mmap* _valuesMap=_getMapOfType(VT_UNDEFINED);
+    if(_valuesMap){
+        size_t numberOfAllocationTypes=getNumberOfAllocationTypes();
+        if(numberOfAllocationTypes){
+            // we start with a general overview (the counts per type)
+	        char* allocationtypes=getAllocationTypes();
+            size_t* allocationcounts=getAllocationCounts();
+            Mstring *_allocationTypeText=__string(),*_allocationTypeCharactersText=_getString("'"); // free ASAP
+            if(_allocationTypeText&&_allocationTypeCharactersText){
+                Mmap* _valuecountsMap=_getMapOfType(VT_MAP); // we're going to store the value counts in a map
+                // NOTE dividing by sizeof(char) is far fetched
+                for(size_t i=0;i<numberOfAllocationTypes;i++){
+                    if(string_append_char(_allocationTypeCharactersText,allocationtypes[i])&&string_append_char(_allocationTypeText,allocationtypes[i])){
+                        if(_valuecountsMap){
+                            Mmap* _valuecountMap=_getMapOfType(VT_INTEGER);
+                            if(_valuecountMap){
+                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(allocationcounts[i<<1]));
+                                appendedToMap(_valuecountMap,(i==0?"bytes occupied":"size"),_getIntegerValue(allocationcounts[1+(i<<1)]));
+                                if(!appendedToMap(_valuecountsMap,string(_allocationTypeText),_getValueOfMap(_valuecountMap,true)))
+                                    output("%sFailed to store the allocation count map of '%c'.\n",ERROR_PREFIX,allocationtypes[i]);
+                            }else
+                                output("%sFailed to create the allocation count map of '%c'.\n",ERROR_PREFIX,allocationtypes[i]);
+                        }
+                        string_setlength(_allocationTypeText,0);
+                    }
+                }
+                if(!appendedToMap(_valuesMap,"types",_getTextValue(string(_allocationTypeCharactersText),false)))outputError("Failed to store the data type characters.");
+                if(_valuecountsMap&&!appendedToMap(_valuesMap,"counts",_getValueOfMap(_valuecountsMap,true)))outputError("Failed to store the data type counts.");
+            }
+            free_string(_allocationTypeCharactersText);
+            free_string(_allocationTypeText); // freed
+        }else
+            outputError("No allocation types/counts registered");
+        // the variable names map with the structure as returned by _getVariableNamesMap of course
+        if(variableNamesMapValue){
+            // TODO what are we going to do here??????
+        }
+    }else
+        outputError("Failed to create the values map");
+    return _valuesMap;
+}
 
 // MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
 Mvariable* getVariable(Menvironment const * const _environment,char const * const name, bool verbose){

@@ -27,7 +27,7 @@ void free_variable(Mvariable* _variable,bool weak){
     if(_variable){
         if(_variable->_name)free(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
         if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
-        free(_variable);
+        FREE(_variable,'V');
     }
 }/* VALIDATED */
 Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
@@ -79,7 +79,7 @@ bool free_listelement(Mlistelement* _listelement,bool weak){
     if(_listelement){
         if(_listelement->_next){free_listelement(_listelement->_next,weak);_listelement->_next=NULL;}
         if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
-        free(_listelement);
+        FREE(_listelement,'l');
         return true;
     }
     return false;
@@ -87,7 +87,7 @@ bool free_listelement(Mlistelement* _listelement,bool weak){
 void free_list(Mlist* _list){
     if(_list){
         if(_list->_first){free_listelement(_list->_first,_list->weak);_list->_first=NULL;}
-        free(_list);
+        FREE(_list,'L');
     }
 }/* VALIDATED */
 bool free_mapelement(Mmapelement* _mapelement,bool weak){
@@ -106,7 +106,7 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak){
             _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
         }else
             outputWarning("No map attribute to free!");
-        free(_mapelement);
+        FREE(_mapelement,'m');
         if(amVerbose()&&amDebugging())outputLine("\tMap element freed!");
         return true;
     }
@@ -116,7 +116,7 @@ void free_map(Mmap* _map){
     if(_map){
         if(amDebugging()&&amVerbose())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
         if(_map->_first){free_mapelement(_map->_first,_map->weak);_map->_first=NULL;}else outputLine("No map attributes to free!");
-        free(_map);
+        FREE(_map,'M');
     }
 }/* VALIDATED */
 
@@ -128,7 +128,7 @@ void free_valuereference(Mvaluereference* _valuereference){
         if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
         */
         if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
-        free(_valuereference);
+        FREE(_valuereference,'@');
     }
 }/* VALIDATED */
 
@@ -151,10 +151,10 @@ void free_value(Mvalue* _value){
             case VT_REFERENCE:if(_value->value._reference){free_reference(_value->value._reference);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
-        FREE(_value,'V');
+        FREE(_value,'X');
         if(amVerbose())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
     }else
-        output("BUG: No value to free!\n");
+        outputBug("No value to free!");
 }/* VALIDATED */
 
 // manage a list of created values
@@ -162,12 +162,12 @@ void free_value(Mvalue* _value){
 Mlist* _valueList=NULL;
 Mvalue* __value(char const * const descriptor){
     Mvalue* _value=NULL;
-    if(!_valueList)_valueList=(Mlist*)CALLOC(1,sizeof(Mlist),'X');
+    if(!_valueList)_valueList=(Mlist*)CALLOC(1,sizeof(Mlist),'Z');
     if(_valueList){
         _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
-        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'x'); // both pointers NULL
+        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'z'); // both pointers NULL
         if(_valueListelement){
-            _value=(Mvalue*)CALLOC(1,sizeof(Mvalue),'V');
+            _value=(Mvalue*)CALLOC(1,sizeof(Mvalue),'Y');
             if(_value){
                 // shouldn't pose a problem now...
                 _valueListelement->_value=_value;
@@ -178,7 +178,7 @@ Mvalue* __value(char const * const descriptor){
                 _valueListelement->index=_valueList->numberOfElements;
                 if(descriptor)if(amVerbose())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
             }else // couldn't get a new value, so free the value list element immediately
-                FREE(_valueListelement,'x');
+                FREE(_valueListelement,'z');
         }
     }
     if(!_value)if(amVerbose())outputError("Failed to create value!");
@@ -292,12 +292,12 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 */
 // MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
 Mreference* _getReference(Mvariable* variable){
-    Mreference* _reference=(variable?CALLOC(1,sizeof(Mreference),'R'):NULL);
+    Mreference* _reference=(variable?CALLOC(1,sizeof(Mreference),'Q'):NULL);
     if(_reference){_reference->variable=variable;_reference->referenceindex=(++variable->referencecount);}
     return _reference;
 }
 void free_reference(Mreference* reference){
-    if(reference){reference->variable->referencecount--;FREE(reference,'R');}
+    if(reference){reference->variable->referencecount--;FREE(reference,'Q');}
 }
 Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure){
     if(!_reference){outputLine("No reference to wrap.");return NULL;}

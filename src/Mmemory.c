@@ -1,20 +1,27 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
+
 #include "Mmemory.h"
 
+#include "Malloc.h"
 #include "Moutput.h"
-
 /**
  * _strdup() adds writing a error message to strdup()
  */
 char* _strdup(const char* const _c){
+    char* _hc=NULL;
     if(_c){
-        char* _hc=strdup(_c);
+        size_t l=strlen(_c)+1;
+        char* _hc=MALLOC(l*sizeof(char),'"'); //CALLOC(l,sizeof(char),'"'); // allocate text
+        if(_hc)strcpy(_hc,_c);else printf("Failed to allocate memory to store '%s'.\n",_c);
+        /* replacing:
+        _hc=strdup(_c);
+        */
         if(_hc)return _hc;
-        printf("\nERROR: Failed to make a dynamic copy of '%s'.",_c);
+        printf("\nERROR: Failed to make a dynamic copy of '%s'.\n",_c);
     }else
-        printf("\nERROR: Nothing to copy!");
+        printf("No text to copy!\n");
     return NULL;
 }
 

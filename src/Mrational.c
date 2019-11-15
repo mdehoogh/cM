@@ -759,7 +759,7 @@ void free_rational(Mrational* _rational){
         if(_rational->num)free_biginteger(_rational->num);
         if(_rational->den)free_biginteger(_rational->den);
         if(_rational->delta)free_float(_rational->delta);
-        free(_rational);
+        FREE(_rational,'R');
     }else
     if(amDebugging())outputLine("No rational to free!");
 }/* VALIDATED */

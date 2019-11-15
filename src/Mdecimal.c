@@ -1564,7 +1564,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 	// the initial value of the sine is x, and of the cosine is 1
 	mpd_sincos_t* _mpd_sinandcos=NULL;
 	if(mpd_context&&x){
-		_mpd_sinandcos=CALLOC(1,sizeof(mpd_sincos_t),'T');
+		_mpd_sinandcos=CALLOC(1,sizeof(mpd_sincos_t),'#');
 		if(_mpd_sinandcos){
 			// initialize the sine and cosine to x and 1 respectively i.e. the first term of the infinite series expansion
 			_mpd_sinandcos->sin=get_mpd_copy(mpd_context,x);
@@ -1784,14 +1784,14 @@ void free_sincoselement(Msincoselement* _sincoselement){
     if(_sincoselement){
 		if(_sincoselement->_next)free_sincoselement(_sincoselement->_next); // unlikely though
         free_mpd(_sincoselement->_angle);free_mpd(_sincoselement->_sine);free_mpd(_sincoselement->_cosine);
-        free(_sincoselement);
+        FREE(_sincoselement,'#');
     }
 }
 
 void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle){
 	free_sincoselement(_mpd_relative_angle->sincoselement); // MDH@11SEP2019: now we do need to free the Msincoselement*
 	free_mpd(_mpd_relative_angle->_delta_angle);
-	FREE(_mpd_relative_angle,'A');
+	FREE(_mpd_relative_angle,'$');
 }
 
 // MDH@11SEP2019: we can do much faster and better now we have the predefinedsines in Mdecimalcontext's
@@ -1802,7 +1802,7 @@ mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * c
 			_intermediateResult->mpd=angle;
 			outputDecimal("Computing the relative angle of '",_intermediateResult,"' to the nearest predefined angles for which sines were computed.\n");
 		}
-		mpd_relative_angle_t* _relativeAngle=CALLOC(1,sizeof(mpd_relative_angle_t),'A');
+		mpd_relative_angle_t* _relativeAngle=CALLOC(1,sizeof(mpd_relative_angle_t),'$');
 		if(_relativeAngle){
 			mpd_t *_deltaAngle=__mpd(decimalcontext->mpd_context,0),*_predefinedAngleIndex=__mpd(decimalcontext->mpd_context,0);
 			if(_deltaAngle&&_predefinedAngleIndex){
