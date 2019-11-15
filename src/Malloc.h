@@ -18,20 +18,20 @@ char* getAllocationTypes();
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign
 #ifndef __PRODUCTION__
-void* Mmalloc(size_t size,char type);
+void* Mmalloc(size_t nitems,size_t size,char type);
 void* Mcalloc(size_t nitems,size_t size,char type);
 void* Mrealloc(void* ptr,size_t size,char type);
 void Mfree(void* ptr,char type);
 // use the substitutes
-#define MALLOC(size,type) Mmalloc(size,type)
+#define MALLOC(nitems,size,type) Mmalloc(nitems,size,type)
 #define CALLOC(nitems,size,type) Mcalloc(nitems,size,type)
-//#define REALLOC(ptr,size,type) Mrealloc(ptr,size,type)
+#define REALLOC(ptr,size,type) Mrealloc(ptr,size,type)
 #define FREE(ptr,type) Mfree(ptr,type)
 #else
 // use the system methods
-#define MALLOC(size,type) malloc(size)
+#define MALLOC(nitems,size,type) malloc(nitems*size)
 #define CALLOC(nitems,size,type) calloc(nitems,size)
 #define FREE(ptr,type) free(ptr)
+#define REALLOC(ptr,size,type) realloc(ptr,size)
 #endif
 
-#define REALLOC(ptr,size,type) realloc(ptr,size)

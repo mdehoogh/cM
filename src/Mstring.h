@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BLOCK_SIZE 8
+#define BLOCK_SIZE 16
 
 typedef struct{
     char* chars;

@@ -157,6 +157,7 @@ void Mfree(void* ptr,char type){
 }
 
 void* Mrealloc(void* ptr,size_t size,char type){
+    printf(".");
     // kind of like 'freeing' the space ptr is using now
     // step 1. take out what has been registered before...
     long long freed=(ptr?sizeof(*ptr):0); // best to determine it here
@@ -174,7 +175,7 @@ void* Mrealloc(void* ptr,size_t size,char type){
                     }
                     _allocationcounts[allocationtypecountoffset]+=more; // subtract the count
                     _allocationcounts[0]+=more;
-                    _allocationcounts[1]+=more;
+                    _allocationcounts[1]+=(_allocationcounts[allocationtypecountoffset+1]*more); // update the number of bytes we've changed!!!
                 }else
                     printf("BUG: Mrealloc() called on the global data type (*).\n");
             }else 

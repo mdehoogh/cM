@@ -16,7 +16,8 @@ Mstring* __string(){
     Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
-        ans->chars=MALLOC(BLOCK_SIZE*sizeof *(ans->chars),'"'); // changed type 's' to '"' to prevent the check for size...
+        // the size of each allocation is BLOCKSIZE characters!!!
+        ans->chars=MALLOC(1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'"');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
         // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
@@ -28,12 +29,12 @@ Mstring* __string(){
 
 Mstring* _getString(const char* const s){
     if(!s)return NULL;
-    Mstring* ans=CALLOC(1,sizeof *ans,'S');
+    Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
-        ans->chars=MALLOC((++ans->blocks)*BLOCK_SIZE,'"'); // here we increment ans->blocks (as we must)
+        ans->chars=MALLOC(++ans->blocks,sizeof(char)*BLOCK_SIZE,'s'); // here we increment ans->blocks (as we must)
         if(ans->chars){
             //////////////strcpy(ans->chars,s);ans->length=l; // also copies the ending '\0' over but memcpy() does not have to check for '\0' so we use memcpy()
             ans->length=l; // MDH@21JUN2019: no need to copy '\0' at the end!!! replacing: ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
@@ -94,7 +95,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
         // if we do not have enough blocks ascertain to have enough...
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
-            char* new_str=REALLOC(str->chars,BLOCK_SIZE*blocks*sizeof *(str->chars),'"');
+            char* new_str=REALLOC(str->chars,BLOCK_SIZE*blocks*sizeof *(str->chars),'s');
             if (!new_str)return NULL; // failure!!
             str->chars=new_str;
             str->blocks=blocks;
@@ -182,7 +183,7 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
                 // do we need to get another block?    
                 if(l==str->blocks*BLOCK_SIZE){
                     /////////printf("Realloc string_insert_char().\n");
-                    char *new_str=REALLOC(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars),'"');
+                    char *new_str=REALLOC(str->chars,sizeof(char)*BLOCK_SIZE*(str->blocks+1),'s');
                     if (new_str==NULL)return NULL;
                     ++(str->blocks);
                     ////// can't know the size of what new_str points to!!! printf("YY%lu-%dYY",sizeof(new_str),str->blocks);
@@ -213,7 +214,7 @@ Mstring* string_append_char(Mstring* const str,char c){
             /////printf("{%hu-%d}",l,str->blocks);
             if(l==str->blocks*BLOCK_SIZE){
                 //////////////printf("Realloc string_append_char().\n");
-                char *new_str=REALLOC(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars),'"');
+                char *new_str=REALLOC(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars),'s');
                 if (!new_str)return NULL; // failure!!
                 ++(str->blocks);
                 ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);

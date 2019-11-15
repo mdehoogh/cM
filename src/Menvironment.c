@@ -248,6 +248,7 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
     Mmap* _valuesMap=_getMapOfType(VT_UNDEFINED);
     if(_valuesMap){
         size_t numberOfAllocationTypes=getNumberOfAllocationTypes();
+        appendedToMap(_valuesMap,"typecount",_getIntegerValue(numberOfAllocationTypes));
         if(numberOfAllocationTypes){
             // we start with a general overview (the counts per type)
 	        char* allocationtypes=getAllocationTypes();
@@ -557,7 +558,7 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
                 while(environment&&(!environment->_variableMap||environment->_variableMap->immutable))environment=environment->_execution;
                 if(environment){
                     if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
-                    Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'V');
+                    Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
                     if(_variableMapelement){
                         // store the references
                         _variableMapelement->_next=NULL;
@@ -791,7 +792,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
     if(_environment&&name&&strlen(name)){
         _function=getFunction(_environment,name);
         if(!_function){ // doesn't exist yet
-            _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'F');
+            _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'E');
             if(_function){
                 ///////////_function->type=functionType;
                 _function->_definitionEnvironment=_environment; // TODO why would we need this?????
@@ -802,7 +803,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
                     if(p){
                         Mfunctionmap* _functionmap=_environment->_functionMap;
                         if(_functionmap){
-                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(1,sizeof(Mfunctionmapelement),'f');
+                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(1,sizeof(Mfunctionmapelement),'e');
                             if(_functionmapelement){
                                 _functionmapelement->_name=_functionName; // MDH@10JUL2019: moved over to the function map element
                                 _functionmapelement->_function=_function; // no worries here

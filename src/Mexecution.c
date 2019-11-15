@@ -273,7 +273,7 @@ void free_float(Mfloat* _float){
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
 Minteger* _getInteger(long long ll){
-    Minteger* _integer=MALLOC(sizeof(Minteger),'I');
+    Minteger* _integer=MALLOC(1,sizeof(Minteger),'I');
     if(_integer)_integer->ll=ll;
     return _integer;
 }/* VALIDATED */
@@ -289,7 +289,7 @@ Mbiginteger*__biginteger(z_t zt){
 long double getFloatLongDouble(Mfloat const * const _float){return(_float?_float->ld:M_LD_NAN);}
 
 Mfloat* _getFloat(long double ld){
-    Mfloat* _float=MALLOC(sizeof(Mfloat),'F');
+    Mfloat* _float=MALLOC(1,sizeof(Mfloat),'F'); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
     if(_float)_float->ld=ld;
     return _float;
 }/* VALIDATED */
