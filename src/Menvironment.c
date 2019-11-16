@@ -792,7 +792,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
     if(_environment&&name&&strlen(name)){
         _function=getFunction(_environment,name);
         if(!_function){ // doesn't exist yet
-            _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'E');
+            _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'=');
             if(_function){
                 ///////////_function->type=functionType;
                 _function->_definitionEnvironment=_environment; // TODO why would we need this?????
@@ -803,7 +803,7 @@ Mfunction* _getFunction(Menvironment* const _environment,const char* const name)
                     if(p){
                         Mfunctionmap* _functionmap=_environment->_functionMap;
                         if(_functionmap){
-                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(1,sizeof(Mfunctionmapelement),'e');
+                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(1,sizeof(Mfunctionmapelement),'+');
                             if(_functionmapelement){
                                 _functionmapelement->_name=_functionName; // MDH@10JUL2019: moved over to the function map element
                                 _functionmapelement->_function=_function; // no worries here
@@ -1331,7 +1331,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
     // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
     if(_nameValue&&_parameterMapValue){
         if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-            Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'U');
+            Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'-');
             if(_userfunction){
                 Mtext* functionName=_nameValue->value._text;
                 // user function expects a list of commands, so we have to wrap the single token (if any)

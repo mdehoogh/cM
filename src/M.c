@@ -1375,7 +1375,7 @@ FunctionBodyRequest* requestBodyOfFunction(char* functionName){
 			return NULL;
 		}
 		if(amVerbose())output("The body of function '%s' being requested.\n",functionName);
-		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'G');
+		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'9');
 		if(_functionBodyRequest){
 			_functionBodyRequest->functionName=functionName;
 			if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
@@ -1454,7 +1454,7 @@ FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL;
 bool createFunctionBodyInput(const FunctionBodyRequest* const _firstFunctionBodyRequest){
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'H'); // free if not bound
+	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getEnvironment(),_firstFunctionBodyRequest->functionName);
 	if(function&&function->type==FT_USER){
@@ -1784,7 +1784,7 @@ void setLastTokenAutocompletionText(char* _text){
 	}else{ // not present yet, so add (i.e. prepend!!)
 		if(strlen(_text)>0){
 			if(amDebugging())inputInfo("Prepending auto completion text '%s' of token '%s' with offset %zu.",_text,string(_userInputCommand->_lastToken->text),_userInputCommand->_lastToken->offset);
-			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'J');
+			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'7');
 			if(_tokenautocompletiontext){
 				deleteAutocompletionText(); // I guess this is a bit confusing
 				_tokenautocompletiontext->_text=_text; // and bound
@@ -1971,7 +1971,7 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 			result=_lastConsumedAutocompletiontext;
 		}else{
 			// TODO for now always use an anonymous (nontoken) prepend
-			Mtokenautocompletiontext* autocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'J');
+			Mtokenautocompletiontext* autocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'7');
 			if(autocompletiontext){
 				Mstring* _string=__string(); // free asap
 				if(_string){
@@ -2075,7 +2075,7 @@ typedef struct Muserinputline{
 Muserinputline* _userinputline=NULL; // reference to the current user input line
 // call _userinputline() when starting a new line
 Muserinputline* __userinputline(){
-	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'N');
+	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'6');
 	if(_newUserinputline){
 		_newUserinputline->_prev=_userinputline;
 		_newUserinputline->offset=getUserInputLength(); // number of characters in front of it
@@ -2521,13 +2521,20 @@ bool registerCommand(Mcommand* command){
 }
 // MDH@21JUN2019: reset() takes care of removing all stored commands
 void reset(){
-	while(commandCount>0){
-		free_command(commands[--commandCount]);
-	}
-#ifdef __ADEBUG__
-	outputChar('\n');
-	syncallocations();
-#endif
+	if(commandCount>0){
+		output("Delete all remembered commands? ");
+		char c;inputCharRead(&c);
+		newline();
+		if(c=='Y'||c=='y'){
+			while(commandCount>0)free_command(commands[--commandCount]);
+		}else
+			outputLine("No commands deleted!");
+		while(inputCharRead(&c)); // clear the input buffer
+#ifndef __PRODUCTION__
+		syncallocations();
+#endif	
+	}else
+		outputLine("No commands to delete!");
 }
 
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
@@ -3509,7 +3516,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
  */
 Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
-	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'@');
+	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'5');
 	_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
 	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	return _valuereference;
@@ -3799,7 +3806,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	if(expressionToken){
 		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-		_valueReference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'@');
+		_valueReference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'5');
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
@@ -6439,7 +6446,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		}
 		
 		Mvaluereference* _valuereference;
-		Mformulaelement* formula=CALLOC(1,sizeof(Mformulaelement),'p');
+		Mformulaelement* formula=CALLOC(1,sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
 
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
@@ -6534,7 +6541,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
 				if(amVerbose())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
-				_formulaelement->_next=(Mformulaelement*)CALLOC(1,sizeof(Mformulaelement),'p');
+				_formulaelement->_next=(Mformulaelement*)CALLOC(1,sizeof(Mformulaelement),'4');
 				_formulaelement=_formulaelement->_next;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
