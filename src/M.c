@@ -3769,7 +3769,7 @@ long long getBigintegerInteger(Mbiginteger* biginteger){
 		}else
 			if(amVerbose())outputLine("Big integer cannot be converted to a small integer.");
 	}
-	output("Small integer result: %lld.\n",result);
+	if(amVerbose()&&amDebugging())output("Small integer result: %lld.\n",result);
 	return result;
 }
 
