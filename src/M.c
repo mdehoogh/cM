@@ -20,9 +20,10 @@
 #include "Menvironment.h"
 
 char const * const M_VERSION="0.1.1";
+//char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
+char const * const M_BUILD="2";char const * const M_DATE="17 November 2019, 19:00";
 
-char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
-
+//char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
 //char const * const M_BUILD="2";char const * const M_DATE="22 October 2019, 12:00";
 //char const * const M_BUILD="3";char const * const M_DATE="23 October 2019, 18:00";
@@ -3760,7 +3761,15 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 // MDH@24OCT2019: we need a method that can convert a big integer to an integer
 long long getBigintegerInteger(Mbiginteger* biginteger){
 	long long result=M_LL_INVALID;
-	if(biginteger)if(mp_cmp(biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(biginteger,getBigintegerLLMax())!=MP_GT)result=mp_get_i64(biginteger);
+	if(biginteger){
+		if(amVerbose())outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
+		if(mp_cmp(biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(biginteger,getBigintegerLLMax())!=MP_GT){
+			result=mp_get_i64(biginteger);
+			if(amVerbose())outputLine("Big integer converted to a small integer.");
+		}else
+			if(amVerbose())outputLine("Big integer cannot be converted to a small integer.");
+	}
+	output("Small integer result: %lld.\n",result);
 	return result;
 }
 
@@ -3946,6 +3955,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
 				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
+				/* MDH@17NOV2019: as we're dealing with the indices below, we should not do it here!!!!
 				// a variable can be followed by an index that we should store in the value reference's itemid field
 				if(expressionToken->next&&expressionToken->next->type==TT_LIST){
 					expressionToken=nextEnvironmentExpressionToken(); // MDH@16OCT2019: why was this commented out???????
@@ -3962,25 +3972,25 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					//                the problem with NULL is that _itemid is NULL by itself, so this poses a problem it can't be NULL
 					//                I think we'd get an empty list in return not a NULL value (which is a problem if we do!!!!)
 					//                for now allow an empty list
-					if(indexListValue&&indexListValue->type==VT_LIST /*&&indexListValue->value._list->_first*/){ // a non-empty list
+					if(indexListValue&&indexListValue->type==VT_LIST){ // a non-empty list
 						if(amVerbose())outputValue("Index id: '",indexListValue,"'.\n");
 						// MDH@15OCT2019: apparently there is enlisting too many: we can take the first element to unlist what we received BUT this must mean there's a mistake somewhere
 						// _valueReference->_itemid=indexListValue; // MDH@02NOV2019 replacing: 
 						assignValue(&_valueReference->_itemid,indexListValue); //////////// NOT SURE... indexListValue->value._list->_first->_value); // now storing the entire index/attribute name list
-						/* replacing (storing only the last index/attribute name):
-						Mlist* indexList=indexListValue->value._list;
-						Mlistelement* indexListelement=indexList->_first; // must be there!!!
-						// as long as there are successors we haven't reach the last index yet!!!!
-						// TODO what if someone does not specify ALL indices??????
-						while(indexListelement->_next){
-							// replace the current value with the value in the list (TODO map) at the current index
-							assignValue(&_valueReference->_value,getValueAtIndex(_valueReference->_value->value._list,indexListelement->_value));
-							indexListelement=indexListelement->_next;
-						}
-						if(amVerbose())outputValue("Last index: ",indexListelement->_value,"'.");
-						// TODO what is going to happen to indexListValue?????? it should be discarded as its reference count will remain zero but all elements that are used elsewhere (like the last index stored in _valueReference will persist a little longer!!)
-						assignValue(&_valueReference->_itemid,indexListelement->_value); // store the last index value in the _itemid field
-						*/
+						//// replacing (storing only the last index/attribute name):
+						// Mlist* indexList=indexListValue->value._list;
+						// Mlistelement* indexListelement=indexList->_first; // must be there!!!
+						// // as long as there are successors we haven't reach the last index yet!!!!
+						// // TODO what if someone does not specify ALL indices??????
+						// while(indexListelement->_next){
+						// 	// replace the current value with the value in the list (TODO map) at the current index
+						// 	assignValue(&_valueReference->_value,getValueAtIndex(_valueReference->_value->value._list,indexListelement->_value));
+						// 	indexListelement=indexListelement->_next;
+						// }
+						// if(amVerbose())outputValue("Last index: ",indexListelement->_value,"'.");
+						// // TODO what is going to happen to indexListValue?????? it should be discarded as its reference count will remain zero but all elements that are used elsewhere (like the last index stored in _valueReference will persist a little longer!!)
+						// assignValue(&_valueReference->_itemid,indexListelement->_value); // store the last index value in the _itemid field
+						////
 					}else
 					if(indexListValue)
 						output("%sIndex of variable '%s' not a list!\n",ERROR_PREFIX,_valueReference->_name);
@@ -3996,6 +4006,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					_valueReference->_value=getValue(getEnvironment(),_valueReference->_name);
 					// MDH@02NOV2019: replacing: assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
 				}
+				*/
 				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
 				break;
 			case TT_REFERENCE:
@@ -4125,7 +4136,38 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		// MDH@17NOV2019: if indexing is theoretically possible, we should further check for indexes
 		//                now, even if _valueReference is NULL we have to consume the indexes if present
 		if(canbeindexedtheoretically){
-
+			expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
+			// MDH@17NOV2019: moved over from getValueOfExpression() to where it should below i.e. before unary operators are applied!!!
+			while(expressionToken&&expressionToken->next&&expressionToken->next->type==TT_LIST){
+				expressionToken=nextEnvironmentExpressionToken();
+				if(amVerbose()&&amDebugging())
+				{output("Augmented item id(s) token: ");outputToken(expressionToken);outputChar('\n');}
+				Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
+				if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
+					// we should append the indices to the index_id
+					Mvaluereference* operandValueReference=_valueReference; // instead of _formulaelement->operand
+					if(operandValueReference->_itemid){ // there are already indices defined, so we should append the additional list items
+						Mlist* itemIdsList=(operandValueReference->_itemid->type==VT_LIST?operandValueReference->_itemid->value._list:NULL);
+						if(itemIdsList){
+							Mlist* newItemIdsList=indexListValue->value._list;
+							Mlistelement* newItemIdListElement=newItemIdsList->_first;
+							while(newItemIdListElement){
+								if(!appendedToList(itemIdsList,newItemIdListElement->_value,M_LL_INVALID))
+									outputError("Failed to append augmented item id.");
+								newItemIdListElement=newItemIdListElement->_next;
+							}
+						}else 
+							outputBug("Item ids not a list.");
+						// indexListValue will be removed by the garbage collector
+					}else // no item id yet, so the same way as is done before set _itemid to the index list value
+						assignValue(&operandValueReference->_itemid,indexListValue);
+					if(amVerbose()&&amDebugging())
+					outputValue("Augmented item ids: ",operandValueReference->_itemid,".\n");
+				}
+				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
+				if(amVerbose()&&amDebugging())
+				{output("End of augmented item id(s) token: ");outputToken(expressionToken);outputChar('\n');}
+			}
 		}
 
 		// apply the unary operators (backwards)
@@ -5247,22 +5289,29 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger *_biginteger2=(smallinteger2?_getBiginteger(_value2->value._integer->ll):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
-			if(amVerbose()){outputBiginteger("Exponentiating big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+			if(amVerbose())
+			{outputBiginteger("Exponentiating big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
 			_powerBiginteger=_getBigintegerPowerWithPositiveBigintegerExponent(_biginteger1,_biginteger2);
-			if(amVerbose()){outputBiginteger(" - Power: '",_powerBiginteger,"'.\n");}
+			if(amVerbose()){outputBiginteger("Power: '",_powerBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
 		if(smallinteger1)free_biginteger(_biginteger1);
 		if(smallinteger2)free_biginteger(_biginteger2);
 		// MDH@24OCT2019: if the base is integer, we're going to try to return a small integer
 		if(smallinteger1){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
+			if(amVerbose())outputLine("Will try to convert the big integer result back to a small integer.");
 			// if computing the sum failed return the invalid (small) integer (to indicate a missing result)
-			if(!_powerBiginteger)return _getIntegerValue(M_LL_INVALID);
-			long long llpower=getBigintegerInteger(_powerBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
+			long long llpower=getBigintegerInteger(_powerBiginteger);
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llpower!=M_LL_INVALID){free_biginteger(_powerBiginteger);return _getIntegerValue(llpower);}
-			outputWarning("Small integer power out of range, will continue using big integer power.");
+			if(llpower!=M_LL_INVALID){
+				if(amVerbose())outputLine("Will remove the big integer exponentiation result!");
+				free_biginteger(_powerBiginteger);
+				if(amVerbose())outputLine("Returning the small integer equivalent of the big integer exponentation result.");
+				return _getIntegerValue(llpower);
+			}
+			outputWarning("Small integer exponentation result out of range, will continue using the big integer exponentiation result.");
 		}
+		///////outputBiginteger("Exponentation result: '",_powerBiginteger,"'.\n");
 		return _getBigintegerValue(_powerBiginteger,true);
 	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
@@ -6521,6 +6570,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				//                TODO alternatively we could move this functionality to getValueReference()!!
 				//                TODO this also means that we can have an index on a value (not per se a variable)
 				//                TODO are we allowing indexing strings as well??????
+				/* MDH@17NOV2019: moved over to getValueReference() where it actually belongs
 				if(amVerbose()&&amDebugging())
 				{output("Possible augmented list item ids expression token");outputToken(expressionToken);outputChar('\n');}
 				while(expressionToken&&expressionToken->type==TT_LIST){
@@ -6548,13 +6598,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						if(amVerbose()&&amDebugging())
 							outputValue("Augmented item ids: ",operandValueReference->_itemid,".\n");
 					}
-					/*
-					expressionToken=getEnvironmentExpressionToken();
-					output("Expression token");outputToken(expressionToken);outputChar('\n');
-					if(!expressionToken->next)break; // TODO don't like this!!!
-					*/
 					expressionToken=nextEnvironmentExpressionToken();
 				}
+				*/
 			}
 
 			// MDH@16MAY2019: can't end an expression with an operator BRO'

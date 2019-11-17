@@ -23,13 +23,16 @@
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
-extern const char* const ERROR_PREFIX,WARNING_PREFIX,BUG_PREFIX;
+extern const char* const ERROR_PREFIX;
+extern const char* const WARNING_PREFIX;
+extern const char* const BUG_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const mpd_context_t* _decimalContext;
 
 void outputError(char const * const error){
     size_t l=(error?strlen(error):0);
     if(l==0)return;
+    if(!ERROR_PREFIX)return;
     output("%s%s",ERROR_PREFIX,error);
     l--;if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
     newline();
@@ -38,15 +41,18 @@ void outputError(char const * const error){
 void outputWarning(char const * const warning){
     size_t l=(warning?strlen(warning):0);
     if(l==0)return;
+    if(!WARNING_PREFIX)return;
     output("%s%s",WARNING_PREFIX,warning);
     l--;if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
     newline();
 }
-void outputMemoryError(char const * const memoryerror){if(memoryerror)output("%s. Probable cause: out of memory!\n",memoryerror);}
+void outputMemoryError(char const * const memoryerror){
+    if(memoryerror)output("%s%s. Probable cause: out of memory!\n",ERROR_PREFIX,memoryerror);
+}
 void outputBug(char const * const bug){
-    if(!bug)return;
-    size_t l=strlen(bug);
+    size_t l=(bug?strlen(bug):0);
     if(l==0)return;
+    if(!BUG_PREFIX)return;
     output("%s%s",BUG_PREFIX,bug);
     l--;if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
     newline();
@@ -697,8 +703,22 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
 
 Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
 
-Mbiginteger* getBigintegerLLMin(){if(!_biLLMin)_biLLMin=_getBiginteger(M_LL_MIN);return _biLLMin;}/* VALIDATED */
-Mbiginteger* getBigintegerLLMax(){if(!_biLLMax)_biLLMax=_getBiginteger(M_LL_MAX);return _biLLMax;}/* VALIDATED */
+Mbiginteger* getBigintegerLLMin(){
+    if(!_biLLMin){
+        if(amVerbose())outputLine("Determining the big integer equivalent of the smallest small integer.");
+        _biLLMin=_getBiginteger(M_LL_MIN);
+        if(amVerbose())outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
+    }
+    return _biLLMin;
+}/* VALIDATED */
+Mbiginteger* getBigintegerLLMax(){
+    if(!_biLLMax){
+        if(amVerbose())outputLine("Determining the big integer equivalent of the largest small integer.");
+        _biLLMax=_getBiginteger(M_LL_MAX);
+        if(amVerbose())outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
+    }
+    return _biLLMax;
+}/* VALIDATED */
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
 /*
