@@ -3784,7 +3784,10 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
  * a value reference syntax: optionally a number of unary operators, optionally followed by function call with arguments, and variable or value literal
  * we need to store the value in a value reference just in case the value is the destination of an assignment, so yes, reference is an apt name
 */
+// MDH@17NOV2019: applying unary operator on an indexed value not working as it should, so has to be fixed
+
 Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
+	
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
 
 	Mvaluereference* _valueReference=NULL;
@@ -3817,12 +3820,18 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}
 		}
 		*/
+		// MDH@17NOV2019: some value references can be indexed BEFORE applying the unary operators
+		//                the index can be determined following determining what is being indexex
+		//                alternatively: we can determine the initial value reference and check afterwards
+		//                we can start with making the theoretic indexing possibility
+		bool canbeindexedtheoretically=false; // this should have the same result as the tokenizer does
 		char* _significantTokenText=_stringstart(expressionToken->text,expressionToken->significantCharacterCount);
 		switch(expressionToken->type){
 			case TT_FUNCTION:
 				{
 					Mfunction* function=getFunction(getEnvironment(),_significantTokenText); // get the function associated with the name of the function
 					if(function){
+						canbeindexedtheoretically=true; // MDH@17NOV2019: stick to what the tokenizer allow TODO exclude special functions
 						// MDH@17JUL2019: we know the function and when the name is one of the special functions
 						//                like 'function' to define a function we know not to evaluate the third argument!!
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
@@ -3931,6 +3940,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
+				if(expressionToken->type==TT_VARIABLE)canbeindexedtheoretically=true;
 				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerbose())output("Value reference variable name: '%s'.\n",_valueReference->_name);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
@@ -3989,6 +3999,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
 				break;
 			case TT_REFERENCE:
+				// TODO might allow indexing in the future???
 				// MDH@04NOV2019: a reference is an interesting little bugger which we unfortunately need for certain function calls like settype()
 				//                for now we only allow referencing FULL variables i.e. not parts of variables like array or map elements although that seems to be a straightforward extension
 				//                so it's much similar to an unindexed variable at the moment
@@ -4070,10 +4081,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
 			case TT_LIST: // a list literal
+				canbeindexedtheoretically=true;
 				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false));
 				break;
 			case TT_MAP: // a map literal
 			{
+				canbeindexedtheoretically=true;
 				Mvalue* _mapValue=getValueOfMap();
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose())outputValue("Map extracted: '",_mapValue,"'.\n");
@@ -4082,6 +4095,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
 			{
+				canbeindexedtheoretically=true;
 				Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0,false);
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose())outputLine("Going to wrap the list extracted!");
@@ -4107,15 +4121,43 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}else
 				outputLine("No value reference!");
 		}
+
+		// MDH@17NOV2019: if indexing is theoretically possible, we should further check for indexes
+		//                now, even if _valueReference is NULL we have to consume the indexes if present
+		if(canbeindexedtheoretically){
+
+		}
+
 		// apply the unary operators (backwards)
-		if(unaryOperators){
-			if(amVerbose())output("Applying unary operators: '%s'.\n",string(unaryOperators));
-			uint16_t l=string_length(unaryOperators);
-			while(l>0&&_valueReference->_value){
+		// MDH@17NOV2019: why is the unary operator applied to the _value instead of what _valueReference references?????
+		size_t l=(unaryOperators?string_length(unaryOperators):0);
+		if(l>0){
+			Mvalue* referencedValue;
+			char unaryOperator;
+			while(l>0&&_valueReference){
+				unaryOperator=string_char(unaryOperators,--l);
+				referencedValue=getReferencedValue(_valueReference);
+				if(amVerbose()){
+					output("Applying unary operators: '%c'",unaryOperator);
+					outputValue(" to '",referencedValue,"'.\n");
+				}
 				/////////////decrementReferenceCount(_valueReference->_value);
-				_valueReference->_value=applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value);
+				_valueReference->_value=applyUnaryOperator(unaryOperator,referencedValue); // MDH@17NOV2019 replacing: _valueReference->_value);
 				// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
+				// MDH@17NOV2019: applying a unary operator is dangerous because we may set the value BUT that's NOT enough
+				//                because if the name and/or item id remains it will be used again later on
+				if(_valueReference->_name){free(_valueReference->_name);_valueReference->_name=NULL;}
+				if(_valueReference->_itemid){ // this is is a value wrapping a list of indices
+					// conform what would happen in free_valuereference!!! 
+					// TODO consider alternative creating a new value reference
+					//      which is probably better!!!!
+					assignValue(&_valueReference->_itemid,NULL);
+					/* which is identical to:
+					decrementReferenceCount(_valueReference->_itemid);
+					_valueReference->_itemid=NULL; // TODO should we do more here? I think not because it's a weak list????
+					*/
+				}
 			}
 			if(amVerbose())outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
 		}else
@@ -7931,7 +7973,9 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				if(behindBinaryOperator)while(lastTokenToCheck->type>=3&&lastTokenToCheck->type<=7)lastTokenToCheck=lastTokenToCheck->prev;
 				if(amVerbose())inputInfo("Type of token to check: %s.",TOKENTYPE_STRING[lastTokenToCheck->type]);
 				// ASSERT lastTokenToCheck should either represent a variable or the end of a list element to allow for operator
-				if(lastTokenToCheck->type==TT_END_OF_LIST){ // end of a list
+				// MDH@17NOV2019: we now allow multiple index elements after one another not just one
+				//                but we do need a variable in front of those
+				while(lastTokenToCheck&&lastTokenToCheck->type==TT_END_OF_LIST){ // end of a list
 					// we have to find the associated start of the list, and the token in front of that (which should be a variable!!!)
 					// which is easy because the expr tells us the start of the list BUT 
 					lastTokenToCheck=lastTokenToCheck->expr;
