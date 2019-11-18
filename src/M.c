@@ -21,7 +21,8 @@
 
 char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
-char const * const M_BUILD="2";char const * const M_DATE="17 November 2019, 19:00";
+//char const * const M_BUILD="2";char const * const M_DATE="17 November 2019, 19:00";
+char const * const M_BUILD="3";char const * const M_DATE="18 November 2019, 17:00";
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -741,8 +742,8 @@ Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){
 	return _getValueOfList(_dlist,true);
 }
 const char* const REAL_OCTET_INDEX_IDS[]={"1","2","3","4","5","6","7","8","9","10"};
-Mvalue* getRealDecimalMapValue(long double ld,bool littleEndianOrder){
-	Mmap* _dmap=_getMapOfType(VT_INTEGER);
+Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){
+	Mmap* _dmap=_getMapOfType(VT_UNDEFINED); // not just for storing integers!!!
 	if(!_dmap)return NULL;
 	longdoubleunion lld;
 	lld.ld=ld;
@@ -795,7 +796,7 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){
 	}
 	return _getValueOfMap(_dmap,true);
 }
-Mvalue* getRealDecimalListValue(long double ld,bool littleEndianOrder){
+Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){
 	Mlist* _dlist=_getListOfType(VT_INTEGER);
 	if(!_dlist)return NULL;
 	longdoubleunion lld;
@@ -822,11 +823,13 @@ Mvalue* d(Mvalue* value){
 	}
 	return NULL;
 }
-Mvalue* b(Mvalue* value){ // little-endian representation list to return
+
+// MDH@18NOV2019: b/B renamed to o/O (for octets), and we're gonna create a b function for transforming to big integer
+Mvalue* o(Mvalue* value){ // little-endian representation list to return
 	if(value){
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
-			case VT_FLOAT:return getRealDecimalMapValue(value->value._float->ld,true);
+			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,true);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
 			default:break;
 		}
@@ -834,11 +837,11 @@ Mvalue* b(Mvalue* value){ // little-endian representation list to return
 	return NULL;
 } 
 
-Mvalue* B(Mvalue* value){ // big endian decimal representation list to return
+Mvalue* O(Mvalue* value){ // big endian decimal representation list to return
 	if(value){
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
-			case VT_FLOAT:return getRealDecimalMapValue(value->value._float->ld,false);
+			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,false);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
 			default:break;
 		}
@@ -854,7 +857,7 @@ Mvalue* i(Mvalue* value){
 }
 
 // convert to a big integer
-Mvalue* I(Mvalue* value){
+Mvalue* b(Mvalue* value){
 	if(value){
 		if(value->type==VT_BIGINTEGER)return value; // already a big integer
 		Mbiginteger* _bigInteger=_getValueBiginteger(value);
@@ -4330,7 +4333,7 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 */
 // rational number addition
 // generic addition
-Mdecimal* getValueDecimal(Mvalue* _value);
+///// MDH@18NOV2019 is now defined elsewhere!!: Mdecimal* getValueDecimal(Mvalue* _value);
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL; // MDH@24OCT2019: propagate NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
@@ -8681,12 +8684,12 @@ bool initEnvironment(){
 				return false;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
-			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"I"),"I",I)
+			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)
 					||!completedValueValueFunction(_getFunction(_Menvironment,"t"),"t",t)
 					||!completedValueFunction(_getFunction(_Menvironment,"f"),"f",f)
 					||!completedValueFunction(_getFunction(_Menvironment,"q"),"q",q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),"Q",Q)
 					||!completedValueFunction(_getFunction(_Menvironment,"d"),"d",d)
-					||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)||!completedValueFunction(_getFunction(_Menvironment,"B"),"B",B)){
+					||!completedValueFunction(_getFunction(_Menvironment,"o"),"o",o)||!completedValueFunction(_getFunction(_Menvironment,"O"),"O",O)){
 				outputError("Failed to register value type conversion functions");
 				return false;
 			}
