@@ -3,7 +3,6 @@
 
 #include "Mcolors.h"
 
-#include "Mconstants.h"
 #include "Moutput.h"
 
 // MDH@16APR2019: let's define the standard colors and high-itensity colors which are dark and light versions

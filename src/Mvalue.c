@@ -16,8 +16,8 @@ extern const char * const VALUETYPENAMES[]; // the characters associated with ea
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const ERROR_PREFIX;
-extern const char * const M_NULL_VALUE_TEXT_REPRESENTATION; // MDH@31OCT2019: the text to use to represent a value that is NULL
-extern const char * const M_UNDEFINED_VALUE_TEXT_REPRESENTATION; // MDH@31OCT2019: the text to use to represent a value of type VT_UNDEFINED
+extern const char * const M_NULL_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value that is NULL
+extern const char * const M_UNDEFINED_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value of type VT_UNDEFINED
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const long double LD_PI; // for Mfacd()
@@ -1180,7 +1180,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
         ////outputChar('+');
 		////output("TYPE: %d\n",_value->type);
 		switch(_value->type){
-            case VT_UNDEFINED:valueText=_getString(M_UNDEFINED_VALUE_TEXT_REPRESENTATION);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
+            case VT_UNDEFINED:valueText=_getString(M_UNDEFINED_VALUE_TEXT);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
 			case VT_INTEGER:valueText=_getIntegerText(_value->value._integer);break;
             case VT_BIGINTEGER:valueText=_getBigintegerText(_value->value._biginteger);break; // how many characters do we need????
             case VT_DECIMAL:valueText=_getDecimalText(_value->value._decimal,false);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
@@ -1237,7 +1237,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
             default:break;
 		}
 	}else // the text we use for an value that is NULL!
-        valueText=_getString(M_NULL_VALUE_TEXT_REPRESENTATION);
+        valueText=_getString(M_NULL_VALUE_TEXT);
     if(valueText)if(amAssisting())valueText=appendll(string_append_char(valueText,'#'),_value->count); // show the reference count as well
     /////outputChar('.');
     return(valueText?valueText:_getUndefinedValueText());

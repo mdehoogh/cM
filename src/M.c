@@ -22,7 +22,8 @@
 char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
 //char const * const M_BUILD="2";char const * const M_DATE="17 November 2019, 19:00";
-char const * const M_BUILD="3";char const * const M_DATE="18 November 2019, 17:00";
+//char const * const M_BUILD="3";char const * const M_DATE="18 November 2019, 17:00";
+char const * const M_BUILD="4";char const * const M_DATE="20 November 2019, 14:00";
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -67,9 +68,9 @@ const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES=3;// MDH@14NOV2019: yes, t
 //                alternatively we could use capital letters to denote the variable, and lowercase to denote the value (which makes sense I suppose)
 //                to prevent confusion it's best to use the same text for the value, otherwise they see 'null' as value and think they can use that to embed a NULL value!!!
 //                OK the NULL value is displayed in the normal foreground color whereas the variable is displayed in another color (see showValueColored() for the coloring)
-const char* const M_NULL_VALUE_TEXT_REPRESENTATION="NULL"; // the text to represent values that are undefined...
+const char* const M_NULL_VALUE_TEXT="NULL"; // the text to represent values that are undefined...
 const char* const M_NULL_VARIABLE_NAME="NULL";
-const char* const M_UNDEFINED_VALUE_TEXT_REPRESENTATION="UNDEFINED"; // the text to represent values that are undefined...
+const char* const M_UNDEFINED_VALUE_TEXT="UNDEFINED"; // the text to represent values that are undefined...
 const char* const M_UNDEFINED_VARIABLE_NAME="UNDEFINED";
 
 const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
@@ -6888,10 +6889,11 @@ void clearCommand(){
 	if(_userInputCommand->_firstToken){freeToken(_userInputCommand->_firstToken);_userInputCommand->_firstToken=NULL;}
 	*/
 }
+// TODO find a way to not have to replicate as we do now what getValueText() is also doing (but without coloring of course)
 void outputValueColored(Mvalue* _value){
 	if(_value){
 		switch(_value->type){
-			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_UNDEFINED_VALUE_TEXT_REPRESENTATION);break; // let's use the same color as for double quotes string (for now)
+			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_UNDEFINED_VALUE_TEXT);break; // let's use the same color as for double quotes string (for now)
 			case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
 			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
 			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
@@ -6967,7 +6969,7 @@ void outputValueColored(Mvalue* _value){
 		}
 	}else{
 		outputTokenTypeColor(TT_DQSTRING);
-		output("%s",M_NULL_VALUE_TEXT_REPRESENTATION);
+		output("%s",M_NULL_VALUE_TEXT);
 	} // TODO what color should we use????
 	resetOutputColor();
 }

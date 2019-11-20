@@ -4,6 +4,8 @@
  */
 #include <stdlib.h>
 
+#include "Mconstants.h"
+
 // MDH@28FEB2019: most conveniently to be able to output to the console through a single method that will allow a format string, and any number of arguments
 //                TODO delegate all functions that output to the output device to this function
 size_t output(const char *fmt,...);

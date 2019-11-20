@@ -3,8 +3,6 @@
  * - output to the console (specifically)
  * - TODO in due course any other destination???
  */
-#include "Mconstants.h"
-
 #include <stdarg.h>
 #include <stdio.h>
 

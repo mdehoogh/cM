@@ -27,6 +27,7 @@ extern const char* const ERROR_PREFIX;
 extern const char* const WARNING_PREFIX;
 extern const char* const BUG_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
+extern const char* const M_UNDEFINED_VALUE_TEXT; // TODO might be called M_NULL_VALUETEXT though
 extern const mpd_context_t* _decimalContext;
 
 void outputError(char const * const error){
@@ -1027,7 +1028,7 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){
 // the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
 // we can solve that by returning a new undefined value text instance every time
 Mstring* _getUndefinedValueText(){
-    return _getString(UNDEFINED_VALUETEXT); // just wrapping UNDEFINED_VALUETEXT again...
+    return _getString(M_UNDEFINED_VALUE_TEXT); // just wrapping UNDEFINED_VALUETEXT again...
     /* replacing:
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
     return string_copy(_UNDEFINED_VALUETEXT);
