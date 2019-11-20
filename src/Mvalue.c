@@ -128,7 +128,7 @@ void free_valuereference(Mvaluereference* _valuereference){
         if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
         */
         if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
-        FREE(_valuereference,'@');
+        FREE(_valuereference,'5'); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
     }
 }/* VALIDATED */
 

@@ -1545,7 +1545,7 @@ typedef struct{
 void free_command(Mcommand* _command){
 	if(!_command)return;
 	if(_command->_firstToken)free_token(_command->_firstToken); // will free ALL connected tokens!!!
-	free(_command);
+	FREE(_command,'K');
 }
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
 Mcommand* _getNewCommand(bool withFirstToken){
@@ -2525,20 +2525,31 @@ bool registerCommand(Mcommand* command){
 }
 // MDH@21JUN2019: reset() takes care of removing all stored commands
 void reset(){
+	newline();
 	if(commandCount>0){
 		output("Delete all remembered commands? ");
 		char c;inputCharRead(&c);
+		outputChar(c);
 		newline();
 		if(c=='Y'||c=='y'){
-			while(commandCount>0)free_command(commands[--commandCount]);
+			output("Deleting %lld command(s).\n",commandCount);
+			while(commandCount>0){
+				commandCount--;
+				free_command(commands[commandCount]);
+			}
+			outputLine("All commands deleted!");
 		}else
 			outputLine("No commands deleted!");
-		while(inputCharRead(&c)); // clear the input buffer
-#ifndef __PRODUCTION__
-		syncallocations();
-#endif	
+		if(c==27)while(inputCharRead(&c)); // clear the input buffer
 	}else
 		outputLine("No commands to delete!");
+#ifndef __PRODUCTION__
+	////syncallocations();
+	if(resetAllocationTypes())
+		outputLine("Allocation type recording reset.");
+	else
+		outputWarning("Failed to reset the allocation type count recording.");
+#endif
 }
 
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
@@ -6482,6 +6493,19 @@ typedef struct Mformulaelement{
 	struct Mformulaelement* _next;
 	struct Mformulaelement* _prev; // MDH@21MAY2019: unfortunately needed for moving back!!
 }Mformulaelement;
+size_t free_formulaelement(Mformulaelement* _formulaelement){
+	// return the total number of formula elements freed
+	size_t result=0;
+	if(_formulaelement){
+		if(_formulaelement->_next)result+=free_formulaelement(_formulaelement->_next);
+		if(_formulaelement->_operator)free_string(_formulaelement->_operator);
+		if(_formulaelement->_operand)free_valuereference(_formulaelement->_operand);
+		FREE(_formulaelement,'4');
+		result+=1; // another one
+		outputChar('.');
+	}
+	return result;
+}
 /* any formula starts with
 typedef struct Mformula{
 	Mvaluereference* _operand;
@@ -6539,9 +6563,12 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			output(".\n");
 		}
 		
+		///////////output("Number of allocated formula elements before: %zd.\n",getAllocationTypeCount('4'));
+
 		Mvaluereference* _valuereference;
 		Mformulaelement* formula=CALLOC(1,sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
+		size_t formulaElementCount=1;
 
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 
@@ -6633,6 +6660,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				}
 				if(amVerbose())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
 				_formulaelement->_next=(Mformulaelement*)CALLOC(1,sizeof(Mformulaelement),'4');
+				formulaElementCount++;
 				_formulaelement=_formulaelement->_next;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
@@ -6696,7 +6724,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					free_string(_formulaelement->_operator);_formulaelement->_operator=nextformulaelement->_operator;
 					// can't reach the consumed formula element anymore, so release whatever it contains (except for the operator which we have retained)
 					free_valuereference(nextformulaelement->_operand); // free the consumed operand
-					FREE(nextformulaelement,'p'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+					FREE(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+					formulaElementCount--; // one less to free!!!
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
 					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
 					// is there a formula element in front of it that has not yet been applied?????
@@ -6767,16 +6796,24 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
-			if(amVerbose())outputLine("Freeing formula elements.");
+			///if(amVerbose())
+			output("Freeing %zd formula elements.\n",formulaElementCount);
+			size_t numberOfFormulaElementsFreed=free_formulaelement(formula);
+			newline();
+			output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+			/* replacing:
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;
 			while(_formulaelement){
 				free_string(_formulaelement->_operator);
 				free_valuereference(_formulaelement->_operand);
 				_nextformulaelement=_formulaelement->_next;
-				free(_formulaelement);
+				FREE(_formulaelement,'4'); // OOPS have to call FREE here not free()
+				outputChar('.');
 				_formulaelement=_nextformulaelement;
 			}
+			newline();
+			*/
 			if(amVerbose())outputLine("Formula elements freed.");
 		}else
 		if(amVerbose())output("No result of expression '%s' to store.",info);
@@ -7046,6 +7083,8 @@ bool evaluateCommand(Mvalue* *resultValue){
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 	if(!isAValidCommand(_userInputCommand,true))return false;
 
+	output("Number of allocated formula elements before evaluating the command: %zd.\n",getAllocationTypeCount('4'));
+
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	Mstring* commandText=_getCommandText(true);
@@ -7067,6 +7106,9 @@ bool evaluateCommand(Mvalue* *resultValue){
 
 	///////if(amVerbose())outputLine("Command to release!");
 	free_string(commandText);
+
+	output("Number of allocated formula elements after evaluating the command: %zd.\n",getAllocationTypeCount('4'));
+
 	////////if(amVerbose())outputLine("Command released!");
 	return true;
 

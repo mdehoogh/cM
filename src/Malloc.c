@@ -17,6 +17,7 @@ struct{
 
 // you HAVE to call this method to be able to register allocations
 bool allocationrecordinginitialized(){
+    printf("Initializing allocation recording...\n");
     allocations.l=0;
 #ifndef __PRODUCTION__
     allocations._chars=malloc(16); // starting out with one block
@@ -80,6 +81,24 @@ size_t addallocation(char allocationtype,size_t size,size_t nitems){
 // MDH@15NOV2019: allow access to the allocation counts
 size_t* getAllocationCounts(){return _allocationcounts;}
 char* getAllocationTypes(){return _allocationtypes;}
+// MDH@19NOV2019: 
+bool resetAllocationTypes(){
+    /////printf("Resetting allocation type counts.\n");
+    // best to free the lot, the reinitialize
+    if(_allocationtypes)free(_allocationtypes);
+    if(_allocationcounts)free(_allocationcounts);
+    if(allocations._chars)free(allocations._chars);
+    ////////printf("Allocation type counts reset.\n");
+    return allocationrecordinginitialized();
+}
+long long getAllocationTypeCount(char allocationtype){
+    long long allocationTypeCount=-2; // if there's some error
+    if(_allocationtypes&&_allocationcounts){
+        char* _allocationtype=strchr(_allocationtypes,allocationtype);
+        allocationTypeCount=(_allocationtype?_allocationcounts[(_allocationtype-_allocationtypes)<<1]:-1);
+    }
+    return allocationTypeCount;
+}
 
 // 'public' functions
 size_t allocationmark(){return addallocation(' ',0,0);}
@@ -128,6 +147,7 @@ void* Mcalloc(size_t nitems,size_t size,char type){
 
 void Mfree(void* ptr,char type){
     if(!ptr)return;
+    /////printf("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     size_t nitems=0,typesize=0,allocationtypecountoffset=0;
     char* _allocationtype=(_allocationtypes&&_allocationcounts?strchr(_allocationtypes,type):NULL);
@@ -139,6 +159,7 @@ void Mfree(void* ptr,char type){
         }
     }
     free(ptr);
+    //////printf("!");
     // undo the allocation of the given type
     if(!allocations._chars){printf("Allocation types not recorded!\n");return;}
     if(allocations.l==0){printf("Nothing allocated to free.\n");return;}
@@ -148,12 +169,14 @@ void Mfree(void* ptr,char type){
         if(allocations._chars[pos]==type){allocations._chars[pos]='.';break;}
         pos--;
     }
+    ///////printf("!");
     // MDH@15NOV2019: if this is an existing type
     if(nitems>0){ // we know both how many items AND where
         _allocationcounts[allocationtypecountoffset]-=nitems; // subtract the count
         _allocationcounts[0]-=nitems;
         _allocationcounts[1]-=(nitems*typesize);
     }
+    ////////printf("!\n");
 }
 
 void* Mrealloc(void* ptr,size_t size,char type){
