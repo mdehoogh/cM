@@ -34,18 +34,19 @@ size_t getNumberOfAllocationTypes(){return (_allocationtypes&&_allocationcounts?
 
 size_t getNewAllocationTypeIndex(char allocationtype,size_t size){
     size_t allocationtypeindex=getNumberOfAllocationTypes(); // at least one!!!
-    if(allocationtypeindex>0){
+    if(allocationtypeindex>0){ // meaning we have both _allocationtypes and _allocationcounts
         ////////printf("New allocation type #%zd: '%c'!\n",allocationtypeindex,allocationtype);
         _allocationtypes=realloc(_allocationtypes,sizeof(char)*(allocationtypeindex+1));
         _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*3); // for every type we store 3 size_t values, one to keep the item count, and one to keep the size
-        if(!_allocationtypes||!_allocationcounts)return 0; // failure
-        // still got them
-        numberofallocationtypes=allocationtypeindex+1; // keep track of how many we've got
-        _allocationtypes[allocationtypeindex]=allocationtype;
-        // register the size and initialize the count to 0!!!
-        _allocationcounts[allocationtypeindex*3]=size; // storing the size in the second element of the pair
-        _allocationcounts[(allocationtypeindex*3)+1]=0; // number of allocations
-        _allocationcounts[(allocationtypeindex*3)+2]=0; // number of frees
+        if(_allocationtypes&&_allocationcounts){
+            // still got them
+            _allocationtypes[allocationtypeindex]=allocationtype;
+            numberofallocationtypes=allocationtypeindex+1; // keep track of how many we've got
+            // register the size and initialize the count to 0!!!
+            _allocationcounts[allocationtypeindex*3]=size; // storing the size in the second element of the pair
+            _allocationcounts[(allocationtypeindex*3)+1]=0; // number of allocations
+            _allocationcounts[(allocationtypeindex*3)+2]=0; // number of frees
+        }
     }
     return allocationtypeindex;
 }
