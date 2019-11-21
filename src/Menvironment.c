@@ -262,8 +262,9 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
                         if(_valuecountsMap){
                             Mmap* _valuecountMap=_getMapOfType(VT_INTEGER);
                             if(_valuecountMap){
-                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(allocationcounts[i<<1]));
-                                appendedToMap(_valuecountMap,(i==0?"bytes occupied":"size"),_getIntegerValue(allocationcounts[1+(i<<1)]));
+                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(allocationcounts[i*3+1]));
+                                appendedToMap(_valuecountMap,(i==0?"bytes allocated":"allocated"),_getIntegerValue(allocationcounts[1+i*3]));
+                                appendedToMap(_valuecountMap,(i==0?"bytes freed":"freed"),_getIntegerValue(allocationcounts[2+i*3]));
                                 if(!appendedToMap(_valuecountsMap,string(_allocationTypeText),_getValueOfMap(_valuecountMap,true)))
                                     output("%sFailed to store the allocation count map of '%c'.\n",ERROR_PREFIX,allocationtypes[i]);
                             }else

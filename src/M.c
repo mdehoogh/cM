@@ -6700,6 +6700,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			if(amVerbose())output("Number of assignments: %u.\n",numberOfAssignments);
 			
+			size_t allocated=getAllocationTypeAllocated('3'),freed=getAllocationTypeFreed('3');
+			output("Type '3' BEFORE: allocated: %zd - freed: %zd.\n",allocated,freed);
+
 			// MDH@14OCT2019: applying binary operators typically is done taking operator precedence into account which means we cannot apply lower precedence binary operators until higher precedence binary operators are applied first
 			//                which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
 			//                we always need to compare two successive operators if the precedence of the first is not below the precedence of the second you may apply the first operator, otherwise you skip applying the operator
@@ -6725,7 +6728,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					free_string(_formulaelement->_operator);_formulaelement->_operator=nextformulaelement->_operator;
 					// can't reach the consumed formula element anymore, so release whatever it contains (except for the operator which we have retained)
 					free_valuereference(nextformulaelement->_operand); // free the consumed operand
-					FREE(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+					if(!nextformulaelement)
+						outputLine("No formula element to free!");
+					else
+						FREE(nextformulaelement,'3'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
 					formulaElementCount--; // one less to free!!!
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
 					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
@@ -6749,7 +6755,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			*/
 			if(amVerbose())outputValue("Result: '",_result,"'.\n");
-			
+
+			allocated=getAllocationTypeAllocated('3');freed=getAllocationTypeFreed('3');
+			output("Type '3' AFTER: allocated: %zd - freed: %zd.\n",allocated,freed);
+
 			// perform assignments right-to-left (which is a little problematic though)
 			if(numberOfAssignments){
 				if(amVerbose())output("Performing %u assignments.\n",numberOfAssignments);
@@ -7085,7 +7094,7 @@ bool evaluateCommand(Mvalue* *resultValue){
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 	if(!isAValidCommand(_userInputCommand,true))return false;
 
-	output("Number of allocated formula elements before evaluating the command: %zd.\n",getAllocationTypeCount('4'));
+	output("Number of allocated/freed formula elements before evaluating the command: (%zd,%zd).\n",getAllocationTypeAllocated('4'),getAllocationTypeFreed('4'));
 
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
@@ -7109,7 +7118,7 @@ bool evaluateCommand(Mvalue* *resultValue){
 	///////if(amVerbose())outputLine("Command to release!");
 	free_string(commandText);
 
-	output("Number of allocated formula elements after evaluating the command: %zd.\n",getAllocationTypeCount('4'));
+	output("Number of allocated/freed formula elements after evaluating the command: (%zd,%zd).\n",getAllocationTypeAllocated('4'),getAllocationTypeFreed('4'));
 
 	////////if(amVerbose())outputLine("Command released!");
 	return true;

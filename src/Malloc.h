@@ -15,7 +15,8 @@ size_t getNumberOfAllocationTypes();
 size_t* getAllocationCounts();
 char* getAllocationTypes();
 bool resetAllocationTypes();
-long long getAllocationTypeCount(char allocationtype);
+size_t getAllocationTypeAllocated(char allocationtype);
+size_t getAllocationTypeFreed(char allocationtype);
 
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign

@@ -22,7 +22,7 @@ bool allocationrecordinginitialized(){
 #ifndef __PRODUCTION__
     allocations._chars=malloc(16); // starting out with one block
     _allocationtypes=malloc(sizeof(char));if(_allocationtypes){numberofallocationtypes=1;*_allocationtypes='*';} // always keep track of the total allocation count, which we mark with a wildcard *
-    if(numberofallocationtypes>0)_allocationcounts=calloc(2,sizeof(size_t)); // start out with two size_t items one to store the count and one to store the size!!
+    if(numberofallocationtypes>0)_allocationcounts=calloc(3,sizeof(size_t)); // start out with two size_t items one to store the count and one to store the size!!
 #else
     allocations._chars=NULL;
 #endif
@@ -31,6 +31,25 @@ bool allocationrecordinginitialized(){
 }
 
 size_t getNumberOfAllocationTypes(){return (_allocationtypes&&_allocationcounts?numberofallocationtypes:0);}
+
+size_t getNewAllocationTypeIndex(char allocationtype,size_t size){
+    size_t allocationtypeindex=getNumberOfAllocationTypes(); // at least one!!!
+    if(allocationtypeindex>0){
+        ////////printf("New allocation type #%zd: '%c'!\n",allocationtypeindex,allocationtype);
+        _allocationtypes=realloc(_allocationtypes,sizeof(char)*(allocationtypeindex+1));
+        _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*3); // for every type we store 3 size_t values, one to keep the item count, and one to keep the size
+        if(!_allocationtypes||!_allocationcounts)return 0; // failure
+        // still got them
+        numberofallocationtypes=allocationtypeindex+1; // keep track of how many we've got
+        _allocationtypes[allocationtypeindex]=allocationtype;
+        // register the size and initialize the count to 0!!!
+        _allocationcounts[allocationtypeindex*3]=size; // storing the size in the second element of the pair
+        _allocationcounts[(allocationtypeindex*3)+1]=0; // number of allocations
+        _allocationcounts[(allocationtypeindex*3)+2]=0; // number of frees
+    }
+    return allocationtypeindex;
+}
+
 size_t addallocation(char allocationtype,size_t size,size_t nitems){
     if(!allocationtype)return 0; // force using allocationtype to prevent unused-parameter warning
 #ifndef __PRODUCTION__
@@ -48,27 +67,17 @@ size_t addallocation(char allocationtype,size_t size,size_t nitems){
         if(allocationtypeindex>0){ // yes, we should already have at least one allocation type
             char* _allocationtype=strchr(_allocationtypes,allocationtype);
             if(!_allocationtype){ // haven't got this one yet!!!
-                ////////printf("New allocation type #%zd: '%c'!\n",allocationtypeindex,allocationtype);
-                _allocationtypes=realloc(_allocationtypes,sizeof(char)*(allocationtypeindex+1));
-                _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))<<1); // for every type we store 2 size_t values, one to keep the item count, and one to keep the size
-                if(_allocationtypes&&_allocationcounts){ // still got them
-                    numberofallocationtypes=allocationtypeindex+1; // keep track of how many we've got
-                    _allocationtypes[allocationtypeindex]=allocationtype;
-                    // register the size and initialize the count to 0!!!
-                    _allocationcounts[allocationtypeindex<<1]=0;
-                    _allocationcounts[(allocationtypeindex<<1)+1]=size; // storing the size in the second element of the pair
-                }else
-                    allocationtypeindex=0; // too bad
+                allocationtypeindex=getNewAllocationTypeIndex(allocationtype,size);
             }else{ // already got it
                 allocationtypeindex=(_allocationtype-_allocationtypes);
                 // NOTE text with variable length is allocated as type '"' and should not be checked!!
-                if(allocationtype!='"'&&size!=_allocationcounts[1+(allocationtypeindex<<1)])
-                    printf("*****************\nBUG: Different size (%zd) of data type '%c' (size: %zd) received!\n*****************\n",size,allocationtype,_allocationcounts[1+(allocationtypeindex<<1)]);
+                if(allocationtype!='"'&&size!=_allocationcounts[allocationtypeindex*3])
+                    printf("*****************\nBUG: Different size (%zd) of data type '%c' (size: %zd) received!\n*****************\n",size,allocationtype,_allocationcounts[3*allocationtypeindex]);
             }
             if(allocationtypeindex>0){
-                _allocationcounts[allocationtypeindex<<1]+=nitems;
-                _allocationcounts[0]+=nitems;
-                _allocationcounts[1]+=(nitems*size); // keep track of the total amount of bytes used
+                _allocationcounts[allocationtypeindex*3+1]+=nitems; // another nitems allocated
+                _allocationcounts[0]+=(nitems*size); // keep track of the total amount of bytes used
+                _allocationcounts[1]+=nitems; // another nitems allocated
             } // increment the allocation type count and the total allocation count
         }
     }
@@ -91,13 +100,21 @@ bool resetAllocationTypes(){
     ////////printf("Allocation type counts reset.\n");
     return allocationrecordinginitialized();
 }
-long long getAllocationTypeCount(char allocationtype){
-    long long allocationTypeCount=-2; // if there's some error
+long long getAllocationTypeAllocated(char allocationtype){
+    long long allocationTypeAllocated=-2; // if there's some error
     if(_allocationtypes&&_allocationcounts){
         char* _allocationtype=strchr(_allocationtypes,allocationtype);
-        allocationTypeCount=(_allocationtype?_allocationcounts[(_allocationtype-_allocationtypes)<<1]:-1);
+        allocationTypeAllocated=(_allocationtype?_allocationcounts[1+(_allocationtype-_allocationtypes)*3]:-1);
     }
-    return allocationTypeCount;
+    return allocationTypeAllocated;
+}
+long long getAllocationTypeFreed(char allocationtype){
+    long long allocationTypeFreed=-2; // if there's some error
+    if(_allocationtypes&&_allocationcounts){
+        char* _allocationtype=strchr(_allocationtypes,allocationtype);
+        allocationTypeFreed=(_allocationtype?_allocationcounts[2+(_allocationtype-_allocationtypes)*3]:-1);
+    }
+    return allocationTypeFreed;
 }
 
 // 'public' functions
@@ -150,11 +167,13 @@ void Mfree(void* ptr,char type){
     /////printf("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     size_t nitems=0,typesize=0,allocationtypecountoffset=0;
-    char* _allocationtype=(_allocationtypes&&_allocationcounts?strchr(_allocationtypes,type):NULL);
-    if(_allocationtype){
-        allocationtypecountoffset=(_allocationtype-_allocationtypes)<<1; // double the index to get at the first position of the size_t pair
-        if(allocationtypecountoffset>0){
-            typesize=_allocationcounts[allocationtypecountoffset+1]; // where the size is stored!!!
+    char* _allocationtype=NULL;
+    if(_allocationtypes&&_allocationcounts){
+        char* _allocationtype=strchr(_allocationtypes,type);
+        // assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
+        allocationtypecountoffset=3*(_allocationtype?_allocationtype-_allocationtypes:getNewAllocationTypeIndex(type,1));
+        if(allocationtypecountoffset>0){ // success (and not the accumulative (zero) one!!!)
+            typesize=_allocationcounts[allocationtypecountoffset]; // where the size is stored!!!
             if(typesize>0)nitems=sizeof(*ptr)/typesize;
         }
     }
@@ -172,9 +191,9 @@ void Mfree(void* ptr,char type){
     ///////printf("!");
     // MDH@15NOV2019: if this is an existing type
     if(nitems>0){ // we know both how many items AND where
-        _allocationcounts[allocationtypecountoffset]-=nitems; // subtract the count
-        _allocationcounts[0]-=nitems;
-        _allocationcounts[1]-=(nitems*typesize);
+        _allocationcounts[allocationtypecountoffset+2]+=nitems; // increment the number of freed data type items
+        _allocationcounts[0]-=(nitems*typesize);
+        _allocationcounts[2]+=nitems; // another nitems freed!!
     }
     ////////printf("!\n");
 }
@@ -185,20 +204,23 @@ void* Mrealloc(void* ptr,size_t size,char type){
     // step 1. take out what has been registered before...
     long long freed=(ptr?sizeof(*ptr):0); // best to determine it here
     void* newptr=realloc(ptr,size);
-    long long more=(newptr?sizeof(*newptr):0)-freed; // what we need to add
-    if(more!=0){ // the difference between what we had and what we have now
+    long long occupied=(newptr?sizeof(*newptr):0); // what we need to add
+    if(freed!=occupied){ // amount changed
         if(_allocationtypes&&_allocationcounts){
             char* _allocationtype=strchr(_allocationtypes,type);
             if(_allocationtype){
-                size_t allocationtypecountoffset=(_allocationtype-_allocationtypes)<<1; // double the index to get at the first position of the size_t pair
+                size_t allocationtypecountoffset=(_allocationtype-_allocationtypes)*3; // double the index to get at the first position of the size_t pair
                 if(allocationtypecountoffset>0){
-                    if(_allocationcounts[allocationtypecountoffset+1]!=1){
+                    if(_allocationcounts[allocationtypecountoffset]!=1){
                         printf("WARNING: Mrealloc() called on a data type that does not occupy a single byte.");
-                        more/=_allocationcounts[allocationtypecountoffset+1]; // which might round and we are in trouble!!!!
+                        freed/=_allocationcounts[allocationtypecountoffset]; // which might round and we are in trouble!!!!
+                        occupied/=_allocationcounts[allocationtypecountoffset];
                     }
-                    _allocationcounts[allocationtypecountoffset]+=more; // subtract the count
-                    _allocationcounts[0]+=more;
-                    _allocationcounts[1]+=(_allocationcounts[allocationtypecountoffset+1]*more); // update the number of bytes we've changed!!!
+                    _allocationcounts[allocationtypecountoffset+1]+=occupied; // increment what was occupied
+                    _allocationcounts[allocationtypecountoffset+2]+=freed; // increment what was freed
+                    _allocationcounts[1]+=occupied;
+                    _allocationcounts[2]+=freed;
+                    _allocationcounts[0]+=(_allocationcounts[allocationtypecountoffset+1]*(occupied-freed)); // update the number of bytes we've changed!!!
                 }else
                     printf("BUG: Mrealloc() called on the global data type (*).\n");
             }else 
