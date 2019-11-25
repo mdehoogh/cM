@@ -15,6 +15,7 @@ size_t getNumberOfAllocationTypes();
 size_t* getAllocationCounts();
 char* getAllocationTypes();
 bool resetAllocationTypes();
+void markAllocationCounts();
 size_t getAllocationTypeAllocated(char allocationtype);
 size_t getAllocationTypeFreed(char allocationtype);
 

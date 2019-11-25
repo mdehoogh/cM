@@ -122,7 +122,10 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
 
 Mmap* _getVariableNamesMap(Menvironment* environment); // MDH@14NOV2019: returns a map with the names of all local variables (in attribute '') and the names of the variables in the parent environment with the name of the parent environment!
 
+void outputTable(Mlist* table); // MDH@25NOV2019: certain lists are now constructed and recognized as 'tables'
+
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue);
+Mlist* _getValuesTable(Mvalue* variableNamesMapValue); // MDH@25NOV2019: storing the memory allocations in a table makes it more displayable
 
 bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable);
 /*

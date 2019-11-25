@@ -7172,6 +7172,11 @@ void showPreviousCommandPage(){
 	else
 		output("%s","No further commands to show.");
 }
+// MDH@25NOV2019: it's more convenient to output the values in control mode than asking for it in command mode
+//                as values() command would affect what is returned (given that it's a command)
+void outputValues(){
+	outputTable(_getValuesTable(NULL));
+}
 /*
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
 char* removedRestOfCommand(){
@@ -7221,6 +7226,7 @@ char switchToControlMode(char* message){
 		if(message!=NULL){setColor(getErrorColor());output("\n%s\n",message);} // MDH@01OCT2019: message will typically be an error so
 		resetOutputColor();
 		setInputMode(IM_CONTROL);
+		if(amVerbose())outputValues(); // MDH@25NOV2019: it's convenient to also output the values when verbose
 		outputVariables(); // immediately show the list of available variables (so we can then use v for verbose flag, AND s is available for Shell again!!!!)
 	}
 	///////////outputFlags(); // show the user the current flags!!
@@ -8556,8 +8562,12 @@ Mvalue* Mvariables(){
 	return _getValueOfMap(_getVariableNamesMap(getEnvironment()),true);
 }
 // MDH@15NOV2019: returning value counts (per value type), passing in a list of variable names
+// MDH@25NOV2019: what about returning a table??? which is a list
 Mvalue* Mvalues(Mvalue* variableNamesValue){
-	return _getValueOfMap(_getValuesMap(variableNamesValue),true);
+	// MDH@25NOV2019: requesting the table allows for better reproduction
+	//                TODO instead of the table return the text representation of the table (which is easier to inspect!!!)
+	return _getValueOfList(_getValuesTable(variableNamesValue),true);
+	// replacing: return _getValueOfMap(_getValuesTable(variableNamesValue),true);
 }
 
 bool initEnvironment(){
