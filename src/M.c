@@ -23,7 +23,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
 //char const * const M_BUILD="2";char const * const M_DATE="17 November 2019, 19:00";
 //char const * const M_BUILD="3";char const * const M_DATE="18 November 2019, 17:00";
-char const * const M_BUILD="4";char const * const M_DATE="20 November 2019, 14:00";
+//char const * const M_BUILD="4";char const * const M_DATE="20 November 2019, 14:00";
+char const * const M_BUILD="5";char const * const M_DATE="25 November 2019, 18:00";
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -7175,7 +7176,12 @@ void showPreviousCommandPage(){
 // MDH@25NOV2019: it's more convenient to output the values in control mode than asking for it in command mode
 //                as values() command would affect what is returned (given that it's a command)
 void outputValues(){
-	outputTable(_getValuesTable(NULL));
+	Mlist* _valuesTable=_getValuesTable(NULL);
+	if(_valuesTable){
+		outputTable(_valuesTable);
+		free_list(_valuesTable);
+	}else 
+		outputError("No values table to output.");
 }
 /*
 // when the user tries to insert a character we need to cut off the rest of the command and append it afterwards
@@ -8791,12 +8797,12 @@ bool initEnvironment(){
 				outputError("Failed to register the empty function");
 				return false;
 			}
-			if(!completedListFunction(_getFunction(_Menvironment,"statistics"),"statistics",Mstats)||!completedListFunction(_getFunction(_Menvironment,"pull"),"pull",Mpull)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
-				outputError("Failed to register the statistics, pull, pop, first and last list functions");
+			if(!completedListFunction(_getFunction(_Menvironment,"statistics"),"statistics",Mstats)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
+				outputError("Failed to register the statistics, first and last list functions");
 				return false;
 			}
 			if(!completedListValueFunction(_getFunction(_Menvironment,"removed"),"removed",Mremoved)||!completedListValueFunction(_getFunction(_Menvironment,"push"),"push",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"drop"),"drop",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"shove"),"shove",Mshove)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)){
-				outputError("Failed to register the push(=drop), pop, shove and removed functions");
+				outputError("Failed to register the removed, push(=drop), shove and pop functions");
 				return false;
 			}
 			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,"find"),"find",Mfind)){

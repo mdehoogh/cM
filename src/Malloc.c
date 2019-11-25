@@ -91,8 +91,15 @@ size_t addallocation(char allocationtype,size_t size,size_t nitems){
 }
 
 // MDH@15NOV2019: allow access to the allocation counts
-size_t* getAllocationCounts(){return _allocationcounts;}
-char* getAllocationTypes(){return _allocationtypes;}
+// MDH@25NOV2019: let's return copies, so that we can get a frozen snapshot instead of something that can change
+size_t* _getAllocationCounts(){
+    size_t sizeallocationcounts=(_allocationcounts?numberofallocationtypes*sizeof(size_t)*5:0);
+    return(sizeallocationcounts>0?memcpy((char*)malloc(sizeallocationcounts),_allocationcounts,sizeallocationcounts):NULL);
+}
+char* _getAllocationTypes(){
+    size_t sizeallocationtypes=(_allocationtypes?numberofallocationtypes*sizeof(char):0);
+    return(sizeallocationtypes>0?memcpy((char*)malloc(sizeallocationtypes),_allocationtypes,sizeallocationtypes):NULL);
+}
 // MDH@19NOV2019: 
 bool resetAllocationTypes(){
     /////printf("Resetting allocation type counts.\n");

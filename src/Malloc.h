@@ -12,8 +12,8 @@ void syncallocations();
 
 // MDH@15NOV2019: keeping track of the allocation counts and the allocation types
 size_t getNumberOfAllocationTypes();
-size_t* getAllocationCounts();
-char* getAllocationTypes();
+size_t* _getAllocationCounts();
+char* _getAllocationTypes();
 bool resetAllocationTypes();
 void markAllocationCounts();
 size_t getAllocationTypeAllocated(char allocationtype);
