@@ -398,7 +398,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
         }
     }else
         outputError("Failed to create the values table header.");
-    free(_allocationtypes);free(_allocationcounts);
+    free(_allocationtypes);free(_allocationcounts); // being copies of the originals
     return _valuesTable;
 }
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
