@@ -249,12 +249,14 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,bool freeonfailure){
     if(columnNamesList){
         Mlist* _table=_getListOfType(VT_LIST);
         if(_table){
+            _table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
             // wrap the column names list in a value
             // oops this is going to be a nuisance as the list would be copied wouldn't it????????
             //      NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
             //      
             Mvalue* columnNamesListValue=_getValueOfList(columnNamesList,false);
             if(columnNamesListValue){
+                outputValue("Column names values table: '",columnNamesListValue,"'.\n");
                 if(appendedToList(_table,columnNamesListValue,M_LL_INVALID)){
                     while(numberOfRows>0){
                         numberOfRows--;
@@ -294,7 +296,7 @@ void outputTable(Mlist* table){
                                 if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table header loop!");break;}
                                 Mstring* _columnNameText=_getValueText(headerrowListelement->_value,true);
                                 if(_columnNameText){
-                                    columnLengths[columnIndex]=output("%s",_columnNameText);
+                                    columnLengths[columnIndex]=output("%s",string(_columnNameText));
                                     free_string(_columnNameText);
                                 }
                                 columnIndex++;
@@ -323,6 +325,7 @@ void outputTable(Mlist* table){
                                     }
                                 }
                             }
+                            free(columnLengths); // essential bro'
                             newline(); // one newline() at the end!!
                         }else 
                             outputError("Failed to prepare for displaying the table header.");
@@ -345,13 +348,13 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
     // let's create the list containing the column names
     Mlist* _valuesColumnNames=_getListOfType(VT_TEXT);
     if(_valuesColumnNames
-        &&appendedToList(_valuesColumnNames,_getTextValue("'values:",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'TYPE",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'SIZE",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'ALLOCATED  ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'FREED      ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED    ",false),M_LL_INVALID)>0){
+        &&appendedToList(_valuesColumnNames,_getTextValue("'Values: ",false),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,_getTextValue("'TYPE        ",false),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,_getTextValue("'SIZE        ",false),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,_getTextValue("'ALLOCATED   ",false),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,_getTextValue("'FREED       ",false),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED ",false),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED     ",false),M_LL_INVALID)>0){
         size_t numberOfAllocationTypes=(_allocationtypes?sizeof(_allocationtypes)/sizeof(char):0);
         // get a table with the given values column names and number of rows (which are initialized to empty lists)
         // NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
@@ -366,7 +369,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
                         Mlist* _valuecountsList=_getListOfType(VT_UNDEFINED); // we're going to store the value counts in a map
                         if(_valuecountsList){
                             // start with the table row index below the name of the table!!!
-                            if(appendedToList(_valuecountsList,_getIntegerValue(i),M_LL_INVALID)
+                            if(appendedToList(_valuecountsList,_getIntegerValue(i+1),M_LL_INVALID)
                                 &&appendedToList(_valuecountsList,_getTextValue(string(_allocationTypeText),false),M_LL_INVALID)){
                                 // now the 5 counts
                                 appendedToList(_valuecountsList,_getIntegerValue(_allocationcounts[i*5]),M_LL_INVALID);

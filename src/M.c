@@ -7096,6 +7096,8 @@ bool evaluateCommand(Mvalue* *resultValue){
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 	if(!isAValidCommand(_userInputCommand,true))return false;
 
+	markAllocationCounts(); // remember the allocation counts at the start of evaluating a command!!!
+
 	output("Number of allocated/freed formula elements before evaluating the command: (%zd,%zd).\n",getAllocationTypeAllocated('4'),getAllocationTypeFreed('4'));
 
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to

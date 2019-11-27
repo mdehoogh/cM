@@ -11,12 +11,14 @@
  */
 char* _strdup(const char* const _c){
     if(_c){
+        /* something wrong with this replacement code:
         size_t l=strlen(_c)+1;
         char* _hc=MALLOC(l,sizeof(char),':'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
         if(_hc)strcpy(_hc,_c);else printf("Failed to allocate memory to store '%s'.\n",_c);
-        /* replacing:
-        _hc=strdup(_c);
         */
+        ///* replacing:
+        char* _hc=strdup(_c);
+        //*/
         if(_hc)return _hc;
         printf("\nERROR: Failed to make a dynamic copy of '%s'.\n",_c);
     }else

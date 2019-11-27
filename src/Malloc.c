@@ -111,7 +111,7 @@ bool resetAllocationTypes(){
     return allocationrecordinginitialized();
 }
 // MDH@25NOV2019: markAllcoationTypes() remembers the current allocation type counts in the 4th and 5th element
-void markAllocationTypes(){
+void markAllocationCounts(){
     if(_allocationtypes&&_allocationcounts){
         size_t numberofallocationtypes=getNumberOfAllocationTypes();
         while(numberofallocationtypes>0){
