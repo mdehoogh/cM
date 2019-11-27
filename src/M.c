@@ -24,7 +24,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="2";char const * const M_DATE="17 November 2019, 19:00";
 //char const * const M_BUILD="3";char const * const M_DATE="18 November 2019, 17:00";
 //char const * const M_BUILD="4";char const * const M_DATE="20 November 2019, 14:00";
-char const * const M_BUILD="5";char const * const M_DATE="25 November 2019, 18:00";
+//char const * const M_BUILD="5";char const * const M_DATE="25 November 2019, 18:00";
+char const * const M_BUILD="6";char const * const M_DATE="27 November 2019, 18:00";
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -9063,6 +9064,8 @@ int main(int argc, char **argv){
 			// ask the user for input
 			if(!inputCharRead(&inputChar))break;
 
+			/////////outputChar(inputChar);
+
 			// hide the suggested text again before processing the character read
 			if(inputMode==IM_COMMAND){
 				hideSuggestedText();
@@ -9074,6 +9077,7 @@ int main(int argc, char **argv){
 
 			inputCharType=INPUTCHARACTERTYPES[inputChar];
 			
+			outputChar(inputCharType);
 			/* something terribly going wrong when the following code is executed!!!
 			if(inputMode==IM_COMMAND){
 				if(!amDebugging())outputStatus(inputChar,inputCharType);
@@ -9104,6 +9108,20 @@ int main(int argc, char **argv){
 			if(inputCharType=='i')continue; // insignificant input character without specific purpose
 
 			if(inputCharType=='n'){ // end-of-line (CR of LF) character
+				// MDH@27NOV2019: how about treating the Enter key as line break when the token is finished
+				/////////outputChar('X');
+				///////inputInfo("Checking for command continuation");
+				if(inputMode==IM_COMMAND){
+					if(_userInputCommand&&_userInputCommand->_lastToken){
+						// not using \ for newline continuation forces me to actually check whether the command is valid!!
+						if(!isAValidCommand(_userInputCommand,false)){
+							inputInfo("User newline break");
+							inputCharType='W';
+							inputChar='\\'; // TODO should we do this more generic????
+						}
+					}
+				}
+				if(inputCharType=='n')
 				break; // MDH@31OCT2019: changed to using ` as newline character which is considered whitespace so it's appended to the end of a token and ends that token as well, so that a token cannot be split over two lines (which would be ackward)
 				/* replacing using it as a newline character:
 				// MDH@30OCT2019: if not in command mode or (in command mode) we do not have an input command or it is not valid
@@ -9466,7 +9484,7 @@ int main(int argc, char **argv){
 						char firstSuggestedCharacterConsumed=getFirstSuggestedCharacterConsumed(inputChar,true);
 						if(firstSuggestedCharacterConsumed)removeFirstSuggestedCharacter(firstSuggestedCharacterConsumed,false);else inputCharType=switchToControlMode("Failed to accept the matching first suggested character.");
 					}else{
-						// MDH@31OCT2019: when the accepted character is the backtick in whitespace we should continue with the command on the next line
+						// MDH@31OCT2019: when the accepted character is the backslash in whitespace we should continue with the command on the next line
 						//                OOPS a backtick inside a string is also recognized as such which shouldn't happen
 						//                ALSO because the backtick will be visible it's probably better to insert an empty token for it of type TT_NEWLINE or something like that
 						//                it's probably best to check whether to accept a backtick here???? NOTE we could have backticks in commands read from files as well????
