@@ -9115,7 +9115,7 @@ int main(int argc, char **argv){
 					if(_userInputCommand&&_userInputCommand->_lastToken){
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
 						if(!isAValidCommand(_userInputCommand,false)){
-							inputInfo("User newline break");
+							/////////inputInfo("User newline break");
 							inputCharType='W';
 							inputChar='\\'; // TODO should we do this more generic????
 						}
