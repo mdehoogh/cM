@@ -24,18 +24,18 @@ size_t getAllocationTypeFreed(char allocationtype);
 #ifndef __PRODUCTION__
 void* Mmalloc(size_t nitems,size_t size,char type);
 void* Mcalloc(size_t nitems,size_t size,char type);
-void* Mrealloc(void* ptr,size_t size,char type);
+void* Mrealloc(void* ptr,size_t from_nitems,size_t to_nitems,size_t size,char type);
 void Mfree(void* ptr,char type);
 // use the substitutes
 #define MALLOC(nitems,size,type) Mmalloc(nitems,size,type)
 #define CALLOC(nitems,size,type) Mcalloc(nitems,size,type)
-#define REALLOC(ptr,size,type) Mrealloc(ptr,size,type)
+#define REALLOC(ptr,from_nitems,to_nitems,size,type) Mrealloc(ptr,from_nitems,to_nitems,size,type)
 #define FREE(ptr,type) Mfree(ptr,type)
 #else
 // use the system methods
 #define MALLOC(nitems,size,type) malloc(nitems*size)
 #define CALLOC(nitems,size,type) calloc(nitems,size)
 #define FREE(ptr,type) free(ptr)
-#define REALLOC(ptr,size,type) realloc(ptr,size)
+#define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc(ptr,to_nitems*size)
 #endif
 

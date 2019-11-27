@@ -16,7 +16,7 @@ Mstring* __string(){
     Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
-        // the size of each allocation is BLOCKSIZE characters!!!
+        // the size of each allocation is BLOCKSIZE characters
         ans->chars=MALLOC(1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'"');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
         // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
@@ -95,7 +95,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
         // if we do not have enough blocks ascertain to have enough...
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
-            char* new_str=REALLOC(str->chars,BLOCK_SIZE*blocks*sizeof *(str->chars),'s');
+            char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
             if (!new_str)return NULL; // failure!!
             str->chars=new_str;
             str->blocks=blocks;
@@ -183,7 +183,7 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
                 // do we need to get another block?    
                 if(l==str->blocks*BLOCK_SIZE){
                     /////////printf("Realloc string_insert_char().\n");
-                    char *new_str=REALLOC(str->chars,sizeof(char)*BLOCK_SIZE*(str->blocks+1),'s');
+                    char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                     if (new_str==NULL)return NULL;
                     ++(str->blocks);
                     ////// can't know the size of what new_str points to!!! printf("YY%lu-%dYY",sizeof(new_str),str->blocks);
@@ -214,7 +214,7 @@ Mstring* string_append_char(Mstring* const str,char c){
             /////printf("{%hu-%d}",l,str->blocks);
             if(l==str->blocks*BLOCK_SIZE){
                 //////////////printf("Realloc string_append_char().\n");
-                char *new_str=REALLOC(str->chars,BLOCK_SIZE*(str->blocks+1)*sizeof *(str->chars),'s');
+                char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                 if (!new_str)return NULL; // failure!!
                 ++(str->blocks);
                 ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);

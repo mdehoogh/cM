@@ -340,6 +340,16 @@ void outputTable(Mlist* table){
     }else
         outputError("No table to output.");
 }
+const char* HEXCHARS[]={
+    "00","01","02","03","04","05","06","07","08","09","0A","0B","0C","0D","0E","0F",
+    "10","11","12","13","14","15","16","17","18","19","1A","1B","1C","1D","1E","1F",
+    "20","21","22","23","24","25","26","27","28","29","2A","2B","2C","2D","2E","2F",
+    "30","31","32","33","34","35","36","37","38","39","3A","3B","3C","3D","3E","3F",
+    "40","41","42","43","44","45","46","47","48","49","4A","4B","4C","4D","4E","4F",
+    "50","51","52","53","54","55","56","57","58","59","5A","5B","5C","5D","5E","5F",
+    "60","61","62","63","64","65","66","67","68","69","6A","6B","6C","6D","6E","6F",
+    "70","71","72","73","74","75","76","77","78","79","7A","7B","7C","7D","7E","7F"
+    };
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
     // MDH@25NOV2019: we should get the allocation types and counts asap (otherwise they will change), unless they are passed in
     char* _allocationtypes=_getAllocationTypes();
@@ -365,18 +375,24 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
                 // NOTE dividing by sizeof(char) is far fetched
                 for(size_t i=0;i<numberOfAllocationTypes;i++){
                     Mstring* _allocationTypeText=_getString("'");
-                    if(_allocationTypeText&&string_append_char(_allocationTypeText,_allocationtypes[i])){
+                    if(_allocationTypeText
+                            &&string_append_char(_allocationTypeText,_allocationtypes[i])
+                            &&string_append(_allocationTypeText,"=0x")
+                            &&string_append(_allocationTypeText,HEXCHARS[_allocationtypes[i]]))
+                    {
                         Mlist* _valuecountsList=_getListOfType(VT_UNDEFINED); // we're going to store the value counts in a map
                         if(_valuecountsList){
+                            Mvalue* _zeroTextValue=_getTextValue("'",false); // will be garbage collected automatically when the reference count is not incremented (as in weak lists)
+                            _valuecountsList->weak=true; // TODO should we do this???
                             // start with the table row index below the name of the table!!!
                             if(appendedToList(_valuecountsList,_getIntegerValue(i+1),M_LL_INVALID)
                                 &&appendedToList(_valuecountsList,_getTextValue(string(_allocationTypeText),false),M_LL_INVALID)){
                                 // now the 5 counts
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationcounts[i*5]),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationcounts[1+i*5]),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationcounts[2+i*5]),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationcounts[3+i*5]),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationcounts[4+i*5]),M_LL_INVALID);
+                                appendedToList(_valuecountsList,(_allocationcounts[i*5]>0?_getIntegerValue(_allocationcounts[i*5]):_zeroTextValue),M_LL_INVALID);
+                                appendedToList(_valuecountsList,(_allocationcounts[1+i*5]>0?_getIntegerValue(_allocationcounts[1+i*5]):_zeroTextValue),M_LL_INVALID);
+                                appendedToList(_valuecountsList,(_allocationcounts[2+i*5]>0?_getIntegerValue(_allocationcounts[2+i*5]):_zeroTextValue),M_LL_INVALID);
+                                appendedToList(_valuecountsList,(_allocationcounts[3+i*5]>0?_getIntegerValue(_allocationcounts[3+i*5]):_zeroTextValue),M_LL_INVALID);
+                                appendedToList(_valuecountsList,(_allocationcounts[4+i*5]>0?_getIntegerValue(_allocationcounts[4+i*5]):_zeroTextValue),M_LL_INVALID);
                                 if(!appendedToList(_valuesTable,_getValueOfList(_valuecountsList,true),M_LL_INVALID))
                                     outputError("Failed to remember a values table row.");
                             }else{

@@ -171,9 +171,9 @@ void syncallocations(){
 }
 
 #ifndef __PRODUCTION__
-void* Mmalloc(size_t size,char type){
-    void* ptr=(size>0?malloc(size):NULL);
-    if(ptr)addallocation(type,1,size); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
+void* Mmalloc(size_t nitems,size_t size,char type){
+    void* ptr=(size>0&&nitems>0?malloc(size*nitems):NULL);
+    if(ptr)addallocation(type,size,nitems); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
     return ptr;
 }
 
@@ -219,21 +219,23 @@ void Mfree(void* ptr,char type){
     ////////printf("!\n");
 }
 
-void* Mrealloc(void* ptr,size_t size,char type){
+// MDH@27NOV2019: now passing the number of items in as well, and the current number of items
+void* Mrealloc(void* ptr,size_t from_nitems,size_t to_nitems,size_t size,char type){
     //////printf(".");
     // kind of like 'freeing' the space ptr is using now
     // step 1. take out what has been registered before...
-    long long freed=(ptr?sizeof(*ptr):0); // best to determine it here
-    void* newptr=realloc(ptr,size);
-    long long occupied=(newptr?sizeof(*newptr):0); // what we need to add
+    void* newptr=ptr; // by default return the original pointer!!!
+    long long freed=from_nitems*size; /////// replacing: (ptr?sizeof(*ptr):0); // best to determine it here
+    long long occupied=to_nitems*size; //// replacing: (newptr?sizeof(*newptr):0); // what we need to add
     if(freed!=occupied){ // amount changed
+        newptr=realloc(ptr,occupied); // we have to reallocate nitems each of the given size
         if(_allocationtypes&&_allocationcounts){
             char* _allocationtype=strchr(_allocationtypes,type);
             if(_allocationtype){
                 size_t allocationtypecountoffset=(_allocationtype-_allocationtypes)*5; // double the index to get at the first position of the size_t pair
                 if(allocationtypecountoffset>0){
-                    if(_allocationcounts[allocationtypecountoffset]!=1){
-                        printf("WARNING: Mrealloc() called on a data type that does not occupy a single byte.");
+                    if(_allocationcounts[allocationtypecountoffset]!=size){
+                        printf("WARNING: Mrealloc() called on a data type that does not occupy a %zd bytes.",size);
                         freed/=_allocationcounts[allocationtypecountoffset]; // which might round and we are in trouble!!!!
                         occupied/=_allocationcounts[allocationtypecountoffset];
                     }
