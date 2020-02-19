@@ -25,7 +25,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="3";char const * const M_DATE="18 November 2019, 17:00";
 //char const * const M_BUILD="4";char const * const M_DATE="20 November 2019, 14:00";
 //char const * const M_BUILD="5";char const * const M_DATE="25 November 2019, 18:00";
-char const * const M_BUILD="6";char const * const M_DATE="27 November 2019, 18:00";
+//char const * const M_BUILD="6";char const * const M_DATE="27 November 2019, 18:00";
+char const * const M_BUILD="7";char const * const M_DATE="28 November 2019, 18:00"; // with user and system memory usage determination
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -7086,6 +7087,23 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 	getEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerbose())outputLine("Evaluating...");
 	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
+}
+
+// MDH@29NOV2019: we're going to keep track of the system and user allocation counts
+size_t* getAllocationCountDifferences(size_t* from,size_t* to){
+
+}
+size_t *_systemallocationcounts,*_userallocationcounts;
+size_t *_lastcommandsystemallocationcounts,*_lastcommanduserallocationcounts;
+void prepareForEvaluatingCommand(){
+	// we need a new pre evaluation allocation counts
+	if(_lastcommandsystemallocationcounts)free(_lastcommandsystemallocationcounts);
+	_lastcommandsystemallocationcounts=_getAllocationCounts();
+	// using that we can update the system allocation counts by subtracting _lastcommanduserallocationcounts
+
+}
+void doneWithEvaluatingCommand(){
+
 }
 
 // anything the user types is a sequence of tokens which we can store in a linked list
