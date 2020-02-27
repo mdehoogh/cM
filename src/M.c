@@ -1556,6 +1556,118 @@ void unfinishToken(Mtoken* lastCommandToken){
 				lastCommandToken->significantCharacterCount=0;
 }
 
+<<<<<<< HEAD
+=======
+bool isAValidCommand(Mcommand* command,bool report){
+
+	// 1. if no command nothing evaluated TODO don't call when this is the case though
+	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return false;}
+	
+	Mtoken* lastCommandToken=command->_lastToken;
+	if(!lastCommandToken){if(report)outputError("Unfinished command");return false;}
+	
+	// 2. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
+	//    as a result _userInputCommand->_lastToken and _userInputCommand->_firstToken could now both be NULL, that's why we test this first
+	if(lastCommandToken->type==TT_COMMENT)if(!removeToken()){if(report)outputError("Failed to remove the comment");return false;}
+
+	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
+	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
+	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
+
+	// 2. if the last token is an error, can't evaluate (well, better not)
+	// TODO it makes sense to remove the error token
+	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Can't evaluate erroneous command");if(!removeToken()){if(report)outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
+
+	// 3. if the last token is an operator of sorts the command is incomplete
+	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return false;}
+
+	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
+	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
+	//                    this actually means that if expr is NULL there's one parentheses too many!!!
+	/*
+	if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
+	if(_userInputCommand->_lastToken->expr!=_userInputCommand->_firstToken){outputError("Not enough parentheses!");return false;}
+	*/
+	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
+	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
+	//////////// already noticed while entering the expression!!!!: if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
+	Mtoken* expressionToken=lastCommandToken->expr; // the token pointed to by the last command token
+	if(expressionToken)if(lastCommandToken->type==TT_END_OF_LIST||lastCommandToken->type==TT_END_OF_FUNCTION_CALL||lastCommandToken->type==TT_END_OF_MAP)expressionToken=expressionToken->expr;
+	if(expressionToken){ // could be a problem
+		// MDH@16OCT2019: I made ] ) and } again point to the associated [ ( and {, which of course should be pointing to NULL if it does not the command is incomplete
+		if(amVerbose())if(report)output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
+		if(report)
+		switch(expressionToken->type){
+			case TT_LIST:outputError("Missing end of list");break;
+			case TT_FUNCTION_CALL:outputError("Missing end of function call");break;
+			case TT_MAP:outputError("Missing end of map");break;
+			default:output("%sUnknown expression with first token of type %s left unfinished.\n",ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);break;
+		}
+		return false;
+		/* replacing:
+		// MDH@23JUL2019: we can now be very strict
+		//                the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
+		if(_userInputCommand->_lastToken->expr->type!=TT_EXPRESSION||(string_length(_userInputCommand->_lastToken->expr->text)&&string_char(_userInputCommand->_lastToken->expr->text,0)!=' ')){
+			outputError("Incomplete command");
+			return false;
+		}
+		*/
+		/* replacing:
+		// this is allowed if this token ends something that points to NULL
+		if((_userInputCommand->_lastToken->type!=TT_END_OF_LIST&&_userInputCommand->_lastToken->type!=TT_END_OF_FUNCTION_CALL&&_userInputCommand->_lastToken->type!=TT_END_OF_MAP)||_userInputCommand->_lastToken->expr->expr){
+			switch(_userInputCommand->_lastToken->expr->expr->type){
+				case TT_LIST:outputError("Missing end of list.");break;
+				case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
+				case TT_MAP:outputError("Missing end of map!");break;
+				default:outputError("Not enough parentheses.");break;
+			}
+			return false;
+		}
+		*/
+	}
+
+	// 4. can't end with function of function call
+	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
+	if(lastCommandToken->type==TT_FUNCTION){if(report)outputError("Function call missing at end of command");return false;}
+	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)outputError("Unfinished function call");return false;}
+	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)outputError("Unfinished list");return false;}
+	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)outputError("Unfinished string literal");return false;}
+	if(lastCommandToken->type==TT_EXPRESSION){if(report)outputError("Unfinished expression");return false;}
+	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return false;}
+	
+	return true;
+
+}
+
+void outputCommandInfo(Mcommand* command);
+
+// if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
+Mvalue* getCommandValue(Mcommand* command,char commandType){
+	if(amVerbose())outputCommandInfo(command);
+	if(!isAValidCommand(command,amVerbose()))return NULL;
+	getEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
+	if(amVerbose())outputLine("Evaluating...");
+	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
+}
+
+// MDH@29NOV2019: we're going to keep track of the system and user allocation counts
+size_t* getAllocationCountDifferences(size_t* from,size_t* to){
+
+}
+size_t *_systemallocationcounts,*_userallocationcounts;
+size_t *_lastcommandsystemallocationcounts,*_lastcommanduserallocationcounts;
+void prepareForEvaluatingCommand(){
+	// we need a new pre evaluation allocation counts
+	if(_lastcommandsystemallocationcounts)free(_lastcommandsystemallocationcounts);
+	_lastcommandsystemallocationcounts=_getAllocationCounts();
+	// using that we can update the system allocation counts by subtracting _lastcommanduserallocationcounts
+
+}
+void doneWithEvaluatingCommand(){
+
+}
+
+>>>>>>> a1679b76b7947aeebf9e0676736409271ba1dff3
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //                instead of returning a bool we could return the command text (or NULL if failing to do so????)
