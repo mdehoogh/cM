@@ -4,8 +4,6 @@
 
 #include "Mmemory.h"
 
-#include "Malloc.h"
-#include "Moutput.h"
 /**
  * _strdup() adds writing a error message to strdup()
  */

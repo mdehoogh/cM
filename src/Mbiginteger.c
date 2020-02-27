@@ -1,6 +1,3 @@
-#include "Msettings.h"
-#include "Moutput.h"
-
 #include "Mbiginteger.h"
 
 extern const long long M_LL_INVALID,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;

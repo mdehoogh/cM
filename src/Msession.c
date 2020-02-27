@@ -3,6 +3,7 @@
  * - interactive session stuff
  */
 #include <stdint.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <termios.h>
@@ -12,17 +13,13 @@
 
 #include "Msession.h"
 
-#include "Msettings.h"
-#include "Mconstants.h"
-#include "Mcolors.h"
-#include "Moutput.h"
-
 struct termios orig_termios;
 
 bool rawmode=false;
 
 void disableRawmode(){
     if(!rawmode)return;
+	printf("%s","Disabling character input mode.\n");
 	rawmode=false;
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
 }
@@ -36,6 +33,7 @@ void endOfUserInput(){
 
 void enableRawmode(){
     if(rawmode)return;
+	printf("%s","Enabling character input mode.\n");
 	rawmode=true;
 	tcgetattr(STDIN_FILENO,&orig_termios);
 	atexit(endOfUserInput); // or std::atexit() in C++
@@ -49,13 +47,7 @@ void enableRawmode(){
 ///////char inputChar='\0'; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
 // currently inputCharRead() blocks until a character can be read (and put in inputChar)
 bool inputCharRead(char* inputChar){enableRawmode();return(read(STDIN_FILENO,inputChar,1)==1);}
-int kbhit(){
-    struct timeval tv={0L,0L};
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(0, &fds);
-    return select(1,&fds,NULL,NULL,&tv);
-}
+
 int getch(){
 	// ASSERT assume in one-character-at-a-time-mode!!!
     int r;unsigned char c;
@@ -68,26 +60,40 @@ int getch(){
 // interfacing with the console
 void oneLineUp(){outputControlText("1A");} // ascertain that the previous line is visible
 void oneLineDown(){outputControlText("1B");} // one line down
-void toStartOfLine(){outputChar('\r');}
+void toStartOfLine(){outputChar('\r');} // replacing: '\r');}
 void clearLine(){toStartOfLine();outputControlText("K");} // MDH@30OCT2019: adjusted to always to the start of the line before clearing it, this is to ascertain that any called does not need toStartOfLine() per se
-void moveCursorLeft(uint16_t pos){if(pos)output(ES"%huD",pos);} // TODO can't use outputControlText here!!!
-void moveCursorRight(uint16_t pos){if(pos)output(ES"%huC",pos);} // TODO can't use outputControlText here!!!
-void clearScreenFromCursor(){outputControlText("J");}
+
+void moveCursorLeft(uint16_t pos){
+	if(pos)output(ES"%huD",pos);
+} // TODO can't use outputControlText here!!!
+
+void moveCursorRight(uint16_t pos){
+	if(pos)output(ES"%huC",pos);
+} // TODO can't use outputControlText here!!!
+
+void clearScreenFromCursor(){
+	outputControlText("J");
+}
 void clearDisplay(){
 	clearScreenFromCursor();// replacing: outputControlText("2J");
 }
-void beep(){outputChar('\a');}
+void beep(){outputChar(7);} // replacing \a
 void removeLastCharacter(){outputChar('\b');}
 void hidecursor(){outputControlText("?25l");}
 void showcursor(){outputControlText("?25h");}
 void emptyline(){outputControlText("2K\r");}
 void backspace(){outputControlText("D"); /* go left one character */ outputControlText("K"); /* clear the rest of the line */}
 
-void setColor(char const * const colortext){output(ES"38;5;%sm",colortext);}
-void setBackColor(char const * const colortext){output(ES"48;5;%sm",colortext);}
+void setColor(char const * const colortext){
+	output(ES"38;5;%sm",colortext);
+}
+void setBackColor(char const * const colortext){
+	output(ES"48;5;%sm",colortext);
+}
 
 void resetOutputColor(){setColor(getInfoColor());setBackColor(getBackgroundColor());}
 
+// MDH@27FEB2020: delegating to outputInfo after resetting the output color
 void outputLine(char* s){resetOutputColor();output("%s\n",s);} // for writing a single line of output text in the info color
 
 void activateColorscheme(){

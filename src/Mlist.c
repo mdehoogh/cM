@@ -1,9 +1,5 @@
 #include "Mlist.h"
 
-#include "Malloc.h"
-#include "Msettings.h"
-#include "Moutput.h"
-
 extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 extern long double M_LD_NAN;
 extern char const * const ERROR_PREFIX;

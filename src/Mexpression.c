@@ -1,10 +1,8 @@
-#include "Malloc.h"
 #include "Mexpression.h"
-#include "Moutput.h"
 
 void free_token(Mtoken* _token){
     if(_token){
-        output("Freeing token '%s'.\n",string(_token->text));
+        if(amDebugging())output("Freeing token '%s'.\n",string(_token->text));
         if(_token->next)free_token(_token->next);
         if(_token->text)free_string(_token->text);
         FREE(_token,'O');

@@ -16,7 +16,7 @@ struct{
 }allocations;
 
 // you HAVE to call this method to be able to register allocations
-bool allocationrecordinginitialized(){
+bool allocationRecordingInitialized(){
     printf("Initializing allocation recording...\n");
     allocations.l=0;
 #ifndef __PRODUCTION__
@@ -108,7 +108,7 @@ bool resetAllocationTypes(){
     if(_allocationcounts)free(_allocationcounts);
     if(allocations._chars)free(allocations._chars);
     ////////printf("Allocation type counts reset.\n");
-    return allocationrecordinginitialized();
+    return allocationRecordingInitialized();
 }
 // MDH@25NOV2019: markAllcoationTypes() remembers the current allocation type counts in the 4th and 5th element
 void markAllocationCounts(){

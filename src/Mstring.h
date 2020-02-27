@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "Malloc.h"
+
 #define BLOCK_SIZE 16
 
 typedef struct{

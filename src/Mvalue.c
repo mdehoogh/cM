@@ -2,13 +2,6 @@
 #include <limits.h>
 #include <math.h>
 
-#include "Malloc.h"
-#include "Mstring.h"
-#include "Msettings.h"
-#include "Moutput.h"
-// TODO find a way NOT to have to include Msession here (now for using outputLine!!)
-#include "Msession.h"
-
 #include "Mvalue.h"
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
@@ -94,7 +87,7 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak){
     if(_mapelement){
         if(amVerbose()&&amDebugging())output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
         if(_mapelement->_next){
-            if(!free_mapelement(_mapelement->_next,weak))outputError("Failed to free a map element!");//////else outputLine("Next map element freed!");
+            if(!free_mapelement(_mapelement->_next,weak))outputError("Failed to free a map element!");//////else outputInfo("Next map element freed!");
             _mapelement->_next=NULL;
         }
         if(_mapelement->_variable){
@@ -107,7 +100,7 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak){
         }else
             outputWarning("No map attribute to free!");
         FREE(_mapelement,'m');
-        if(amVerbose()&&amDebugging())outputLine("\tMap element freed!");
+        if(amVerbose()&&amDebugging())outputInfo("\tMap element freed!");
         return true;
     }
     return false;
@@ -115,7 +108,7 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak){
 void free_map(Mmap* _map){
     if(_map){
         if(amDebugging()&&amVerbose())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
-        if(_map->_first){free_mapelement(_map->_first,_map->weak);_map->_first=NULL;}else outputLine("No map attributes to free!");
+        if(_map->_first){free_mapelement(_map->_first,_map->weak);_map->_first=NULL;}else outputInfo("No map attributes to free!");
         FREE(_map,'M');
     }
 }/* VALIDATED */
@@ -200,14 +193,14 @@ size_t getNumberOfRemovedValues(){
             checked++;
             if(showDebugInfo)output("Checking value #%llu with id %llu.\n",checked,_valueListelement->index);
             if(_valueListelement->_value){
-                if(showDebugInfo)outputLine("\tChecking the count!");
+                if(showDebugInfo)outputInfo("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
                     if(showDebugInfo)output("\tAbout to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                     free_value(_valueListelement->_value);
                     _valueListelement->_value=NULL; // just in case
                     tofree++;
                 }else
-                if(showDebugInfo)outputLine("\tStill in use!");
+                if(showDebugInfo)outputInfo("\tStill in use!");
             }else
                 output("%sNo value stored in value #%llu.\n",ERROR_PREFIX,checked);
             _valueListelement=_valueListelement->_next;
@@ -243,7 +236,7 @@ size_t getNumberOfRemovedValues(){
         }
     }
     if(tofree){
-        if(tofree>removed)output("WARNING: Failed to free %llu unused value list elements.\n",(tofree-removed));else if(showDebugInfo)outputLine("All unused value list elements freed!");
+        if(tofree>removed)output("WARNING: Failed to free %llu unused value list elements.\n",(tofree-removed));else if(showDebugInfo)outputInfo("All unused value list elements freed!");
     }
     return removed;
 }/* VALIDATED */
@@ -268,7 +261,7 @@ bool decrementReferenceCount(Mvalue* _value){
         output("BUG: Reference count of '%s' of type '%c' already zero.\n",string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
         free_string(_valueText);
     }else
-    if(amVerbose())outputLine("No value to decrement the reference count of.");
+    if(amVerbose())outputInfo("No value to decrement the reference count of.");
     return true;
 }/* VALIDATED */
 bool incrementReferenceCount(Mvalue* _value){
@@ -276,7 +269,7 @@ bool incrementReferenceCount(Mvalue* _value){
         (_value->count)++;
         return true;
     }
-    if(amVerbose())outputLine("No value to increment the reference count of.");
+    if(amVerbose())outputInfo("No value to increment the reference count of.");
     return false;
 }/* VALIDATED */
 // interface functions that use the above functions
@@ -300,13 +293,13 @@ void free_reference(Mreference* reference){
     if(reference){reference->variable->referencecount--;FREE(reference,'Q');}
 }
 Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure){
-    if(!_reference){outputLine("No reference to wrap.");return NULL;}
+    if(!_reference){outputInfo("No reference to wrap.");return NULL;}
     Mvalue* _referenceValue=__value("reference");
     if(_referenceValue){_referenceValue->type=VT_REFERENCE;_referenceValue->value._reference=_reference;}else if(freeonfailure)free_reference(_reference);
     return _referenceValue;
 }
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
-    if(!_decimal){outputLine("No decimal to wrap.");return NULL;}
+    if(!_decimal){outputInfo("No decimal to wrap.");return NULL;}
     Mvalue* _decimalValue=__value("decimal");
     //////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
     if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
@@ -330,7 +323,7 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
         if(freeonfailure)free_biginteger(_biginteger);
         if(amVerbose()){output("%s",ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
     }else
-    if(amVerbose())outputLine("No big integer to wrap.");
+    if(amVerbose())outputInfo("No big integer to wrap.");
     return _bigintegerValue;
 }/* VALIDATED */
 Mvalue* _getFloatValue(long double ld){
@@ -463,7 +456,7 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     _map->_last=_mapelement;
-                    if(amDebugging())outputLine("Returning the single float map!");
+                    if(amDebugging())outputInfo("Returning the single float map!");
                     return _map;
                 }
                 outputError("Failed to create the float variable map");
@@ -565,7 +558,7 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
                     _mapelement->_variable=_integerVariable;
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    if(amVerbose())outputLine("Returning the single integer map!");
+                    if(amVerbose())outputInfo("Returning the single integer map!");
                     return _map;
                 }
                 outputError("Failed to create the integer variable map");
@@ -682,7 +675,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
                    _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     _map->_last=_mapelement;
-                    if(amDebugging())outputLine("Returning the single list map!");
+                    if(amDebugging())outputInfo("Returning the single list map!");
                     return _map;
                 }
                 outputError("Failed to create the list variable map");
@@ -991,7 +984,7 @@ void checkList(Mlist* _list){
             (_nextListelement->index)++;
             if(amDebugging()){outputValue("Index of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);}
             _nextListelement=_nextListelement->_next;
-            if(amDebugging()){if(_nextListelement)outputLine("A element to consider!");else outputLine("No next element to consider!");}
+            if(amDebugging()){if(_nextListelement)outputInfo("A element to consider!");else outputInfo("No next element to consider!");}
         }
         if(amVerbose())outputValue("'",_listelement->_value,"' prepended.\n");
     }

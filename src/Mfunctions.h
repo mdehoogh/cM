@@ -43,7 +43,7 @@ Mvalue* Msqrt(Mvalue* _value);
 
 // additional one-argument functions
 Mvalue* Mout(Mvalue* _value); // for writing text to standard output (console)
-Mvalue* Min(Mvalue* value); // for reading text from standard input (console)
+// MDH@27FEB2020 moved over to M.c as it uses inputCharRead in Msession.c: Mvalue* Min(Mvalue* value); // for reading text from standard input (console)
 
 Mvalue* Mbc(Mvalue* _value); // get a background color text representation where value indicates a color in 256-color mode, so an integer in range [0,255]
 Mvalue* Mtc(Mvalue* _value); // get a text color text representation

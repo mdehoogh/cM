@@ -1,7 +1,5 @@
 #include "Msettings.h"
 
-#include "Moutput.h"
-
 // Edit flags
 bool acceptinghistorycommand=true; // whether to immediately accept a history command
 bool matchingparentheses=true;  // by default will 'match' parentheses

@@ -12,53 +12,14 @@
 #include <limits.h>
 #include <math.h>
 
-#include "Malloc.h"
-#include "Mstring.h"
-#include "Msettings.h"
-#include "Moutput.h"
-// TODO find a way NOT to have to include Msession here (now for using outputLine!!)
-#include "Msession.h"
-
 #include "Mexecution.h"
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char* const ERROR_PREFIX;
-extern const char* const WARNING_PREFIX;
-extern const char* const BUG_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const char* const M_UNDEFINED_VALUE_TEXT; // TODO might be called M_NULL_VALUETEXT though
 extern const mpd_context_t* _decimalContext;
-
-void outputError(char const * const error){
-    size_t l=(error?strlen(error):0);
-    if(l==0)return;
-    if(!ERROR_PREFIX)return;
-    output("%s%s",ERROR_PREFIX,error);
-    l--;if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    newline();
-    // replacing: if(error)output("%s%s.\n",ERROR_PREFIX,error);
-}
-void outputWarning(char const * const warning){
-    size_t l=(warning?strlen(warning):0);
-    if(l==0)return;
-    if(!WARNING_PREFIX)return;
-    output("%s%s",WARNING_PREFIX,warning);
-    l--;if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    newline();
-}
-void outputMemoryError(char const * const memoryerror){
-    if(memoryerror)output("%s%s. Probable cause: out of memory!\n",ERROR_PREFIX,memoryerror);
-}
-void outputBug(char const * const bug){
-    size_t l=(bug?strlen(bug):0);
-    if(l==0)return;
-    if(!BUG_PREFIX)return;
-    output("%s%s",BUG_PREFIX,bug);
-    l--;if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
-    newline();
-} // MDH@05NOV2019: might come in handy to be able to report bugs
-void outputErrorAndText(char const * const error,char const * const text){if(error)output("%s%s",ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
 static int8_t littleEndian=-1;
 // NOTE force execution immediately (don't think this is working)
@@ -133,11 +94,11 @@ bool initExecution(){
  */
 void free_biginteger(Mbiginteger* biginteger){
     if(biginteger){
-        if(amDebugging())outputLine("Freeing a big integer."); // TODO can we display the value?
+        if(amDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
         FREE(biginteger,'B'); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
     }else
-    if(amVerbose())outputLine("No big integer to free!");
+    if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
 Mbiginteger* __biginteger(){
     Mbiginteger* biginteger=(Mbiginteger*)CALLOC(1,sizeof(Mbiginteger),'B');
@@ -259,21 +220,21 @@ void free_text(Mtext* _text){
     if(_text){
         FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
     }else
-    if(amDebugging())outputLine("No text to free!");
+    if(amDebugging())outputInfo("No text to free!");
 }/* VALIDATED */
 void free_integer(Minteger* _integer){
     if(_integer){
         if(amVerbose())output("Freeing integer %llu.\n",_integer->ll);
         FREE(_integer,'I');
     }else
-    if(amDebugging())outputLine("No integer to free!");
+    if(amDebugging())outputInfo("No integer to free!");
 }/* VALIDATED */
 void free_float(Mfloat* _float){
     if(_float){
         if(amVerbose())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
         FREE(_float,'F');
     }else
-    if(amDebugging())outputLine("No real to free!");
+    if(amDebugging())outputInfo("No real to free!");
 }/* VALIDATED */
 
 // ALLOCATORS (private)
@@ -680,7 +641,7 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
             // determine the required size
             int arepsize=0;
             ///outputChar('C');
-            ///////if(amVerbose())outputLine("Determining a big integer text representation.");
+            ///////if(amVerbose())outputInfo("Determining a big integer text representation.");
             if(mp_radix_size(_biginteger,10,&arepsize)==MP_OKAY){
                 ///outputChar('D');
                 ////////output("Representation size: %d.\n",arepsize);
@@ -706,7 +667,7 @@ Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
 
 Mbiginteger* getBigintegerLLMin(){
     if(!_biLLMin){
-        if(amVerbose())outputLine("Determining the big integer equivalent of the smallest small integer.");
+        if(amVerbose())outputInfo("Determining the big integer equivalent of the smallest small integer.");
         _biLLMin=_getBiginteger(M_LL_MIN);
         if(amVerbose())outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
     }
@@ -714,7 +675,7 @@ Mbiginteger* getBigintegerLLMin(){
 }/* VALIDATED */
 Mbiginteger* getBigintegerLLMax(){
     if(!_biLLMax){
-        if(amVerbose())outputLine("Determining the big integer equivalent of the largest small integer.");
+        if(amVerbose())outputInfo("Determining the big integer equivalent of the largest small integer.");
         _biLLMax=_getBiginteger(M_LL_MAX);
         if(amVerbose())outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
     }

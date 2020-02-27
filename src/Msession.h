@@ -13,7 +13,7 @@
 // input functions
 void enableRawmode();
 bool inputCharRead(char* inputChar); // passing in a pointer to where the input character is to be stored...
-int kbhit(); // check whether keyboard hit
+// MDH@27FEB2020 moved over to Mmessage.h: int kbhit(); // check whether keyboard hit
 //int getch();
 
 /////////char getInputChar();

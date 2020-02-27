@@ -4,11 +4,6 @@
 
 #include "Mdecimal.h"
 
-#include "Malloc.h"
-#include "Msettings.h"
-#include "Moutput.h"
-#include "Msession.h"
-
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 extern long double const M_LD_NAN;
 extern char const * const ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
@@ -368,7 +363,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
 						if(amVerbose())if(_p)output("Decimal text so far: '%s'.\n",string(_p));
 
 						// if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
-						if(isBigintegerZero(_remainderListelement->_biginteger)){if(amVerbose())outputLine("Remainder is zero, so the decimal is finished.");break;}
+						if(isBigintegerZero(_remainderListelement->_biginteger)){if(amVerbose())outputInfo("Remainder is zero, so the decimal is finished.");break;}
 					}
 					if(_firstRemainderListelement)free_bigintegerListelement(_firstRemainderListelement); // replacing: free_list(_remainderList);
 					if(!_p){free_string(_decimalText);_decimalText=NULL;} // some failure occurred
@@ -407,7 +402,7 @@ void report_mpd_status(uint32_t mpd_status){
 		if(mpd_status&MPD_Underflow)output(" Underflow error");
 		output("\n");
 	}else
-		outputLine("No decimal context status.");
+		outputInfo("No decimal context status.");
 }
 
 bool mpd_error(mpd_context_t const * const mpd_context){return(mpd_getstatus(mpd_context)&0xEFBF)!=0;}
@@ -798,7 +793,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 		mpd_t *d8=__mpd(mpd_context,8),*d32=__mpd(mpd_context,32);
 #endif
 		if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
-		if(amVerbose())outputLine("\tInitial helper decimals created!");
+		if(amVerbose())outputInfo("\tInitial helper decimals created!");
 		unsigned long long iter=0;
 		if(amVerbose()){
 			output("\tIteration %u:",iter);
@@ -825,7 +820,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 		long long iterthen=iter,seconds=0; // report every second
 		int cmp;
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
-		outputLine("In the approximation two additional decimal digits will be computed after which rounding will be applied cutting off the two extra decimals.");
+		outputInfo("In the approximation two additional decimal digits will be computed after which rounding will be applied cutting off the two extra decimals.");
 		if(then>=0)output("Iterations per second (abort by pressing any key):");
 		bool interrupted=false;
 		while(!mpd_error(mpd_context)){
@@ -962,7 +957,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 		if(!decimalcontext->pi)
 			outputError("Failed to store the decimal approximation of pi in the decimal context");
 		else
-			outputLine("The decimal approximation of pi was stored in the decimal context.");
+			outputInfo("The decimal approximation of pi was stored in the decimal context.");
 		// TODO should I mpd_finalize the pi values stored? or for now leave them unrounded?????????
 
 		// get rid of all the decimals we used
@@ -1003,7 +998,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 
 	}else{ // decimalcontext->pi exists
 
-		if(amVerbose())outputLine("NOTE: Returning the decimal approximation of pi stored in the decimal context.");
+		if(amVerbose())outputInfo("NOTE: Returning the decimal approximation of pi stored in the decimal context.");
 		// a copy to return
 		_decimal=_getDecimal(get_mpd_copy(mpd_context,decimalcontext->pi),decimalprecision,0,true);
 
@@ -1038,11 +1033,11 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			mpd_t *_0=__mpd(mpd_context,0),*_1=__mpd(mpd_context,1),*_predefined=__mpd(mpd_context,0),*_rotationsine=__mpd(mpd_context,0),*_rotationcosine=__mpd(mpd_context,0),*_t1=__mpd(mpd_context,0),*_t2=__mpd(mpd_context,0),*_t3=__mpd(mpd_context,0),*_t4=__mpd(mpd_context,0);
 			decimalcontext->predefinedsinedeltaangle=__mpd(mpd_context,0);
 			if(decimalcontext->predefinedsinedeltaangle&&_0&&_1&&_predefined&&_rotationsine&&_rotationcosine&&_t1&&_t2&&_t3&&_t4){
-				if(_intermediateResult)outputLine("Precomputing 257 equidistant sines in [0,pi/2].");
+				if(_intermediateResult)outputInfo("Precomputing 257 equidistant sines in [0,pi/2].");
 				for(int index=256;index>=0;index--)decimalcontext->predefinedsines[index]=__mpd(mpd_context,0); // create all 257 predefined sines instances...
 				// initialize the first and last sine
 				mpd_qcopy(decimalcontext->predefinedsines[256],_1,&status);mpd_qcopy(decimalcontext->predefinedsines[0],_0,&status);
-				if(_intermediateResult)outputLine("Predefined sine of 0 and pi/2 radians set.");
+				if(_intermediateResult)outputInfo("Predefined sine of 0 and pi/2 radians set.");
 				// now we can half index and use the predefined sine and cosine to compute the new sine and cosine
 				int16_t index=256;
 				// store pi/512 or (pi/2)/256 in the predefinedsinedeltaangle!!!
@@ -1066,7 +1061,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 						if(_intermediateResult){output("Constituent predefined sine #%" PRIu16 ":",256-index);_intermediateResult->mpd=decimalcontext->predefinedsines[256-index];outputDecimal(" ",_intermediateResult,".\n");}
 					}
 				}
-				if(_intermediateResult)outputLine("Constituent predefined sines computed!");
+				if(_intermediateResult)outputInfo("Constituent predefined sines computed!");
 				// now we know all the initial predefined sines and cosines that we may now use to compute all sines in between
 				uint16_t rotationindex,inbetweenindex=128,skipindex=64;
 				// from 127 through 3 that's all we need to do
@@ -1094,7 +1089,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 					mpd_qcopy(decimalcontext->predefinedsines[256-inbetweenindex],_rotationcosine,&status);
 				}
 				if(_intermediateResult){
-					outputLine("Predefined sines:");
+					outputInfo("Predefined sines:");
 					for(int index=0;index<=256;index++){
 						output("#%d",index);
 						_intermediateResult->mpd=decimalcontext->predefinedsines[index];
@@ -1169,7 +1164,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 				Msincoselement* _lastCordicElement=NULL;
 				while((status&0xEFBF)==0){
 					iteration++;
-					if(iteration==mpd_context->prec*10){outputLine("Computation of CORDIC angles stopped when exceeding the maximum number of iterations.");break;}
+					if(iteration==mpd_context->prec*10){outputInfo("Computation of CORDIC angles stopped when exceeding the maximum number of iterations.");break;}
 					mpd_qdiv_u32(_cordicangle,_cordicangle,2,mpd_context,&status); // divide the angle by 2
 					// we need the cosine to compute the sine of half the angle
 					// initially this cosine will equal _cos15 and we will use _cos15 to compute the new sine
@@ -1991,7 +1986,7 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the CORDIC sine of");return NULL;}
-					if(amVerbose())outputLine("Computing the CORDIC sine of a negative decimal.");
+					if(amVerbose())outputInfo("Computing the CORDIC sine of a negative decimal.");
 				}
 				mpd_t* _CORDICsine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2041,10 +2036,10 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 							///*
 							if(_CORDICsine){
 								if((_absx!=NULL)!=(xquadrant==2||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
-									if(amVerbose())outputLine("Negating the computed CORDIC sine!");
+									if(amVerbose())outputInfo("Negating the computed CORDIC sine!");
 									mpd_set_negative(_CORDICsine); // negate the _sine
 								}else
-								if(amVerbose())outputLine("Not negating the CORDIC sine!");
+								if(amVerbose())outputInfo("Not negating the CORDIC sine!");
 								if(amVerbose()){
 									Mdecimal* _decimal=__decimal(mpd_context,0,0);
 									if(_decimal){
@@ -2093,7 +2088,7 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the CORDIC cosine of");return NULL;}
-					if(amVerbose())outputLine("Computing the CORDIC cosine of a negative decimal.");
+					if(amVerbose())outputInfo("Computing the CORDIC cosine of a negative decimal.");
 				}
 				mpd_t* _CORDICcosine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2143,10 +2138,10 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 							///*
 							if(_CORDICcosine){
 								if(xquadrant==1||xquadrant==2){
-									if(amVerbose())outputLine("Negating the computed CORDIC cosine!");
+									if(amVerbose())outputInfo("Negating the computed CORDIC cosine!");
 									mpd_set_negative(_CORDICcosine); // negate the _sine
 								}else
-								if(amVerbose())outputLine("Not negating the CORDIC cosine!");
+								if(amVerbose())outputInfo("Not negating the CORDIC cosine!");
 								if(amVerbose()){
 									Mdecimal* _decimal=__decimal(mpd_context,0,0);
 									if(_decimal){
@@ -2269,7 +2264,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
-					if(amVerbose())outputLine("Computing the sine of a negative decimal.");
+					if(amVerbose())outputInfo("Computing the sine of a negative decimal.");
 				}
 				mpd_t* _sine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2343,7 +2338,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 										free_decimal(_decimal);
 									}else
 										outputChar('?');
-									outputLine(".");
+									outputInfo(".");
 								}
 								// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
 								// which consists of two terms that need to be added or subtracted
@@ -2398,7 +2393,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 										free_decimal(_decimal);
 									}else
 										outputChar('?');
-									outputLine(".");
+									outputInfo(".");
 								}
 								// with the relative angle we can compute the sine using sin(a+/-b)=sin(a)cos(b)+/-sin(b)cos(a)
 								// which consists of two terms that need to be added or subtracted
@@ -2461,11 +2456,11 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 							*/
 							if(_sine){
 								if((_absx!=NULL)!=(xquadrant==2||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
-									if(amVerbose())outputLine("Negating the computed sine!");
+									if(amVerbose())outputInfo("Negating the computed sine!");
 									mpd_set_negative(_sine); // negate the _sine
 								}else
 								if(amVerbose())
-									outputLine("Not negating the sine!");
+									outputInfo("Not negating the sine!");
 							}else
 								outputError("Failed to compute the sine of the normalized decimal");
 						}
@@ -2503,7 +2498,7 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the cosine of");return NULL;}
-					if(amVerbose())outputLine("Computing the cosine of a negative decimal.");
+					if(amVerbose())outputInfo("Computing the cosine of a negative decimal.");
 				}
 				mpd_t* _cosine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2615,7 +2610,7 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
-					if(amVerbose())outputLine("Computing the sine of a negative decimal.");
+					if(amVerbose())outputInfo("Computing the sine of a negative decimal.");
 				}
 				mpd_t* _tan=NULL; // the end result
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2681,11 +2676,11 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 
 							if(_tan){
 								if((_absx!=NULL)!=(xquadrant==1||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
-									if(amVerbose())outputLine("Negating the computed tangent!");
+									if(amVerbose())outputInfo("Negating the computed tangent!");
 									mpd_set_negative(_tan); // negate the _sine
 								}else
 								if(amVerbose())
-									outputLine("Not negating the tangent!");
+									outputInfo("Not negating the tangent!");
 							}else
 								outputError("Failed to compute the tangent of the normalized decimal");
 						}
@@ -2748,7 +2743,7 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 				}else
 					outputError("Failed to initialize the result of dexp()");
 			}else
-			if(amVerbose())outputLine("Zero argument to exp() approximation.");
+			if(amVerbose())outputInfo("Zero argument to exp() approximation.");
 			if(_exp)return _getDecimal(_exp,mpd_context->prec,0,true);
 		}else
 			outputError("No decimal context available for use in dexp().");

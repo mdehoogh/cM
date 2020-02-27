@@ -1,4 +1,7 @@
 #include <string.h>
+
+#include "Mexpression.h"
+
 // make a copy of _c on the heap, prints a error message when failing to do so!!
 char* _strdup(const char* const _c);
 

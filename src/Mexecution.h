@@ -23,26 +23,17 @@
 #include <math.h>
 #include <float.h>
 
-// for heap_string_copy() to copy char* stuff
-#include "Mmemory.h"
-
 // MDH@31MAY2019: big integer support switched from libzahl to libtommatch
 #include "tommath.h"
 
 // MDH@10JUN2019: decimal support by libmpdec
 #include "mpdecimal.h"
 
-#include "Mexpression.h"
+// for heap_string_copy() to copy char* stuff
+#include "Mmemory.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
-
-void outputError(char const * const error);
-void outputWarning(char const * const warning);
-void outputErrorAndText(char const * const error,char const * const text);
-// MDH@05NOV2019: some special error reporting (typically bugs and out of memory problems)
-void outputMemoryError(char const * const memoryerror);
-void outputBug(char const * const bug);
 
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated

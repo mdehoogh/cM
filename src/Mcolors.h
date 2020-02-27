@@ -4,6 +4,8 @@
  */
 #include <inttypes.h>
 
+#include "Msettings.h"
+
 #define NUMBER_OF_COLOR_SCHEMES 2
 
 const char* getInfoColor();

@@ -54,7 +54,7 @@ rm -f *.a
 cp ../lib/* .
 # make all files readable
 chmod 644 *
-cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec Malloc.c Mstring.c Msettings.c Mcolors.c Moutput.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mlist.c Mfunctions.c Menvironment.c M.c -o M 
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec Moutput.c Mmessage.c Malloc.c Mstring.c Msettings.c Mcolors.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mlist.c Mfunctions.c Menvironment.c Mshell.c M.c -o M 
 
 # check whether it is there!!!
 if [ -f M ]; then

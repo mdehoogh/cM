@@ -1,10 +1,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "Mmessage.h"
+
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
 size_t addallocation(char allocationtype,size_t size,size_t nitems);
-bool allocationrecordinginitialized();
+bool allocationRecordingInitialized();
 size_t allocationmark();
 size_t unmarkallocation(size_t mark);
 void allocationreport(size_t mark); // report on the current allocation status

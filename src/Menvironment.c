@@ -5,13 +5,6 @@
 #include <limits.h>
 #include <math.h>
 
-#include "Malloc.h"
-#include "Mstring.h"
-#include "Msettings.h"
-#include "Moutput.h"
-// TODO find a way NOT to have to include Msession here (now for using outputLine!!)
-#include "Msession.h"
-
 #include "Menvironment.h"
 
 // externally (in M.c) defined constants
@@ -784,7 +777,7 @@ bool setValue(const Menvironment* const _environment,const char* const name,cons
                         output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
                         free_string(_valueText);
                     }else
-                        outputLine("No value text!");
+                        outputInfo("No value text!");
                 }
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
@@ -925,7 +918,7 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
         _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC(1,sizeof(Mmap),'M')); // MDH@02NOV2019: force the map to be weak
         Mmap* functionParameterMap=_function->_parameterMap;
         if(_functionArgumentMap&&functionParameterMap){
-            if(amVerbose())outputLine("Matching the function parameters!");
+            if(amVerbose())outputInfo("Matching the function parameters!");
             Mmapelement* functionParameterMapelement=functionParameterMap->_first;
             unsigned long long argumentindex=0; // MDH@05NOV2019: because _argumentList could be sparse, i.e. have missing elements, we use an index that is used to find the argument list element with that index!!!
             Mlistelement* argumentListelement=_argumentList->_first;
@@ -959,7 +952,7 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
                 functionParameterMapelement=functionParameterMapelement->_next;
             }
         }
-        if(amVerbose())outputLine("Argument map created.");
+        if(amVerbose())outputInfo("Argument map created.");
     }
     return _functionArgumentMap;
 }/* VALIDATED */
@@ -1592,7 +1585,6 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedValueFunction(_getFunction(_environment,"return"),"return",Mreturn))return false;
 
     if(!completedValueFunction(_getFunction(_environment,"out"),"out",Mout))return false;
-    if(!completedValueFunction(_getFunction(_environment,"in"),"in",Min))return false;
 
     if(!completedValueFunction(_getFunction(_environment,"bc"),"bc",Mbc))return false;
     if(!completedValueFunction(_getFunction(_environment,"tc"),"tc",Mtc))return false;

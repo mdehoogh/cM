@@ -1,9 +1,6 @@
 #include "Mrational.h"
 
-#include "Malloc.h"
-#include "Msettings.h"
-#include "Moutput.h"
-#include "Msession.h"
+// MDH@27FEB2020 replacing: #include "Msession.h"
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char * const ERROR_PREFIX;
@@ -146,16 +143,16 @@ mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * con
         // TODO do we need to NULL the denominator????? if(c->den){free_biginteger(c->den);c->den=NULL;}
         // if b is not defined, or zero, copy a into c
         if(!b||!b->num||isBigintegerZero(b->num)==M_TRUE){ // b is undefined or zero: return a
-            if(amVerbose())outputLine("Second rational argument undefined or zero.");
+            if(amVerbose())outputInfo("Second rational argument undefined or zero.");
             if(a->num){c->num=_getBigintegerCopy(a->num);if(!c->num)return MP_ERR;}
             if(a->den){c->den=_getBigintegerCopy(a->den);if(!c->den)return MP_ERR;}
         }else
         if(!a||!a->num||isBigintegerZero(a->num)==M_TRUE){ // a is undefined or zero: return b
-            if(amVerbose())outputLine("First rational argument undefined or zero.");
+            if(amVerbose())outputInfo("First rational argument undefined or zero.");
             if(b->num){c->num=_getBigintegerCopy(b->num);if(!c->num)return MP_ERR;}
             if(b->den){c->den=_getBigintegerCopy(b->den);if(!c->den)return MP_ERR;}
         }else{
-            if(amVerbose())outputLine("Subtracting two pure rationals.");
+            if(amVerbose())outputInfo("Subtracting two pure rationals.");
             // ASSERT a and b both defined
             Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
             if(a->den||b->den)status=_bimul(a->den,b->den,&_den); // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
@@ -242,26 +239,26 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     if(status==MP_OKAY)status=_bimul(a->den,b->num,&_num2); // multiply denominator of a with numerator of b for the min term of the result numerator
     if(status==MP_OKAY)status=_biadd(_num1,_num2,&_num); // add the numerator parts
     // loose the numerator parts (are not stored in the result rational anyway)
-    ////outputLine("Rational numerator parts to free.");
+    ////outputInfo("Rational numerator parts to free.");
     if(_num1)free_biginteger(_num1);
     if(_num2)free_biginteger(_num2);
-    ////outputLine("Rational numerator parts freed.");
+    ////outputInfo("Rational numerator parts freed.");
     if(status!=MP_OKAY){ // numerator and denominator not computed both
-        ////outputLine("Freeing new numerator, denominator and delta!");
+        ////outputInfo("Freeing new numerator, denominator and delta!");
         if(_num)free_biginteger(_num);
         if(_den)free_biginteger(_den);
         //////if(_delta)free_float(_delta);
-        ////outputLine("New numerator, denominator and delta freed!");
+        ////outputInfo("New numerator, denominator and delta freed!");
     }else{ // numerator and denominator computed
         ////outputBiginteger("Storing numerator '",_num,"'");outputBiginteger(" and denominator '",_den,"'.\n");
         // too bad we have to clear the current numerator and denominator pointers (if any)
-        if(c&&c->num){if(amVerbose())outputLine("Freeing previous numerator.");free_biginteger(c->num);}
-        if(c&&c->den){if(amVerbose())outputLine("Freeing previous denominator.");free_biginteger(c->den);}
-        /////outputLine("Previous numerator and denominator released.");
+        if(c&&c->num){if(amVerbose())outputInfo("Freeing previous numerator.");free_biginteger(c->num);}
+        if(c&&c->den){if(amVerbose())outputInfo("Freeing previous denominator.");free_biginteger(c->den);}
+        /////outputInfo("Previous numerator and denominator released.");
         c->num=_num;c->den=_den;
-        /////outputLine("Numerator and denominator stored.");
+        /////outputInfo("Numerator and denominator stored.");
         // normalize the rational
-        /////outputLine("Normalizing the sum rational.");
+        /////outputInfo("Normalizing the sum rational.");
         c->normalized=false;normalizeRational(c);
         // register the delta sum
         ////////c->delta=_delta;
@@ -761,7 +758,7 @@ void free_rational(Mrational* _rational){
         if(_rational->delta)free_float(_rational->delta);
         FREE(_rational,'R');
     }else
-    if(amDebugging())outputLine("No rational to free!");
+    if(amDebugging())outputInfo("No rational to free!");
 }/* VALIDATED */
 
 // TODO should we free the given big integers when they are NOT bound to the rational that is being returned????
@@ -824,13 +821,13 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
                 // MDH@15AUG2019: we prefer the numerator to be negative instead of the denominator
                 // MDH@10OCT2019: TODO wouldn't it be better to be able to toggle the signs???? YES but I can't find a function in tommath to do so!!!!
                 if(_denominator&&mp_isneg(_denominator)==MP_YES){ // the given denominator is negative             
-                    if(amVerbose())outputLine("Moving the sign from the denominator to the numerator of the rational.");
+                    if(amVerbose())outputInfo("Moving the sign from the denominator to the numerator of the rational.");
                     // we have to get negated versions of both the numerator and the denominator
                     // if we succeed in doing so we use those otherwise we stick to using the current ones
                     Mbiginteger *_negatedNumerator=_getBigintegerNeg(_nonnullnumerator),*_negatedDenominator=_getBigintegerNeg(_denominator);
                     // actually we need both or neither
                     if(_negatedNumerator&&_negatedDenominator){ // succeeded in negating the numerator and denominator
-                        if(amVerbose())outputLine("Using the negated numerator and denominator.");
+                        if(amVerbose())outputInfo("Using the negated numerator and denominator.");
                         _rational->num=_negatedNumerator;
                         _rational->den=_negatedDenominator;
                         // NOTE that we do NOT free _numerator explicitly but if _numerator is not null, _nonnullnumerator will be equal to it and we're freeing the right thing, if _numerator is NULL we're freeing the created _getBiginteger(1) which is also the right thing to do
@@ -859,7 +856,7 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
                 }
                 /* replacing what was obviously not always correct:
                 if(_negatedNumerator&&_negatedDenominator){ // succeeded in negating the numerator and denominator
-                    if(amVerbose())outputLine("Using the negated numerator and denominator.");
+                    if(amVerbose())outputInfo("Using the negated numerator and denominator.");
                     _rational->num=_negatedNumerator;
                     _rational->den=_negatedDenominator;
                     // NOTE that we do NOT free _numerator explicitly but if _numerator is not null, _nonnullnumerator will be equal to it and we're freeing the right thing, if _numerator is NULL we're freeing the created _getBiginteger(1) which is also the right thing to do
@@ -978,7 +975,7 @@ Mstring* _getRationalText(const Mrational* const _rational){
             ///outputChar('o');
         }
     }else
-        if(amVerbose())outputLine("No rational to determine the text representation of.");
+        if(amVerbose())outputInfo("No rational to determine the text representation of.");
     outputChar('p');
     return _rationalText;
 }/* VALIDATED */

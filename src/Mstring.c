@@ -1,5 +1,4 @@
 #include "Mstring.h"
-#include "Malloc.h"
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //                TODO if blocks is zero failed to 

@@ -1,8 +1,5 @@
 #include <stdint.h>
 
-#include "Msettings.h"
-#include "Moutput.h"
-#include "Msession.h"
 #include "Mfunctions.h"
 
 extern char const * const VALUETYPENAMES[];
@@ -13,19 +10,19 @@ extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating th
 
 void outputDecimalStatus(uint32_t status){
 	if(status>0){
-		outputLine("Decimal computations error report.");
-		if(status&MPD_IEEE_Invalid_operation)outputLine("\tIEEE Invalid operation error.");
-		if(status&MPD_Clamped)outputLine("\tClamped error.");
-		if(status&MPD_Division_by_zero)outputLine("\tDivision by zero error.");
-		if(status&MPD_Fpu_error)outputLine("\tFPU error.");
-		if(status&MPD_Inexact)outputLine("\tInexact error.");
-		if(status&MPD_Not_implemented)outputLine("\tNot implemented error.");
-		if(status&MPD_Overflow)outputLine("\tOverflow error.");
-		if(status&MPD_Rounded)outputLine("\tRounding error.");
-		if(status&MPD_Subnormal)outputLine("\tSubnormal error.");
-		if(status&MPD_Underflow)outputLine("\tUnderflow error.");
+		outputInfo("Decimal computations error report.");
+		if(status&MPD_IEEE_Invalid_operation)outputInfo("\tIEEE Invalid operation error.");
+		if(status&MPD_Clamped)outputInfo("\tClamped error.");
+		if(status&MPD_Division_by_zero)outputInfo("\tDivision by zero error.");
+		if(status&MPD_Fpu_error)outputInfo("\tFPU error.");
+		if(status&MPD_Inexact)outputInfo("\tInexact error.");
+		if(status&MPD_Not_implemented)outputInfo("\tNot implemented error.");
+		if(status&MPD_Overflow)outputInfo("\tOverflow error.");
+		if(status&MPD_Rounded)outputInfo("\tRounding error.");
+		if(status&MPD_Subnormal)outputInfo("\tSubnormal error.");
+		if(status&MPD_Underflow)outputInfo("\tUnderflow error.");
 	}else
-		outputLine("No decimal context errors.");
+		outputInfo("No decimal context errors.");
 }
 
 // applying unary operators by means of functions
@@ -112,7 +109,7 @@ Mvalue* Msin(Mvalue* _value){
             Mdecimal *_numeratorDecimal=__decimal(_decimalContext,0,0),*_denominatorDecimal=__decimal(_decimalContext,1,0),*_multiplierDecimal=__decimal(_decimalContext,0,0);
             Mdecimal *_piDecimal=pi_decimal(NULL);
             if(_sineDecimal&&_qDecimal&&_twoDecimal&&_squareDividedByPiDecimal&&_numeratorDecimal&&_denominatorDecimal&&_multiplierDecimal&&_2nplus1Decimal&&_dividedByPiDecimal&&_piDecimal){
-                if(amVerbose())outputLine("Ready to compute the sine of a decimal.");
+                if(amVerbose())outputInfo("Ready to compute the sine of a decimal.");
                 // to use the product formula I found on internet at matrixlab-examples.com I need to compute (x/pi)^2, I suppose I need to subtract 2*pi until the result is between -pi and pi
                 // so if we divide the input by pi we get a value that should be between -1 and 1, so we have to divide it by pi and use the remainder
                 Mdecimal* _decimal=_value->value._decimal;
@@ -120,7 +117,7 @@ Mvalue* Msin(Mvalue* _value){
                 int neg=mpd_isnegative(_decimal->mpd);
                 Mdecimal* _negatedDecimal=(neg?__adecimal():_decimal);if(!_negatedDecimal)status=1;else if(neg)mpd_qcopy_negate(_negatedDecimal->mpd,_decimal->mpd,&status);
                 if((status&0xEFBF)==0){
-                    if(amVerbose())outputLine("Determining the normalized decimal to use as argument of the sine approximation.");
+                    if(amVerbose())outputInfo("Determining the normalized decimal to use as argument of the sine approximation.");
                     // NOTE the remainder is the starting value of the sine approximation
                     mpd_qdivmod(_qDecimal->mpd,_sineDecimal->mpd,_negatedDecimal->mpd,_piDecimal->mpd,_decimalContext,&status);
                     if((status&0xEFBF)==0){
@@ -137,7 +134,7 @@ Mvalue* Msin(Mvalue* _value){
                                 // the initial value of the sine decimal is the product of _negatedDecimal and the square of _dividedByPiRemainderDecimal
                                 mpd_qmul(_squareDividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_dividedByPiDecimal->mpd,_decimalContext,&status);
                                 if((status&0xEFBF)==0){
-                                    /////////if(amVerbose())outputLine("Product multiplier numerator subcomputed.");
+                                    /////////if(amVerbose())outputInfo("Product multiplier numerator subcomputed.");
                                     mpd_qsub(_numeratorDecimal->mpd,_denominatorDecimal->mpd,_squareDividedByPiDecimal->mpd,_decimalContext,&status);
                                     if((status&0xEFBF)==0){
                                         if(amVerbose())outputDecimal("Multiplier: '",_numeratorDecimal,"' -> ");
@@ -146,7 +143,7 @@ Mvalue* Msin(Mvalue* _value){
                                         ///////////////if(amVerbose())outputDecimal("Second approximation to the sine: '",_sineDecimal,"'.\n");
                                         int64_t count=M_LL_MAX;
                                         while((status&0xEFBF)==0){
-                                            if(--count==0){outputLine("Maximum number of iterations exceeded!");break;}
+                                            if(--count==0){outputInfo("Maximum number of iterations exceeded!");break;}
                                             if(amVerbose())outputDecimal("Sine approximation: '",_sineDecimal,"'.\n");
                                             mpd_qadd(_2nplus1Decimal->mpd,_2nplus1Decimal->mpd,_twoDecimal->mpd,_decimalContext,&status);if((status&0xEFBF)!=0)break; // add 2 to 2n+1 to get 2(n+1)+1 so becoming 3, 5, 7, ....
                                             // add _2nplus1Decimal to the numerator and denominator
@@ -521,7 +518,7 @@ Mvalue* Mfacd(Mvalue* _value){
 
 // TODO remember intermediate values in some list, that we can use as starting point
 Mvalue* Mfac(Mvalue* _value){
-    if(!_value){if(amVerbose())outputLine("No argument to factorial() function!");return NULL;}
+    if(!_value){if(amVerbose())outputInfo("No argument to factorial() function!");return NULL;}
     if(amVerbose())outputValue("Argument of factorial() function: '",_value,"'.\n");
     if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){outputValue("\nERROR: Non-integer argument '",_value,"' to factorial() function!");return NULL;}
     // some special cases (i.e. the input number is smaller than 2)
@@ -576,71 +573,6 @@ Mvalue* Mout(Mvalue* _value){
     if(result>0)output("%s",string(_valueText));
     free_string(_valueText);
     return _getIntegerValue(result);
-}
-// method for reading a text from standard out which means reading characters until Enter-key is encountered!!
-Mvalue* Min(Mvalue* value){
-    Mvalue* result=NULL;
-    // value represents the text to write in front of the prompt for text i.e. it's a prompt text
-    Mout(value); // just get it out!!!!
-    Mstring* _inText=_getString("'"); // initialize _inText to a a single quote character (as required by _getTextValue)
-    char c;
-    while(inputCharRead(&c)){ // should be Ok to use inputCharRead() here
-        outputChar(c);/////output("[%u]",c);
-        // how about allowing starting over (with Ctrl-C)
-        if(c==13||c==10)break;
-        if(c==3){
-            string_setlength(_inText,1);
-            outputChar('\n');
-            Mout(value);
-            continue;
-        }
-        if(c==127){
-            if(string_length(_inText)>1){
-                // take the last character off
-                string_setlength(_inText,string_length(_inText)-1);
-                backspace();
-                outputChar(' ');
-                backspace();
-            }else
-                beep();
-            continue;
-        }
-        if(c==27){ // Escape sequence
-            if(inputCharRead(&c)){
-                if(c==91){
-                    if(inputCharRead(&c)){
-                        if(c==51){
-                            if(inputCharRead(&c)){
-                                if(c==126){ // delete
-                                    beep();
-                                }
-                            }
-                        }else
-                        if(c==65){ // up arrow 
-                            beep();
-                        }else
-                        if(c==66){ // down arrow
-                            beep();
-                        }else
-                        if(c==67){ // right arrow
-                            beep();
-                        }else
-                        if(c==68){ // left arrow
-                            beep();
-                        }
-                    }
-                }
-            }
-            continue;
-        }
-        string_append_char(_inText,c);
-    }
-    outputChar('\n'); // go to the next line...
-    if(_inText){
-        result=_getTextValue(string(_inText),false);
-        free_string(_inText);
-    }
-    return result;
 }
 
 // MDH@17OCT2019: instead of setting the back color we can return the text to be used in out to set the back color
