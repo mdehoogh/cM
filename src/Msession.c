@@ -61,7 +61,9 @@ int getch(){
 void oneLineUp(){outputControlText("1A");} // ascertain that the previous line is visible
 void oneLineDown(){outputControlText("1B");} // one line down
 void toStartOfLine(){outputChar('\r');} // replacing: '\r');}
-void clearLine(){toStartOfLine();outputControlText("K");} // MDH@30OCT2019: adjusted to always to the start of the line before clearing it, this is to ascertain that any called does not need toStartOfLine() per se
+void clearLine(){
+	toStartOfLine();outputControlText("K");
+} // MDH@30OCT2019: adjusted to always to the start of the line before clearing it, this is to ascertain that any called does not need toStartOfLine() per se
 
 void moveCursorLeft(uint16_t pos){
 	if(pos)output(ES"%huD",pos);
@@ -77,7 +79,7 @@ void clearScreenFromCursor(){
 void clearDisplay(){
 	clearScreenFromCursor();// replacing: outputControlText("2J");
 }
-void beep(){outputChar(7);} // replacing \a
+void beep(){outputChar('\a');} // replacing \a
 void removeLastCharacter(){outputChar('\b');}
 void hidecursor(){outputControlText("?25l");}
 void showcursor(){outputControlText("?25h");}

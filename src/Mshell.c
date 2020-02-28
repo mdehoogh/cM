@@ -3,6 +3,189 @@
 
 #include "Mshell.h"
 
+Mvalue* NULL_value=NULL;
+// prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
+
+// all the available constants go here...
+const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference"};
+const char* const M_VARIABLE_NAME="M"; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
+const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function for getting previous results
+const char* const IFFUNCTION_NAME="if";
+const char* const WHILEFUNCTION_NAME="while";
+const char* const FORFUNCTION_NAME="for";
+const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
+const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
+const char* const DEFINEUSERFUNCTION_NAME="function";
+const char* const MUTABLEVALUETYPECHARS="uoibdqftlmr"; // the characters associated with each of the value types
+const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters associated with each of the value types
+const char* const INFO_PREFIX=""; // MDH@27FEB2020: as for now NO actual info prefix text to use
+const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
+const char* const WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
+const char* const BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
+
+const char* M_HIDDEN_VARIABLE_NAMES[]={"M","?","_"}; // MDH@14NOV2019: the variable names not to show when the variables are shown (with their current value)
+const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES=3;// MDH@14NOV2019: yes, three of them
+
+// MDH@31OCT2019: if the value of something equals the NULL value, this is the text to use to represent it, this is also the name of the NULL variable!!!
+//                alternatively we could use capital letters to denote the variable, and lowercase to denote the value (which makes sense I suppose)
+//                to prevent confusion it's best to use the same text for the value, otherwise they see 'null' as value and think they can use that to embed a NULL value!!!
+//                OK the NULL value is displayed in the normal foreground color whereas the variable is displayed in another color (see showValueColored() for the coloring)
+const char* const M_NULL_VALUE_TEXT="NULL"; // the text to represent values that are undefined...
+const char* const M_NULL_VARIABLE_NAME="NULL";
+const char* const M_UNDEFINED_VALUE_TEXT="UNDEFINED"; // the text to represent values that are undefined...
+const char* const M_UNDEFINED_VARIABLE_NAME="UNDEFINED";
+
+const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
+// it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
+const long long M_LL_MIN=LLONG_MIN+1;
+const long long M_LL_MAX=LLONG_MAX;
+const long long M_FALSE=0;
+const long long M_TRUE=1;
+const long long M_ZERO=0;
+const long long M_POSITIVE=1;
+const long long M_NEGATIVE=-1;
+//const enum BOOLEAN_ENUM {M_FALSE,M_TRUE};
+//const enum SIGN_ENUM {M_NEGATIVE,M_ZERO,M_POSITIVE};
+const long double M_LD_NAN=0.0/0.0; // or strtold("nan",NULL) would work as well
+const long double M_LD_Q_EPS=1e-18; // this is the exact boundary to use for approximating 13/11 (which seems to be an notorious long double to approximate with rational (13/11)!!!)
+const long double M_LD_PI=3.1415926535897932384626433832795L; // 31 non-zero decimal digits of PI (before the first 0)
+const long double M_LD_E=2.718281828459045235360287471353L; // 30 decimal digits of E
+
+long long M_DP=20; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
+
+const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
+
+const char M_WHITESPACE_CHARACTER=' '; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
+const char M_NEWLINE_CHARACTER='\\'; // MDH@31OCT2019: the character to request a newline with!!!
+
+// as needed by the tokenizer (as part of evaluating a command)
+// associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
+// t=tab(feedforward variable),n=newline(end of command),U=unary operator,D=double quoted string literal,C=comment,L=letter (in identifiers),l=letter (not at start of identifier)
+// D=digit,d=digit (not at start of numeric value),e=the letter e which may be part of an 'extended' number (or represent the constant e)
+// B=binary operator,b=binary operator that cannot be used as first binary operator character,A=assignment operator,
+// E=starts an expression(a comma),e=ends and expression ( ) and ]), (NOTE: some characters are best represented by themselves
+// all lowercase characters represent control characters, like t=tab, n=newline, x=escape control character,o=switch to control mode,d=delete,b=backspace
+// O=operator that can be either unary or binary depending on its position (+ and - characters)
+// use x for eXit (e.g. with Ctrl-C and Ctrl-Z), c for cancel command, and m for going into M (control) mode
+// as for operators: there are 8 different groups of operators
+// !     not unary operator or first character of binary operator !=
+// ~     pure unary operator
+// -+    sign unary operator or binary minus/plus operator
+// %^    pure binary operator
+// */    binary operator extensible to make ** power operator or // integer division operator
+// <>    binary operator extensible to make << or >> operator but can also be followed by an = sign (is this not the same as */?)
+// =     assignment operator that can follow most of the binary operators (except < and >)
+// |&    binary or and operator extensible to make || logical or or && logical and operator but the latter cannot be followed by =
+// MDH@16APR2019: removing the o input character type (for switching explicitly to or from control mode), replacing it by n, so we can use the backtick for certain purposes...
+//                in certain languages it means evaluate this (or the result of a system command??????)
+//                furthermore we're combining operators to a single input character type: \^~% become %, /* become * and |& become &
+// MDH@31OCT2019: let's use the backtick (`) as special whitespace character to use when one wants to insert a line break (i.e. continue the command on the next line)
+//                although this would mean that it would show up when writing the tokens
+//                we tried inserting a TT_WHITESPACE token with a backtick character (i.e. using ` as associated input character type) but ran into all kinds of problems so now we treat ` as W input character type
+//                so it is appended to the current token, we only need to get it displayed in another color
+//                ok, we're going to use \ for newline request character, so \ used to be % now becomes for type \ indicating a newline request (or escape character in a string!!!!)
+//                switched to using the blank to indicate a newline request (using \ is a bit clumsy, backtick goes back to being the backtick, although no idea what we can use it for)
+//                no we let \ be whitespace but we can turn it into a blank when it's a functional newline request
+// MDH@04NOV2019: in order to be able to pass value references (i.e. variables) to a function we define @ as the redirection operator so that not the value but the value reference is returned (unresolved)
+//                by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
+//                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
+const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+// replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
+
+// now we define all the state transitions i.e. what input character types result in which new token type
+// NOTE this can be organized in many ways perhaps it's easiest to tell per input character what the transformation is
+//      only changes to the token type need to be registered, so if the change is NOT present, no need to put it in the transition table
+//      EWW means that when starting an expression any whitespace starts a whitespace token, we use * to indicate ALL possible input character types
+//      *WW means that any W character received in any state will result in a W state 
+// we can make an array of transitions with each element corresponding to the character in TOKENTYPES, so the first entry contains all responses to E, the second entry the responses to W etc.
+// it's easier to tell for any possible resulting token type which input character types will result in that type
+// it's a hell of a job to create the token type transitions matrix
+/* LEGEND:
+   - signs are allowed in an EREAL but only directly behind the E, which means we have to somehow have an EREALEXPONENT element unless you treat this E as a binary operator which I think is a very good idea!!!
+   - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
+     E is Assignable e r u, so we can get rid of the EREAL token type!!!
+*/
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","q","q","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
+
+/* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
+   NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
+   Operator token types:
+   UNARY 						! - + 				which consist of ! (not) and - and + first characters at a place where a unary operator is acceptable
+   ASSIGNMENT 					=					any token that ends with = with an identifier in front of (possibly of a list element which will make it more complex)
+   BIN_UNEXT_ASSIGNABLE			+ - ~ ^ \ %			a non-extendable binary operator but that is assignable behind a variable identifier
+   BIN_EXT_ASSIGNABLE 			* /					a binary operator that is extendable (with the same character) but (both) with an assignment operator (behind an identifier token)
+   BIN_EXT_OR_ASSIGNABLE		& |					a binary operator that can either be extended (with the same character) or assigned (because it's a binary operator by itself)
+   BIN_EQ_OR_NEQ				! =					binary equal or unequal operator (to be postfixed with =) where a binary operator is expected (behind an identifier or some other value argument)
+   BINARY  						? :					things that are immediately binary (and that do not allow additional characters in the token)
+   COMPARISON					< >					comparison operator that is extendable with the same sign and it assignable after adding this second sign, but still = can be added to it to become binary
+   You may notice that the interpretation of the first character may differ for ! - + (unary or binary) = (binary assignment behind identifier or equality operator elsewhere)
+   Some of these token types are intermediate that is INCOMPLETE and I think these are the first token that is not inherently complete immediately as with identifiers and literals (wel double quoted string are also inccomplete)
+   Technically we could finish up with UNARY and BINARY or even OPERATOR as the position determine if it's a unary or binary operator BUT there's nothing wrong with keeping ASSIGNMENT, COMPARISON, EQUAL_OR_UNEQUAL, COMPARISON
+   We can code these characters with digits 1, 2, 3, 4, 5, 6, 7, 8 unary could be encoded with 1 
+   Well characters with multiple meanings like ! - + and = could be represented by themselves but the first letter of the token type that would be U A B C which leaves us with four additional for which we can use % / & 
+*/
+/* MDH@23MAR2019: syntacticly we have less operators
+	TOKENTYPE(TT_ONE_CHAR_UNARY=0b10000001) 						!(un) -(un) +(un)
+	TOKENTYPE(TT_ONE_CHAR_BINARY_=0b10100001)      					?
+	TOKENTYPE(TT_ONE_CHAR_ASSIGNABLE_BIANRY=0b10101010)  			= ~ ^ % \ -(bin) +(bin)
+	TOKENTYPE(TT_TWO_CHAR_BINARY=0b10101110)      					! (followed by =)
+	TOKENTYPE(TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY=0b10101011)		& | (interesting =+= and &+= and |+= and itself)
+	TOKENTYPE(TT_TWO_CHAR_ASSIGNABLE_BINARY=0b10111011)				< > * /
+	printf("\nError                                        : %d.",TT_ERROR);
+	printf("\nOne character unary operator                 : %d.",TT_ONE_CHAR_UNARY);
+	printf("\nAssignment operator                          : %d.",TT_ASSIGNMENT);
+	printf("\nOne character binary operator                : %d.",TT_ONE_CHAR_BINARY);
+	printf("\nOne character assignable binary operator     : %d.",TT_ONE_CHAR_ASSIGNABLE_BINARY);
+	printf("\nTwo character binary operator                : %d.",TT_TWO_CHAR_BINARY);
+	printf("\nTwo character once assignable binary operator: %d.",TT_TWO_CHAR_ONCE_ASSIGNABLE_BINARY);
+	printf("\nTwo character assignable binary operator     : %d.",TT_TWO_CHAR_ASSIGNABLE_BINARY);
+	printf("\nComparison or shift operator                 : %d.",TT_COMPARISON_OR_SHIFT_BINARY);
+*/
+/* MDH@10APR2019: 
+- some transitions only change the type but do not start a new token, but this is true for all binary operators, so I guess we can force that programmatically
+- if we put ERROR at the end we do not need to add an array for dealing with error transitions (as we cannot leave an error!!)
+*/
+// operator input type characters: ! ~ + - % * < = | (8 different operator groups)
+// ! ~ and + start a unary operator when a value is expected
+// MDH@15APR2019: still to determine what to do with @ and ` (the latter for system commands????)
+//                inserting macro's should also be possible somehow...
+// MDH@05AUG2019: it's a pity that I need to allow a , behind a new variable in order to allow that when a do function call executes code after initializing these variables that are not yet recognized as created
+//                we can solve this by remembering ALL variables when they are created in every expression that is tokenized, this would be possible by creating a tokenizing environment where we remember all created variables in in the tokenizing process
+// MDH@04NOV2019: the reference token type added, so we can pass references to functions wrapped inside a value
+/*
+ "EXPR","UNA" ,"A","Baeru","BaErU","BAeRu","BaERu","BAeru" ,"Taeru","REF" ,"VAR"  ,"NEWVAR","L_EL","INT","REAL","DQSTRING","SQSTRING","END_DQS","END_SQS","LIST","END_L","MAP","M_V","END_M","FUNCTION","F_CALL","END_FC","CM","ERROR"},*/
+const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN_TYPES]={ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*  , >?:    ] }="}, /* EXPRESSION */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; CDS% )&*  , >?:    ]{}="}, /* ONE CHARACTER UNARY !-+~ */ \
+{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*  , >?:    ] }" }, /* ASSIGNMENT = */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ] }="}, /* Baeru finished bin.op. */ \
+{""    ,""    ,"" ,"="    ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,"`R;!CDS%()&*+-,.>?:LEN[]{}" }, /* BaErU unfinished bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,""        ,""        ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; CDS% )&*  , >?:    ]"   }, /* BAeRu assignable repeatable */ \
+{"("   ,"!-+~","" ,"="    ,""     ,""     ,""      ,"R"    ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  ,  ?:    ]"   }, /* BaERu comp. (<>) bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]"   }, /* BAeru assignable bin.op. */ \
+{"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,"LEN.",""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
+{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN." ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`R;! DS%()&*+- .>?:   [ {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,"D"      ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* DQSTRING: double quoted string */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,"S"      ,""    ,""     ,""   ,""   ,""     ,""        ,""      ,""      ,""  ,""                           }, /* SQSTRING: single quoted string */ \
+{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
+{";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
+{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (     .   LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
+{";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
+{""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,""      ,""    ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,""     ,""   ,""   ,""     ,""        ,"("     ,""      ,""  ,"`R;!CDS%& )*+-,.>?:   []{}="}, /* FUNCTION: some identifier recognized as function name */ \
+{"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %&  *    >?:    ] }="}, /* FUNCTION_CALL ( following the name of a function */ \
+{";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (     .   L N  {"  }, /* END_OF_FUNCTION_CALL ) at end of last function call argument, ending a function call */ \
+};
+
+const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,0b1000000,0b11111111};
+
 bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap* _variableMap){
 	bool executionEnvironmentInitialized=true;
 	Mmapelement* variableMapelement=_variableMap->_first;
@@ -59,64 +242,32 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 	return _functionExecutionEnvironment;
 }
 
-// MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
-// MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
-// MDH@30OCT2019: if we let toInfoInputLine() return the number of lines it moved back we can pass that into toUserInputCursorPosition() to go down that number of lines
-// MDH@30OCT2019: for each user input line, keep track of the total number of characters written by the user
-Muserinputline* __userinputline(int userInputLength){
-	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'6');
-	if(_newUserinputline){
-		_newUserinputline->_prev=_userinputline;
-		_newUserinputline->offset=userInputLength; // now passing it in because how else would we know?????
-		_newUserinputline->index=(_userinputline?_userinputline->index:0)+1; // count the lines
-		_userinputline=_newUserinputline;
+// the list of token type ids in the corresponding order!!!
+const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
+	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
+	////////output("(%d)",tokentype_id);
+	switch(tokentype_id>>6){
+		case 0: // value token
+			return getValueTokenColor(tokentype_id);
+		case 1: // operator: unary, binary, ternary, assignment the operator category will be: (tokentype_id&0x30)>>4
+			return getOperatorTokenColor((tokentype_id&0x30)>>4);
+		case 2: // comment or end of comment
+			return getCommentColor();
+		case 3: // error token
+			/////////outputChar('E');
+			return getErrorColor();
 	}
-	return _newUserinputline;
+	return "";
 }
-// call free_userinputline() when starting a new user input command
-size_t free_userinputline(){
-	size_t numberOfUserInputLines=0;
-	Muserinputline* prevUserinputline;
-	while(_userinputline){
-		numberOfUserInputLines++;
-		prevUserinputline=_userinputline->_prev;
-		FREE(_userinputline,'N');
-		_userinputline=prevUserinputline;
-	}
-	return numberOfUserInputLines;
+void outputTokenTypeColor(TokenType tokenType){
+	setBackColor(getBackgroundColor());
+	setColor(getTokenColor(tokenType));
 }
-void removeUserinputline(){
-	Muserinputline* prevUserinputline=_userinputline->_prev;
-	FREE(_userinputline,'N');
-	_userinputline=prevUserinputline;
+void outputTokenColor(Mtoken* _token){
+	if(_token)outputTokenTypeColor(_token->type);
+	///////printf("[%d]",_userInputCommand->_lastToken->type);
+	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
 }
-// MDH@30OCT2019 END
-size_t toInfoInputLine(){
-	size_t linesUp=0;
-    size_t lines=(_userinputline?_userinputline->index+1:0);
-	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();
-    return linesUp;
-} // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
-void toUserInputCursorPosition(size_t linesDown){while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();}
-void inputInfo(const char* const fmt,...){
-	if(fmt&&strlen(fmt)){ // we have a format
-		size_t linesMovedUp=toInfoInputLine();
-		resetOutputColor(); // get the default output color!!
-		// NOTE we have to call vprintf here NOT printf!!!
-		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
-		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toUserInputCursorPosition(linesMovedUp);
-	}
-}
-void inputError(const char* const fmt,...){
-	if(fmt&&strlen(fmt)){ // we have a format
-		size_t linesMovedUp=toInfoInputLine();
-		setColor(getErrorColor());setBackColor(getBackgroundColor());
-		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toUserInputCursorPosition(linesMovedUp);
-	}
-}
-
 void outputCommandInfo(Mcommand* command){
 	if(!command||!command->_lastToken)return;
 	// MDH@12AUG2019: identifiers first
@@ -160,25 +311,55 @@ void outputCommandInfo(Mcommand* command){
 		token=token->next;
 	}
 }
+
+/**
+ * freeToken() frees the memory @_userInputCommand->_lastToken points to and returns true on successfully removing the entire chain of tokens it points to
+ * @returns the previous token (as we need that )  
+ */
+Mtoken* freeToken(Mtoken* _token){
+	// MDH@30APR2019: let's delegate to free_token()
+	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token);}return _prevToken;
+}
+// keep track of the state of entering a command
+// MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
+// MDH@28FEB2020: we NO longer NULL Mcommand* (we can't because that would require Mcommand**) BUT that would only be required 
+//                I suppose this also means that we do not need to return true or false anymore, any caller can check for a last token itself (i.e. an empty command!!!!)
+//                now returning the new last command token
+Mtoken* removedLastCommandToken(Mcommand* command){
+	// NOTE we can still remove the pointer although you cannot use it anymore (except for testing) because free_token would have released the associated memory!!!
+	if(command&&command->_lastToken){
+		command->_lastToken=freeToken(command->_lastToken); // MDH@28FEB2020: used to be removeLastUserInputCommandToken
+		if(command->_lastToken)command->_lastToken->next=NULL;
+		else command->_firstToken=NULL; // MDH@20FEB2020 ADDITION: it makes sense to NULL _firstToken if _lastToken is NULL
+	}
+	return(command?command->_lastToken:NULL);
+}
+
 bool isAValidCommand(Mcommand* command,bool report){
 
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
 	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return false;}
 	
 	Mtoken* lastCommandToken=command->_lastToken;
-	if(!lastCommandToken){if(report)outputError("Unfinished command");return false;}
-	
-	// 2. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
-	//    as a result _userInputCommand->_lastToken and _userInputCommand->_firstToken could now both be NULL, that's why we test this first
-	if(lastCommandToken->type==TT_COMMENT)if(!removeToken()){if(report)outputError("Failed to remove the comment");return false;}
+	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command);
 
+	if(!lastCommandToken){if(report)outputError("Empty command");return false;}
+	
 	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
 	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
 	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
 
+	// MDH@28FEB2020: if the current last command token is an error do NOT remove, but let the caller handle it!!!!
+	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Command is erroneous.");return false;}
+	/* replacing:
 	// 2. if the last token is an error, can't evaluate (well, better not)
 	// TODO it makes sense to remove the error token
-	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Can't evaluate erroneous command");if(!removeToken()){if(report)outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
+	if(lastCommandToken&&lastCommandToken->type==TT_ERROR){unfinishToken(lastCommandToken);lastCommandToken=removedLastCommandToken(command);return false;}
+
+	{if(report)outputError("Can't evaluate erroneous command");if(!removedLastCommandToken(command)){if(report)outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
+
+	lastCommandToken=command->_lastToken;
+	*/
 
 	// 3. if the last token is an operator of sorts the command is incomplete
 	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return false;}
@@ -248,101 +429,6 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 	if(amVerbose())outputInfo("Evaluating...");
 	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
 }
-
-// MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
-typedef struct FunctionBodyRequest{
-	char* functionName;
-	struct FunctionBodyRequest *_next;
-}FunctionBodyRequest;
-// requests can come out of a single command containing multiple function definitions
-// _firstFunctionBodyRequest represents the first one to execute
-FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
-FunctionBodyRequest* requestBodyOfFunction(char* functionName){
-	if(functionName&&strlen(functionName)){ // a 'valid' function name
-		// technically it should not have been requested already (or exist)
-		FunctionBodyRequest* _functionBodyRequest=_firstFunctionBodyRequest;
-		while(_functionBodyRequest&&strcmp(functionName,_functionBodyRequest->functionName))_functionBodyRequest=_functionBodyRequest->_next;
-		if(_functionBodyRequest){
-			output("%sBody of function '%s' already requested.\n",ERROR_PREFIX,functionName);
-			return NULL;
-		}
-		if(amVerbose())output("The body of function '%s' being requested.\n",functionName);
-		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'9');
-		if(_functionBodyRequest){
-			_functionBodyRequest->functionName=functionName;
-			if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
-			_lastFunctionBodyRequest=_functionBodyRequest;
-			if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
-			return _lastFunctionBodyRequest;
-		}
-		output("%sFailed to register the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
-	}
-	return NULL;
-}
-typedef struct FunctionBodyInput{
-	////////char* functionName;
-	Muserfunction* _function;
-	struct FunctionBodyInput* _prev;
-	struct FunctionBodyRequest* _request;
-}FunctionBodyInput;
-FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
-bool createFunctionBodyInput(const FunctionBodyRequest* const _firstFunctionBodyRequest){
-	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
-	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
-	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
-	Mfunction* function=getFunction(getEnvironment(),_firstFunctionBodyRequest->functionName);
-	if(function&&function->type==FT_USER){
-		// it's better to put the next request in, so after finishing with this request we can do the following if any
-		_currentFunctionBodyInput->_request=_firstFunctionBodyRequest->_next; // remember the request that initiated this body input
-		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
-		if(!_functionBodyInputStack)_functionBodyInputStack=_currentFunctionBodyInput;
-		// if we succeed in activating the execution environment of the new function we're good to go
-		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
-		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_firstFunctionBodyRequest->functionName,function->_parameterMap);
-		if(_functionExecutionEnvironment){
-			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
-			free_environment(_functionExecutionEnvironment);
-		}
-		outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
-	}else
-		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
-	FREE(_currentFunctionBodyInput,'H');
-	return false;
-}
-bool startFunctionBodyInput(){
-	// ASSERT only call with _firstFunctionBodyRequest not NULL
-	// move out of the queue into the stack
-	// push on top of the functionBodyInputStack
-	/////////if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
-	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next; // remember the function body request to do next
-	char* functionName=_firstFunctionBodyRequest->functionName;
-	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
-	free(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request
-	if(functionBodyInputCreated)return true; // succeeded, so done
-	// failed, so do the next one
-	_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
-	output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,functionName);
-	// if we still have a first function body request start that one, otherwise 
-	return(_firstFunctionBodyRequest?startFunctionBodyInput():true);
-}
-/*
- \brief will only fail when we fail to start the next one
- */
-bool endFunctionBodyInput(){
-	// ASSERT do NOT call with _currentFunctionBodyInput equal to NULL
-	// pop the function body request execution environment we just ended
-	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
-	_currentFunctionBodyInput->_function->_functionMap=getEnvironment()->_functionMap;
-	popExecutionEnvironment();
-	// the new first function body request is the successor of the previous one
-	// TODO shouldn't we free it?
-	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request; // the next function body request as stored in the _request field
-	free(_currentFunctionBodyInput);_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
-	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
-	return startFunctionBodyInput(); // will NULL _firstFunctionBodyInput to ascertain not to get called in the main user input loop
-}
-// MDH@19JUL2019 END
 
 // decimal stuff
 /* MDH@20JUN2019: by not using DP_value anymore, we solved the problem of DP_value holding a reference to the decimal precision value which apparently was released at some point
@@ -604,8 +690,140 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 	return _result;
 }
 
+// the input info and error function default to shellInputInfo and shellInputError that write the text to the console  (and are replaced in M.c by functions that output above the user input lines)
+static void inputInfo(const char* const fmt,...){
+	if(fmt&&strlen(fmt)){ // we have a format
+		resetOutputColor(); // get the default output color!!
+		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+		newline();
+	}
+}
+static void inputError(const char* const fmt,...){
+	if(fmt&&strlen(fmt)){ // we have a format
+		setColor(getErrorColor());setBackColor(getBackgroundColor());
+		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+		newline();
+	}
+}
+InputResponseFunction* inputInfoFunction=inputInfo;
+InputResponseFunction* inputErrorFunction=inputError;
+void setInputInfoFunction(InputResponseFunction* _inputResponseFunction){inputInfoFunction=_inputResponseFunction;}
+void setInputErrorFunction(InputResponseFunction* _inputResponseFunction){inputErrorFunction=_inputResponseFunction;}
+
 // and the most special one
 // requiring some other stuff for being able to interpret the text and create tokens!!!
+
+// MDH@05JUN2019: it's prudent to return the negative value of the input token type if the given input character type ends the token 
+//                i.e. when NO_TRANSITIONS is a match, so that the caller can set the significantCharacterCount
+int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
+	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
+		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
+		char* noTransition=NO_TRANSITIONS[inputTokenType];
+#ifdef __DEBUG__
+		printf("'%s'",noTransition);
+#endif
+		// TODO we can improve on the following
+		///////////if(noTransition[0]!='`'&&!strchr(noTransition,inputCharacterType))return -inputTokenType;
+		if(strlen(noTransition)==0||(noTransition[0]=='`'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
+			int8_t tokenType=NUMBER_OF_TOKEN_TYPES; // MDH@10APR2019: BUG FIX uint8_t changed to int8_t otherwise would circle around
+			while(--tokenType>=0)if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)return tokenType;
+		}
+#ifdef __DEBUG__
+		else{
+			outputChar('=');
+		}
+#endif
+	}
+	return inputTokenType; // if no match was found assume no change to the token type!!
+}
+// TODO we could call the following function from tokenCheckedForBeingAFunction
+// an identifier with a certain name in a certain special function call (to which it might be local)
+// instead of requiring a specialFunctionCallToken it suffices to know the environment id
+bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId){ // replacing: const Mtoken* const specialFunctionCallToken){
+	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
+	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
+	bool found=false;
+	size_t l=strlen(identifierName);
+	Mtoken* commandIdentifier=command->_lastToken->prevIdentifier;
+	char *match,*commandIdentifierName;
+	uint64_t commandIdentifierEnvironmentId,commandIdentifierEnvironmentLevels,ander=(1<<M_BITS_PER_ENV_LEVEL)-1;
+	while(!found&&commandIdentifier){
+		// if a function call or end of function call identifier, no need to check!!
+		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){ // a (new) variable
+			commandIdentifierName=string(commandIdentifier->text); // I have to do this to get the closing '\0' placed!!!
+			if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
+				// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
+				match=strstr(commandIdentifierName,identifierName);
+				if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){ // the names match
+					if(commandIdentifier->argument==1){ // the identifier is local to one of the special function calls (which is present in `do`, `for` and `function` function calls)
+						// we can't tell for sure that this local identifier is in the same special function call unless `expr` field matches imagine the situation where multiple do's are in the same command following each other
+						// the local variables in the first are not local to the second do call it's all about scope meaning we have to mark the end of a scope as well so we know which identifiers to skip i.e. those identifiers local to another special function call
+						// so if we stored `( f g , h ) ( x, g` the second g is not in the first call and therefore does not exist in the command, so in going back you have to keep track of the level which should be the same as level of the caller
+						// the special function call associated with the two identifiers must match!!
+						// BUT a local variable of a special function call could be used in which the special function call of the identifier is nested within (like a do inside a do) in which case we should keep going up
+						// so: identifier is local to its own special function call but the presented identifier might not i.e. it might be defined in a outer special function call
+						if(identifierEnvironmentId){ // defined inside a subenvironment
+							commandIdentifierEnvironmentId=commandIdentifier->envid;
+							commandIdentifierEnvironmentLevels=(commandIdentifierEnvironmentId&15);
+							// it's all about environmentid subclassing the environment id of identifier
+							// i.e. environment id level should be at least the identifier's environment id
+							if(commandIdentifierEnvironmentLevels<=(identifierEnvironmentId&15)){ // the registered identifier is defined at a level equal to or above that of the identifier
+								commandIdentifierEnvironmentId>>=4;identifierEnvironmentId>>=4; // shift out the number of levels
+								// all environment ids of the local identifier (commandIdentifier) should match those in identifierEnvironmentId
+								while(commandIdentifierEnvironmentLevels>0&&((commandIdentifierEnvironmentId&ander)==(identifierEnvironmentId&ander))){
+									commandIdentifierEnvironmentLevels--;
+									commandIdentifierEnvironmentId>>=M_BITS_PER_ENV_LEVEL;
+									identifierEnvironmentId>>=M_BITS_PER_ENV_LEVEL;
+								}
+								if(commandIdentifierEnvironmentId==0)found=true;
+							}
+						}
+						/* replacing:
+						if(specialFunctionCallToken){ // the given identifier exists inside a special function call therefore it might be the local identifier with the same name!!
+							Mtoken *localIdentifierSpecialFunctionCallToken=getSpecialFunctionCallToken(identifier),*needleSpecialFunctionCallToken=specialFunctionCallToken; // which MUST exist i.e. will NOT be NULL
+							while(needleSpecialFunctionCallToken&&needleSpecialFunctionCallToken!=localIdentifierSpecialFunctionCallToken)needleSpecialFunctionCallToken=getSpecialFunctionCallToken(needleSpecialFunctionCallToken);
+							if(needleSpecialFunctionCallToken)found=true;
+						}
+						*/
+					}else
+						found=true;
+				} // TODO will blank always be the only possible whitespace character????? 
+			}
+		}
+		// get the next identifier
+		commandIdentifier=commandIdentifier->prevIdentifier;
+	}
+	//////////if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
+	return found;
+}
+
+static UpdateLastTokenAutocompletionTextFunction* updateLastTokenAutocompletionTextFunction=NULL;
+void setUpdateLastTokenAutocompletionTextFunction(UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction){updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;}
+
+static ReoutputTokenFunction* reoutputTokenFunction=NULL;
+void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){
+	reoutputTokenFunction=_reoutputTokenFunction;
+}
+void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
+	char* _identifierName=_stringstart(command->_lastToken->text,command->_lastToken->significantCharacterCount); // free asap
+	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
+	command->_lastToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
+	free(_identifierName);
+	// if the reoutput token function is defined, execute it
+	if(reoutputTokenFunction)(*reoutputTokenFunction)(command->_lastToken);else outputChar('*');
+	/* MDH@01OCT2019 because the token isn't actually removed the feed forward text associated with the token does not need to be deleted actually
+	// MDH@20SEP2019: this function is called when a function name changes into a variable name (because the user did not enter ( behind a function name)
+	//                and it makes sense to simply remove the associated feed forward of the token
+	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
+	*/
+	/* replacing:
+	// I think we should remove ( from the behind cursor text if it was inserted
+	if(endOfInput)if(amMatchingparentheses())
+	if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='(')
+	if(!string_removed_char(feedforwardText,0))inputError("Failed to remove the function argument list opening parenthesis from the feed forward text."); // TODO is there a better way???
+	*/
+	// ready to redetermine the new token type!!!!
+}
 // MDH@28OCT2019: in order to implement the eval function the part in commandCharacterAccepted() that can work with any command is moved over to commandCharacterAppended()
 //                and is called from commandCharacterAccepted() passing _userInputCommand->_lastToken in as first argument!!
 //                NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
@@ -616,8 +834,8 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
 	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
-	if(!lastCommandToken){inputError("%sNo last command token.",BUG_PREFIX);return NULL;}
-	if(amDebugging())inputInfo("Appending '%c'.",inputChar);
+	if(!lastCommandToken){(*inputErrorFunction)("%sNo last command token.",BUG_PREFIX);return NULL;}
+	if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
 	//                so it's actually best if we create a new token that points to the last non-whitespace command token
@@ -653,14 +871,14 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	printf("[%d+%c->%d]",_userInputCommand->_lastToken->type,inputCharacterType,newTokenType);
 	outputTokenColor(_userInputCommand->_lastToken);
 #endif
-		/////if(amDebugging())inputInfo("B");
+		/////if(amDebugging())(*inputInfoFunction)("B");
 		//MDH@17JUL2019: typically we'd get an error immediately when NOT entering a function call character ( behind a function identifier
 		// MDH@02OCT2019: we need some additional corrections in certain situations i.e. do NOT end a single/double quoted string if ' or " was entered behind the escape character
 		switch(newTokenType){
 			case TT_ERROR:
 				if(lastCommandToken->type==TT_FUNCTION){
 					// we should assume that the identifier represents a (new) variable (identifier)
-					changeFunctionTokenToAVariable(endOfInput);
+					changeFunctionTokenToAVariable(command,endOfInput);
 					newTokenType=nextTokenType(lastCommandToken->type,*inputCharacterType);
 				}
 				break;
@@ -672,7 +890,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				break;
 		}
 
-		/////if(amDebugging())inputInfo("C");
+		/////if(amDebugging())(*inputInfoFunction)("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
 		if(newTokenType<0||newTokenType==lastCommandToken->type){
@@ -686,17 +904,17 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
 				if(lastCommandToken->type!=TT_LIST&&lastCommandToken->type!=TT_FUNCTION_CALL&&lastCommandToken->type!=TT_UNARY&&lastCommandToken->type!=TT_TERNARY_aeru&&lastCommandToken->type!=TT_LISTELEMENT&&lastCommandToken->type!=TT_END_OF_FUNCTION_CALL&&lastCommandToken->type!=TT_END_OF_MAP&&lastCommandToken->type!=TT_END_OF_LIST){
 					newTokenType=TT_ERROR;
-					if(amVerbose())inputError("Token already finished!");
+					if(amVerbose())(*inputErrorFunction)("Token already finished!");
 				}
 			}
 		}else{ // different token types
 			// a shortcut assignment can NOT be turned into a equality comparison
 			if(*inputCharacterType=='='&&lastCommandToken->type==TT_ASSIGNMENT&&(lastCommandToken->prev->type==TT_BINARY_AeRu||lastCommandToken->prev->type==TT_BINARY_Aeru)){
 				newTokenType=TT_ERROR;
-				if(amVerbose())inputError("A shortcut operator assignment cannot change into an equality.");
+				if(amVerbose())(*inputErrorFunction)("A shortcut operator assignment cannot change into an equality.");
 			}
 		}
-		/////if(amDebugging())inputInfo("D");
+		/////if(amDebugging())(*inputInfoFunction)("D");
 		// MDH@03MAY2019: no matter what the new token type is, any token of type TT_EXPRESSION always ends immediately...
 		//                this is because the first (offset) token in a command is always of type TT_EXPRESSION which should end immediately on any next token although significantCharacterCount will still be zero
 		//                this way it will always be there!!
@@ -704,7 +922,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 
 		}else
 		if(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||lastCommandToken->significantCharacterCount>0){
-			///////////if(amVerbose())outputInfo("!");/////inputInfo("New token!");
+			///////////if(amVerbose())outputInfo("!");/////(*inputInfoFunction)("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
 			//                NO we decide NOT to do this when the command is evaluated we should compose the values and apply the operators
@@ -720,7 +938,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				// MDH@21MAY2019: possibly we have multiple tokens representing a binary operator (like ** << and >> which are allowed!!!) so we need to skip all binary operators in front of the assignment character
 				Mtoken* lastTokenToCheck=lastCommandToken;
 				if(behindBinaryOperator)while(lastTokenToCheck->type>=3&&lastTokenToCheck->type<=7)lastTokenToCheck=lastTokenToCheck->prev;
-				if(amVerbose())inputInfo("Type of token to check: %s.",TOKENTYPE_STRING[lastTokenToCheck->type]);
+				if(amVerbose())(*inputInfoFunction)("Type of token to check: %s.",TOKENTYPE_STRING[lastTokenToCheck->type]);
 				// ASSERT lastTokenToCheck should either represent a variable or the end of a list element to allow for operator
 				// MDH@17NOV2019: we now allow multiple index elements after one another not just one
 				//                but we do need a variable in front of those
@@ -728,30 +946,32 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 					// we have to find the associated start of the list, and the token in front of that (which should be a variable!!!)
 					// which is easy because the expr tells us the start of the list BUT 
 					lastTokenToCheck=lastTokenToCheck->expr;
-					///////////if(amVerbose())inputInfo("Presumed list start token");
-					if(lastTokenToCheck)lastTokenToCheck=lastTokenToCheck->prev;else inputError("%s","Start of index list not found!");
+					///////////if(amVerbose())(*inputInfoFunction)("Presumed list start token");
+					if(lastTokenToCheck)lastTokenToCheck=lastTokenToCheck->prev;else (*inputErrorFunction)("%s","Start of index list not found!");
 				}
 				// two options: = behind a binary operator without variable (or list) in front of it is not allowed, i.e. an error, otherwise we assume that = represents the first = of == the equality operator...
 				if(lastTokenToCheck==NULL||(lastTokenToCheck->type!=TT_VARIABLE&&lastTokenToCheck->type!=TT_NEW_VARIABLE)){
 					if(behindBinaryOperator){
 						newTokenType=TT_ERROR;
-						//if(amVerbose())inputError("No variable to assign to.");
+						//if(amVerbose())(*inputErrorFunction)("No variable to assign to.");
 					}else
 						newTokenType=TT_BINARY_aErU;
 				}
 			}
-			/////if(amDebugging())inputInfo("E");
+			/////if(amDebugging())(*inputInfoFunction)("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
 			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType/*,endOfInput*/);
-			if(endOfInput)updateLastTokenAutocompletionText();
+			
+			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(); // MDH@28FEB2020: a bit of a nuisance...
+
 			if(!lastCommandToken)return NULL;
 			/* replacing:
 			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,newTokenType);
 			// MDH@23SEP2019: moved out of _getToken (because not always will we need to update the feed forward text when new tokens are created, e.g. in copyUserInputCommand()!)
 			setLastTokenType(newTokenType,endOfInput);
 			*/
-			/////if(amDebugging())inputInfo("F");
+			/////if(amDebugging())(*inputInfoFunction)("F");
 /*
 #ifdef __DEBUG__
 			printf("@%p=%p?:%s",_userInputCommand->_firstToken,_userInputCommand->_lastToken,string(_userInputCommand->_firstToken->text));
@@ -765,8 +985,8 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 					switch(newTokenType){
 						case TT_END_OF_FUNCTION_CALL:
 							if(_userInputCommand->_lastToken->expr->type!=TT_FUNCTION_CALL&&_userInputCommand->_lastToken->expr->type!=TT_EXPRESSION){
-								/////inputError("%s","No function call or expression to end here!");
-								inputError("End of function call/expression character does not match '%s' of type '%s'!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
+								/////(*inputErrorFunction)("%s","No function call or expression to end here!");
+								(*inputErrorFunction)("End of function call/expression character does not match '%s' of type '%s'!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
 								_userInputCommand->_lastToken->type=TT_ERROR;
 							}
 							break;
@@ -775,7 +995,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 							if(_userInputCommand->_lastToken->expr->type!=TT_LIST&&_userInputCommand->_lastToken->expr->type!=TT_MAP){
 								// so if it's a function call it might be allowed
 								if(_userInputCommand->_lastToken->expr->type!=TT_FUNCTION_CALL){
-									inputError("First expression token '%s' of type '%s' does not start a list or map!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
+									(*inputErrorFunction)("First expression token '%s' of type '%s' does not start a list or map!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
 									_userInputCommand->_lastToken->type=TT_ERROR;
 								}else{
 									// the token in front of the function call token should denote a function
@@ -787,9 +1007,9 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 									uint32_t listElementCount=getListElementCount()+1;
 									if(!function||listElementCount>=function->_parameterMap->numberOfElements){
 										if(function)
-											inputError("Function '%s' does not allow for more than %u argument(s).",functionName,listElementCount);
+											(*inputErrorFunction)("Function '%s' does not allow for more than %u argument(s).",functionName,listElementCount);
 										else
-											inputError("Cannot tell whether function '%s' allows for more than %u argument(s).",functionName,listElementCount);
+											(*inputErrorFunction)("Cannot tell whether function '%s' allows for more than %u argument(s).",functionName,listElementCount);
 										_userInputCommand->_lastToken->type=TT_ERROR;
 									}
 								}
@@ -797,14 +1017,14 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 							break;
 						case TT_END_OF_LIST:
 							if(_userInputCommand->_lastToken->expr->type!=TT_LIST){
-								inputError("First token '%s' of type '%s' does not start a list!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
+								(*inputErrorFunction)("First token '%s' of type '%s' does not start a list!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
 								_userInputCommand->_lastToken->type=TT_ERROR;
 							}
 							break;
 						case TT_END_OF_MAP:
 							if(_userInputCommand->_lastToken->expr->type!=TT_MAP){
-								inputError("First expression token '%s' of type '%s' does not start a map!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
-								//inputError("No map to end here!");
+								(*inputErrorFunction)("First expression token '%s' of type '%s' does not start a map!",string(_userInputCommand->_lastToken->expr->text),TOKENTYPE_STRING[_userInputCommand->_lastToken->expr->type]);
+								//(*inputErrorFunction)("No map to end here!");
 								_userInputCommand->_lastToken->type=TT_ERROR;
 							}
 							break;
@@ -813,7 +1033,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 					// TODO we can do the following even on error but what if we didn't???
 					///////////////////_userInputCommand->_lastToken->expr=_userInputCommand->_lastToken->expr->expr;
 				}else{
-					inputError("%s","Can't end a (function argument) list or map here!");
+					(*inputErrorFunction)("%s","Can't end a (function argument) list or map here!");
 					_userInputCommand->_lastToken->type=TT_ERROR;
 				}
 			}
@@ -837,9 +1057,9 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 								char* newVariableName=string(_userInputCommand->_lastToken->prev->text);
 								if(pushInitialization(newVariableName)){
 									initializationsChanged=true;
-									if(amVerbose())inputInfo("New variable '%s' initialization registered.",newVariableName);
+									if(amVerbose())(*inputInfoFunction)("New variable '%s' initialization registered.",newVariableName);
 								}else
-									inputError("Failed to register the initialization of new variable '%s'.",newVariableName);
+									(*inputErrorFunction)("Failed to register the initialization of new variable '%s'.",newVariableName);
 							}
 							*/
 							break;
@@ -851,21 +1071,21 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 								if(pushInitialization("(")){
 									_lastInitialization->argument=((!strcmp(functionName,DOFUNCTION_NAME)||!strcmp(functionName,FORFUNCTION_NAME)?0:(!strcmp(functionName,DEFINEUSERFUNCTION_NAME)?1:-1)));
 									initializationsChanged=true;
-									if(amVerbose())inputInfo("Function '%s' registered.",functionName);
+									if(amVerbose())(*inputInfoFunction)("Function '%s' registered.",functionName);
 								}else
-									inputError("Failed to register function call '%s'.",functionName);
+									(*inputErrorFunction)("Failed to register function call '%s'.",functionName);
 								*/
 							}else
-								inputError("No function in front of function call.");
+								(*inputErrorFunction)("No function in front of function call.");
 							break;
 						case TT_END_OF_FUNCTION_CALL:
 							if(lastCommandToken->argument==-1)lastCommandToken->argument=1;
 							/* replacing:
 							if(pushInitialization(")")){ // will set the argument count appropriately...
-								if(amVerbose())inputInfo("End of function call registered.");
+								if(amVerbose())(*inputInfoFunction)("End of function call registered.");
 								initializationsChanged=true;
 							}else
-								inputError("Failed to register the end of a function call.");
+								(*inputErrorFunction)("Failed to register the end of a function call.");
 							*/
 							break;
 						case TT_LISTELEMENT:
@@ -875,10 +1095,10 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 								// not any comma is a function call argument separator!!!
 								if(pushInitialization(",")){
 									_lastInitialization->argument--; // decrement the argument count (once it is zero any initialization is local to the function call)
-									if(amVerbose())inputInfo("End of function argument with count set to %lld.",_lastInitialization->argument);
+									if(amVerbose())(*inputInfoFunction)("End of function argument with count set to %lld.",_lastInitialization->argument);
 									initializationsChanged=true;
 								}else
-									inputError("Failed to register a next function call argument!");
+									(*inputErrorFunction)("Failed to register a next function call argument!");
 								*/
 							}
 						default:
@@ -887,7 +1107,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 					/* removing:
 					if(amDebugging()){
 						if(!initializationsChanged)
-							inputInfo("Token with text '%c' of type %s considered to be a one character token.",inputChar,TOKENTYPE_STRING[_userInputCommand->_lastToken->type]);
+							(*inputInfoFunction)("Token with text '%c' of type %s considered to be a one character token.",inputChar,TOKENTYPE_STRING[_userInputCommand->_lastToken->type]);
 						else 
 						if(!amVerbose())showInitializations();
 					}
@@ -901,17 +1121,17 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			}
 			// TODO should we write the associated colors here?????
 			/////// moved over to commandCharacterAccepted because it's definitely not part of an inline command (evaluated by Meval!!!) outputTokenColor(lastCommandToken);
-			/////if(amDebugging())inputInfo("H");
+			/////if(amDebugging())(*inputInfoFunction)("H");
 		}
 	}else{ // a functional whitespace character, ends a current token!!
 		if(lastCommandToken->significantCharacterCount==0&&lastCommandToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
 			lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 		if(inputChar==' ')inputChar=M_WHITESPACE_CHARACTER; // MDH@31OCT2019: so we can make the blanks visible!!
 	}
-	/////if(amDebugging())inputInfo("I");
+	/////if(amDebugging())(*inputInfoFunction)("I");
 	// append the typed character at getUserInputLength() minus current token offset in _userInputCommand->_lastToken->text
 	string_append_char(lastCommandToken->text,inputChar);
-	/////if(amDebugging())inputInfo("J");
+	/////if(amDebugging())(*inputInfoFunction)("J");
 
 	if(newTokenType<0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 
@@ -951,6 +1171,8 @@ Mvalue* Mevalfunction(Mvalue* value){
 				if(_evalEnvironment){
 					_evalEnvironment->_name=_strdup("eval");
 					if(pushExecutionEnvironment(_evalEnvironment)){
+						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
+						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
 						_evalValue=getCommandValue(_evalCommand,'e');
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
@@ -978,20 +1200,20 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 Mcommand* _getNewCommand(bool withFirstToken){
 	Mcommand* _command=CALLOC(1,sizeof(Mcommand),'K');
 	if(_command){
-		if(amDebugging())inputInfo("New command created.");
+		if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
 			_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/);
 			if(_command->_firstToken){ // we've got a first token allocated
-				if(amDebugging())inputInfo("New command token created.");
+				if(amDebugging())(*inputInfoFunction)("New command token created.");
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
 				FREE(_command,'K');_command=NULL;
-				if(amDebugging())inputError("Failed to create the first command token.");
+				if(amDebugging())(*inputErrorFunction)("Failed to create the first command token.");
 			}
 		}
 	}else
-	if(amDebugging())inputError("Failed to create the command.");
+	if(amDebugging())(*inputErrorFunction)("Failed to create the command.");
 	return _command;
 }
 
@@ -2700,6 +2922,122 @@ Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
 	}
 	return NULL;
 }
+
+bool isOneCharacterTokenType(uint8_t tokenType){
+	// TODO how about TT_EXPRESSION -> NO because a TT_EXPRESSION token is always considered ended, i.e. significantCharacterCount is not an issue in determining whether a new token starts there
+	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
+}
+
+size_t outputToken(Mtoken* _token){
+	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
+	if(numberOfCharactersToOutput>0){
+		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
+		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
+		char firstWhitespaceCharacter=(_token->significantCharacterCount>0?string_replacedchar(_token->text,'\0',_token->significantCharacterCount):'\0');
+		// if we allow comments in tokens we're in trouble!!!
+		outputTokenColor(_token);output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
+		// if there's whitespace text to start with write it in the default output color
+		if(firstWhitespaceCharacter){ // some whitespace left to write
+			string_setchar(_token->text,firstWhitespaceCharacter,_token->significantCharacterCount);
+			resetOutputColor();
+			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
+		}
+	}
+	return numberOfCharactersToOutput;
+	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
+}
+void outputLastTokenChar(Mtoken* _token){
+	///////outputTokenColor(_userInputCommand->_lastToken);
+	outputChar(string_last_char(_token->text));
+	//////////resetOutputColor();
+}
+
+// MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
+// requests can come out of a single command containing multiple function definitions
+// _firstFunctionBodyRequest represents the first one to execute
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
+FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
+FunctionBodyRequest* requestBodyOfFunction(char* functionName){
+	if(functionName&&strlen(functionName)){ // a 'valid' function name
+		// technically it should not have been requested already (or exist)
+		FunctionBodyRequest* _functionBodyRequest=_firstFunctionBodyRequest;
+		while(_functionBodyRequest&&strcmp(functionName,_functionBodyRequest->functionName))_functionBodyRequest=_functionBodyRequest->_next;
+		if(_functionBodyRequest){
+			output("%sBody of function '%s' already requested.\n",ERROR_PREFIX,functionName);
+			return NULL;
+		}
+		if(amVerbose())output("The body of function '%s' being requested.\n",functionName);
+		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'9');
+		if(_functionBodyRequest){
+			_functionBodyRequest->functionName=functionName;
+			if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
+			_lastFunctionBodyRequest=_functionBodyRequest;
+			if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
+			return _lastFunctionBodyRequest;
+		}
+		output("%sFailed to register the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
+	}
+	return NULL;
+}
+static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
+FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
+bool createFunctionBodyInput(const FunctionBodyRequest* const _firstFunctionBodyRequest){
+	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
+	///////////if(!_firstFunctionBodyRequest)return false;
+	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
+	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
+	Mfunction* function=getFunction(getEnvironment(),_firstFunctionBodyRequest->functionName);
+	if(function&&function->type==FT_USER){
+		// it's better to put the next request in, so after finishing with this request we can do the following if any
+		_currentFunctionBodyInput->_request=_firstFunctionBodyRequest->_next; // remember the request that initiated this body input
+		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
+		if(!_functionBodyInputStack)_functionBodyInputStack=_currentFunctionBodyInput;
+		// if we succeed in activating the execution environment of the new function we're good to go
+		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
+		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_firstFunctionBodyRequest->functionName,function->_parameterMap);
+		if(_functionExecutionEnvironment){
+			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
+			free_environment(_functionExecutionEnvironment);
+		}
+		outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
+	}else
+		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
+	FREE(_currentFunctionBodyInput,'H');
+	return false;
+}
+bool startFunctionBodyInput(){
+	// ASSERT only call with _firstFunctionBodyRequest not NULL
+	// move out of the queue into the stack
+	// push on top of the functionBodyInputStack
+	/////////if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
+	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next; // remember the function body request to do next
+	char* functionName=_firstFunctionBodyRequest->functionName;
+	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
+	free(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request
+	if(functionBodyInputCreated)return true; // succeeded, so done
+	// failed, so do the next one
+	_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
+	output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,functionName);
+	// if we still have a first function body request start that one, otherwise 
+	return(_firstFunctionBodyRequest?startFunctionBodyInput():true);
+}
+/*
+ \brief will only fail when we fail to start the next one
+ */
+bool endFunctionBodyInput(){
+	// ASSERT do NOT call with _currentFunctionBodyInput equal to NULL
+	// pop the function body request execution environment we just ended
+	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
+	_currentFunctionBodyInput->_function->_functionMap=getEnvironment()->_functionMap;
+	popExecutionEnvironment();
+	// the new first function body request is the successor of the previous one
+	// TODO shouldn't we free it?
+	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request; // the next function body request as stored in the _request field
+	free(_currentFunctionBodyInput);_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
+	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
+	return startFunctionBodyInput(); // will NULL _firstFunctionBodyInput to ascertain not to get called in the main user input loop
+}
+// MDH@19JUL2019 END
 
 /**
  * getValueReference() retrieves a single value reference that either ends when a binary operator token is encountered or one of the end token types
@@ -5401,7 +5739,7 @@ size_t free_formulaelement(Mformulaelement* _formulaelement){
 		if(_formulaelement->_operand)free_valuereference(_formulaelement->_operand);
 		FREE(_formulaelement,'4');
 		result+=1; // another one
-		outputChar('.');
+		// outputChar('.');
 	}
 	return result;
 }

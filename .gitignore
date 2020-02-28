@@ -21,4 +21,5 @@ libtommath/*.o
 src/Makefile
 src/mpdecimal.h
 src/*.o
+src/*.a
 src/M

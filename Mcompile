@@ -47,14 +47,18 @@ cd src
 # remove M
 rm -f M
 # remove all object files
-rm -f *.o
+######rm -f *.o
 # and static libraries
 rm -f *.a
 # move the static libraries in here
 cp ../lib/* .
 # make all files readable
 chmod 644 *
-cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec Moutput.c Mmessage.c Malloc.c Mstring.c Msettings.c Mcolors.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mlist.c Mfunctions.c Menvironment.c Mshell.c M.c -o M 
+# MDH@28FEB2020: we can do this in pieces creating the static library on the go
+cc -Wno-incompatible-pointer-types-discards-qualifiers -c Moutput.c Mmessage.c Malloc.c Mstring.c Msettings.c Mcolors.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mlist.c Mfunctions.c Menvironment.c Mshell.c
+ar cvq libM.a *.o
+# then link the lot together to create the interactive M program!!
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM M.c -o M 
 
 # check whether it is there!!!
 if [ -f M ]; then

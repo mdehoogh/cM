@@ -11,11 +11,31 @@
 #include <time.h>
 #include <limits.h>
 
-// indicate to be running an interactive session to Mshell.h
-#define __INTERACTIVE_SESSION__ 1
-
 // MDH@27FEB2020: on top of environment management we have the 'shell' for setting up the root M environment
 #include "Mshell.h"
+
+// the constants are defined in Mshell.c
+extern char const* const ERROR_PREFIX;
+extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual info prefix text to use
+extern const char* const WARNING_PREFIX; // used in Mexecution.c as well (defined there as extern!!!)
+extern const char* const BUG_PREFIX; // MDH@05NOV2019: for reporting bugs
+extern const char M_WHITESPACE_CHARACTER; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
+extern const char M_NEWLINE_CHARACTER; // MDH@31OCT2019: the character to request a newline with!!!
+extern const char* const M_VARIABLE_NAME; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
+extern const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES];
+extern const char INPUTCHARACTERTYPES[];
+extern const char* const MFUNCTION_NAME; // the text to represent values that are undefined...
+extern const char* const DOFUNCTION_NAME;
+extern const char* const FORFUNCTION_NAME;
+extern const char* const DEFINEUSERFUNCTION_NAME;
+extern const char* const M_NULL_VALUE_TEXT; // the text to represent values that are undefined...
+extern const char* const M_NULL_VARIABLE_NAME;
+extern const char* const M_UNDEFINED_VALUE_TEXT; // the text to represent values that are undefined...
+extern const char* const M_UNDEFINED_VARIABLE_NAME;
+extern long long M_DP; // the default decimal precision (initially 20) TODO should this be a constant after all?????????
+extern const unsigned long long M_BITS_PER_ENV_LEVEL; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
+extern const Mvalue* NULL_value;
+extern const long long M_LL_INVALID;
 
 char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
@@ -25,7 +45,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="5";char const * const M_DATE="25 November 2019, 18:00";
 //char const * const M_BUILD="6";char const * const M_DATE="27 November 2019, 18:00";
 //char const * const M_BUILD="7";char const * const M_DATE="20 Februari 2020, 18:00";
-char const * const M_BUILD="8";char const * const M_DATE="27 Februari 2020, 18:00";
+//char const * const M_BUILD="8";char const * const M_DATE="27 Februari 2020, 18:00";
+char const * const M_BUILD="9";char const * const M_DATE="28 Februari 2020, 18:00";
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -202,14 +223,13 @@ void restoreCursor(){printf("\0338");}
 void displayFlags(){
 	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
 }
-
 void outputFlags(){
 	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
 }
 
 // FEED FORWARD STUFF
-void inputInfo(const char* const fmt,...); // prototype
-void inputError(const char* const fmt,...); // prototype
+static void inputInfo(const char* const fmt,...); // prototype
+static void inputError(const char* const fmt,...); // prototype
 
 // manual feed forward characters stuff
 // what the user consumed manually, and is supposed to remain continguous i.e. uninterrupted by other feed forward texts
@@ -734,13 +754,91 @@ Mstring* shellCommand=NULL;
 
 // keeping track of both the cursor position and the total command length
 size_t getUserInputLength(){
-	return(inputMode==IM_COMMAND?(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0):(inputMode==IM_SHELL?string_length(shellCommand):0));
+	if(inputMode==IM_COMMAND)return(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0);
+	if(inputMode==IM_SHELL)return string_length(shellCommand);
+	return 0;
 }
 
 size_t getNumberOfSuggestedCharacters(){return(_suggestedText?string_length(_suggestedText):0);}
 size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
+// MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
+// MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
+// MDH@30OCT2019: if we let toInfoInputLine() return the number of lines it moved back we can pass that into toUserInputCursorPosition() to go down that number of lines
+// MDH@30OCT2019: for each user input line, keep track of the total number of characters written by the user
+typedef struct Muserinputline{
+	size_t offset,index; // the number of characters on previous lines and the line index
+	struct Muserinputline *_prev; // for accessing previous lines
+}Muserinputline;
+Muserinputline* _userinputline=NULL;
+Muserinputline* __userinputline(){
+	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'6');
+	if(_newUserinputline){
+		_newUserinputline->_prev=_userinputline;
+		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
+		_newUserinputline->index=(_userinputline?_userinputline->index:0)+1; // count the lines
+		_userinputline=_newUserinputline;
+	}
+	return _newUserinputline;
+}
+// call free_userinputline() when starting a new user input command
+size_t free_userinputline(){
+	size_t numberOfUserInputLines=0;
+	Muserinputline* prevUserinputline;
+	while(_userinputline){
+		numberOfUserInputLines++;
+		prevUserinputline=_userinputline->_prev;
+		FREE(_userinputline,'6');
+		_userinputline=prevUserinputline;
+	}
+	return numberOfUserInputLines;
+}
+void removeUserinputline(){
+	Muserinputline* prevUserinputline=_userinputline->_prev;
+	FREE(_userinputline,'6');
+	_userinputline=prevUserinputline;
+}
+// MDH@30OCT2019 END
+size_t toInfoInputLine(){
+	size_t linesUp=0;
+    size_t lines=(_userinputline?_userinputline->index:0)+1;
+	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();
+    return linesUp;
+} // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
+// output functions that require access to the current token
+void outputUserInputCommandTokenColor(){
+	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
+}
 uint8_t promptLength=0;
+void returnToUserInputCommandCursorPosition(){
+	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
+	toStartOfLine();
+	moveCursorRight(promptLength+getUserInputLength()-(_userinputline?_userinputline->offset:0)); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
+	outputUserInputCommandTokenColor();
+}
+void toUserInputCursorPosition(size_t linesDown){while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();}
+// MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
+static void inputInfo(const char* const fmt,...){
+	if(fmt&&strlen(fmt)){ // we have a format
+		size_t linesMovedUp=toInfoInputLine();
+		resetOutputColor(); // get the default output color!!
+		// NOTE we have to call vprintf here NOT printf!!!
+		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
+		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+		toUserInputCursorPosition(linesMovedUp);
+	}
+}
+static void inputError(const char* const fmt,...){
+	if(fmt&&strlen(fmt)){ // we have a format
+		size_t linesMovedUp=toInfoInputLine();
+		setColor(getErrorColor());setBackColor(getBackgroundColor());
+		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+		toUserInputCursorPosition(linesMovedUp);
+	}
+}
+
+// request body of function moved over to Mshell.h/c
+
 void showPrompt(){
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
@@ -761,7 +859,7 @@ void showPrompt(){
 				promptLength=1;
 				*/
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
-				if(_currentFunctionBodyInput)
+				if(getCurrentFunctionBodyInput())
 					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getEnvironment()->_name));	// replacing: printf("%lu",(commandCount+1));
 				else
 					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
@@ -792,7 +890,7 @@ void showPrompt(){
 bool showContinuedPrompt(){
 	// ASSERT only to be called in command mode with _userInputCommand not NULL
 	// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
-	if(!__userinputline(getUserInputLength()))return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
+	if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
 	clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
 	outputChar('\n'); // move over to the next line
 	uint8_t blanks=promptLength;while(blanks>3){outputChar(' ');blanks--;}
@@ -803,7 +901,7 @@ bool showContinuedPrompt(){
 }
 // MDH@30OCT2019 END
 void promptForUserInput(){
-	free_userinputline();// somewhere else please: if(__userinputline())outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
+	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode();
 	resetOutputColor();
 	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
@@ -830,58 +928,10 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
-// the list of token type ids in the corresponding order!!!
-const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
-	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
-	////////output("(%d)",tokentype_id);
-	switch(tokentype_id>>6){
-		case 0: // value token
-			return getValueTokenColor(tokentype_id);
-		case 1: // operator: unary, binary, ternary, assignment the operator category will be: (tokentype_id&0x30)>>4
-			return getOperatorTokenColor((tokentype_id&0x30)>>4);
-		case 2: // comment or end of comment
-			return getCommentColor();
-		case 3: // error token
-			/////////outputChar('E');
-			return getErrorColor();
-	}
-	return "";
-}
-void outputTokenTypeColor(TokenType tokenType){
-	setBackColor(getBackgroundColor());
-	setColor(getTokenColor(tokenType));
-}
-void outputTokenColor(Mtoken* _token){
-	if(_token)outputTokenTypeColor(_token->type);
-	///////printf("[%d]",_userInputCommand->_lastToken->type);
-	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
-}
-size_t outputToken(Mtoken* _token){
-	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
-	if(numberOfCharactersToOutput>0){
-		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
-		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
-		char firstWhitespaceCharacter=(_token->significantCharacterCount>0?string_replacedchar(_token->text,'\0',_token->significantCharacterCount):'\0');
-		// if we allow comments in tokens we're in trouble!!!
-		outputTokenColor(_token);output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
-		// if there's whitespace text to start with write it in the default output color
-		if(firstWhitespaceCharacter){ // some whitespace left to write
-			string_setchar(_token->text,firstWhitespaceCharacter,_token->significantCharacterCount);
-			resetOutputColor();
-			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
-		}
-	}
-	return numberOfCharactersToOutput;
-	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
-}
-void outputLastTokenChar(Mtoken* _token){
-	///////outputTokenColor(_userInputCommand->_lastToken);
-	outputChar(string_last_char(_token->text));
-	//////////resetOutputColor();
-}
 // MDH@30APR2019: when a function returns to a variable and the other way round
 void reoutputToken(Mtoken* _token){
 	if(!_token)return;
+	// outputChar('X');
 	size_t tokenLength=(_token->text?string_length(_token->text):0);
 	if(tokenLength==0)return; // shouldn't happen though
 	// MDH@31OCT2019: this is particularly hard if the token is written over several lines
@@ -897,25 +947,11 @@ void reoutputToken(Mtoken* _token){
 	outputToken(_token); // back where we started (hopefully)
 	if(tokenOnPreviousInputLine){oneLineDown();toStartOfLine();moveCursorRight(promptLength+getUserInputLength()-_userinputline->offset);}
 }
-/**
- * freeToken() frees the memory @_userInputCommand->_lastToken points to and returns true on successfully removing the entire chain of tokens it points to
- * @returns the previous token (as we need that )  
- */
-Mtoken* freeToken(Mtoken* _token){
-	// MDH@30APR2019: let's delegate to free_token()
-	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token);}return _prevToken;
-}
-// output functions that require access to the current token
-void outputUserInputCommandTokenColor(){
-	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
-}
-void returnToUserInputCommandCursorPosition(){
-	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
-	toStartOfLine();
-	moveCursorRight(promptLength+getUserInputLength()-(_userinputline?_userinputline->offset:0)); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
-	outputUserInputCommandTokenColor();
-}
-void clearInfo(){toUserInputCursorPosition(toInfoInputLine());} // MDH@30OCT2019: toInfoInputLine() automatically clears the info input line!!!
+
+void clearInfo(){
+	toUserInputCursorPosition(toInfoInputLine());
+} // MDH@30OCT2019: toInfoInputLine() automatically clears the info input line!!!
+
 void inputInfoCommand(Mcommand* command){
 	size_t linesMovedUp=toInfoInputLine();
 	resetOutputColor();
@@ -1106,7 +1142,7 @@ Mcommand** commands=NULL; // array for storing the pointers to the first token o
 uint32_t commandBlocks=0;
 bool registerCommand(Mcommand* command){
 	if(!command)return false;
-	if(!_currentFunctionBodyInput){ // a top-level (non function body) command
+	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
 			commandBlocks++;
@@ -1120,8 +1156,8 @@ bool registerCommand(Mcommand* command){
 		// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
 		Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(command->_firstToken,false);
 		if(_commandToEvaluateTokenValue){
-			if(!_currentFunctionBodyInput->_function->_bodyCommandList)_currentFunctionBodyInput->_function->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
-			if(appendedToList(_currentFunctionBodyInput->_function->_bodyCommandList,_commandToEvaluateTokenValue,M_LL_INVALID)>0)return true;
+			if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)getCurrentFunctionBodyInput()->_function->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
+			if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,_commandToEvaluateTokenValue,M_LL_INVALID)>0)return true;
 			outputError("Failed to add the command to the body of the function");
 		}
 	}
@@ -1258,30 +1294,6 @@ bool initialized(char* variableName){
 // suggesting NOT to be able to get out of an error condition but to allow viewing information on the error somehow!!! (how about tab as this will do feed forward!!!!!)
 // if we put the error info in the error token
 
-// MDH@05JUN2019: it's prudent to return the negative value of the input token type if the given input character type ends the token 
-//                i.e. when NO_TRANSITIONS is a match, so that the caller can set the significantCharacterCount
-int8_t nextTokenType(uint8_t inputTokenType,char inputCharacterType){
-	if(inputTokenType<NUMBER_OF_FINISHABLE_TOKEN_TYPES){ // can only move to another token type if currently inside a valid token (i.e. you cannot get out of a TT_ERROR token type!!!)
-		// finding the type will be more difficult actually if we end up with the token type character instead of the token type index!!!
-		char* noTransition=NO_TRANSITIONS[inputTokenType];
-#ifdef __DEBUG__
-		printf("'%s'",noTransition);
-#endif
-		// TODO we can improve on the following
-		///////////if(noTransition[0]!='`'&&!strchr(noTransition,inputCharacterType))return -inputTokenType;
-		if(strlen(noTransition)==0||(noTransition[0]=='`'?strchr(noTransition,inputCharacterType)!=NULL:strchr(noTransition,inputCharacterType)==NULL)){
-			int8_t tokenType=NUMBER_OF_TOKEN_TYPES; // MDH@10APR2019: BUG FIX uint8_t changed to int8_t otherwise would circle around
-			while(--tokenType>=0)if(strchr(TRANSITIONS[inputTokenType][tokenType],inputCharacterType)!=NULL)return tokenType;
-		}
-#ifdef __DEBUG__
-		else{
-			outputChar('=');
-		}
-#endif
-	}
-	return inputTokenType; // if no match was found assume no change to the token type!!
-}
-
 //// first operator characters (0=assignment character, 1-6: binary 1 and 2-character operators, 7-8: 1-character binary, 9-10: unary/binary, 11-12: 1-character unary)
 //const char ASSIGNMENT_CHARACTER='=';
 //const char FIRST_OPERATOR_CHARACTERS[]={ASSIGNMENT_CHARACTER,'<','>','|','&','*','/','^','%','+','-','~','!','\0'}; // i.e. "=<>|&*/^%+-~!";
@@ -1301,30 +1313,17 @@ bool continuesOperator(Mtoken* _userInputCommand->_lastToken,char inputChar){
 }
 */
 bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
-bool isOneCharacterTokenType(uint8_t tokenType){
-	// TODO how about TT_EXPRESSION -> NO because a TT_EXPRESSION token is always considered ended, i.e. significantCharacterCount is not an issue in determining whether a new token starts there
-	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
-}
 
-// keep track of the state of entering a command
-// MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
-bool removeToken(){	
+// removeLastToken() removes the last user input command token, delegating the actual removal to removeLastCommandToken now defined in Mshell.h/c
+bool removeLastUserInputCommandToken(){
+	if(!_userInputCommand||!_userInputCommand->_lastToken)return false;
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
 	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
-	// ASSERT _userInputCommand->_lastToken should NOT be NULL and empty (i.e. empty tokens should be removed!!!)
-	// NOTE if we call freeToken() to free this token all forwardly connected tokens are also freed, so pPrevToken->next should become NULL
-	// MDH@02OCT2019: every time _userInputCommand->_lastToken changes, call setLastUserInputCommandToken which will set identifierContinuationIsDirty if it's an identifier token
-	setLastUserInputCommandToken(freeToken(_userInputCommand->_lastToken));
-	/* replacing:
-	_userInputCommand->_lastToken=freeToken(_userInputCommand->_lastToken); // _userInputCommand->_lastToken now equals its own previous token!!
-	if(inIdentifierToken())identifierContinuationIsDirty=true; // every time the last command to evaluate token changes, we need this
-	*/
-	if(!_userInputCommand->_lastToken){_userInputCommand=NULL;return false;} // TODO is it safe to NULL _userInputCommand without freeing?????
-	_userInputCommand->_lastToken->next=NULL;
+	removedLastCommandToken(_userInputCommand); // NOT using the result (which would be the new last command token)
 	return true;
 }
 
-// MDH@04NOV2019: moved from line 1800 or so over here as it calls removeToken() and we do not like to have to use prototypes TODO remove all prototype() definitions
+// MDH@04NOV2019: moved from line 1800 or so over here as it calls removeLastUserInputCommandToken() and we do not like to have to use prototypes TODO remove all prototype() definitions
 void updateUserInputCommandIdentifierContinuation(){
 	// MDH@30OCT2019: simplified updating the identifier continuation a bit so wee do not need to be afraid that it won't work AND we no longer need the userInputCommandIdentifierContinuationNeedsUpdating flag!!!!
 	//                BUT right after a delete we should be allowed to set the flag so the continuation will be deleted and nothing more
@@ -1366,7 +1365,7 @@ void updateUserInputCommandIdentifierContinuation(){
 										if(_errorToken){
 											_userInputCommand->_lastToken=_errorToken; // update the last token assuming we will succeed in doing what needs doing
 											if(!string_append_char(_errorToken->text,c)){
-												if(removeToken())
+												if(removeLastUserInputCommandToken())
 													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
 												else
 													inputError("%sFailed to undo failing to mark the last character as erroneous.",BUG_PREFIX);
@@ -1556,91 +1555,8 @@ void unfinishToken(Mtoken* lastCommandToken){
 				lastCommandToken->significantCharacterCount=0;
 }
 
-<<<<<<< HEAD
-=======
-bool isAValidCommand(Mcommand* command,bool report){
-
-	// 1. if no command nothing evaluated TODO don't call when this is the case though
-	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return false;}
-	
-	Mtoken* lastCommandToken=command->_lastToken;
-	if(!lastCommandToken){if(report)outputError("Unfinished command");return false;}
-	
-	// 2. if the last token is a comment, remove it before further evaluation TODO should we unfinish the token??????
-	//    as a result _userInputCommand->_lastToken and _userInputCommand->_firstToken could now both be NULL, that's why we test this first
-	if(lastCommandToken->type==TT_COMMENT)if(!removeToken()){if(report)outputError("Failed to remove the comment");return false;}
-
-	// 3. any command always has two significant tokens TODO could compare _userInputCommand->_firstToken with _userInputCommand->_lastToken which should be different!!!
-	//    in this case we clear the command, so that the command won't be repeated, and the user can switch to control mode immediately with the Enter key!!
-	/// TODO fix: if(firstCommandToken==lastCommandToken->expr){if(report)outputError("Empty command");/*clearCommand(firstCommandToken);*/return false;} // TODO do we need clearCommand() here at all???????
-
-	// 2. if the last token is an error, can't evaluate (well, better not)
-	// TODO it makes sense to remove the error token
-	if(lastCommandToken->type==TT_ERROR){if(report)outputError("Can't evaluate erroneous command");if(!removeToken()){if(report)outputError("Failed to remove the error");}unfinishToken(lastCommandToken);return false;}
-
-	// 3. if the last token is an operator of sorts the command is incomplete
-	if(lastCommandToken->type<=8){if(report)outputError("Value behind operator at end of command missing");return false;}
-
-	// MDH@03MAY2019: this is new, if expr is not NULL apparently we have missing parentheses!!!!
-	//                BUT given that the first token always is of type TT_EXPRESSION and the last token will be pointing to it when complete we'd have to check for that too
-	//                    this actually means that if expr is NULL there's one parentheses too many!!!
-	/*
-	if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
-	if(_userInputCommand->_lastToken->expr!=_userInputCommand->_firstToken){outputError("Not enough parentheses!");return false;}
-	*/
-	// MDH@22MAY2019: the following is complex because we might be right behind the closing of a list, map or function call, in which case the command is still complete!!!
-	// MDH@27MAY2019: the last token should now either point to the first token in the command, or to something that does point to the first token in the command
-	//////////// already noticed while entering the expression!!!!: if(!_userInputCommand->_lastToken->expr){outputError("Too many parentheses!");return false;}
-	Mtoken* expressionToken=lastCommandToken->expr; // the token pointed to by the last command token
-	if(expressionToken)if(lastCommandToken->type==TT_END_OF_LIST||lastCommandToken->type==TT_END_OF_FUNCTION_CALL||lastCommandToken->type==TT_END_OF_MAP)expressionToken=expressionToken->expr;
-	if(expressionToken){ // could be a problem
-		// MDH@16OCT2019: I made ] ) and } again point to the associated [ ( and {, which of course should be pointing to NULL if it does not the command is incomplete
-		if(amVerbose())if(report)output("First token in last expression pointed to: '%s' of type '%s' at offset '%" PRIu16 "'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],expressionToken->offset);
-		if(report)
-		switch(expressionToken->type){
-			case TT_LIST:outputError("Missing end of list");break;
-			case TT_FUNCTION_CALL:outputError("Missing end of function call");break;
-			case TT_MAP:outputError("Missing end of map");break;
-			default:output("%sUnknown expression with first token of type %s left unfinished.\n",ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);break;
-		}
-		return false;
-		/* replacing:
-		// MDH@23JUL2019: we can now be very strict
-		//                the last token should point to the first expression which only contains whitespace, whereas all other expression tokens start with ()
-		if(_userInputCommand->_lastToken->expr->type!=TT_EXPRESSION||(string_length(_userInputCommand->_lastToken->expr->text)&&string_char(_userInputCommand->_lastToken->expr->text,0)!=' ')){
-			outputError("Incomplete command");
-			return false;
-		}
-		*/
-		/* replacing:
-		// this is allowed if this token ends something that points to NULL
-		if((_userInputCommand->_lastToken->type!=TT_END_OF_LIST&&_userInputCommand->_lastToken->type!=TT_END_OF_FUNCTION_CALL&&_userInputCommand->_lastToken->type!=TT_END_OF_MAP)||_userInputCommand->_lastToken->expr->expr){
-			switch(_userInputCommand->_lastToken->expr->expr->type){
-				case TT_LIST:outputError("Missing end of list.");break;
-				case TT_FUNCTION_CALL:outputError("Missing end of function call!");break;
-				case TT_MAP:outputError("Missing end of map!");break;
-				default:outputError("Not enough parentheses.");break;
-			}
-			return false;
-		}
-		*/
-	}
-
-	// 4. can't end with function of function call
-	// MDH@20JUL2019: BUT we can treat the function as (new) variable, although new variables should not occur at the end of a command???
-	if(lastCommandToken->type==TT_FUNCTION){if(report)outputError("Function call missing at end of command");return false;}
-	if(lastCommandToken->type==TT_FUNCTION_CALL){if(report)outputError("Unfinished function call");return false;}
-	if(lastCommandToken->type==TT_LIST||lastCommandToken->type==TT_LISTELEMENT){if(report)outputError("Unfinished list");return false;}
-	if(lastCommandToken->type==TT_DQSTRING||lastCommandToken->type==TT_SQSTRING){if(report)outputError("Unfinished string literal");return false;}
-	if(lastCommandToken->type==TT_EXPRESSION){if(report)outputError("Unfinished expression");return false;}
-	if(lastCommandToken->type==TT_MAP||lastCommandToken->type==TT_MAP_VALUE){if(report)outputError("Unfinished map");return false;}
-	
-	return true;
-
-}
-
-void outputCommandInfo(Mcommand* command);
-
+// void outputCommandInfo(Mcommand* command);
+/* MDH@28FEB2020: moved over to Mshell.c/h
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
 Mvalue* getCommandValue(Mcommand* command,char commandType){
 	if(amVerbose())outputCommandInfo(command);
@@ -1649,10 +1565,10 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 	if(amVerbose())outputLine("Evaluating...");
 	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
 }
-
+*/
 // MDH@29NOV2019: we're going to keep track of the system and user allocation counts
 size_t* getAllocationCountDifferences(size_t* from,size_t* to){
-
+	return NULL;
 }
 size_t *_systemallocationcounts,*_userallocationcounts;
 size_t *_lastcommandsystemallocationcounts,*_lastcommanduserallocationcounts;
@@ -1664,17 +1580,22 @@ void prepareForEvaluatingCommand(){
 
 }
 void doneWithEvaluatingCommand(){
-
 }
 
->>>>>>> a1679b76b7947aeebf9e0676736409271ba1dff3
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //                instead of returning a bool we could return the command text (or NULL if failing to do so????)
 bool evaluateCommand(Mvalue* *resultValue){
 	
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
-	if(!isAValidCommand(_userInputCommand,true))return false;
+	if(!isAValidCommand(_userInputCommand,true)){
+		// MDH@20FEB2020: this is what we did in isAValidCommand() before, but removed from it: if the command ends with an error, we remove the error token, unfinish the (new) last token, so we can re-use it
+		if(_userInputCommand&&_userInputCommand->_lastToken&&_userInputCommand->_lastToken->type==TT_ERROR){
+			removeLastUserInputCommandToken();
+			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishToken(_userInputCommand->_lastToken);
+		}
+		return false;
+	}
 
 	markAllocationCounts(); // remember the allocation counts at the start of evaluating a command!!!
 
@@ -2217,65 +2138,6 @@ Mtoken* getSpecialFunctionCallToken(const Mtoken* const token){
 	return container;
 }
 */
-// an identifier with a certain name in a certain special function call (to which it might be local)
-// instead of requiring a specialFunctionCallToken it suffices to know the environment id
-bool existsInCommand(char* identifierName,uint64_t identifierEnvironmentId){ // replacing: const Mtoken* const specialFunctionCallToken){
-	// every token contains a reference to its previous identifier (or name of the function being called), basically this means we can find all identifiers present in the current command
-	// but we have to be careful because variables declared locally should be skipped unless they are in the same function call i.e. expr
-	bool found=false;
-	size_t l=strlen(identifierName);
-	Mtoken* commandIdentifier=_userInputCommand->_lastToken->prevIdentifier;
-	char *match,*commandIdentifierName;
-	uint64_t commandIdentifierEnvironmentId,commandIdentifierEnvironmentLevels,ander=(1<<M_BITS_PER_ENV_LEVEL)-1;
-	while(!found&&commandIdentifier){
-		// if a function call or end of function call identifier, no need to check!!
-		if(commandIdentifier->type!=TT_FUNCTION&&commandIdentifier->type!=TT_END_OF_FUNCTION_CALL){ // a (new) variable
-			commandIdentifierName=string(commandIdentifier->text); // I have to do this to get the closing '\0' placed!!!
-			if(strlen(commandIdentifierName)>=l){ // a match is only possible if identifierName is at least as long as 
-				// TODO using strstr for now, but it would be better to find the position of the first non-matching character and if that is at least l we're good
-				match=strstr(commandIdentifierName,identifierName);
-				if(match==commandIdentifierName)if(commandIdentifierName[l]=='\0'||commandIdentifierName[l]==' '){ // the names match
-					if(commandIdentifier->argument==1){ // the identifier is local to one of the special function calls (which is present in `do`, `for` and `function` function calls)
-						// we can't tell for sure that this local identifier is in the same special function call unless `expr` field matches imagine the situation where multiple do's are in the same command following each other
-						// the local variables in the first are not local to the second do call it's all about scope meaning we have to mark the end of a scope as well so we know which identifiers to skip i.e. those identifiers local to another special function call
-						// so if we stored `( f g , h ) ( x, g` the second g is not in the first call and therefore does not exist in the command, so in going back you have to keep track of the level which should be the same as level of the caller
-						// the special function call associated with the two identifiers must match!!
-						// BUT a local variable of a special function call could be used in which the special function call of the identifier is nested within (like a do inside a do) in which case we should keep going up
-						// so: identifier is local to its own special function call but the presented identifier might not i.e. it might be defined in a outer special function call
-						if(identifierEnvironmentId){ // defined inside a subenvironment
-							commandIdentifierEnvironmentId=commandIdentifier->envid;
-							commandIdentifierEnvironmentLevels=(commandIdentifierEnvironmentId&15);
-							// it's all about environmentid subclassing the environment id of identifier
-							// i.e. environment id level should be at least the identifier's environment id
-							if(commandIdentifierEnvironmentLevels<=(identifierEnvironmentId&15)){ // the registered identifier is defined at a level equal to or above that of the identifier
-								commandIdentifierEnvironmentId>>=4;identifierEnvironmentId>>=4; // shift out the number of levels
-								// all environment ids of the local identifier (commandIdentifier) should match those in identifierEnvironmentId
-								while(commandIdentifierEnvironmentLevels>0&&((commandIdentifierEnvironmentId&ander)==(identifierEnvironmentId&ander))){
-									commandIdentifierEnvironmentLevels--;
-									commandIdentifierEnvironmentId>>=M_BITS_PER_ENV_LEVEL;
-									identifierEnvironmentId>>=M_BITS_PER_ENV_LEVEL;
-								}
-								if(commandIdentifierEnvironmentId==0)found=true;
-							}
-						}
-						/* replacing:
-						if(specialFunctionCallToken){ // the given identifier exists inside a special function call therefore it might be the local identifier with the same name!!
-							Mtoken *localIdentifierSpecialFunctionCallToken=getSpecialFunctionCallToken(identifier),*needleSpecialFunctionCallToken=specialFunctionCallToken; // which MUST exist i.e. will NOT be NULL
-							while(needleSpecialFunctionCallToken&&needleSpecialFunctionCallToken!=localIdentifierSpecialFunctionCallToken)needleSpecialFunctionCallToken=getSpecialFunctionCallToken(needleSpecialFunctionCallToken);
-							if(needleSpecialFunctionCallToken)found=true;
-						}
-						*/
-					}else
-						found=true;
-				} // TODO will blank always be the only possible whitespace character????? 
-			}
-		}
-		// get the next identifier
-		commandIdentifier=commandIdentifier->prevIdentifier;
-	}
-	//////////if(found)inputInfo("%s",identifierName);else inputInfo("NOT %s",identifierName);
-	return found;
-}
 
 // MDH@30APR2019: if the current token is a variable/function check whether it still is
 //                call whenever the current token changes (in removePreviousTokenCharacter() and commandCharacterAccepted())
@@ -2319,7 +2181,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	if(lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
-		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getEnvironment(),_identifierName)));
+		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getEnvironment(),_identifierName)));
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(!variableExists){ // apparently does NOT exist
 				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
@@ -2439,7 +2301,7 @@ char removedTokenCharacter(bool endOfInput){
 			}
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//                HOWEVER we're assuming that we're dealing with an end of input situation
-			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)?removeToken():false);
+			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)?removeLastUserInputCommandToken():false);
 			unfinishToken(_userInputCommand->_lastToken); // we need to do this to allow appending characters to the token again
 			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,endOfInput);
 		}
@@ -2484,26 +2346,6 @@ uint32_t getListElementCount(){
 	while(token!=startToken){if(token->expr==startToken&&token->type==TT_LISTELEMENT)listElementCount++;token=token->prev;}
 	return listElementCount;
 }
-// TODO we could call the following function from tokenCheckedForBeingAFunction
-void changeFunctionTokenToAVariable(bool endOfInput){
-	char* _identifierName=_stringstart(_userInputCommand->_lastToken->text,_userInputCommand->_lastToken->significantCharacterCount); // free asap
-	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
-	_userInputCommand->_lastToken->type=(_userInputCommand->_lastToken->argument!=1&&(existsInCommand(_identifierName,_userInputCommand->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
-	free(_identifierName);
-	reoutputToken(_userInputCommand->_lastToken);
-	/* MDH@01OCT2019 because the token isn't actually removed the feed forward text associated with the token does not need to be deleted actually
-	// MDH@20SEP2019: this function is called when a function name changes into a variable name (because the user did not enter ( behind a function name)
-	//                and it makes sense to simply remove the associated feed forward of the token
-	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
-	*/
-	/* replacing:
-	// I think we should remove ( from the behind cursor text if it was inserted
-	if(endOfInput)if(amMatchingparentheses())
-	if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='(')
-	if(!string_removed_char(feedforwardText,0))inputError("Failed to remove the function argument list opening parenthesis from the feed forward text."); // TODO is there a better way???
-	*/
-	// ready to redetermine the new token type!!!!
-}
 
 // MDH@27FEB2020: commandCharacterAppended() moved over to Mshell.c
 
@@ -2526,7 +2368,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	if(!_userInputCommand){inputError("%sNo user input command.",BUG_PREFIX);return false;}
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	/////outputChar('3');
-	clearInfo();
+	clearInfo(); // MDH@28FEB2020: is responsible for the experienced problem
 	/////outputChar('4');
 	/////////if(amDebugging())inputInfo("A");
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
@@ -2569,7 +2411,9 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	printf("[%s]",string(_userInputCommand->_lastToken->text));
 #endif
 	// MDH@24APR2019 obsolete: getCommandLength()++; // increment total command length
+	// outputChar('>');
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
+
 	//putchar('\b');
 
 	if(endOfInput){
@@ -2854,6 +2698,15 @@ void prepareShellEnvironmentForInteractiveSession(){
 
 }
 
+// additional functions are available in an interactive session to be added to the shell environment
+// as well as specific functions for displaying input info and input error messages
+void prepareForInteractiveSession(){
+	prepareShellEnvironmentForInteractiveSession();
+	setInputErrorFunction(inputError);
+	setInputInfoFunction(inputInfo);
+	setReoutputTokenFunction(reoutputToken);
+	outputInfo("Ready for an interactive session.");
+}
 // MDH@27FEB2020: called from within main() only, so can be placed directly in front of main (and separated into a separate M.c or better Minterpreter.c or Mcli.c)
 
 void prepareForUserInput(){
@@ -2931,7 +2784,7 @@ int main(int argc, char **argv){
 		exit(1);
 	}
 
-	prepareShellEnvironmentForInteractiveSession(); // initialize the shell environment for use in an interactive session
+	prepareForInteractiveSession(); // initialize the shell environment for use in an interactive session
 
 	// MDH@11NOV2019: at this point getNumberOfValues() still represents the actual number of remembered values (before values are removed from it)
 	if(amVerbose())output("M shell initialized with %llu predefined values.\n",getNumberOfValues());
@@ -3088,7 +2941,7 @@ int main(int argc, char **argv){
 			// ask the user for input
 			if(!inputCharRead(&inputChar))break;
 
-			/////////outputChar(inputChar);
+			// outputChar(inputChar);
 
 			// hide the suggested text again before processing the character read
 			if(inputMode==IM_COMMAND){
@@ -3440,8 +3293,8 @@ int main(int argc, char **argv){
 												tokenCheckedForBeingAFunction(true);
 											*/
 											/*
-											else // nothing left in current token // MDH@23SEP2019: it seems better to call removeToken() here as removeToken() will also remove the token's feed forward text
-												removeToken();
+											else // nothing left in current token // MDH@23SEP2019: it seems better to call removeLastUserInputCommandToken() here as removeLastUserInputCommandToken() will also remove the token's feed forward text
+												removeLastUserInputCommandToken();
 											*/
 											// MDH@30SEP2019: this is the only call to getAutocompletionTextOfCharacterPrepended() therefore we can simply adjust that function to check whether this character matches a consumed character!!!
 											//                but I guess failing to do so is not that terrible that we should switch to control mode
@@ -3513,6 +3366,7 @@ int main(int argc, char **argv){
 						//                ALSO because the backtick will be visible it's probably better to insert an empty token for it of type TT_NEWLINE or something like that
 						//                it's probably best to check whether to accept a backtick here???? NOTE we could have backticks in commands read from files as well????
 						if(commandCharacterAccepted(inputChar,&inputCharType,true,false)){
+							// outputChar('X');
 							if(inputCharType==' '){ // a newline request (whenever M_NEWLINE_CHARACTER is input at a functional position)
 								showContinuedPrompt();
 								//////////showSuggestedText(); // we have to rewrite the suggested text though
@@ -3673,9 +3527,9 @@ int main(int argc, char **argv){
 					}
 				}else{
 					string_append_char(shellCommand,inputChar);
-					outputChar('<');
+					// outputChar('<');
 					outputChar(inputChar);
-					outputChar('>');
+					// outputChar('>');
 					// MDH@24APR2019: getUserInputLength()++;
 				}
 			}
@@ -3693,7 +3547,7 @@ int main(int argc, char **argv){
 		// if eXit input character(s) received...
 		if(inputCharType=='x'){
 			// we should only exit M when not entering a function body
-			if(!_currentFunctionBodyInput)break; // break out of user input loop
+			if(!getCurrentFunctionBodyInput())break; // break out of user input loop
 			// switch back to command mode
 			endFunctionBodyInput();
 			switchToCommandMode();
@@ -3703,7 +3557,8 @@ int main(int argc, char **argv){
 			if(inputMode==IM_COMMAND){
 				// MDH@21JUL2019: if the last token appears to be a function identifier change it to a variable
 				//                so we won't end up with refusal of evaluation
-				if(_userInputCommand&&_userInputCommand->_lastToken)if(_userInputCommand->_lastToken->type==TT_FUNCTION)changeFunctionTokenToAVariable(false);
+				if(_userInputCommand&&_userInputCommand->_lastToken)if(_userInputCommand->_lastToken->type==TT_FUNCTION)
+					changeFunctionTokenToAVariable(_userInputCommand,false); // MDH@28FEB2020: command now passed in to the function call as well (see Mshell.c)
 				inputInfo("%s",""); // so that line will be empty
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore
@@ -3783,7 +3638,7 @@ int main(int argc, char **argv){
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
-					if(_firstFunctionBodyRequest&&!startFunctionBodyInput())outputError("Failed to start requesting the body of a new function");
+					if(getFirstFunctionBodyRequest()&&!startFunctionBodyInput())outputError("Failed to start requesting the body of a new function");
 
 				}else{
 					// MDH@14AUG2019: if a user presses Enter when there's no command but still feedforwardText it looses feedforwardText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)
