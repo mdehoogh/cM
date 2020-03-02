@@ -922,7 +922,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			outputError("Failed to finalize pi");
 		}else
 		if(!interrupted){
-			if(then>=0)if(!interrupted){outputChar('.');newline();}
+			// if(then>=0)if(!interrupted){outputChar('.');newline();}
 			//output("Number of iterations to compute pi to %lld decimals: %lld.\n",mpd_context->prec,iter);
 			if(mpd_context){
 				// store pi, pi/2 and pi/4 in the decimal context (all or none) BEFORE readjusting the precision i.e. if no error occurred

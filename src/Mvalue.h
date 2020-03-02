@@ -175,6 +175,9 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 Mstring* _getListText(Mlist* _list);
 Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings);
 
+void outputList(char const * const prefix,Mlist* list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
+void outputMap(char const * const prefix,Mmap* map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
+
 Mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)

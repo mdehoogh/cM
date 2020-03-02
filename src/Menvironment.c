@@ -1505,6 +1505,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
         if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
             Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'-');
             if(_userfunction){
+                if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
                 Mtext* functionName=_nameValue->value._text;
                 // user function expects a list of commands, so we have to wrap the single token (if any)
                 if(_bodyTokenValue){
@@ -1518,6 +1519,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                     // MDH@17JUL2019: the map needs to be stored with the Mfunction
                 Mfunction* _function=_getFunction(getEnvironment(),functionName->_c);
                 if(_function){
+                    // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                     _function->_parameterMap=_parameterMapValue->value._map;
                     _function->functionunion._userfunction=_userfunction;
                     // return the result of applying the function to the default parameter map

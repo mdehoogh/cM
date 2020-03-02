@@ -188,7 +188,8 @@ const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01
 
 bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap* _variableMap){
 	bool executionEnvironmentInitialized=true;
-	Mmapelement* variableMapelement=_variableMap->_first;
+	outputMap("Execution environment variable map: ",_variableMap,".\n");
+	Mmapelement* variableMapelement=(_variableMap?_variableMap->_first:NULL);
 	Mvariable* variableMapelementVariable;
 	while(executionEnvironmentInitialized&&variableMapelement){
 		variableMapelementVariable=variableMapelement->_variable;
@@ -213,8 +214,10 @@ obviously when defining the function body there will be no commands to execute
  */
 Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
+	outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=__environment(); // free asap
 	if(_functionExecutionEnvironment){
+		if(amVerbose())outputInfo("Registering the name of the function execution environment");
 		_functionExecutionEnvironment->_name=_strdup(functionName); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
@@ -224,10 +227,12 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		*/
 		// 2. make the definition environment the parent of the function execution environment
 		_functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
+		if(amVerbose())outputInfo("Parent of function execution environment set to the function definition environment");
 		// 3. create the argument map fields as variables in the function execution environment
 		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,_argumentMap);
 		if(functionExecutionEnvironmentInitialized){
-		// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
+			if(amVerbose())outputInfo("Function execution environment initialized.");
+			// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
 			if(!addVariable(_functionExecutionEnvironment,"$",VT_UNDEFINED,false)){
 				outputError("Failed to add the result variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
@@ -236,7 +241,8 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 				outputError("Failed to add the exit flag variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}
-		}
+		}else
+			outputError("Failed to initialize the function execution environment.");
 		if(!functionExecutionEnvironmentInitialized){free_environment(_functionExecutionEnvironment);_functionExecutionEnvironment=NULL;}
 	}
 	return _functionExecutionEnvironment;
@@ -1154,7 +1160,7 @@ Mvalue* Mevalfunction(Mvalue* value){
 			*/
 			uint32_t pos=0;
 			char evalInputChar,evalInputCharType;
-			if(amVerbose())output("Parsing '");
+			if(amVerbose())output("%s","Parsing '");
 			Mtoken* newLastEvalCommandToken=NULL;
 			while(pos<string_length(_evalValueText)){
 				evalInputChar=string_char(_evalValueText,pos++);
@@ -2955,53 +2961,77 @@ void outputLastTokenChar(Mtoken* _token){
 // MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
 // requests can come out of a single command containing multiple function definitions
 // _firstFunctionBodyRequest represents the first one to execute
-static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
-FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
-FunctionBodyRequest* requestBodyOfFunction(char* functionName){
-	if(functionName&&strlen(functionName)){ // a 'valid' function name
-		// technically it should not have been requested already (or exist)
-		FunctionBodyRequest* _functionBodyRequest=_firstFunctionBodyRequest;
-		while(_functionBodyRequest&&strcmp(functionName,_functionBodyRequest->functionName))_functionBodyRequest=_functionBodyRequest->_next;
-		if(_functionBodyRequest){
-			output("%sBody of function '%s' already requested.\n",ERROR_PREFIX,functionName);
-			return NULL;
-		}
-		if(amVerbose())output("The body of function '%s' being requested.\n",functionName);
+FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){
+	FunctionBodyRequest* _functionBodyRequest=NULL;
+	if(functionName){
 		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'9');
 		if(_functionBodyRequest){
-			_functionBodyRequest->functionName=functionName;
-			if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
-			_lastFunctionBodyRequest=_functionBodyRequest;
-			if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
-			return _lastFunctionBodyRequest;
+			_functionBodyRequest->_functionName=_strdup(functionName);
+			if(!_functionBodyRequest->_functionName){
+				free(_functionBodyRequest);_functionBodyRequest=NULL;
+			}
 		}
-		output("%sFailed to register the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
 	}
-	return NULL;
+	return _functionBodyRequest;
 }
+void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest){
+	if(!_functionBodyRequest)return;
+	free(_functionBodyRequest->_functionName);
+	free(_functionBodyRequest);
+}
+// active 'list' of function body requests
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
+static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
+	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
+	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName))functionBodyRequest=functionBodyRequest->_next;
+	return functionBodyRequest;
+}
+FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
+// MDH@02MAR2020 NOTE: there's no need to return the new function body request instance as it is not used
+static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
+	if(!functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
+	// ASSERT a 'valid' function name
+	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",ERROR_PREFIX,functionName);return NULL;} // already have it
+	// technically it should not have been requested already (or exist)
+	FunctionBodyRequest* _functionBodyRequest=new_functionbodyrequest(functionName); // guarantees that functionName is defined
+	if(_functionBodyRequest){		
+		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
+		_lastFunctionBodyRequest=_functionBodyRequest;
+		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
+		if(amVerbose())output("The request for the body of function '%s' was created.\n",functionName);
+	}else
+		output("%sFailed to create the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
+	return _functionBodyRequest;
+}
+
 static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
 FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
-bool createFunctionBodyInput(const FunctionBodyRequest* const _firstFunctionBodyRequest){
+// MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
+bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
 	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
-	Mfunction* function=getFunction(getEnvironment(),_firstFunctionBodyRequest->functionName);
+	Mfunction* function=getFunction(getEnvironment(),_functionBodyRequest->_functionName);
 	if(function&&function->type==FT_USER){
 		// it's better to put the next request in, so after finishing with this request we can do the following if any
-		_currentFunctionBodyInput->_request=_firstFunctionBodyRequest->_next; // remember the request that initiated this body input
+		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
 		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
-		if(!_functionBodyInputStack)_functionBodyInputStack=_currentFunctionBodyInput;
+		if(!_functionBodyInputStack){_functionBodyInputStack=_currentFunctionBodyInput;if(amVerbose())output("%s\n.","Function body input stack created.");}
+		outputMap("Function parameter map: ",function->_parameterMap,".\n");
 		// if we succeed in activating the execution environment of the new function we're good to go
 		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
-		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_firstFunctionBodyRequest->functionName,function->_parameterMap);
+		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
+		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName,function->_parameterMap);
 		if(_functionExecutionEnvironment){
+			if(amVerbose())output("Execution environment of '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
+			outputError("Failed to register the function execution environment.");
 			free_environment(_functionExecutionEnvironment);
-		}
-		outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
+		}else
+			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
-		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_firstFunctionBodyRequest->functionName);
+		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_functionBodyRequest->_functionName);
 	FREE(_currentFunctionBodyInput,'H');
 	return false;
 }
@@ -3010,16 +3040,22 @@ bool startFunctionBodyInput(){
 	// move out of the queue into the stack
 	// push on top of the functionBodyInputStack
 	/////////if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
+	bool result=true;
 	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next; // remember the function body request to do next
-	char* functionName=_firstFunctionBodyRequest->functionName;
+	// MDH@02MAR2020 ADJUSTMENT: because _functionName is now a heap copy of the original function name (from the function argument list to 'function') we need to free it BEFORE returning the result
+	//                           now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
 	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
-	free(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request
-	if(functionBodyInputCreated)return true; // succeeded, so done
-	// failed, so do the next one
-	_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
-	output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,functionName);
-	// if we still have a first function body request start that one, otherwise 
-	return(_firstFunctionBodyRequest?startFunctionBodyInput():true);
+	if(!functionBodyInputCreated)output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->_functionName);
+	free_functionbodyrequest(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request (if we succeed to request the function body input or not)
+	if(!functionBodyInputCreated){ // i.e. failed to start requesting for the body of the given function, so we should continue with the next one
+		// failed, so do the next one
+		 // TODO why is this here???????
+		// if we haven't got a next function body request, or we failed to start one, the result will be false
+		_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
+		if(!_firstFunctionBodyRequest||!startFunctionBodyInput())result=false;
+	}
+	// MDH@02MAR2020: forgot to do the following so here we go
+	return result;
 }
 /*
  \brief will only fail when we fail to start the next one
@@ -3151,21 +3187,29 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							*/
 							// 3. the result of applying the function to the arguments is the end result
 							// MDH@19JUL2019: we need to know when a function is being created, so we can ask for the body commands in command mode
+							// MDH@02MAR2020 BUG FIX: extract the function name BEFORE the function call is evaluated!!!!
+							char* definedFunctionName=(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)?NULL:_functionCallArgumentMap->_first->_variable->_value->value._text->_c);
+							if(definedFunctionName)outputMap("Function argument map: ",_functionCallArgumentMap,".\n");
 							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
 							// if this was a call to the 'define user function' function
-							if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
+							if(definedFunctionName){ // MDH@02MAR2020: replacing: !strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
 								// is the result 1???
 								if(functionCallValue&&functionCallValue->type==VT_INTEGER&&functionCallValue->value._integer->ll){ // function successfully created
 									// let's push the function name on the stack of functions to create
 									// we know the first argument contains the function name
-									char* definedFunctionName=_functionCallArgumentMap->_first->_variable->_value->value._text->_c;
+									// MDH@02MAR2020: is this a bug???? because we cannot simply assign unless we strdup() the defined function name!!
+									// MDH@02MAR2020 replacing (see above): char* definedFunctionName=_functionCallArgumentMap->_first->_variable->_value->value._text->_c;
 									Mfunction* definedFunction=getFunction(getEnvironment(),definedFunctionName);
 									// if the function now exists but does not yet have a body, queue the function name on the list of bodies to be set
 									if(definedFunction&&definedFunction->type==FT_USER&&!definedFunction->functionunion._userfunction->_bodyCommandList)
-										requestBodyOfFunction(definedFunctionName);
+										registerFunctionBodyRequest(definedFunctionName);
 									else
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
-								}
+								}else
+								if(strlen(definedFunctionName))
+									output("%sFailed to create function '%s'.",ERROR_PREFIX,definedFunctionName);
+								else
+									outputError("Name of function to create not defined.");
 							}
 							//////outputValue("Function call value '",functionCallValue,"'.\n");
 							_valueReference->_value=functionCallValue; // MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,functionCallValue);

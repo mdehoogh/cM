@@ -1117,6 +1117,13 @@ Mstring* _getListText(Mlist* _list){
 	}
 	return result;
 }/* VALIDATED */
+// MDH@02MAR2020: utility function to output a map
+void outputList(char const * const prefix,Mlist* list,char const * const suffix){
+    Mstring* _listText=_getListText(list);
+    output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
+    free_string(_listText);
+}/* VALIDATED */
+
 Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings){
 	Mstring* result=__string();
     if(result){
@@ -1159,6 +1166,12 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
 	}
 	return result;
 }/* VALIDATED */
+// MDH@02MAR2020: utility function to output a map
+void outputMap(char const * const prefix,Mmap* map,char const * const suffix){
+    Mstring* _mapText=_getMapText(map,true,true,true);
+    output("%s%s%s",(prefix?prefix:""),(_mapText?string(_mapText):""),(suffix?suffix:""));
+    free_string(_mapText);
+}/* VALIDATED */ 
 
 // MDH@24OCT2019: if you want the value representation or perhaps the name of a constant depends on whether name is defined
 /*
