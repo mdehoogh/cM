@@ -102,7 +102,7 @@ Menvironment* __environment(){
 static Menvironment* _executionEnvironment=NULL;
 void outputEnvironmentName(){
     Mstring* _environmentName=_getEnvironmentName();
-    output("Current execution environment: '%s'.\n",string(_environmentName));
+    if(amVerbose())output("Current execution environment: '%s'.\n",string(_environmentName));
     free_string(_environmentName);
 }
 bool pushExecutionEnvironment(Menvironment* _environment){
@@ -914,14 +914,15 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 // MDH@05NOV2019: if there are missing elements in _argumentList (what we allow now), there should be an associated map element with value NULL
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList){
     Mmap* _functionArgumentMap=NULL;
-    if(_function&&_argumentList){
+    // MDH@03MAR2020: _argumentList should also be allowed to be NULL (because then defaults would be used)
+    if(_function/*&&_argumentList*/){
         _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC(1,sizeof(Mmap),'M')); // MDH@02NOV2019: force the map to be weak
         Mmap* functionParameterMap=_function->_parameterMap;
         if(_functionArgumentMap&&functionParameterMap){
             if(amVerbose())outputInfo("Matching the function parameters!");
             Mmapelement* functionParameterMapelement=functionParameterMap->_first;
             unsigned long long argumentindex=0; // MDH@05NOV2019: because _argumentList could be sparse, i.e. have missing elements, we use an index that is used to find the argument list element with that index!!!
-            Mlistelement* argumentListelement=_argumentList->_first;
+            Mlistelement* argumentListelement=(_argumentList?_argumentList->_first:NULL);
             while(functionParameterMapelement){
                 argumentindex++; // the index of the argument we need
                 // if the current list element has an index below the one we need, get the next argument list element until we have found one with an index at least equal to argument index
@@ -1520,7 +1521,8 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                 Mfunction* _function=_getFunction(getEnvironment(),functionName->_c);
                 if(_function){
                     // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
-                    _function->_parameterMap=_parameterMapValue->value._map;
+                    //                so we have to make a copy of the parameter map
+                    _function->_parameterMap=_getMapCopy(_parameterMapValue->value._map); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
                     _function->functionunion._userfunction=_userfunction;
                     // return the result of applying the function to the default parameter map
 

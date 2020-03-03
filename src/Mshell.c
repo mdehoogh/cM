@@ -188,7 +188,7 @@ const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01
 
 bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap* _variableMap){
 	bool executionEnvironmentInitialized=true;
-	outputMap("Execution environment variable map: ",_variableMap,".\n");
+	if(amVerbose())outputMap("Execution environment variable map: ",_variableMap,".\n");
 	Mmapelement* variableMapelement=(_variableMap?_variableMap->_first:NULL);
 	Mvariable* variableMapelementVariable;
 	while(executionEnvironmentInitialized&&variableMapelement){
@@ -214,7 +214,7 @@ obviously when defining the function body there will be no commands to execute
  */
 Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-	outputMap("Function execution argument map: ",_argumentMap,".\n");
+	if(amVerbose()&&amDebugging())outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=__environment(); // free asap
 	if(_functionExecutionEnvironment){
 		if(amVerbose())outputInfo("Registering the name of the function execution environment");
@@ -3018,13 +3018,14 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
 		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
 		if(!_functionBodyInputStack){_functionBodyInputStack=_currentFunctionBodyInput;if(amVerbose())output("%s\n.","Function body input stack created.");}
-		outputMap("Function parameter map: ",function->_parameterMap,".\n");
+		if(amVerbose()){output("Parameter map of new function '%s'",_functionBodyRequest->_functionName);outputMap(": ",function->_parameterMap,".\n");}
 		// if we succeed in activating the execution environment of the new function we're good to go
 		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
 		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
+		// MDH@03MAR2020 TODO can we pass function->_parameterMap like this or should we pass _getFunctionArgumentMap(function,NULL)????????
 		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName,function->_parameterMap);
 		if(_functionExecutionEnvironment){
-			if(amVerbose())output("Execution environment of '%s' created.\n",_functionBodyRequest->_functionName);
+			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
 			outputError("Failed to register the function execution environment.");
 			free_environment(_functionExecutionEnvironment);
@@ -3189,7 +3190,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// MDH@19JUL2019: we need to know when a function is being created, so we can ask for the body commands in command mode
 							// MDH@02MAR2020 BUG FIX: extract the function name BEFORE the function call is evaluated!!!!
 							char* definedFunctionName=(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)?NULL:_functionCallArgumentMap->_first->_variable->_value->value._text->_c);
-							if(definedFunctionName)outputMap("Function argument map: ",_functionCallArgumentMap,".\n");
+							if(definedFunctionName)if(amVerbose()){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
 							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
 							// if this was a call to the 'define user function' function
 							if(definedFunctionName){ // MDH@02MAR2020: replacing: !strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined

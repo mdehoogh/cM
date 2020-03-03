@@ -2520,6 +2520,7 @@ char switchToShellMode(char* message){
 }
 void switchToCommandMode(){
 	if(inputMode==IM_COMMAND)return;
+	if(inputMode==IM_CONTROL)newline(); // MDH@03MAR2020: TODO let's see if this is OK
 	setInputMode(IM_COMMAND);
 	// ascertain to not have autocompletion text
 	deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
@@ -2662,6 +2663,35 @@ Mvalue* Min(Mvalue* value){
     }
     return result;
 }
+// MDH@03MAR2020: useful to have a command to execute an OS command
+Mvalue* MexecuteOSCommand(Mvalue* _commandValue){
+	Mvalue* _commandOutputValue=NULL;
+	Mstring* _commandText=_getValueText(_commandValue,true);
+	if(_commandText&&string_length(_commandText)){
+		FILE *fp=popen(string(_commandText),"r");
+		if(fp){
+			Mlist* _commandOutputList=_getListOfType(VT_TEXT);	
+	  		char path[1036]; // incremented by one to store the single quote
+			path[0]='\''; // a single-quote to surround the output text lines
+  			/* Read the output a line at a time - output it. */
+  			while(fgets(path+1,sizeof(path)-1,fp)!=NULL){
+				  // put an end-of-line at the position where end-of-line is encountered
+				  uint16_t i=0;while(++i<1035)if(path[i]=='\n'||path[i]=='\r')break;path[i]='\0';
+				  Mvalue* _pathValue=_getTextValue(path,false);
+				  if(!_pathValue)continue;
+				  if(appendedToList(_commandOutputList,_pathValue,M_LL_INVALID)<=0){
+					  outputError("Not all output retrieved!");
+					  break;
+				  }
+			}
+			pclose(fp);
+			_commandOutputValue=_getValueOfList(_commandOutputList,true);
+		}else
+			output("%sFailed to execute OS command '%s'.\n",ERROR_PREFIX,string(_commandText));
+	}
+	if(_commandText)free_string(_commandText);
+	return _commandOutputValue;
+}
 
 // in an interactive session we'll have additional variables to set up
 void prepareShellEnvironmentForInteractiveSession(){
@@ -2695,7 +2725,10 @@ void prepareShellEnvironmentForInteractiveSession(){
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 	if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))
-		outputWarning("Failed to register the Min function"); // moved out of registerInternalFunctions!!!!
+		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
+
+	if(!completedValueFunction(_getFunction(_Menvironment,"os"),"os",MexecuteOSCommand))
+		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
 
 }
 
@@ -3399,13 +3432,13 @@ int main(int argc, char **argv){
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
 					// single character responses (and out again)
-					if(inputChar=='a'||inputChar=='A'){setAssisting(inputChar=='A');inputCharType='n';break;}
-					if(inputChar=='d'||inputChar=='D'){setDebugging(inputChar=='D');inputCharType='n';break;}
-					if(inputChar=='m'||inputChar=='M'){setMatchingparentheses(inputChar=='M');inputCharType='n';break;}
-					if(inputChar=='v'||inputChar=='V'){setVerbose(inputChar=='V');inputCharType='n';break;}
-					if(inputChar=='u'||inputChar=='U'){setAcceptinghistorycommand(inputChar='U');inputCharType='n';break;}
+					if(inputChar=='a'||inputChar=='A'){setAssisting(inputChar=='A');/*inputCharType='n';*/break;}
+					if(inputChar=='d'||inputChar=='D'){setDebugging(inputChar=='D');/*inputCharType='n';*/break;}
+					if(inputChar=='m'||inputChar=='M'){setMatchingparentheses(inputChar=='M');/*inputCharType='n';*/break;}
+					if(inputChar=='v'||inputChar=='V'){setVerbose(inputChar=='V');/*inputCharType='n';*/break;}
+					if(inputChar=='u'||inputChar=='U'){setAcceptinghistorycommand(inputChar=='U');/*inputCharType='n';*/break;}
 					if(inputChar>='0'&&inputChar<='9'){setColorscheme(inputChar-'0');inputCharType='n';break;}
-					if(inputChar=='w'||inputChar=='W'){setWrapping(inputChar=='W');inputCharType='n';break;}
+					if(inputChar=='w'||inputChar=='W'){setWrapping(inputChar=='W');/*inputCharType='n';*/break;}
 					////////////if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
 					if(inputChar=='b'||inputChar=='B'){beep();inputCharType='n';break;} // MDH@23SEP2019: so we can test whether beep() is working... TODO for toggling beeping????
 					if(inputChar=='f'||inputChar=='F'){outputFunctions();inputCharType='n';break;}
