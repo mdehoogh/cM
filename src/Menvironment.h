@@ -3,72 +3,15 @@
  */
 #include "Mfunctions.h"
 
- // functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
-// all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
-// MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
-/////////////struct Menvironment;
-// MDH@10JUL2019: user functions are stored differently than M functions
-// MDH@20JUL2019: moved over from Mvalue but this means that we cannot currently store a function in a value...
-struct Mfunctionmap; // prototype of Mfunctionap
-typedef struct Muserfunction{
-    //////////struct Mmap* _parameterMap;
-    struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
-    struct Mlist* _bodyCommandList; // a list of body commands
-}Muserfunction;
-void free_userfunction(Muserfunction* _userfunction);
+// MDH@03FEB2020: every 'execution environment' is effectively a stack of (wrapped) environments
+//                therefore an executing environment remember the previous executing environment to return to once it is no longer executing
+//                but an executing environment has it's own parent executing environment
 
-typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS}Mfunctiontype;
-
-typedef union Mfunctionunion{
-    NoArgumentFunction noArgumentFunction;
-    OneArgumentFunction oneArgumentFunction;
-    TwoArgumentFunction twoArgumentFunction;
-    ThreeArgumentFunction threeArgumentFunction;
-    FourArgumentFunction fourArgumentFunction;
-    Muserfunction* _userfunction; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
-}Mfunctionunion;
-
-struct Menvironment;
-typedef struct Mfunction{
-    ////////Mstring* _name;
-    Mmap* _parameterMap; // a map of values defines the parameters and their default values (implicitly defining the expected types)
-    struct Menvironment* _definitionEnvironment;
-    Mfunctiontype type; // whether internal or external
-    Mfunctionunion functionunion; // where either the internal function to call with the arguments is placed or 
-}Mfunction;
-
-typedef struct Mfunctionmapelement{
-    Mstring* _name;
-    Mfunction* _function;
-    struct Mfunctionmapelement* _next;
-}Mfunctionmapelement;
-
-typedef struct Mfunctionmap{
-    uint32_t numberOfFunctions;  // keeping track of the total number of functions...
-    Mfunctionmapelement* _first;
-    Mfunctionmapelement* _last;
-}Mfunctionmap;
-
-//Mvalue* getFunction(Mfunctionlist functionlist,char* name);
-
-// environments
-
-// an environment is a bag of variables and functions
-typedef struct Menvironment{
-    char* _name; // the name of the environment
-    Mmap* _variableMap; // variables are stored by name
-    Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
-    Mtoken* expressionToken; // MDH@17JUL2019: the current token of the expression being evaluated in this environment
-    struct Menvironment* _parent; // typically the definition environment
-    struct Menvironment* _execution; // the environment that was executing before this one was popped!!
-}Menvironment;
-
-Menvironment* __environment(); // creates a new (empty) environment
-void free_environment(Menvironment* _environment);
+// definitions of Mfunction and Menvironment moved over to the end of Mvalue.h as we use it there as well
 bool pushExecutionEnvironment(Menvironment* _environment);
 void popExecutionEnvironment(); // should never go wrong (a bug is reported if there's no environment to pop though)
-Menvironment* getEnvironment(); // the current environment
-Mstring* _getEnvironmentName(); // for use in prompting
+Menvironment* getExecutionEnvironment(); // the current environment
+Mstring* _getExecutionEnvironmentName();
 
 // MDH@17JUL2019: getting and updating the environment expression token
 Mtoken* getEnvironmentExpressionToken();
@@ -112,22 +55,22 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
 
 // MDH@14NOV2019: same as setValue but does not use assignValue (which will copy the value passed in)
-bool setVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
+bool setVariable(Menvironment * const _environment,char const * const name,Mvalue const * const _value);
 
-Mvalue* getValue(const Menvironment* const _environment,const char* const name);
+Mvalue* getValue(Menvironment const * const _environment,const char* const name);
 
 char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value); // MDH@24OCT2019: if we want to find a constant with the same value we can use that as a 'symbol'
 // MDH@24OCT2019: if we want to see the variables in an environment vall getVariableMapText(), which will also represent values by the names of constants with the same value (representing symbols)
 Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenfiles);
 
-Mmap* _getVariableNamesMap(Menvironment* environment); // MDH@14NOV2019: returns a map with the names of all local variables (in attribute '') and the names of the variables in the parent environment with the name of the parent environment!
+Mmap* _getVariableNamesMap(Menvironment const * const environment); // MDH@14NOV2019: returns a map with the names of all local variables (in attribute '') and the names of the variables in the parent environment with the name of the parent environment!
 
 void outputTable(Mlist* table); // MDH@25NOV2019: certain lists are now constructed and recognized as 'tables'
 
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue);
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue); // MDH@25NOV2019: storing the memory allocations in a table makes it more displayable
 
-bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable);
+bool addVariable(Menvironment * const _environment,char const * const name,Mvaluetype valuetype,bool immutable);
 /*
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mfloat* _real);
@@ -136,16 +79,17 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string);
 */
 
 // functions
-Mstring* _getFunctionNames(const Menvironment* const _environment,const char* const sep);
+Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep);
 bool registerInternalFunctions(Menvironment* const _environment);
 
 // helper function to return the function
-Mfunction* getFunction(const Menvironment* const _environment,const char* const functionName);
-Muserfunction* getUserfunction(const Menvironment* const _environment,const char* const userfunctionName);
+Mfunction* getFunction(Menvironment const * const _environment,const char* const functionName);
+Muserfunction* getUserfunction(Menvironment const * const _environment,const char* const userfunctionName);
 
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList);
-Mfunction* _getFunction(Menvironment* const _environment,const char* const functionName); // creates the function if it does not exist yet
+
+Mfunction* _getFunction(Menvironment* const _environment,char const * const name); // creates the function if it does not exist yet
 
 bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction);
 bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);

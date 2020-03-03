@@ -226,7 +226,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		_functionExecutionEnvironment->_functionMap=_function->functionunion._userfunction->_functionMap;
 		*/
 		// 2. make the definition environment the parent of the function execution environment
-		_functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
+		assignValue(&_functionExecutionEnvironment->_parent,_function->_definitionEnvironmentValue); // MDH@03FEB2020 replacing: _functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
 		if(amVerbose())outputInfo("Parent of function execution environment set to the function definition environment");
 		// 3. create the argument map fields as variables in the function execution environment
 		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,_argumentMap);
@@ -431,9 +431,9 @@ bool isAValidCommand(Mcommand* command,bool report){
 Mvalue* getCommandValue(Mcommand* command,char commandType){
 	if(amVerbose())outputCommandInfo(command);
 	if(!isAValidCommand(command,amVerbose()))return NULL;
-	getEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
+	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerbose())outputInfo("Evaluating...");
-	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
+	return getValueOfExpression(getExecutionEnvironment()->_name,commandType,(TokenType[]){},0);
 }
 
 // decimal stuff
@@ -510,12 +510,12 @@ Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue*
 	Mvalue* _result=NULL;
 	if(isValueZero(_conditionTokenValue)==M_TRUE){
 		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
-			getEnvironment()->expressionToken=_elseTokenValue->value._token;
+			getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
 			_result=getValueOfExpression("else clause",'e',NULL,0);
 		}
 	}else{
 		if(_thenTokenValue&&_thenTokenValue->type==VT_TOKEN){
-			getEnvironment()->expressionToken=_thenTokenValue->value._token;
+			getExecutionEnvironment()->expressionToken=_thenTokenValue->value._token;
 			_result=getValueOfExpression("then clause",'t',NULL,0);
 		}
 	}
@@ -526,11 +526,11 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 	if(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN&&_whilebodyTokenValue&&_whilebodyTokenValue->type==VT_TOKEN){
 		while(true){
 			// evaluate the condition
-			getEnvironment()->expressionToken=_conditionTokenValue->value._token;
+			getExecutionEnvironment()->expressionToken=_conditionTokenValue->value._token;
 			Mvalue* _conditionValue=getValueOfExpression("while condition",'w',NULL,0);
 			if(isValueZero(_conditionValue)==M_TRUE)break; // condition evaluates to zero
 			// evaluate the body
-			getEnvironment()->expressionToken=_whilebodyTokenValue->value._token;
+			getExecutionEnvironment()->expressionToken=_whilebodyTokenValue->value._token;
 			_result=getValueOfExpression("while loop",'l',NULL,0);
 		}
 	}
@@ -813,7 +813,7 @@ void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	char* _identifierName=_stringstart(command->_lastToken->text,command->_lastToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
-	command->_lastToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
+	command->_lastToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	// if the reoutput token function is defined, execute it
 	if(reoutputTokenFunction)(*reoutputTokenFunction)(command->_lastToken);else outputChar('*');
@@ -1006,7 +1006,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 								}else{
 									// the token in front of the function call token should denote a function
 									char* functionName=string(_userInputCommand->_lastToken->expr->prev->text);
-									Mfunction* function=getFunction(getEnvironment(),functionName);
+									Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
 									/////////////if(amVerbose())output("Function '%s'.\n",functionName);
 									// TODO this works for two-argument functions but can we tell which argument this is?????
 									// we have to count the parameters by counting the list elements
@@ -2703,7 +2703,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					if(variable)referencedValue=_getReferenceValue(_getReference(variable),true);else output("%sReferenced variable '%s' vanished.\n",ERROR_PREFIX,_valuereference->_name[1]);
 				}else // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
-					referencedValue=getValue(getEnvironment(),_valuereference->_name); // the value at the top level
+					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name); // the value at the top level
 			}
 		}
 		// only composite values can be indexex...
@@ -2816,7 +2816,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 		if(amVerbose()){output("Setting the value reference of '%s'",_valuereference->_name);outputValue(" to '",_newValue,"'.\n");}
 		// MDH@18OCT2019: without an _itemid the variable is allowed to NOT yet exist
 		if(_valuereference->_itemid){ // the hard part: index/attribute name list assignment!!
-			Mvalue* _value=getValue(getEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
+			Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 			if(_value&&(_value->type==VT_LIST||_value->type==VT_MAP)){
 				result=true;
 				if(amVerbose())outputInfo("Element to set.");
@@ -2888,7 +2888,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 			}else
 				output("%sReferenced variable '%s' cannot be indexed: it's value is not a list or a map.\n",ERROR_PREFIX,_valuereference->_name);
 		}else
-		if(setValue(getEnvironment(),_valuereference->_name,_newValue)){
+		if(setValue(getExecutionEnvironment(),_valuereference->_name,_newValue)){
 			// NOTE even if the value itself is NULL, its address is never NULL
 			_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
 			result=true;
@@ -3012,7 +3012,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 	///////////if(!_firstFunctionBodyRequest)return false;
 	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
-	Mfunction* function=getFunction(getEnvironment(),_functionBodyRequest->_functionName);
+	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
 	if(function&&function->type==FT_USER){
 		// it's better to put the next request in, so after finishing with this request we can do the following if any
 		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
@@ -3065,7 +3065,7 @@ bool endFunctionBodyInput(){
 	// ASSERT do NOT call with _currentFunctionBodyInput equal to NULL
 	// pop the function body request execution environment we just ended
 	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
-	_currentFunctionBodyInput->_function->_functionMap=getEnvironment()->_functionMap;
+	_currentFunctionBodyInput->_function->_functionMap=getExecutionEnvironment()->_functionMap;
 	popExecutionEnvironment();
 	// the new first function body request is the successor of the previous one
 	// TODO shouldn't we free it?
@@ -3126,7 +3126,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		switch(expressionToken->type){
 			case TT_FUNCTION:
 				{
-					Mfunction* function=getFunction(getEnvironment(),_significantTokenText); // get the function associated with the name of the function
+					Mfunction* function=getFunction(getExecutionEnvironment(),_significantTokenText); // get the function associated with the name of the function
 					if(function){
 						canbeindexedtheoretically=true; // MDH@17NOV2019: stick to what the tokenizer allow TODO exclude special functions
 						// MDH@17JUL2019: we know the function and when the name is one of the special functions
@@ -3200,7 +3200,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 									// we know the first argument contains the function name
 									// MDH@02MAR2020: is this a bug???? because we cannot simply assign unless we strdup() the defined function name!!
 									// MDH@02MAR2020 replacing (see above): char* definedFunctionName=_functionCallArgumentMap->_first->_variable->_value->value._text->_c;
-									Mfunction* definedFunction=getFunction(getEnvironment(),definedFunctionName);
+									Mfunction* definedFunction=getFunction(getExecutionEnvironment(),definedFunctionName);
 									// if the function now exists but does not yet have a body, queue the function name on the list of bodies to be set
 									if(definedFunction&&definedFunction->type==FT_USER&&!definedFunction->functionunion._userfunction->_bodyCommandList)
 										registerFunctionBodyRequest(definedFunctionName);
@@ -3232,13 +3232,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// NOTE in certain situations tokenizing occurs outside the evaluation environment so it could be marked as new where it will not be when evaluated
 				//      therefore I've adapted addVariable() so it won't return false when the variable already exists
 				// MDH@08AUG2019: any variable that's marked as new should be added to the top-level environment if it does not exist there
-				//                we can make that happen by passing in NULL for getEnvironment() in which case it should check getEnvironment() only (and not all the parents as well)
+				//                we can make that happen by passing in NULL for getExecutionEnvironment() in which case it should check getExecutionEnvironment() only (and not all the parents as well)
 				// MDH@09AUG2019: I suppose only explicit local variables (in special function calls) should not be checked to exist in parent environments, but otherwise they should
 				//                we could give a warning if this variable is defined inside a special function call and is not a local variable
 				////////if(amVerbose())
 				if(amVerbose())output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
-				if(!addVariable(expressionToken->argument==1?NULL:getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
-					Mstring* _environmentName=_getEnvironmentName();
+				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
+					Mstring* _environmentName=_getExecutionEnvironmentName();
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					free_string(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!
@@ -3299,8 +3299,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(!_valueReference->_itemid){
 					if(amVerbose())output("Retrieving the value of '%s' when no item id was specified.\n",_valueReference->_name);
 					// MDH@18OCT2019: TODO this is dangerous?! MDH@14NOV2019: we could wait until the value is actually requested
-					_valueReference->_value=getValue(getEnvironment(),_valueReference->_name);
-					// MDH@02NOV2019: replacing: assignValue(&_valueReference->_value,getValue(getEnvironment(),_valueReference->_name));
+					_valueReference->_value=getValue(getExecutionEnvironment(),_valueReference->_name);
+					// MDH@02NOV2019: replacing: assignValue(&_valueReference->_value,getValue(getExecutionEnvironment(),_valueReference->_name));
 				}
 				*/
 				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
@@ -5967,8 +5967,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(_lastAssignmentFormulaelement)_formulaelement->_prev=_lastAssignmentFormulaelement; // MDH@21MAY2019: in order to be able to traverse back!!!
 				// MDH@11AUG2019: should we force existence?????? I don't think so because creation is done when the value reference is actually created, but I need to make certain that this is the case!!!!
 				/*
-				if(!addVariable(expressionToken->argument==1?NULL:getEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
-					Mstring* _environmentName=_getEnvironmentName();
+				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
+					Mstring* _environmentName=_getExecutionEnvironmentName();
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					free_string(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!

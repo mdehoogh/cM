@@ -142,6 +142,8 @@ void free_value(Mvalue* _value){
             case VT_LIST:if(_value->value._list){free_list(_value->value._list);_value->value._list=NULL;}break;
             case VT_MAP:if(_value->value._map){free_map(_value->value._map);_value->value._map=NULL;}break;
             case VT_REFERENCE:if(_value->value._reference){free_reference(_value->value._reference);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
+            case VT_FUNCTION:if(_value->value._function){free_function(_value->value._function);_value->value._function=NULL;}break;
+            case VT_ENVIRONMENT:if(_value->value._environment){free_environment(_value->value._environment);_value->value._environment=NULL;}break;
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         FREE(_value,'X');
@@ -1615,6 +1617,9 @@ Mdecimal* getValueDecimal(Mvalue* value){
 }
 // END DECIMAL EXTRACTION
 
+// MDH@03FEB2020: extract specific data elements wrapped in values
+Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_ENVIRONMENT?value->value._environment:NULL);}
+
 Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=CALLOC(1,sizeof(Mlist),'L');_list->valuetype=valuetype;return _list;}/* VALIDATED */
 Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=CALLOC(1,sizeof(Mmap),'M');_map->valuetype=valuetype;return _map;}/* VALIDATED */
 
@@ -1711,6 +1716,8 @@ long long isValueNull(Mvalue* value){
         case VT_TOKEN:result=(value->value._token?M_FALSE:M_TRUE);break;
         case VT_UNDEFINED:result=M_TRUE;break;
         case VT_REFERENCE:result=(value->value._reference?M_FALSE:M_TRUE);break;
+        case VT_FUNCTION:result=(value->value._function?M_FALSE:M_TRUE);break;
+        case VT_ENVIRONMENT:result=(value->value._environment?M_FALSE:M_TRUE);break;
     }
     return result;
 }/* VALIDATED */
@@ -1732,6 +1739,8 @@ long long isValueUndefined(Mvalue* value){
         case VT_TOKEN:result=isTokenUndefined(value->value._token);break; /////string_length(_value->value._token->text)==0;
         case VT_UNDEFINED:result=M_TRUE;break;
         case VT_REFERENCE:result=(value->value._reference?M_FALSE:M_TRUE);break;
+        case VT_FUNCTION:result=(value->value._function?M_FALSE:M_TRUE);break;
+        case VT_ENVIRONMENT:result=(value->value._environment?M_FALSE:M_TRUE);break;
     }
     return result;
 }/* VALIDATED */
@@ -2036,6 +2045,118 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
         case VT_UNDEFINED:return true; // there's only ONE undefined value around??????
         case VT_REFERENCE: // TODO this might be hard
             break;
+        case VT_FUNCTION:return(value1->value._function==value2->value._function);
+        case VT_ENVIRONMENT:return(strcmp(value1->value._environment->_name,value2->value._environment->_name)==0); // TODO we might need to use the full name of the environment here though
     }
     return false;
 }
+
+// MDH@03MAR2020: moved over from Menvironment.c
+void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
+    if(_expressionlistelement){
+        free_expressionlistelement(_expressionlistelement->_next);
+        free_value(_expressionlistelement->_value);
+        free(_expressionlistelement);
+    }
+}/* VALIDATED */
+void free_expressionlist(Mexpressionlist* _expressionlist){
+    if(_expressionlist){
+        free_expressionlistelement(_expressionlist->_next);
+        free_value(_expressionlist->_value);
+        free(_expressionlist);
+    }
+}/* VALIDATED */
+
+// NOTE typically you're not supposed to free internal functions safe M function definitions 
+// TODO if a function map is freed, we shouldn't free internal functions BUT those are only present in the main environment which is never released!!
+bool free_function(Mfunction* _function){
+    if(_function){
+        /////// MDH@10JUL2019: moved over to the map element containing the function! free_string(_function->_name);
+        free_map(_function->_parameterMap);
+        if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction);
+        free(_function);
+        return true;
+    }
+    return false;
+}/* VALIDATED */
+bool free_functionmapelement(Mfunctionmapelement* _functionmapelement){
+    if(_functionmapelement){
+        if(free_functionmapelement(_functionmapelement->_next))_functionmapelement->_next=NULL;
+        if(free_function(_functionmapelement->_function)){
+            free_string(_functionmapelement->_name);
+            free(_functionmapelement);
+            return true;
+        }
+    }
+    return false;
+}// VALIDATED
+void free_functionmap(Mfunctionmap* _functionmap){
+    if(_functionmap){
+        free_functionmapelement(_functionmap->_first);
+        free(_functionmap);
+    }
+}// VALIDATED
+// MDH@20JUL2019: might never get called, wel perhaps on internal functions when it goes out of scope???????
+void free_userfunction(Muserfunction* _userfunction){
+    if(_userfunction){
+        ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
+        // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
+        free_list(_userfunction->_bodyCommandList);
+        // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
+        free(_userfunction);
+    }
+}/* VALIDATED */
+// END RELEASERS
+
+// Menvironment stuff
+void free_environment(Menvironment* _environment){
+    if(_environment){
+        if(_environment->_name){free(_environment->_name);_environment->_name=NULL;}
+        assignValue(&_environment->_parent,NULL); // MDH@03FEB2020 replacing:
+        assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
+        free_map(_environment->_variableMap);
+        /* MDH@10JUL2019: only Menvironment has a function map!!   
+           MDH@20JUL2019: NO user functions may also contain a function map, which is referenced in a user function execution environment
+                          and indeed being a referenced they should not be freed (otherwise we would loose these nested functions on
+                          freeing the execution environment)
+        if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
+        */
+        FREE(_environment,'E');
+    }
+}/* VALIDATED */
+Menvironment* __environment(){
+    Menvironment* _environment=CALLOC(1,sizeof(Menvironment),'E');
+    if(!_environment)return NULL;
+    _environment->_variableMap=CALLOC(1,sizeof(Mmap),'M'); // ascertain that the environment contains a variable map
+    if(!_environment->_variableMap){free_environment(_environment);_environment=NULL;}
+    return _environment;
+}/* VALIDATED */
+Mstring* _getEnvironmentName(Menvironment* _environment){
+    Mstring* _environmentName=__string();
+    if(_environmentName){
+        Mstring* p=_environmentName;
+        while(p&&_environment){
+            if(string_length(p)>0)p=string_insert_char(p,0,'.');
+            ////////output("Prepending '%s'.\n",_environment->_name);
+            p=string_prepend(p,_environment->_name);
+            _environment=getEnvironmentParent(_environment); // MDH@03FEB2020 replacing: _environment->_parent;
+        }
+        if(!p){free_string(_environmentName);_environmentName=NULL;}
+    }
+    return _environmentName;
+}
+Menvironment* getEnvironmentParent(Menvironment* _environment){return(_environment?getValueEnvironment(_environment->_parent):NULL);}
+
+// additional function for wrapping environments and functions
+Mvalue* _getValueOfFunction(Mfunction* _function,bool freeonfailure){
+    if(!_function)return NULL;
+    Mvalue* _value=__value("function");
+    if(_value){_value->type=VT_FUNCTION;_value->value._function=_function;}else if(freeonfailure)free_function(_function);
+    return _value;
+}/* VALIDATED */
+Mvalue* _getValueOfEnvironment(Menvironment* _environment,bool freeonfailure){
+    if(!_environment)return NULL;
+    Mvalue* _value=__value("environment");
+    if(_value){_value->type=VT_ENVIRONMENT;_value->value._environment=_environment;}else if(freeonfailure)free_environment(_environment);
+    return _value;
+}/* VALIDATED */

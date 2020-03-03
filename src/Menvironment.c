@@ -20,144 +20,66 @@ extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with ea
 extern const char* const ERROR_PREFIX;
 extern const char * const VALUETYPENAMES[];
 
-void free_expressionlistelement(Mexpressionlistelement* _expressionlistelement){
-    if(_expressionlistelement){
-        free_expressionlistelement(_expressionlistelement->_next);
-        free_value(_expressionlistelement->_value);
-        free(_expressionlistelement);
-    }
-}/* VALIDATED */
-void free_expressionlist(Mexpressionlist* _expressionlist){
-    if(_expressionlist){
-        free_expressionlistelement(_expressionlist->_next);
-        free_value(_expressionlist->_value);
-        free(_expressionlist);
-    }
-}/* VALIDATED */
+// moved over to the end of Mvalue.c
 
-// NOTE typically you're not supposed to free internal functions safe M function definitions 
-// TODO if a function map is freed, we shouldn't free internal functions BUT those are only present in the main environment which is never released!!
-bool free_function(Mfunction* _function){
-    if(_function){
-        /////// MDH@10JUL2019: moved over to the map element containing the function! free_string(_function->_name);
-        free_map(_function->_parameterMap);
-        if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction);
-        free(_function);
-        return true;
-    }
-    return false;
-}/* VALIDATED */
-bool free_functionmapelement(Mfunctionmapelement* _functionmapelement){
-    if(_functionmapelement){
-        if(free_functionmapelement(_functionmapelement->_next))_functionmapelement->_next=NULL;
-        if(free_function(_functionmapelement->_function)){
-            free_string(_functionmapelement->_name);
-            free(_functionmapelement);
-            return true;
-        }
-    }
-    return false;
-}// VALIDATED
-void free_functionmap(Mfunctionmap* _functionmap){
-    if(_functionmap){
-        free_functionmapelement(_functionmap->_first);
-        free(_functionmap);
-    }
-}// VALIDATED
-// MDH@20JUL2019: might never get called, wel perhaps on internal functions when it goes out of scope???????
-void free_userfunction(Muserfunction* _userfunction){
-    if(_userfunction){
-        ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
-        // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
-        free_list(_userfunction->_bodyCommandList);
-        // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
-        free(_userfunction);
-    }
-}/* VALIDATED */
-// END RELEASERS
-
-// Menvironment stuff
-void free_environment(Menvironment* _environment){
-    if(_environment){
-        if(_environment->_name){free(_environment->_name);_environment->_name=NULL;}
-        _environment->_execution=NULL;
-        free_map(_environment->_variableMap);
-        /* MDH@10JUL2019: only Menvironment has a function map!!   
-           MDH@20JUL2019: NO user functions may also contain a function map, which is referenced in a user function execution environment
-                          and indeed being a referenced they should not be freed (otherwise we would loose these nested functions on
-                          freeing the execution environment)
-        if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
-        */
-        FREE(_environment,'E');
-    }
-}/* VALIDATED */
-Menvironment* __environment(){
-    Menvironment* _environment=CALLOC(1,sizeof(Menvironment),'E');
-    if(!_environment)return NULL;
-    _environment->_variableMap=CALLOC(1,sizeof(Mmap),'M'); // ascertain that the environment contains a variable map
-    if(!_environment->_variableMap){free_environment(_environment);_environment=NULL;}
-    return _environment;
-}/* VALIDATED */
 // keep track of the current execution environment
-static Menvironment* _executionEnvironment=NULL;
+// MDH@03FEB2020: now wrapped inside a value
+static Mvalue* _executionEnvironmentValue=NULL;
+Menvironment* getExecutionEnvironment(){return getValueEnvironment(_executionEnvironmentValue);} // convenience method for obtaining the current execution environment from its wrapper
+Mstring* _getExecutionEnvironmentName(){return _getEnvironmentName(getExecutionEnvironment());}
 void outputEnvironmentName(){
-    Mstring* _environmentName=_getEnvironmentName();
+    Mstring* _environmentName=_getExecutionEnvironmentName();
     if(amVerbose())output("Current execution environment: '%s'.\n",string(_environmentName));
     free_string(_environmentName);
 }
 bool pushExecutionEnvironment(Menvironment* _environment){
-    if(!_environment)return false;
-    if(!_environment->_parent)_environment->_parent=_executionEnvironment; // if without a parent give it the current one
-    _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
-    _executionEnvironment=_environment;
+    // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
+    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment(_environment,false):NULL);
+    if(!_environmentValue)return false;
+    if(!_environment->_parent)assignValue(&_environment->_parent,_environmentValue); // if without a parent give it the current one
+    // first the current execution environment value
+    assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
+    // keep a reference to the current execution environment (value) that we may return to if the execution environment is popped off
+    assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
     if(amVerbose())outputEnvironmentName();
     return true;
 }/* VALIDATED */
 void popExecutionEnvironment(){
+    Menvironment* _executionEnvironment=getExecutionEnvironment();
     if(!_executionEnvironment){outputBug("No environment left to pop!");return;} // nothing to pop
     // NOTE only execution environments that have a parent can be popped!!!
-    Menvironment* _previousExecutionEnvironment=_executionEnvironment->_execution;
-    if(!_previousExecutionEnvironment){outputBug("Can't pop top-most environment!");return;}
-    free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
-    _executionEnvironment=_previousExecutionEnvironment;
+    // MDH@03FEB2020: freeing the current execution environment value will NULL the execution field (i.e. releasing the reference to the environment it points to), so by remembering it here, we can use it AFTER the free_value call
+    Mvalue* _nextExecutionEnvironmentValue=_executionEnvironment->execution; 
+    if(!_nextExecutionEnvironmentValue){outputBug("Can't pop the top-most environment!");return;}
+    free_value(_executionEnvironmentValue); // MDH@03FEB2020 replacing: free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
+    // MDH@03FEB2020 by assigning to _executionEnvironmentValue the reference count to the environment is incremented again so it will not be 'garbage collected'!!!!
+    assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
     if(amVerbose())outputEnvironmentName();
 }/* VALIDATED */
-Menvironment* getEnvironment(){return _executionEnvironment;}/* VALIDATED */
-Mstring* _getEnvironmentName(){
-    Mstring* _environmentName=__string();
-    if(_environmentName){
-        Mstring* p=_environmentName;
-        Menvironment* _environment=_executionEnvironment;
-        while(p&&_environment){
-            if(string_length(p)>0)p=string_insert_char(p,0,'.');
-            ////////output("Prepending '%s'.\n",_environment->_name);
-            p=string_prepend(p,_environment->_name);
-            _environment=_environment->_parent;
-        }
-        if(!p){free_string(_environmentName);_environmentName=NULL;}
-    }
-    return _environmentName;
-}
+Mvalue* getEnvironment(){return _executionEnvironmentValue;}/* VALIDATED */
+
 Mtoken* getEnvironmentExpressionToken(){
     // MDH@22JUL2019: let's allow breaking here
     ////////if(kbhit())return NULL;
-    return(_executionEnvironment?_executionEnvironment->expressionToken:NULL);
+    Menvironment* executionEnvironment=getExecutionEnvironment();
+    return(executionEnvironment?executionEnvironment->expressionToken:NULL);
 }/* VALIDATED */
 Mtoken* nextEnvironmentExpressionToken(){
+    Menvironment* _executionEnvironment=getValueEnvironment(_executionEnvironmentValue);
     if(!_executionEnvironment)return NULL;
     if(_executionEnvironment->expressionToken)_executionEnvironment->expressionToken=_executionEnvironment->expressionToken->next;
     return _executionEnvironment->expressionToken;
 }/* VALIDATED */
 
 // read access to the elements defined in an environment
-uint32_t getNumberOfVariables(const Menvironment* const _environment){
+uint32_t getNumberOfVariables(Menvironment const * const _environment){
     if(!_environment||!_environment->_variableMap)return 0;
     // MDH@20JUL2019: now returning the sum of the variables in the parent plus those in the environment itself!!
-    return getNumberOfVariables(_environment->_parent)+_environment->_variableMap->numberOfElements;
+    return getNumberOfVariables(getValueEnvironment(_environment->_parent))+_environment->_variableMap->numberOfElements;
 }/* VALIDATED */
 
 // the names of the variables may be requested
-Mstring* _getVariableNames(const Menvironment* const _environment,const char* const sep){
+Mstring* _getVariableNames(Menvironment const * const _environment,const char* const sep){
     Mstring* _variableNames=NULL;
     if(_environment&&sep){
         _variableNames=__string();
@@ -165,7 +87,7 @@ Mstring* _getVariableNames(const Menvironment* const _environment,const char* co
             Mstring* p=_variableNames;
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                Mstring* _parentVariableNames=_getVariableNames(_environment->_parent,sep); // free asap
+                Mstring* _parentVariableNames=_getVariableNames(getValueEnvironment(_environment->_parent),sep); // free asap
                 if(_parentVariableNames){
                     p=string_append(p,string(_parentVariableNames));
                     free_string(_parentVariableNames); // we can do this because string_append copies the characters
@@ -214,7 +136,7 @@ Mlist* _getVariableNamesList(Menvironment* environment){
     }
     return _variableNamesList;
 }
-Mmap* _getVariableNamesMap(Menvironment* environment){
+Mmap* _getVariableNamesMap(Menvironment const * const environment){
     // how about returning for each environment that is active an attribute in a map?
     // first get the map of the parent
     Mmap* _variableNamesMap=(environment?_getMapOfType(VT_UNDEFINED):NULL);
@@ -227,9 +149,9 @@ Mmap* _getVariableNamesMap(Menvironment* environment){
         }
         if(environment->_parent){
             // determine the variable names map of the parent environment and wrap it
-            Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(environment->_parent),true);
+            Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(getValueEnvironment(environment->_parent)),true);
             // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
-            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,environment->_parent->_name,_parentVariableNamesMapValue)){
+            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,getValueEnvironment(environment->_parent)->_name,_parentVariableNamesMapValue)){
                 /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
                 output("%sFailed to register the variable names of the parent of '%s'.\n",ERROR_PREFIX,environment->_name);
             }
@@ -465,7 +387,8 @@ Mvariable* getVariable(Menvironment const * const _environment,char const * cons
     if(!name){outputError("No variable name specified");return NULL;}
     if(verbose)output("Looking for variable '%s'.\n",name);
     // input valid
-    Mmap* variableMap=(_environment?_environment->_variableMap:(_executionEnvironment?_executionEnvironment->_variableMap:NULL));
+    Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
+    Mmap* variableMap=(environment?environment->_variableMap:NULL);
     if(!variableMap){output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=variableMap->_first;
@@ -473,18 +396,19 @@ Mvariable* getVariable(Menvironment const * const _environment,char const * cons
     while(_variableMapelement&&(!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))_variableMapelement=_variableMapelement->_next;
     // MDH@20JUL2019: if found return
     if(_variableMapelement){
-        if(verbose)output("Variable '%s' found in environment '%s'.\n",name,(_environment?_environment:_executionEnvironment)->_name);
+        if(verbose)output("Variable '%s' found in environment '%s'.\n",name,environment->_name);
         return _variableMapelement->_variable;
     }
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
-    return (_environment&&_environment->_parent?getVariable(_environment->_parent,name,verbose):NULL);
+    return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,verbose):NULL);
 }/* VALIDATED */
 bool containsVariable(Menvironment const * const _environment,char const * const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
 
-char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value){
+char* getConstantWithValue(Menvironment const * const _environment,char * name,Mvalue* value){
     if(!value)return NULL; // forget about NULL
     // input valid
-    Mmap* variableMap=(environment?environment->_variableMap:(_executionEnvironment?_executionEnvironment->_variableMap:NULL));
+    Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
+    Mmap* variableMap=(environment?environment->_variableMap:NULL);
     if(!variableMap){output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=variableMap->_first;
@@ -501,14 +425,15 @@ char* getConstantWithValue(Menvironment const * const environment,char * name,Mv
     }
     // MDH@20JUL2019: if found return
     if(_variableMapelement){
-        if(amVerbose()){output("Variable '%s' found in environment '%s'",name,(environment?environment:_executionEnvironment)->_name);outputValue(" with value '",value,"'.\n");}
+        if(amVerbose()){output("Variable '%s' found in environment '%s'",name,environment->_name);outputValue(" with value '",value,"'.\n");}
         return _variableMapelement->_variable->_name;
     }
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
-    return (environment&&environment->_parent?getConstantWithValue(environment->_parent,name,value):NULL);
+    return (environment&&environment->_parent?getConstantWithValue(getValueEnvironment(environment->_parent),name,value):NULL);
 }
-Mstring* _getVariableMapText(Menvironment const * const environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenvariablevalues){
-    Mmap* map=(environment?environment->_variableMap:_executionEnvironment->_variableMap);
+Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenvariablevalues){
+    Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
+    Mmap* map=(environment?environment->_variableMap:NULL);
 	Mstring* result=(map?__string():NULL);
     if(result){
 	    Mstring* p=result;
@@ -570,7 +495,7 @@ Mstring* _getVariableMapText(Menvironment const * const environment,bool showcur
 // use Mexists to determine if a variable exists passed in as text, we might decide to return the name of the environment it exists in
 Mvalue* Mexists(Mvalue* _value){
     if(_value&&_value->type==VT_TEXT){
-        return _getIntegerValue(getVariable(getEnvironment(),_value->value._text->_c,false)?1:0);
+        return _getIntegerValue(getVariable(getExecutionEnvironment(),_value->value._text->_c,false)?1:0);
     }
     return NULL; // input invalid
 }
@@ -596,7 +521,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
             if(string_append_char(_completion,completiontype)){ // completion type appended!!!
                 // check all active environments
                 char* completion=NULL; // the current completion string
-                Menvironment* _environment=_executionEnvironment;
+                Menvironment* _environment=getExecutionEnvironment();
                 while(_environment){
                     // check variables
                     Mmap* variableMap=_environment->_variableMap;
@@ -689,7 +614,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
                         }
                     }
                     // and check the parent as well
-                    _environment=_environment->_parent;
+                    _environment=getValueEnvironment(_environment->_parent);
                 }
                 // either append completion (when the completion type equals 1), or replace the completion type
                 if(completiontype==1)if(completion&&!string_append_chars(_completion,completion,completionlength))completiontype=0;
@@ -713,9 +638,9 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 
 // addVariable returns the value map element that was created (if successful)
 // MDH@09AUG2019: we allow checking the current environment only when _environment is NULL
-bool addVariable(Menvironment* const _environment,const char* const name,Mvaluetype valuetype,bool immutable){
+bool addVariable(Menvironment * const _environment,char const * const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
-    if(name&&strlen(name)>0){ // input valid
+    if(_environment&&name&&strlen(name)>0){ // input valid
         _variable=getVariable(_environment,name,false);
         if(!_variable){ // non-existing...
             if(amVerbose())output("Variable '%s' to be created.\n",name);
@@ -723,11 +648,12 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
             if(_variable){
                 if(amVerbose())output("Variable '%s' created.\n",name);
                 // get a reference to the environment to which variable map we should be appending...
-                Menvironment* environment=(_environment?_environment:_executionEnvironment);
+                Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
                 // MDH@10NOV2019: because we now allow immutable environment variable maps, the environment to add the variable to
                 //                is the first one up of which the variable map is not immutable...
                 //                TODO check whether to use _execution or _parent (I suppose we should move up the execution chain)
-                while(environment&&(!environment->_variableMap||environment->_variableMap->immutable))environment=environment->_execution;
+                //                DONE MDH@03FEB2020: that should definitely be the parent (as e.g. each function execution has its own environment stack)
+                while(environment&&(!environment->_variableMap||environment->_variableMap->immutable))environment=getValueEnvironment(environment->_parent);
                 if(environment){
                     if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
                     Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
@@ -759,7 +685,7 @@ bool addVariable(Menvironment* const _environment,const char* const name,Mvaluet
     return false;
 }/* VALIDATED */
 
-bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
+bool setValue(Menvironment const * const _environment,const char* const name,const Mvalue* const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name){outputError("Cannot set the value: no variable name");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
@@ -791,7 +717,7 @@ bool setValue(const Menvironment* const _environment,const char* const name,cons
 }/* VALIDATED */
 
 // MDH@14NOV2019: sometimes we need a setValue that does not use assignValue() because we do not want to copy the (composite) value passed in
-bool setVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
+bool setVariable(Menvironment * const _environment,char const * const name,Mvalue const * const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("No variable specified to set the value of");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
@@ -819,11 +745,11 @@ bool setVariable(const Menvironment* const _environment,const char* const name,c
         }else
             output("%sCannot set variable '%s': it is not mutable!\n",ERROR_PREFIX,name);
     }else
-        output("%sCannot set variable '%s': it is unknown to '%s'.\n",ERROR_PREFIX,name,(_environment?_environment:_executionEnvironment)->_name);
+        output("%sCannot set variable '%s': it is unknown to '%s'.\n",ERROR_PREFIX,name,(_environment?_environment:getExecutionEnvironment())->_name);
     return false;
 }/* VALIDATED */
 
-long long appendToListVariable(const Menvironment* const _environment,const char* const name,const Mvalue* const _value){
+long long appendToListVariable(Menvironment const * const _environment,const char* const name,const Mvalue* const _value){
     if(!_environment||!name){outputError("No environment or variable name specified");return 0;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
     if(variable){
@@ -843,7 +769,7 @@ long long appendToListVariable(const Menvironment* const _environment,const char
     return 0;
 }/* VALIDATED */
 
-Mvalue* getValue(const Menvironment* const _environment,const char* const name){
+Mvalue* getValue(Menvironment const * const _environment,const char* const name){
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     Mvariable* variable=getVariable(_environment,name,false);
     return(variable?variable->_value:NULL);
@@ -851,7 +777,7 @@ Mvalue* getValue(const Menvironment* const _environment,const char* const name){
 
 // FUNCTION STUFF
 // the names of the variables may be requested
-Mstring* _getFunctionNames(const Menvironment* const _environment,const char* const sep){
+Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep){
     Mstring* _functionNames=NULL;
     if(_environment&&sep){
         _functionNames=__string();
@@ -859,7 +785,7 @@ Mstring* _getFunctionNames(const Menvironment* const _environment,const char* co
             Mstring* p=_functionNames;
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                Mstring* _parentFunctionNames=_getFunctionNames(_environment->_parent,sep);
+                Mstring* _parentFunctionNames=_getFunctionNames(getValueEnvironment(_environment->_parent),sep);
                 if(_parentFunctionNames){
                     p=string_append(p,string(_parentFunctionNames));
                     free_string(_parentFunctionNames); // we can do this because string_append copies the characters that string() points to!!
@@ -882,7 +808,7 @@ Mstring* _getFunctionNames(const Menvironment* const _environment,const char* co
     return _functionNames;
 }/* VALIDATED */
 
-Mfunction* getFunction(const Menvironment* const _environment,const char* const functionName){
+Mfunction* getFunction(Menvironment const * const _environment,const char* const functionName){
     if(_environment&&functionName&&strlen(functionName)){
         Mfunctionmap* functionmap=_environment->_functionMap;
         if(functionmap){
@@ -898,7 +824,7 @@ Mfunction* getFunction(const Menvironment* const _environment,const char* const 
             }
         }
         // might exist in the parent environment
-        if(_environment->_parent)return getFunction(_environment->_parent,functionName);
+        if(_environment->_parent)return getFunction(getValueEnvironment(_environment->_parent),functionName);
     }
     return NULL;
 }/* VALIDATED */
@@ -912,7 +838,7 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 }// VALIDATED
 */
 // MDH@05NOV2019: if there are missing elements in _argumentList (what we allow now), there should be an associated map element with value NULL
-Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList){
+Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList){
     Mmap* _functionArgumentMap=NULL;
     // MDH@03MAR2020: _argumentList should also be allowed to be NULL (because then defaults would be used)
     if(_function/*&&_argumentList*/){
@@ -960,15 +886,20 @@ Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* cons
 
 // newFunction renamed to _getFunction(), not to be confused with getFunction()
 // _getFunction() will create the function
-Mfunction* _getFunction(Menvironment* const _environment,const char* const name){
+// MDH@03FEB2020: now wrapping the environment in the parameter list in a value
+//                a new function is always created on the currently executing environment
+Mfunction* _getFunction(Menvironment * const _environment,const char* const name){
     Mfunction* _function=NULL;
     if(_environment&&name&&strlen(name)){
-        _function=getFunction(_environment,name);
+        _function=getFunction(_environment,name); // check for a function with the given name in the given environment
         if(!_function){ // doesn't exist yet
             _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'=');
             if(_function){
                 ///////////_function->type=functionType;
-                _function->_definitionEnvironment=_environment; // TODO why would we need this?????
+                /* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
+                // MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
+                assignValue(&_function->_definitionEnvironmentValue,_environmentValue?_environmentValue:_executionEnvironmentValue); // MDH@03FEB2020 replacing: _function->_definitionEnvironment=_environment; // TODO why would we need this?????
+                */
                 Mstring* _functionName=__string();
                 if(_functionName){
                     Mstring* p=_functionName;
@@ -1477,13 +1408,13 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 }
 */
 unsigned long long getNumberOfFunctionCommands(const char* const functionName){
-    Mfunction* function=getFunction(getEnvironment(),functionName);
+    Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
     if(!function||function->type!=FT_USER){if(!function)output("%sFunction '%s' not found.\n",ERROR_PREFIX,functionName);return -1;}
     return (function->functionunion._userfunction->_bodyCommandList?function->functionunion._userfunction->_bodyCommandList->numberOfElements:0);
 }
 bool registerFunctionCommand(const char* const functionName,Mtoken* command){
     if(!functionName||!command)return false;
-    Mfunction* function=getFunction(getEnvironment(),functionName);
+    Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
     if(function&&function->type==FT_USER){
         Mvalue* _commandValue=_getValueOfToken(command,false);
         if(_commandValue){
@@ -1518,7 +1449,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                 //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
                 ///////if(_userfunctionValue){
                     // MDH@17JUL2019: the map needs to be stored with the Mfunction
-                Mfunction* _function=_getFunction(getEnvironment(),functionName->_c);
+                Mfunction* _function=_getFunction(getExecutionEnvironment(),functionName->_c);
                 if(_function){
                     // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                     //                so we have to make a copy of the parameter map
@@ -1547,12 +1478,12 @@ Mvalue* Mreturn(Mvalue* _value){
     // if you call return with NO value, the current value of $ will be used (or the value of the last executed function body command)
     // do NOT replace the value of "$" if _value is NULL (which should indicate a return without argument), this means you cannot undo the result value
     // perhaps with $=NULL though
-    if(_value!=NULL&&!setValue(getEnvironment(),"$",_value)){
+    if(_value!=NULL&&!setValue(getExecutionEnvironment(),"$",_value)){
         outputError("Failed to set the function execution result variable");
         return NULL;
     }
     // setting the exit flag variable will get the function execution aborted
-    if(!setValue(getEnvironment(),"!",_getIntegerValue(1))){
+    if(!setValue(getExecutionEnvironment(),"!",_getIntegerValue(1))){
         outputError("Failed to set the function execution exit flag variable");
         return NULL;
     }

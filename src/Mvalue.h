@@ -7,6 +7,9 @@
 struct Mlist;
 struct Mmap;
 struct Mreference;
+// MDH@03MAR2020: if we want to be able to wrap a function or an environment in a value we have to add them here
+struct Mfunction;
+struct Menvironment;
 // MDH@04NOV2019: we need a variable reference not a value reference as used in M.c, so I've introduced Mreference in Mexecution.c instead!!!! struct Mvaluereference; // MDH@26OCT2019: being able to store a value reference in a value coming up next...
 typedef union Mvalueunion{
     Mtoken* _token;
@@ -19,6 +22,8 @@ typedef union Mvalueunion{
     struct Mlist* _list;
     struct Mmap* _map;
     struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
+    struct Mfunction* _function; // MDH@03MAR2020
+    struct Menvironment* _environment; // MDH@03MAR2020
     //////////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
@@ -246,3 +251,79 @@ Mdecimal* getValueDecimal(Mvalue* _value);
 Mdecimal* _getValueTextDecimal(Mvalue* value); // MDH@09OCT2019: delegates to _getTextDecimal() in Mdecimal.h/c, guarantees to return a new decimal from parsing the value text representation (unless the value wraps a decimal itself)
 
 bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2); //MDH@05NOV2019: moved over from Menvironment.h/c as we need it in Mlist's find() function
+
+// MDH@03MAR2020: moved over from Menvironment.h
+ // functions of different types, internal (no body but a function to pass the arguments to) or external (with a body)
+// all functions are executed in an execution environment, that descends from the environment in which the function is defined (the definition environment)
+// MDH@28MAY2019: how about NOT passing the execution environment and instead keep a current execution environment instead (in case one needs it)
+/////////////struct Menvironment;
+// MDH@10JUL2019: user functions are stored differently than M functions
+// MDH@20JUL2019: moved over from Mvalue but this means that we cannot currently store a function in a value...
+struct Mfunctionmap; // prototype of Mfunctionap
+typedef struct Muserfunction{
+    //////////struct Mmap* _parameterMap;
+    struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
+    struct Mlist* _bodyCommandList; // a list of body commands
+}Muserfunction;
+void free_userfunction(Muserfunction* _userfunction);
+
+typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS}Mfunctiontype;
+
+typedef union Mfunctionunion{
+    NoArgumentFunction noArgumentFunction;
+    OneArgumentFunction oneArgumentFunction;
+    TwoArgumentFunction twoArgumentFunction;
+    ThreeArgumentFunction threeArgumentFunction;
+    FourArgumentFunction fourArgumentFunction;
+    Muserfunction* _userfunction; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
+}Mfunctionunion;
+
+// struct Menvironment;
+// MDH@03FEB2020: the definition environment (in which the function is created is wrapped in a value so that it can persist even when popped from the execution stack (JavaScript like))
+typedef struct Mfunction{
+    ////////Mstring* _name;
+    Mmap* _parameterMap; // a map of values defines the parameters and their default values (implicitly defining the expected types)
+    Mvalue* _definitionEnvironmentValue; // MDH@03FEB2020 replacing: struct Menvironment* _definitionEnvironment;
+    Mfunctiontype type; // whether internal or external
+    Mfunctionunion functionunion; // where either the internal function to call with the arguments is placed or 
+}Mfunction;
+
+typedef struct Mfunctionmapelement{
+    Mstring* _name;
+    Mfunction* _function;
+    struct Mfunctionmapelement* _next;
+}Mfunctionmapelement;
+
+typedef struct Mfunctionmap{
+    uint32_t numberOfFunctions;  // keeping track of the total number of functions...
+    Mfunctionmapelement* _first;
+    Mfunctionmapelement* _last;
+}Mfunctionmap;
+
+//Mvalue* getFunction(Mfunctionlist functionlist,char* name);
+
+// environments
+
+// an environment is a bag of variables and functions
+// MDH@03FEB2020: all environments should be wrapped in Mvalue instances, so they won't get released until they can
+typedef struct Menvironment{
+    char* _name; // the name of the environment
+    Mmap* _variableMap; // variables are stored by name
+    Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
+    Mtoken* expressionToken; // MDH@17JUL2019: the current token of the expression being evaluated in this environment
+    Mvalue* _parent; // MDH@03FEB2020 replacing: struct Menvironment* _parent; // typically the definition environment
+    Mvalue* execution; // MDH@03FEB2020 replacing: struct Menvironment* _execution; // the environment that was executing before this one was popped!!
+}Menvironment;
+
+Menvironment* __environment(); // creates a new (empty) environment
+Mstring* _getEnvironmentName(Menvironment* _environment); // for use in prompting
+void free_environment(Menvironment* _environment);
+Mstring* _getEnvironmentName(Menvironment* _environment);
+Menvironment* getEnvironmentParent(Menvironment* _environment);
+
+bool free_function(Mfunction* _function);
+
+Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
+
+Mvalue* _getValueOfFunction(Mfunction* _function,bool freeonfailure);
+Mvalue* _getValueOfEnvironment(Menvironment* _environment,bool freeonfailure);

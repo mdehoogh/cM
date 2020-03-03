@@ -118,7 +118,7 @@ bool initVariable(Menvironment* _Menvironment,char* name,double d){
 */
 // there will be a root (M) environment
 
-Menvironment* _Menvironment=NULL; // this is the root (M) environment
+Menvironment* _Menvironment=NULL; // this is the root (M) environment that we will be executing in
 ///// NOT HERE see Mexecution.c!!!! Menvironment* _executionEnvironment=NULL; // the current execution environment (in which functions are called!!!)
 
 /* some prototypes we need in initEnvironment()
@@ -191,14 +191,14 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 	return s;
 }
 void outputFunctions(){
-	Mstring* _functionsText=_getFunctionMapText(getEnvironment()->_functionMap);
+	Mstring* _functionsText=_getFunctionMapText(getExecutionEnvironment()->_functionMap);
 	output("\nFunctions: %s.\n",string(_functionsText));
 	free_string(_functionsText);
 }/* VALIDATED */
 void outputVariables(){
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
 	// MDH@24OCT2019: now using _getVariableMapText() instead of _getMapText() because the former is environment aware and can show the symbols with the same value (if any)
-	Mstring* _variablesText=_getVariableMapText(getEnvironment(),false,false,true,false); // do NOT show the hidden variables!!!
+	Mstring* _variablesText=_getVariableMapText(getExecutionEnvironment(),false,false,true,false); // do NOT show the hidden variables!!!
 	output("\nVariables: %s.\n",string(_variablesText));
 	free_string(_variablesText);
 }/* VALIDATED */
@@ -849,7 +849,7 @@ void showPrompt(){
 	switch(inputMode){
 		case IM_COMMAND:
 			{
-				Mstring* _environmentName=_getEnvironmentName(); // free asap
+				Mstring* _environmentName=_getExecutionEnvironmentName(); // free asap
 				if(_environmentName){
 					output(string(_environmentName));
 					promptLength=string_length(_environmentName);
@@ -861,7 +861,7 @@ void showPrompt(){
 				*/
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
 				if(getCurrentFunctionBodyInput())
-					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getEnvironment()->_name));	// replacing: printf("%lu",(commandCount+1));
+					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getExecutionEnvironment()->_name));	// replacing: printf("%lu",(commandCount+1));
 				else
 					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
 				output("[%s] = ",str);
@@ -1562,9 +1562,9 @@ void unfinishToken(Mtoken* lastCommandToken){
 Mvalue* getCommandValue(Mcommand* command,char commandType){
 	if(amVerbose())outputCommandInfo(command);
 	if(!isAValidCommand(command,amVerbose()))return NULL;
-	getEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
+	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerbose())outputLine("Evaluating...");
-	return getValueOfExpression(getEnvironment()->_name,commandType,(TokenType[]){},0);
+	return getValueOfExpression(getExecutionEnvironment()->_name,commandType,(TokenType[]){},0);
 }
 */
 // MDH@29NOV2019: we're going to keep track of the system and user allocation counts
@@ -1607,7 +1607,7 @@ bool evaluateCommand(Mvalue* *resultValue){
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
 	Mstring* commandText=_getCommandText(true);
 	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
-	getEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
+	getExecutionEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
 	clock_t then=clock();
 	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
@@ -2149,7 +2149,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
 	char* _identifierName=_stringstart(lastCommandToken->text,lastCommandToken->significantCharacterCount); // free asap
 	if(lastCommandToken->type!=TT_FUNCTION){ // is it a function (now)?
-		if(getFunction(getEnvironment(),_identifierName)){ // yes, it is
+		if(getFunction(getExecutionEnvironment(),_identifierName)){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
 			// MDH@20SEP2019: I suppose we need to ascertain that an opening parenthesis is associated with the token now, and no longer anything else
 			/* MDH@20SEP2019: removing:
@@ -2165,7 +2165,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			*/
 		}
 	}else{ // is it (still) a function?
-		if(!getFunction(getEnvironment(),_identifierName)){ // no, it ain't
+		if(!getFunction(getExecutionEnvironment(),_identifierName)){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
 			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 			reoutputToken(lastCommandToken);
@@ -2182,7 +2182,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	if(lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
-		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getEnvironment(),_identifierName)));
+		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName)));
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(!variableExists){ // apparently does NOT exist
 				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
@@ -2588,7 +2588,7 @@ Mvalue* Mvariables(){
 	if(amVerbose())outputInfo("Getting the variables!");
 	// returning the names of the local variables (including the hidden ones)
 	// NOTE _getVariableNamesMap() always requires a non NULL environment to start with
-	return _getValueOfMap(_getVariableNamesMap(getEnvironment()),true);
+	return _getValueOfMap(_getVariableNamesMap(getExecutionEnvironment()),true);
 }
 // MDH@15NOV2019: returning value counts (per value type), passing in a list of variable names
 // MDH@25NOV2019: what about returning a table??? which is a list
@@ -2694,7 +2694,12 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){
 }
 
 // in an interactive session we'll have additional variables to set up
-void prepareShellEnvironmentForInteractiveSession(){
+uint16_t prepareShellEnvironmentForInteractiveSession(){
+	
+	uint16_t errorflags=0;
+
+	// Menvironment* _Menvironment=getValueEnviroment(_MenvironmentValue); // MDH@03FEB2020: extracting the environment from its wrapper
+	// if(!pushExecutionEnvironment(_Menvironment))return false;
 
 	// we're gonna need a list to store lists of command and result pairs
 	M_value=_getListValue(VT_MAP,false);
@@ -2704,42 +2709,61 @@ void prepareShellEnvironmentForInteractiveSession(){
 	if(M_value){
 		if(!addVariable(_Menvironment,M_VARIABLE_NAME,VT_LIST,true)||!setVariable(_Menvironment,M_VARIABLE_NAME,M_value)){
 			outputWarning("Failed to create, add or initialize M.");
+			errorflags|=1;
 		}
 		// if M_value wasn't bound to the M variable, it's memory will be freed by the garbage collector, by setting M_value to NULL we know we do not need to update the wrapped list
-		if(M_value->count==0){M_value=NULL;output("%sFailed to initialize %s.\n",ERROR_PREFIX,M_VARIABLE_NAME);}
-	}else
+		if(M_value->count==0){M_value=NULL;errorflags|=2;output("%sFailed to initialize %s.\n",ERROR_PREFIX,M_VARIABLE_NAME);}
+	}else{
+		errorflags|=4;
 		outputWarning("Failed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!");
+	}
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
 	if(M_value){
-		if(!completedValueFunction(_getFunction(_Menvironment,MFUNCTION_NAME),MFUNCTION_NAME,MM))
+		if(!completedValueFunction(_getFunction(_Menvironment,MFUNCTION_NAME),MFUNCTION_NAME,MM)){
+			errorflags|=8;
 			output("%sFailed to register function %s.",ERROR_PREFIX,MFUNCTION_NAME);
-		else 
+		}else
+		if(amVerbose())
 			output("Function %s registered.\n",MFUNCTION_NAME);
 	}
 
-	if(!completedFunction(_getFunction(_Menvironment,"variables"),"variables",Mvariables))
+	if(!completedFunction(_getFunction(_Menvironment,"variables"),"variables",Mvariables)){
+		errorflags|=16;
 		outputWarning("Failed to register the variables() function");
-	if(!completedValueFunction(_getFunction(_Menvironment,"values"),"values",Mvalues))
+	}
+	if(!completedValueFunction(_getFunction(_Menvironment,"values"),"values",Mvalues)){
+		errorflags|=32;
 		outputWarning("Failed to register the values() function");
+	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
-	if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))
+	if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min)){
+		errorflags|=64;
 		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
-
-	if(!completedValueFunction(_getFunction(_Menvironment,"os"),"os",MexecuteOSCommand))
+	}
+	if(!completedValueFunction(_getFunction(_Menvironment,"os"),"os",MexecuteOSCommand)){
+		errorflags|=128;
 		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
-
+	}
+	return errorflags;
 }
 
 // additional functions are available in an interactive session to be added to the shell environment
 // as well as specific functions for displaying input info and input error messages
-void prepareForInteractiveSession(){
-	prepareShellEnvironmentForInteractiveSession();
+bool prepareForInteractiveSession(){
+	uint16_t errorflags=prepareShellEnvironmentForInteractiveSession();
+	if(errorflags){
+		output("Errors preparing for running an interactive session (with code %ud). Do you want to continue? ",errorflags);
+		char answer;
+		inputCharRead(&answer);
+		if(answer!='Y'||answer!='y')return false;
+	}
 	setInputErrorFunction(inputError);
 	setInputInfoFunction(inputInfo);
 	setReoutputTokenFunction(reoutputToken);
 	outputInfo("Ready for an interactive session.");
+	return true;
 }
 // MDH@27FEB2020: called from within main() only, so can be placed directly in front of main (and separated into a separate M.c or better Minterpreter.c or Mcli.c)
 
@@ -2813,17 +2837,24 @@ int main(int argc, char **argv){
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	_Menvironment=getShellEnvironment();
 	if(!_Menvironment){ // ascertain to have an shell environment!!!
-		outputError("Exiting: due to failing to initialize the M execution environment!");
+		outputError("Exiting: due to failing to initialize the M environment!");
 		resetOutputColor();
 		exit(1);
 	}
 
-	prepareForInteractiveSession(); // initialize the shell environment for use in an interactive session
+	// initialize the shell environment for use in an interactive session
+	if(!prepareForInteractiveSession()){
+		outputError("Exiting: due to failing to prepare for running an interactive session.");
+		resetOutputColor();
+		exit(2);
+	}
 
 	// MDH@11NOV2019: at this point getNumberOfValues() still represents the actual number of remembered values (before values are removed from it)
 	if(amVerbose())output("M shell initialized with %llu predefined values.\n",getNumberOfValues());
 
-	Mstring* predefinedVariableNames=_getVariableNames(getEnvironment(),", ");
+	// done by getShellEnvironment()!!!! pushExecutionEnvironment(_Menvironment);
+	
+	Mstring* predefinedVariableNames=_getVariableNames(getExecutionEnvironment(),", ");
 	if(predefinedVariableNames){
 		output("Predefined variables: %s.\n",string(predefinedVariableNames));
 		free_string(predefinedVariableNames); // no get rid of it!!!
