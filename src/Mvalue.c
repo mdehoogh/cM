@@ -664,6 +664,33 @@ Mmap* _getFloatFloatMap(char* name1,char* name2){
     }
     return NULL;
 }/* VALIDATED */
+Mmap* _getMapTokenMap(char* name1,char* name2){
+    if(name1&&name2){
+        if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_MAP,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _map->_last=_mapelement2;
+                        _map->numberOfElements=2;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
 Mmap* _getListMap(char* name,Mvalue* _listValue){
     if(name&&_listValue){
         Mvariable* _listVariable=_getVariable(name,VT_LIST,true);
@@ -1238,6 +1265,55 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                             if(_valueText){p=string_append(p,string(_valueText));free_string(_valueText);}
                         }
                         */
+                        if(!p){free_string(valueText);valueText=NULL;}
+                    }
+                }
+                break;
+            case VT_FUNCTION:
+                {
+                    valueText=_getString("function");
+                    if(valueText){
+                        Mstring* p=valueText;
+                        Mfunction* function=_value->value._function;
+                        if(function){
+                            p=string_append_char(p,'(');
+                            if(p&&function->_parameterMap){
+                                Mmapelement* _parameterMapelement=function->_parameterMap->_first;
+                                while(p&&_parameterMapelement){
+                                    if(_parameterMapelement->_variable){
+                                        p=string_append(p,_parameterMapelement->_variable->_name);
+                                        p=string_append_char(p,':');
+                                        Mstring* _parameterValueText=_getValueText(_parameterMapelement->_variable->_value,false);
+                                        p=string_append(p,string(_parameterValueText));
+                                        free_string(_parameterValueText);
+                                    }
+                                    _parameterMapelement=_parameterMapelement->_next;
+                                    if(_parameterMapelement)p=string_append_char(p,',');
+                                }
+                            }
+                            p=string_append_char(p,')');
+                        }else
+                            p=string_append_char(p,'?');
+                        if(!p){free_string(valueText);valueText=NULL;}
+                    }
+                }
+                break;
+            case VT_ENVIRONMENT:
+                {
+                    valueText=_getString("environment");
+                    if(valueText){
+                        Mstring* p=valueText;
+                        Menvironment* environment=_value->value._environment;
+                        if(environment){
+                            p=string_append_char(p,'(');
+                            p=string_append_char(p,'\'');
+                            Mstring* _environmentName=_getEnvironmentName(environment);
+                            p=string_append(p,string(_environmentName));
+                            free_string(_environmentName);
+                            p=string_append_char(p,'\'');
+                            p=string_append_char(p,')');
+                        }else
+                            p=string_append_char(p,'?');
                         if(!p){free_string(valueText);valueText=NULL;}
                     }
                 }
@@ -2115,6 +2191,7 @@ void free_environment(Menvironment* _environment){
         assignValue(&_environment->_parent,NULL); // MDH@03FEB2020 replacing:
         assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
         free_map(_environment->_variableMap);
+        // free_map(_environment->_functionMap); // MDH@04MAR2020: TODO do we need this??????
         /* MDH@10JUL2019: only Menvironment has a function map!!   
            MDH@20JUL2019: NO user functions may also contain a function map, which is referenced in a user function execution environment
                           and indeed being a referenced they should not be freed (otherwise we would loose these nested functions on
@@ -2137,21 +2214,24 @@ Mstring* _getEnvironmentName(Menvironment* _environment){
         Mstring* p=_environmentName;
         while(p&&_environment){
             if(string_length(p)>0)p=string_insert_char(p,0,'.');
-            ////////output("Prepending '%s'.\n",_environment->_name);
+            /////// printf("Prepending '%s'.\n",_environment->_name);
             p=string_prepend(p,_environment->_name);
-            _environment=getEnvironmentParent(_environment); // MDH@03FEB2020 replacing: _environment->_parent;
+            _environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
         }
         if(!p){free_string(_environmentName);_environmentName=NULL;}
     }
     return _environmentName;
 }
-Menvironment* getEnvironmentParent(Menvironment* _environment){return(_environment?getValueEnvironment(_environment->_parent):NULL);}
+Menvironment* getEnvironmentParent(Menvironment* _environment){
+    return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
+}/* VALIDATED */
 
 // additional function for wrapping environments and functions
 Mvalue* _getValueOfFunction(Mfunction* _function,bool freeonfailure){
     if(!_function)return NULL;
     Mvalue* _value=__value("function");
     if(_value){_value->type=VT_FUNCTION;_value->value._function=_function;}else if(freeonfailure)free_function(_function);
+    if(!_value)outputError("Failed to wrap function.");
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfEnvironment(Menvironment* _environment,bool freeonfailure){

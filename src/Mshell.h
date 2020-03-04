@@ -28,22 +28,29 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 Mcommand* _getNewCommand(bool withFirstToken);
 
 // MDH@20FEB2020: the function definition so we can plug in our own inputInfo and inputError functions
-typedef void InputResponseFunction(const char* const fmt,...);
+typedef void InputResponseFunction(char const * const fmt,...);
+typedef size_t OutputTokenFunction(Mtoken* token);
+typedef void ReoutputTokenFunction(Mtoken* token);
+typedef void UpdateLastTokenAutocompletionTextFunction();
+typedef void OutputCommandInfoFunction(Mcommand* command);
+typedef bool InputCharReadFunction(char* _c);
+/*
 void setInputInfoFunction(InputResponseFunction* _inputResponseFunction);
 void setInputErrorFunction(InputResponseFunction* _inputResponseFunction);
 // MDH@28FEB2020: for now being able to plug in a reoutput token function solves the problem of having to reoutput a token when typed by the user in a interactive session
-typedef void ReoutputTokenFunction(Mtoken* token);
 void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction);
-typedef void UpdateLastTokenAutocompletionTextFunction();
 void setUpdateLastTokenAutocompletionTextFunction(UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction);
-
+void setOutputCommandInfoFunction(OutputCommandInfoFunction* _outputCommandInfoFunction);
+*/
 bool isOneCharacterTokenType(uint8_t tokenType);
 
 // the list of token type ids in the corresponding order!!!
+/* MDH@04MAR2020: no color use in the shell
 const char* getTokenColor(enum TOKENTYPE_ENUM tokenType);
 void outputTokenTypeColor(TokenType tokenType);
 void outputTokenColor(Mtoken* _token);
 size_t outputToken(Mtoken* _token);
+*/
 void outputLastTokenChar(Mtoken* token);
 // does not need to be exposed as it's only used internally: Mtoken* freeToken(Mtoken* _token);
 Mtoken* removedLastCommandToken(Mcommand* command); // needs to be here, as it is used by isAValidCommand() to cut off comments and errors
@@ -51,7 +58,7 @@ Mtoken* removedLastCommandToken(Mcommand* command); // needs to be here, as it i
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput);
 bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId);
 Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput);
-void outputCommandInfo(Mcommand* command);
+
 bool isAValidCommand(Mcommand* command,bool report);
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount);
 
@@ -74,4 +81,13 @@ bool endFunctionBodyInput();
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest);
 
 // and finally obtaining a root environment
-Menvironment* getShellEnvironment();
+bool shellInitialized(
+				InputCharReadFunction _inputCharReadFunction,
+				InputResponseFunction _inputInfoFunction,
+				InputResponseFunction _inputErrorFunction,
+				OutputTokenFunction _outputTokenFunction,
+				ReoutputTokenFunction _reoutputTokenFunction,
+				UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,
+				OutputCommandInfoFunction _outputCommandInfoFunction
+			);
+

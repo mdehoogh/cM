@@ -12,7 +12,7 @@
 #include <limits.h>
 
 // MDH@27FEB2020: on top of environment management we have the 'shell' for setting up the root M environment
-#include "Mshell.h"
+#include "Msession.h"
 
 // the constants are defined in Mshell.c
 extern char const* const ERROR_PREFIX;
@@ -70,8 +70,76 @@ char const * const M_BUILD="10";char const * const M_DATE="2 March 2020, 12:00";
 
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
-
+// the list of token type ids in the corresponding order!!!
+static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
+	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
+	////////output("(%d)",tokentype_id);
+	switch(tokentype_id>>6){
+		case 0: // value token
+			return getValueTokenColor(tokentype_id);
+		case 1: // operator: unary, binary, ternary, assignment the operator category will be: (tokentype_id&0x30)>>4
+			return getOperatorTokenColor((tokentype_id&0x30)>>4);
+		case 2: // comment or end of comment
+			return getCommentColor();
+		case 3: // error token
+			/////////outputChar('E');
+			return getErrorColor();
+	}
+	return "";
+}
+static void outputTokenTypeColor(TokenType tokenType){
+	setBackColor(getBackgroundColor());
+	setColor(getTokenColor(tokenType));
+}
+static void outputTokenColor(Mtoken* _token){
+	if(_token)outputTokenTypeColor(_token->type);
+	///////printf("[%d]",_userInputCommand->_lastToken->type);
+	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
+}
 // I guess we could allow the user to specify another eps value through the QEPS command line argument!!!
+static void outputCommandInfo(Mcommand* command){
+	if(!command||!command->_lastToken)return;
+	// MDH@12AUG2019: identifiers first
+	Mtoken* identifierToken=command->_lastToken->prevIdentifier;
+	if(identifierToken){
+		output("%s","Identifiers:");
+		while(1){
+			//if(identifierToken==TT_VARIABLE||identifierToken==TT_NEW_VARIABLE){
+				// all identier tokens with argument equal to 1 should be considered new, if not it is a bug
+				if(identifierToken->argument==1&&identifierToken->type!=TT_NEW_VARIABLE)setColor(getErrorColor());else outputTokenColor(identifierToken);
+				output(" %s",string(identifierToken->text));
+				resetOutputColor();
+				output("(%u)",identifierToken->offset);
+			//}
+			identifierToken=identifierToken->prevIdentifier;
+			if(!identifierToken)break;
+		}
+		outputChar('\n');
+	}
+	// tokens
+	Mtoken* token=command->_firstToken;
+	uint16_t tokenIndex=0;
+	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
+	while(token!=NULL){
+		tokenIndex++;
+		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
+		if(token->expr)
+			output("\n%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
+		else
+			output("\t%s\n","Not part of another expression!");
+		if(token->prevIdentifier)
+			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
+		/* removing:
+		if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
+			Mtoken* specialFunctionCallToken=getSpecialFunctionCallToken(token);
+			if(specialFunctionCallToken){
+				output("%s\t%u\n"," local to",specialFunctionCallToken->offset);
+			}
+		}
+		*/
+		token=token->next;
+	}
+}
 
 void writeTimestamp(FILE* _file){
 	if(_file){
@@ -929,8 +997,27 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
+static size_t outputToken(Mtoken* _token){
+	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
+	if(numberOfCharactersToOutput>0){
+		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
+		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
+		char firstWhitespaceCharacter=(_token->significantCharacterCount>0?string_replacedchar(_token->text,'\0',_token->significantCharacterCount):'\0');
+		// if we allow comments in tokens we're in trouble!!!
+		outputTokenColor(_token);
+		output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
+		// if there's whitespace text to start with write it in the default output color
+		if(firstWhitespaceCharacter){ // some whitespace left to write
+			string_setchar(_token->text,firstWhitespaceCharacter,_token->significantCharacterCount);
+			resetOutputColor();
+			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
+		}
+	}
+	return numberOfCharactersToOutput;
+	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
+}
 // MDH@30APR2019: when a function returns to a variable and the other way round
-void reoutputToken(Mtoken* _token){
+static void reoutputToken(Mtoken* _token){
 	if(!_token)return;
 	// outputChar('X');
 	size_t tokenLength=(_token->text?string_length(_token->text):0);
@@ -1496,37 +1583,41 @@ void outputValueColored(Mvalue* _value){
 			case VT_LIST:
 				// TODO not using _getListText() as defined in Mexecution
 				/////////if(amVerbose())outputValue("List value '",_value,"'.");
-				outputChar('[');
-				Mlist* _list=_value->value._list;
-				if(_list&&_list->numberOfElements){
-					Mlistelement* _listelement=_list->_first;
-					unsigned long long listitemindex=1;
-					while(_listelement){
-						if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;outputChar(',');} // missing elements
-						outputValueColored(_listelement->_value);
-						_listelement=_listelement->_next;
+				{
+					outputChar('[');
+					Mlist* _list=_value->value._list;
+					if(_list&&_list->numberOfElements){
+						Mlistelement* _listelement=_list->_first;
+						unsigned long long listitemindex=1;
+						while(_listelement){
+							if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;outputChar(',');} // missing elements
+							outputValueColored(_listelement->_value);
+							_listelement=_listelement->_next;
+						}
 					}
+					outputChar(']');
 				}
-				outputChar(']');
 				break;
 			case VT_MAP:
-				outputChar('{');
-				Mmap* _map=_value->value._map;
-				if(_map&&_map->numberOfElements){
-					Mvariable* _mapelementvariable;
-					Mmapelement* _mapelement=_map->_first;
-					while(_mapelement){
-						_mapelementvariable=_mapelement->_variable;
-						// TODO are we coloring the name?????
-						// quoting the name to indicate it is alphanumeric!!
-						output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
-						outputValueColored(_mapelementvariable->_value);
-						if(!_mapelement->_next)break;
-						outputChar(',');
-						_mapelement=_mapelement->_next;
+				{
+					outputChar('{');
+					Mmap* _map=_value->value._map;
+					if(_map&&_map->numberOfElements){
+						Mvariable* _mapelementvariable;
+						Mmapelement* _mapelement=_map->_first;
+						while(_mapelement){
+							_mapelementvariable=_mapelement->_variable;
+							// TODO are we coloring the name?????
+							// quoting the name to indicate it is alphanumeric!!
+							output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
+							outputValueColored(_mapelementvariable->_value);
+							if(!_mapelement->_next)break;
+							outputChar(',');
+							_mapelement=_mapelement->_next;
+						}
 					}
+					outputChar('}');
 				}
-				outputChar('}');
 				break;
 			case VT_REFERENCE:
 				outputChar('@');
@@ -1535,7 +1626,12 @@ void outputValueColored(Mvalue* _value){
 					outputChar(':');
 					output("%zu",_value->value._reference->referenceindex);
 				}
-			default:
+				break;
+			default: // for VT_FUNCTION, VT_ENVIRONMENT and the like
+				{
+					Mstring* _valueText=_getValueText(_value,false);
+					if(_valueText){output("%s",string(_valueText));free_string(_valueText);}
+				}
 				break;
 		}
 	}else{
@@ -2751,17 +2847,14 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 
 // additional functions are available in an interactive session to be added to the shell environment
 // as well as specific functions for displaying input info and input error messages
-bool prepareForInteractiveSession(){
+bool interactiveSessionInitialized(){
 	uint16_t errorflags=prepareShellEnvironmentForInteractiveSession();
 	if(errorflags){
-		output("Errors preparing for running an interactive session (with code %ud). Do you want to continue? ",errorflags);
+		output("Errors preparing for running an interactive session (with code %x). Do you want to continue? ",errorflags);
 		char answer;
 		inputCharRead(&answer);
 		if(answer!='Y'||answer!='y')return false;
 	}
-	setInputErrorFunction(inputError);
-	setInputInfoFunction(inputInfo);
-	setReoutputTokenFunction(reoutputToken);
 	outputInfo("Ready for an interactive session.");
 	return true;
 }
@@ -2821,6 +2914,23 @@ int main(int argc, char **argv){
 		}
 	}
 
+	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
+	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
+	if(!shellInitialized(inputCharRead,inputInfo,inputError,outputToken,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
+		outputError("Failed to initialize the M shell!");
+		resetOutputColor();
+		exit(1);
+	}
+
+	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
+
+	// prepare an interactive session
+	if(!interactiveSessionInitialized()){
+		outputError("Failed to initialize the interactive session.");
+		resetOutputColor();
+		exit(2);
+	}
+
 	prepareForUserInput(); // AFTER using the command-line parameters (will effectuate wrap mode and color scheme)
 
 	resetOutputColor(); // just in case
@@ -2833,21 +2943,6 @@ int main(int argc, char **argv){
 	
 	// tell user whether allocation recording is active!!!
 	outputInfo(allocationRecordingInitialized()?"Allocation recording ready!":"No allocation recording!");
-
-	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
-	_Menvironment=getShellEnvironment();
-	if(!_Menvironment){ // ascertain to have an shell environment!!!
-		outputError("Exiting: due to failing to initialize the M environment!");
-		resetOutputColor();
-		exit(1);
-	}
-
-	// initialize the shell environment for use in an interactive session
-	if(!prepareForInteractiveSession()){
-		outputError("Exiting: due to failing to prepare for running an interactive session.");
-		resetOutputColor();
-		exit(2);
-	}
 
 	// MDH@11NOV2019: at this point getNumberOfValues() still represents the actual number of remembered values (before values are removed from it)
 	if(amVerbose())output("M shell initialized with %llu predefined values.\n",getNumberOfValues());

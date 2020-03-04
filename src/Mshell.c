@@ -15,7 +15,8 @@ const char* const WHILEFUNCTION_NAME="while";
 const char* const FORFUNCTION_NAME="for";
 const char* const DOFUNCTION_NAME="do"; // MDH@05AUG2019: the do function allowing the creation of variables local to the do execution
 const char* const EVALFUNCTION_NAME="eval"; // MDH@28OCT2019: evaluating a text is nice
-const char* const DEFINEUSERFUNCTION_NAME="function";
+const char* const DEFINEUSERFUNCTION_NAME="defun"; // MDH@04MAR2020: the 'classic' approach is by defining a function with a fixed name which cannot be passed along
+const char* const DEFINEANONYMOUSFUNCTION_NAME="function"; // MDH@04MAR2020: an anonymous function that is to be assigned to a variable/argument
 const char* const MUTABLEVALUETYPECHARS="uoibdqftlmr"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters associated with each of the value types
 const char* const INFO_PREFIX=""; // MDH@27FEB2020: as for now NO actual info prefix text to use
@@ -248,23 +249,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 	return _functionExecutionEnvironment;
 }
 
-// the list of token type ids in the corresponding order!!!
-const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
-	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
-	////////output("(%d)",tokentype_id);
-	switch(tokentype_id>>6){
-		case 0: // value token
-			return getValueTokenColor(tokentype_id);
-		case 1: // operator: unary, binary, ternary, assignment the operator category will be: (tokentype_id&0x30)>>4
-			return getOperatorTokenColor((tokentype_id&0x30)>>4);
-		case 2: // comment or end of comment
-			return getCommentColor();
-		case 3: // error token
-			/////////outputChar('E');
-			return getErrorColor();
-	}
-	return "";
-}
+/* moved back to M.c
 void outputTokenTypeColor(TokenType tokenType){
 	setBackColor(getBackgroundColor());
 	setColor(getTokenColor(tokenType));
@@ -274,7 +259,17 @@ void outputTokenColor(Mtoken* _token){
 	///////printf("[%d]",_userInputCommand->_lastToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
 }
-void outputCommandInfo(Mcommand* command){
+*/
+// MDH@04MAR2020: delegating displaying the output command to a callback that can be changed
+/*
+void setOutputCommandInfoFunction(OutputCommandInfoFunction* _outputCommandInfoFunction){
+	outputCommandInfoFunction=_outputCommandInfoFunction;
+}
+*/
+static InputCharReadFunction* inputCharReadFunction=NULL;
+
+// MDH@04MAR2020: the default version outputs the command the same way as within a session except without the colors
+static void outputCommandInfo(Mcommand* command){
 	if(!command||!command->_lastToken)return;
 	// MDH@12AUG2019: identifiers first
 	Mtoken* identifierToken=command->_lastToken->prevIdentifier;
@@ -283,9 +278,7 @@ void outputCommandInfo(Mcommand* command){
 		while(1){
 			//if(identifierToken==TT_VARIABLE||identifierToken==TT_NEW_VARIABLE){
 				// all identier tokens with argument equal to 1 should be considered new, if not it is a bug
-				if(identifierToken->argument==1&&identifierToken->type!=TT_NEW_VARIABLE)setColor(getErrorColor());else outputTokenColor(identifierToken);
 				output(" %s",string(identifierToken->text));
-				resetOutputColor();
 				output("(%u)",identifierToken->offset);
 			//}
 			identifierToken=identifierToken->prevIdentifier;
@@ -306,17 +299,10 @@ void outputCommandInfo(Mcommand* command){
 			output("\t%s\n","Not part of another expression!");
 		if(token->prevIdentifier)
 			output("%s\t%u\t%s\t%s\t%-24s\n"," points to",token->prevIdentifier->offset,"","",TOKENTYPE_STRING[token->prevIdentifier->type]);
-		/* removing:
-		if(token->type==TT_VARIABLE||token->type==TT_NEW_VARIABLE){
-			Mtoken* specialFunctionCallToken=getSpecialFunctionCallToken(token);
-			if(specialFunctionCallToken){
-				output("%s\t%u\n"," local to",specialFunctionCallToken->offset);
-			}
-		}
-		*/
 		token=token->next;
 	}
 }
+static OutputCommandInfoFunction* outputCommandInfoFunction=outputCommandInfo;
 
 /**
  * freeToken() frees the memory @_userInputCommand->_lastToken points to and returns true on successfully removing the entire chain of tokens it points to
@@ -429,7 +415,7 @@ bool isAValidCommand(Mcommand* command,bool report){
 }
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
 Mvalue* getCommandValue(Mcommand* command,char commandType){
-	if(amVerbose())outputCommandInfo(command);
+	if(amVerbose())if(outputCommandInfoFunction)outputCommandInfoFunction(command); // MDH@04MAR2020: using the given output command info function
 	if(!isAValidCommand(command,amVerbose()))return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerbose())outputInfo("Evaluating...");
@@ -667,7 +653,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								}
 								/*
 									char inputChar;
-									if(!inputCharRead(&inputChar))break;
+									if(!inputCharReadFunction(&inputChar))break;
 								*/
 							}
 						}
@@ -696,25 +682,23 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 	return _result;
 }
 
-// the input info and error function default to shellInputInfo and shellInputError that write the text to the console  (and are replaced in M.c by functions that output above the user input lines)
+// the input info and error function default to shellInputInfo and shellInputError that write the text to the console  (and are replaced in M.c by functions that output above the user input lines and use colors)
 static void inputInfo(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
-		resetOutputColor(); // get the default output color!!
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
 		newline();
 	}
 }
 static void inputError(const char* const fmt,...){
 	if(fmt&&strlen(fmt)){ // we have a format
-		setColor(getErrorColor());setBackColor(getBackgroundColor());
 		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
 		newline();
 	}
 }
-InputResponseFunction* inputInfoFunction=inputInfo;
-InputResponseFunction* inputErrorFunction=inputError;
-void setInputInfoFunction(InputResponseFunction* _inputResponseFunction){inputInfoFunction=_inputResponseFunction;}
-void setInputErrorFunction(InputResponseFunction* _inputResponseFunction){inputErrorFunction=_inputResponseFunction;}
+static InputResponseFunction* inputInfoFunction=inputInfo;
+static InputResponseFunction* inputErrorFunction=inputError;
+// void setInputInfoFunction(InputResponseFunction* _inputResponseFunction){inputInfoFunction=_inputResponseFunction;}
+// void setInputErrorFunction(InputResponseFunction* _inputResponseFunction){inputErrorFunction=_inputResponseFunction;}
 
 // and the most special one
 // requiring some other stuff for being able to interpret the text and create tokens!!!
@@ -804,12 +788,11 @@ bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierE
 }
 
 static UpdateLastTokenAutocompletionTextFunction* updateLastTokenAutocompletionTextFunction=NULL;
-void setUpdateLastTokenAutocompletionTextFunction(UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction){updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;}
+// void setUpdateLastTokenAutocompletionTextFunction(UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction){updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;}
 
 static ReoutputTokenFunction* reoutputTokenFunction=NULL;
-void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){
-	reoutputTokenFunction=_reoutputTokenFunction;
-}
+// void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){reoutputTokenFunction=_reoutputTokenFunction;}
+
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	char* _identifierName=_stringstart(command->_lastToken->text,command->_lastToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
@@ -2635,6 +2618,125 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 	return NULL;
 }
 
+// MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
+// requests can come out of a single command containing multiple function definitions
+// _firstFunctionBodyRequest represents the first one to execute
+FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){
+	FunctionBodyRequest* _functionBodyRequest=NULL;
+	if(functionName){
+		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'9');
+		if(_functionBodyRequest){
+			_functionBodyRequest->_functionName=_strdup(functionName);
+			if(!_functionBodyRequest->_functionName){
+				free(_functionBodyRequest);_functionBodyRequest=NULL;
+			}
+		}
+	}
+	return _functionBodyRequest;
+}
+void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest){
+	if(!_functionBodyRequest)return;
+	free(_functionBodyRequest->_functionName);
+	free(_functionBodyRequest);
+}
+// active 'list' of function body requests
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
+static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
+	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
+	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName))functionBodyRequest=functionBodyRequest->_next;
+	return functionBodyRequest;
+}
+FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
+// MDH@02MAR2020 NOTE: there's no need to return the new function body request instance as it is not used
+static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
+	if(!functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
+	// ASSERT a 'valid' function name
+	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",ERROR_PREFIX,functionName);return NULL;} // already have it
+	// technically it should not have been requested already (or exist)
+	FunctionBodyRequest* _functionBodyRequest=new_functionbodyrequest(functionName); // guarantees that functionName is defined
+	if(_functionBodyRequest){		
+		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
+		_lastFunctionBodyRequest=_functionBodyRequest;
+		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
+		if(amVerbose())output("The request for the body of function '%s' was created.\n",functionName);
+	}else
+		output("%sFailed to create the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
+	return _functionBodyRequest;
+}
+
+static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
+FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
+// MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
+bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){
+	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
+	///////////if(!_firstFunctionBodyRequest)return false;
+	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
+	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
+	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
+	if(function&&function->type==FT_USER){
+		// it's better to put the next request in, so after finishing with this request we can do the following if any
+		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
+		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
+		if(!_functionBodyInputStack){_functionBodyInputStack=_currentFunctionBodyInput;if(amVerbose())output("%s\n.","Function body input stack created.");}
+		if(amVerbose()){output("Parameter map of new function '%s'",_functionBodyRequest->_functionName);outputMap(": ",function->_parameterMap,".\n");}
+		// if we succeed in activating the execution environment of the new function we're good to go
+		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
+		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
+		// MDH@03MAR2020 TODO can we pass function->_parameterMap like this or should we pass _getFunctionArgumentMap(function,NULL)????????
+		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName,function->_parameterMap);
+		if(_functionExecutionEnvironment){
+			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
+			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
+			outputError("Failed to register the function execution environment.");
+			free_environment(_functionExecutionEnvironment);
+		}else
+			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
+	}else
+		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_functionBodyRequest->_functionName);
+	FREE(_currentFunctionBodyInput,'H');
+	return false;
+}
+bool startFunctionBodyInput(){
+	// ASSERT only call with _firstFunctionBodyRequest not NULL
+	// move out of the queue into the stack
+	// push on top of the functionBodyInputStack
+	/////////if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
+	bool result=true;
+	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next; // remember the function body request to do next
+	// MDH@02MAR2020 ADJUSTMENT: because _functionName is now a heap copy of the original function name (from the function argument list to 'function') we need to free it BEFORE returning the result
+	//                           now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
+	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
+	if(!functionBodyInputCreated)output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->_functionName);
+	free_functionbodyrequest(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request (if we succeed to request the function body input or not)
+	if(!functionBodyInputCreated){ // i.e. failed to start requesting for the body of the given function, so we should continue with the next one
+		// failed, so do the next one
+		 // TODO why is this here???????
+		// if we haven't got a next function body request, or we failed to start one, the result will be false
+		_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
+		if(!_firstFunctionBodyRequest||!startFunctionBodyInput())result=false;
+	}
+	// MDH@02MAR2020: forgot to do the following so here we go
+	return result;
+}
+/*
+ \brief will only fail when we fail to start the next one
+ */
+bool endFunctionBodyInput(){
+	// ASSERT do NOT call with _currentFunctionBodyInput equal to NULL
+	// pop the function body request execution environment we just ended
+	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
+	_currentFunctionBodyInput->_function->_functionMap=getExecutionEnvironment()->_functionMap;
+	if(amVerbose())outputExecutionEnvironmentName("End of the body of '","'.\n");
+	popExecutionEnvironment();
+	// the new first function body request is the successor of the previous one
+	// TODO shouldn't we free it?
+	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request; // the next function body request as stored in the _request field
+	free(_currentFunctionBodyInput);_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
+	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
+	return startFunctionBodyInput(); // will NULL _firstFunctionBodyInput to ascertain not to get called in the main user input loop
+}
+// MDH@19JUL2019 END
+
 /**
  * MDH@Jacky=65yrs:
  * getValueOfExpression() returns the value of the tokens behind _offsetToken together with the token that ends the expression in an Mexpressionvalue*
@@ -2887,12 +2989,25 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 					outputError("No index/attribute name specified");
 			}else
 				output("%sReferenced variable '%s' cannot be indexed: it's value is not a list or a map.\n",ERROR_PREFIX,_valuereference->_name);
-		}else
-		if(setValue(getExecutionEnvironment(),_valuereference->_name,_newValue)){
-			// NOTE even if the value itself is NULL, its address is never NULL
-			_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
-			result=true;
-			if(amVerbose())outputInfo("Value set!");
+		}else{
+			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
+			//                the same way as happens when you use the defun internal function
+			if(setValue(getExecutionEnvironment(),_valuereference->_name,_newValue)){
+				// NOTE even if the value itself is NULL, its address is never NULL
+				_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
+				result=true;
+				// MDH@04MAR2020: as soon as result is set, we can determine if a function without a body is assigned!!
+				if(_newValue&&_newValue->type==VT_FUNCTION){
+					Mfunction* function=_newValue->value._function;
+					if(function->type==FT_USER){
+						Muserfunction* userfunction=function->functionunion._userfunction;
+						if(userfunction&&!userfunction->_bodyCommandList){
+							registerFunctionBodyRequest(_valuereference->_name);
+						}
+					}
+				}
+				if(amVerbose())outputInfo("Value set!");
+			}
 		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
 	}
@@ -2934,147 +3049,30 @@ bool isOneCharacterTokenType(uint8_t tokenType){
 	return(tokenType==TT_ASSIGNMENT||tokenType==TT_UNARY||tokenType==TT_TERNARY_aeru||tokenType==TT_LIST||tokenType==TT_LISTELEMENT||tokenType==TT_END_OF_LIST||tokenType==TT_MAP||tokenType==TT_END_OF_MAP||tokenType==TT_FUNCTION_CALL||tokenType==TT_END_OF_FUNCTION_CALL||tokenType==TT_END_OF_DQSTRING||tokenType==TT_END_OF_SQSTRING);
 }
 
-size_t outputToken(Mtoken* _token){
+static size_t outputToken(Mtoken* _token){
 	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
 	if(numberOfCharactersToOutput>0){
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
 		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
 		char firstWhitespaceCharacter=(_token->significantCharacterCount>0?string_replacedchar(_token->text,'\0',_token->significantCharacterCount):'\0');
 		// if we allow comments in tokens we're in trouble!!!
-		outputTokenColor(_token);output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
+		output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
 		// if there's whitespace text to start with write it in the default output color
 		if(firstWhitespaceCharacter){ // some whitespace left to write
 			string_setchar(_token->text,firstWhitespaceCharacter,_token->significantCharacterCount);
-			resetOutputColor();
 			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
 		}
 	}
 	return numberOfCharactersToOutput;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
+static OutputTokenFunction* outputTokenFunction=outputToken;
+
 void outputLastTokenChar(Mtoken* _token){
 	///////outputTokenColor(_userInputCommand->_lastToken);
 	outputChar(string_last_char(_token->text));
 	//////////resetOutputColor();
 }
-
-// MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
-// requests can come out of a single command containing multiple function definitions
-// _firstFunctionBodyRequest represents the first one to execute
-FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){
-	FunctionBodyRequest* _functionBodyRequest=NULL;
-	if(functionName){
-		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'9');
-		if(_functionBodyRequest){
-			_functionBodyRequest->_functionName=_strdup(functionName);
-			if(!_functionBodyRequest->_functionName){
-				free(_functionBodyRequest);_functionBodyRequest=NULL;
-			}
-		}
-	}
-	return _functionBodyRequest;
-}
-void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest){
-	if(!_functionBodyRequest)return;
-	free(_functionBodyRequest->_functionName);
-	free(_functionBodyRequest);
-}
-// active 'list' of function body requests
-static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
-static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
-	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
-	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName))functionBodyRequest=functionBodyRequest->_next;
-	return functionBodyRequest;
-}
-FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
-// MDH@02MAR2020 NOTE: there's no need to return the new function body request instance as it is not used
-static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
-	if(!functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
-	// ASSERT a 'valid' function name
-	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",ERROR_PREFIX,functionName);return NULL;} // already have it
-	// technically it should not have been requested already (or exist)
-	FunctionBodyRequest* _functionBodyRequest=new_functionbodyrequest(functionName); // guarantees that functionName is defined
-	if(_functionBodyRequest){		
-		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
-		_lastFunctionBodyRequest=_functionBodyRequest;
-		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
-		if(amVerbose())output("The request for the body of function '%s' was created.\n",functionName);
-	}else
-		output("%sFailed to create the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
-	return _functionBodyRequest;
-}
-
-static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
-FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
-// MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
-bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){
-	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
-	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
-	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
-	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
-	if(function&&function->type==FT_USER){
-		// it's better to put the next request in, so after finishing with this request we can do the following if any
-		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
-		_currentFunctionBodyInput->_function=function->functionunion._userfunction;
-		if(!_functionBodyInputStack){_functionBodyInputStack=_currentFunctionBodyInput;if(amVerbose())output("%s\n.","Function body input stack created.");}
-		if(amVerbose()){output("Parameter map of new function '%s'",_functionBodyRequest->_functionName);outputMap(": ",function->_parameterMap,".\n");}
-		// if we succeed in activating the execution environment of the new function we're good to go
-		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
-		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
-		// MDH@03MAR2020 TODO can we pass function->_parameterMap like this or should we pass _getFunctionArgumentMap(function,NULL)????????
-		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName,function->_parameterMap);
-		if(_functionExecutionEnvironment){
-			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
-			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
-			outputError("Failed to register the function execution environment.");
-			free_environment(_functionExecutionEnvironment);
-		}else
-			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
-	}else
-		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_functionBodyRequest->_functionName);
-	FREE(_currentFunctionBodyInput,'H');
-	return false;
-}
-bool startFunctionBodyInput(){
-	// ASSERT only call with _firstFunctionBodyRequest not NULL
-	// move out of the queue into the stack
-	// push on top of the functionBodyInputStack
-	/////////if(!_firstFunctionBodyRequest)return true; // NO function body request to 'execute'
-	bool result=true;
-	FunctionBodyRequest* nextFunctionBodyRequest=_firstFunctionBodyRequest->_next; // remember the function body request to do next
-	// MDH@02MAR2020 ADJUSTMENT: because _functionName is now a heap copy of the original function name (from the function argument list to 'function') we need to free it BEFORE returning the result
-	//                           now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
-	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
-	if(!functionBodyInputCreated)output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->_functionName);
-	free_functionbodyrequest(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request (if we succeed to request the function body input or not)
-	if(!functionBodyInputCreated){ // i.e. failed to start requesting for the body of the given function, so we should continue with the next one
-		// failed, so do the next one
-		 // TODO why is this here???????
-		// if we haven't got a next function body request, or we failed to start one, the result will be false
-		_firstFunctionBodyRequest=nextFunctionBodyRequest; // simply skip this request!!
-		if(!_firstFunctionBodyRequest||!startFunctionBodyInput())result=false;
-	}
-	// MDH@02MAR2020: forgot to do the following so here we go
-	return result;
-}
-/*
- \brief will only fail when we fail to start the next one
- */
-bool endFunctionBodyInput(){
-	// ASSERT do NOT call with _currentFunctionBodyInput equal to NULL
-	// pop the function body request execution environment we just ended
-	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
-	_currentFunctionBodyInput->_function->_functionMap=getExecutionEnvironment()->_functionMap;
-	popExecutionEnvironment();
-	// the new first function body request is the successor of the previous one
-	// TODO shouldn't we free it?
-	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request; // the next function body request as stored in the _request field
-	free(_currentFunctionBodyInput);_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
-	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
-	return startFunctionBodyInput(); // will NULL _firstFunctionBodyInput to ascertain not to get called in the main user input loop
-}
-// MDH@19JUL2019 END
 
 /**
  * getValueReference() retrieves a single value reference that either ends when a binary operator token is encountered or one of the end token types
@@ -3157,7 +3155,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
 							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
-							if(amVerbose()){char c;output("Press any key to continue...");inputCharRead(&c);}
+							if(amVerbose())if(inputCharReadFunction){char c;output("Press any key to continue...");inputCharReadFunction(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
@@ -3192,6 +3190,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							char* definedFunctionName=(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)?NULL:_functionCallArgumentMap->_first->_variable->_value->value._text->_c);
 							if(definedFunctionName)if(amVerbose()){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
 							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
+							if(amVerbose()){output("Result of calling '%s'",_significantTokenText);outputValue(": '",functionCallValue,"'.\n");}
 							// if this was a call to the 'define user function' function
 							if(definedFunctionName){ // MDH@02MAR2020: replacing: !strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
 								// is the result 1???
@@ -3437,7 +3436,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			while(expressionToken&&expressionToken->next&&expressionToken->next->type==TT_LIST){
 				expressionToken=nextEnvironmentExpressionToken();
 				if(amVerbose()&&amDebugging())
-				{output("Augmented item id(s) token: ");outputToken(expressionToken);outputChar('\n');}
+				{output("Augmented item id(s) token: ");outputTokenFunction(expressionToken);outputChar('\n');}
 				Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
 				if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
 					// we should append the indices to the index_id
@@ -3462,7 +3461,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose()&&amDebugging())
-				{output("End of augmented item id(s) token: ");outputToken(expressionToken);outputChar('\n');}
+				{output("End of augmented item id(s) token: ");outputTokenFunction(expressionToken);outputChar('\n');}
 			}
 		}
 
@@ -4368,10 +4367,10 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										}
 										output(".\n");
 										if(decimalprecisionreached)break; // decimal precision reached
-
-										output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");inputCharRead(&c);outputChar('\n'); // wait for any key
-										if(c==3)break;
-
+										if(inputCharReadFunction){
+											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");inputCharReadFunction(&c);outputChar('\n'); // wait for any key
+											if(c==3)break;
+										}
 										if(mp_copy(_nextpk,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
 										if(mp_copy(_nextqk,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
 
@@ -4496,8 +4495,10 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 														output("Root approximation at iteration #%" PRIu32 ":",iter);
 														outputDecimal(" ",_bigintegerRootDecimal,".");
 														////////outputDecimal(" Distance: ",_distance,".");
-														output(" %s...","Press any key to continue");
-														inputCharRead(&c);
+														if(inputCharReadFunction){
+															output(" %s...","Press any key to continue");
+															inputCharReadFunction(&c);
+														}
 														outputChar('\n');
 													}
 													mpd_qdiv(_quotient->mpd,_rootArgumentDecimal->mpd,_quotientdenominator->mpd,mpd_context,&status);
@@ -5680,11 +5681,11 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 				if(integerrangeValue){
 					if(amVerbose()){
 						Mvalue* lastIntegerrangeValue=(up?Mfloor(_value2):Mceil(_value2));
-						if(amVerbose()&&amDebugging())
-						{
-						outputValue("Determining the integers in [",integerrangeValue,",");
-						outputValue(NULL,lastIntegerrangeValue,"].\n");
-						char c;output("%s...","Press Ctrl-C to stop or any other key to continue");inputCharRead(&c);if(c==3)return NULL;
+						if(amDebugging()){
+							outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
+							if(inputCharReadFunction){
+								char c;output("%s...","Press Ctrl-C to stop or any other key to continue");inputCharReadFunction(&c);if(c==3)return NULL;
+							}
 						}
 					}
 					Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
@@ -6152,7 +6153,17 @@ Mexpressionvalue* getFunctionValue(Mtoken* _offsetToken,char* functionName){
 */
 
 // and finally
-Menvironment* getShellEnvironment(){
+// MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
+bool shellInitialized(InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){
+
+	// register the callbacks
+	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;
+	if(_inputInfoFunction)inputInfoFunction=_inputInfoFunction;
+	if(_inputErrorFunction)inputErrorFunction=_inputErrorFunction;
+	if(_outputTokenFunction)outputTokenFunction=_outputTokenFunction;
+	if(_reoutputTokenFunction)reoutputTokenFunction=_reoutputTokenFunction;
+	if(_updateLastTokenAutocompletionTextFunction)updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
+	if(_outputCommandInfoFunction)outputCommandInfoFunction=_outputCommandInfoFunction;
 
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return NULL; // let's force starting with a default decimal context

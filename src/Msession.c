@@ -45,8 +45,8 @@ void enableRawmode(){
 }
 
 ///////char inputChar='\0'; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
-// currently inputCharRead() blocks until a character can be read (and put in inputChar)
-bool inputCharRead(char* inputChar){enableRawmode();return(read(STDIN_FILENO,inputChar,1)==1);}
+// currently inputCharRead() blocks until a character can be read (and put in _c)
+bool inputCharRead(char* _c){enableRawmode();return(read(STDIN_FILENO,_c,1)==1);}
 
 int getch(){
 	// ASSERT assume in one-character-at-a-time-mode!!!

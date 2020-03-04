@@ -56,10 +56,10 @@ cp ../lib/* .
 chmod 644 *
 # MDH@28FEB2020: we can do this in pieces creating the static library on the go
 # MDH@03MAR2020: compile with the -g flag so we can debug it
-cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Moutput.c Mmessage.c Malloc.c Mstring.c Msettings.c Mcolors.c Msession.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mlist.c Mfunctions.c Menvironment.c Mshell.c
+cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Moutput.c Mmessage.c Malloc.c Mstring.c Msettings.c Mcolors.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mlist.c Mfunctions.c Menvironment.c Mshell.c 
 ar cvq libM.a *.o
 # then link the lot together to create the interactive M program!!
-cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM -g M.c -o M 
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM -g Msession.c M.c -o M 
 
 # check whether it is there!!!
 if [ -f M ]; then

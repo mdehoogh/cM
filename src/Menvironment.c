@@ -15,6 +15,7 @@ extern const char * const M_HIDDEN_VARIABLE_NAMES[]; // MDH@14NOV2019: the name 
 extern const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES;
 // TODO make the following variables start with M_
 extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
+extern const char* const DEFINEANONYMOUSFUNCTION_NAME; // the name of the define user function function
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* const ERROR_PREFIX;
@@ -27,23 +28,26 @@ extern const char * const VALUETYPENAMES[];
 static Mvalue* _executionEnvironmentValue=NULL;
 Menvironment* getExecutionEnvironment(){return getValueEnvironment(_executionEnvironmentValue);} // convenience method for obtaining the current execution environment from its wrapper
 Mstring* _getExecutionEnvironmentName(){return _getEnvironmentName(getExecutionEnvironment());}
-void outputEnvironmentName(){
+void outputExecutionEnvironmentName(char* prefix,char* suffix){
+    if(prefix)output("%s",prefix);
     Mstring* _environmentName=_getExecutionEnvironmentName();
-    if(amVerbose())output("Current execution environment: '%s'.\n",string(_environmentName));
+    output("%s",string(_environmentName));
+    if(suffix)output("%s",suffix);
     free_string(_environmentName);
 }
 bool pushExecutionEnvironment(Menvironment* _environment){
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
     Mvalue* _environmentValue=(_environment?_getValueOfEnvironment(_environment,false):NULL);
     if(!_environmentValue)return false;
-    if(!_environment->_parent)assignValue(&_environment->_parent,_environmentValue); // if without a parent give it the current one
-    // first the current execution environment value
-    assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
+    // MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
+    if(!_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one
     // keep a reference to the current execution environment (value) that we may return to if the execution environment is popped off
     assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
-    if(amVerbose())outputEnvironmentName();
+    // replace the current execution environment with the new one
+    assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
+    if(amVerbose())outputExecutionEnvironmentName("New execution environment '","'.\n");
     return true;
-}/* VALIDATED */
+}/* NOT VALIDATED */
 void popExecutionEnvironment(){
     Menvironment* _executionEnvironment=getExecutionEnvironment();
     if(!_executionEnvironment){outputBug("No environment left to pop!");return;} // nothing to pop
@@ -51,11 +55,11 @@ void popExecutionEnvironment(){
     // MDH@03FEB2020: freeing the current execution environment value will NULL the execution field (i.e. releasing the reference to the environment it points to), so by remembering it here, we can use it AFTER the free_value call
     Mvalue* _nextExecutionEnvironmentValue=_executionEnvironment->execution; 
     if(!_nextExecutionEnvironmentValue){outputBug("Can't pop the top-most environment!");return;}
-    free_value(_executionEnvironmentValue); // MDH@03FEB2020 replacing: free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
+    // OOPS the following is wrong because only the garbage collector is allowed to free values: free_value(_executionEnvironmentValue); // MDH@03FEB2020 replacing: free_environment(_executionEnvironment); // TODO I guess we won't be needing this execution environment any more????
     // MDH@03FEB2020 by assigning to _executionEnvironmentValue the reference count to the environment is incremented again so it will not be 'garbage collected'!!!!
     assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
-    if(amVerbose())outputEnvironmentName();
-}/* VALIDATED */
+    if(amVerbose())outputExecutionEnvironmentName("Returned to execution environment '","'.\n");
+}/* NOT VALIDATED */
 Mvalue* getEnvironment(){return _executionEnvironmentValue;}/* VALIDATED */
 
 Mtoken* getEnvironmentExpressionToken(){
@@ -402,7 +406,9 @@ Mvariable* getVariable(Menvironment const * const _environment,char const * cons
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,verbose):NULL);
 }/* VALIDATED */
-bool containsVariable(Menvironment const * const _environment,char const * const name){return(getVariable(_environment,name,false)!=NULL);}/* VALIDATED */
+bool containsVariable(Menvironment const * const _environment,char const * const name){
+    return(getVariable(_environment,name,false)!=NULL);
+}/* VALIDATED */
 
 char* getConstantWithValue(Menvironment const * const _environment,char * name,Mvalue* value){
     if(!value)return NULL; // forget about NULL
@@ -808,6 +814,7 @@ Mstring* _getFunctionNames(Menvironment const * const _environment,const char* c
     return _functionNames;
 }/* VALIDATED */
 
+// MDH@04MAR2020: getFunction() is used to determine if some identifier name represents a function, which can now also be a variable which value is a(n anonymous) function
 Mfunction* getFunction(Menvironment const * const _environment,const char* const functionName){
     if(_environment&&functionName&&strlen(functionName)){
         Mfunctionmap* functionmap=_environment->_functionMap;
@@ -821,6 +828,18 @@ Mfunction* getFunction(Menvironment const * const _environment,const char* const
                     return functionmapelement->_function;
                 }
                 functionmapelement=functionmapelement->_next;
+            }
+        }
+        // MDH@04MAR2020: could now also be an anonymous function stored as variable value
+        Mmap* variableMap=_environment->_variableMap;
+        if(variableMap){
+            Mmapelement* variablemapelement=variableMap->_first;
+            Mvariable* variable;
+            while(variablemapelement){
+                variable=variablemapelement->_variable;
+                if(variable&&!strcmp(variable->_name,functionName)&&variable->_value&&variable->_value->type==VT_FUNCTION)
+                    return variable->_value->value._function;
+                variablemapelement=variablemapelement->_next;
             }
         }
         // might exist in the parent environment
@@ -1287,7 +1306,20 @@ bool completedStringMapTokenFunction(Mfunction* const _function,const char* cons
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register string map list argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register string map token argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedMapTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=_getMapTokenMap("parameters","body");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register map token argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1429,6 +1461,38 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){
     return false;
 }
 
+// MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
+//                so these are actually anonymous functions
+Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
+    Mvalue* _functionValue=NULL;
+    if((!_parameterMapValue||_parameterMapValue->type==VT_MAP)&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
+        Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'-');
+        if(_userfunction){
+            if(amVerbose())if(_parameterMapValue)outputValue("Defining an anonymous function with parameters ",_parameterMapValue,".\n");
+            // user function expects a list of commands, so we have to wrap the single token (if any)
+            if(_bodyTokenValue){
+                _userfunction->_bodyCommandList=_getListOfType(VT_TOKEN);
+                if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,_bodyTokenValue,M_LL_INVALID))
+                    outputError("Failed to store the inline command as body of an anonymous function.");
+                // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
+            }
+            Mfunction* _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'=');
+            if(_function){
+                // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
+                //                so we have to make a copy of the parameter map
+                if(_parameterMapValue)_function->_parameterMap=_getMapCopy(_parameterMapValue->value._map); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+                _function->functionunion._userfunction=_userfunction;
+                // return the result of applying the function to the default parameter map
+                _functionValue=_getValueOfFunction(_function,true);
+            }else
+                outputError("Failed to create an anonymous function.");
+        }
+    }else
+        outputError("Invalid anonymous function parameter map or body.");
+    if(!_functionValue)outputError("Failed to create an anonymous function.");
+    return _functionValue;
+}
+// might make the following obsolete (defun)
 Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
     // the user specifies the body as a text (to prevent evaluation during defining the function)
     // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
@@ -1516,7 +1580,9 @@ bool registerInternalFunctions(Menvironment* const _environment){
     if(!completedValueTextValueFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
     if(!completedFloatFloatFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
 
-    if(!completedStringMapTokenFunction(_getFunction(_environment,"function"),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
+    if(!completedStringMapTokenFunction(_getFunction(_environment,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
+    if(!completedMapTokenFunction(_getFunction(_environment,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
+
     if(!completedValueFunction(_getFunction(_environment,"return"),"return",Mreturn))return false;
 
     if(!completedValueFunction(_getFunction(_environment,"out"),"out",Mout))return false;

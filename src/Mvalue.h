@@ -190,6 +190,7 @@ long long getValueInteger(const Mvalue* const _value);
 void outputValue(const char* const prefix,const Mvalue* value,const char* const suffix);
 
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3);
+Mmap* _getMapTokenMap(char* name1,char* name2);
 Mmap* _getTokenTokenMap(char* name1,char* name2);
 Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);

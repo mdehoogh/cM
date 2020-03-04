@@ -4,11 +4,10 @@
  */
 
 // terminal input stuff
-#include <termios.h>
 #include <stdbool.h>
 #include <inttypes.h>
 
-#include "Mcolors.h"
+#include "Mshell.h"
 
 // input functions
 void enableRawmode();

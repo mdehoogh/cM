@@ -12,6 +12,7 @@ bool pushExecutionEnvironment(Menvironment* _environment);
 void popExecutionEnvironment(); // should never go wrong (a bug is reported if there's no environment to pop though)
 Menvironment* getExecutionEnvironment(); // the current environment
 Mstring* _getExecutionEnvironmentName();
+void outputExecutionEnvironmentName(char* prefix,char* suffix);
 
 // MDH@17JUL2019: getting and updating the environment expression token
 Mtoken* getEnvironmentExpressionToken();
