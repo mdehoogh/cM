@@ -1587,8 +1587,6 @@ bool registerInternalFunctions(Menvironment* const _environment){
 
     if(!completedValueFunction(_getFunction(_environment,"out"),"out",Mout))return false;
 
-    if(!completedValueFunction(_getFunction(_environment,"bc"),"bc",Mbc))return false;
-    if(!completedValueFunction(_getFunction(_environment,"tc"),"tc",Mtc))return false;
     if(!completedThreeIntegersFunction(_getFunction(_environment,"brgb"),"brgb",Mbrgb))return false;
     if(!completedThreeIntegersFunction(_getFunction(_environment,"trgb"),"trgb",Mtrgb))return false;
     return true;

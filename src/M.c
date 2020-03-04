@@ -2842,6 +2842,17 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 		errorflags|=128;
 		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
 	}
+
+	// color functions
+	if(!completedValueFunction(_getFunction(_Menvironment,"bc"),"bc",Mbc)){
+		errorflags|=256;
+		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
+	}
+    if(!completedValueFunction(_getFunction(_Menvironment,"tc"),"tc",Mtc)){
+		errorflags|=512;
+		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
+	}
+
 	return errorflags;
 }
 

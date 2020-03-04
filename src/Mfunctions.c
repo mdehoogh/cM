@@ -575,37 +575,6 @@ Mvalue* Mout(Mvalue* _value){
     return _getIntegerValue(result);
 }
 
-// MDH@17OCT2019: instead of setting the back color we can return the text to be used in out to set the back color
-// set the backcolor
-Mvalue* Mbc(Mvalue* _value){
-    long long ll=(_value?getValueInteger(_value):-1); // all negative colors default to the back color
-    if(ll==M_LL_INVALID)return NULL;
-    char s[16];if(ll>=0)sprintf(s,"'\\033[48;5;%lldm",ll%256);else sprintf(s,"'\\033[48;5;%sm",getBackgroundColor());
-    ////////////output("ANSI background color code: '%s'.\n",s);
-    return _getTextValue(_strdup(s),true);
-    /* replacing:
-    Mstring* _valueText=_getValueText(_value,true);
-    size_t result=string_length(_valueText);
-    if(result>0)setBackColor(string(_valueText));
-    free_string(_valueText);
-    return _getIntegerValue(result);
-    */
-}
- // set text color
-Mvalue* Mtc(Mvalue* _value){
-    long long ll=(_value?getValueInteger(_value):-1);
-    if(ll==M_LL_INVALID)return NULL;
-    char s[16];if(ll>=0)sprintf(s,"'\\033[38;5;%lldm",ll%256);else sprintf(s,"'\\033[38;5;%sm",getInfoColor());
-    ////////output("ANSI foreground color code: '%s'.\n",s);
-    return _getTextValue(_strdup(s),true);
-    /*
-    Mstring* _valueText=_getValueText(_value,true);
-    size_t result=string_length(_valueText);
-    if(result>0)setColor(string(_valueText));
-    free_string(_valueText);
-    return _getIntegerValue(result);
-    */
-}
 // or by defining an rgb value
 Mvalue* Mbrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
     long long ll1=getValueInteger(_value1),ll2=getValueInteger(_value2),ll3=getValueInteger(_value3);

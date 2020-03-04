@@ -7,7 +7,8 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#include "Mshell.h"
+// MDH@04MAR2020: Mcolors.h is the first interactive session file
+#include "Mcolors.h"
 
 // input functions
 void enableRawmode();
@@ -41,3 +42,7 @@ void resetOutputColor();
 void outputLine(char* s); // for writing a single line of output text in the info color
 
 void initSession();
+
+// moved over from Mfunctions.h/c because only available in interactive sessions
+Mvalue* Mbc(Mvalue* _value);
+Mvalue* Mtc(Mvalue* _value);
