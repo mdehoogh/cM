@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "Mdecimal.h"
 

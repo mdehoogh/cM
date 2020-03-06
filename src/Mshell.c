@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "Mshell.h"
 
