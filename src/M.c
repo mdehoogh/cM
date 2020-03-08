@@ -28,6 +28,7 @@ extern const char* const MFUNCTION_NAME; // the text to represent values that ar
 extern const char* const DOFUNCTION_NAME;
 extern const char* const FORFUNCTION_NAME;
 extern const char* const DEFINEUSERFUNCTION_NAME;
+extern const char* const DEFINEANONYMOUSFUNCTION_NAME; // MDH@08FEB2020
 extern const char* const M_NULL_VALUE_TEXT; // the text to represent values that are undefined...
 extern const char* const M_NULL_VARIABLE_NAME;
 extern const char* const M_UNDEFINED_VALUE_TEXT; // the text to represent values that are undefined...
@@ -1146,9 +1147,9 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 				char* _functionName=_stringstart(prevToken->text,prevToken->significantCharacterCount); // free asap
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
 				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
-				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;else pNewToken->argument=-2;
+				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME)||!strcmp(_functionName,DEFINEANONYMOUSFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;else pNewToken->argument=-2;
 				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
-				if(pNewToken->argument){ // a special function call
+				if(pNewToken->argument>0){ // a special function call // MDH@09MAR2020: added >0 TODO is that correct?
 					uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
 					// the maximum value of incrementoctet (the environment depth) is 60/M_BITS_PER_ENV_LEVEL
 					if((incrementoctet*M_BITS_PER_ENV_LEVEL)<60&&(prevToken->envid)>>((incrementoctet+1)*M_BITS_PER_ENV_LEVEL)<(2<<M_BITS_PER_ENV_LEVEL)-1){ // checking the octet to increment as well because it should not be 15 (or we would get overflow!!)
@@ -1184,11 +1185,22 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 					// careful now, is this a comma that ends a function call argument??????
 					// let's inspect the expr field which should point to start parenthesis
 					// BUT we should only subtract from argument when this is a `do`, `for` or `function` call
+					// MDH@09MAR2020: `function` renamed to `defun` and `function` now represents anynomous function
+					//                which has to be assigned to a variable in order to be remembered (and used)
+					//                both with `function` and `defun` the user can define the body inside the definition itself
 					if(pNewToken->expr){
-						if(pNewToken->expr->type==TT_FUNCTION_CALL){
+						if(pNewToken->expr->type==TT_FUNCTION_CALL){ // a function call argument
+							// MDH@09MAR2020: with function calls that have a 'body' i.e. for, do, function and defun
+							//                I think we can use envid to determine whether this is the case
+							//                there's different behaviour for the different arguments
 							if(pNewToken->expr->argument>0){
 								pNewToken->argument=pNewToken->argument-1;
 								if(amDebugging())inputInfo("New function call argument!");
+								// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
+								//                what we would do on ) 
+								if(pNewToken->argument==0){
+
+								}
 							}else
 							if(amDebugging())
 								inputInfo("Non-local variable function call argument");
