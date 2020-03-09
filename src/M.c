@@ -1065,177 +1065,21 @@ void outputDebugInfo(){
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
 
-// MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
-//                this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
-Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
-	Mtoken* pNewToken=__token();
-	if(pNewToken){
-		/////if(amDebugging())inputInfo("E1");
-		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
-		if(prevToken){
-			// finish the previous token
-			prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
-			if(!prevToken->significantCharacterCount)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
-			// initialize the new token
-			pNewToken->prev=prevToken; // set the predecessor
-			/////if(amDebugging())inputInfo("E2");
-			// MDH@27MAY2019: let's by default copy prevToken-expr over
-
-			// MDH@18MAY2019: if a , starts an expression we won't be pointing to the opening parenthesis!!!
-			//                which would mean that on verification we'd have to jump back until we found a non-comma!!!
-			//                so we can fix this by NOT including TT_EXPRESSION prev tokens to point to!!!
-			//                BUT the first (dummy) expression token should be included though!!!
-			// TODO having to test an expression for starting with ( is a bit of a nuisance (so we won't accidently do that on the initial expression token and any comma token!!!)
-			// MDH@27MAY2019: set expr NOTE the first token behind the (start of) expression token, should keep pointing to NULL
-			// MDH@23JUL2019: we're going to change this a little bit because we want } ) ] to point to what the expr of prevToken points to
-			//                and NOT wait for the next token
-			//                typically a new token points to the same expr that the predecessor points to
-			//                but we want 
-			// take special care when the new token ends a list, map or function call
-			// MDH@29OCT2019: no need for \p first anymore (that we used previously) because testing for the first TT_EXPRESSION can also be done by looking at the text in the expression
-			//                TODO in time we should change the first token into a WHITESPACE token
-			if(prevToken->type==TT_LIST||prevToken->type==TT_FUNCTION_CALL||prevToken->type==TT_MAP||(prevToken->type==TT_EXPRESSION&&string_length(prevToken->text)>0&&string_char(prevToken->text,0)!=' '))
-				pNewToken->expr=prevToken;
-			else
-				pNewToken->expr=prevToken->expr; // DEFAULT: take over the expr of the previous token
-			
-			// MDH@09AUG2019: before we actually kill the expr in the end of function call we update the envid
-			// if ending a special function call, we should zero the last set octet, but determining whether that is the case is not as easy as it seems
-			// I suppose the argument of the expr field of the new token will tell us if it is a special function call (because the argument field would then be positive)
-			if(newTokenType==TT_END_OF_FUNCTION_CALL&&pNewToken->expr&&pNewToken->expr->type==TT_FUNCTION_CALL&&pNewToken->expr->argument>0){
-				//////////inputInfo("*** End of special function call! ***");
-				// we have to decrement the octet that should be incremented
-				// it would be nicer to make the octet we loose 0 in the process because in that case we do not need to do that when we nest again
-				// the number of bits per level determines value to increment ander with and shift (at this moment the maximum depth is at most 15 i.e. 4 bits are always used to keep track of the current level)
-				uint64_t ander=0,incrementoctet=0;while(incrementoctet!=(prevToken->envid&15)){ander=(ander<<M_BITS_PER_ENV_LEVEL)+((1<<M_BITS_PER_ENV_LEVEL)-1);incrementoctet++;}
-				pNewToken->envid=(((prevToken->envid>>4)<<4)+incrementoctet-1)&((ander<<4)+15); // shifting ander by 4 additional bits and adding 15 to maintain the level value (increment octet)
-			}else
-				pNewToken->envid=prevToken->envid; // MDH@09AUG2019: take over the environment id!!
-
-			// MDH@16OCT2019: if the previous token was an end of list/function call/map it was accepted and itself would be pointing to the start of the list/function call/map
-			//                therefore we do not need to set 
-			if(prevToken->type==TT_END_OF_LIST||prevToken->type==TT_END_OF_FUNCTION_CALL||prevToken->type==TT_END_OF_MAP){
-				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
-				//                TODO this is checked afterwards, so perhaps we should do that here?????
-				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
-			}
-			// we still have to recognize an error
-			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP)if(!pNewToken->expr)newTokenType=TT_ERROR;
-
-			/* replacing:
-			if(newTokenType==TT_END_OF_LIST||newTokenType==TT_END_OF_FUNCTION_CALL||newTokenType==TT_END_OF_MAP){
-				// MDH@23JUL2019: this new token is actually only allowed when there's a matching token, but if there isn't pNewToken->expr will most likely be NULL
-				//                TODO this is checked afterwards, so perhaps we should do that here?????
-				if(pNewToken->expr)pNewToken->expr=pNewToken->expr->expr;else newTokenType=TT_ERROR;
-			}
-			*/
-			/*
-			if(amVerbose()){
-				if(pNewToken->expr)inputInfo("Matching: %s",string(pNewToken->expr->text));else inputInfo("%s","-");
-			}
-			*/
-			///////if(amVerbose()){if(pNewToken->expr)inputInfo("Pointing to %s of type %s.",string(pNewToken->expr->text),TOKENTYPE_STRING[pNewToken->expr->type]);else inputInfo("Nothing to point to.");}
-			//////// ending with NULL means all is Ok!! if(!pNewToken->expr)pNewToken->expr=_userInputCommand->_firstToken; // TODO will this help???
-			pNewToken->offset=prevToken->offset+string_length(prevToken->text); // set the offset
-			// MDH@07AUG2019: a token 'inherits' the prevIdentifier and argument of its previous token, to be adapted if necessary depending on what it is
-			//                of course if prevToken is an identifier itself, the new token should point to that token and not to the identifier prevToken is pointing to
-			//                how about function identifiers? they are special in that they change the argument value
-			/////if(amDebugging())inputInfo("E3");
-			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?) TODO shouldn't we test whether the new token type is TT_FUNCTION_CALL instead??????
-				pNewToken->prevIdentifier=prevToken;
-				// what should now be the argument value? this depends on the name of the function
-				char* _functionName=_stringstart(prevToken->text,prevToken->significantCharacterCount); // free asap
-				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
-				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
-				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME)||!strcmp(_functionName,DEFINEANONYMOUSFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;else pNewToken->argument=-2;
-				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
-				if(pNewToken->argument>0){ // a special function call // MDH@09MAR2020: added >0 TODO is that correct?
-					uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
-					// the maximum value of incrementoctet (the environment depth) is 60/M_BITS_PER_ENV_LEVEL
-					if((incrementoctet*M_BITS_PER_ENV_LEVEL)<60&&(prevToken->envid)>>((incrementoctet+1)*M_BITS_PER_ENV_LEVEL)<(2<<M_BITS_PER_ENV_LEVEL)-1){ // checking the octet to increment as well because it should not be 15 (or we would get overflow!!)
-						while(incrementoctet>0){addendum<<=M_BITS_PER_ENV_LEVEL;incrementoctet--;}
-						// we have to increment the addendum by 1 because we also need to increment the octet that should be incremented when a nested special function call is encountered!!
-						pNewToken->envid=(prevToken->envid+addendum+1); // ander will take care of removing what's too the left
-					}else{ // can't increment
-						pNewToken->type=TT_ERROR;
-						inputError("Cannot exceed the maximum number of 15 (nested) special function calls");
-					}
-				}
-				free(_functionName);
-				// every , that ends a function call argument should decrement the argument value
-			}else{ // not a function identifier	
-				/////if(amDebugging())inputInfo("E4");		
-				if(prevToken->type!=TT_NEW_VARIABLE&&prevToken->type!=TT_VARIABLE&&prevToken->type!=TT_END_OF_FUNCTION_CALL) // not behind a variable identifier or end of function call
-					/////inputInfo("Checking new token of type %s behind token of type %s!",TOKENTYPE_STRING[newTokenType],TOKENTYPE_STRING[prevToken->type]);	
-					pNewToken->prevIdentifier=prevToken->prevIdentifier;
-				else // behind a variable identifier or end of function call
-					pNewToken->prevIdentifier=prevToken;
-				/////if(amDebugging())inputInfo("E5");
-				// what to do with the argument if a function call ends???????
-				// the function name of the function call should contain the right argument value TODO check this!!!!!!!!
-				// BUG FIX aha end of function call does not always end a function call, but an expression (a single opening parenthesis without a function name in front of it), so explicitly checking for that!!!
-				if(prevToken->type==TT_END_OF_FUNCTION_CALL&&prevToken->expr&&prevToken->expr->type==TT_FUNCTION_CALL)
-					pNewToken->argument=prevToken->expr->prev->argument;
-				else
-					pNewToken->argument=prevToken->argument;
-				/////if(amDebugging())inputInfo("E6");
-				// should we change the argument??????
-				if(newTokenType==TT_LISTELEMENT){ // ha ha, can't use pNewToken->type here as not assigned yet!!!
-					///////inputInfo("List element!");	
-					// careful now, is this a comma that ends a function call argument??????
-					// let's inspect the expr field which should point to start parenthesis
-					// BUT we should only subtract from argument when this is a `do`, `for` or `function` call
-					// MDH@09MAR2020: `function` renamed to `defun` and `function` now represents anynomous function
-					//                which has to be assigned to a variable in order to be remembered (and used)
-					//                both with `function` and `defun` the user can define the body inside the definition itself
-					if(pNewToken->expr){
-						if(pNewToken->expr->type==TT_FUNCTION_CALL){ // a function call argument
-							// MDH@09MAR2020: with function calls that have a 'body' i.e. for, do, function and defun
-							//                I think we can use envid to determine whether this is the case
-							//                there's different behaviour for the different arguments
-							if(pNewToken->expr->argument>0){
-								pNewToken->argument=pNewToken->argument-1;
-								if(amDebugging())inputInfo("New function call argument!");
-								// MDH@09MAR2020: we need to do something on every argument with 0 argument attribute
-								//                what we would do on ) 
-								if(pNewToken->argument==0){
-
-								}
-							}else
-							if(amDebugging())
-								inputInfo("Non-local variable function call argument");
-						}else
-						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP){
-							newTokenType=TT_ERROR;
-							inputError("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[pNewToken->expr->type]);
-						}
-					}else{ // a comma should always match either a map or list or expression start
-						newTokenType=TT_ERROR;
-						inputError("Comma not allowed outside map, list or function call!");
-					}
-				}
-				/////if(amDebugging())inputInfo("E7");
-			}
-		}
-		/////if(amDebugging())inputInfo("E8");
-		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
-		pNewToken->text=__string();
-		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
-		if(!pNewToken->text){
-			inputError("Failed to initialize the new token.");
-			pNewToken->type=TT_ERROR; 
-		}
-		if(amDebugging())inputInfo("New token text initialized."); // TODOhow about 
-		/////if(amDebugging())inputInfo("E9");
-		/* not needed with calloc() allocation
-		pNewToken->significantCharacterCount=0; // MDH@22MAR2019: remembers the amount of significant characters (to be set when the token ends)
-		pNewToken->next=NULL;
-		*/
-	}
-	if(!pNewToken)inputError("Failed to create a new token.");else pNewToken->type=newTokenType;
-	return pNewToken;
+/*
+// MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
+// command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
+	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
+	//                but we should remove any identifier continuation
+	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
+	Mtoken* _newCommandToken=_getToken(lastCommandToken,tokenType);
+	if(_newCommandToken)
+		setTokenType(_newCommandToken,tokenType);
+	else 
+		inputError("Failed to create a command token");
+	return _newCommandToken;
 }
-
+*/
 // keep track of all commands so far
 #define COMMAND_BLOCKSIZE 8
 Mcommand** commands=NULL; // array for storing the pointers to the first token of all commands entered
@@ -2073,19 +1917,6 @@ bool commandUp(){
 	return true;
 }
 
-// MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
-//                therefore it is best to set the last token type using a separate function
-// MDH@03OCT2019: every time the token type changes we need to sync the immediate feed forward text as well!!!!
-void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
-	if(token){
-		if(tokenType!=token->type){
-			// MDH@04OCT2019 moved to input loop removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the current token immediate feed forward text.");
-			token->type=tokenType;
-			// MDH@04OCT2019 moved to input loop removing: if(!updateImmediateFeedforwardTextOfUserInputCommand())inputError("Failed to add the current token immediate feed forward text.");
-		}
-	}
-	///////// MDH@29OCT2019 probably don't need this here anymore: if(endOfInput)updateLastTokenAutocompletionText();
-}
 /*
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)

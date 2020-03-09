@@ -24,6 +24,7 @@ typedef struct{
 	/////////////////bool identifierContinuationIsDirty; // convenient to keep it with the command itself
 }Mcommand;
 void free_command(Mcommand* _command);
+void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/);
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
 Mcommand* _getNewCommand(bool withFirstToken);
 
