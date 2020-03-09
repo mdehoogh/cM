@@ -407,7 +407,10 @@ Mvariable* getVariable(Menvironment const * const _environment,char const * cons
     return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,verbose):NULL);
 }/* VALIDATED */
 bool containsVariable(Menvironment const * const _environment,char const * const name){
-    return(getVariable(_environment,name,false)!=NULL);
+    // MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
+    Mvariable* variable=getVariable(_environment,name,false);
+    return(variable!=NULL&&variable->valuetype!=VT_FUNCTION);
+    // replacing: return(getVariable(_environment,name,false)!=NULL);
 }/* VALIDATED */
 
 char* getConstantWithValue(Menvironment const * const _environment,char * name,Mvalue* value){

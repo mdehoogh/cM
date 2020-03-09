@@ -3173,8 +3173,19 @@ int main(int argc, char **argv){
 				///////inputInfo("Checking for command continuation");
 				if(inputMode==IM_COMMAND){
 					if(_userInputCommand&&_userInputCommand->_lastToken){
+						// MDH@09MAR2020: I forgot to check whether the last token supposedly is a function which actually is a variable
+						if(_userInputCommand->_lastToken->type==TT_FUNCTION){
+							changeFunctionTokenToAVariable(_userInputCommand,false);
+							/* replacing: can't use tokenCheckedFor because that only applies to changed token text and not to a function name used at the end of an expression
+							if(tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,true)){
+								if(_userInputCommand->_lastToken->type==TT_VARIABLE)inputInfo("%s","Token recognized as variable!");
+							}else
+								inputInfo("%s%s",ERROR_PREFIX,"Checking the token for being a variable failed!");
+							char c;inputCharRead(&c);
+							*/
+						}
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
-						if(!isAValidCommand(_userInputCommand,false)){
+						if(!isAValidCommand(_userInputCommand,true)){
 							/////////inputInfo("User newline break");
 							inputCharType='W';
 							inputChar='\\'; // TODO should we do this more generic????
@@ -3740,9 +3751,11 @@ int main(int argc, char **argv){
 			if(inputMode==IM_COMMAND){
 				// MDH@21JUL2019: if the last token appears to be a function identifier change it to a variable
 				//                so we won't end up with refusal of evaluation
-				if(_userInputCommand&&_userInputCommand->_lastToken)if(_userInputCommand->_lastToken->type==TT_FUNCTION)
+				if(_userInputCommand&&_userInputCommand->_lastToken&&_userInputCommand->_lastToken->type==TT_FUNCTION){
 					changeFunctionTokenToAVariable(_userInputCommand,false); // MDH@28FEB2020: command now passed in to the function call as well (see Mshell.c)
-				inputInfo("%s",""); // so that line will be empty
+					inputInfo("%s","Assumed function apparently a variable!");
+				}else
+					inputInfo("%s",""); // so that line will be empty
 				resetOutputColor(); // prevent showing subsequent output in the wrong colors
 				clearScreenFromCursor(); // so we won't see the behind cursor text anymore
 			}
