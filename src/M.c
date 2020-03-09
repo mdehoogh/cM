@@ -2086,7 +2086,7 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 	}
 	///////// MDH@29OCT2019 probably don't need this here anymore: if(endOfInput)updateLastTokenAutocompletionText();
 }
-
+/*
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
@@ -2094,10 +2094,10 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 	//                but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
 	Mtoken* _newCommandToken=_getToken(lastCommandToken,tokenType);
-	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else /*if(amDebugging())*/inputError("Failed to create a command token");
+	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else inputError("Failed to create a command token");
 	return _newCommandToken;
 }
-
+*/
 void createUserInputCommand(){
 	// MDH@24APR2019 obsolete: getCommandLength()=string_length(feedforwardText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
