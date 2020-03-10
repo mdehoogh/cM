@@ -59,6 +59,7 @@ const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow f
 
 const char M_WHITESPACE_CHARACTER=' '; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 const char M_NEWLINE_CHARACTER='\\'; // MDH@31OCT2019: the character to request a newline with!!!
+const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 
 // as needed by the tokenizer (as part of evaluating a command)
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
@@ -167,7 +168,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]"   }, /* BAeru assignable bin.op. */ \
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,"LEN.",""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
-{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"LEN." ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
+{""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"RLEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"` ;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
 {""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`R;! DS%()&*+- .>?:   [ {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
@@ -696,8 +697,9 @@ static void inputError(const char* const fmt,...){
 		newline();
 	}
 }
-static InputResponseFunction* inputInfoFunction=inputInfo;
-static InputResponseFunction* inputErrorFunction=inputError;
+// MDH@10MAR2020: initialized in shellInitialized() so shellInitialized() must be called prior to any input processing
+static InputResponseFunction* inputInfoFunction=NULL;
+static InputResponseFunction* inputErrorFunction=NULL;
 // void setInputInfoFunction(InputResponseFunction* _inputResponseFunction){inputInfoFunction=_inputResponseFunction;}
 // void setInputErrorFunction(InputResponseFunction* _inputResponseFunction){inputErrorFunction=_inputResponseFunction;}
 
@@ -797,7 +799,7 @@ static ReoutputTokenFunction* reoutputTokenFunction=NULL;
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	char* _identifierName=_stringstart(command->_lastToken->text,command->_lastToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
-	command->_lastToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
+	command->_lastToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	// if the reoutput token function is defined, execute it
 	if(reoutputTokenFunction)(*reoutputTokenFunction)(command->_lastToken);else outputChar('*');
@@ -3268,7 +3270,7 @@ static size_t outputToken(Mtoken* _token){
 	return numberOfCharactersToOutput;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
-static OutputTokenFunction* outputTokenFunction=outputToken;
+static OutputTokenFunction* outputTokenFunction=NULL;
 
 void outputLastTokenChar(Mtoken* _token){
 	///////outputTokenColor(_userInputCommand->_lastToken);
@@ -6359,13 +6361,13 @@ Mexpressionvalue* getFunctionValue(Mtoken* _offsetToken,char* functionName){
 bool shellInitialized(InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){
 
 	// register the callbacks
-	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;
-	if(_inputInfoFunction)inputInfoFunction=_inputInfoFunction;
-	if(_inputErrorFunction)inputErrorFunction=_inputErrorFunction;
-	if(_outputTokenFunction)outputTokenFunction=_outputTokenFunction;
-	if(_reoutputTokenFunction)reoutputTokenFunction=_reoutputTokenFunction;
-	if(_updateLastTokenAutocompletionTextFunction)updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
-	if(_outputCommandInfoFunction)outputCommandInfoFunction=_outputCommandInfoFunction;
+	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else outputWarning("No input character read function defined!");
+	if(!_inputInfoFunction){inputInfoFunction=inputInfo;outputWarning("Using the default input info function.");}else inputInfoFunction=_inputInfoFunction;
+	if(!_inputErrorFunction){inputErrorFunction=inputError;outputWarning("Using the default input error function.");}else inputErrorFunction=_inputErrorFunction;
+	if(!_outputTokenFunction){outputTokenFunction=outputToken;outputWarning("Using the default output token function.");}else outputTokenFunction=_outputTokenFunction;
+	if(!_reoutputTokenFunction)outputWarning("No reoutput token function.");else reoutputTokenFunction=_reoutputTokenFunction;
+	if(!_updateLastTokenAutocompletionTextFunction)outputWarning("No update last token autocompletion text function.");else updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;
+	if(!_outputCommandInfoFunction)outputWarning("No output command info function.");else outputCommandInfoFunction=_outputCommandInfoFunction;
 
 	long long decimalprecision=getDP();
 	if(decimalprecision==M_LL_INVALID)return NULL; // let's force starting with a default decimal context

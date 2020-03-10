@@ -37,6 +37,7 @@ extern long long M_DP; // the default decimal precision (initially 20) TODO shou
 extern const unsigned long long M_BITS_PER_ENV_LEVEL; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
 extern const Mvalue* NULL_value;
 extern const long long M_LL_INVALID;
+extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
@@ -297,10 +298,95 @@ void outputFlags(){
 	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
 }
 
-// FEED FORWARD STUFF
-static void inputInfo(const char* const fmt,...); // prototype
-static void inputError(const char* const fmt,...); // prototype
+// the user input (either the shell command or the M user input command)
+Mstring* shellCommand=NULL;
 
+Mcommand* _userInputCommand=NULL; // the current input command
+
+// keeping track of both the cursor position and the total command length
+size_t getUserInputLength(){
+	if(inputMode==IM_COMMAND)return(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0);
+	if(inputMode==IM_SHELL)return string_length(shellCommand);
+	return 0;
+}
+
+// MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
+// MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
+// MDH@30OCT2019: if we let toInfoInputLine() return the number of lines it moved back we can pass that into toUserInputCursorPosition() to go down that number of lines
+// MDH@30OCT2019: for each user input line, keep track of the total number of characters written by the user
+typedef struct Muserinputline{
+	size_t offset,index; // the number of characters on previous lines and the line index
+	struct Muserinputline *_prev; // for accessing previous lines
+}Muserinputline;
+Muserinputline* _userinputline=NULL;
+Muserinputline* __userinputline(){
+	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'6');
+	if(_newUserinputline){
+		_newUserinputline->_prev=_userinputline;
+		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
+		_newUserinputline->index=(_userinputline?_userinputline->index:0)+1; // count the lines
+		_userinputline=_newUserinputline;
+	}
+	return _newUserinputline;
+}
+// call free_userinputline() when starting a new user input command
+size_t free_userinputline(){
+	size_t numberOfUserInputLines=0;
+	Muserinputline* prevUserinputline;
+	while(_userinputline){
+		numberOfUserInputLines++;
+		prevUserinputline=_userinputline->_prev;
+		FREE(_userinputline,'6');
+		_userinputline=prevUserinputline;
+	}
+	return numberOfUserInputLines;
+}
+void removeUserinputline(){
+	Muserinputline* prevUserinputline=_userinputline->_prev;
+	FREE(_userinputline,'6');
+	_userinputline=prevUserinputline;
+}
+// MDH@30OCT2019 END
+size_t toInfoInputLine(){
+	size_t linesUp=0;
+    size_t lines=(_userinputline?_userinputline->index:0)+1;
+	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();
+    return linesUp;
+} // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
+// output functions that require access to the current token
+void outputUserInputCommandTokenColor(){
+	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
+}
+uint8_t promptLength=0;
+void returnToUserInputCommandCursorPosition(){
+	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
+	toStartOfLine();
+	moveCursorRight(promptLength+getUserInputLength()-(_userinputline?_userinputline->offset:0)); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
+	outputUserInputCommandTokenColor();
+}
+void toUserInputCursorPosition(size_t linesDown){while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();}
+// MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
+static void inputInfo(const char* const fmt,...){
+	if(fmt&&strlen(fmt)){ // we have a format
+		// outputChar('X');
+		size_t linesMovedUp=toInfoInputLine();
+		resetOutputColor(); // get the default output color!!
+		// NOTE we have to call vprintf here NOT printf!!!
+		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
+		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+		toUserInputCursorPosition(linesMovedUp);
+	}
+}
+static void inputError(const char* const fmt,...){
+	if(fmt&&strlen(fmt)){ // we have a format
+		size_t linesMovedUp=toInfoInputLine();
+		setColor(getErrorColor());setBackColor(getBackgroundColor());
+		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
+		toUserInputCursorPosition(linesMovedUp);
+	}
+}
+
+// FEED FORWARD STUFF
 // manual feed forward characters stuff
 // what the user consumed manually, and is supposed to remain continguous i.e. uninterrupted by other feed forward texts
 // it's possible that manual feed forward text is empty so it will block the identifier continuation text when that is the case!!
@@ -330,7 +416,6 @@ bool inIdentifierToken(Mtoken* lastCommandToken){
 	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE||lastCommandToken->type==TT_REFERENCE:false);
 }
 
-Mcommand* _userInputCommand=NULL; // the current input command
 /* MDH@28OCT2019 replacing: 
 Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the command input by the user
 */
@@ -819,93 +904,11 @@ Mstring* _suggestedText=NULL; // MDH@04SEP2019: where we'll be storing the entir
 long long commandCount=0; // the total number of command input
 long long commandIndex=0;
 
-Mstring* shellCommand=NULL;
 /// MDH@28OCT2019: replaced by _userInputCommand: Mtoken* _userInputCommand->_firstToken=NULL;
-
-// keeping track of both the cursor position and the total command length
-size_t getUserInputLength(){
-	if(inputMode==IM_COMMAND)return(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0);
-	if(inputMode==IM_SHELL)return string_length(shellCommand);
-	return 0;
-}
 
 size_t getNumberOfSuggestedCharacters(){return(_suggestedText?string_length(_suggestedText):0);}
 size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
-// MDH@16MAY2019: not showing the error on the line above the user input line, but now below (in info color)
-// MDH@22MAY2019 NOTE: const Mvalue* const is protested against in the call to _getValueText
-// MDH@30OCT2019: if we let toInfoInputLine() return the number of lines it moved back we can pass that into toUserInputCursorPosition() to go down that number of lines
-// MDH@30OCT2019: for each user input line, keep track of the total number of characters written by the user
-typedef struct Muserinputline{
-	size_t offset,index; // the number of characters on previous lines and the line index
-	struct Muserinputline *_prev; // for accessing previous lines
-}Muserinputline;
-Muserinputline* _userinputline=NULL;
-Muserinputline* __userinputline(){
-	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'6');
-	if(_newUserinputline){
-		_newUserinputline->_prev=_userinputline;
-		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
-		_newUserinputline->index=(_userinputline?_userinputline->index:0)+1; // count the lines
-		_userinputline=_newUserinputline;
-	}
-	return _newUserinputline;
-}
-// call free_userinputline() when starting a new user input command
-size_t free_userinputline(){
-	size_t numberOfUserInputLines=0;
-	Muserinputline* prevUserinputline;
-	while(_userinputline){
-		numberOfUserInputLines++;
-		prevUserinputline=_userinputline->_prev;
-		FREE(_userinputline,'6');
-		_userinputline=prevUserinputline;
-	}
-	return numberOfUserInputLines;
-}
-void removeUserinputline(){
-	Muserinputline* prevUserinputline=_userinputline->_prev;
-	FREE(_userinputline,'6');
-	_userinputline=prevUserinputline;
-}
-// MDH@30OCT2019 END
-size_t toInfoInputLine(){
-	size_t linesUp=0;
-    size_t lines=(_userinputline?_userinputline->index:0)+1;
-	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();
-    return linesUp;
-} // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
-// output functions that require access to the current token
-void outputUserInputCommandTokenColor(){
-	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
-}
-uint8_t promptLength=0;
-void returnToUserInputCommandCursorPosition(){
-	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
-	toStartOfLine();
-	moveCursorRight(promptLength+getUserInputLength()-(_userinputline?_userinputline->offset:0)); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
-	outputUserInputCommandTokenColor();
-}
-void toUserInputCursorPosition(size_t linesDown){while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();}
-// MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
-static void inputInfo(const char* const fmt,...){
-	if(fmt&&strlen(fmt)){ // we have a format
-		size_t linesMovedUp=toInfoInputLine();
-		resetOutputColor(); // get the default output color!!
-		// NOTE we have to call vprintf here NOT printf!!!
-		// MDH@22JUL2019: as we're not calling output() here, we can make output() read a character to allow interuption????
-		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toUserInputCursorPosition(linesMovedUp);
-	}
-}
-static void inputError(const char* const fmt,...){
-	if(fmt&&strlen(fmt)){ // we have a format
-		size_t linesMovedUp=toInfoInputLine();
-		setColor(getErrorColor());setBackColor(getBackgroundColor());
-		va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args); // NOTE would be a mistake to call output() here, resulting
-		toUserInputCursorPosition(linesMovedUp);
-	}
-}
 
 // request body of function moved over to Mshell.h/c
 
@@ -1301,7 +1304,7 @@ void updateUserInputCommandIdentifierContinuation(){
 						if(lastTokenLength>1){ // at least one character of the existing variable present in the reference
 							char c=string_last_char(_userInputCommand->_lastToken->text); // get the last character (to mark as erroneous)
 							if(c){ // we've got the character that is responsible for not getting a completion text anymore
-								if(!containsVariable(NULL,string_remainder(_userInputCommand->_lastToken->text,1))){ // not already complete TODO perhaps there's a better way to compose the completion text in this case in _getCompletion()
+								if(!containsVariable(NULL,string_remainder(_userInputCommand->_lastToken->text,1),(amVerbose()?-1:0))){ // not already complete TODO perhaps there's a better way to compose the completion text in this case in _getCompletion()
 									// let's do something like a backspace but without moving the cursor on the screen
 									// replacing the last character with a blank is another option????
 									if(string_setlength(_userInputCommand->_lastToken->text,lastTokenLength-1)){ // managed to 'cut off' c (although it's still there, because when you set the length only ->length is adjusted nothing yet to the text itself)
@@ -1476,7 +1479,7 @@ void outputValueColored(Mvalue* _value){
 				}
 				break;
 			case VT_REFERENCE:
-				outputChar('@');
+				outputChar(M_DEREFERENCE_CHARACTER); // same as the reference character 
 				if(_value->value._reference){
 					output("%s",_value->value._reference->variable->_name);
 					outputChar(':');
@@ -1916,7 +1919,21 @@ bool commandUp(){
 	setCommandIndex(commandIndex>0?commandIndex-1:commandCount);
 	return true;
 }
-
+/*
+// MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
+//                therefore it is best to set the last token type using a separate function
+// MDH@03OCT2019: every time the token type changes we need to sync the immediate feed forward text as well!!!!
+void setTokenType(Mtoken* token,TokenType tokenType){
+	if(token){
+		if(tokenType!=token->type){
+			// MDH@04OCT2019 moved to input loop removing: if(!deleteLastTokenImmediateFeedforwardText())inputError("Failed to remove the current token immediate feed forward text.");
+			token->type=tokenType;
+			// MDH@04OCT2019 moved to input loop removing: if(!updateImmediateFeedforwardTextOfUserInputCommand())inputError("Failed to add the current token immediate feed forward text.");
+		}
+	}
+	///////// MDH@29OCT2019 probably don't need this here anymore: if(endOfInput)updateLastTokenAutocompletionText();
+}
+*/
 /*
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
@@ -2121,9 +2138,10 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	if(lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
-		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName)));
+		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1)));
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(!variableExists){ // apparently does NOT exist
+				inputInfo("'%s' not an existing variable.",_identifierName);
 				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 				reoutputToken(lastCommandToken);
 				// suggested characters should make = show (probably already present in the behind cursor text)
@@ -2768,6 +2786,13 @@ int main(int argc, char **argv){
 		}
 	}
 
+	prepareForUserInput(); // BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!
+	resetOutputColor(); // just in case
+	outputInfo("Welcome to M.");
+	newline();
+	output("Version: %s - Build: %s - Date: %s",M_VERSION,M_BUILD,M_DATE);
+	newline();newline();
+
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
 	if(!shellInitialized(inputCharRead,inputInfo,inputError,outputToken,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
@@ -2775,6 +2800,7 @@ int main(int argc, char **argv){
 		resetOutputColor();
 		exit(1);
 	}
+	outputInfo("Shell initialized.");
 
 	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
 
@@ -2785,13 +2811,6 @@ int main(int argc, char **argv){
 		exit(2);
 	}
 
-	prepareForUserInput(); // AFTER using the command-line parameters (will effectuate wrap mode and color scheme)
-
-	resetOutputColor(); // just in case
-	outputInfo("Welcome to M.");
-	newline();
-	output("Version: %s - Build: %s - Date: %s",M_VERSION,M_BUILD,M_DATE);
-	newline();newline();
 	displayFlags();
 	newline();
 	
@@ -3016,7 +3035,7 @@ int main(int argc, char **argv){
 							*/
 						}
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
-						if(!isAValidCommand(_userInputCommand,true)){
+						if(!isAValidCommand(_userInputCommand,false)){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!
 							/////////inputInfo("User newline break");
 							inputCharType='W';
 							inputChar='\\'; // TODO should we do this more generic????

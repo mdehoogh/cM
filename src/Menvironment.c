@@ -12,6 +12,7 @@ extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const char * const M_HIDDEN_VARIABLE_NAMES[]; // MDH@14NOV2019: the name of the M variables to NOT return when requesting the variable map text!!!
+extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: is set elsewhere (in Mshell.c/h)
 extern const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES;
 // TODO make the following variables start with M_
 extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
@@ -387,9 +388,21 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
 }
 
 // MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
-Mvariable* getVariable(Menvironment const * const _environment,char const * const name, bool verbose){
+// MDH@10MAR2020: if `name` ends with @ we should return the variable that the thing in front of it references (i.e. if y=@x then y@ represents x)
+Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * const name, bool verbose){ // MDH@10MAR2020: because we might want to cut off the last character name characters can not be const any more (between char and *)
     if(!name){outputError("No variable name specified");return NULL;}
+    // MDH@10MAR2020: taking care of variable names that end with @ which acts as dereference operator
+    size_t l=strlen(name);
+    if(l==0){outputError("Undefined variable name.");return NULL;}
     if(verbose)output("Looking for variable '%s'.\n",name);
+    if(name[l-1]==M_DEREFERENCE_CHARACTER){
+        // I need to cut off the last character, get the associated variable of that part
+        name[l-1]='\0';
+        Mvariable* variable=getVariable(_environment,name,verbose);
+        name[l-1]=M_DEREFERENCE_CHARACTER;
+        return(variable&&variable->valuetype==VT_REFERENCE?variable->_value->value._reference->variable:NULL);
+    }
+    // MDH@10MAR2020 END
     // input valid
     Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
     Mmap* variableMap=(environment?environment->_variableMap:NULL);
@@ -406,9 +419,11 @@ Mvariable* getVariable(Menvironment const * const _environment,char const * cons
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,verbose):NULL);
 }/* VALIDATED */
-bool containsVariable(Menvironment const * const _environment,char const * const name){
+bool containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
     // MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
     Mvariable* variable=getVariable(_environment,name,false);
+    // if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
+    if(report>0)output("'%s' %s recognized as an existing variable.\n",name,(variable?"":" NOT "));
     return(variable!=NULL&&variable->valuetype!=VT_FUNCTION);
     // replacing: return(getVariable(_environment,name,false)!=NULL);
 }/* VALIDATED */
@@ -694,7 +709,7 @@ bool addVariable(Menvironment * const _environment,char const * const name,Mvalu
     return false;
 }/* VALIDATED */
 
-bool setValue(Menvironment const * const _environment,const char* const name,const Mvalue* const _value){
+bool setValue(Menvironment const * const _environment,char /*const*/ * const name,const Mvalue* const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name){outputError("Cannot set the value: no variable name");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
@@ -726,7 +741,7 @@ bool setValue(Menvironment const * const _environment,const char* const name,con
 }/* VALIDATED */
 
 // MDH@14NOV2019: sometimes we need a setValue that does not use assignValue() because we do not want to copy the (composite) value passed in
-bool setVariable(Menvironment * const _environment,char const * const name,Mvalue const * const _value){
+bool setVariable(Menvironment * const _environment,char /*const*/ * const name,Mvalue const * const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("No variable specified to set the value of");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
@@ -778,10 +793,11 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
     return 0;
 }/* VALIDATED */
 
-Mvalue* getValue(Menvironment const * const _environment,const char* const name){
+Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name){
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     Mvariable* variable=getVariable(_environment,name,false);
-    return(variable?variable->_value:NULL);
+    if(!variable){output("%sVariable '%s' not found.\n",ERROR_PREFIX,name);return NULL;}
+    return variable->_value;
 }/* VALIDATED */
 
 // FUNCTION STUFF

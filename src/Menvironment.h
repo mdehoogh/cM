@@ -31,9 +31,9 @@ Mstring* _getVariableNames(Menvironment const * const _environment,char const * 
 /* replacing:
 Mvariable* getNewVariable(Menvironment* _environment,const char* name);
 */
-Mvariable* getVariable(Menvironment const * const _environment,char const * const name,bool verbose); // we need to be able to do this in M.c
+Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * const name,bool verbose); // we need to be able to do this in M.c MDH@10MAR2020: name characters are alterable so we do not need to create a dynamic copy of it
 Mvalue* Mexists(Mvalue* _value);
-bool containsVariable(const Menvironment* const _environment,const char* const name);
+bool containsVariable(const Menvironment* const _environment,char /*const*/ * const name, int8_t report);
 Mvaluetype getVariableType(const Menvironment* const _environment,const char* const name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
 Mvaluetype getVariableValueType(const Menvironment* const _environment,const char* const name); // same as getVariableType() if a type is defined for the given variable
 
@@ -53,12 +53,12 @@ Mvalue* getListValueAtIndex(Menvironment* _environment,const char* name,Mvalue* 
 // once you've created an Mvalue with one of the above new... functions you can link it to a variable with a given name, if unsuccessful you have to release the value yourself!!!!
 // NOTE this is possible when _value is not allowed or the variable does not exists, anyway if the assignment succeeds true should be returned false otherwise
 // decided to allow asking for a value of a given type that always owns what it contains (Minteger, Mfloat, Mtext, Mlist or Mmap pointer)
-bool setValue(const Menvironment* const _environment,const char* const name,const Mvalue* const _value);
+bool setValue(const Menvironment* const _environment,char /*const*/ * const name,const Mvalue* const _value);
 
 // MDH@14NOV2019: same as setValue but does not use assignValue (which will copy the value passed in)
-bool setVariable(Menvironment * const _environment,char const * const name,Mvalue const * const _value);
+bool setVariable(Menvironment * const _environment,char /*const*/ * const name,Mvalue const * const _value);
 
-Mvalue* getValue(Menvironment const * const _environment,const char* const name);
+Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name);
 
 char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value); // MDH@24OCT2019: if we want to find a constant with the same value we can use that as a 'symbol'
 // MDH@24OCT2019: if we want to see the variables in an environment vall getVariableMapText(), which will also represent values by the names of constants with the same value (representing symbols)
