@@ -2138,10 +2138,31 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	if(lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
-		bool variableExists=(lastCommandToken->argument!=1&&(existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid/*replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1)));
+		bool variableExists=(lastCommandToken->argument!=1);
+		if(variableExists){
+			if(!existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid)){
+				switch(containsVariable(getExecutionEnvironment(),_identifierName,-1)){
+					case -2:
+						inputInfo("Missing environment or variable name (%s)!",_identifierName);
+						break;
+					case -1:
+						variableExists=false;
+						inputInfo("'%s' is not an existing variable!",_identifierName);
+						break;
+					case 0:
+						inputInfo("'%s' is a function variable, so exists.",_identifierName);
+						break;
+					case 1:
+						inputInfo("'%s' is an existing non-function variable.",_identifierName);
+						break;
+				}
+			}else
+				inputInfo("'%s' is initialized in the command.",_identifierName);
+		}else
+			inputInfo("'%s' is local, so it cannot be a existing variable.",_identifierName);
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(!variableExists){ // apparently does NOT exist
-				inputInfo("'%s' not an existing variable.",_identifierName);
+				// inputInfo("'%s' not an existing variable.",_identifierName);
 				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 				reoutputToken(lastCommandToken);
 				// suggested characters should make = show (probably already present in the behind cursor text)

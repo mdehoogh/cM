@@ -33,7 +33,7 @@ Mvariable* getNewVariable(Menvironment* _environment,const char* name);
 */
 Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * const name,bool verbose); // we need to be able to do this in M.c MDH@10MAR2020: name characters are alterable so we do not need to create a dynamic copy of it
 Mvalue* Mexists(Mvalue* _value);
-bool containsVariable(const Menvironment* const _environment,char /*const*/ * const name, int8_t report);
+int8_t containsVariable(const Menvironment* const _environment,char /*const*/ * const name, int8_t report);
 Mvaluetype getVariableType(const Menvironment* const _environment,const char* const name); // the type of a variable can be fixed (only values of this type can be assigned to it) or unfixed (any value can be assigned to it)
 Mvaluetype getVariableValueType(const Menvironment* const _environment,const char* const name); // same as getVariableType() if a type is defined for the given variable
 

@@ -389,42 +389,71 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
 
 // MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
 // MDH@10MAR2020: if `name` ends with @ we should return the variable that the thing in front of it references (i.e. if y=@x then y@ represents x)
-Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * const name, bool verbose){ // MDH@10MAR2020: because we might want to cut off the last character name characters can not be const any more (between char and *)
-    if(!name){outputError("No variable name specified");return NULL;}
+Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * const name, bool report){ // MDH@10MAR2020: because we might want to cut off the last character name characters can not be const any more (between char and *)
+    if(!name){if(report)outputError("No variable name specified");return NULL;}
     // MDH@10MAR2020: taking care of variable names that end with @ which acts as dereference operator
     size_t l=strlen(name);
-    if(l==0){outputError("Undefined variable name.");return NULL;}
-    if(verbose)output("Looking for variable '%s'.\n",name);
+    if(l==0){if(report)outputError("Undefined variable name.");return NULL;}
+    // testing with: outputChar(M_DEREFERENCE_CHARACTER);
     if(name[l-1]==M_DEREFERENCE_CHARACTER){
         // I need to cut off the last character, get the associated variable of that part
         name[l-1]='\0';
-        Mvariable* variable=getVariable(_environment,name,verbose);
+        if(report)output("Looking for the variable referenced by '%s'.\n",name);
+        Mvariable* variable=getVariable(_environment,name,report);
         name[l-1]=M_DEREFERENCE_CHARACTER;
-        return(variable&&variable->valuetype==VT_REFERENCE?variable->_value->value._reference->variable:NULL);
+        if(!variable)return NULL;
+        // OOPS testing the valuetype of the variable is NOT enough
+        //      because the variable itself could be unbound (i.e. untyped)
+        //      whereas the value being held could be a reference!!!!!
+        //      this means we need to add the following
+        if(!variable->_value)return NULL; // no value, so also no variable referenced to start with
+        if(variable->_value->type!=VT_REFERENCE)return NULL; // not something referenced
+        // replacing (see explanation above): if(variable->valuetype!=VT_REFERENCE)return NULL;
+        variable=variable->_value->value._reference->variable;
+        if(!variable)return NULL;
+        if(report)output("Referenced variable '%s'.\n",variable->_name);
+        return variable;
     }
     // MDH@10MAR2020 END
     // input valid
     Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
     Mmap* variableMap=(environment?environment->_variableMap:NULL);
-    if(!variableMap){output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
+    if(!variableMap){
+        if(report)output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);
+        return NULL;
+    }
+    if(report)output("Looking for variable '%s' in '%s'.\n",name,environment->_name);
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
-    while(_variableMapelement&&(!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))_variableMapelement=_variableMapelement->_next;
+    while(_variableMapelement&&
+            (!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))
+        _variableMapelement=_variableMapelement->_next;
     // MDH@20JUL2019: if found return
     if(_variableMapelement){
-        if(verbose)output("Variable '%s' found in environment '%s'.\n",name,environment->_name);
+        if(report)
+            output("Variable '%s' found in environment '%s'.\n",name,environment->_name);
         return _variableMapelement->_variable;
     }
+    if(report)output("Variable '%s' NOT found in environment '%s'.\n",name,environment->_name);
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
-    return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,verbose):NULL);
+    return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,report):NULL);
 }/* VALIDATED */
-bool containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
+int8_t containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
     // MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
+    if(!_environment||!name)return -2; // invalid input
     Mvariable* variable=getVariable(_environment,name,false);
+    if(!variable){
+        if(report>0)output("'%s' not an existing variable.");
+        return -1;
+    }
     // if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
-    if(report>0)output("'%s' %s recognized as an existing variable.\n",name,(variable?"":" NOT "));
-    return(variable!=NULL&&variable->valuetype!=VT_FUNCTION);
+    if(variable->valuetype==VT_FUNCTION){
+        if(report>0)output("'%s' is a function variable, and not a true (value) variable.\n",name);
+        return 0;
+    }
+    if(report>0)output("'%s' is recognized as an existing variable.\n",name);
+    return 1;
     // replacing: return(getVariable(_environment,name,false)!=NULL);
 }/* VALIDATED */
 
