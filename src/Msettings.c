@@ -27,29 +27,29 @@ bool amAcceptinghistorycommand(){return acceptinghistorycommand;}
 // flags used in (interactive) session mode
 void setAssisting(bool newAssisting){
     assisting=newAssisting;
-    output("\nWill %sassist!",(assisting?"":"not "));
+    output("Will %sassist!",(assisting?"":"not "));newline();
 }
 void setDebugging(bool newDebugging){
     debugging=newDebugging;
-    output("\nWill %sdebug!",(debugging?"":"not "));
+    output("Will %sdebug!",(debugging?"":"not "));newline();
 }
 void setMatchingparentheses(bool newMatchingparentheses){
     matchingparentheses=newMatchingparentheses;
-    output("\nWill %smatch parentheses!",(matchingparentheses?"":"not"));
+    output("Will %smatch parentheses!",(matchingparentheses?"":"not"));newline();
 }
 void setVerbose(bool newVerbose){
     verbose=newVerbose;
-    output("\nWill %sbe verbose!",(verbose?"":"not "));
+    output("Will %sbe verbose!",(verbose?"":"not "));newline();
 }
 void setAcceptinghistorycommand(bool newAcceptinghistorycommand){
     acceptinghistorycommand=newAcceptinghistorycommand;
-    output("\nWill use history command %s!",(acceptinghistorycommand?"immediately":"as auto-completion"));
+    output("Will use history command %s!",(acceptinghistorycommand?"immediately":"as auto-completion"));newline();
 }
 
 // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
 void activateWrapmode(){
     outputControlText(wrapping?"?6l":"?7l"); // 7h used to be 6l doesn't seem to work though
-    output("\nWill %s!",(wrapping?"wrap":"not wrap"));
+    output("Will %s!",(wrapping?"wrap":"not wrap"));newline();
 }
 // M settings
 void setWrapping(bool newWrapping){

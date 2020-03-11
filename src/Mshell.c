@@ -566,29 +566,38 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){
 	}
 	return _result;
 }
-Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue){
+// MDH@11MAR2020: the value of the result token is assigned to $ so that will become the result of the application of the Mforfunction
+Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){
 	Mvalue* _result=NULL;
 	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
 		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
 		(!_incrementTokenValue||_incrementTokenValue->type==VT_TOKEN)&&
-		(_bodyTokenValue&&_bodyTokenValue->type==VT_TOKEN)){
+		(_bodyTokenValue&&_bodyTokenValue->type==VT_TOKEN)&&
+		(!_resultTokenValue||_resultTokenValue->type==VT_TOKEN)){
 		if(amVerbose()){
 			output("For loop:");
 			outputValue(" Initialization=",_initializationTokenValue,NULL);
 			outputValue(" Condition=",_conditionTokenValue,NULL);
 			outputValue(" Increment=",_incrementTokenValue,NULL);
-			outputValue(" Body=",_bodyTokenValue,"\n");
+			outputValue(" Body=",_bodyTokenValue,NULL);
+			outputValue(" Result=",_resultTokenValue,NULL);
+			newline();
 		}
 		Menvironment* _forEnvironment=__environment();
 		if(_forEnvironment){
 			_forEnvironment->_name=_strdup("for loop");
 			// better wait with pushing until _forEnvironment is initialized appropriately
-			bool forEnvironmentInitialized=addVariable(_forEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0));
+			// MDH@11MAR2020: $ is NOT needed when there's an explicit result token value!!
+			bool forEnvironmentInitialized=(_resultTokenValue?true:addVariable(_forEnvironment,"$",VT_UNDEFINED,false))&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0));
 			if(forEnvironmentInitialized){
 				if(pushExecutionEnvironment(_forEnvironment)){
 					// evaluate the initialization inside the for environment once
 					if(_initializationTokenValue){
 						_forEnvironment->expressionToken=_initializationTokenValue->value._token;
+						// MDH@11MAR2020: to force the creation of all identifiers that are assigned in the initialization token value, we have to ascertain that they are considered TT_NEW_VARIABLE
+						//                essentially this means you cannot set an outside variable in the first for loop expression
+						//                alternatively, we could simple add all these variables beforehand and mark all as TT_VARIABLE which is another way of doing that
+						//                assignment is crucial? yes, if not assigned 
 						Mvalue* initializationValue=getValueOfExpression("for initialization",'i',(TokenType[]){},0); // return value NOT imported
 						// any map is used to initialize as local variables (just like we did in defining functions)
 						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
@@ -659,12 +668,19 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								*/
 							}
 						}
-						_result=getValue(_forEnvironment,"$"); // get the result
-						if(!_result){
-							_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
-							if(amVerbose()&&amDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
-						}else
-						if(amVerbose()&&amDebugging())outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
+						// MDH@11MAR2020: if there's a result token value, we use that value as the result of the for loop (in which case we would not need $ at all)
+						//                of course we could let $ take precedence over the result token BUT the general idea is that any result token replaces the implicit result (which would be the number of times the loop is executed)
+						if(_resultTokenValue){
+							_forEnvironment->expressionToken=_resultTokenValue->value._token;
+							_result=getValueOfExpression("for loop",'l',(TokenType[]){},0);
+						}else{ // no explicit result token which value denotes the result
+							_result=getValue(_forEnvironment,"$"); // get the result
+							if(!_result){
+								_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
+								if(amVerbose()&&amDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
+							}else
+							if(amVerbose()&&amDebugging())outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
+						}
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
 					if(amVerbose()&&amDebugging())outputInfo("For loop environment popped.");
@@ -796,13 +812,26 @@ static UpdateLastTokenAutocompletionTextFunction* updateLastTokenAutocompletionT
 static ReoutputTokenFunction* reoutputTokenFunction=NULL;
 // void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){reoutputTokenFunction=_reoutputTokenFunction;}
 
+// MDH@11MAR2020: Ok, need to be careful here
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
-	char* _identifierName=_stringstart(command->_lastToken->text,command->_lastToken->significantCharacterCount); // free asap
+	Mtoken* functionToken=command->_lastToken;
+	char* _identifierName=_stringstart(functionToken->text,functionToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
-	command->_lastToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
+	if(functionToken->argument==1){
+		functionToken->type=TT_NEW_VARIABLE;
+	}else
+	if(existsInCommand(command,_identifierName,functionToken->envid)){
+		functionToken->type=TT_VARIABLE;
+	}else
+	if(containsVariable(NULL,_identifierName,-1)>=0){ // MDH@11MAR2020: containsVariable() now returns -2 (no name or environment), 0 means it is a function variable, 1 means a value variable but existing nevertheless
+		functionToken->type=TT_VARIABLE;
+	}else{
+		functionToken->type=TT_NEW_VARIABLE;
+	}
+	// replacing: functionToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
 	// if the reoutput token function is defined, execute it
-	if(reoutputTokenFunction)(*reoutputTokenFunction)(command->_lastToken);else outputChar('*');
+	if(reoutputTokenFunction)(*reoutputTokenFunction)(functionToken);else outputChar('*');
 	/* MDH@01OCT2019 because the token isn't actually removed the feed forward text associated with the token does not need to be deleted actually
 	// MDH@20SEP2019: this function is called when a function name changes into a variable name (because the user did not enter ( behind a function name)
 	//                and it makes sense to simply remove the associated feed forward of the token
@@ -1303,7 +1332,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 						pNewToken->envid=(prevToken->envid+addendum+1); // ander will take care of removing what's too the left
 					}else{ // can't increment
 						pNewToken->type=TT_ERROR;
-						inputError("Cannot exceed the maximum number of 15 (nested) special function calls");
+						(*inputErrorFunction)("Cannot exceed the maximum number of 15 (nested) special function calls");
 					}
 				}
 				free(_functionName);
@@ -1352,11 +1381,11 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 						}else
 						if(pNewToken->expr->type!=TT_LIST&&pNewToken->expr->type!=TT_MAP){
 							newTokenType=TT_ERROR;
-							inputError("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[pNewToken->expr->type]);
+							if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed in expression of type %s.",TOKENTYPE_STRING[pNewToken->expr->type]);
 						}
 					}else{ // a comma should always match either a map or list or expression start
 						newTokenType=TT_ERROR;
-						inputError("Comma not allowed outside map, list or function call!");
+						if(inputErrorFunction)(*inputErrorFunction)("Comma not allowed outside map, list or function call!");
 					}
 				}
 				/////if(amDebugging())inputInfo("E7");
@@ -1367,8 +1396,8 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 		pNewToken->text=__string();
 		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
 		if(!pNewToken->text){
-			inputError("Failed to initialize the new token.");
 			pNewToken->type=TT_ERROR; 
+			if(inputErrorFunction)(*inputErrorFunction)("Failed to initialize the new token.");
 		}
 		if(amDebugging())inputInfo("New token text initialized."); // TODOhow about 
 		/////if(amDebugging())inputInfo("E9");
@@ -1377,7 +1406,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 		pNewToken->next=NULL;
 		*/
 	}
-	if(!pNewToken)inputError("Failed to create a new token.");else pNewToken->type=newTokenType;
+	if(!pNewToken){if(inputErrorFunction)(*inputErrorFunction)("Failed to create a new token.");}else pNewToken->type=newTokenType;
 	return pNewToken;
 }
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
@@ -1387,7 +1416,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	//                but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
 	Mtoken* _newCommandToken=_getToken(lastCommandToken,tokenType);
-	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else if(amDebugging())inputError("Failed to create a command token");
+	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
 	return _newCommandToken;
 }
 Mcommand* _getNewCommand(bool withFirstToken){
@@ -1397,16 +1426,16 @@ Mcommand* _getNewCommand(bool withFirstToken){
 		if(withFirstToken){
 			_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/);
 			if(_command->_firstToken){ // we've got a first token allocated
-				if(amDebugging())(*inputInfoFunction)("New command token created.");
+				if(amDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
 				FREE(_command,'K');_command=NULL;
-				if(amDebugging())(*inputErrorFunction)("Failed to create the first command token.");
+				if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
 			}
 		}
 	}else
-	if(amDebugging())(*inputErrorFunction)("Failed to create the command.");
+	if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create the command.");
 	return _command;
 }
 
@@ -2818,6 +2847,29 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL)
 																		,(_fourthArgumentmapelement?_fourthArgumentmapelement->_variable->_value:NULL));
 			}
+			break;
+		case FT_INTERNAL_FIVE_ARGUMENTS:
+			{
+				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
+				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
+				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
+				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement?_thirdArgumentmapelement->_next:NULL);
+				Mmapelement* _fifthArgumentmapelement=(_fourthArgumentmapelement?_fourthArgumentmapelement->_next:NULL);
+				if(amVerbose()){
+					output("Applying five-argument function '%s'",functionName);
+					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
+					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
+					if(_thirdArgumentmapelement)outputValue(" and '",_thirdArgumentmapelement->_variable->_value,"'");
+					if(_fourthArgumentmapelement)outputValue(" and '",_fourthArgumentmapelement->_variable->_value,"'");
+					if(_fifthArgumentmapelement)outputValue(" and '",_fifthArgumentmapelement->_variable->_value,"'");
+					outputChar('.');newline();
+				}
+				return (*_function->functionunion.fiveArgumentFunction)((_firstArgumentmapelement?_firstArgumentmapelement->_variable->_value:NULL)
+																		,(_secondArgumentmapelement?_secondArgumentmapelement->_variable->_value:NULL)
+																		,(_thirdArgumentmapelement?_thirdArgumentmapelement->_variable->_value:NULL)
+																		,(_fourthArgumentmapelement?_fourthArgumentmapelement->_variable->_value:NULL)
+																		,(_fifthArgumentmapelement?_fifthArgumentmapelement->_variable->_value:NULL));
+			}
 	}
 	return NULL;
 }
@@ -3001,12 +3053,18 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 		// MDH@14NOV2019: if no referened value is available we should use the name to obtain the value of the top level referenced value
 		if(!referencedValue){ // no actual referenced value stored (BUT that could actually be the value to return)
 			// if we do NOT have a name it's a literal
-			if(_valuereference->_name){
+			if(_valuereference->_name&&strlen(_valuereference->_name)>0){
 				// MDH@04NOV2019: now that we've added the TT_REFERENCE token, the name may start with @ to indicate a variable reference
-				if(_valuereference->_name[0]=='@'){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
+				if(_valuereference->_name[0]==M_DEREFERENCE_CHARACTER){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
 					// I suppose we need to wrap a copy unless we make a separate reference thing where we store the name of the variable which could just be an Mstring?????
-					Mvariable* variable=getVariable(NULL,&_valuereference->_name[1],false);
-					if(variable)referencedValue=_getReferenceValue(_getReference(variable),true);else output("%sReferenced variable '%s' vanished.\n",ERROR_PREFIX,_valuereference->_name[1]);
+					// MDH@11MAR2020: let's distinguish between an unnamed ref (with no variable name defined), and a named ref (where the variable SHOULD exist)
+					Mvariable* variable=getVariable(getExecutionEnvironment(),&_valuereference->_name[1],false);
+					if(variable||strlen(_valuereference->_name)==1){
+						referencedValue=_getReferenceValue(_getReference(variable),true);
+						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
+						//                so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
+					}else
+						output("%sReferenced variable '%s' does not exist.\n",ERROR_PREFIX,_valuereference->_name+1);
 				}else // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
 					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name); // the value at the top level
@@ -3344,7 +3402,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							numberOfElementsToNotEvaluate=2;
 						}else
 						if(!strcmp(_significantTokenText,FORFUNCTION_NAME)){ // the initialization argument should always be evaluated (once)
-							numberOfElementsToNotEvaluate=4;
+							numberOfElementsToNotEvaluate=5;
 						}else
 						if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){ // all arguments to the do function should not be evaluated beforehand
 							numberOfElementsToNotEvaluate=LLONG_MAX; // all elements should NOT be evaluated
@@ -6357,8 +6415,19 @@ Mexpressionvalue* getFunctionValue(Mtoken* _offsetToken,char* functionName){
 */
 
 // and finally
+bool settingApplied(char settingCharacter){
+	if(settingCharacter=='v'||settingCharacter=='V'){setVerbose(settingCharacter=='V');return true;}
+	if(settingCharacter=='d'||settingCharacter=='D'){setDebugging(settingCharacter=='D');return true;}
+	if(settingCharacter=='a'||settingCharacter=='A'){setAssisting(settingCharacter=='A');return true;}
+	// all the rest unfortunately are interactive session characters
+	return false;
+}
+
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
-bool shellInitialized(InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){
+bool shellInitialized(char const * const settingCharacters,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){
+
+	size_t numberOfSettingCharacters=(settingCharacters?strlen(settingCharacters):0);
+	while(numberOfSettingCharacters>0)settingApplied(settingCharacters[--numberOfSettingCharacters]);
 
 	// register the callbacks
 	if(_inputCharReadFunction)inputCharReadFunction=_inputCharReadFunction;else outputWarning("No input character read function defined!");
@@ -6481,7 +6550,7 @@ bool shellInitialized(InputCharReadFunction _inputCharReadFunction,InputResponse
 			// register if, while and for special functions
 		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
 		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
-		    if(!completedTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
+		    if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
 			// MDH@05AUG2019: the do function has a single token to process
 		    if(!completedTokenListFunction(_getFunction(_Menvironment,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
 		    if(!completedValueFunction(_getFunction(_Menvironment,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;

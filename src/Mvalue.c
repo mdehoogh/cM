@@ -15,6 +15,7 @@ extern const long double M_LD_Q_EPS; // the threshold for accepting a rational a
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const long double LD_PI; // for Mfacd()
 extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (default) decimal context
+extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 
 void free_variable(Mvariable* _variable,bool weak){
     if(_variable){
@@ -287,15 +288,16 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 */
 // MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
 Mreference* _getReference(Mvariable* variable){
-    Mreference* _reference=(variable?CALLOC(1,sizeof(Mreference),'Q'):NULL);
-    if(_reference){_reference->variable=variable;_reference->referenceindex=(++variable->referencecount);}
+    // MDH@11MAR2020: variable can now be NULL
+    Mreference* _reference=CALLOC(1,sizeof(Mreference),'Q');
+    if(_reference){_reference->variable=variable;if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
     return _reference;
 }
 void free_reference(Mreference* reference){
     if(reference){reference->variable->referencecount--;FREE(reference,'Q');}
 }
 Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure){
-    if(!_reference){outputInfo("No reference to wrap.");return NULL;}
+    if(!_reference){outputWarning("No reference to wrap.");return NULL;}
     Mvalue* _referenceValue=__value("reference");
     if(_referenceValue){_referenceValue->type=VT_REFERENCE;_referenceValue->value._reference=_reference;}else if(freeonfailure)free_reference(_reference);
     return _referenceValue;
@@ -904,6 +906,49 @@ Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name
     }
     return NULL;
 }/* VALIDATED */
+Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5){
+    if(name1&&name2&&name3&&name4){
+        if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
+            strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name1,name5)&&
+            strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name2,name5)&&
+            strcmp(name3,name4)&&strcmp(name3,name5)&&
+            strcmp(name4,name5)){
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement5=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4&&_mapelement5){
+                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                if(_map){
+                    _mapelement1->_variable=_getVariable(name1,VT_TOKEN,true);
+                    _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
+                    _mapelement3->_variable=_getVariable(name3,VT_TOKEN,true);
+                    _mapelement4->_variable=_getVariable(name4,VT_TOKEN,true);
+                    _mapelement5->_variable=_getVariable(name5,VT_TOKEN,true);
+                    if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable&&_mapelement5->_variable){
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
+                        _mapelement3->_next=_mapelement4;
+                        _mapelement4->_next=_mapelement5;
+                        _map->_last=_mapelement5;
+                        _map->numberOfElements=5;
+                        return _map;
+                    }
+                    free_map(_map); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                }
+            }
+            // either map element might have been created and we need to release them
+            free_mapelement(_mapelement1,false);
+            free_mapelement(_mapelement2,false);
+            free_mapelement(_mapelement3,false);
+            free_mapelement(_mapelement4,false);
+            free_mapelement(_mapelement5,false);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
 // end helper functions 
 
 // LIST STUFF
@@ -1244,8 +1289,8 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                     valueText=__string();
                     if(valueText){
                         Mstring* p=valueText;
-                        p=string_append_char(p,'@');
-                        if(_value->value._reference){
+                        p=string_append_char(p,M_DEREFERENCE_CHARACTER);
+                        if(_value->value._reference&&_value->value._reference->variable){ // MDH@11MAR2020: possibly a reference without a variable yet associated (typically used with reference function parameters)
                             p=string_append(p,_value->value._reference->variable->_name);
                             // append the reference index so we know which one it is
                             p=string_append_char(p,':');
@@ -1322,7 +1367,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
 		}
 	}else // the text we use for an value that is NULL!
         valueText=_getString(M_NULL_VALUE_TEXT);
-    if(valueText)if(amAssisting())valueText=appendll(string_append_char(valueText,'#'),_value->count); // show the reference count as well
+    if(_value)if(amAssisting())if(valueText)valueText=appendll(string_append_char(valueText,'#'),_value->count); // show the reference count as well
     /////outputChar('.');
     return(valueText?valueText:_getUndefinedValueText());
     /* replacing:

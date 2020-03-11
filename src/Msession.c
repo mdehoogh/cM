@@ -15,13 +15,13 @@
 
 extern long long M_LL_INVALID;
 
-struct termios orig_termios;
+static struct termios orig_termios;
 
-bool rawmode=false;
+static bool rawmode=false;
 
 void disableRawmode(){
     if(!rawmode)return;
-	printf("%s","Disabling character input mode.\n");
+	outputLine("Disabling character input mode.");
 	rawmode=false;
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
 }
@@ -35,7 +35,7 @@ void endOfUserInput(){
 
 void enableRawmode(){
     if(rawmode)return;
-	printf("%s","Enabling character input mode.\n");
+	outputLine("Enabling character input mode.\n");
 	rawmode=true;
 	tcgetattr(STDIN_FILENO,&orig_termios);
 	atexit(endOfUserInput); // or std::atexit() in C++

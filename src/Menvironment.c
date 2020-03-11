@@ -20,6 +20,7 @@ extern const char* const DEFINEANONYMOUSFUNCTION_NAME; // the name of the define
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* const ERROR_PREFIX;
+extern const char* const WARNING_PREFIX;
 extern const char * const VALUETYPENAMES[];
 
 // moved over to the end of Mvalue.c
@@ -441,7 +442,7 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
 }/* VALIDATED */
 int8_t containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
     // MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
-    if(!_environment||!name)return -2; // invalid input
+    if(!name)return -2; // invalid input
     Mvariable* variable=getVariable(_environment,name,false);
     if(!variable){
         if(report>0)output("'%s' not an existing variable.");
@@ -693,7 +694,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 // MDH@09AUG2019: we allow checking the current environment only when _environment is NULL
 bool addVariable(Menvironment * const _environment,char const * const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
-    if(_environment&&name&&strlen(name)>0){ // input valid
+    if(name&&strlen(name)>0){ // input valid
         _variable=getVariable(_environment,name,false);
         if(!_variable){ // non-existing...
             if(amVerbose())output("Variable '%s' to be created.\n",name);
@@ -730,7 +731,7 @@ bool addVariable(Menvironment * const _environment,char const * const name,Mvalu
             }else
                 outputErrorAndText("Failed to create variable ",name);
         }else{
-            output("WARNING: Won't add existing variable '%s'.\n",name);
+            output("%sWon't add existing variable '%s'.",WARNING_PREFIX,name);
             return true;
         }
     }else
@@ -1472,6 +1473,19 @@ bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char
             return true;
         }
         output("%sFailed to register four token argument function '%s'.\n",ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction){
+    if(_function){
+        _function->type=FT_INTERNAL_FIVE_ARGUMENTS;
+        _function->functionunion.fiveArgumentFunction=fiveArgumentFunction;
+        _function->_parameterMap=_getTokenTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body","result");
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register five token argument function '%s'.\n",ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */

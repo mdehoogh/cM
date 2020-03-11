@@ -81,8 +81,12 @@ bool startFunctionBodyInput();
 bool endFunctionBodyInput();
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest);
 
+bool settingApplied(char settingCharacter);
+
 // and finally obtaining a root environment
+// in general initializing the shell with the callbacks and the M setting characters
 bool shellInitialized(
+				char const * const settingCharacters,
 				InputCharReadFunction _inputCharReadFunction,
 				InputResponseFunction _inputInfoFunction,
 				InputResponseFunction _inputErrorFunction,

@@ -47,7 +47,7 @@ cd src
 # remove M
 rm -f M
 # remove all object files
-######rm -f *.o
+rm -f *.o
 # and static libraries
 rm -f *.a
 # move the static libraries in here
@@ -58,8 +58,10 @@ chmod 644 *
 # MDH@03MAR2020: compile with the -g flag so we can debug it
 cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Moutput.c Mmessage.c Malloc.c Mstring.c Msettings.c Mexpression.c Mmemory.c Mexecution.c Mbiginteger.c Mrational.c Mdecimal.c Mvalue.c Mlist.c Mfunctions.c Menvironment.c Mshell.c 
 ar cvq libM.a *.o
+# compile the M interactive session source files separately
+cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Mcolors.c Msession.c M.c
 # then link the lot together to create the interactive M program!!
-cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM -g Mcolors.c Msession.c M.c -o M 
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM Mcolors.o Msession.o M.o -o M 
 
 # check whether it is there!!!
 if [ -f M ]; then

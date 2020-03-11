@@ -113,6 +113,8 @@ bool completedValueTokenTokenFunction(Mfunction* const _function,const char* con
 bool completedValueValueValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 
 bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction);
+bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction);
+
 bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 
 Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);

@@ -49,7 +49,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="7";char const * const M_DATE="20 Februari 2020, 18:00";
 //char const * const M_BUILD="8";char const * const M_DATE="27 Februari 2020, 18:00";
 //char const * const M_BUILD="9";char const * const M_DATE="28 Februari 2020, 18:00";
-char const * const M_BUILD="10";char const * const M_DATE="2 March 2020, 12:00";
+//char const * const M_BUILD="10";char const * const M_DATE="2 March 2020, 12:00";
+char const * const M_BUILD="11";char const * const M_DATE="11 March 2020, 18:00";
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -977,7 +978,8 @@ void promptForUserInput(){
 	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode();
 	resetOutputColor();
-	output("\n%s\n",promptinfo[inputMode]); // show the appropriate input mode prompt info
+	newline();
+	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	//////if(inputMode==IM_COMMAND)
 }
@@ -1478,15 +1480,17 @@ void outputValueColored(Mvalue* _value){
 					outputChar('}');
 				}
 				break;
+				/* MDH@11MAR2020: better to use _getValueText() for all cases where we're NOT color coding as _getValueText() is kept up to date in the first place
 			case VT_REFERENCE:
 				outputChar(M_DEREFERENCE_CHARACTER); // same as the reference character 
-				if(_value->value._reference){
+				if(_value->value._reference&&_value._reference->variable){ // MDH@11MAR2020 now corrected to account for NULL variable field
 					output("%s",_value->value._reference->variable->_name);
 					outputChar(':');
 					output("%zu",_value->value._reference->referenceindex);
 				}
 				break;
-			default: // for VT_FUNCTION, VT_ENVIRONMENT and the like
+				*/
+			default: // for VT_REFERENCE, VT_FUNCTION, VT_ENVIRONMENT and the like
 				{
 					Mstring* _valueText=_getValueText(_value,false);
 					if(_valueText){output("%s",string(_valueText));free_string(_valueText);}
@@ -1684,7 +1688,7 @@ void setInputMode(enum INPUTMODE_ENUM newInputMode){
 char switchToControlMode(char* message){
 	if(inputMode!=IM_CONTROL){
 		if(inputMode==IM_COMMAND)clearCommand();
-		if(message!=NULL){setColor(getErrorColor());output("\n%s\n",message);} // MDH@01OCT2019: message will typically be an error so
+		if(message!=NULL){newline();setColor(getErrorColor());outputLine(message);} // MDH@01OCT2019: message will typically be an error so
 		resetOutputColor();
 		setInputMode(IM_CONTROL);
 		if(amVerbose())outputValues(); // MDH@25NOV2019: it's convenient to also output the values when verbose
@@ -2123,8 +2127,10 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	}else{ // is it (still) a function?
 		if(!getFunction(getExecutionEnvironment(),_identifierName)){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
+			// MDH@11MAR2020: ok, here we have an issue: 
 			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 			reoutputToken(lastCommandToken);
+			inputInfo("'%s' considered to be an existing variable.",_identifierName);
 			//////////outputInfo("Variable redrawn!");
 			// remove any opening parenthesis from the behind cursor text
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019: I suppose when TT_VARIABLE changes to TT_NEW_VARIABLE later on, an equal sign might be added!!!
@@ -2141,7 +2147,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		bool variableExists=(lastCommandToken->argument!=1);
 		if(variableExists){
 			if(!existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid)){
-				switch(containsVariable(getExecutionEnvironment(),_identifierName,-1)){
+				switch(containsVariable(NULL,_identifierName,-1)){
 					case -2:
 						inputInfo("Missing environment or variable name (%s)!",_identifierName);
 						break;
@@ -2760,6 +2766,32 @@ void prepareForUserInput(){
 	initSession();
 }
 
+signed char getSessionSettingApplied(char sessionSettingCharacter){
+	signed char result=0;
+	if(sessionSettingCharacter=='m'||sessionSettingCharacter=='M')setMatchingparentheses(sessionSettingCharacter=='M');else
+	if(sessionSettingCharacter>='0'&&sessionSettingCharacter<='9'){setColorscheme(sessionSettingCharacter-'0');result='n';}else
+	if(sessionSettingCharacter=='w'||sessionSettingCharacter=='W')setWrapping(sessionSettingCharacter=='W');else
+	////////////if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
+	if(sessionSettingCharacter=='u'||sessionSettingCharacter=='U'){setAcceptinghistorycommand(sessionSettingCharacter=='U');/*result='n';*/}else
+	if(sessionSettingCharacter=='b'||sessionSettingCharacter=='B'){beep();result='n';}else // MDH@23SEP2019: so we can test whether beep() is working... TODO for toggling beeping????
+	if(sessionSettingCharacter=='f'||sessionSettingCharacter=='F'){outputFunctions();result='n';}else
+	if(sessionSettingCharacter=='r'||sessionSettingCharacter=='R'){reset();result='n';}else
+	// options
+	if(sessionSettingCharacter=='x'||sessionSettingCharacter=='X')result='x';else
+	if(sessionSettingCharacter=='s'||sessionSettingCharacter=='S')result=switchToShellMode(NULL);else
+	if(sessionSettingCharacter=='h'||sessionSettingCharacter=='H'){
+		// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
+		// we could call them a, b, c etc.
+		if(commandCount){
+			commandPages=1+(commandCount-1)/10;
+			showNextCommandPage(); // as soon as commandPage>0 we are paging...
+		}else
+			output("%s\n","No previous commands to show.");
+	}else // unprocessed
+		result=-1;
+	return result;
+}
+
 int main(int argc, char **argv){
 
 	COMMAND_PROCESSOR_AVAILABLE=system(NULL); // check if there's a command processor available
@@ -2782,46 +2814,36 @@ int main(int argc, char **argv){
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
+	Mstring* _settingsCharacterText=__string();
 	if(argc>1){
 		printf("%s\n","Arguments");
+		char settingCharacter;
 		for(int arg=1;arg<argc;arg++){
 			printf("%i. %s\n",arg,argv[arg]);
 			if(argv[arg][0]=='-'){ // a flag (or flags)
 				int i=0;
-				while(argv[arg][++i]){
-					if(argv[arg][i]=='v')setVerbose(false);else
-					if(argv[arg][i]=='V')setVerbose(true);else
-					if(argv[arg][i]=='d')setDebugging(false);else
-					if(argv[arg][i]=='D')setDebugging(true);else
-					if(argv[arg][i]=='a')setAssisting(false);else
-					if(argv[arg][i]=='A')setAssisting(true);else
-					if(argv[arg][i]=='m')setMatchingparentheses(false);else
-					if(argv[arg][i]=='M')setMatchingparentheses(true);else
-					if(argv[arg][i]=='C')setColorscheme(0);else // light color scheme
-					if(argv[arg][i]=='c')setColorscheme(1);else // dark color scheme
-					if(argv[arg][i]=='W')setWrapping(true);else
-					if(argv[arg][i]=='w')setWrapping(false);else
-					if(argv[arg][i]>='0'&&argv[arg][i]<='9')setColorscheme(argv[arg][i]-'0'); // a digit indicating the color scheme to use
+				while((settingCharacter=argv[arg][++i])){
+					// if it's not a session setting we're going to pass it along to shellInitialized (see below) if we can
+					if(getSessionSettingApplied(settingCharacter)<0){ // not a session setting
+						_settingsCharacterText=string_append_char(_settingsCharacterText,settingCharacter); // register to pass along to shell initialized
+						if(!_settingsCharacterText)settingApplied(settingCharacter); // if failing to add, do it from here
+					}
 				}
 			}
 		}
 	}
 
 	prepareForUserInput(); // BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!
-	resetOutputColor(); // just in case
-	outputInfo("Welcome to M.");
-	newline();
-	output("Version: %s - Build: %s - Date: %s",M_VERSION,M_BUILD,M_DATE);
-	newline();newline();
 
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
-	if(!shellInitialized(inputCharRead,inputInfo,inputError,outputToken,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),inputCharRead,inputInfo,inputError,outputToken,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
 		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(1);
 	}
 	outputInfo("Shell initialized.");
+	if(_settingsCharacterText)free_string(_settingsCharacterText);
 
 	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
 
@@ -2832,6 +2854,11 @@ int main(int argc, char **argv){
 		exit(2);
 	}
 
+	resetOutputColor(); // just in case
+	outputInfo("Welcome to M.");
+	newline();
+	output("Version: %s - Build: %s - Date: %s.\n",M_VERSION,M_BUILD,M_DATE);
+	newline();
 	displayFlags();
 	newline();
 	
@@ -3460,32 +3487,13 @@ int main(int argc, char **argv){
 			}else
 			if(inputMode==IM_CONTROL){ // inputChar received in control mode
 				outputChar(inputChar); // nice to see the character we typed...
+				newline();
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
-					// single character responses (and out again)
-					if(inputChar=='a'||inputChar=='A'){setAssisting(inputChar=='A');/*inputCharType='n';*/break;}
-					if(inputChar=='d'||inputChar=='D'){setDebugging(inputChar=='D');/*inputCharType='n';*/break;}
-					if(inputChar=='m'||inputChar=='M'){setMatchingparentheses(inputChar=='M');/*inputCharType='n';*/break;}
-					if(inputChar=='v'||inputChar=='V'){setVerbose(inputChar=='V');/*inputCharType='n';*/break;}
-					if(inputChar=='u'||inputChar=='U'){setAcceptinghistorycommand(inputChar=='U');/*inputCharType='n';*/break;}
-					if(inputChar>='0'&&inputChar<='9'){setColorscheme(inputChar-'0');inputCharType='n';break;}
-					if(inputChar=='w'||inputChar=='W'){setWrapping(inputChar=='W');/*inputCharType='n';*/break;}
-					////////////if(inputChar=='v'||inputChar=='V'){outputVariables();inputCharType='n';break;}
-					if(inputChar=='b'||inputChar=='B'){beep();inputCharType='n';break;} // MDH@23SEP2019: so we can test whether beep() is working... TODO for toggling beeping????
-					if(inputChar=='f'||inputChar=='F'){outputFunctions();inputCharType='n';break;}
-					if(inputChar=='r'||inputChar=='R'){reset();inputCharType='n';break;}
-					// options
-					if(inputChar=='x'||inputChar=='X'){inputCharType='x';break;}
-					if(inputChar=='s'||inputChar=='S')inputCharType=switchToShellMode(NULL);
-					if(inputChar=='h'||inputChar=='H'){
-						// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
-						// we could call them a, b, c etc.
-						if(commandCount){
-							commandPages=1+(commandCount-1)/10;
-							showNextCommandPage(); // as soon as commandPage>0 we are paging...
-						}else
-							output("%s\n","No previous commands to show.");
-					}
+					unsigned char sessionSettingApplied=getSessionSettingApplied(inputChar); // try to process myself
+					// we can get 'n' or 'x' responses
+					if(sessionSettingApplied>0){inputCharType=sessionSettingApplied;break;}
+					if(sessionSettingApplied<0)if(!settingApplied(inputChar))output("%sFailed to apply setting '%s'.\n",ERROR_PREFIX,inputChar);
 				}else
 					// user might have selected one of the commands (letter a through j)
 					commandPage=0; // stop paging

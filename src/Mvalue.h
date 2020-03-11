@@ -195,6 +195,8 @@ Mmap* _getTokenTokenMap(char* name1,char* name2);
 Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
+Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5);
+
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getIntegerBooleanMap(char* name1,char* name2);
 
@@ -235,6 +237,7 @@ typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
 typedef Mvalue* (*TwoArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value);
 typedef Mvalue* (*ThreeArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value);
 typedef Mvalue* (*FourArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value);
+typedef Mvalue* (*FiveArgumentFunction)(Mvalue* _argument1Value,Mvalue* _argument2Value,Mvalue* _argument3Value,Mvalue* _argument4Value,Mvalue* _argument5Value);
 
 Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
 Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
@@ -268,7 +271,7 @@ typedef struct Muserfunction{
 }Muserfunction;
 void free_userfunction(Muserfunction* _userfunction);
 
-typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS}Mfunctiontype;
+typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS,FT_INTERNAL_FIVE_ARGUMENTS}Mfunctiontype;
 
 typedef union Mfunctionunion{
     NoArgumentFunction noArgumentFunction;
@@ -276,6 +279,7 @@ typedef union Mfunctionunion{
     TwoArgumentFunction twoArgumentFunction;
     ThreeArgumentFunction threeArgumentFunction;
     FourArgumentFunction fourArgumentFunction;
+    FiveArgumentFunction fiveArgumentFunction;
     Muserfunction* _userfunction; // a list of expressions to evaluate that use the parameters (and have defaults, and an environment)
 }Mfunctionunion;
 
