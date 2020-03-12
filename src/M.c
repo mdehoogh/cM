@@ -38,6 +38,7 @@ extern const unsigned long long M_BITS_PER_ENV_LEVEL; // the minimum is 4 (to al
 extern const Mvalue* NULL_value;
 extern const long long M_LL_INVALID;
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
+extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
@@ -50,7 +51,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="8";char const * const M_DATE="27 Februari 2020, 18:00";
 //char const * const M_BUILD="9";char const * const M_DATE="28 Februari 2020, 18:00";
 //char const * const M_BUILD="10";char const * const M_DATE="2 March 2020, 12:00";
-char const * const M_BUILD="11";char const * const M_DATE="11 March 2020, 18:00";
+//char const * const M_BUILD="11";char const * const M_DATE="11 March 2020, 18:00";
+char const * const M_BUILD="12";char const * const M_DATE="12 March 2020, 18:00";
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -2147,9 +2149,19 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		bool variableExists=(lastCommandToken->argument!=1);
 		if(variableExists){
 			if(!existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid)){
+				// MDH@12MAR2020: if containsVariable() returns -2 this only happens with a property reference that is invalid in which case the token should be considered an error
+				//                I suppose we should then change the token type to TT_ERROR
 				switch(containsVariable(NULL,_identifierName,-1)){
 					case -2:
-						inputInfo("Missing environment or variable name (%s)!",_identifierName);
+						{
+							char* propertyName=strrchr(_identifierName,M_PROPERTY_SEPARATOR_CHARACTER);
+							if(propertyName){
+								setTokenType(lastCommandToken,TT_ERROR);
+								reoutputToken(lastCommandToken);
+								inputInfo("Invalid property '%s'.",propertyName);
+							}else
+								inputInfo("Missing environment or variable name (%s)!",_identifierName);
+						}
 						break;
 					case -1:
 						variableExists=false;

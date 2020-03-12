@@ -13,6 +13,7 @@ extern const long double M_LD_Q_EPS; // the threshold for accepting a rational a
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const char * const M_HIDDEN_VARIABLE_NAMES[]; // MDH@14NOV2019: the name of the M variables to NOT return when requesting the variable map text!!!
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: is set elsewhere (in Mshell.c/h)
+extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: is set elsewhere (in Mshell.c/h)
 extern const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES;
 // TODO make the following variables start with M_
 extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user function function
@@ -390,11 +391,45 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
 
 // MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
 // MDH@10MAR2020: if `name` ends with @ we should return the variable that the thing in front of it references (i.e. if y=@x then y@ represents x)
+// MDH@12MAR2020: if `name` ends with . the part in front of it needs to be an existing variable that contains a map otherwise it is actually not allowed but that is actually handled by the parser (not allowing . in new variable)
 Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * const name, bool report){ // MDH@10MAR2020: because we might want to cut off the last character name characters can not be const any more (between char and *)
     if(!name){if(report)outputError("No variable name specified");return NULL;}
     // MDH@10MAR2020: taking care of variable names that end with @ which acts as dereference operator
     size_t l=strlen(name);
-    if(l==0){if(report)outputError("Undefined variable name.");return NULL;}
+    if(l==0){if(report)outputError("Undefined variable name");return NULL;}
+    // MDH@12MAR2020: if `name` refers to a property in a map variable we have to determine if that property exists or not and return it if it does
+    //                in combination with containsVariable() we decided to 
+    char* nextPropertySeparator=strchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
+    if(nextPropertySeparator){
+        char* propertySeparator=name;
+        // the 'root' name must be a variable in the current (environment) variable map
+        propertySeparator[nextPropertySeparator-propertySeparator]='\0'; // pointer arithmetic
+        Mvariable* mapVariable=getVariable(_environment,propertySeparator,report);
+        propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER;
+        if(!mapVariable)return NULL;
+        if(!mapVariable->_value)return NULL;
+        if(mapVariable->_value->type!=VT_MAP)return NULL;
+        // it's a map so now we can check all properties
+        Mmap* map=mapVariable->_value->value._map;
+        Mmapelement* mapelement;
+        // starting out with a map and a list of 'dot' seperated property names
+        while(map){
+            propertySeparator=nextPropertySeparator+1; // the first position after the 'dot' so containing the 
+            nextPropertySeparator=strchr(propertySeparator,M_PROPERTY_SEPARATOR_CHARACTER);
+            if(nextPropertySeparator)propertySeparator[nextPropertySeparator-propertySeparator]='\0';
+            if(report)output("Looking for property '%s' in '%s'.\n",propertySeparator,name);
+            mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name,propertySeparator)))mapelement=mapelement->_next;
+            if(nextPropertySeparator)propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER; // put the property separator character back where it belongs
+            if(!mapelement)return NULL; // if we did not find a matching map element (property) definitely not an existing property
+            // ASSERT matching 'property' found
+            if(!nextPropertySeparator)return mapelement->_variable; // if no next property to look for we can return the associated (map) variable
+            // ASSERT because there is a next property the property must have a map associated with it, so let's update map
+            map=(mapelement->_variable&&mapelement->_variable->_value&&mapelement->_variable->_value->type==VT_MAP?mapelement->_variable->_value->value._map:NULL);
+        }
+        // if we get here we definitely did not find the final property
+        if(report)output("Property '%s' not found.\n",name);
+        return NULL;
+    }
     // testing with: outputChar(M_DEREFERENCE_CHARACTER);
     if(name[l-1]==M_DEREFERENCE_CHARACTER){
         // I need to cut off the last character, get the associated variable of that part
@@ -439,23 +474,6 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
     if(report)output("Variable '%s' NOT found in environment '%s'.\n",name,environment->_name);
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,report):NULL);
-}/* VALIDATED */
-int8_t containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
-    // MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
-    if(!name)return -2; // invalid input
-    Mvariable* variable=getVariable(_environment,name,false);
-    if(!variable){
-        if(report>0)output("'%s' not an existing variable.");
-        return -1;
-    }
-    // if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
-    if(variable->valuetype==VT_FUNCTION){
-        if(report>0)output("'%s' is a function variable, and not a true (value) variable.\n",name);
-        return 0;
-    }
-    if(report>0)output("'%s' is recognized as an existing variable.\n",name);
-    return 1;
-    // replacing: return(getVariable(_environment,name,false)!=NULL);
 }/* VALIDATED */
 
 char* getConstantWithValue(Menvironment const * const _environment,char * name,Mvalue* value){
@@ -692,9 +710,25 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 
 // addVariable returns the value map element that was created (if successful)
 // MDH@09AUG2019: we allow checking the current environment only when _environment is NULL
-bool addVariable(Menvironment * const _environment,char const * const name,Mvaluetype valuetype,bool immutable){
+// MDH@12MAR2020: we have to also now take care of adding properties for name containing 'dots' i.e. property references
+bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
     if(name&&strlen(name)>0){ // input valid
+        // MDH@12MAR2020: it's more convenient to take care of adding properties separately because otherwise there would be a lot duplication of code in getVariable() in _getVariable()
+        //                we can re-use some of the code that is present in containsVariable()
+        char* lastPropertySeparator=strrchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
+        if(lastPropertySeparator){ // a property reference
+            name[lastPropertySeparator-name]='\0';
+            _variable=getVariable(_environment,name,false);
+            Mmap* map=(_variable&&_variable->_value&&_variable->_value->type==VT_MAP?_variable->_value->value._map:NULL);
+            bool result=false;
+            if(!map)output("%s'%s' does not hold a map value.",ERROR_PREFIX,name);else
+            if(map->immutable)output("%sCannot add a property to the immutable map stored in '%s'.",ERROR_PREFIX,name);else result=true; // TODO more specific please
+            name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER;
+            if(result)if(!appendedToMap(map,lastPropertySeparator+1,NULL)){result=false;output("%sFailed to add property '%s'.",ERROR_PREFIX,lastPropertySeparator+1);}
+            return result;
+        }
+        // MDH@12MAR2020: 
         _variable=getVariable(_environment,name,false);
         if(!_variable){ // non-existing...
             if(amVerbose())output("Variable '%s' to be created.\n",name);
@@ -731,7 +765,7 @@ bool addVariable(Menvironment * const _environment,char const * const name,Mvalu
             }else
                 outputErrorAndText("Failed to create variable ",name);
         }else{
-            output("%sWon't add existing variable '%s'.",WARNING_PREFIX,name);
+            if(amVerbose())output("%sWon't add existing variable '%s'\n.",WARNING_PREFIX,name);
             return true;
         }
     }else
@@ -739,9 +773,9 @@ bool addVariable(Menvironment * const _environment,char const * const name,Mvalu
     return false;
 }/* VALIDATED */
 
-bool setValue(Menvironment const * const _environment,char /*const*/ * const name,const Mvalue* const _value){
+bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
-    if(!name){outputError("Cannot set the value: no variable name");return false;}
+    if(!name||strlen(name)==0){outputError("Cannot set the value: no variable name");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
     if(variable){
         if(!variable->_value||!variable->immutable){
@@ -764,9 +798,13 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
             }
             output("%sCannot set the value of variable `%s`: the new value is of the wrong type.\n",ERROR_PREFIX,name);
         }else
-            output("%sCannot set the value of variable `%s`: it is not mutable!\n",ERROR_PREFIX,name);
+        if(variable->_value){
+            output("%sCannot change the value of variable '%s'",ERROR_PREFIX,name);
+            outputValue(" from '",variable->_value,"'");outputValue(" to '",_value,"': it is not mutable!\n");
+        }else
+            output("%sCannot initialize the value of variable '%s': it is not mutable!\n",ERROR_PREFIX,name);
     }else
-        output("%sCannot set the value of variable `%s`: it is unknown.\n",ERROR_PREFIX,name);
+        output("%sCannot set the value of variable '%s': it is unknown.\n",ERROR_PREFIX,name);
     return false;
 }/* VALIDATED */
 
@@ -797,7 +835,12 @@ bool setVariable(Menvironment * const _environment,char /*const*/ * const name,M
             }
             output("%sCannot set variable '%s': the new value is of the wrong type.\n",ERROR_PREFIX,name);
         }else
-            output("%sCannot set variable '%s': it is not mutable!\n",ERROR_PREFIX,name);
+        if(variable->_value){
+            output("%sCannot change the value of variable '%s'",ERROR_PREFIX,name);
+            outputValue("from '",variable->_value,"'");
+            outputValue(" to '",_value,"': it is not mutable.\n");
+        }else
+            output("%sCannot initialize the value of variable '%s': it is not mutable!\n",ERROR_PREFIX,name);
     }else
         output("%sCannot set variable '%s': it is unknown to '%s'.\n",ERROR_PREFIX,name,(_environment?_environment:getExecutionEnvironment())->_name);
     return false;

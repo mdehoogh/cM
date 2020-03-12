@@ -71,7 +71,7 @@ void outputTable(Mlist* table); // MDH@25NOV2019: certain lists are now construc
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue);
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue); // MDH@25NOV2019: storing the memory allocations in a table makes it more displayable
 
-bool addVariable(Menvironment * const _environment,char const * const name,Mvaluetype valuetype,bool immutable);
+bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype valuetype,bool immutable);
 /*
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mfloat* _real);

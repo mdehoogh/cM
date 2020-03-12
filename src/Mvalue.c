@@ -505,8 +505,9 @@ Mmap* _getMapCopy(Mmap const * const map){ // creates a 'deep' copy
                     _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // new map element to hold a copy
                     if(_mapelement){
                         // create a variable with the same name and value as the variable in mapelement
-                        _mapelement->_variable=_getVariable(mapelementVariable->_name,mapelementVariable->valuetype,true);
-                        assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the vale over
+                        // MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
+                        _mapelement->_variable=_getVariable(mapelementVariable->_name,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/);
+                        assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the value over
                         if(_map->_last)_map->_last->_next=_mapelement; // make the current last point to the new last
                         _map->_last=_mapelement; // replace current last by the new last
                         if(!_map->_first)_map->_first=_map->_last; // initialize first if necessary
@@ -1091,7 +1092,7 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index){
 
 // MAP STUFF
 // MDH@24MAY2019: if already in the map should replace the current value
-long long appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue){
+long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue const * const _attributeValue){
     long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
     if(result!=M_LL_INVALID){
         if(!_map->immutable){ // the map is mutable
@@ -1103,6 +1104,7 @@ long long appendedToMap(Mmap* const _map,const char* const attributeName,const M
                 if(!_mapelement){ // not found
                     _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
+                        // MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
                         _mapelement->_variable=_getVariable(attributeName,VT_UNDEFINED,false); // TODO why would this 'variable' be mutable, and allowing all values????
                         if(_mapelement->_variable){ // the variable was created so attach in map
                             if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
