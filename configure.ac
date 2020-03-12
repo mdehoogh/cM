@@ -6,7 +6,7 @@ AC_CONFIG_SRCDIR([src/M.c])
 
 # MDH@23OCT2019: we do not want to overwrite src/Makefile.in (because I adjusted it)
 #                NO we can change Makefile.in after autoconf creates it!!!
-AM_INIT_AUTOMAKE([foreign no-dist-gz dist-xz])
+AM_INIT_AUTOMAKE([foreign no-dist-gzip dist-xz])
 
 #INTI_REQUIRED_VERSION=1.0.7
 #PKG_CHECK_MODULES(INTI, inti-1.0 >= $INTI_REQUIRED_VERSION)
