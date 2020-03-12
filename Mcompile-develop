@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# MDH@12MAR2020: using libtommath_develop instead of libtommath itself
+
 # MDH@21OCT2019: assuming that the M source files are in subfolder src/ now and the library files to link in the current directory as we would expect after a make
 
 # the actual stuff
@@ -23,9 +25,6 @@ fi
 
 # ASSERT the lib subdirectory should now exist
 
-echo "Copying tommath.h from the libtommath subdirectory."
-cp libtommath/tommath.h .
-
 # copy the library files over if present in the current directory after which we remove them
 # NOTE we will copy them over instead of moving, so we do not have to recreate them every time, wait a minute if they are already present in lib leave it
 # NOTE this means that this will happen once directly after a make (technically Mcompile would replace making src/Makefile)
@@ -33,24 +32,24 @@ if [[ -f libmpdec.a && ! -f lib/libmpdec.a ]]; then
     echo "Moving libmpdec.a to the lib subdirectory."
     mv libmpdec.a lib/
 fi
-if [[ -f libtommath.a && ! -f lib/libtommath.a ]]; then
-    echo "Moving libtommath.a to the lib subdirectory."
-    mv libtommath.a lib/
+if [[ -f libtommath_develop.a && ! -f lib/libtommath_develop.a ]]; then
+    echo "Moving libtommath_develop.a to the lib subdirectory."
+    mv libtommath_develop.a lib/
 fi
 
 # the static libraries should now be present in the lib folder
-if [[ ! -f lib/libmpdec.a || ! -f lib/libtommath.a ]]; then
+if [[ ! -f lib/libmpdec.a || ! -f lib/libtommath_develop.a ]]; then
     echo "ERROR: Static libraries as needed by M not present in the lib folder."
     exit 1
 fi
 
 cd src
+
 echo "Copying tommath.h from the libtommath subdirectory into the src folder."
 cp ../libtommath/tommath.h .
 
 echo ""
 echo "Compiling M..."
-
 # remove M
 rm -f M
 # remove all object files
@@ -68,7 +67,7 @@ ar cvq libM.a *.o
 # compile the M interactive session source files separately
 cc -Wno-incompatible-pointer-types-discards-qualifiers -g -c Mcolors.c Msession.c M.c
 # then link the lot together to create the interactive M program!!
-cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath -lmpdec -lM Mcolors.o Msession.o M.o -o M 
+cc -Wno-incompatible-pointer-types-discards-qualifiers -L. -ltommath_develop -lmpdec -lM Mcolors.o Msession.o M.o -o M 
 
 # check whether it is there!!!
 if [ -f M ]; then
