@@ -3,8 +3,15 @@
  * - output to the console
  */
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "Mconstants.h"
+
+// MDH@13MAR2020: let's allow echoing output to a file as well if so requested
+bool setOutputFilename(char const * const outputFilename);
+size_t outputToFile(char const * const prefix,char const * const str,char const * const suffix);
+bool echoToOutputFile();
+void dontEchoToOutputFile();
 
 // MDH@28FEB2019: most conveniently to be able to output to the console through a single method that will allow a format string, and any number of arguments
 //                TODO delegate all functions that output to the output device to this function

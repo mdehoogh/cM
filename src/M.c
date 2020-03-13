@@ -146,13 +146,34 @@ static void outputCommandInfo(Mcommand* command){
 	}
 }
 
+Mstring* _getTimestamp(char const * const format){
+	Mstring* _timestamp=__string();
+	if(_timestamp){
+		Mstring* p=string_setlength(_timestamp,50);
+		if(p){
+	    	time_t now=time(NULL);
+			struct tm * nowlocal=localtime(&now);
+			p=string_setlength(p,strftime(p->chars,50,(format?format:"%Y-%m-%d %H:%M:%S"),nowlocal));
+		}
+		if(!p){free_string(_timestamp);_timestamp=NULL;}
+	}
+	return _timestamp;
+}
+
 void writeTimestamp(FILE* _file){
 	if(_file){
+		Mstring* _timestamp=_getTimestamp(NULL);
+		if(_timestamp){
+	    	fprintf(_file,"%s\t",string(_timestamp));
+			free_string(_timestamp);
+		}
+		/* replacing:
     	time_t now=time(NULL);
 		struct tm * nowlocal=localtime(&now);
     	char buffer[50];
 		strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",nowlocal);
     	fprintf(_file,"%s\t",buffer);
+		*/
 	}
 }
 
@@ -912,9 +933,12 @@ long long commandIndex=0;
 size_t getNumberOfSuggestedCharacters(){return(_suggestedText?string_length(_suggestedText):0);}
 size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
-
 // request body of function moved over to Mshell.h/c
-
+void outputTimestamp(){				
+	Mstring* _promptTimestamp=_getTimestamp(NULL); // get a timestamp
+	outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
+	if(_promptTimestamp)free_string(_promptTimestamp);
+}
 void showPrompt(){
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
@@ -924,6 +948,8 @@ void showPrompt(){
 	switch(inputMode){
 		case IM_COMMAND:
 			{
+				outputTimestamp();
+				echoToOutputFile();
 				Mstring* _environmentName=_getExecutionEnvironmentName(); // free asap
 				if(_environmentName){
 					output(string(_environmentName));
@@ -939,7 +965,9 @@ void showPrompt(){
 					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getExecutionEnvironment()->_name));	// replacing: printf("%lu",(commandCount+1));
 				else
 					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
-				output("[%s] = ",str);
+				output("[%s]",str);
+				dontEchoToOutputFile(); // MDH@13MAR2020: not interested in the rest of the prompt just the command we're in
+				output("%s"," = ");
 				promptLength+=strlen(str)+5;
 				clearScreenFromCursor();
 			}
@@ -1579,6 +1607,9 @@ bool evaluateCommand(Mvalue* *resultValue){
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
 	if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show
 	
+	Mstring* _showResultTimestamp=_getTimestamp(NULL);outputToFile("@",string(_showResultTimestamp),":\n");if(_showResultTimestamp)free_string(_showResultTimestamp);
+	echoToOutputFile();
+
 	// output the commandText
 	output("%s = ",string(_commandText));
 	free_string(_commandText);
@@ -1587,6 +1618,10 @@ bool evaluateCommand(Mvalue* *resultValue){
 	clock_t before_writing=clock();size_t written=outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);long long elapsed_writing=(clock()-before_writing)/1000;
 	
 	newline(); // outputValueColored() doesn't do that!!
+	
+	Mstring* _doneShowingResultTimestamp=_getTimestamp(NULL);outputToFile(">",string(_doneShowingResultTimestamp),"\n");if(_doneShowingResultTimestamp)free_string(_doneShowingResultTimestamp);
+	dontEchoToOutputFile();
+
 	if(elapsed_writing>0)output("The writing took %lld ms.\n",elapsed_writing);
 	///// outputValueColored() does do this (and should): resetOutputColor();
 	if(written>1000)if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating);/////////else output("less than 1 ms.");
@@ -2922,6 +2957,14 @@ int main(int argc, char **argv){
 
 	// let's mark the allocations BEFORE we start looping
 	addallocation('!',0,0);
+
+	// MDH@13MAR2020: echo all requested output to the log file as well, I suppose we should use a timestamp in the name, so we get a different log for each session
+	if(setOutputFilename("M.log")){
+		dontEchoToOutputFile(); // turn off what setOutputFilename turned on
+		Mstring* _sessionStartTimestamp=_getTimestamp(NULL);outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");if(_sessionStartTimestamp)free_string(_sessionStartTimestamp);
+		outputInfo("Session information will be written to M.log.");
+	}else
+		outputError("Failed to open M.log for writing session information to.");
 
 	while(1){ // command loop
 

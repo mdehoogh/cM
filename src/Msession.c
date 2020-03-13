@@ -29,6 +29,7 @@ void disableRawmode(){
 void endOfUserInput(){
 	// return to the 'right' colors
 	resetOutputColor();
+	setOutputFilename(NULL); // MDH@13MAR2020: will close the current output file (if any), so it will contain all required information
 	output("\n\n%s\n\n","Thanks for using M.");
 	disableRawmode();
 }
