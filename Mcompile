@@ -23,8 +23,8 @@ fi
 
 # ASSERT the lib subdirectory should now exist
 
-echo "Copying tommath.h from the libtommath subdirectory."
-cp libtommath/tommath.h .
+#echo "Copying tommath.h from the libtommath subdirectory."
+#cp libtommath/tommath.h .
 
 # copy the library files over if present in the current directory after which we remove them
 # NOTE we will copy them over instead of moving, so we do not have to recreate them every time, wait a minute if they are already present in lib leave it
@@ -45,8 +45,8 @@ if [[ ! -f lib/libmpdec.a || ! -f lib/libtommath.a ]]; then
 fi
 
 cd src
-echo "Copying M.tommath.h to the src folder."
-cp ../M.tommath.h ./M.tommath.h
+echo "Copying M.tommath-1.1.0.h to the src folder."
+cp ../M.tommath-1.1.0.h ./M.tommath.h
 
 echo ""
 echo "Compiling M..."

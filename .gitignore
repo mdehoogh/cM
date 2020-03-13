@@ -15,11 +15,15 @@ lib/*
 cdecimal-2.3/*
 
 libtommath-1.1.0/*
+
 libtommath/*.a
 libtommath/*.o
 
 libtommath-develop/*.a
 libtommath-develop/*.o
+
+libtommath-1.2.0/*.a
+libtommath-1.2.0/*.o
 
 src/Makefile
 src/mpdecimal.h
