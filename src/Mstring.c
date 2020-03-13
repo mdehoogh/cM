@@ -1,3 +1,5 @@
+#include <float.h>
+
 #include "Mstring.h"
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
@@ -104,6 +106,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
         // MDH@21JUN2019 removing: str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
     }else
     if(length<str->length){
+        // output("Shortening the length from %zu to %zu.\n",str->length,length);
         str->length=length;
         // MDH@21JUN2019 removing: str->chars[str->length]='\0';
     }
@@ -362,4 +365,99 @@ bool string_equal(Mstring* str1,Mstring* str2){
     if(!str1->chars||!str2->chars)return false; // we need both chars arrays (actually should never be NULL though)
     str1->chars[str1->length]='\0';str2->chars[str2->length]='\0'; // place end-of-text markers so we can use str_cmp for comparison
     return(strcmp(str1->chars,str2->chars)==0);
+}
+
+// MDH@13MAR2020: helper functions now implemented here (instead of in Mexecution.h/c)
+Mstring* string_append_ull(Mstring* const ms,unsigned long long ll){
+	char llText[80];
+	snprintf(llText,80,"%lld",ll); // TODO will this fit?
+	return string_append(ms,llText);
+}/* VALIDATED */
+// helper function
+Mstring* string_append_ll(Mstring* const ms,long long ll){
+	char llText[80];
+	snprintf(llText,80,"%lld",ll); // TODO will this fit?
+	return string_append(ms,llText);
+}/* VALIDATED */
+Mstring* string_append_ld(Mstring* const ms,long double ld){
+	char ldText[80];
+    // how about using scientific notation here?????
+	snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); //////snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); // replaced f with e to get scientific notation!!
+    // alternatively we could shift
+    char* exp=strchr(ldText,'e');
+    int l=strlen(ldText); // where we will be searching for decimal zeroes
+    int exponent=0;
+    if(exp){
+        int e=(int)(exp-ldText);
+        l=e++;
+        ldText[l]='\0'; // cut off the exponent (we can still extract the exponent though)
+        //////output("With exponent: '%s'",ldText);
+        // extract the exponent
+        bool neg=(ldText[e]=='-');if(neg||ldText[e]=='+')e++;
+        while(ldText[e]!='\0'){exponent=10*exponent+(ldText[e]-'0');e++;}
+        if(neg)exponent=-exponent;
+        //////output("Exponent: %u.",exponent);
+        /* replacing:
+        while(--l>0&&ldText[l]=='0');
+        if(ldText[l]=='-'||ldText[l]=='+')l--;
+        if(ldText[l]=='e'){ // the e-part is zero
+            ///output("Zero exponent!");
+            exp=NULL;
+        }else{
+            while(--l>0&&ldText[l]!='e'); // move to the 'e'
+        }
+        */
+    }///////else output("Without exponent: '%s'",ldText);
+
+    // ASSERT l is now on the 'e' of the exponent (if any)
+    
+    char* period=strchr(ldText,'.');
+    if(period){ // there's a decimal period
+        int p=(int)(period-ldText); // p is the position of the decimal point
+        // l-p-1 is the number of decimals if the exponent is smaller than that
+        if(exponent>0){ // move the period up as far as necessary
+            if(exponent<l-p)while(exponent>0){ldText[p]=ldText[p+1];ldText[++p]='.';exponent--;}
+        }else
+        if(exponent<0){ // move the period back as far as possible
+            if(exponent+p>=0)while(exponent<0){ldText[p]=ldText[p-1];ldText[--p]='.';exponent++;}
+        }
+        // ASSERT p is the index of the period
+        while(ldText[--l]=='0'); // a bit naughty to simply replacing '0' with '\0' to pretend to end the text!!!
+        ldText[l+1]='\0';
+    }
+	if(!string_append(ms,ldText))return NULL;
+    if(exponent!=0)if(!string_append_char(ms,'e')||!string_append_ll(ms,exponent))return NULL; // append the exponent
+    return ms;
+}/* VALIDATED */
+
+Mstring* _string_info(Mstring* str){
+    Mstring* str_info=__string();
+    if(str_info){
+        Mstring* p=str_info;
+        if(str){
+            size_t l=str->length;
+            p=string_append(p,"Length: ");
+            p=string_append_ull(p,l);
+            p=string_append_char(p,',');
+            p=string_append(p,"Blocks: ");
+            p=string_append_ull(p,str->blocks);
+            p=string_append_char(p,',');
+            // let's append all the characters
+            p=string_append(p,"Characters: ");
+            if(str->chars){
+                while(1){
+                    p=string_append_ull(p,l);
+                    p=string_append_char(p,'=');
+                    p=string_append_ull(p,str->chars[l]);
+                    if(l==0)break;
+                    l--;
+                    p=string_append_char(p,' ');
+                }
+            }else
+                p=string_append(p,"(undefined)");
+        }else
+            p=string_append(p,"(undefined)");
+        if(!p){free_string(str_info);str_info=NULL;}
+    }
+    return str_info;
 }

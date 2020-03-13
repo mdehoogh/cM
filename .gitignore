@@ -18,6 +18,9 @@ libtommath-1.1.0/*
 libtommath/*.a
 libtommath/*.o
 
+libtommath-develop/*.a
+libtommath-develop/*.o
+
 src/Makefile
 src/mpdecimal.h
 src/*.o

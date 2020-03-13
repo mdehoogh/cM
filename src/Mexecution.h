@@ -24,7 +24,8 @@
 #include <float.h>
 
 // MDH@31MAY2019: big integer support switched from libzahl to libtommatch
-#include "tommath.h"
+// MDH@13MAR2020: switched to using Mtommath.h instead of tommath.h itself because sometimes we want to use a different tommath.h (like Mtommath-develop.h)
+#include "M.tommath.h"
 
 // MDH@10JUN2019: decimal support by libmpdec
 #include "mpdecimal.h"
@@ -230,5 +231,5 @@ long long isBigintegerUndefined(Mbiginteger* biginteger);
 long long isTextUndefined(Mtext* text);
 long long isTokenUndefined(Mtoken* token);
 
-void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
-void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);
+size_t outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
+size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);

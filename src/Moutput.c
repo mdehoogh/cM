@@ -20,9 +20,9 @@ size_t output(const char *fmt,...){
 } // NOTE use vprintf here, NOT printf!!!!
 
 // convenience methods delegating to output() so all output (to stdout by default) goes through function output()
-void outputChar(char c){output("%c",c);} // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
+size_t outputChar(char c){return output("%c",c);} // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
 
-void newline(){outputChar('\n');}
+size_t newline(){return outputChar('\n');}
 
 // all output to the display has to go through output!!
 void outputControlText(char* s){output(ES"%s",s);}

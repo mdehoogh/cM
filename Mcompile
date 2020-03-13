@@ -45,8 +45,8 @@ if [[ ! -f lib/libmpdec.a || ! -f lib/libtommath.a ]]; then
 fi
 
 cd src
-echo "Copying tommath.h from the libtommath subdirectory into the src folder."
-cp ../libtommath/tommath.h .
+echo "Copying M.tommath.h to the src folder."
+cp ../M.tommath.h ./M.tommath.h
 
 echo ""
 echo "Compiling M..."

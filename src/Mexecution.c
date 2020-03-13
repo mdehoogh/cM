@@ -539,67 +539,9 @@ Minteger* _getInteger(long long ll){
 }
 */
 
-Mstring* appendull(Mstring* const ms,unsigned long long ll){
-	char llText[80];
-	snprintf(llText,80,"%lld",ll); // TODO will this fit?
-	return string_append(ms,llText);
-}/* VALIDATED */
-// helper function
-Mstring* appendll(Mstring* const ms,long long ll){
-	char llText[80];
-	snprintf(llText,80,"%lld",ll); // TODO will this fit?
-	return string_append(ms,llText);
-}/* VALIDATED */
-Mstring* appendld(Mstring* const ms,long double ld){
-	char ldText[80];
-    // how about using scientific notation here?????
-	snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); //////snprintf(ldText,80,"%.*Le",LDBL_DIG,ld); // replaced f with e to get scientific notation!!
-    // alternatively we could shift
-    char* exp=strchr(ldText,'e');
-    int l=strlen(ldText); // where we will be searching for decimal zeroes
-    int exponent=0;
-    if(exp){
-        int e=(int)(exp-ldText);
-        l=e++;
-        ldText[l]='\0'; // cut off the exponent (we can still extract the exponent though)
-        //////output("With exponent: '%s'",ldText);
-        // extract the exponent
-        bool neg=(ldText[e]=='-');if(neg||ldText[e]=='+')e++;
-        while(ldText[e]!='\0'){exponent=10*exponent+(ldText[e]-'0');e++;}
-        if(neg)exponent=-exponent;
-        //////output("Exponent: %u.",exponent);
-        /* replacing:
-        while(--l>0&&ldText[l]=='0');
-        if(ldText[l]=='-'||ldText[l]=='+')l--;
-        if(ldText[l]=='e'){ // the e-part is zero
-            ///output("Zero exponent!");
-            exp=NULL;
-        }else{
-            while(--l>0&&ldText[l]!='e'); // move to the 'e'
-        }
-        */
-    }///////else output("Without exponent: '%s'",ldText);
-
-    // ASSERT l is now on the 'e' of the exponent (if any)
-    
-    char* period=strchr(ldText,'.');
-    if(period){ // there's a decimal period
-        int p=(int)(period-ldText); // p is the position of the decimal point
-        // l-p-1 is the number of decimals if the exponent is smaller than that
-        if(exponent>0){ // move the period up as far as necessary
-            if(exponent<l-p)while(exponent>0){ldText[p]=ldText[p+1];ldText[++p]='.';exponent--;}
-        }else
-        if(exponent<0){ // move the period back as far as possible
-            if(exponent+p>=0)while(exponent<0){ldText[p]=ldText[p-1];ldText[--p]='.';exponent++;}
-        }
-        // ASSERT p is the index of the period
-        while(ldText[--l]=='0'); // a bit naughty to simply replacing '0' with '\0' to pretend to end the text!!!
-        ldText[l+1]='\0';
-    }
-	if(!string_append(ms,ldText))return NULL;
-    if(exponent!=0)if(!string_append_char(ms,'e')||!appendll(ms,exponent))return NULL; // append the exponent
-    return ms;
-}/* VALIDATED */
+Mstring* appendull(Mstring* const ms,unsigned long long ull){return string_append_ull(ms,ull);}/* VALIDATED */
+Mstring* appendll(Mstring* const ms,long long ll){return string_append_ll(ms,ll);}/* VALIDATED */
+Mstring* appendld(Mstring* const ms,long double ld){return string_append_ld(ms,ld);}/* VALIDATED */
 
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
@@ -636,23 +578,44 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
     Mstring* _bigintegerText=__string();
     ////outputChar('A');
     if(_bigintegerText){
+        /// output("Initial big integer text length: %zu.\n",_bigintegerText->length);
         ///outputChar('B');
         if(_biginteger){
             // determine the required size
+// MDH@13MAR2020: this is unfortunate because I would have wanted to solve everything with tommath.h
+#ifdef M_MP_DEVELOP
+            size_t arepsize=0; // MDH@13MAR2020: changing type int to size_t (which is larger), so that we should be able to use it with libtommath-develop
+#else
             int arepsize=0;
+#endif
             ///outputChar('C');
             ///////if(amVerbose())outputInfo("Determining a big integer text representation.");
+            // output("Big integer text length: %zu.\n",_bigintegerText->length);
+            // output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));free_string(str_info);
             if(mp_radix_size(_biginteger,10,&arepsize)==MP_OKAY){
-                ///outputChar('D');
-                ////////output("Representation size: %d.\n",arepsize);
-                if(arepsize<=0xFFFFFFFF){
-                    ///outputChar('E');
-                    string_setlength(_bigintegerText,arepsize);
-                    ///outputChar('F');
-                    if(mp_toradix(_biginteger,_bigintegerText->chars,10)==MP_OKAY)string_synclength(_bigintegerText);
-                    ///outputChar('G');
+#ifdef M_MP_DEVELOP
+                // if(arepsize>0)output("Length of big integer text representation: %zu.\n",arepsize-1);
+#else
+                // if(arepsize>0)output("Length of big integer text representation: %d.\n",arepsize-1);
+#endif
+                // output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));free_string(str_info);
+                // outputChar('D');
+                // if(amVerbose()&&amDebugging())
+                if(arepsize<=SIZE_MAX){
+                    // outputChar('E');
+                    // MDH@13MAR2020: arepsize actually includes the '\0' character at the end of any text representation which means that the text itself is one byte shorter
+                    //                however string_synclength() didn't like the length being set to arepsize-1 I suppose because there would be no '\0' at that position in the text
+                    //                as mp_toradix would write
+                    if(string_setlength(_bigintegerText,arepsize)){
+                        // outputChar('F');
+                        if(mp_toradix(_biginteger,_bigintegerText->chars,10)==MP_OKAY)string_synclength(_bigintegerText);
+                        // outputChar('G');
+                    }else{
+                        free_string(_bigintegerText);_bigintegerText=NULL;
+                        output("%sFailed to initialize the length of the big integer text representation to %d.",ERROR_PREFIX,arepsize);
+                    }
                 }else
-                    output("%sCan't store more than %u characters in a string.\n",ERROR_PREFIX,0xFFFFFFFF);
+                    output("%sCan't store more than %u characters in a string.\n",ERROR_PREFIX,SIZE_MAX);
             }else
                 outputError("Couldn't determine the size of a big integer");
         }else
@@ -996,31 +959,35 @@ Mstring* _getUndefinedValueText(){
     */
 }/* VALIDATED */
 
-void outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix){
-    if(prefix)output("%s",prefix);
+size_t outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix){
+    size_t written=0;
+    if(prefix)written=output("%s",prefix);
     if(_biginteger){
         Mstring* _bigintegerText=_getBigintegerText(_biginteger);
         if(_bigintegerText){
-            output("%s",string(_bigintegerText));
+            written+=output("%s",string(_bigintegerText));
             free_string(_bigintegerText);
         }else
-            output("no big integer text representation");
+            written+=output("no big integer text representation");
     }else
-        outputChar('?');
-    if(postfix)output("%s",postfix);
+        written+=outputChar('?');
+    if(postfix)written+=output("%s",postfix);
+    return written;
 }/* VALIDATED */
-void outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix){
-    if(prefix)output("%s",prefix);
+size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix){
+    size_t written=0;
+    if(prefix)written=output("%s",prefix);
     if(_decimal){
         Mstring* _decimalText=_getDecimalText(_decimal,false);
         if(_decimalText){
-            output("%s",string(_decimalText));
+            written+=output("%s",string(_decimalText));
             free_string(_decimalText);
         }else
-            output("no decimal text representation");
+            written+=output("no decimal text representation");
     }else
-        outputChar('?');
-    if(postfix)output("%s",postfix);
+        written+=outputChar('?');
+    if(postfix)written+=output("%s",postfix);
+    return written;
 }/* VALIDATED */
 
 // conversion from big integer to the long long it contains (when in range)

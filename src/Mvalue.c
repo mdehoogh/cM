@@ -1379,14 +1379,17 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
     return _UNDEFINED_VALUETEXT;
     */
 }/* VALIDATED */
-void outputValue(const char* const prefix,const Mvalue* const value,const char* const suffix){
-    if(prefix)output("%s",prefix);
+// MDH@13MAR2020: now returning the number of characters written
+size_t outputValue(const char* const prefix,const Mvalue* const value,const char* const suffix){
+    size_t written=0;
+    if(prefix)written=output("%s",prefix);
     if(value){
         Mstring* _valueText=_getValueText(value,false); // free asap
-        if(_valueText){output("%s",string(_valueText));free_string(_valueText);}
+        if(_valueText){written+=output("%s",string(_valueText));free_string(_valueText);}
     }else
-        outputChar('-');
-    if(suffix)output("%s",suffix);
+        written+=outputChar('-');
+    if(suffix)written+=output("%s",suffix);
+    return written;
 }/* VALIDATED */
 
 long long getValueInteger(const Mvalue* const _value){

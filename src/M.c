@@ -1411,29 +1411,31 @@ void clearCommand(){
 	*/
 }
 // TODO find a way to not have to replicate as we do now what getValueText() is also doing (but without coloring of course)
-void outputValueColored(Mvalue* _value){
+// MDH@13MAR2020: result type changed to size_t because now returning the number of characters written
+size_t outputValueColored(Mvalue* _value){
+	size_t written=0;
 	if(_value){
 		switch(_value->type){
-			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);output("%s",M_UNDEFINED_VALUE_TEXT);break; // let's use the same color as for double quotes string (for now)
-			case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
-			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);outputValue(NULL,_value,NULL);break;
-			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._biginteger,NULL);break;
+			case VT_UNDEFINED:outputTokenTypeColor(TT_DQSTRING);written=output("%s",M_UNDEFINED_VALUE_TEXT);break; // let's use the same color as for double quotes string (for now)
+			case VT_TOKEN:outputTokenTypeColor(_value->value._token->type);written=output("%s",string(_value->value._token->text));break; // easy the token type determines the color to use!!!
+			case VT_INTEGER:outputTokenTypeColor(TT_INTEGER);written=outputValue(NULL,_value,NULL);break;
+			case VT_BIGINTEGER:outputTokenTypeColor(TT_INTEGER);written=outputBiginteger(NULL,_value->value._biginteger,NULL);break;
 			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
 			case VT_RATIONAL:
 				if(_value->value._rational){
-					output("(");
-					outputTokenTypeColor(TT_INTEGER);outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
-					output("/");outputTokenTypeColor(TT_INTEGER);
-					if(_value->value._rational->den)outputBiginteger(NULL,_value->value._rational->den,NULL);else outputChar('1'); // a missing denominator means it's equal to 1
+					written+=outputChar('(');
+					outputTokenTypeColor(TT_INTEGER);written+=outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
+					written+=outputChar('/');outputTokenTypeColor(TT_INTEGER);
+					if(_value->value._rational->den)written+=outputBiginteger(NULL,_value->value._rational->den,NULL);else written+=outputChar('1'); // a missing denominator means it's equal to 1
 					resetOutputColor();
-					output(")");
+					written+=outputChar(')');
 					if(_value->value._rational->delta){
 						outputTokenTypeColor(TT_REAL);
-						if(_value->value._rational->delta->ld>=0)output("+");
+						if(_value->value._rational->delta->ld>=0)written+=outputChar('+');
 						Mstring* _realValueText=__string();
 						if(_realValueText){
 							appendld(_realValueText,_value->value._rational->delta->ld);
-							output("%s",string(_realValueText));
+							written+=output("%s",string(_realValueText));
 							free_string(_realValueText);
 						}
 						// replacing:	output("%.*Lf",LDBL_DIG,_value->value._rational->delta->ld);
@@ -1441,29 +1443,29 @@ void outputValueColored(Mvalue* _value){
 					}
 				}
 				break;
-			case VT_FLOAT:outputTokenTypeColor(TT_REAL);outputValue(NULL,_value,NULL);break;
-			case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);outputValue(NULL,_value,NULL);break;
+			case VT_FLOAT:outputTokenTypeColor(TT_REAL);written+=outputValue(NULL,_value,NULL);break;
+			case VT_TEXT:outputTokenTypeColor(_value->value._text->presuffix=='"'?TT_DQSTRING:TT_SQSTRING);written+=outputValue(NULL,_value,NULL);break;
 			case VT_LIST:
 				// TODO not using _getListText() as defined in Mexecution
 				/////////if(amVerbose())outputValue("List value '",_value,"'.");
 				{
-					outputChar('[');
+					written+=outputChar('[');
 					Mlist* _list=_value->value._list;
 					if(_list&&_list->numberOfElements){
 						Mlistelement* _listelement=_list->_first;
 						unsigned long long listitemindex=1;
 						while(_listelement){
-							if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;outputChar(',');} // missing elements
-							outputValueColored(_listelement->_value);
+							if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
+							written+=outputValueColored(_listelement->_value);
 							_listelement=_listelement->_next;
 						}
 					}
-					outputChar(']');
+					written+=outputChar(']');
 				}
 				break;
 			case VT_MAP:
 				{
-					outputChar('{');
+					written+=outputChar('{');
 					Mmap* _map=_value->value._map;
 					if(_map&&_map->numberOfElements){
 						Mvariable* _mapelementvariable;
@@ -1472,14 +1474,14 @@ void outputValueColored(Mvalue* _value){
 							_mapelementvariable=_mapelement->_variable;
 							// TODO are we coloring the name?????
 							// quoting the name to indicate it is alphanumeric!!
-							output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
-							outputValueColored(_mapelementvariable->_value);
+							written+=output("%c%s%c%c",'\'',_mapelementvariable->_name,'\'',':');
+							written+=outputValueColored(_mapelementvariable->_value);
 							if(!_mapelement->_next)break;
-							outputChar(',');
+							written+=outputChar(',');
 							_mapelement=_mapelement->_next;
 						}
 					}
-					outputChar('}');
+					written+=outputChar('}');
 				}
 				break;
 				/* MDH@11MAR2020: better to use _getValueText() for all cases where we're NOT color coding as _getValueText() is kept up to date in the first place
@@ -1495,15 +1497,16 @@ void outputValueColored(Mvalue* _value){
 			default: // for VT_REFERENCE, VT_FUNCTION, VT_ENVIRONMENT and the like
 				{
 					Mstring* _valueText=_getValueText(_value,false);
-					if(_valueText){output("%s",string(_valueText));free_string(_valueText);}
+					if(_valueText){written+=output("%s",string(_valueText));free_string(_valueText);}
 				}
 				break;
 		}
 	}else{
 		outputTokenTypeColor(TT_DQSTRING);
-		output("%s",M_NULL_VALUE_TEXT);
+		written+=output("%s",M_NULL_VALUE_TEXT);
 	} // TODO what color should we use????
 	resetOutputColor();
+	return written;
 }
 
 void unfinishToken(Mtoken* lastCommandToken){
@@ -1566,25 +1569,31 @@ bool evaluateCommand(Mvalue* *resultValue){
 
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
-	Mstring* commandText=_getCommandText(true);
+	Mstring* _commandText=_getCommandText(true); // MDH@13MAR2020 TODO determine later???????
 	// plug the token following the dummy starting token of the command into the current execution environment (typically _Menvironment I suppose)
+	clock_t before_evaluating=clock();
 	getExecutionEnvironment()->expressionToken=_userInputCommand->_firstToken->next; // initialize the (current) expression token
-	clock_t then=clock();
 	*resultValue=getValueOfExpression("command",'e',(TokenType[]){},0);
+	long long elapsed_evaluating=(clock()-before_evaluating)/1000;
+
 	resetOutputColor(); // MDH@02OCT2019: given that the out() might've been used to write stuff to the console in weird colorings TODO doesn't seem to help	
-	long long elapsed=(clock()-then)/1000;
+	if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating); // MDH@13MAR2020: because the output text can take long to show
+	
 	// output the commandText
-	output("%s = ",string(commandText));
+	output("%s = ",string(_commandText));
+	free_string(_commandText);
+
 	// if the result is a null value, show the NULL_value
-	outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);
+	clock_t before_writing=clock();size_t written=outputValueColored(isValueNull(*resultValue)?NULL_value:*resultValue);long long elapsed_writing=(clock()-before_writing)/1000;
+	
 	newline(); // outputValueColored() doesn't do that!!
+	if(elapsed_writing>0)output("The writing took %lld ms.\n",elapsed_writing);
 	///// outputValueColored() does do this (and should): resetOutputColor();
-	if(elapsed>0)output("The evaluation took %d ms.\n",elapsed);/////////else output("less than 1 ms.");
+	if(written>1000)if(elapsed_evaluating>0)output("The evaluation took %lld ms.\n",elapsed_evaluating);/////////else output("less than 1 ms.");
 
 	///////////////decrementReferenceCount(_commandExpressionValue); if(amVerbose())outputInfo("Result released!"); // TODO do we need to do this?????
 
 	///////if(amVerbose())outputInfo("Command to release!");
-	free_string(commandText);
 
 	if(amDebugging())
 		output("Number of allocated/freed formula elements after evaluating the command: (%zd,%zd).\n",getAllocationTypeAllocated('4'),getAllocationTypeFreed('4'));

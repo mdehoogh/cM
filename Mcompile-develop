@@ -45,8 +45,9 @@ fi
 
 cd src
 
-echo "Copying tommath.h from the libtommath subdirectory into the src folder."
-cp ../libtommath/tommath.h .
+# MDH@13MAR2020: tommath-m-develop.h is the (M) adapted original tommath.h to allow using the development version of libtommath with M
+echo "Copying M.tommath-develop.h to the src folder."
+cp ../M.tommath-develop.h ./M.tommath.h
 
 echo ""
 echo "Compiling M..."

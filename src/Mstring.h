@@ -64,4 +64,11 @@ size_t string_number_of_matching_chars(Mstring const * const str,char const * ch
 
 bool string_equal(Mstring* str1,Mstring* str2); // MDH@24OCT2019: whether or not two strings are considered equal
 
+// MDH@13MAR2020: helper function implementations now here (moved from Mexecution.h/c)
+Mstring* string_append_ull(Mstring* const ms,unsigned long long ll);
+Mstring* string_append_ll(Mstring* const ms,long long ll);
+Mstring* string_append_ld(Mstring* const ms,long double ld);
+
+Mstring* _string_info(Mstring* str);
+
 #endif /* __MSTRING_H__ */
