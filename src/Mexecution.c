@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <math.h>
+#include <time.h>
 
 #include "Mexecution.h"
 
@@ -589,35 +590,63 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
             int arepsize=0;
 #endif
             ///outputChar('C');
+            clock_t then=clock();
             ///////if(amVerbose())outputInfo("Determining a big integer text representation.");
             // output("Big integer text length: %zu.\n",_bigintegerText->length);
             // output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));free_string(str_info);
             if(mp_radix_size(_biginteger,10,&arepsize)==MP_OKAY){
 #ifdef M_MP_DEVELOP
                 // if(arepsize>0)output("Length of big integer text representation: %zu.\n",arepsize-1);
+                if(arepsize<=SIZE_MAX){
 #else
                 // if(arepsize>0)output("Length of big integer text representation: %d.\n",arepsize-1);
+                if(arepsize<=INT_MAX){
 #endif
                 // output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));free_string(str_info);
                 // outputChar('D');
                 // if(amVerbose()&&amDebugging())
-                if(arepsize<=SIZE_MAX){
                     // outputChar('E');
                     // MDH@13MAR2020: arepsize actually includes the '\0' character at the end of any text representation which means that the text itself is one byte shorter
                     //                however string_synclength() didn't like the length being set to arepsize-1 I suppose because there would be no '\0' at that position in the text
                     //                as mp_toradix would write
+                    uint8_t failure=0;
                     if(string_setlength(_bigintegerText,arepsize)){
-                        // outputChar('F');
-                        if(mp_toradix(_biginteger,_bigintegerText->chars,10)==MP_OKAY)string_synclength(_bigintegerText);
-                        // outputChar('G');
-                    }else{
+                        if(mp_toradix(_biginteger,_bigintegerText->chars,10)==MP_OKAY){
+                            if(string_synclength(_bigintegerText)){
+                                size_t trailingZeroCount=string_trailing(_bigintegerText,'0');
+                                if(trailingZeroCount>=3){
+                                    if(string_shorten(_bigintegerText,trailingZeroCount)){ // 'remove' the trailing zeroes
+                                        if(string_append_char(_bigintegerText,'e')){
+                                            if(!string_append_ll(_bigintegerText,trailingZeroCount))
+                                                failure=6;
+                                        }else
+                                            failure=5;
+                                    }else
+                                        failure=4;
+                                }
+                            }else
+                                failure=3;
+                        }else
+                            failure=2;
+                    }else
+                        failure=1;
+                    if(failure>0){
                         free_string(_bigintegerText);_bigintegerText=NULL;
-                        output("%sFailed to initialize the length of the big integer text representation to %d.",ERROR_PREFIX,arepsize);
+                        switch(failure){
+                            case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",ERROR_PREFIX,arepsize);break;
+                            case 2:outputError("Failed to determine the big integer representation");break;
+                            case 3:outputError("Failed to sync the length of the big integer representation");break;
+                            case 4:outputError("Failed to remove the trailing zeroes from the big integer representation.");break;
+                            case 5:outputError("Failed to append 'e' to the big integer representation.");break;
+                            case 6:outputError("Failed to append the exponent part to the big integer representation.");break;
+                        }
                     }
                 }else
                     output("%sCan't store more than %u characters in a string.\n",ERROR_PREFIX,SIZE_MAX);
             }else
                 outputError("Couldn't determine the size of a big integer");
+            //if(amVerbose())
+            output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
         }else
             outputError("No big integer to represent");
     }else

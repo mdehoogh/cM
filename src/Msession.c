@@ -10,6 +10,8 @@
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdlib.h>
+// for being able to determine the window size
+#include <sys/ioctl.h>
 
 #include "Msession.h"
 
@@ -106,18 +108,33 @@ void activateColorscheme(){
 	clearScreenFromCursor(); // MDH@30OCT2019 replacing: clearDisplay();
 	///////outputLine((colorscheme?"Will assume white background!":"Will assume black background!"));
 }
+
 void initDisplay(){
 	outputControlText("=3h"); // 80x25 color mode
 	outputControlText("?3l"); // switch to 132 column mode (if possible)
 	outputControlText("0m");
 	setColorscheme(getColorscheme());
 	activateColorscheme(); // activate the current color scheme
+	resetOutputColor(); // MDH@16MAR2020: think we need this
 	///////setWrapping(amWrapping()); // activate the current wrap mode!!!
 }
 
-void initSession(){ 
+static int windowRows=0,windowCols=0;
+// MDH@15MAR2020: could be useful (for automatic wrapping) to know the window size
+bool windowSizeDetermined() {
+	struct winsize ws;
+	if(ioctl(STDOUT_FILENO,TIOCGWINSZ,&ws)==-1||ws.ws_col==0)return false;
+	windowCols=ws.ws_col;
+    windowRows=ws.ws_row;
+	return true;
+}
+int getNumberOfWindowTextLines(){return windowRows;}
+int getNumberOfWindowTextColumns(){return windowCols;}
+
+bool sessionInitialized(){
+	initDisplay();
     // interfaces with initDisplay() TODO perhaps initialize settings here for a common interactive session???
-    initDisplay();
+	return windowSizeDetermined();
 }
 
 // MDH@17OCT2019: instead of setting the back color we can return the text to be used in out to set the back color

@@ -4,6 +4,8 @@
 #ifndef TOMMATH_H_
 #define TOMMATH_H_
 
+#define M_MP_DEVELOP 1
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -93,6 +95,13 @@ typedef enum {
    MP_EQ = 0,     /* equal */
    MP_GT = 1      /* greater than */
 } mp_ord;
+
+#ifdef M_MP_DEVELOP
+typedef enum {
+   MP_NO = 0,
+   MP_YES = 1
+} mp_bool;
+#endif
 
 typedef enum {
    MP_OKAY  = 0,   /* no error */
@@ -427,6 +436,9 @@ mp_err mp_expt_n(const mp_int *a, int b, mp_int *c) MP_WUR;
  * returns error if a < 0 and b is even
  */
 mp_err mp_root_n(const mp_int *a, int b, mp_int *c) MP_WUR;
+#ifdef M_MP_DEVELOP
+#define mp_n_root(a, b, c) mp_root_n((a), (b), (c))
+#endif
 
 /* special sqrt algo */
 mp_err mp_sqrt(const mp_int *arg, mp_int *ret) MP_WUR;
@@ -569,7 +581,9 @@ mp_err mp_to_sbin(const mp_int *a, uint8_t *buf, size_t maxlen, size_t *written)
 
 mp_err mp_read_radix(mp_int *a, const char *str, int radix) MP_WUR;
 mp_err mp_to_radix(const mp_int *a, char *str, size_t maxlen, size_t *written, int radix) MP_WUR;
-
+#ifdef M_MP_DEVELOP
+#define mp_toradix(a, str, radix) mp_to_radix((a), (str), SIZE_MAX, NULL, (radix))
+#endif
 mp_err mp_radix_size(const mp_int *a, int radix, size_t *size) MP_WUR;
 mp_err mp_radix_size_overestimate(const mp_int *a, const int radix, size_t *size) MP_WUR;
 

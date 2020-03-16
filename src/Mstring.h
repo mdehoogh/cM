@@ -29,7 +29,7 @@ bool string_empty(Mstring const * const str);
 size_t string_length(Mstring const * const str);
 Mstring* string_setlength(Mstring * const str, size_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
 
-void string_synclength(Mstring * const str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
+Mstring* string_synclength(Mstring * const str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
 
 char string_char(Mstring const * const str,size_t pos);
 char string_last_char(Mstring const * const str);
@@ -70,5 +70,7 @@ Mstring* string_append_ll(Mstring* const ms,long long ll);
 Mstring* string_append_ld(Mstring* const ms,long double ld);
 
 Mstring* _string_info(Mstring* str);
+
+size_t string_trailing(Mstring* str,char c);
 
 #endif /* __MSTRING_H__ */

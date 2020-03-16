@@ -140,6 +140,9 @@ typedef uint64_t mp_word;
 
 MP_STATIC_ASSERT(correct_word_size, sizeof(mp_word) == (2u * sizeof(mp_digit)))
 
+/* MDH@15MAR2020: what we need in the 1.1.0 bn_mp_incr */
+#define MP_IS_ZERO(a) ((a)->used == 0)
+
 /* default number of digits */
 #ifndef MP_DEFAULT_DIGIT_COUNT
 #   ifndef MP_LOW_MEM

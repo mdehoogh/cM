@@ -41,8 +41,14 @@ void resetOutputColor();
 
 void outputLine(char* s); // for writing a single line of output text in the info color
 
-void initSession();
+void initDisplay();
+
+bool sessionInitialized();
 
 // moved over from Mfunctions.h/c because only available in interactive sessions
 Mvalue* Mbc(Mvalue* _value);
 Mvalue* Mtc(Mvalue* _value);
+
+// MDH@16MAR2020: exposing the number of lines and columns per line in the window
+int getNumberOfWindowTextLines();
+int getNumberOfWindowTextColumns();

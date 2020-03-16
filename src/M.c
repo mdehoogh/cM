@@ -2815,11 +2815,15 @@ bool interactiveSessionInitialized(){
 }
 // MDH@27FEB2020: called from within main() only, so can be placed directly in front of main (and separated into a separate M.c or better Minterpreter.c or Mcli.c)
 
-void prepareForUserInput(){
+bool preparedForUserInput(){
 	//enableRawMode();
 	// disable output buffering on printf (as in raw input mode it would not write at all)
-	setbuf(stdout,NULL);
-	initSession();
+	bool result=sessionInitialized();
+	if(result){
+		setbuf(stdout,NULL);
+		output("Window dimensions: %dx%d.\n",getNumberOfWindowTextColumns(),getNumberOfWindowTextLines());
+	}
+	return result;
 }
 
 signed char getSessionSettingApplied(char sessionSettingCharacter){
@@ -2889,7 +2893,12 @@ int main(int argc, char **argv){
 		}
 	}
 
-	prepareForUserInput(); // BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!
+	// BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!	
+	if(!preparedForUserInput()){
+		outputError("Failed to initialize the user session.");
+		resetOutputColor();
+		exit(1);
+	}
 
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks

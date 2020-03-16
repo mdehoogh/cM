@@ -3437,9 +3437,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
 						// MDH@25JUL2019: adding if, while and for functions
 						unsigned long long numberOfFunctionParameters=(function->_parameterMap?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
+						if(!strcmp(_significantTokenText,DEFINEANONYMOUSFUNCTION_NAME)){
+							if(amVerbose())outputInfo("Definition of an anonymous function encountered!");
+							numberOfElementsToNotEvaluate=numberOfFunctionParameters-1; // i.e. evaluate the first argument only in the current context
+						}else
 						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
 							if(amVerbose())outputInfo("Definition of a user function encountered!");
-							numberOfElementsToNotEvaluate=1;		
+							numberOfElementsToNotEvaluate=numberOfFunctionParameters-2;	// i.e. evaluate the first two arguments only in the current context
 						}else
 						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)||!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
 							numberOfElementsToNotEvaluate=2;

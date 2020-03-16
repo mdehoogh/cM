@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <time.h>
 
 #include "Mfunctions.h"
 
@@ -536,6 +537,7 @@ Mvalue* Mfac(Mvalue* _value){
     if(amVerbose()&&amDebugging())outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
     Mbiginteger* _result=_getBiginteger(6); // the smallest value to return
     if(_result){
+        clock_t then=(amVerbose()?clock():0);
         // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
         // we could start at some intermediate value????
         Mbiginteger *_multiplier=_getBiginteger(3);
@@ -549,6 +551,7 @@ Mvalue* Mfac(Mvalue* _value){
             free_biginteger(_multiplier);
         }else        
             outputError("Failed to create big integer 3");
+        if(amVerbose()){outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/1000);}
     }else
         outputError("Failed to create big integer 6");
     free_biginteger(_finalmultiplier);

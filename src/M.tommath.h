@@ -1,12 +1,16 @@
 /* LibTomMath, multiple-precision integer library -- Tom St Denis */
 /* SPDX-License-Identifier: Unlicense */
 
-#ifndef TOMMATH_H_
-#define TOMMATH_H_
+#ifndef BN_H_
+#define BN_H_
 
-#include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
+#include <limits.h>
+
+#ifdef LTM_NO_FILE
+#  warning LTM_NO_FILE has been deprecated, use MP_NO_FILE.
+#  define MP_NO_FILE
+#endif
 
 #ifndef MP_NO_FILE
 #  include <stdio.h>
@@ -17,7 +21,7 @@ extern "C" {
 #endif
 
 /* MS Visual C++ doesn't have a 128bit type for words, so fall back to 32bit MPI's (where words are 64bit) */
-#if (defined(_MSC_VER) || defined(__LLP64__) || defined(__e2k__) || defined(__LCC__)) && !defined(MP_64BIT)
+#if defined(_MSC_VER) || defined(__LLP64__) || defined(__e2k__) || defined(__LCC__)
 #   define MP_32BIT
 #endif
 
@@ -28,8 +32,8 @@ extern "C" {
     defined(__sparcv9) || defined(__sparc_v9__) || defined(__sparc64__) || \
     defined(__ia64) || defined(__ia64__) || defined(__itanium__) || defined(_M_IA64) || \
     defined(__LP64__) || defined(_LP64) || defined(__64BIT__)
-#   if !(defined(MP_64BIT) || defined(MP_32BIT) || defined(MP_16BIT))
-#      if defined(__GNUC__) && !defined(__hppa)
+#   if !(defined(MP_32BIT) || defined(MP_16BIT) || defined(MP_8BIT))
+#      if defined(__GNUC__)
 /* we support 128bit integers only via: __attribute__((mode(TI))) */
 #         define MP_64BIT
 #      else
@@ -40,7 +44,7 @@ extern "C" {
 #endif
 
 #ifdef MP_DIGIT_BIT
-#   error Defining MP_DIGIT_BIT is disallowed, use MP_16/31/32/64BIT
+#   error Defining MP_DIGIT_BIT is disallowed, use MP_8/16/31/32/64BIT
 #endif
 
 /* some default configurations.
@@ -52,18 +56,26 @@ extern "C" {
  * [any size beyond that is ok provided it doesn't overflow the data type]
  */
 
-#if defined(MP_16BIT)
+#ifdef MP_8BIT
+typedef uint8_t              mp_digit;
+typedef uint16_t             private_mp_word;
+#   define MP_DIGIT_BIT 7
+#elif defined(MP_16BIT)
 typedef uint16_t             mp_digit;
+typedef uint32_t             private_mp_word;
 #   define MP_DIGIT_BIT 15
 #elif defined(MP_64BIT)
+/* for GCC only on supported platforms */
 typedef uint64_t mp_digit;
+typedef unsigned long        private_mp_word __attribute__((mode(TI)));
 #   define MP_DIGIT_BIT 60
 #else
 typedef uint32_t             mp_digit;
+typedef uint64_t             private_mp_word;
 #   ifdef MP_31BIT
 /*
  * This is an extension that uses 31-bit digits.
- * Please be aware that not all functions support this size, especially s_mp_mul_comba
+ * Please be aware that not all functions support this size, especially s_mp_mul_digs_fast
  * will be reduced to work on small numbers only:
  * Up to 8 limbs, 248 bits instead of up to 512 limbs, 15872 bits with MP_28BIT.
  */
@@ -75,6 +87,11 @@ typedef uint32_t             mp_digit;
 #   endif
 #endif
 
+/* mp_word is a private type */
+#define mp_word MP_DEPRECATED_PRAGMA("mp_word has been made private") private_mp_word
+
+#define MP_SIZEOF_MP_DIGIT (MP_DEPRECATED_PRAGMA("MP_SIZEOF_MP_DIGIT has been deprecated, use sizeof (mp_digit)") sizeof (mp_digit))
+
 #define MP_MASK          ((((mp_digit)1)<<((mp_digit)MP_DIGIT_BIT))-((mp_digit)1))
 #define MP_DIGIT_MAX     MP_MASK
 
@@ -83,49 +100,79 @@ typedef uint32_t             mp_digit;
 #define MP_PRIME_SAFE     0x0002 /* Safe prime (p-1)/2 == prime */
 #define MP_PRIME_2MSB_ON  0x0008 /* force 2nd MSB to 1 */
 
+#define LTM_PRIME_BBS      (MP_DEPRECATED_PRAGMA("LTM_PRIME_BBS has been deprecated, use MP_PRIME_BBS") MP_PRIME_BBS)
+#define LTM_PRIME_SAFE     (MP_DEPRECATED_PRAGMA("LTM_PRIME_SAFE has been deprecated, use MP_PRIME_SAFE") MP_PRIME_SAFE)
+#define LTM_PRIME_2MSB_ON  (MP_DEPRECATED_PRAGMA("LTM_PRIME_2MSB_ON has been deprecated, use MP_PRIME_2MSB_ON") MP_PRIME_2MSB_ON)
+
+#ifdef MP_USE_ENUMS
 typedef enum {
-   MP_ZPOS = 0,   /* positive */
-   MP_NEG = 1     /* negative */
+   MP_ZPOS = 0,
+   MP_NEG = 1
 } mp_sign;
-
 typedef enum {
-   MP_LT = -1,    /* less than */
-   MP_EQ = 0,     /* equal */
-   MP_GT = 1      /* greater than */
+   MP_LT = -1,
+   MP_EQ = 0,
+   MP_GT = 1
 } mp_ord;
-
 typedef enum {
-   MP_OKAY  = 0,   /* no error */
-   MP_ERR   = -1,  /* unknown error */
-   MP_MEM   = -2,  /* out of mem */
-   MP_VAL   = -3,  /* invalid input */
-   MP_ITER  = -4,  /* maximum iterations reached */
-   MP_BUF   = -5,  /* buffer overflow, supplied buffer too small */
-   MP_OVF   = -6   /* mp_int overflow, too many digits */
+   MP_NO = 0,
+   MP_YES = 1
+} mp_bool;
+typedef enum {
+   MP_OKAY  = 0,
+   MP_ERR   = -1,
+   MP_MEM   = -2,
+   MP_VAL   = -3,
+   MP_ITER  = -4
 } mp_err;
-
-typedef enum {
-   MP_LSB_FIRST = -1,
-   MP_MSB_FIRST =  1
-} mp_order;
-
-typedef enum {
-   MP_LITTLE_ENDIAN  = -1,
-   MP_NATIVE_ENDIAN  =  0,
-   MP_BIG_ENDIAN     =  1
-} mp_endian;
+#else
+typedef int mp_sign;
+#define MP_ZPOS       0   /* positive integer */
+#define MP_NEG        1   /* negative */
+typedef int mp_ord;
+#define MP_LT        -1   /* less than */
+#define MP_EQ         0   /* equal to */
+#define MP_GT         1   /* greater than */
+typedef int mp_bool;
+#define MP_YES        1   /* yes response */
+#define MP_NO         0   /* no response */
+typedef int mp_err;
+#define MP_OKAY       0   /* ok result */
+#define MP_ERR        -1  /* unknown error */
+#define MP_MEM        -2  /* out of mem */
+#define MP_VAL        -3  /* invalid input */
+#define MP_RANGE      (MP_DEPRECATED_PRAGMA("MP_RANGE has been deprecated in favor of MP_VAL") MP_VAL)
+#define MP_ITER       -4  /* Max. iterations reached */
+#endif
 
 /* tunable cutoffs */
+
 #ifndef MP_FIXED_CUTOFFS
 extern int
-MP_MUL_KARATSUBA_CUTOFF,
-MP_SQR_KARATSUBA_CUTOFF,
-MP_MUL_TOOM_CUTOFF,
-MP_SQR_TOOM_CUTOFF;
+KARATSUBA_MUL_CUTOFF,
+KARATSUBA_SQR_CUTOFF,
+TOOM_MUL_CUTOFF,
+TOOM_SQR_CUTOFF;
 #endif
 
 /* define this to use lower memory usage routines (exptmods mostly) */
 /* #define MP_LOW_MEM */
+
+/* default precision */
+#ifndef MP_PREC
+#   ifndef MP_LOW_MEM
+#      define PRIVATE_MP_PREC 32        /* default digits of precision */
+#   elif defined(MP_8BIT)
+#      define PRIVATE_MP_PREC 16        /* default digits of precision */
+#   else
+#      define PRIVATE_MP_PREC 8         /* default digits of precision */
+#   endif
+#   define MP_PREC (MP_DEPRECATED_PRAGMA("MP_PREC is an internal macro") PRIVATE_MP_PREC)
+#endif
+
+/* size of comba arrays, should be at least 2 * 2**(BITS_PER_WORD - BITS_PER_DIGIT*2) */
+#define PRIVATE_MP_WARRAY (int)(1uLL << (((CHAR_BIT * sizeof(private_mp_word)) - (2 * MP_DIGIT_BIT)) + 1))
+#define MP_WARRAY (MP_DEPRECATED_PRAGMA("MP_WARRAY is an internal macro") PRIVATE_MP_WARRAY)
 
 #if defined(__GNUC__) && __GNUC__ >= 4
 #   define MP_NULL_TERMINATED __attribute__((sentinel))
@@ -143,33 +190,35 @@ MP_SQR_TOOM_CUTOFF;
  * Most functions in libtommath return an error code.
  * This error code must be checked in order to prevent crashes or invalid
  * results.
+ *
+ * If you still want to avoid the error checks for quick and dirty programs
+ * without robustness guarantees, you can `#define MP_WUR` before including
+ * tommath.h, disabling the warnings.
  */
-#if defined(__GNUC__) && __GNUC__ >= 4
-#   define MP_WUR __attribute__((warn_unused_result))
-#else
-#   define MP_WUR
+#ifndef MP_WUR
+#  if defined(__GNUC__) && __GNUC__ >= 4
+#     define MP_WUR __attribute__((warn_unused_result))
+#  else
+#     define MP_WUR
+#  endif
 #endif
 
-#if defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__ >= 405)
-#  define MP_DEPRECATED(x) __attribute__((deprecated("replaced by " #x)))
-#elif defined(_MSC_VER) && _MSC_VER >= 1500
-#  define MP_DEPRECATED(x) __declspec(deprecated("replaced by " #x))
-#else
-#  define MP_DEPRECATED(x)
-#endif
-
-#ifndef MP_NO_DEPRECATED_PRAGMA
 #if defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__ >= 301)
+#  define MP_DEPRECATED(x) __attribute__((deprecated("replaced by " #x)))
 #  define PRIVATE_MP_DEPRECATED_PRAGMA(s) _Pragma(#s)
 #  define MP_DEPRECATED_PRAGMA(s) PRIVATE_MP_DEPRECATED_PRAGMA(GCC warning s)
 #elif defined(_MSC_VER) && _MSC_VER >= 1500
+#  define MP_DEPRECATED(x) __declspec(deprecated("replaced by " #x))
 #  define MP_DEPRECATED_PRAGMA(s) __pragma(message(s))
-#endif
-#endif
-
-#ifndef MP_DEPRECATED_PRAGMA
+#else
+#  define MP_DEPRECATED
 #  define MP_DEPRECATED_PRAGMA(s)
 #endif
+
+#define DIGIT_BIT   (MP_DEPRECATED_PRAGMA("DIGIT_BIT macro is deprecated, MP_DIGIT_BIT instead") MP_DIGIT_BIT)
+#define USED(m)     (MP_DEPRECATED_PRAGMA("USED macro is deprecated, use z->used instead") (m)->used)
+#define DIGIT(m, k) (MP_DEPRECATED_PRAGMA("DIGIT macro is deprecated, use z->dp instead") (m)->dp[(k)])
+#define SIGN(m)     (MP_DEPRECATED_PRAGMA("SIGN macro is deprecated, use z->sign instead") (m)->sign)
 
 /* the infamous mp_int structure */
 typedef struct  {
@@ -177,6 +226,10 @@ typedef struct  {
    mp_sign sign;
    mp_digit *dp;
 } mp_int;
+
+/* callback for mp_prime_random, should fill dst with random bytes and return how many read [upto len] */
+typedef int private_mp_prime_callback(unsigned char *dst, int len, void *dat);
+typedef private_mp_prime_callback MP_DEPRECATED(mp_rand_source) ltm_prime_callback;
 
 /* error code to char* string */
 const char *mp_error_to_string(mp_err code) MP_WUR;
@@ -207,10 +260,10 @@ mp_err mp_grow(mp_int *a, int size) MP_WUR;
 mp_err mp_init_size(mp_int *a, int size) MP_WUR;
 
 /* ---> Basic Manipulations <--- */
-#define mp_iszero(a) ((a)->used == 0)
-#define mp_isneg(a)  ((a)->sign == MP_NEG)
-#define mp_iseven(a) (((a)->used == 0) || (((a)->dp[0] & 1u) == 0u))
-#define mp_isodd(a)  (!mp_iseven(a))
+#define mp_iszero(a) (((a)->used == 0) ? MP_YES : MP_NO)
+mp_bool mp_iseven(const mp_int *a) MP_WUR;
+mp_bool mp_isodd(const mp_int *a) MP_WUR;
+#define mp_isneg(a)  (((a)->sign != MP_ZPOS) ? MP_YES : MP_NO)
 
 /* set to zero */
 void mp_zero(mp_int *a);
@@ -240,23 +293,30 @@ void mp_set_u64(mp_int *a, uint64_t b);
 mp_err mp_init_u64(mp_int *a, uint64_t b) MP_WUR;
 
 /* get magnitude */
-uint32_t mp_get_mag_u32(const mp_int *a) MP_WUR;
-uint64_t mp_get_mag_u64(const mp_int *a) MP_WUR;
-unsigned long mp_get_mag_ul(const mp_int *a) MP_WUR;
+uint32_t mp_get_mag32(const mp_int *a) MP_WUR;
+uint64_t mp_get_mag64(const mp_int *a) MP_WUR;
 
 /* get integer, set integer (long) */
-long mp_get_l(const mp_int *a) MP_WUR;
-void mp_set_l(mp_int *a, long b);
-mp_err mp_init_l(mp_int *a, long b) MP_WUR;
+#define mp_get_l(a)        (sizeof (long) == 8 ? (long)mp_get_i64(a) : (long)mp_get_i32(a))
+#define mp_set_l(a, b)     (sizeof (long) == 8 ? mp_set_i64((a), (b)) : mp_set_i32((a), (int32_t)(b)))
 
 /* get integer, set integer (unsigned long) */
-#define mp_get_ul(a) ((unsigned long)mp_get_l(a))
-void mp_set_ul(mp_int *a, unsigned long b);
-mp_err mp_init_ul(mp_int *a, unsigned long b) MP_WUR;
+#define mp_get_ul(a)       (sizeof (long) == 8 ? (unsigned long)mp_get_u64(a) : (unsigned long)mp_get_u32(a))
+#define mp_set_ul(a, b)    (sizeof (long) == 8 ? mp_set_u64((a), (b)) : mp_set_u32((a), (uint32_t)(b)))
+#define mp_get_magl(a)     (sizeof (long) == 8 ? (unsigned long)mp_get_mag64(a) : (unsigned long)mp_get_mag32(a))
 
 /* set to single unsigned digit, up to MP_DIGIT_MAX */
 void mp_set(mp_int *a, mp_digit b);
 mp_err mp_init_set(mp_int *a, mp_digit b) MP_WUR;
+
+/* get integer, set integer and init with integer (deprecated) */
+MP_DEPRECATED(mp_get_mag32/mp_get_u32) unsigned long mp_get_int(const mp_int *a) MP_WUR;
+MP_DEPRECATED(mp_get_magl/mp_get_ul) unsigned long mp_get_long(const mp_int *a) MP_WUR;
+MP_DEPRECATED(mp_get_mag64/mp_get_u64) unsigned long long mp_get_long_long(const mp_int *a) MP_WUR;
+MP_DEPRECATED(mp_set_u32) mp_err mp_set_int(mp_int *a, unsigned long b);
+MP_DEPRECATED(mp_set_ul) mp_err mp_set_long(mp_int *a, unsigned long b);
+MP_DEPRECATED(mp_set_u64) mp_err mp_set_long_long(mp_int *a, unsigned long long b);
+MP_DEPRECATED(mp_init_u32) mp_err mp_init_set_int(mp_int *a, unsigned long b) MP_WUR;
 
 /* copy, b = a */
 mp_err mp_copy(const mp_int *a, mp_int *b) MP_WUR;
@@ -267,14 +327,11 @@ mp_err mp_init_copy(mp_int *a, const mp_int *b) MP_WUR;
 /* trim unused digits */
 void mp_clamp(mp_int *a);
 
-/* unpack binary data */
-mp_err mp_unpack(mp_int *rop, size_t count, mp_order order, size_t size, mp_endian endian,
-                 size_t nails, const void *op) MP_WUR;
+/* import binary data */
+mp_err mp_import(mp_int *rop, size_t count, int order, size_t size, int endian, size_t nails, const void *op) MP_WUR;
 
-/* pack binary data */
-size_t mp_pack_count(const mp_int *a, size_t nails, size_t size) MP_WUR;
-mp_err mp_pack(void *rop, size_t maxcount, size_t *written, mp_order order, size_t size,
-               mp_endian endian, size_t nails, const mp_int *op) MP_WUR;
+/* export binary data */
+mp_err mp_export(void *rop, size_t *countp, int order, size_t size, int endian, size_t nails, const mp_int *op) MP_WUR;
 
 /* ---> digit manipulation <--- */
 
@@ -309,24 +366,46 @@ int mp_cnt_lsb(const mp_int *a) MP_WUR;
 
 /* makes a pseudo-random mp_int of a given size */
 mp_err mp_rand(mp_int *a, int digits) MP_WUR;
+/* makes a pseudo-random small int of a given size */
+MP_DEPRECATED(mp_rand) mp_err mp_rand_digit(mp_digit *r) MP_WUR;
 /* use custom random data source instead of source provided the platform */
-void mp_rand_source(mp_err(*source)(void *out, size_t size));
+void mp_rand_source(mp_err source(void *out, size_t size));
+
+#ifdef MP_PRNG_ENABLE_LTM_RNG
+#  warning MP_PRNG_ENABLE_LTM_RNG has been deprecated, use mp_rand_source instead.
+/* A last resort to provide random data on systems without any of the other
+ * implemented ways to gather entropy.
+ * It is compatible with `rng_get_bytes()` from libtomcrypt so you could
+ * provide that one and then set `ltm_rng = rng_get_bytes;` */
+extern unsigned long (*ltm_rng)(unsigned char *out, unsigned long outlen, void (*callback)(void));
+extern void (*ltm_rng_callback)(void);
+#endif
 
 /* ---> binary operations <--- */
 
+/* Checks the bit at position b and returns MP_YES
+ * if the bit is 1, MP_NO if it is 0 and MP_VAL
+ * in case of error
+ */
+MP_DEPRECATED(s_mp_get_bit) int mp_get_bit(const mp_int *a, int b) MP_WUR;
+
 /* c = a XOR b (two complement) */
+MP_DEPRECATED(mp_xor) mp_err mp_tc_xor(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 mp_err mp_xor(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 
 /* c = a OR b (two complement) */
+MP_DEPRECATED(mp_or) mp_err mp_tc_or(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 mp_err mp_or(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 
 /* c = a AND b (two complement) */
+MP_DEPRECATED(mp_and) mp_err mp_tc_and(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 mp_err mp_and(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 
 /* b = ~a (bitwise not, two complement) */
 mp_err mp_complement(const mp_int *a, mp_int *b) MP_WUR;
 
 /* right shift with sign extension */
+MP_DEPRECATED(mp_signed_rsh) mp_err mp_tc_div_2d(const mp_int *a, int b, mp_int *c) MP_WUR;
 mp_err mp_signed_rsh(const mp_int *a, int b, mp_int *c) MP_WUR;
 
 /* ---> Basic arithmetic <--- */
@@ -353,22 +432,13 @@ mp_err mp_sub(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 mp_err mp_mul(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 
 /* b = a*a  */
-#define mp_sqr(a, b) mp_mul((a), (a), (b))
+mp_err mp_sqr(const mp_int *a, mp_int *b) MP_WUR;
 
 /* a/b => cb + d == a */
 mp_err mp_div(const mp_int *a, const mp_int *b, mp_int *c, mp_int *d) MP_WUR;
 
 /* c = a mod b, 0 <= c < b  */
 mp_err mp_mod(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
-
-/* Increment "a" by one like "a++". Changes input! */
-mp_err mp_incr(mp_int *a) MP_WUR;
-/* MDH@15MAR2020: using the 1.1.0 mp_incr replacing:
-#define mp_incr(a) mp_add_d((a), 1u, (a))
-*/
-
-/* Decrement "a" by one like "a--". Changes input! */
-#define mp_decr(a) mp_sub_d((a), 1u, (a))
 
 /* ---> single digit functions <--- */
 
@@ -378,8 +448,14 @@ mp_ord mp_cmp_d(const mp_int *a, mp_digit b) MP_WUR;
 /* c = a + b */
 mp_err mp_add_d(const mp_int *a, mp_digit b, mp_int *c) MP_WUR;
 
+/* Increment "a" by one like "a++". Changes input! */
+mp_err mp_incr(mp_int *a) MP_WUR;
+
 /* c = a - b */
 mp_err mp_sub_d(const mp_int *a, mp_digit b, mp_int *c) MP_WUR;
+
+/* Decrement "a" by one like "a--". Changes input! */
+mp_err mp_decr(mp_int *a) MP_WUR;
 
 /* c = a * b */
 mp_err mp_mul_d(const mp_int *a, mp_digit b, mp_int *c) MP_WUR;
@@ -387,8 +463,15 @@ mp_err mp_mul_d(const mp_int *a, mp_digit b, mp_int *c) MP_WUR;
 /* a/b => cb + d == a */
 mp_err mp_div_d(const mp_int *a, mp_digit b, mp_int *c, mp_digit *d) MP_WUR;
 
+/* a/3 => 3c + d == a */
+mp_err mp_div_3(const mp_int *a, mp_int *c, mp_digit *d) MP_WUR;
+
+/* c = a**b */
+mp_err mp_expt_d(const mp_int *a, mp_digit b, mp_int *c) MP_WUR;
+MP_DEPRECATED(mp_expt_d) mp_err mp_expt_d_ex(const mp_int *a, mp_digit b, mp_int *c, int fast) MP_WUR;
+
 /* c = a mod b, 0 <= c < b  */
-#define mp_mod_d(a, b, c) mp_div_d((a), (b), NULL, (c))
+mp_err mp_mod_d(const mp_int *a, mp_digit b, mp_digit *c) MP_WUR;
 
 /* ---> number theory <--- */
 
@@ -416,17 +499,12 @@ mp_err mp_exteuclid(const mp_int *a, const mp_int *b, mp_int *U1, mp_int *U2, mp
 /* c = [a, b] or (a*b)/(a, b) */
 mp_err mp_lcm(const mp_int *a, const mp_int *b, mp_int *c) MP_WUR;
 
-/* Integer logarithm to integer base */
-mp_err mp_log_n(const mp_int *a, int base, int *c) MP_WUR;
-
-/* c = a**b */
-mp_err mp_expt_n(const mp_int *a, int b, mp_int *c) MP_WUR;
-
 /* finds one of the b'th root of a, such that |c|**b <= |a|
  *
  * returns error if a < 0 and b is even
  */
-mp_err mp_root_n(const mp_int *a, int b, mp_int *c) MP_WUR;
+mp_err mp_n_root(const mp_int *a, mp_digit b, mp_int *c) MP_WUR;
+MP_DEPRECATED(mp_n_root_ex) mp_err mp_n_root_ex(const mp_int *a, mp_digit b, mp_int *c, int fast) MP_WUR;
 
 /* special sqrt algo */
 mp_err mp_sqrt(const mp_int *arg, mp_int *ret) MP_WUR;
@@ -435,7 +513,10 @@ mp_err mp_sqrt(const mp_int *arg, mp_int *ret) MP_WUR;
 mp_err mp_sqrtmod_prime(const mp_int *n, const mp_int *prime, mp_int *ret) MP_WUR;
 
 /* is number a square? */
-mp_err mp_is_square(const mp_int *arg, bool *ret) MP_WUR;
+mp_err mp_is_square(const mp_int *arg, mp_bool *ret) MP_WUR;
+
+/* computes the jacobi c = (a | n) (or Legendre if b is prime)  */
+MP_DEPRECATED(mp_kronecker) mp_err mp_jacobi(const mp_int *a, const mp_int *n, int *c) MP_WUR;
 
 /* computes the Kronecker symbol c = (a | p) (like jacobi() but with {a,p} in Z */
 mp_err mp_kronecker(const mp_int *a, const mp_int *p, int *c) MP_WUR;
@@ -462,7 +543,7 @@ mp_err mp_montgomery_calc_normalization(mp_int *a, const mp_int *b) MP_WUR;
 mp_err mp_montgomery_reduce(mp_int *x, const mp_int *n, mp_digit rho) MP_WUR;
 
 /* returns 1 if a is a valid DR modulus */
-bool mp_dr_is_modulus(const mp_int *a) MP_WUR;
+mp_bool mp_dr_is_modulus(const mp_int *a) MP_WUR;
 
 /* sets the value of "d" required for mp_dr_reduce */
 void mp_dr_setup(const mp_int *a, mp_digit *d);
@@ -471,7 +552,7 @@ void mp_dr_setup(const mp_int *a, mp_digit *d);
 mp_err mp_dr_reduce(mp_int *x, const mp_int *n, mp_digit k) MP_WUR;
 
 /* returns true if a can be reduced with mp_reduce_2k */
-bool mp_reduce_is_2k(const mp_int *a) MP_WUR;
+mp_bool mp_reduce_is_2k(const mp_int *a) MP_WUR;
 
 /* determines k value for 2k reduction */
 mp_err mp_reduce_2k_setup(const mp_int *a, mp_digit *d) MP_WUR;
@@ -480,7 +561,7 @@ mp_err mp_reduce_2k_setup(const mp_int *a, mp_digit *d) MP_WUR;
 mp_err mp_reduce_2k(mp_int *a, const mp_int *n, mp_digit d) MP_WUR;
 
 /* returns true if a can be reduced with mp_reduce_2k_l */
-bool mp_reduce_is_2k_l(const mp_int *a) MP_WUR;
+mp_bool mp_reduce_is_2k_l(const mp_int *a) MP_WUR;
 
 /* determines k value for 2k reduction */
 mp_err mp_reduce_2k_setup_l(const mp_int *a, mp_int *d) MP_WUR;
@@ -493,15 +574,29 @@ mp_err mp_exptmod(const mp_int *G, const mp_int *X, const mp_int *P, mp_int *Y) 
 
 /* ---> Primes <--- */
 
+/* number of primes */
+#ifdef MP_8BIT
+#  define PRIVATE_MP_PRIME_TAB_SIZE 31
+#else
+#  define PRIVATE_MP_PRIME_TAB_SIZE 256
+#endif
+#define PRIME_SIZE (MP_DEPRECATED_PRAGMA("PRIME_SIZE has been made internal") PRIVATE_MP_PRIME_TAB_SIZE)
+
+/* table of first PRIME_SIZE primes */
+MP_DEPRECATED(internal) extern const mp_digit ltm_prime_tab[PRIVATE_MP_PRIME_TAB_SIZE];
+
+/* result=1 if a is divisible by one of the first PRIME_SIZE primes */
+MP_DEPRECATED(mp_prime_is_prime) mp_err mp_prime_is_divisible(const mp_int *a, mp_bool *result) MP_WUR;
+
 /* performs one Fermat test of "a" using base "b".
  * Sets result to 0 if composite or 1 if probable prime
  */
-mp_err mp_prime_fermat(const mp_int *a, const mp_int *b, bool *result) MP_WUR;
+mp_err mp_prime_fermat(const mp_int *a, const mp_int *b, mp_bool *result) MP_WUR;
 
 /* performs one Miller-Rabin test of "a" using base "b".
  * Sets result to 0 if composite or 1 if probable prime
  */
-mp_err mp_prime_miller_rabin(const mp_int *a, const mp_int *b, bool *result) MP_WUR;
+mp_err mp_prime_miller_rabin(const mp_int *a, const mp_int *b, mp_bool *result) MP_WUR;
 
 /* This gives [for a given bit size] the number of trials required
  * such that Miller-Rabin gives a prob of failure lower than 2^-96
@@ -511,12 +606,12 @@ int mp_prime_rabin_miller_trials(int size) MP_WUR;
 /* performs one strong Lucas-Selfridge test of "a".
  * Sets result to 0 if composite or 1 if probable prime
  */
-mp_err mp_prime_strong_lucas_selfridge(const mp_int *a, bool *result) MP_WUR;
+mp_err mp_prime_strong_lucas_selfridge(const mp_int *a, mp_bool *result) MP_WUR;
 
 /* performs one Frobenius test of "a" as described by Paul Underwood.
  * Sets result to 0 if composite or 1 if probable prime
  */
-mp_err mp_prime_frobenius_underwood(const mp_int *N, bool *result) MP_WUR;
+mp_err mp_prime_frobenius_underwood(const mp_int *N, mp_bool *result) MP_WUR;
 
 /* performs t random rounds of Miller-Rabin on "a" additional to
  * bases 2 and 3.  Also performs an initial sieve of trial
@@ -532,14 +627,25 @@ mp_err mp_prime_frobenius_underwood(const mp_int *N, bool *result) MP_WUR;
  *
  * Sets result to 1 if probably prime, 0 otherwise
  */
-mp_err mp_prime_is_prime(const mp_int *a, int t, bool *result) MP_WUR;
+mp_err mp_prime_is_prime(const mp_int *a, int t, mp_bool *result) MP_WUR;
 
 /* finds the next prime after the number "a" using "t" trials
  * of Miller-Rabin.
  *
- * bbs_style = true means the prime must be congruent to 3 mod 4
+ * bbs_style = 1 means the prime must be congruent to 3 mod 4
  */
-mp_err mp_prime_next_prime(mp_int *a, int t, bool bbs_style) MP_WUR;
+mp_err mp_prime_next_prime(mp_int *a, int t, int bbs_style) MP_WUR;
+
+/* makes a truly random prime of a given size (bytes),
+ * call with bbs = 1 if you want it to be congruent to 3 mod 4
+ *
+ * You have to supply a callback which fills in a buffer with random bytes.  "dat" is a parameter you can
+ * have passed to the callback (e.g. a state or something).  This function doesn't use "dat" itself
+ * so it can be NULL
+ *
+ * The prime generated will be larger than 2^(8*size).
+ */
+#define mp_prime_random(a, t, size, bbs, cb, dat) (MP_DEPRECATED_PRAGMA("mp_prime_random has been deprecated, use mp_prime_rand instead") mp_prime_random_ex(a, t, ((size) * 8) + 1, (bbs==1)?MP_PRIME_BBS:0, cb, dat))
 
 /* makes a truly random prime of a given size (bits),
  *
@@ -554,34 +660,47 @@ mp_err mp_prime_next_prime(mp_int *a, int t, bool bbs_style) MP_WUR;
  * so it can be NULL
  *
  */
+MP_DEPRECATED(mp_prime_rand) mp_err mp_prime_random_ex(mp_int *a, int t, int size, int flags,
+      private_mp_prime_callback cb, void *dat) MP_WUR;
 mp_err mp_prime_rand(mp_int *a, int t, int size, int flags) MP_WUR;
+
+/* Integer logarithm to integer base */
+mp_err mp_ilogb(const mp_int *a, mp_digit base, mp_int *c) MP_WUR;
 
 /* ---> radix conversion <--- */
 int mp_count_bits(const mp_int *a) MP_WUR;
 
-size_t mp_ubin_size(const mp_int *a) MP_WUR;
-mp_err mp_from_ubin(mp_int *a, const uint8_t *buf, size_t size) MP_WUR;
-mp_err mp_to_ubin(const mp_int *a, uint8_t *buf, size_t maxlen, size_t *written) MP_WUR;
+int mp_unsigned_bin_size(const mp_int *a) MP_WUR;
+mp_err mp_read_unsigned_bin(mp_int *a, const unsigned char *b, int c) MP_WUR;
+mp_err mp_to_unsigned_bin(const mp_int *a, unsigned char *b) MP_WUR;
+mp_err mp_to_unsigned_bin_n(const mp_int *a, unsigned char *b, unsigned long *outlen) MP_WUR;
 
-size_t mp_sbin_size(const mp_int *a) MP_WUR;
-mp_err mp_from_sbin(mp_int *a, const uint8_t *buf, size_t size) MP_WUR;
-mp_err mp_to_sbin(const mp_int *a, uint8_t *buf, size_t maxlen, size_t *written) MP_WUR;
+int mp_signed_bin_size(const mp_int *a) MP_WUR;
+mp_err mp_read_signed_bin(mp_int *a, const unsigned char *b, int c) MP_WUR;
+mp_err mp_to_signed_bin(const mp_int *a,  unsigned char *b) MP_WUR;
+mp_err mp_to_signed_bin_n(const mp_int *a, unsigned char *b, unsigned long *outlen) MP_WUR;
 
 mp_err mp_read_radix(mp_int *a, const char *str, int radix) MP_WUR;
-mp_err mp_to_radix(const mp_int *a, char *str, size_t maxlen, size_t *written, int radix) MP_WUR;
-
-mp_err mp_radix_size(const mp_int *a, int radix, size_t *size) MP_WUR;
-mp_err mp_radix_size_overestimate(const mp_int *a, const int radix, size_t *size) MP_WUR;
+mp_err mp_toradix(const mp_int *a, char *str, int radix) MP_WUR;
+mp_err mp_toradix_n(const mp_int *a, char *str, int radix, int maxlen) MP_WUR;
+mp_err mp_radix_size(const mp_int *a, int radix, int *size) MP_WUR;
 
 #ifndef MP_NO_FILE
 mp_err mp_fread(mp_int *a, int radix, FILE *stream) MP_WUR;
 mp_err mp_fwrite(const mp_int *a, int radix, FILE *stream) MP_WUR;
 #endif
 
-#define mp_to_binary(M, S, N)  mp_to_radix((M), (S), (N), NULL, 2)
-#define mp_to_octal(M, S, N)   mp_to_radix((M), (S), (N), NULL, 8)
-#define mp_to_decimal(M, S, N) mp_to_radix((M), (S), (N), NULL, 10)
-#define mp_to_hex(M, S, N)     mp_to_radix((M), (S), (N), NULL, 16)
+#define mp_read_raw(mp, str, len) (MP_DEPRECATED_PRAGMA("replaced by mp_read_signed_bin") mp_read_signed_bin((mp), (str), (len)))
+#define mp_raw_size(mp)           (MP_DEPRECATED_PRAGMA("replaced by mp_signed_bin_size") mp_signed_bin_size(mp))
+#define mp_toraw(mp, str)         (MP_DEPRECATED_PRAGMA("replaced by mp_to_signed_bin") mp_to_signed_bin((mp), (str)))
+#define mp_read_mag(mp, str, len) (MP_DEPRECATED_PRAGMA("replaced by mp_read_unsigned_bin") mp_read_unsigned_bin((mp), (str), (len))
+#define mp_mag_size(mp)           (MP_DEPRECATED_PRAGMA("replaced by mp_unsigned_bin_size") mp_unsigned_bin_size(mp))
+#define mp_tomag(mp, str)         (MP_DEPRECATED_PRAGMA("replaced by mp_to_unsigned_bin") mp_to_unsigned_bin((mp), (str)))
+
+#define mp_tobinary(M, S)  mp_toradix((M), (S), 2)
+#define mp_tooctal(M, S)   mp_toradix((M), (S), 8)
+#define mp_todecimal(M, S) mp_toradix((M), (S), 10)
+#define mp_tohex(M, S)     mp_toradix((M), (S), 16)
 
 #ifdef __cplusplus
 }

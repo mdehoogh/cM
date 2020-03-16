@@ -75,7 +75,9 @@
 #   define MP_MONTGOMERY_CALC_NORMALIZATION_C
 #   define MP_MONTGOMERY_REDUCE_C
 #   define MP_MONTGOMERY_SETUP_C
+/*
 #   define MP_MUL_C
+*/
 #   define MP_MUL_2_C
 #   define MP_MUL_2D_C
 #   define MP_MUL_D_C
@@ -165,6 +167,8 @@
 #   define S_MP_SUB_C
 #   define S_MP_ZERO_BUF_C
 #   define S_MP_ZERO_DIGS_C
+#   define BN_MP_MUL_C
+#   define BN_MP_INCR_C
 #endif
 #endif
 #if defined(MP_2EXPT_C)

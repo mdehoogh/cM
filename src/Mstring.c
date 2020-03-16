@@ -112,11 +112,13 @@ Mstring* string_setlength(Mstring* const str,size_t length){
     }
     return str;
 }
-void string_synclength(Mstring* const str){
-    if(!str)return;
-    size_t l=str->length;
-    while(l>0)if(str->chars[--l]=='\0')break;
-    str->length=l;
+Mstring* string_synclength(Mstring* const str){
+    if(str){
+        size_t l=str->length;
+        while(l>0)if(str->chars[--l]=='\0')break;
+        if(l>0||str->chars[0]=='\0')str->length=l; // if str->chars[l] does not equal 0 (i.e. '\0') (only possible if l equals 0) we should NOT change the length
+    }
+    return str;
 }
 
 bool string_shorten(Mstring* const str,size_t length){
@@ -460,4 +462,16 @@ Mstring* _string_info(Mstring* str){
         if(!p){free_string(str_info);str_info=NULL;}
     }
     return str_info;
+}
+
+// MDH@16MAR2020: let's allow for determining the number of trailing elements
+size_t string_trailing(Mstring* str,char c){
+    size_t i,l=(str?str->length:0u);
+    if(l>0){
+        size_t i=l;
+        while(i>0&&str->chars[--i]==c);
+        if(str->chars[i]==c)return l; // all characters equaled c
+        return(l-i-1u);
+    }
+    return 0;
 }
