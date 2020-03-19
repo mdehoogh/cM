@@ -170,7 +170,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {"("   ,"!-+~","=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"`R; C  % )&*  , >?:    ]{}" }, /* Taeru ternary op. (? only now) */ \
 {""    ,""    ,"" ,""     ,""     ,""     ,""      ,""     ,""     ,"LEN.",""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R;! DS%( &*+-  >?:   [ { ="}, /* REFERENCE to an existing variable */ \
 {""    ,""    ,"=",""     ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"RLEN.",""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"` ;  DS (               {"  }, /* VARIABLE (identifier that is NOT a function) FUNCTION: some identifier not yet recognized as function name */ \
-{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,"LEN"   ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`R;! DS%()&*+- .>?:   [ {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
+{""    ,""    ,"=",""     ,""     ,""     ,""      ,""     ,""     ,""    ,""     ,"LEN."  ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,""      ,"C" ,"`R;! DS%()&*+-  >?:     {"  }, /* NEW_VARIABLE (variable that does not exist yet) */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,""      ,""  ,"` ; C  % )&*    >?:      }="}, /* LIST ELEMENT (similar to expression) */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,"N"  ,"."   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (          L  [ {"  }, /* INTEGER: (signless) list of digits */ \
 {";"   ,""    ,"" ,"?:"   ,"!="   ,"&*"   ,">"     ,"-+%E" ,"?"    ,""    ,""     ,""      ,","   ,""   ,"N"   ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS (      .   L  [ {"  }, /* REAL: part behind a decimal period */ \
@@ -179,7 +179,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
 {";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (     .   LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,"."    ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (         LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
 {";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""     ,""      ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS% (   - .  :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
@@ -813,46 +813,53 @@ static UpdateLastTokenAutocompletionTextFunction* updateLastTokenAutocompletionT
 static ReoutputTokenFunction* reoutputTokenFunction=NULL;
 // void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){reoutputTokenFunction=_reoutputTokenFunction;}
 
+static bool representsAFunction(Mvariable* variable){
+	// ASSERT variable should NOT be NULL
+	if(variable->valuetype==VT_FUNCTION)return true; // TODO this is questionable BUT ok
+	return(variable->_value?variable->_value->type==VT_FUNCTION:false);
+}
 // MDH@12MAR2020: because containsVariable() is not called in Menvironment.h/c itself, and it uses inputInfoFunction I moved it over here today just before it is getting used
 int8_t containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report){
     // MDH@09MAR2020: because we can now also have variables that are functions a true variable requires the variable to NOT be a function
-    if(!name)return -2; // invalid input
+    if(!name)return 0; // invalid input
     // MDH@12MAR2020: when using dot notation to access properties in maps it is essential that the part in front of the period references an existing map if it does not the 'dot' is basically NOT allowed
     //                because getVariable() would also return NULL if the map does not yet contain the '' property (to indicate the '' property to be set) it cannot distinguish that situation in getVariable so we do it here
     //                and we can return -2 as well to indicate invalid input in which case a TT_ERROR token should be started
     size_t l=strlen(name);
-    if(l==0)return -2;
+    if(l==0)return 0;
+	Mvariable* variable=NULL;
     // MDH@12MAR2020: with dot notation it starts with also determining whether or not the dot notation is valid 
     //                ok the essential thing here is that the thing holding the last property must be a variable that has a map value
     char* lastPropertySeparator=strrchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
     if(lastPropertySeparator){
         name[lastPropertySeparator-name]='\0'; // pretend the name to end at the last property separator
         if(report>0)output("Looking for map variable '%s'.\n",name);else if(report<0)(*inputInfoFunction)("Looking for map variable '%s'.\n",name);
-        Mvariable* variable=getVariable(_environment,name,report>0); // getVariable() uses output() and we can only use that when report>0
+        variable=getVariable(_environment,name,report>0); // getVariable() uses output() and we can only use that when report>0
         name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER; // put the last property separator back
         if(!variable)return -2; // if this happens the part in front of the period does not denote an existing variable (and it should)
-        if(!variable->_value)return -2; // the part in front of it does not contain a value
-        if(variable->_value->type!=VT_MAP)return -2; // the part in front of it is not a map
+        if(!variable->_value)return -3; // the part in front of it does not contain a value
+        if(variable->_value->type!=VT_MAP)return -4; // the part in front of it is not a map
         // if the map contains property '' it's an existing property otherwise it's a non-existing property
         Mmap* map=variable->_value->value._map;
-        if(!map)return -2;
+        if(!map)return -5;
         Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name,lastPropertySeparator+1)))mapelement=mapelement->_next;
-        return(mapelement?1:-1); // if a map element with '' property name exists, the 'variable' exists, otherwise it doesn't exist
-    }
-    // ASSERT not a property reference!!!!!
-    Mvariable* variable=getVariable(_environment,name,false);
-    if(!variable){
-        if(report>0)output("'%s' not an existing variable.",name);else if(report<0)(*inputInfoFunction)("'%s' not an existing variable.",name);
-        return -1;
-    }
+		// point variable to the _variable in the map element
+		variable=(mapelement?mapelement->_variable:NULL);
+    }else // ASSERT not a property reference!!!!!
+		variable=getVariable(_environment,name,false);
+	// if variable is undefined, return -1
+	if(!variable){
+		if(report>0)output("'%s' does not exist.",name);else if(report<0)(*inputInfoFunction)("'%s' does not exist.",name);
+		return -1;
+	}
+	// ASSERT variable!=NULL
     // if(report<0)inputInfo("'%s' %s recognized as an existing variable.",name,(variable?"":" NOT "));else 
-    if(variable->valuetype==VT_FUNCTION){
-        if(report>0)output("'%s' is a function variable, and not a true (value) variable.\n",name);else if(report>0)(*inputInfoFunction)("'%s' is a function variable, and not a true (value) variable.\n",name);
-        return 0;
+    if(representsAFunction(variable)){
+        if(report>0)output("'%s' holds a function, not a value.\n",name);else if(report>0)(*inputInfoFunction)("'%s' holds a function, not a value.\n",name);
+        return 1;
     }
-    if(report>0)output("'%s' is recognized as an existing variable.\n",name);else if(report<0)(*inputInfoFunction)("'%s' is recognized as an existing variable.\n",name);
-    return 1;
-    // replacing: return(getVariable(_environment,name,false)!=NULL);
+    if(report>0)output("'%s' exists.\n",name);else if(report<0)(*inputInfoFunction)("'%s' exists.\n",name);
+    return 2;
 }/* VALIDATED */
 
 // MDH@11MAR2020: Ok, need to be careful here
@@ -860,16 +867,20 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	Mtoken* functionToken=command->_lastToken;
 	char* _identifierName=_stringstart(functionToken->text,functionToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
-	if(functionToken->argument==1){
+	if(functionToken->argument==1)
 		functionToken->type=TT_NEW_VARIABLE;
-	}else
-	if(existsInCommand(command,_identifierName,functionToken->envid)){
+	else
+	if(existsInCommand(command,_identifierName,functionToken->envid))
 		functionToken->type=TT_VARIABLE;
-	}else
-	if(containsVariable(NULL,_identifierName,-1)>=0){ // MDH@11MAR2020: containsVariable() now returns -2 (no name or environment), 0 means it is a function variable, 1 means a value variable but existing nevertheless
-		functionToken->type=TT_VARIABLE;
-	}else{
-		functionToken->type=TT_NEW_VARIABLE;
+	else{
+		int8_t variableExistsIndicator=containsVariable(NULL,_identifierName,-1);
+		if(variableExistsIndicator>0) // MDH@11MAR2020: containsVariable() now returns -2 (no name or environment), 0 means it is a function variable, 1 means a value variable but existing nevertheless
+			functionToken->type=TT_VARIABLE;
+		else
+		if(variableExistsIndicator<0)
+			functionToken->type=TT_NEW_VARIABLE;
+		else // TODO what more can we do????
+			output("%sInvalid identifier name '%s'.",BUG_PREFIX,_identifierName);
 	}
 	// replacing: functionToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);

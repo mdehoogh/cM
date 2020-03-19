@@ -1332,14 +1332,17 @@ void updateUserInputCommandIdentifierContinuation(){
 					if(_userInputCommand->_lastToken->type==TT_REFERENCE){
 						// MDH@04NOV2019: if we mark the entire reference token as error, we're going to have problems recovering it, so it would make sense to mark the character that caused not having a completion text anymore as erroneous
 						//                so we should cut off that last character and put it in an error token, ready to be removed again
-						size_t lastTokenLength=string_length(_userInputCommand->_lastToken->text);
+						Mstring* lastTokenText=_userInputCommand->_lastToken->text; // NOTE no need to release this, we just need the pointer multiple times
+						size_t lastTokenLength=string_length(lastTokenText);
 						if(lastTokenLength>1){ // at least one character of the existing variable present in the reference
-							char c=string_last_char(_userInputCommand->_lastToken->text); // get the last character (to mark as erroneous)
+							char c=string_last_char(lastTokenText); // get the last character (to mark as erroneous)
 							if(c){ // we've got the character that is responsible for not getting a completion text anymore
-								if(!containsVariable(NULL,string_remainder(_userInputCommand->_lastToken->text,1),(amVerbose()?-1:0))){ // not already complete TODO perhaps there's a better way to compose the completion text in this case in _getCompletion()
+								int8_t variableExistsIndicator=containsVariable(NULL,string_remainder(lastTokenText,1),(amVerbose()?-1:0));
+								// TODO should NOT return 0 because it only does that when the name is invalid
+								if(variableExistsIndicator<=0){ // not already complete TODO perhaps there's a better way to compose the completion text in this case in _getCompletion()
 									// let's do something like a backspace but without moving the cursor on the screen
 									// replacing the last character with a blank is another option????
-									if(string_setlength(_userInputCommand->_lastToken->text,lastTokenLength-1)){ // managed to 'cut off' c (although it's still there, because when you set the length only ->length is adjusted nothing yet to the text itself)
+									if(string_setlength(lastTokenText,lastTokenLength-1)){ // managed to 'cut off' c (although it's still there, because when you set the length only ->length is adjusted nothing yet to the text itself)
 										Mtoken* _errorToken=_getNewCommandToken(_userInputCommand->_lastToken,TT_ERROR); // by passing in NULL all the complicated stuff is not happening!!!
 										if(_errorToken){
 											_userInputCommand->_lastToken=_errorToken; // update the last token assuming we will succeed in doing what needs doing
@@ -2190,13 +2193,19 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	if(lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_NEW_VARIABLE){ // might not exist after all both in the command and in the current environment
 		// MDH@08AUG2019 WARNING: all variables assigned to in the local variable declaration argument of the special functions should ALWAYS be considered new, but of course we cannot see that until they are assigned to
 		//                        unless we do not require them to be assigned to (and we can just use them by name itself without assigning a value to them) in which case they are local but uninitialized...
-		bool variableExists=(lastCommandToken->argument!=1);
-		if(variableExists){
+		int8_t variableExistsIndicator=0; // assuming invalid
+		if(lastCommandToken->argument!=1){
 			if(!existsInCommand(_userInputCommand,_identifierName,lastCommandToken->envid)){
 				// MDH@12MAR2020: if containsVariable() returns -2 this only happens with a property reference that is invalid in which case the token should be considered an error
-				//                I suppose we should then change the token type to TT_ERROR
-				switch(containsVariable(NULL,_identifierName,-1)){
-					case -2:
+				//                I suppose we should then change the token type to TT_ERROR in which case the type won't change from NEW_VARIABLE to VARIABLE or vice versa
+				variableExistsIndicator=containsVariable(NULL,_identifierName,-1);
+				switch(variableExistsIndicator){
+					case -5: // value of type MAP but no map defined (TODO is that a bug?????)
+					case -3: // value does not exist
+					case -2: // variable hosting the property does not exist
+						break;
+					case 0: // illegal input
+					case -4: // there is a value but it is NOT a map, I suppose this would be the only ERRONEOUS situation
 						{
 							char* propertyName=strrchr(_identifierName,M_PROPERTY_SEPARATOR_CHARACTER);
 							if(propertyName){
@@ -2208,30 +2217,34 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 						}
 						break;
 					case -1:
-						variableExists=false;
-						inputInfo("'%s' is not an existing variable!",_identifierName);
-						break;
-					case 0:
-						inputInfo("'%s' is a function variable, so exists.",_identifierName);
+						inputInfo("'%s' does not exist!",_identifierName);
 						break;
 					case 1:
-						inputInfo("'%s' is an existing non-function variable.",_identifierName);
+						inputInfo("'%s' exists, its value is a function.",_identifierName);
+						break;
+					case 2:
+						inputInfo("'%s' exists.",_identifierName);
 						break;
 				}
-			}else
+			}else{
+				variableExistsIndicator=3; // assumed to exist, but whether a function or not cannot be determined
 				inputInfo("'%s' is initialized in the command.",_identifierName);
-		}else
+			}
+		}else{
+			variableExistsIndicator=-3; // assumed to NOT exist but whether a function or not cannot be determined
 			inputInfo("'%s' is local, so it cannot be a existing variable.",_identifierName);
+		}
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
-			if(!variableExists){ // apparently does NOT exist
+			if(variableExistsIndicator<0){ // apparently does NOT exist
 				// inputInfo("'%s' not an existing variable.",_identifierName);
 				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 				reoutputToken(lastCommandToken);
 				// suggested characters should make = show (probably already present in the behind cursor text)
 				// MDH@23SEP2019 take care of by setLastTokenType, so removed: setLastTokenAutocompletionText("="); // MDH@20SEP2019 replacing: if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(feedforwardText,0)!='=')string_insert_char(feedforwardText,0,'=');
 			}
-		}else{ // a new variable
-			if(variableExists){ // now an existing variable
+		}else
+		if(lastCommandToken->type==TT_NEW_VARIABLE){ // a new variable
+			if(variableExistsIndicator>0){ // now an existing variable
 				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
 				reoutputToken(lastCommandToken);
 				///// MDH@23SEP2019 removed: deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);

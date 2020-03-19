@@ -714,29 +714,99 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype valuetype,bool immutable){
     Mvariable* _variable=NULL;
     if(name&&strlen(name)>0){ // input valid
+        // MDH@19MAR2020: if a property reference was accepted (even though the hosting variable does not exist or it's value is currently NULL) we can still create it, the map and the property in the map!!!!
+        //                we would need to go from left to right essential at the top level we start with _variableMap of environment
         // MDH@12MAR2020: it's more convenient to take care of adding properties separately because otherwise there would be a lot duplication of code in getVariable() in _getVariable()
         //                we can re-use some of the code that is present in containsVariable()
-        char* lastPropertySeparator=strrchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
-        if(lastPropertySeparator){ // a property reference
-            name[lastPropertySeparator-name]='\0';
-            _variable=getVariable(_environment,name,false);
+        // MDH@19MAR2020: _environment determines which environment name should be defined in
+        char* property=name; // initialize the property to create to name
+        char* propertySeparator=strchr(property,M_PROPERTY_SEPARATOR_CHARACTER);
+        if(propertySeparator)property[propertySeparator-property]='\0'; // a property reference and we need to start with the top-level variable
+        // determine whether this 'property' exists in the environment
+        Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
+        _variable=getVariable(environment,property,false);
+        // if it does not yet exist, try to create it
+        if(!_variable){ // the variable doesn't exist in the given environment (and also not in any of it's parents)
+            // TODO why would we add the variable to the first immutable variable map?????
+            while(environment&&(!environment->_variableMap||environment->_variableMap->immutable))environment=getValueEnvironment(environment->_parent);
+            Mmap* map=(environment?environment->_variableMap:NULL); // the map to add the variable
+            if(map){
+                if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
+                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
+                if(_variableMapelement){
+                    if(amVerbose())output("Variable '%s' to be created.\n",name);
+                    // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
+                    _variable=_getVariable(name,(propertySeparator?VT_UNDEFINED:valuetype),immutable); // creates the variable, free when not bound BUT that will NOT happen
+                    // store the references
+                    _variableMapelement->_next=NULL;
+                    _variableMapelement->_variable=_variable;
+                    Mmapelement* _lastVariableMapelement=map->_last;
+                    if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else map->_first=_variableMapelement;
+                    map->_last=_variableMapelement;
+                    map->numberOfElements++;
+                    if(amVerbose())output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
+                }else
+                    output("%sFailed to create a new map element for variable '%s'.",ERROR_PREFIX,name);
+            }else
+                output("%sNo (environment) variable map to add variable '%s' to.\n",ERROR_PREFIX,name);
+        }
+        if(!propertySeparator)return(_variable?true:false); // if not a property reference we're done anyway (and the result depends on whether or not _variable is NULL)
+        // ASSERT some property reference, and we have to undo the '\0' character placement
+        property[propertySeparator-property]=M_PROPERTY_SEPARATOR_CHARACTER;
+        while(_variable){
+            // if the variable does not have a value
+            if(!_variable->_value)assignValue(&_variable->_value,_getMapValue(VT_UNDEFINED,false));
+            Mmap* map=(_variable->_value&&_variable->_value->type==VT_MAP?_variable->_value->value._map:NULL);
+            if(!map){_variable=NULL;break;} // if its value is NOT a map failure...
+            // update property
+            property=propertySeparator+1; // make property point to the start of the next separator
+            // we need a map to put the next property in
+            // on to the next part
+            propertySeparator=strchr(property,M_PROPERTY_SEPARATOR_CHARACTER);
+            if(propertySeparator)property[propertySeparator-property]='\0';
+            // add the given property to the map BUT it might already be defined in the map!!!!!
+            Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(property,mapelement->_variable->_name)))mapelement=mapelement->_next;
+            if(!mapelement){ // property does not yet exist
+                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
+                if(_variableMapelement){
+                    if(amVerbose())output("Variable '%s' to be created.\n",name);
+                    // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
+                    _variable=_getVariable(property,(propertySeparator?VT_UNDEFINED:valuetype),immutable); // creates the variable, free when not bound BUT that will NOT happen
+                    // store the references
+                    _variableMapelement->_next=NULL;
+                    _variableMapelement->_variable=_variable;
+                    Mmapelement* _lastVariableMapelement=map->_last;
+                    if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else map->_first=_variableMapelement;
+                    map->_last=_variableMapelement;
+                    map->numberOfElements++;
+                    if(amVerbose())output("Property '%s' added.\n",property);
+                }else{ // failure
+                    _variable=NULL;
+                    output("%sFailed to create a new map element to store property '%s'.",ERROR_PREFIX,property);
+                }
+            }else // property already exists
+                _variable=mapelement->_variable;
+            if(!propertySeparator)break;
+            // put the separator back
+            property[propertySeparator-property]=M_PROPERTY_SEPARATOR_CHARACTER;
+        }
+        /* MDH@19MAR2020 replacing:
+        if(environment){
             Mmap* map=(_variable&&_variable->_value&&_variable->_value->type==VT_MAP?_variable->_value->value._map:NULL);
             bool result=false;
             if(!map)output("%s'%s' does not hold a map value.",ERROR_PREFIX,name);else
             if(map->immutable)output("%sCannot add a property to the immutable map stored in '%s'.",ERROR_PREFIX,name);else result=true; // TODO more specific please
-            name[lastPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER;
-            if(result)if(!appendedToMap(map,lastPropertySeparator+1,NULL)){result=false;output("%sFailed to add property '%s'.",ERROR_PREFIX,lastPropertySeparator+1);}
+            name[firstPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER;
+            if(result)if(!appendedToMap(map,firstPropertySeparator+1,NULL)){result=false;output("%sFailed to add property '%s'.",ERROR_PREFIX,firstPropertySeparator+1);}
             return result;
         }
-        // MDH@12MAR2020: 
-        _variable=getVariable(_environment,name,false);
+        _variable=getVariable(environment,name,false);
         if(!_variable){ // non-existing...
             if(amVerbose())output("Variable '%s' to be created.\n",name);
             _variable=_getVariable(name,valuetype,immutable); // creates the variable, free when not bound
             if(_variable){
                 if(amVerbose())output("Variable '%s' created.\n",name);
                 // get a reference to the environment to which variable map we should be appending...
-                Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
                 // MDH@10NOV2019: because we now allow immutable environment variable maps, the environment to add the variable to
                 //                is the first one up of which the variable map is not immutable...
                 //                TODO check whether to use _execution or _parent (I suppose we should move up the execution chain)
@@ -764,13 +834,12 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
                 outputErrorAndText("Failed to link variable ",name);
             }else
                 outputErrorAndText("Failed to create variable ",name);
-        }else{
+        }else
             if(amVerbose())output("%sWon't add existing variable '%s'\n.",WARNING_PREFIX,name);
-            return true;
-        }
+        */
     }else
         outputError("No variable name specified");
-    return false;
+    return(_variable!=NULL);
 }/* VALIDATED */
 
 bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){
