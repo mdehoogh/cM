@@ -646,7 +646,7 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
             }else
                 outputError("Couldn't determine the size of a big integer");
             //if(amVerbose())
-            output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
+            // output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
         }else
             outputError("No big integer to represent");
     }else

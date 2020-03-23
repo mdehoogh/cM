@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: Unlicense */
 
 /* MDH@13MAR2020: by defining M_MP_DEVELOP the adaptations to use the develop version of libtommath in M are applied so M can use the libtommath-develop library */
+/* MDH@14MAR2020: bn_mp_incr.c now added to libtommath-develop and to OBJECTS in makefile so it will also be present in libtommath.a */
 #define M_MP_DEVELOP 1
 
 #ifndef BN_H_

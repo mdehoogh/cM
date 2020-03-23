@@ -599,6 +599,7 @@ char* _getLastTokenAutoCompletionText(){
 		case TT_TERNARY_aeru:break;
 		case TT_UNARY:break;
 		case TT_VARIABLE:case TT_REFERENCE:
+		case TT_PROPERTY: // MDH@23MAR2020
 		default:break;
 	}
 	return strdup(tokenAutoCompletionText); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
@@ -2155,6 +2156,7 @@ Mtoken* getSpecialFunctionCallToken(const Mtoken* const token){
 // MDH@01OCT2019: aSuggestedCharacter is actually not used anymore, so no need to pass it in anymore
 bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bool aSuggestedCharacter*/){
 	// only identifiers should be checked...
+	// what about properties????? properties should NEVER be considered functions
 	if(lastCommandToken->type!=TT_VARIABLE&&lastCommandToken->type!=TT_NEW_VARIABLE&&lastCommandToken->type!=TT_FUNCTION)return false;
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
 	char* _identifierName=_stringstart(lastCommandToken->text,lastCommandToken->significantCharacterCount); // free asap
