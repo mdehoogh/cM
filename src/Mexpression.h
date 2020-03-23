@@ -87,11 +87,12 @@
 
 */
 
+// MDH@23MAR2020: inserted TT_PROPERTY to indicate a variable that starts with M_PROPERTY_SEPARATOR_CHARACTER
 // MDH@30APR2019: inserted TT_NEW_VARIABLE to indicate a variable that does not yet exist (which means it cannot be compared with, and should be assigned first)
 // MDH@10APR2019: NUMBER_OF_FINISHABLE_TOKEN_TYPES defines the number of tokens that can finish, currently error and comment tokens can never end 
 // MDH@31OCT2019: TT_WHITESPACE added which never should take part in any transition (so although it is a token type it is not counted in the number of (finishable) token types)
 // MDH@04NOV2019: TT_REFERENCE added to be used for all references to existing variables
-#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 27
+#define NUMBER_OF_FINISHABLE_TOKEN_TYPES 28
 #define NUMBER_OF_TOKEN_TYPES NUMBER_OF_FINISHABLE_TOKEN_TYPES+2
 // MDH@03MAY2019: TT_EXPRESSION is now the 'default' token type, so there's no need to set the token type on a new token
 #define FOREACH_TOKENTYPE(TOKENTYPE) \
@@ -107,6 +108,7 @@
 		TOKENTYPE(TT_REFERENCE) \
 		TOKENTYPE(TT_VARIABLE) \
         TOKENTYPE(TT_NEW_VARIABLE) \
+        TOKENTYPE(TT_PROPERTY) \
 		TOKENTYPE(TT_LISTELEMENT) \
 		TOKENTYPE(TT_INTEGER) \
 		TOKENTYPE(TT_REAL) \

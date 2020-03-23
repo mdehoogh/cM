@@ -52,7 +52,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="9";char const * const M_DATE="28 Februari 2020, 18:00";
 //char const * const M_BUILD="10";char const * const M_DATE="2 March 2020, 12:00";
 //char const * const M_BUILD="11";char const * const M_DATE="11 March 2020, 18:00";
-char const * const M_BUILD="12";char const * const M_DATE="12 March 2020, 18:00";
+//char const * const M_BUILD="12";char const * const M_DATE="12 March 2020, 18:00";
+char const * const M_BUILD="14";char const * const M_DATE="23 March 2020, 18:00"; // introducing PROPERTY token
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -1575,8 +1576,6 @@ void prepareForEvaluatingCommand(){
 	// using that we can update the system allocation counts by subtracting _lastcommanduserallocationcounts
 
 }
-void doneWithEvaluatingCommand(){
-}
 
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
@@ -1584,12 +1583,14 @@ void doneWithEvaluatingCommand(){
 bool evaluateCommand(Mvalue* *resultValue){
 	
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
-	if(!isAValidCommand(_userInputCommand,true)){
+	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,true);
+	if(aValidCommandIndicator<=0){
 		// MDH@20FEB2020: this is what we did in isAValidCommand() before, but removed from it: if the command ends with an error, we remove the error token, unfinish the (new) last token, so we can re-use it
 		if(_userInputCommand&&_userInputCommand->_lastToken&&_userInputCommand->_lastToken->type==TT_ERROR){
 			removeLastUserInputCommandToken();
 			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishToken(_userInputCommand->_lastToken);
 		}
+		//output("%sInvalid command indicator: %d.\n",ERROR_PREFIX,aValidCommandIndicator);
 		return false;
 	}
 
@@ -2832,11 +2833,12 @@ bool preparedForUserInput(){
 	//enableRawMode();
 	// disable output buffering on printf (as in raw input mode it would not write at all)
 	bool result=sessionInitialized();
-	if(result){
-		setbuf(stdout,NULL);
+	if(result)
 		output("Window dimensions: %dx%d.\n",getNumberOfWindowTextColumns(),getNumberOfWindowTextLines());
-	}
-	return result;
+	else
+		outputWarning("Failed to obtain the window dimensions.");
+	setbuf(stdout,NULL);
+	return true;
 }
 
 signed char getSessionSettingApplied(char sessionSettingCharacter){
@@ -3168,11 +3170,29 @@ int main(int argc, char **argv){
 							char c;inputCharRead(&c);
 							*/
 						}
+						int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,false);
+						inputInfo("Valid command indicator: %d.",aValidCommandIndicator);
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
-						if(!isAValidCommand(_userInputCommand,false)){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!
+						if(aValidCommandIndicator<=0){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!
 							/////////inputInfo("User newline break");
 							inputCharType='W';
 							inputChar='\\'; // TODO should we do this more generic????
+							switch(aValidCommandIndicator){
+								case   0:inputInfo("Invalid or empty command.");break;
+								case  -1:inputInfo("Erroneous command.");break;
+								case  -2:inputInfo("Value behind operator at end of command missing.");break;
+								case  -3:inputInfo("Missing end of list.");break;
+								case  -4:inputInfo("Missing end of function call.");break;
+								case  -5:inputInfo("Missing end of map.");break;
+								case  -6:inputInfo("Unknown expression with first token left unfinished.");break;
+								case  -7:inputInfo("Function call missing at end of command.");break;
+								case  -8:inputInfo("Unfinished function call.");break;
+								case  -9:inputInfo("Unfinished list.");break;
+								case -10:inputInfo("Unfinished string literal.");break;
+								case -11:inputInfo("Unfinished expression.");break;
+								case -12:inputInfo("Unfinished map.");break;
+								default:inputInfo("Invalid command indicator %d.",aValidCommandIndicator);break;
+							}
 						}
 					}
 				}
@@ -3758,7 +3778,7 @@ int main(int argc, char **argv){
 					// TODO the next part should be improved, as it is getting a bit messy
 					Mstring* _userInputCommandText=_getCommandText(false); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
 					if(!commandEvaluated){
-						if(!string_length(_userInputCommandText)){
+						if(string_length(_userInputCommandText)==0){
 							clearCommand();
 							outputInfo("Nothing to evaluate!");
 						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())

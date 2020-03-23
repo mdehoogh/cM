@@ -34,7 +34,8 @@ size_t output(const char *fmt,...){
 
 bool setOutputFilename(char const * const outputFilename){
     // close any current output file
-    if(outputFile){int closeResult=fclose(outputFile);if(closeResult!=0)fprintf(stderr,"Failed to close the output file (reason: %d).\n",closeResult);free(outputFile);outputFile=NULL;}
+    // NOTE apparently fclose() already takes care of free'ing the file handle, so calling free(outputFile) would result in a runtime error!!!
+    if(outputFile){int closeResult=fclose(outputFile);if(closeResult!=0)fprintf(stderr,"Failed to close the output file (reason: %d).\n",closeResult);/*free(outputFile);*/outputFile=NULL;}
     echo_to_output_file=false;
     if(outputFilename&&strlen(outputFilename)>0){
         outputFile=fopen(outputFilename,"a+t");

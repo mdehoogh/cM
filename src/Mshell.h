@@ -63,7 +63,8 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput);
 bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId);
 Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput);
 
-bool isAValidCommand(Mcommand* command,bool report);
+int8_t isAValidCommandIndicator(Mcommand* command,bool report); // returns negative values for invalid commands, 0 for invalid input, positive value for valid commands
+
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount);
 
 // MDH@20FEB2020 only called inside Mshell.c so removed from this header file: Mvalue* getCommandValue(Mcommand* command,char commandType);
