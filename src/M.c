@@ -3598,10 +3598,16 @@ int main(int argc, char **argv){
 				newline();
 				// might be paging through the commands
 				if(!commandPage){ // not currently paging through the commands
-					unsigned char sessionSettingApplied=getSessionSettingApplied(inputChar); // try to process myself
+					signed char sessionSettingApplied=getSessionSettingApplied(inputChar); // try to process myself
 					// we can get 'n' or 'x' responses
-					if(sessionSettingApplied>0){inputCharType=sessionSettingApplied;break;}
-					if(sessionSettingApplied<0)if(!settingApplied(inputChar))output("%sFailed to apply setting '%s'.\n",ERROR_PREFIX,inputChar);
+					if(sessionSettingApplied>0){
+						inputCharType=sessionSettingApplied;
+						break;
+					}
+					if(sessionSettingApplied<0){
+						if(settingApplied(inputChar))break;
+						output("%sFailed to apply setting '%s'.\n",ERROR_PREFIX,inputChar);
+					}
 				}else
 					// user might have selected one of the commands (letter a through j)
 					commandPage=0; // stop paging
