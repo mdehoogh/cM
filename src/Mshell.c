@@ -180,7 +180,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 {";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,""     ,","   ,""   ,""    ,"D"       ,"S"       ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_DQSTRING: double quoted string at end of double quoted string */ \
 {";"   ,""    ,"" ,"+"    ,"!="   ,"&"    ,">"     ,""     ,"?"    ,""    ,""     ,""      ,""     ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,""    ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS%&( * - .   LEN[ {"  }, /* END_SQSTRING single quoted string at end of single quoted string */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,","   ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,"]"    ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*   .>?:      }="}, /* LIST: [ starts a list */ \
-{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,""     ,","   ,""   ,"."   ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (         LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
+{";"   ,""    ,"=","?"    ,"!"    ,"&*"   ,">"     ,"-+%"  ,"?"    ,""    ,""     ,""      ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,":"  ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS  (         LEN  {"  }, /* END_OF_LIST: behind ] that ends a list */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,""    ,"N"  ,""    ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,""   ,""   ,"}"    ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  ,.>?:    ]{ ="}, /* MAP: { starts a map */ \
 {"("   ,"!-+~","" ,""     ,""     ,""     ,""      ,""     ,""     ,"R"   ,"LE"   ,""      ,""     ,""    ,"N"  ,"."   ,"D"       ,"S"       ,""       ,""       ,"["   ,""     ,"{"  ,""   ,""     ,""        ,""      ,")"     ,""  ,"` ; C  %& )*  , >?:    ] }="}, /* MAP_VALUE: : starts a map value */ \
 {";"   ,""    ,"" ,"?"    ,"!="   ,"&*"   ,">"     ,"+"    ,"?"    ,""    ,""     ,""      ,"."    ,","   ,""   ,""    ,""        ,""        ,""       ,""       ,"["   ,"]"    ,""   ,""   ,"}"    ,""        ,""      ,")"     ,"C" ,"`R   DS% (   -    :LEN  {"  }, /* END_OF_MAP: behind } that ends a map */ \
@@ -3759,39 +3759,62 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		// MDH@17NOV2019: if indexing is theoretically possible, we should further check for indexes
 		//                now, even if _valueReference is NULL we have to consume the indexes if present
 		if(canbeindexedtheoretically){
+			// MDH@24MAR2020: 'indexing' can either take the form of something inside square brackets but now also combined with property names using dot notation
+			//                BECAUSE all 'indexing' can be done using square bracket notation every property should become an element in the itemIdsList
+			//                so apart from testing for TT_LIST (which start an square bracket index list), we should also test for TT_PROPERTY which also results in adding something to the index list
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 			// MDH@17NOV2019: moved over from getValueOfExpression() to where it should below i.e. before unary operators are applied!!!
-			while(expressionToken&&expressionToken->next&&expressionToken->next->type==TT_LIST){
+			// MDH@24MAR2020: it's probably easier to create a list of item ids here to be filled with indices (some of which can be property names)
+			Mlist* itemIdsList=NULL;
+			while(expressionToken&&expressionToken->next&&(expressionToken->next->type==TT_LIST||expressionToken->next->type==TT_PROPERTY)){
+				if(!itemIdsList){
+					itemIdsList=_getListOfType(VT_UNDEFINED); // we know we're going to need to list
+					if(!itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",ERROR_PREFIX,_valueReference->_name);break;}
+				}
 				expressionToken=nextEnvironmentExpressionToken();
 				if(amVerbose()&&amDebugging())
 				{output("Augmented item id(s) token: ");outputTokenFunction(expressionToken);outputChar('\n');}
-				Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
-				if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
-					// we should append the indices to the index_id
-					Mvaluereference* operandValueReference=_valueReference; // instead of _formulaelement->operand
-					if(operandValueReference->_itemid){ // there are already indices defined, so we should append the additional list items
-						Mlist* itemIdsList=(operandValueReference->_itemid->type==VT_LIST?operandValueReference->_itemid->value._list:NULL);
-						if(itemIdsList){
-							Mlist* newItemIdsList=indexListValue->value._list;
-							Mlistelement* newItemIdListElement=newItemIdsList->_first;
-							while(newItemIdListElement){
-								if(!appendedToList(itemIdsList,newItemIdListElement->_value,M_LL_INVALID))
-									outputError("Failed to append augmented item id.");
-								newItemIdListElement=newItemIdListElement->_next;
+				if(expressionToken->type==TT_LIST){
+					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
+					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
+						Mlist* newItemIdsList=indexListValue->value._list;
+						Mlistelement* newItemIdListElement=newItemIdsList->_first;
+						while(newItemIdListElement){
+							if(!appendedToList(itemIdsList,newItemIdListElement->_value,M_LL_INVALID)){
+								outputError("Failed to append augmented item id.");
+								// TODO can't break here?????
 							}
-						}else 
-							outputBug("Item ids not a list.");
-						// indexListValue will be removed by the garbage collector
-					}else // no item id yet, so the same way as is done before set _itemid to the index list value
-						assignValue(&operandValueReference->_itemid,indexListValue);
-					if(amVerbose()&&amDebugging())
-					outputValue("Augmented item ids: ",operandValueReference->_itemid,".\n");
+							newItemIdListElement=newItemIdListElement->_next;
+						}
+					}else
+						outputBug("Item ids not a list.");
+					// indexListValue will be removed by the garbage collector
+				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
+					// we have to wrap the property name inside a value as text
+					Mstring* _propertyName=_stringCopy(expressionToken->text,expressionToken->significantCharacterCount);
+					if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
+						Mvalue* propertyNameValue=_getTextValue(string(_propertyName),false); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
+						if(!propertyNameValue||!appendedToList(itemIdsList,propertyNameValue,M_LL_INVALID)){
+							output("%sFailed to add property name '%s' to the index list of '%s'.\n",ERROR_PREFIX,string(_propertyName),_valueReference->_name);
+							// TODO can't break here
+						}
+					}
+					// NOTE have to release _propertyName here
+					if(_propertyName)free_string(_propertyName);
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerbose()&&amDebugging())
 				{output("End of augmented item id(s) token: ");outputTokenFunction(expressionToken);outputChar('\n');}
 			}
+			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
+			if(itemIdsList){
+				assignValue(&_valueReference->_itemid,_getValueOfList(itemIdsList,true));
+				//if(amVerbose()&&amDebugging())
+				outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
+			}
 		}
+
+		// MDH@24MAR2020: with dot property notation now syntacticly accepted, after an index 
 
 		// apply the unary operators (backwards)
 		// MDH@17NOV2019: why is the unary operator applied to the _value instead of what _valueReference references?????
