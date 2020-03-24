@@ -96,6 +96,7 @@ const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator b
 const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
+// MDH@24MAR2020 BUG FIX: needed to insert an additional "" for TT_PROPERTY which I forgot previously
 // now we define all the state transitions i.e. what input character types result in which new token type
 // NOTE this can be organized in many ways perhaps it's easiest to tell per input character what the transformation is
 //      only changes to the token type need to be registered, so if the change is NOT present, no need to put it in the transition table
@@ -109,7 +110,7 @@ const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-
    - E stands for *10** so is this an assignable operator I suppose you could make it assignable as in 4e=3 to muliply by 1000, yes this look strange, as such . could also be considered an operator but Ok
      E is Assignable e r u, so we can get rid of the EREAL token type!!!
 */
-char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","q","q","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
+char* const NO_TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES]={"","","","","","","","","","","","","","","q","q","`D","`S","","","","","","","","LEN","",""}; // MDH@30APR2019: oops one extra needed...
 
 /* MDH@18MAR2019: I have to add all token containing operator characters which is any of 8 different types of operators
    NOTE some operators are temporary in that they can be completed to become another (final) operator like ! or = when an = could be added, so it's actually a transition from an existing token to the same token
