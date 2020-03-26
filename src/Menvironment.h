@@ -59,6 +59,8 @@ bool setValue(const Menvironment* const _environment,char /*const*/ * const name
 bool setVariable(Menvironment * const _environment,char /*const*/ * const name,Mvalue const * const _value);
 
 Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name);
+// MDH@26MAR2020: if we need the address of the value pointer
+Mvalue** getValueHolder(Menvironment const * const _environment,char /*const*/ * const name);
 
 char* getConstantWithValue(Menvironment const * const environment,char * name,Mvalue* value); // MDH@24OCT2019: if we want to find a constant with the same value we can use that as a 'symbol'
 // MDH@24OCT2019: if we want to see the variables in an environment vall getVariableMapText(), which will also represent values by the names of constants with the same value (representing symbols)

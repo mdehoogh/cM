@@ -53,7 +53,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="10";char const * const M_DATE="2 March 2020, 12:00";
 //char const * const M_BUILD="11";char const * const M_DATE="11 March 2020, 18:00";
 //char const * const M_BUILD="12";char const * const M_DATE="12 March 2020, 18:00";
-char const * const M_BUILD="14";char const * const M_DATE="23 March 2020, 18:00"; // introducing PROPERTY token
+//char const * const M_BUILD="14";char const * const M_DATE="23 March 2020, 18:00"; // introducing PROPERTY token
+char const * const M_BUILD="15";char const * const M_DATE="26 March 2020, 18:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -1050,6 +1051,7 @@ static size_t outputToken(Mtoken* _token){
 			resetOutputColor();
 			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
 		}
+		resetOutputColor();
 	}
 	return numberOfCharactersToOutput;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
@@ -1666,10 +1668,11 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
 		Mtoken* token=commands[lastCommandToShowIndex+commandToShowIndex]->_firstToken;
 		while(token){outputToken(token);token=token->next;}
+		outputChar('\n');
 	}
 	resetOutputColor();
 	output("%s","Select the last digit of the command to use, or the up/down key to show the next/previous page.");
-	output("%s",">> "); // TODO what kind of prompting do we want to do???
+	output("%c%c%c%c",' ','>','>',' '); // TODO what kind of prompting do we want to do???
 }
 void showNextCommandPage(){
 	if(commandPage<commandPages)
@@ -3605,8 +3608,8 @@ int main(int argc, char **argv){
 						break;
 					}
 					if(sessionSettingApplied<0){
-						if(settingApplied(inputChar))break;
-						output("%sFailed to apply setting '%s'.\n",ERROR_PREFIX,inputChar);
+						if(!settingApplied(inputChar))output("%sSetting character '%c' not recognized.\n",ERROR_PREFIX,inputChar);
+						break;
 					}
 				}else
 					// user might have selected one of the commands (letter a through j)

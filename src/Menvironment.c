@@ -942,6 +942,14 @@ Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const 
     return variable->_value;
 }/* VALIDATED */
 
+// MDH@26MAR2020: sometimes we need the address of the value pointer (in the variable)
+Mvalue** getValueHolder(Menvironment const * const _environment,char /*const*/ * const name){
+    if(!_environment||!name){outputError("No environment or name specified");return NULL;}
+    Mvariable* variable=getVariable(_environment,name,false);
+    if(!variable){output("%sVariable '%s' not found.\n",ERROR_PREFIX,name);return NULL;}
+    return &(variable->_value);
+}/* VALIDATED */
+
 // FUNCTION STUFF
 // the names of the variables may be requested
 Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep){

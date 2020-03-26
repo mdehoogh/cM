@@ -177,6 +177,9 @@ long long getValueSign(Mvalue const * const value); // return -1 for negative va
 Mvalue* getValueAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
 Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 
+Mvalue** getValueHolderAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
+Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName);
+
 Mstring* _getListText(Mlist* _list);
 Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings);
 

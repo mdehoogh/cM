@@ -990,12 +990,18 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			   MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
 			   MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
 			*/
-			if(newTokenType==lastCommandToken->type&&lastCommandToken->significantCharacterCount>0){
-				// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
-				// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
-				if(lastCommandToken->type!=TT_LIST&&lastCommandToken->type!=TT_FUNCTION_CALL&&lastCommandToken->type!=TT_UNARY&&lastCommandToken->type!=TT_TERNARY_aeru&&lastCommandToken->type!=TT_LISTELEMENT&&lastCommandToken->type!=TT_END_OF_FUNCTION_CALL&&lastCommandToken->type!=TT_END_OF_MAP&&lastCommandToken->type!=TT_END_OF_LIST){
-					newTokenType=TT_ERROR;
-					if(amVerbose())(*inputErrorFunction)("Token already finished!");
+			if(newTokenType==lastCommandToken->type){
+				if(lastCommandToken->significantCharacterCount>0){
+					// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
+					// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
+					if(lastCommandToken->type!=TT_LIST&&lastCommandToken->type!=TT_FUNCTION_CALL&&lastCommandToken->type!=TT_UNARY&&lastCommandToken->type!=TT_TERNARY_aeru&&lastCommandToken->type!=TT_LISTELEMENT&&lastCommandToken->type!=TT_END_OF_FUNCTION_CALL&&lastCommandToken->type!=TT_END_OF_MAP&&lastCommandToken->type!=TT_END_OF_LIST){
+						newTokenType=TT_ERROR;
+						if(amVerbose())(*inputErrorFunction)("Token already finished!");
+					}
+				}else{ // MDH@25MAR2020: a property cannot contain a 'dot' (period) other than at the first position
+					// 'finishing' a token forces creating a new one below
+					if(newTokenType==TT_PROPERTY&&inputChar==M_PROPERTY_SEPARATOR_CHARACTER)
+						if(lastCommandToken->significantCharacterCount==0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 				}
 			}
 		}else{ // different token types
@@ -1004,6 +1010,12 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				newTokenType=TT_ERROR;
 				//if(amVerbose())
 				(*inputErrorFunction)("A shortcut operator assignment cannot change into an equality.");
+			}else{
+				// MDH@26MAR2020: TODO check whether this should be done elsewhere???
+				if(newTokenType==TT_PROPERTY&&lastCommandToken->type==TT_FUNCTION){
+					if(lastCommandToken->significantCharacterCount==0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
+					changeFunctionTokenToAVariable(command,true);
+				}
 			}
 		}
 		/////if(amDebugging())(*inputInfoFunction)("D");
@@ -3239,80 +3251,147 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
-		if(amVerbose()){output("Setting the value reference of '%s'",_valuereference->_name);outputValue(" to '",_newValue,"'.\n");}
+		if(amVerbose()){
+			output("Setting the value reference of '%s",_valuereference->_name);
+			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
+			outputValue("' to '",_newValue,"'.\n");
+		}
 		// MDH@18OCT2019: without an _itemid the variable is allowed to NOT yet exist
-		if(_valuereference->_itemid){ // the hard part: index/attribute name list assignment!!
-			Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
-			if(_value&&(_value->type==VT_LIST||_value->type==VT_MAP)){
+		if(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST){ // the hard part: index/attribute name list assignment!!
+			// MDH@25MAR2020: we can cut the user some slack by allowing automatic initialization to a list or map depending on the whether a property is added or an index
+			//                so value needs to be a list or a map or NULL to be indexable unless we allow values to become maps, or making a list
+			//                but that's dangerous, so _value&& changed to !_value||
+			// MDH@26MAR2020: BUT in order to be able to put a value into the variable we need the address of the value pointer, i.e. the value holder so to speak
+			//                i.e. we need a pointer to where the value pointer is stored, could we be using & on the value pointer being returned to get at the holder?????????
+			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name);
+			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
+			if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
 				result=true;
-				if(amVerbose())outputInfo("Element to set.");
+				if(amVerbose())outputInfo("************ Element to set.");
 				Mlist* _itemidlist=_valuereference->_itemid->value._list; // let's assume that is it always a list
 				// let's get the first index/attribute name
-				Mlistelement* indexorattributenameListelement=_itemidlist->_first;
+				Mlistelement* indexorattributenameListelement=(_itemidlist?_itemidlist->_first:NULL);
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 				//                this works for lists not for maps
-				if(indexorattributenameListelement||_value->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
+				if(indexorattributenameListelement||!(*valueholder)||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
 					// we need to find the last index or attribute name
-					Mvalue* indexorattributenameListelementValue;
-					if(indexorattributenameListelement) // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
-					while(indexorattributenameListelement->_next){
+					Mvalue* indexorattributenameListelementValue=NULL;
+					if(indexorattributenameListelement){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
 						indexorattributenameListelementValue=indexorattributenameListelement->_value;
-						indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
-						// if no value is defined, it is ignored TODO should we????
-						if(indexorattributenameListelementValue){
-							// if we are accessing a map we have to ascertain that the attribute name in a string
-							if(_value->type==VT_MAP){
-								Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
-								if(attributenameText){
-									_value=getValueOfAttribute(_value->value._map,string(attributenameText));		
-									free_string(attributenameText);
-									continue;	
+						while(indexorattributenameListelement->_next){
+							indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
+							// if no value is defined, it is ignored TODO should we????
+							if(indexorattributenameListelementValue){
+								if(amVerbose()){outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
+								// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
+								if(isValueUndefined(*valueholder)!=M_FALSE){
+									if(amVerbose())output("Will initialize '%s' to a composite value.\n",_valuereference->_name);
+									// if the index is of type integer we should make a list out of it
+									// NOTE no need to use assignValue here BECAUSE that would only result in copying the empty list or map again
+									if(indexorattributenameListelementValue->type==VT_INTEGER||indexorattributenameListelementValue->type==VT_BIGINTEGER){
+										assignValue(valueholder,_getListValue(VT_UNDEFINED,false));
+										if(amVerbose())output("Value of '%s' initialized to a list.\n",_valuereference->_name);
+									}else{
+										assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
+										if(amVerbose())output("Value of '%s' initialized to a map.\n",_valuereference->_name);
+									}
+									if(isValueUndefined(*valueholder)!=M_FALSE){valueholder=NULL;outputError("Failed to create a list or map.");}
 								}
-								outputValue("\nERROR: Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.");		
-							}
-							if(_value->type==VT_LIST){
-								if(indexorattributenameListelementValue->type==VT_INTEGER){
-									_value=getValueAtIndex(_value->value._list,indexorattributenameListelementValue->value._integer->ll);
-									continue;
+								if(valueholder){
+									// if we are accessing a map we have to ascertain that the attribute name in a string
+									if((*valueholder)->type==VT_MAP){
+										Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
+										if(attributenameText){
+											Mvalue** newValueholder=getValueHolderOfAttribute((*valueholder)->value._map,string(attributenameText));		
+											if(!newValueholder){
+												if(appendedToMap((*valueholder)->value._map,string(attributenameText),NULL)!=1){
+													valueholder=NULL;
+													output("%sFailed to add property '%s'.\n",ERROR_PREFIX,string(attributenameText));
+												}else
+													valueholder=getValueHolderOfAttribute((*valueholder)->value._map,string(attributenameText));
+											}else
+												valueholder=newValueholder;
+											free_string(attributenameText);
+										}else
+											valueholder=NULL;
+										if(!valueholder){output("%s",ERROR_PREFIX);outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");}
+									}else
+									if((*valueholder)->type==VT_LIST){
+										long long listIndex=M_LL_INVALID;
+										if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
+										if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
+										if(listIndex!=M_LL_INVALID){
+											Mvalue** newValueholder=getValueHolderAtIndex((*valueholder)->value._list,listIndex);
+											if(!newValueholder){
+												if(appendedToList((*valueholder)->value._list,NULL,listIndex)==M_LL_INVALID){
+													valueholder=NULL;
+													output("%sFailed to add list element at index '%lld'.\n",ERROR_PREFIX,listIndex);
+												}else
+													valueholder=getValueHolderAtIndex((*valueholder)->value._list,listIndex);
+											}else
+												valueholder=newValueholder;
+										}
+										if(!valueholder){output("%s",ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
+									}else
+										valueholder=NULL;
 								}
-								outputValue("\nERROR: Assumed index '",indexorattributenameListelementValue,"' not an integer.");
 							}
-							// neither a list nor a map, so nothing to return!!!
-							break;
+							if(!valueholder){result=false;break;}
+							indexorattributenameListelementValue=indexorattributenameListelement->_value;
 						}
 					}
-					// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
-					if(_value->type==VT_MAP){
-						Mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
-						if(!appendedToMap(_value->value._map,string(_attributeName),_newValue)){
-							result=false;
-						}
-						free_string(_attributeName);
-						if(!result)return false;
-					}else
-					if(_value->type==VT_LIST){
-						// NOTE allow appending using 0 or inserting with negative values
-						// MDH@18OCT2019: we now have four situations: 0=prepend, NULL=append, negative integers=set from the back (-1=last element)
-						//                so if no list element is defined, we just append to the list!!!!
-						//                the only invalid situations is when the _value is NULL although it still could NOT denote an integer
-						long long index=(indexorattributenameListelement?getValueInteger(indexorattributenameListelement->_value):M_LL_INVALID);
-						// replace the index to the actual index with the index of the element in the list (so getReferencedValue() will not complain!!!)
-						if(!indexorattributenameListelement||index!=LLONG_MIN){
-							index=appendedToList(_value->value._list,_newValue,index);
-							// MDH@18OCT2019: why are we doing this????? i.e. is the value in the list still pointing somewhere??????
-							if(index>0){
-								if(indexorattributenameListelement)
-								assignValue(&indexorattributenameListelement->_value,_getIntegerValue(index));
+					if(result){
+						// we have to take care of the last index as well
+						if(isValueUndefined(*valueholder)!=M_FALSE){
+							if(amVerbose())output("Will initialize '%s' to a composite value.\n",_valuereference->_name);
+							if(indexorattributenameListelementValue){
+								if(amVerbose()){outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
+								// if the index is of type integer we should make a list out of it
+								if(indexorattributenameListelementValue->type==VT_INTEGER||indexorattributenameListelementValue->type==VT_BIGINTEGER){
+									assignValue(valueholder,_getListValue(VT_UNDEFINED,false));
+									if(amVerbose())output("Value of '%s' initialized to a list.\n",_valuereference->_name);
+								}else{
+									assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
+									if(amVerbose())output("Value of '%s' initialized to a map.\n",_valuereference->_name);
+								}
 							}else
-								result=false;	
+								outputError("No index value.");
+							if(!valueholder||isValueUndefined(*valueholder)!=M_FALSE){result=false;outputError("Failed to create a list or map.");}
+						}					
+					}
+					if(result){
+						// now indexorattributenameListelement should point to the last index/attribute name and _value at the list/map to change
+						if((*valueholder)->type==VT_MAP){
+							Mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
+							if(appendedToMap((*valueholder)->value._map,string(_attributeName),_newValue)!=1)result=false;
+							free_string(_attributeName);
+							// if(!result)return false;
 						}else
-							result=false;
+						if((*valueholder)->type==VT_LIST){
+							// NOTE allow appending using 0 or inserting with negative values
+							// MDH@18OCT2019: we now have four situations: 0=prepend, NULL=append, negative integers=set from the back (-1=last element)
+							//                so if no list element is defined, we just append to the list!!!!
+							//                the only invalid situations is when the _value is NULL although it still could NOT denote an integer
+							long long index=(indexorattributenameListelement?getValueInteger(indexorattributenameListelement->_value):M_LL_INVALID);
+							// replace the index to the actual index with the index of the element in the list (so getReferencedValue() will not complain!!!)
+							if(!indexorattributenameListelement||index!=LLONG_MIN){
+								index=appendedToList((*valueholder)->value._list,_newValue,index);
+								// MDH@18OCT2019: why are we doing this????? i.e. is the value in the list still pointing somewhere??????
+								if(index>0){
+									if(indexorattributenameListelement)assignValue(&indexorattributenameListelement->_value,_getIntegerValue(index));
+								}else
+									result=false;	
+							}else
+								result=false;
+						}
 					}
 				}else
-				if(_value->type!=VT_LIST)
+				if(!valueholder||isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type!=VT_LIST){
+					result=false;
 					outputError("No index/attribute name specified");
+				}
 			}else
-				output("%sReferenced variable '%s' cannot be indexed: it's value is not a list or a map.\n",ERROR_PREFIX,_valuereference->_name);
+				output("%sVariable '%s' cannot be indexed: it's value is not a list or a map.\n",ERROR_PREFIX,_valuereference->_name);
 		}else{
 			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
 			//                the same way as happens when you use the defun internal function
@@ -3483,7 +3562,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
 							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
-							if(amVerbose())if(inputCharReadFunction){char c;output("Press any key to continue...");inputCharReadFunction(&c);}
+							if(amVerbose())if(inputCharReadFunction){char c;output("Press any key to continue...");(*inputCharReadFunction)(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
@@ -3572,7 +3651,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
-				if(expressionToken->type==TT_VARIABLE)canbeindexedtheoretically=true;
+				// MDH@25MAR2020 allow indexing of new variables as well!!!! removing: if(expressionToken->type==TT_VARIABLE)
+				canbeindexedtheoretically=true;
 				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerbose())output("Value reference variable name: '%s'.\n",_valueReference->_name);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
@@ -3773,8 +3853,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(!itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",ERROR_PREFIX,_valueReference->_name);break;}
 				}
 				expressionToken=nextEnvironmentExpressionToken();
-				if(amVerbose()&&amDebugging())
-				{output("Augmented item id(s) token: ");outputTokenFunction(expressionToken);outputChar('\n');}
+				// if(amDebugging())
+				if(amVerbose())
+				{output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 				if(expressionToken->type==TT_LIST){
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
@@ -3804,8 +3885,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(_propertyName)free_string(_propertyName);
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-				if(amVerbose()&&amDebugging())
-				{output("End of augmented item id(s) token: ");outputTokenFunction(expressionToken);outputChar('\n');}
+				// if(amDebugging())
+				if(amVerbose())
+				{output("End of augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 			}
 			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
 			if(itemIdsList){
@@ -4720,7 +4802,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										output(".\n");
 										if(decimalprecisionreached)break; // decimal precision reached
 										if(inputCharReadFunction){
-											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");inputCharReadFunction(&c);outputChar('\n'); // wait for any key
+											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");(*inputCharReadFunction)(&c);outputChar('\n'); // wait for any key
 											if(c==3)break;
 										}
 										if(mp_copy(_nextpk,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
@@ -4849,7 +4931,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 														////////outputDecimal(" Distance: ",_distance,".");
 														if(inputCharReadFunction){
 															output(" %s...","Press any key to continue");
-															inputCharReadFunction(&c);
+															(*inputCharReadFunction)(&c);
 														}
 														outputChar('\n');
 													}
@@ -6036,7 +6118,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 						if(amDebugging()){
 							outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
 							if(inputCharReadFunction){
-								char c;output("%s...","Press Ctrl-C to stop or any other key to continue");inputCharReadFunction(&c);if(c==3)return NULL;
+								char c;output("%s...","Press Ctrl-C to stop or any other key to continue");(*inputCharReadFunction)(&c);if(c==3)return NULL;
 							}
 						}
 					}

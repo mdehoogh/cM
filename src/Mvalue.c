@@ -1088,7 +1088,27 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index){
     }
     return NULL;
 }/* VALIDATED */
-// END LIST STUFF
+Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
+    // NOTE if index is equal to zero definitely no value there!!!
+    if(_list&&index){
+        if(_list->_last){
+            long long maxindex=_list->_last->index;
+            if(index<0)index+=(maxindex+1);
+            if(index>0){
+                if(index==maxindex)return &(_list->_last->_value);
+                if(index<maxindex){
+                    Mlistelement* _listelement=_list->_first;
+                    while(_listelement){
+                        if(_listelement->index==index)return &(_listelement->_value);
+                        if(_listelement->index>index)break; // couldn't find it!!!
+                        _listelement=_listelement->_next;
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
+}/* VALIDATED */// END LIST STUFF
 
 // MAP STUFF
 // MDH@24MAY2019: if already in the map should replace the current value
@@ -1110,7 +1130,7 @@ long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue
                             if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
                             _map->_last=_mapelement;
                             _map->numberOfElements++;
-                            result=M_TRUE; // success
+                            // result=M_TRUE; // success
                         }else{ // we have a map element BUT no variable, so no go
                             free_mapelement(_mapelement,false);_mapelement=NULL;
                             outputError("Failed to create a new attribute");
@@ -1148,6 +1168,21 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
     }
     return NULL;
 }/* VALIDATED */
+// MDH@25MAR2020: sometimes we need the value holder
+Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName){
+    // MDH@14NOV2019: there's no reason why the map couldn't have an attribute with an empty name!!!!
+    if(_map&&attributeName){
+        Mmapelement* _mapelement=_map->_first;
+        if(_mapelement){            
+            // keep looking until there is a match
+            while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+            // if there is a match return the associated value
+            if(_mapelement&&_mapelement->_variable)return &(_mapelement->_variable->_value);
+        }
+    }
+    return NULL;
+}/* VALIDATED */
+
 // END MAP STUFF
 
 Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){
