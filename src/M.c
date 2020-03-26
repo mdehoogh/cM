@@ -2988,12 +2988,18 @@ int main(int argc, char **argv){
 	addallocation('!',0,0);
 
 	// MDH@13MAR2020: echo all requested output to the log file as well, I suppose we should use a timestamp in the name, so we get a different log for each session
-	if(setOutputFilename("M.log")){
-		dontEchoToOutputFile(); // turn off what setOutputFilename turned on
-		Mstring* _sessionStartTimestamp=_getTimestamp(NULL);outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");if(_sessionStartTimestamp)free_string(_sessionStartTimestamp);
-		outputInfo("Session information will be written to M.log.");
-	}else
-		outputError("Failed to open M.log for writing session information to.");
+	Mstring* _outputFilename=_getTimestamp("%Y-%m-%d.%H:%M:%S");
+	if(_outputFilename){
+		if(string_prepend(_outputFilename,"M.")&&string_append(_outputFilename,".log")){
+			if(setOutputFilename(string(_outputFilename))){
+				dontEchoToOutputFile(); // turn off what setOutputFilename turned on
+				Mstring* _sessionStartTimestamp=_getTimestamp(NULL);outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");if(_sessionStartTimestamp)free_string(_sessionStartTimestamp);
+				outputInfo("Session information will be written to M.log.");
+			}else
+				outputError("Failed to open M.log for writing session information to.");
+		}
+		free_string(_outputFilename);
+	}
 
 	while(1){ // command loop
 
