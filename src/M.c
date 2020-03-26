@@ -2994,10 +2994,11 @@ int main(int argc, char **argv){
 			if(setOutputFilename(string(_outputFilename))){
 				dontEchoToOutputFile(); // turn off what setOutputFilename turned on
 				Mstring* _sessionStartTimestamp=_getTimestamp(NULL);outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");if(_sessionStartTimestamp)free_string(_sessionStartTimestamp);
-				outputInfo("Session information will be written to M.log.");
+				output("Session information will be written to %s.\n",string(_outputFilename));
 			}else
-				outputError("Failed to open M.log for writing session information to.");
-		}
+				output("%sFailed to open %s for writing session information to.\n",ERROR_PREFIX,string(_outputFilename));
+		}else
+			outputError("No session log will be written, due to failing to compose the output filename.");
 		free_string(_outputFilename);
 	}
 
