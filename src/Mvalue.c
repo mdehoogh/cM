@@ -380,6 +380,49 @@ Mlist* _getListIndices(Mlist const * const list){
     }
     return _list;
 }/* VALIDATED */
+
+// MDH@30MAR2020: the general idea of flattening a list is that all elements of the list are not lists anymore
+//                let's assume that NULL means something went wrong
+//                reversed tells _getFlattenedList to prepend instead of append
+Mlist* _getFlattenedList(Mvalue const * const value,bool reversed){
+    Mlist* _list=NULL;
+    if(value){
+        _list=_getListOfType(VT_UNDEFINED);
+        if(_list){
+            bool success=true;
+            if(value->type==VT_LIST){
+                // we have to flatten all elements in the list obviously before we can actually add them to _list
+                // if the list is empty we do NOT consider this an error, we simply do nothing
+                Mlistelement* valueListelement=(value->value._list?value->value._list->_first:NULL);
+                if(valueListelement){
+                    while(valueListelement){
+                        // if there is a value associated _getFlattenedList should NOT return NULL (so NULL would represent an error)
+                        if(valueListelement->_value){
+                            Mlist* _sublist=_getFlattenedList(valueListelement->_value,reversed);
+                            if(_sublist){
+                                Mlistelement* valueSublistelement=_sublist->_first;
+                                while(valueSublistelement){
+                                    // if supposed to return the prepend instead of append pass in 0 instead of M_LL_INVALID
+                                    if(valueSublistelement->_value&&appendedToList(_list,valueSublistelement->_value,(reversed?0:M_LL_INVALID))<=0){success=false;break;}
+                                    valueSublistelement=valueSublistelement->_next;
+                                }
+                                // ALWAYS free _sublist
+                                free_list(_sublist);
+                            }else
+                                success=false;
+                            if(!success)break; // do NOT continue with appending when failing to do so
+                        }
+                        valueListelement=valueListelement->_next;
+                    }
+                }
+            }else // a single element to add to the list
+                if(appendedToList(_list,value,M_LL_INVALID)<=0)success=false;
+            if(!success){free_list(_list);_list=NULL;} // on failure release the list
+        }    
+    }
+    return _list;
+}
+
 Mlist* _getMapAttributes(Mmap const * const map){
     Mlist* _list=_getListOfType(VT_TEXT);
     if(!_list)return NULL;

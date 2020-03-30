@@ -3276,13 +3276,14 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				//                this works for lists not for maps
 				if(indexorattributenameListelement||!(*valueholder)||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
 					Mvalue*** valueholders=CALLOC(1,sizeof(void*),'_');
-					size_t numberOfValueholders=(valueholders?1:0);
+					size_t numberOfValueholders=(valueholders?1:0); // if allocating memory for a single Mvalue** succeeds we have a go
 					if(numberOfValueholders>0){
 						valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
 						// we need to find the last index or attribute name
 						Mvalue* indexorattributenameListelementValue=NULL;
 						if(indexorattributenameListelement){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
 							indexorattributenameListelementValue=indexorattributenameListelement->_value;
+							// NOTE the last one needs to be assigned to
 							while(indexorattributenameListelement->_next){
 								indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
 								// if no value is defined, it is ignored TODO should we????
@@ -3314,7 +3315,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 												Mvalue** newValueholder=getValueHolderOfAttribute((*valueholders[0])->value._map,string(attributenameText));		
 												if(!newValueholder){
 													if(appendedToMap((*valueholders[0])->value._map,string(attributenameText),NULL)!=1){
-														valueholder=NULL;
+														valueholders[0]=NULL;
 														output("%sFailed to add property '%s'.\n",ERROR_PREFIX,string(attributenameText));
 													}else
 														valueholders[0]=getValueHolderOfAttribute((*valueholders[0])->value._map,string(attributenameText));
@@ -3324,10 +3325,10 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 												}
 												free_string(attributenameText);
 											}else
-												valueholder=NULL;
-											if(!valueholder){output("%s",ERROR_PREFIX);outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");}
+												valueholders[0]=NULL;
+											if(!valueholders[0]){output("%s",ERROR_PREFIX);outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");}
 										}else
-										if((*valueholder)->type==VT_LIST){
+										if((*valueholders[0])->type==VT_LIST){
 											long long listIndex=M_LL_INVALID;
 											if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
 											if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);

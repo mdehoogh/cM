@@ -165,6 +165,8 @@ Mlist* _getListCopy(Mlist const * const _list);
 Mlist* _getListIndices(Mlist const * const _list);
 Mlist* _getMapAttributes(Mmap const * const _map);
 
+Mlist* _getFlattenedList(Mvalue const * const _value,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
+
 long long isListUndefined(Mlist* list);
 
 long long appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);
