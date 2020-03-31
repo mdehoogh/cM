@@ -382,11 +382,13 @@ Mlist* _getListIndices(Mlist const * const list){
 }/* VALIDATED */
 
 // MDH@30MAR2020: the general idea of flattening a list is that all elements of the list are not lists anymore
-//                let's assume that NULL means something went wrong
+//                let's assume that NULL means something went wrong, caller should take care of situation where value is NULL unless ?TODO? we allow putting a NULL value in the list
 //                reversed tells _getFlattenedList to prepend instead of append
 Mlist* _getFlattenedList(Mvalue const * const value,bool reversed){
     Mlist* _list=NULL;
     if(value){
+        // if(amDebugging())
+            outputValue("Flattening '",value,"'.\n");
         _list=_getListOfType(VT_UNDEFINED);
         if(_list){
             bool success=true;
@@ -394,32 +396,36 @@ Mlist* _getFlattenedList(Mvalue const * const value,bool reversed){
                 // we have to flatten all elements in the list obviously before we can actually add them to _list
                 // if the list is empty we do NOT consider this an error, we simply do nothing
                 Mlistelement* valueListelement=(value->value._list?value->value._list->_first:NULL);
-                if(valueListelement){
-                    while(valueListelement){
-                        // if there is a value associated _getFlattenedList should NOT return NULL (so NULL would represent an error)
-                        if(valueListelement->_value){
-                            Mlist* _sublist=_getFlattenedList(valueListelement->_value,reversed);
-                            if(_sublist){
-                                Mlistelement* valueSublistelement=_sublist->_first;
-                                while(valueSublistelement){
+                while(valueListelement){
+                    // if there is a value associated _getFlattenedList should NOT return NULL (so NULL would represent an error)
+                    if(valueListelement->_value){
+                        // MDH@31MAR2020: a little more effort to check if the value is a list in which case flattening is required, otherwise it is not
+                        if(valueListelement->_value->type==VT_LIST){
+                            Mlist* _subList=_getFlattenedList(valueListelement->_value,reversed);
+                            if(_subList){
+                                Mlistelement* valueSubListelement=_subList->_first;
+                                while(valueSubListelement){
                                     // if supposed to return the prepend instead of append pass in 0 instead of M_LL_INVALID
-                                    if(valueSublistelement->_value&&appendedToList(_list,valueSublistelement->_value,(reversed?0:M_LL_INVALID))<=0){success=false;break;}
-                                    valueSublistelement=valueSublistelement->_next;
+                                    if(valueSubListelement->_value)if(appendedToList(_list,valueSubListelement->_value,(reversed?0:M_LL_INVALID))<=0){success=false;break;}
+                                    valueSubListelement=valueSubListelement->_next;
                                 }
                                 // ALWAYS free _sublist
-                                free_list(_sublist);
+                                free_list(_subList);
                             }else
                                 success=false;
-                            if(!success)break; // do NOT continue with appending when failing to do so
-                        }
-                        valueListelement=valueListelement->_next;
+                        }else
+                            if(appendedToList(_list,valueListelement->_value,(reversed?0:M_LL_INVALID))<=0)success=false;
+                        if(!success)break; // do NOT continue with appending when failing to do so
                     }
+                    valueListelement=valueListelement->_next;
                 }
             }else // a single element to add to the list
                 if(appendedToList(_list,value,M_LL_INVALID)<=0)success=false;
             if(!success){free_list(_list);_list=NULL;} // on failure release the list
         }    
     }
+    // if(amDebugging())
+        outputList("Flattened to '",_list,"'.\n");
     return _list;
 }
 
@@ -1296,7 +1302,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
                 if(showquotes)p=string_append_char(p,'\'');
                 if(showmissings||!isValueUndefined(_mapVariable->_value)){
                     /////output("%s",string(p));
-                    p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+                    p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
                     /////output("%s",string(p));
                     Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
                     /////output("Map element: %s",string(p));
@@ -1309,7 +1315,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
             }
 			_mapelement=_mapelement->_next;
 			if(!_mapelement)break;
-            p=string_append(p,", "); // only when there's a next map element to process
+            p=string_append(p,","); // only when there's a next map element to process
 			////output("%s","next");
 		}
 		//////output("%s(%d)",string(p),string_length(p));
