@@ -2858,7 +2858,10 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 	if(sessionSettingCharacter=='f'||sessionSettingCharacter=='F'){outputFunctions();result='n';}else
 	if(sessionSettingCharacter=='r'||sessionSettingCharacter=='R'){reset();result='n';}else
 	// options
-	if(sessionSettingCharacter=='x'||sessionSettingCharacter=='X')result='x';else
+	// MDH@31MAR2020: with lowercase 'x' let's ask for confirmation
+	if(sessionSettingCharacter=='x')
+	{char c;output("Do you really want to exit M? ");inputCharRead(&c);outputChar(c);if(c=='Y'||c=='y')result='x';}else
+	if(sessionSettingCharacter=='X')result='x';else
 	if(sessionSettingCharacter=='s'||sessionSettingCharacter=='S')result=switchToShellMode(NULL);else
 	if(sessionSettingCharacter=='h'||sessionSettingCharacter=='H'){
 		// are we showing the history 5 commands at a time, or 9 at a time? we want the user to be able to select a command quickly
@@ -3611,14 +3614,11 @@ int main(int argc, char **argv){
 				if(!commandPage){ // not currently paging through the commands
 					signed char sessionSettingApplied=getSessionSettingApplied(inputChar); // try to process myself
 					// we can get 'n' or 'x' responses
-					if(sessionSettingApplied>0){
-						inputCharType=sessionSettingApplied;
-						break;
-					}
 					if(sessionSettingApplied<0){
 						if(!settingApplied(inputChar))output("%sSetting character '%c' not recognized.\n",ERROR_PREFIX,inputChar);
-						break;
-					}
+					}else
+					if(sessionSettingApplied>0)inputCharType=sessionSettingApplied;
+					break;
 				}else
 					// user might have selected one of the commands (letter a through j)
 					commandPage=0; // stop paging
