@@ -3251,7 +3251,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
-		if(amVerbose()){
+		if(amDebugging()){
 			output("Setting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
 			outputValue("' to '",_newValue,"'.\n");
@@ -3270,7 +3270,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 			if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
 				result=true;
-				if(amVerbose())
+				if(amDebugging())
 					outputInfo("************ Element(s) to set.");
 				// let's get the first index/attribute name
 				Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
@@ -3289,7 +3289,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 								indexorattributenameListelementValue=indexorattributenameListelement->_value;
 								// if no value is defined, it is ignored TODO should we????
 								if(indexorattributenameListelementValue){
-									// if(amVerbose())
+									if(amDebugging())
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 									// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 									// NOTE we need to check ALL valueholders
@@ -3303,7 +3303,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 									size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore, so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
-										// if(amVerbose())
+										if(amDebugging())
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
 										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
@@ -3325,10 +3325,10 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 													// if the index is a list we will be duplicating
 													if(_flattenedIndexList->valuetype==VT_INTEGER){ // all integers in the index list
 														assignValue(valueholder,_getListValue(VT_UNDEFINED,false));
-														if(amVerbose())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
+														if(amDebugging())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 													}else{ // not all integers in the index list
 														assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
-														if(amVerbose())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
+														if(amDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 													}
 													if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
 												}
@@ -3340,7 +3340,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 												numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 												indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
 												if(indexorattributenameListelementValue){
-													// if(amVerbose())
+													if(amDebugging())
 														outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
 													int valueholderIndex=numberOfValueholders;
 													while(--valueholderIndex>=0){
@@ -3400,8 +3400,8 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 																				output("%sFailed to add list element at index '%lld'.\n",ERROR_PREFIX,listIndex);
 																			}else{
 																				_valueholders[valueholderIndex+numberOfNewValueholders]=getValueHolderAtIndex((*valueholder)->value._list,listIndex);
-																				// if(amVerbose())
-																					output("List element at index #%zd of %s retrieved.",valueholderIndex+numberOfNewValueholders,_valuereference->_name);
+																				if(amDebugging())
+																					output("List element at index #%zd of %s retrieved.\n",valueholderIndex+numberOfNewValueholders,_valuereference->_name);
 																			}
 																		}else
 																			_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
@@ -3551,7 +3551,8 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 						}
 					}
 				}
-				if(amVerbose())outputInfo("Value set!");
+				if(amDebugging())
+					outputInfo("Value set!");
 			}
 		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
