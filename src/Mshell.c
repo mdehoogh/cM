@@ -6305,11 +6305,53 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 		if(!_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange);
 		// with at least two elements in the list we could use the second argument as the count if it is not a list, this would give us additional functionality
 		// because normally we would expect value2 to be an end point somehow and therefore a list
-		Mvalue* endintegerrangeValue=(_value2->type!=VT_LIST?_value2:(_value2->value._list&&_value2->value._list->_first?_value2->value._list->_first->_value:NULL));
-		if(!endintegerrangeValue)return NULL;
-		Mlist* _integerrangeList=_getScalarRangeList(_value1->value._list->_first->_value,endintegerrangeValue);
-		if(!_integerrangeList)return NULL;
-		
+		Mlistelement* endIntegerRangeListelement=(_value2->type==VT_LIST?_value2->value._list->_first:NULL);
+		Mvalue* endIntegerRangeValue=(_value2->type!=VT_LIST?_value2:endIntegerRangeListelement->_value);
+		if(!endIntegerRangeValue)return NULL; // we need a end value (whether from a scalar or from a list)
+		Mlistelement* startIntegerRangeListelement=_value1->value._list->_first;
+		Mlist* _integerRangeList=_getScalarRangeList(startIntegerRangeListelement->_value,endIntegerRangeValue);
+		if(!_integerRangeList)return NULL;
+		// the first integer range list tells us how many elements we need to create for successive elements
+		// although the deltas to use are numeric there's no specific type to consider
+
+		Mlist* _deltaRangeList=_getListOfType(VT_UNDEFINED);
+		if(!_deltaRangeList)return NULL;
+		while(1){
+			startIntegerRangeListelement=startIntegerRangeListelement->_next;
+			if(!startIntegerRangeListelement)break;
+			Mvalue* startIntegerRangeValue=startIntegerRangeListelement->_value;
+			if(!startIntegerRangeValue)continue; // skip whatever is not present
+			if(endIntegerRangeListelement){
+				endIntegerRangeListelement=endIntegerRangeListelement->_next;
+				endIntegerRangeValue=endIntegerRangeListelement->_value;
+			}
+			// we need to compute the delta (step) 
+			Mvalue* deltaRangeValue=NULL;
+			if(endIntegerRangeValue){
+				Mvalue* integerRangeValue=Msubtract(endIntegerRangeValue,startIntegerRangeValue);
+				deltaRangeValue=Mquotient(integerRangeValue,_getIntegerValue(_integerRangeList->numberOfElements));
+			}else
+				deltaRangeValue=_getIntegerValue(1);
+			if(!deltaRangeValue||appendedToList(_deltaRangeList,deltaRangeValue,M_LL_INVALID)<0){
+				free_list(_deltaRangeList);
+				_deltaRangeList=NULL;
+				break;
+			}
+		}
+		Mlist* _resultList=NULL;
+		if(_deltaRangeList){
+			if(_deltaRangeList->numberOfElements>0){
+				_resultList=_getListOfType(VT_UNDEFINED);
+				if(_resultList){
+					// iterating over all elements in _integerRangeList
+
+				}
+				free_list(_integerRangeList);
+			}else
+				_resultList=_integerRangeList;
+			free_list(_deltaRangeList);
+		}
+		return _getValueOfList(_resultList,true);
 		// replacing: return _appliedToList(_value1->value._list,_value2,Mrange);
 	}
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange);
