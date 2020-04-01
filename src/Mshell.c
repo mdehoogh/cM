@@ -6238,55 +6238,82 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 }
 // end comparison operator implementation
 
+// MDH@01APR2020: we can make a list with intermediate values for multi-dimensional ranging by passing in the start list, the delta list and the end list each of which should have equal length
+//                I guess we can pass in a count that tells us how many multidimensional points to return instead of the end 
+static Mlist* _getRangeList(Mlist* start,Mlist* delta,long long count){
+
+}
+static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue){
+	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?_getListOfType(VT_INTEGER):NULL);
+	if(_scalarRangeList){
+		Mvalue* upValue=smallerthanorequalto(firstRangeValue,lastRangeValue); // the direction we'll be going
+		if(upValue&&upValue->type==VT_INTEGER){
+			bool up=(upValue->value._integer->ll!=0);
+			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
+			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
+			Mvalue* firstIntegerRangeValue=(up?Mceil(firstRangeValue):Mfloor(firstRangeValue));
+			if(firstIntegerRangeValue){
+				long long rangeInteger=getValueInteger(firstIntegerRangeValue);
+				if(rangeInteger!=M_LL_INVALID){
+					Mvalue* integerrangeValue=_getIntegerValue(rangeInteger);
+					if(integerrangeValue){
+						if(amVerbose()){
+							Mvalue* lastIntegerRangeValue=(up?Mfloor(lastRangeValue):Mceil(lastRangeValue));
+							if(amDebugging()){
+								outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerRangeValue,"].\n");
+								if(inputCharReadFunction){
+									char c;output("%s...","Press Ctrl-C to stop or any other key to continue");(*inputCharReadFunction)(&c);if(c==3)return NULL;
+								}
+							}
+						}
+						Mvalue* inrangeValue;
+						while(integerrangeValue){
+							// determine whether this value does not exceed the last value
+							inrangeValue=(up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
+							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
+							if(inrangeValue->value._integer->ll==0)break; // not in range
+							if(appendedToList(_scalarRangeList,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
+							// determine the next value to insert into the integer range
+							if(up)rangeInteger++;else rangeInteger--;
+							integerrangeValue=_getIntegerValue(rangeInteger);
+						}
+						return _getValueOfList(_scalarRangeList,true);
+					}else
+						outputError("Failed to initialize the first candidate range integer");
+				}else
+					outputError("Failed to extract the lower bound of the integer range");
+			}else
+				outputError("Failed to determine the first integer range value");
+		}else
+			outputError("Unable to determine whether to go up or down in the integer range");
+	}else
+		outputError("Failed to create a list to store the integer range");
+	return _scalarRangeList;
+}
 // MDH@18OCT2019: we can get the range of integers between two values
 Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_MAP||_value2->type==VT_MAP)return NULL; // neither operand can be a map for sure
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mrange);
+	if(_value1->type==VT_REFERENCE||_value2->type==VT_REFERENCE)return NULL; // neither operand can be a reference for sure
+	if(_value1->type==VT_FUNCTION||_value2->type==VT_FUNCTION)return NULL; // neither operand can be a function for sure
+	if(_value1->type==VT_ENVIRONMENT||_value2->type==VT_ENVIRONMENT)return NULL; // neither operand can be a environment for sure
+	// MDH@01APR2020: in the past we could use a list as first argument and as second argument and get the same result i.e. 1:[10,10] ===[1,1]:10 -> [[1,...,10],[1,...,10]]
+	//                but now we allow multi-dimensional ranges for all calls that have a list as first argument, and getRangeList is used to get the multi-dimensional points
+	//                I suppose we can stick to the original approach if there are less than 2 elements in the list
+	if(_value1->type==VT_LIST){
+		if(!_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange);
+		// with at least two elements in the list we could use the second argument as the count if it is not a list, this would give us additional functionality
+		// because normally we would expect value2 to be an end point somehow and therefore a list
+		Mvalue* endintegerrangeValue=(_value2->type!=VT_LIST?_value2:(_value2->value._list&&_value2->value._list->_first?_value2->value._list->_first->_value:NULL));
+		if(!endintegerrangeValue)return NULL;
+		Mlist* _integerrangeList=_getScalarRangeList(_value1->value._list->_first->_value,endintegerrangeValue);
+		if(!_integerrangeList)return NULL;
+		
+		// replacing: return _appliedToList(_value1->value._list,_value2,Mrange);
+	}
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange);
 	// now we're dealing with scalars
-	Mvalue* upValue=smallerthanorequalto(_value1,_value2); // the direction we'll be going
-	if(upValue&&upValue->type==VT_INTEGER){
-		bool up=(upValue->value._integer->ll!=0);
-		// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
-		// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
-		Mvalue* firstIntegerrangeValue=(up?Mceil(_value1):Mfloor(_value1));
-		if(firstIntegerrangeValue){
-			long long rangeInteger=getValueInteger(firstIntegerrangeValue);
-			if(rangeInteger!=M_LL_INVALID){
-				Mvalue* integerrangeValue=_getIntegerValue(rangeInteger);
-				if(integerrangeValue){
-					if(amVerbose()){
-						Mvalue* lastIntegerrangeValue=(up?Mfloor(_value2):Mceil(_value2));
-						if(amDebugging()){
-							outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerrangeValue,"].\n");
-							if(inputCharReadFunction){
-								char c;output("%s...","Press Ctrl-C to stop or any other key to continue");(*inputCharReadFunction)(&c);if(c==3)return NULL;
-							}
-						}
-					}
-					Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
-					Mvalue* inrangeValue;
-					while(integerrangeValue){
-						// determine whether this value does not exceed the last value
-						inrangeValue=(up?smallerthanorequalto(integerrangeValue,_value2):largerthanorequalto(integerrangeValue,_value2));
-						if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
-						if(inrangeValue->value._integer->ll==0)break; // not in range
-						if(appendedToList(integerrangeValueList,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
-						// determine the next value to insert into the integer range
-						if(up)rangeInteger++;else rangeInteger--;
-						integerrangeValue=_getIntegerValue(rangeInteger);
-					}
-					return _getValueOfList(integerrangeValueList,true);
-				}else
-					outputError("Failed to initialize the first candidate range integer");
-			}else
-				outputError("Failed to extract the lower bound of the integer range");
-		}else
-			outputError("Failed to determine the first integer range value");
-	}else
-		outputError("Unable to determine whether to go up or down in the integer range");
-	return NULL;
+	return _getValueOfList(_getScalarRangeList(_value1,_value2),true);
 	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
 }
 
