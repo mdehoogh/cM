@@ -6243,7 +6243,7 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 // MDH@01APR2020: we can make a list with intermediate values for multi-dimensional ranging by passing in the start list, the delta list and the end list each of which should have equal length
 //                I guess we can pass in a count that tells us how many multidimensional points to return instead of the end 
 static Mlist* _getRangeList(Mlist* start,Mlist* delta,long long count){
-
+	return NULL;
 }
 static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue){
 	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?_getListOfType(VT_INTEGER):NULL);
@@ -6274,12 +6274,11 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 							inrangeValue=(up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
 							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
 							if(inrangeValue->value._integer->ll==0)break; // not in range
-							if(appendedToList(_scalarRangeList,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
+							if(appendedToList(_scalarRangeList,integerrangeValue,M_LL_INVALID)<=0){free_list(_scalarRangeList);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
 							// determine the next value to insert into the integer range
 							if(up)rangeInteger++;else rangeInteger--;
 							integerrangeValue=_getIntegerValue(rangeInteger);
 						}
-						return _getValueOfList(_scalarRangeList,true);
 					}else
 						outputError("Failed to initialize the first candidate range integer");
 				}else
