@@ -9,6 +9,19 @@ extern const long double M_LD_Q_EPS; // the threshold for accepting a rational a
 
 mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){
     // assuming _c equals NULL
+    // MDH@02APR2020: big integers equal to NULL (i.e. undefined) should be considered equal to 1
+    //                which technically means that we would be returning 1 as result
+    //                HOWEVER we could safeguard against that??????
+    if(a&&b){
+        *_c=__biginteger();
+        return(!_c?MP_ERR:mp_mul(a,b,*_c)); // if both big integers are defined, return the multiplication in *_c
+    }
+    if(!a&&!b)*_c=NULL;else
+    if(!a)*_c=_getBigintegerCopy(b);else
+    if(!b)*_c=_getBigintegerCopy(a);
+    return MP_OKAY;
+    // MDH@02APR2020 END
+    /* replacing:
     if(a||b){
         *_c=__biginteger();
         if(!_c)return MP_ERR;
@@ -17,8 +30,10 @@ mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
     }
     // *_c should be NULL, so return MP_ERR if not NULL
     return (*_c?MP_OKAY:MP_ERR);
+    */
 }
 mp_err _bidiv(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){
+    // MDH@02APR2020: TODO should we do the same here???????
     // assuming _c equals NULL
     if(a||b){
         *_c=__biginteger();
@@ -232,19 +247,53 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
     ///////Mfloat* _delta=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
-    if(status==MP_OKAY)status=_bimul(a->den,b->den,&_den); // multiply denominators to become the result denominator
-    if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+    if(status==MP_OKAY){
+        status=_bimul(a->den,b->den,&_den); // multiply denominators to become the result denominator
+        if(status!=MP_OKAY)
+            output("%sFailed to multiply the denominators of two rationals (error code: %d).\n",ERROR_PREFIX,status);
+        else
+        if(amVerbose())
+            outputInfo("Denominators of two rationals multiplied");
+    }
+    if(status==MP_OKAY){
+        // MDH@02APR2020 I think we had a bug here because the denominator can be undefined so !_den|| replaced by _den&&
+        if(_den&&mp_iszero(_den)==MP_YES){
+            status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+            outputError("Denominator of the sum of two rationals equal to zero");
+        }
+    }
     ////// OOPS the deltas are handled by _getRationalSum!!!! if(status==MP_OKAY){_delta=_floatsum(a->delta,b->delta);if(!_delta)if(a->delta||b->delta)status=MP_ERR;} // if we failed in adding the delta's error as well
-    if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num1); // multiply numerator of a with denominator of b for the plus term of the result numerator
-    if(status==MP_OKAY)status=_bimul(a->den,b->num,&_num2); // multiply denominator of a with numerator of b for the min term of the result numerator
-    if(status==MP_OKAY)status=_biadd(_num1,_num2,&_num); // add the numerator parts
+    if(status==MP_OKAY){
+        status=_bimul(a->num,b->den,&_num1);
+        if(status!=MP_OKAY)
+            output("%sFailed to multiply the numerator and denominator of two rationals (error code: %d).\n",ERROR_PREFIX,status);
+        else
+        if(amVerbose())
+            outputInfo("Numerator and denominator of two rationals multiplied.");
+    }
+    if(status==MP_OKAY){
+        status=_bimul(a->den,b->num,&_num2);
+        if(status!=MP_OKAY)
+            output("%sFailed to multiply the denominator and numerator of two rationals (error code: %d).\n",ERROR_PREFIX,status); // multiply denominator of a with numerator of b for the min term of the result numerator
+        else
+        if(amVerbose())
+            outputInfo("Denominator and numerator of two rationals multiplied.");
+    }
+    if(status==MP_OKAY){
+        status=_biadd(_num1,_num2,&_num);
+        if(status!=MP_OKAY)
+            output("%sFailed to add two rational numerators (error code: %d).",ERROR_PREFIX,status); // add the numerator parts
+        else
+        if(amVerbose())
+            outputInfo("Numerators of two rationals added.");
+    }
     // loose the numerator parts (are not stored in the result rational anyway)
     ////outputInfo("Rational numerator parts to free.");
     if(_num1)free_biginteger(_num1);
     if(_num2)free_biginteger(_num2);
     ////outputInfo("Rational numerator parts freed.");
     if(status!=MP_OKAY){ // numerator and denominator not computed both
-        ////outputInfo("Freeing new numerator, denominator and delta!");
+        outputInfo("Freeing new numerator and denominator when failing to compute the sum of two rationals");
         if(_num)free_biginteger(_num);
         if(_den)free_biginteger(_den);
         //////if(_delta)free_float(_delta);
@@ -259,7 +308,8 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
         /////outputInfo("Numerator and denominator stored.");
         // normalize the rational
         /////outputInfo("Normalizing the sum rational.");
-        c->normalized=false;normalizeRational(c);
+        c->normalized=false;
+        normalizeRational(c);
         // register the delta sum
         ////////c->delta=_delta;
     }
@@ -337,10 +387,15 @@ Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * cons
             if(_pureRationalSum){
                 if(_qadd(_pureRationalSum,q1,q2)!=MP_OKAY){
                     free_rational(_pureRationalSum);_pureRationalSum=NULL;
-                    if(amVerbose())outputError("Failed to compute the sum of two pure rationals");
+                    // if(amVerbose())
+                    outputError("Failed to compute the sum of two pure rationals");
                 }
-            }else if(amVerbose())outputError("Failed to create the pure sum rational");
-        }else if(amVerbose())outputError("Both rationals should be pure, and are not");
+            }else 
+            // if(amVerbose())
+                outputError("Failed to create the pure sum rational");
+        }else 
+        // if(amVerbose())
+        outputError("Both rationals should be pure, and are not");
     }
     return _pureRationalSum;
 }/* VALIDATED */
@@ -353,11 +408,24 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
         mp_err status=_qadd(_rational,q1,q2);
         if(status==MP_OKAY){
             // compute the delta
-        	_rational->delta=_floatsum(q1->delta,q2->delta);
-            // if failed to compute the delta mark error
-            if(q1->delta&&q2->delta)if(!_rational->delta)status=MP_ERR;
+            // MDH@02APR2020: additional check on the input because the following did go wrong
+            if(q1->delta||q2->delta){
+        	    _rational->delta=_floatsum(q1->delta,q2->delta);
+                // if failed to compute the delta mark error
+                // if(q1->delta&&q2->delta)
+                if(!_rational->delta){
+                    status=MP_ERR;
+                    outputError("Failed to update the delta of the sum of two rationals");
+                }
+            }
+        }else
+            output("%sFailed to compute the pure sum of two rationals (error code: %d).\n",ERROR_PREFIX,status);
+        if(status!=MP_OKAY){
+            free_rational(_rational);_rational=NULL;
+            // output("%s",ERROR_PREFIX);
+            // outputRational("Failed to compute the sum of rational ",q1,NULL);
+            // outputRational(" and rational ",q2,".\n");
         }
-        if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;output("%s",ERROR_PREFIX);outputRational("Failed to compute the sum of rational ",q1,NULL);outputRational(" and rational ",q2,".\n");}
     }else
         outputError("Failed to create the rational for storing the sum of two rationals");
     return _rational;
@@ -502,7 +570,8 @@ Mrational* _getRationalQuotient(Mrational const * const q1,Mrational const * con
             if(delta1defined)
                 _rational->delta=_getFloat(getLongDoubleRationalQuotient(q1->delta->ld,q2));
         }else{
-            free_rational(_rational);_rational=NULL;outputError("Failed to compute the quotient of two rationals");
+            free_rational(_rational);_rational=NULL;
+            outputError("Failed to compute the quotient of two rationals");
         }
     }else
         outputError("Failed to create the rational for storing the quotient of two rationals.");
