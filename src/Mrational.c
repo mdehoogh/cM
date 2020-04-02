@@ -357,7 +357,7 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
             // if failed to compute the delta mark error
             if(q1->delta&&q2->delta)if(!_rational->delta)status=MP_ERR;
         }
-        if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;outputError("Failed to compute the sum of two rationals");}
+        if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;output("%s",ERROR_PREFIX);outputRational("Failed to compute the sum of rational ",q1,NULL);outputRational(" and rational ",q2,".\n");}
     }else
         outputError("Failed to create the rational for storing the sum of two rationals");
     return _rational;

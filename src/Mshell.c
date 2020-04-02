@@ -6245,12 +6245,12 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 static Mlist* _getRangeList(Mlist* start,Mlist* delta,long long count){
 	return NULL;
 }
-static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue){
+static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){
 	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?_getListOfType(VT_INTEGER):NULL);
 	if(_scalarRangeList){
 		Mvalue* upValue=smallerthanorequalto(firstRangeValue,lastRangeValue); // the direction we'll be going
 		if(upValue&&upValue->type==VT_INTEGER){
-			bool up=(upValue->value._integer->ll!=0);
+			*up=(upValue->value._integer->ll!=0);
 			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
 			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
 			Mvalue* firstIntegerRangeValue=(up?Mceil(firstRangeValue):Mfloor(firstRangeValue));
@@ -6260,7 +6260,7 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 					Mvalue* integerrangeValue=_getIntegerValue(rangeInteger);
 					if(integerrangeValue){
 						if(amVerbose()){
-							Mvalue* lastIntegerRangeValue=(up?Mfloor(lastRangeValue):Mceil(lastRangeValue));
+							Mvalue* lastIntegerRangeValue=(*up?Mfloor(lastRangeValue):Mceil(lastRangeValue));
 							if(amDebugging()){
 								outputValue("Determining the integers in [",integerrangeValue,",");outputValue(NULL,lastIntegerRangeValue,"].\n");
 								if(inputCharReadFunction){
@@ -6271,12 +6271,12 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 						Mvalue* inrangeValue;
 						while(integerrangeValue){
 							// determine whether this value does not exceed the last value
-							inrangeValue=(up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
+							inrangeValue=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
 							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
 							if(inrangeValue->value._integer->ll==0)break; // not in range
 							if(appendedToList(_scalarRangeList,integerrangeValue,M_LL_INVALID)<=0){free_list(_scalarRangeList);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
 							// determine the next value to insert into the integer range
-							if(up)rangeInteger++;else rangeInteger--;
+							if(*up)rangeInteger++;else rangeInteger--;
 							integerrangeValue=_getIntegerValue(rangeInteger);
 						}
 					}else
@@ -6301,62 +6301,108 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 	// MDH@01APR2020: in the past we could use a list as first argument and as second argument and get the same result i.e. 1:[10,10] ===[1,1]:10 -> [[1,...,10],[1,...,10]]
 	//                but now we allow multi-dimensional ranges for all calls that have a list as first argument, and getRangeList is used to get the multi-dimensional points
 	//                I suppose we can stick to the original approach if there are less than 2 elements in the list
+	bool up;
 	if(_value1->type==VT_LIST){
 		if(!_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange);
+
 		// with at least two elements in the list we could use the second argument as the count if it is not a list, this would give us additional functionality
 		// because normally we would expect value2 to be an end point somehow and therefore a list
 		Mlistelement* endIntegerRangeListelement=(_value2->type==VT_LIST?_value2->value._list->_first:NULL);
-		Mvalue* endIntegerRangeValue=(_value2->type!=VT_LIST?_value2:endIntegerRangeListelement->_value);
+		Mvalue* endIntegerRangeValue=(_value2->type==VT_LIST?(endIntegerRangeListelement?endIntegerRangeListelement->_value:NULL):_value2);
 		if(!endIntegerRangeValue)return NULL; // we need a end value (whether from a scalar or from a list)
+		
 		Mlistelement* startIntegerRangeListelement=_value1->value._list->_first;
-		Mlist* _integerRangeList=_getScalarRangeList(startIntegerRangeListelement->_value,endIntegerRangeValue);
-		if(!_integerRangeList)return NULL;
-		// the first integer range list tells us how many elements we need to create for successive elements
-		// although the deltas to use are numeric there's no specific type to consider
+		Mvalue* startIntegerRangeValue=startIntegerRangeListelement->_value;
+		if(!startIntegerRangeValue)return NULL;
 
-		Mlist* _deltaRangeList=_getListOfType(VT_UNDEFINED);
-		if(!_deltaRangeList)return NULL;
+		Mlist* _integerRangeList=_getScalarRangeList(startIntegerRangeValue,endIntegerRangeValue,&up);
+		if(!_integerRangeList||!_integerRangeList->_first)return NULL; // if undefined or empty apparently no integers between the start and end of the first dimensions
+
+		outputList("First scalar range: ",_integerRangeList,".\n");
+
+		Mvalue* rangeValue=subtract(endIntegerRangeValue,startIntegerRangeValue); // the total range in the first dimension
+		// the first integer range list tells us how many elements we need to create for successive elements
+		Mvalue *firstIntegerRangeValue=_integerRangeList->_first->_value,*lastIntegerRangeValue=_integerRangeList->_last->_value;
+		Mvalue *startDeltaValue=subtract(firstIntegerRangeValue,startIntegerRangeValue),*endDeltaValue=subtract(endIntegerRangeValue,lastIntegerRangeValue);
+
+		// so we either have rangeValue=startDeltaValue+1+...+1+endDelta when up is true or rangeValue=endDelta+-1+...+-1+startDelta when up is false
+
+		// the multiplication factor (deltato use in each successive dimension equals the difference between end and start value divided by rangeValue
+
+		Mlist* _multFactorList=_getListOfType(VT_UNDEFINED);		
+		if(!_multFactorList)return NULL;
+
+		// iterate over all successive elements in the _value1 list
 		while(1){
 			startIntegerRangeListelement=startIntegerRangeListelement->_next;
 			if(!startIntegerRangeListelement)break;
 			Mvalue* startIntegerRangeValue=startIntegerRangeListelement->_value;
 			if(!startIntegerRangeValue)continue; // skip whatever is not present
+			// in the _value2 'list' (if any) get the next end value
 			if(endIntegerRangeListelement){
 				endIntegerRangeListelement=endIntegerRangeListelement->_next;
-				endIntegerRangeValue=endIntegerRangeListelement->_value;
+				if(endIntegerRangeListelement)endIntegerRangeValue=endIntegerRangeListelement->_value;
 			}
 			// we need to compute the delta (step) 
-			Mvalue* deltaRangeValue=NULL;
-			if(endIntegerRangeValue){
-				Mvalue* integerRangeValue=Msubtract(endIntegerRangeValue,startIntegerRangeValue);
-				deltaRangeValue=Mquotient(integerRangeValue,_getIntegerValue(_integerRangeList->numberOfElements));
-			}else
-				deltaRangeValue=_getIntegerValue(1);
-			if(!deltaRangeValue||appendedToList(_deltaRangeList,deltaRangeValue,M_LL_INVALID)<0){
-				free_list(_deltaRangeList);
-				_deltaRangeList=NULL;
+			Mvalue* deltaRangeValue=divide(subtract(endIntegerRangeValue,startIntegerRangeValue),rangeValue);
+			if(!deltaRangeValue)continue;
+			if(appendedToList(_multFactorList,deltaRangeValue,M_LL_INVALID)<0){
+				free_list(_multFactorList);
+				_multFactorList=NULL;
 				break;
 			}
 		}
+
+		outputList("Multiplicators: ",_multFactorList,".\n");
+
 		Mlist* _resultList=NULL;
-		if(_deltaRangeList){
-			if(_deltaRangeList->numberOfElements>0){
+		if(_multFactorList){
+			// now we have multiplication factors we can determine the values in the subsequent dimensions
+			if(_multFactorList->numberOfElements>0){
+				// initialize the start integer range start and end list element
+				// endIntegerRangeListelement=(_value2->type==VT_LIST?_value2->value._list->_first:NULL);
 				_resultList=_getListOfType(VT_UNDEFINED);
 				if(_resultList){
 					// iterating over all elements in _integerRangeList
-
+					Mlistelement* _integerRangeListelement=_integerRangeList->_first;
+					while(_integerRangeListelement){
+						Mlist* _pointList=_getListOfType(VT_UNDEFINED);
+						if(!_pointList){free_list(_resultList);_resultList=NULL;break;}
+						if(appendedToList(_pointList,_integerRangeListelement->_value,M_LL_INVALID)<0){free_list(_resultList);_resultList=NULL;break;}
+						// now to compute the points in all other dimensions which means we have to increment startIntegerRangeListelement and endIntegerRangeListelement
+						Mlistelement* multFactorListelement=_multFactorList->_first;
+						Mvalue* rangeValue;
+						startIntegerRangeListelement=_value1->value._list->_first;
+						while(startIntegerRangeListelement->_next){
+							startIntegerRangeListelement=startIntegerRangeListelement->_next;
+							startIntegerRangeValue=startIntegerRangeListelement->_value; // should always be there
+							/* no need to know the end of the range because we know the multiplication factor (i.e. slope)
+							if(endIntegerRangeListelement)endIntegerRangeListelement=endIntegerRangeListelement->_next;
+							endIntegerRangeValue=(endIntegerRangeListelement?endIntegerRangeListelement->_value:_value2);
+							*/
+							// with startIntegerRangeValue and endIntegerRangeValue we should be able to compute the value to add (which also depends on the index count)
+							rangeValue=add(startIntegerRangeValue,multiply(multFactorListelement->_value,add(startDeltaValue,_getIntegerValue(_integerRangeListelement->index-1))));
+							outputValue("Range value: ",rangeValue,".\n");
+							if(appendedToList(_pointList,rangeValue,M_LL_INVALID)<0){free_list(_resultList);_resultList=NULL;break;}
+							multFactorListelement=multFactorListelement->_next;
+						}
+						if(!_resultList)break;
+						// append _pointList to the result list
+						if(appendedToList(_resultList,_getValueOfList(_pointList,true),M_LL_INVALID)<0){free_list(_resultList);_resultList=NULL;break;}
+						_integerRangeListelement=_integerRangeListelement->_next;
+					}
 				}
 				free_list(_integerRangeList);
 			}else
 				_resultList=_integerRangeList;
-			free_list(_deltaRangeList);
+			free_list(_multFactorList);
 		}
 		return _getValueOfList(_resultList,true);
 		// replacing: return _appliedToList(_value1->value._list,_value2,Mrange);
 	}
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange);
 	// now we're dealing with scalars
-	return _getValueOfList(_getScalarRangeList(_value1,_value2),true);
+	return _getValueOfList(_getScalarRangeList(_value1,_value2,&up),true);
 	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
 }
 
