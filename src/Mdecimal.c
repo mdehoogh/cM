@@ -729,7 +729,7 @@ Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2
 					_decimal=_getRationalDecimal(_r);
 					free_rational(_r);
 				}else
-					outputError("Failed to compute the product of two rationals");
+					outputError("Failed to compute the product of two rational decimals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
 			free_rational(_r1);

@@ -72,11 +72,30 @@ mp_err _biadd(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
  * \brief computes the product of \p a and \p b and puts the result in \p c
  */
 mp_err _qmul(Mrational* const c,Mrational const * const a,Mrational const * const b){
+    // MDH@03APR2020: rewriting of computing _qmul with more precise error reporting...
+    if(!a||!b||!c){
+        outputError("Cannot compute the product of two rationals: input missing");
+        return MP_ERR;
+    }
+    Mbiginteger *_num=NULL,*_den=NULL;
+    mp_err status=_bimul(a->den,b->den,&_den);
+    if(status==MP_OKAY){
+        if(_den&&mp_iszero(_den)==MP_YES){
+            status=MP_ERR;
+            outputError("The denominator of the product of two rationals is zero");
+        }else{
+            status=_bimul(a->num,b->num,&_num);
+            if(status!=MP_OKAY)outputError("Failed to compute the product of the rational numerators");
+        }
+    }else
+        outputError("Failed to compute the product of the rational denominators");
+    /* replacing:
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
     if(status==MP_OKAY)status=_bimul(a->den,b->den,&_den); // multiply denominators
-    if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+    if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible) // MDH@03APR2020: I think that !_den|| is wrong, and should be _den&& (see above)
     if(status==MP_OKAY)status=_bimul(a->num,b->num,&_num); // multiply numerators
+    */
     if(status!=MP_OKAY){ // numerator and denominator not computed both
         if(_num)free_biginteger(_num);
         if(_den)free_biginteger(_den);
@@ -542,10 +561,19 @@ Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * cons
                 else // term2 is defined
                     _rational->delta=_getFloat(term2);
                 // if failed to compute the delta mark error
-                if(q1->delta&&q2->delta)if(!_rational->delta)status=MP_ERR;
+                if(q1->delta&&q2->delta)if(!_rational->delta){
+                    status=MP_ERR;
+                    output("%s",ERROR_PREFIX);
+                    outputRational("Failed to update the delta of the product of rational ",q1,NULL);
+                    outputRational(" and ",q2,".\n");
+                }
             }
+        }else{
+            output("%s",ERROR_PREFIX);
+            outputRational("Failed to multiply rational ",q1,NULL);
+            outputRational(" and ",q2,".\n");
         }
-        if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;outputError("Failed to compute the product of two rationals");}
+        if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;}
     }else
         outputError("Failed to create the rational for storing the product of two rationals");
     return _rational;
@@ -1044,8 +1072,9 @@ Mstring* _getRationalText(const Mrational* const _rational){
             ///outputChar('o');
         }
     }else
-        if(amVerbose())outputInfo("No rational to determine the text representation of.");
-    outputChar('p');
+    if(amVerbose())
+        outputInfo("No rational to determine the text representation of.");
+    // outputChar('p');
     return _rationalText;
 }/* VALIDATED */
 

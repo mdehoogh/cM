@@ -4286,7 +4286,8 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		Mrational* _sumRational=_getRationalSum(_rational1,_rational2); // _qsum replaced by _getRationalSum that takes the deltas into account as well
 		/////outputInfo("Rationals added!");
 		if(_value1->type!=VT_RATIONAL)free_rational(_rational1);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2); // after adding the two rationals we do not need the newly created rationals anymore
-		outputInfo("Rational copies released.");
+		if(amDebugging()&amVerbose())
+			outputInfo("Rational copies released.");
 		Mvalue* _sumValue=NULL;
 		if(_sumRational){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
@@ -6318,7 +6319,9 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 		Mlist* _integerRangeList=_getScalarRangeList(startIntegerRangeValue,endIntegerRangeValue,&up);
 		if(!_integerRangeList||!_integerRangeList->_first)return NULL; // if undefined or empty apparently no integers between the start and end of the first dimensions
 
-		outputList("First scalar range: ",_integerRangeList,".\n");
+		if(amDebugging())
+			if(amVerbose())
+				outputList("First scalar range: ",_integerRangeList,".\n");
 
 		Mvalue* rangeValue=subtract(endIntegerRangeValue,startIntegerRangeValue); // the total range in the first dimension
 		// the first integer range list tells us how many elements we need to create for successive elements
@@ -6353,7 +6356,9 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 			}
 		}
 
-		outputList("Multiplicators: ",_multFactorList,".\n");
+		if(amDebugging())
+			if(amVerbose())
+				outputList("Multiplicators: ",_multFactorList,".\n");
 
 		Mlist* _resultList=NULL;
 		if(_multFactorList){
@@ -6364,6 +6369,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 				_resultList=_getListOfType(VT_UNDEFINED);
 				if(_resultList){
 					// iterating over all elements in _integerRangeList
+					Mvalue *firstRangeValue=startDeltaValue,*incrementValue=_getIntegerValue(1); // MDH@03MAR2020: no need to use assign here because firstRangeValue is temporary
 					Mlistelement* _integerRangeListelement=_integerRangeList->_first;
 					while(_integerRangeListelement){
 						Mlist* _pointList=_getListOfType(VT_UNDEFINED);
@@ -6372,6 +6378,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 						// now to compute the points in all other dimensions which means we have to increment startIntegerRangeListelement and endIntegerRangeListelement
 						Mlistelement* multFactorListelement=_multFactorList->_first;
 						Mvalue* rangeValue;
+						// outputValue("Increment: ",incrementValue,".\n");
 						startIntegerRangeListelement=_value1->value._list->_first;
 						while(startIntegerRangeListelement->_next){
 							startIntegerRangeListelement=startIntegerRangeListelement->_next;
@@ -6381,8 +6388,9 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 							endIntegerRangeValue=(endIntegerRangeListelement?endIntegerRangeListelement->_value:_value2);
 							*/
 							// with startIntegerRangeValue and endIntegerRangeValue we should be able to compute the value to add (which also depends on the index count)
-							rangeValue=add(startIntegerRangeValue,multiply(multFactorListelement->_value,add(startDeltaValue,_getIntegerValue(_integerRangeListelement->index-1))));
-							outputValue("Range value: ",rangeValue,".\n");
+							// outputValue("First range value ",firstRangeValue,".\n");
+							rangeValue=add(startIntegerRangeValue,multiply(multFactorListelement->_value,firstRangeValue));
+							// outputValue("Range value: ",rangeValue,".\n");
 							if(appendedToList(_pointList,rangeValue,M_LL_INVALID)<0){free_list(_resultList);_resultList=NULL;break;}
 							multFactorListelement=multFactorListelement->_next;
 						}
@@ -6390,6 +6398,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 						// append _pointList to the result list
 						if(appendedToList(_resultList,_getValueOfList(_pointList,true),M_LL_INVALID)<0){free_list(_resultList);_resultList=NULL;break;}
 						_integerRangeListelement=_integerRangeListelement->_next;
+						firstRangeValue=add(firstRangeValue,incrementValue); // increment the first range value (which is the X offset so to speak from the first dimension)
 					}
 				}
 				free_list(_integerRangeList);

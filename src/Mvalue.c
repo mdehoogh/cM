@@ -1237,7 +1237,21 @@ Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName){
 Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){
     if(!_rational)return NULL;
     Mvalue* _value=__value("rational");
-    if(_value){_value->type=VT_RATIONAL;_value->value._rational=_rational;}else if(freeonfailure)free_rational(_rational);
+    if(_value){
+        // MDH@03APR2020: if a rational has a denominator that equals 1 we can safely return a big integer instead but only when freeonfailure is true
+        if(freeonfailure){
+            if(!_rational->den){
+                _value->type=VT_BIGINTEGER;
+                _value->value._biginteger=_getBigintegerCopy(_rational->num);
+                if(_value->value._biginteger){ // success
+                    free_rational(_rational);
+                    return _value;
+                }
+            }
+        }
+        _value->type=VT_RATIONAL;_value->value._rational=_rational;
+    }else
+    if(freeonfailure)free_rational(_rational);
     return _value;
 }/* VALIDATED */
 
