@@ -3422,13 +3422,13 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
 																	Mlist* valueholderList=(*valueholder)->value._list;
 																	Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false);
-																	outputList("Value index list: ",_valueIndexList,".\n");
+																	// outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																	if(valueIndexListelement){
 																		Mvalue** newValueholder;
 																		while(valueholderList){
-																			outputList("Value holder list: ",valueholderList,".");
+																			// outputList("Value holder list: ",valueholderList,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																			if(indexorattributenameListelementValue){
 																				long long listIndex=M_LL_INVALID;
