@@ -3299,9 +3299,11 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 									//                of course this makes it a bit more complicated, of course the alternative is to only duplicate the value holders when we come across a list, which makes perfect sense as well
 									//                obviously we can check for a list BEFORE the loop instead of in the loop
 									//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
-									Mlist* _flattenedIndexList=_getFlattenedList(indexorattributenameListelementValue,true); // pass in a non-NULL value will only return NULL when an error occurs
+									// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
+									//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
+									Mlist* _flattenedIndexList=_getFlattenedList(indexorattributenameListelementValue,0,true); // pass in a non-NULL value will only return NULL when an error occurs
 									size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
-									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore, so each of them will result in a single element to append
+									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
 										if(amDebugging())
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
@@ -3310,9 +3312,16 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
+											// MDH@06APR2020: it is very hard to determine what the end result should now be because an 'flattened' list element could now be a list itself, so it is hard to determine what is to be indexed...
+											//                BUT it is still possible by looking at the first element in sublists...
 											// let's check if all index list elements are integer, if not, convert integers to their text equivalent
 											Mlistelement* flattenedIndexListelement=_flattenedIndexList->_first;
-											while(flattenedIndexListelement&&(flattenedIndexListelement->_value->type==VT_INTEGER||flattenedIndexListelement->_value->type==VT_BIGINTEGER))flattenedIndexListelement=flattenedIndexListelement->_next;
+											Mvalue* flattenedIndexListelementValue;
+											while(flattenedIndexListelement){
+												flattenedIndexListelementValue=getFirstScalarValue(flattenedIndexListelement->_value);
+												if(flattenedIndexListelementValue->type!=VT_INTEGER&&flattenedIndexListelementValue->type!=VT_BIGINTEGER)break;
+												flattenedIndexListelement=flattenedIndexListelement->_next;
+											}
 											if(!flattenedIndexListelement)_flattenedIndexList->valuetype=VT_INTEGER; // mark the index list as integer
 											// knowing the index list (element) type already means that we know what the indexed value should be (a list or a map)
 											// now we know whether what we are indexing should be lists or maps we can ascertain that it does
@@ -3366,46 +3375,87 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 															// if we are accessing a map we have to ascertain that the attribute name in a string
 															if((*valueholder)->type==VT_MAP){
 																if(_flattenedIndexList->valuetype!=VT_INTEGER){
-																	Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true);
-																	if(attributenameText){
-																		Mvalue** newValueholder=getValueHolderOfAttribute((*valueholder)->value._map,string(attributenameText));		
-																		if(!newValueholder){
-																			if(appendedToMap((*valueholder)->value._map,string(attributenameText),NULL)!=1){
-																				_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-																				output("%sFailed to add property '%s'.\n",ERROR_PREFIX,string(attributenameText));
-																			}else
-																				_valueholders[valueholderIndex+numberOfNewValueholders]=getValueHolderOfAttribute((*valueholder)->value._map,string(attributenameText));
-																		}else{
-																			//FREE(valueholders,'_');
-																			_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
+																	// MDH@06APR2020: if indexorattributenameListelementValue can now also be a list of indices we need to iterate over the list elements and apply each list element as an index
+																	//                so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
+																	//                which means that we can only retrieve successive elements from maps
+																	//                we could flatten the value here????? so if it is a list we get the list of indices here
+																	Mmap* valueholderMap=(*valueholder)->value._map;
+																	Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
+																	outputList("Value index list: ",_valueIndexList,".\n");
+																	// 'iterating' over all list elements
+																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
+																	if(valueIndexListelement){
+																		Mvalue** newValueholder;
+																		while(valueholderMap){
+																			outputMap("Value holder map: ",valueholderMap,".");
+																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
+																			if(indexorattributenameListelementValue){
+																				Mstring* _attributenameText=_getValueText(indexorattributenameListelementValue,true);
+																				if(_attributenameText){
+																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
+																					if(!newValueholder){
+																						if(appendedToMap(valueholderMap,string(_attributenameText),NULL)!=1)
+																							output("%sFailed to add property '%s'.\n",ERROR_PREFIX,string(_attributenameText));
+																						else
+																							newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
+																					}/*else{
+																						//FREE(valueholders,'_');
+																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
+																					}*/
+																					free_string(_attributenameText);
+																				}else
+																					newValueholder=NULL;
+																			}
+																			valueIndexListelement=valueIndexListelement->_next;
+																			if(!valueIndexListelement)break;
+																			// we have another property 'index', so we should have a value holder map
+																			valueholderMap=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_MAP?(*newValueholder)->value._map:NULL);
 																		}
-																		free_string(attributenameText);
-																	}else
-																		_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
+																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
+																	}
+																	if(_valueIndexList)free_list(_valueIndexList);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 															}else
 															if((*valueholder)->type==VT_LIST){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
-																	long long listIndex=M_LL_INVALID;
-																	if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
-																	if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
-																	if(listIndex!=M_LL_INVALID){
-																		Mvalue** newValueholder=getValueHolderAtIndex((*valueholder)->value._list,listIndex);
-																		if(!newValueholder){
-																			listIndex=appendedToList((*valueholder)->value._list,NULL,listIndex);
-																			if(listIndex==M_LL_INVALID){
-																				_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-																				output("%sFailed to add list element at index '%lld'.\n",ERROR_PREFIX,listIndex);
-																			}else{
-																				_valueholders[valueholderIndex+numberOfNewValueholders]=getValueHolderAtIndex((*valueholder)->value._list,listIndex);
-																				if(amDebugging())
-																					output("List element at index #%zd of %s retrieved.\n",valueholderIndex+numberOfNewValueholders,_valuereference->_name);
+																	Mlist* valueholderList=(*valueholder)->value._list;
+																	Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false);
+																	outputList("Value index list: ",_valueIndexList,".\n");
+																	// 'iterating' over all list elements
+																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
+																	if(valueIndexListelement){
+																		Mvalue** newValueholder;
+																		while(valueholderList){
+																			outputList("Value holder list: ",valueholderList,".");
+																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
+																			if(indexorattributenameListelementValue){
+																				long long listIndex=M_LL_INVALID;
+																				if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
+																				if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
+																				if(listIndex!=M_LL_INVALID){
+																					newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
+																					if(!newValueholder){
+																						listIndex=appendedToList(valueholderList,NULL,listIndex);
+																						if(listIndex!=M_LL_INVALID){
+																							newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
+																							if(amDebugging())
+																								output("List element at index #%zd retrieved.\n",listIndex);	
+																						}else
+																							output("%sFailed to add list element at index '%lld'.\n",ERROR_PREFIX,listIndex);
+																					}
+																				}else
+																					newValueholder=NULL;
 																			}
-																		}else
-																			_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
+																			valueIndexListelement=valueIndexListelement->_next;
+																			if(!valueIndexListelement)break;
+																			// we have another property 'index', so we should have a value holder map
+																			valueholderList=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
+																		}
+																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																	}
+																	if(_valueIndexList)free_list(_valueIndexList);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}

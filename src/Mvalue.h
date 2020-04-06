@@ -165,7 +165,8 @@ Mlist* _getListCopy(Mlist const * const _list);
 Mlist* _getListIndices(Mlist const * const _list);
 Mlist* _getMapAttributes(Mmap const * const _map);
 
-Mlist* _getFlattenedList(Mvalue const * const _value,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
+Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
+Mvalue* getFirstScalarValue(Mvalue* value);
 
 long long isListUndefined(Mlist* list);
 

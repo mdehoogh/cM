@@ -384,7 +384,8 @@ Mlist* _getListIndices(Mlist const * const list){
 // MDH@30MAR2020: the general idea of flattening a list is that all elements of the list are not lists anymore
 //                let's assume that NULL means something went wrong, caller should take care of situation where value is NULL unless ?TODO? we allow putting a NULL value in the list
 //                reversed tells _getFlattenedList to prepend instead of append
-Mlist* _getFlattenedList(Mvalue const * const value,bool reversed){
+// MDH@06APR2020: passing in a flatten level that is decremented on each element and when it reaches 0 no flattening has to occur
+Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){
     Mlist* _list=NULL;
     if(value){
         // if(amDebugging())
@@ -400,8 +401,9 @@ Mlist* _getFlattenedList(Mvalue const * const value,bool reversed){
                     // if there is a value associated _getFlattenedList should NOT return NULL (so NULL would represent an error)
                     if(valueListelement->_value){
                         // MDH@31MAR2020: a little more effort to check if the value is a list in which case flattening is required, otherwise it is not
-                        if(valueListelement->_value->type==VT_LIST){
-                            Mlist* _subList=_getFlattenedList(valueListelement->_value,reversed);
+                        // MDH@06APR2020: if flattenLevel>0 we need to add all list elements individually instead of all together
+                        if(flattenLevel>0&&valueListelement->_value->type==VT_LIST){
+                            Mlist* _subList=_getFlattenedList(valueListelement->_value,(flattenLevel>0?flattenLevel-1:0),reversed);
                             if(_subList){
                                 Mlistelement* valueSubListelement=_subList->_first;
                                 while(valueSubListelement){
@@ -425,8 +427,20 @@ Mlist* _getFlattenedList(Mvalue const * const value,bool reversed){
         }    
     }
     // if(amDebugging())
-        outputList("Flattened to '",_list,"'.\n");
+    {if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}}
     return _list;
+}
+Mvalue* getFirstScalarValue(Mvalue* value){
+    if(!value)return NULL;
+    if(value->type==VT_MAP)return NULL; // can't go into a map
+    if(value->type!=VT_LIST)return value;
+    Mlistelement* listelement=(value->value._list?value->value._list->_first:NULL);
+    while(listelement){
+        Mvalue* firstScalarValue=getFirstScalarValue(listelement->_value);
+        if(firstScalarValue)return firstScalarValue; // if this element is a scalar (i.e. defined and not a map or a list)
+        listelement=listelement->_next;
+    }
+    return NULL;
 }
 
 Mlist* _getMapAttributes(Mmap const * const map){
