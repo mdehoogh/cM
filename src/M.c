@@ -612,7 +612,7 @@ void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext)
 	if(!_autocompletiontext)return;
 	if(_autocompletiontext->_next)free_tokenautocompletiontext(_autocompletiontext->_next);
 	if(_autocompletiontext->_text)free(_autocompletiontext->_text);
-	FREE(_autocompletiontext,'J');
+	FREE(_autocompletiontext,'S'); // MDH@07APR2020: _autocompletiontext is an Mstring* so release as 'S'
 }
 
 // MDH@04OCT2019: if we remember the immediate feed forward token we can determine whether or not we need to remove the associated feed forward text
@@ -3838,8 +3838,11 @@ int main(int argc, char **argv){
 					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
 
 					// garbage collection: remove any values not used anymore...
-					size_t removedValueCount=getNumberOfRemovedValues();
-					if(amDebugging()){if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
+					// if(amDebugging())
+					outputInfo("Removing unreferenced values.");
+					size_t removedValueCount=getNumberOfRemovedValues(amVerbose()/*&&amDebugging()*/);
+					// if(amDebugging())
+					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)

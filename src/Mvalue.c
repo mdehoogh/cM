@@ -9,6 +9,7 @@ extern const char * const VALUETYPENAMES[]; // the characters associated with ea
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const ERROR_PREFIX;
+extern const char * const WARNING_PREFIX;
 extern const char * const M_NULL_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value that is NULL
 extern const char * const M_UNDEFINED_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value of type VT_UNDEFINED
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
@@ -80,7 +81,11 @@ bool free_listelement(Mlistelement* _listelement,bool weak){
 }/* VALIDATED */
 void free_list(Mlist* _list){
     if(_list){
-        if(_list->_first){free_listelement(_list->_first,_list->weak);_list->_first=NULL;}
+        if(_list->_first){
+            if(amDebugging())output("Freeing a %s list.\n",_list->weak?"weak":"strong");
+            free_listelement(_list->_first,_list->weak);
+            _list->_first=NULL;
+        }
         FREE(_list,'L');
     }
 }/* VALIDATED */
@@ -158,12 +163,12 @@ void free_value(Mvalue* _value){
 Mlist* _valueList=NULL;
 Mvalue* __value(char const * const descriptor){
     Mvalue* _value=NULL;
-    if(!_valueList)_valueList=(Mlist*)CALLOC(1,sizeof(Mlist),'Z');
+    if(!_valueList)_valueList=(Mlist*)CALLOC(1,sizeof(Mlist),'L');
     if(_valueList){
         _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
-        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'z'); // both pointers NULL
+        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l'); // both pointers NULL
         if(_valueListelement){
-            _value=(Mvalue*)CALLOC(1,sizeof(Mvalue),'Y');
+            _value=(Mvalue*)CALLOC(1,sizeof(Mvalue),'X'); // MDH@07APR2020: should be 'X' not 'Y'
             if(_value){
                 // shouldn't pose a problem now...
                 _valueListelement->_value=_value;
@@ -174,7 +179,7 @@ Mvalue* __value(char const * const descriptor){
                 _valueListelement->index=_valueList->numberOfElements;
                 if(descriptor)if(amVerbose())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
             }else // couldn't get a new value, so free the value list element immediately
-                FREE(_valueListelement,'z');
+                FREE(_valueListelement,'l');
         }
     }
     if(!_value)if(amVerbose())outputError("Failed to create value!");
@@ -185,30 +190,30 @@ extern const char* const VALUETYPENAMES[];
 
 // can be asked to remove unused values
 // TODO check whether it functions correctly (think so though)
-size_t getNumberOfRemovedValues(){
-    bool showDebugInfo=amDebugging()&&amVerbose();
+size_t getNumberOfRemovedValues(bool showInfo){
     unsigned long long tofree=0,removed=0;
     if(_valueList){
+        if(showInfo)output("Garbage collecting unused values.\n");
         Mlistelement* _valueListelement=_valueList->_first;
-        if(showDebugInfo)output("Maximum index of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
+        if(showInfo)output("Number of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
         unsigned long long checked=0;
         while(_valueListelement){
             checked++;
-            if(showDebugInfo)output("Checking value #%llu with id %llu.\n",checked,_valueListelement->index);
             if(_valueListelement->_value){
-                if(showDebugInfo)outputInfo("\tChecking the count!");
+                if(showInfo){output("Checking value #%llu ",checked);outputValue("(",_valueListelement->_value,")");output(" with id %llu.\n",_valueListelement->index);}
+                // if(showInfo)outputInfo("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
-                    if(showDebugInfo)output("\tAbout to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+                    if(showInfo)output("\tAbout to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                     free_value(_valueListelement->_value);
                     _valueListelement->_value=NULL; // just in case
                     tofree++;
                 }else
-                if(showDebugInfo)outputInfo("\tStill in use!");
+                if(showInfo)outputInfo("\tStill in use!");
             }else
                 output("%sNo value stored in value #%llu.\n",ERROR_PREFIX,checked);
             _valueListelement=_valueListelement->_next;
         }
-        if(showDebugInfo)output("Number of values checked: %llu.\nNumber of value list elements to free: %llu.\n",checked,tofree);
+        if(showInfo)output("Number of values checked: %llu.\nNumber of value list elements to free: %llu.\n",checked,tofree);
         // the list is now intact, are we going to correct the links??????
         if(tofree){ // some values were freed
             Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
@@ -239,7 +244,8 @@ size_t getNumberOfRemovedValues(){
         }
     }
     if(tofree){
-        if(tofree>removed)output("WARNING: Failed to free %llu unused value list elements.\n",(tofree-removed));else if(showDebugInfo)outputInfo("All unused value list elements freed!");
+        if(tofree>removed)output("%sFailed to free %llu unused value list elements.\n",WARNING_PREFIX,(tofree-removed));else 
+        if(showInfo)outputInfo("All unused value list elements freed!");
     }
     return removed;
 }/* VALIDATED */
@@ -1859,7 +1865,7 @@ Mdecimal* getValueDecimal(Mvalue* value){
 Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_ENVIRONMENT?value->value._environment:NULL);}
 
 Mlist* _getListOfType(Mvaluetype valuetype){
-    output("Allocating list (size: %zd).\n",sizeof(Mlist));
+    // output("Allocating list (size: %zd).\n",sizeof(Mlist));
     Mlist* _list=CALLOC(1,sizeof(Mlist),'L');
     _list->valuetype=valuetype;
     return _list;
@@ -2096,7 +2102,7 @@ Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction){
     if(_list){
         _result=_getListOfType(_list->valuetype);
         Mlistelement* _listelement=_list->_first;
-        while(_listelement&&appendedToList(_result,oneArgumentFunction(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+        while(_listelement&&appendedToList(_result,oneArgumentFunction(_listelement->_value),_listelement->index)>0)_listelement=_listelement->_next;
     }
     return _result;
 }/* VALIDATED */
@@ -2105,7 +2111,7 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
     if(_map){
         _result=_getMapOfType(_map->valuetype);
         Mmapelement* _mapelement=_map->_first;
-        while(_mapelement&&appendedToMap(_result,_mapelement->_variable->_name,oneArgumentFunction(_mapelement->_variable->_value)))_mapelement=_mapelement->_next;
+        while(_mapelement&&appendedToMap(_result,_mapelement->_variable->_name,oneArgumentFunction(_mapelement->_variable->_value))==1)_mapelement=_mapelement->_next;
     }
     return _result;
 }/* VALIDATED */

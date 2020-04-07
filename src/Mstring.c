@@ -19,7 +19,7 @@ Mstring* __string(){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         // the size of each allocation is BLOCKSIZE characters
         ans->chars=MALLOC(1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
-        if(!ans->chars){FREE(ans,'"');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
+        if(!ans->chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
         // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
 #ifdef __DEBUGGING__

@@ -4,23 +4,26 @@
 
 #include "Mmemory.h"
 
+extern char const * const ERROR_PREFIX;
+
 /**
  * _strdup() adds writing a error message to strdup()
  */
-char* _strdup(const char* const _c){
+char* _strdup(char const * const _c){
     if(_c){
-        /* something wrong with this replacement code:
+        // MDH@07QAPR2020: strdup worked fine BUT I want to register the allocation of character arrays
+        ///* something wrong with this replacement code:
         size_t l=strlen(_c)+1;
-        char* _hc=MALLOC(l,sizeof(char),':'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
-        if(_hc)strcpy(_hc,_c);else printf("Failed to allocate memory to store '%s'.\n",_c);
-        */
-        ///* replacing:
-        char* _hc=strdup(_c);
+        char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
+        if(_hc)memcpy(_hc,_c,l);else output("%sFailed to allocate memory to store '%s'.\n",ERROR_PREFIX,_c);
         //*/
+        /* replacing:
+        char* _hc=strdup(_c);
+        */
         if(_hc)return _hc;
-        printf("\nERROR: Failed to make a dynamic copy of '%s'.\n",_c);
+        output("%sFailed to make a dynamic copy of '%s'.\n",ERROR_PREFIX,_c);
     }else
-        printf("No text to copy!\n");
+        output("No text to copy!\n");
     return NULL;
 }
 
@@ -32,7 +35,7 @@ long long _strtoll(char* _c,long long invalid){
     long long ll=strtoll(_c,&eptr,0); // assume decimal (TODO allow other representations as well)
     if(!ll){
         if (errno==EINVAL){
-            output("\nERROR: Conversion of '%s' to an integer failed.",_c);
+            output("ERROR: Conversion of '%s' to an integer failed.",_c);
             return invalid;
         }
         /* If the value provided was out of range, display a warning message */

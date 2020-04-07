@@ -229,7 +229,7 @@ void assignValue(Mvalue** _valueholder,Mvalue const * _value);
 
 Mvalue* __value(); // TODO expose __value()????? yes
 
-size_t getNumberOfRemovedValues();
+size_t getNumberOfRemovedValues(bool showInfo);
 unsigned long long getNumberOfValues();
 
 Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);

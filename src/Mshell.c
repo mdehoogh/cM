@@ -6939,8 +6939,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			if(amVerbose())output("Number of assignments: %u.\n",numberOfAssignments);
 			
-			size_t allocated=getAllocationTypeAllocated('3'),freed=getAllocationTypeFreed('3');
-			if(amDebugging())output("Type '3' BEFORE: allocated: %zd - freed: %zd.\n",allocated,freed);
+			size_t allocated=getAllocationTypeAllocated('4'),freed=getAllocationTypeFreed('4');
+			if(amDebugging())output("Type '4' BEFORE: allocated: %zd - freed: %zd.\n",allocated,freed);
 
 			// MDH@14OCT2019: applying binary operators typically is done taking operator precedence into account which means we cannot apply lower precedence binary operators until higher precedence binary operators are applied first
 			//                which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
@@ -6970,7 +6970,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					if(!nextformulaelement)
 						outputInfo("No formula element to free!");
 					else
-						FREE(nextformulaelement,'3'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+						FREE(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
 					formulaElementCount--; // one less to free!!!
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
 					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
@@ -6995,9 +6995,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			*/
 			if(amVerbose())outputValue("Result: '",_result,"'.\n");
 
-			allocated=getAllocationTypeAllocated('3');freed=getAllocationTypeFreed('3');
+			allocated=getAllocationTypeAllocated('4');freed=getAllocationTypeFreed('4');
 			if(amDebugging())
-				output("Type '3' AFTER: allocated: %zd - freed: %zd.\n",allocated,freed);
+				output("Type '4' AFTER: allocated: %zd - freed: %zd.\n",allocated,freed);
 
 			// perform assignments right-to-left (which is a little problematic though)
 			if(numberOfAssignments){

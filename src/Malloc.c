@@ -35,7 +35,7 @@ size_t getNumberOfAllocationTypes(){return (_allocationtypes&&_allocationcounts?
 size_t getNewAllocationTypeIndex(char allocationtype,size_t size){
     size_t allocationtypeindex=getNumberOfAllocationTypes(); // at least one!!!
     if(allocationtypeindex>0){ // meaning we have both _allocationtypes and _allocationcounts
-        ////////printf("New allocation type #%zd: '%c'!\n",allocationtypeindex,allocationtype);
+        // printf("New allocation type #%zd: '%c' of size %zd!\n",allocationtypeindex,allocationtype,size);
         _allocationtypes=realloc(_allocationtypes,sizeof(char)*(allocationtypeindex+1));
         _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*5); // for every type we store 5 size_t values, one to keep the item count, and one to keep the size
         if(_allocationtypes&&_allocationcounts){
@@ -73,8 +73,10 @@ size_t addallocation(char allocationtype,size_t size,size_t nitems){
                 // if(allocationtype!='S'&&allocationtype!='s')printf("Adding %zd allocations of type %c with size %zd.\n",nitems,allocationtype,size);
                 allocationtypeindex=(_allocationtype-_allocationtypes);
                 // NOTE text with variable length is allocated as type '"' and should not be checked!!
-                if(allocationtype!='"'&&size!=_allocationcounts[allocationtypeindex*5])
-                    printf("*****************\nBUG: Different size (%zd) of data type '%c' (size: %zd) received!\n*****************\n",size,allocationtype,_allocationcounts[5*allocationtypeindex]);
+                if(allocationtype!='s'&&size!=_allocationcounts[allocationtypeindex*5]){
+                    // printf("Allocation types: '%s'.\n",_allocationtypes);
+                    printf("*****************\nAllocation types: '%s'.\nBUG: Different size (%zd) of data type '%c' (size: %zd, count: %zd) received!\n*****************\n",_allocationtypes,size,allocationtype,_allocationcounts[5*allocationtypeindex],_allocationcounts[5*allocationtypeindex+1]);
+                }
             }else // haven't got this one yet!!!
                 allocationtypeindex=getNewAllocationTypeIndex(allocationtype,size);
             if(allocationtypeindex>0){
@@ -192,11 +194,14 @@ void Mfree(void* ptr,char type){
     if(_allocationtypes&&_allocationcounts){
         char* _allocationtype=strchr(_allocationtypes,type);
         // assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
-        allocationtypecountoffset=5*(_allocationtype?_allocationtype-_allocationtypes:getNewAllocationTypeIndex(type,1));
-        if(allocationtypecountoffset>0){ // success (and not the accumulative (zero) one!!!)
-            typesize=_allocationcounts[allocationtypecountoffset]; // where the size is stored!!!
-            if(typesize>0)nitems=sizeof(*ptr)/typesize;
-        }
+        if(_allocationtype){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
+            allocationtypecountoffset=5*(_allocationtype?_allocationtype-_allocationtypes:getNewAllocationTypeIndex(type,1));
+            if(allocationtypecountoffset>0){ // success (and not the accumulative (zero) one!!!)
+                typesize=_allocationcounts[allocationtypecountoffset]; // where the size is stored!!!
+                if(typesize>0)nitems=sizeof(*ptr)/typesize;
+            }
+        }else
+            printf("BUG: Memory of unknown type '%c' to be freed!\n",type);
     }
     free(ptr);
     //////printf("!");

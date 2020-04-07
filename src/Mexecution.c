@@ -139,7 +139,7 @@ const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3
 long long isBigintegerOne(Mbiginteger* biginteger){return(biginteger?(mp_cmp((mp_int*)biginteger,getBigintegerOne())==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID);}/* VALIDATED */
 // END BIG INTEGER STUFF
 
-/////////mp_int* __mp_int(){return (mp_int*)MALLOC(sizeof(mp_int),'I');}
+/////////mp_int* __mp_int(){return (mp_int*)MALLOC(1,sizeof(mp_int),'I');}
 // long double to rational or representation
 typedef struct {
     uint64_t mantisse;
@@ -218,10 +218,13 @@ Mrational* _getLongDoubleRational(long double ld){
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
 void free_text(Mtext* _text){
     // MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
+    // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
+    //                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
     if(_text){
         FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
     }else
-    if(amDebugging())outputInfo("No text to free!");
+    if(amDebugging())
+        outputInfo("No text to free!");
 }/* VALIDATED */
 void free_integer(Minteger* _integer){
     if(_integer){
@@ -536,7 +539,7 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string){
 */
 /*
 Minteger* _getInteger(long long ll){
-    Minteger* integer=MALLOC(sizeof(Minteger),'i');if(integer)integer->ll=ll;return integer;
+    Minteger* integer=MALLOC(1,sizeof(Minteger),'i');if(integer)integer->ll=ll;return integer;
 }
 */
 

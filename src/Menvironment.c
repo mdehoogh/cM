@@ -307,15 +307,15 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
                             Mvalue* _zeroTextValue=_getTextValue("'",false); // will be garbage collected automatically when the reference count is not incremented (as in weak lists)
                             _valuecountsList->weak=true; // TODO should we do this???
                             // start with the table row index below the name of the table!!!
-                            if(appendedToList(_valuecountsList,_getIntegerValue(i+1),M_LL_INVALID)
-                                &&appendedToList(_valuecountsList,_getTextValue(string(_allocationTypeText),false),M_LL_INVALID)){
+                            if(appendedToList(_valuecountsList,_getIntegerValue(i+1),M_LL_INVALID)>0
+                                &&appendedToList(_valuecountsList,_getTextValue(string(_allocationTypeText),false),M_LL_INVALID)>0){
                                 // now the 5 counts
                                 appendedToList(_valuecountsList,(_allocationcounts[i*5]>0?_getIntegerValue(_allocationcounts[i*5]):_zeroTextValue),M_LL_INVALID);
                                 appendedToList(_valuecountsList,(_allocationcounts[1+i*5]>0?_getIntegerValue(_allocationcounts[1+i*5]):_zeroTextValue),M_LL_INVALID);
                                 appendedToList(_valuecountsList,(_allocationcounts[2+i*5]>0?_getIntegerValue(_allocationcounts[2+i*5]):_zeroTextValue),M_LL_INVALID);
                                 appendedToList(_valuecountsList,(_allocationcounts[3+i*5]>0?_getIntegerValue(_allocationcounts[3+i*5]):_zeroTextValue),M_LL_INVALID);
                                 appendedToList(_valuecountsList,(_allocationcounts[4+i*5]>0?_getIntegerValue(_allocationcounts[4+i*5]):_zeroTextValue),M_LL_INVALID);
-                                if(!appendedToList(_valuesTable,_getValueOfList(_valuecountsList,true),M_LL_INVALID))
+                                if(appendedToList(_valuesTable,_getValueOfList(_valuecountsList,true),M_LL_INVALID)<=0)
                                     outputError("Failed to remember a values table row.");
                             }else{
                                 free_list(_valuecountsList); // have to explicitly free the list of the row that we failed to register
