@@ -81,8 +81,10 @@ bool free_listelement(Mlistelement* _listelement,bool weak){
 }/* VALIDATED */
 void free_list(Mlist* _list){
     if(_list){
+        // if(amDebugging())
+        {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator);outputChar('.');outputChar('\n');}
         if(_list->_first){
-            if(amDebugging())output("Freeing a %s list.\n",_list->weak?"weak":"strong");
+            if(_list->_creator)FREE(_list->_creator,'"');
             free_listelement(_list->_first,_list->weak);
             _list->_first=NULL;
         }
@@ -158,12 +160,21 @@ void free_value(Mvalue* _value){
         outputBug("No value to free!");
 }/* VALIDATED */
 
+Mlist* __list(char* source){
+    Mlist* _list=CALLOC(1,sizeof(Mlist),'L');
+    if(source){
+        _list->_creator=_strdup(source);
+        output("List creator: '%s'.\n",source);
+    }
+    return _list;
+}
+
 // manage a list of created values
 // if we make a map out of it, we can annote the value with a name????
 Mlist* _valueList=NULL;
 Mvalue* __value(char const * const descriptor){
     Mvalue* _value=NULL;
-    if(!_valueList)_valueList=(Mlist*)CALLOC(1,sizeof(Mlist),'L');
+    if(!_valueList)_valueList=__list("global value list");
     if(_valueList){
         _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
         Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l'); // both pointers NULL
@@ -363,8 +374,8 @@ Mvalue* _getCharTextValue(char _c){
     return _textValue;
 }/* VALIDATED */
 // we can force all listelements to have the same type????
-Mvalue* _getListValue(Mvaluetype listValuetype,bool weak){
-    Mlist* _list=(Mlist*)CALLOC(1,sizeof(Mlist),'L');
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){
+    Mlist* _list=__list((source?source:"_getListValue"));
     if(!_list)return NULL;
     _list->weak=weak;
     _list->valuetype=listValuetype; // register what type of elements this list should have
@@ -1323,37 +1334,42 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
     if(result){
 	    Mstring* p=result;
         if(amDebugging())p=string_append_char(p,'m');
-        if(showcurlybraces)p=string_append_char(p,'{');
-		//////output("%s",string(p));
-		Mmapelement* _mapelement=(_map?_map->_first:NULL);
-		while(p&&_mapelement){
-			//////output("%s","start");
-			Mvariable* _mapVariable=_mapelement->_variable;
-			if(_mapVariable){
-                // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
-                if(showquotes)p=string_append_char(p,'\'');
-                p=string_append(p,_mapVariable->_name);
-                if(showquotes)p=string_append_char(p,'\'');
-                if(showmissings||!isValueUndefined(_mapVariable->_value)){
-                    /////output("%s",string(p));
-                    p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
-                    /////output("%s",string(p));
-                    Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
-                    /////output("Map element: %s",string(p));
-                    // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
-                    if(_mapelementValueText){
-                        p=string_append(p,string(_mapelementValueText)); // append 
-                        free_string(_mapelementValueText); // release AFTER copying over
+        if(_map){
+            if(showcurlybraces)p=string_append_char(p,'{');
+            if(_map->numberOfElements>0){
+                //////output("%s",string(p));
+                Mmapelement* _mapelement=_map->_first;
+                while(p&&_mapelement){
+                    //////output("%s","start");
+                    Mvariable* _mapVariable=_mapelement->_variable;
+                    if(_mapVariable){
+                        // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
+                        if(showquotes)p=string_append_char(p,'\'');
+                        p=string_append(p,_mapVariable->_name);
+                        if(showquotes)p=string_append_char(p,'\'');
+                        if(showmissings||!isValueUndefined(_mapVariable->_value)){
+                            /////output("%s",string(p));
+                            p=string_append_char(p,':'); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
+                            /////output("%s",string(p));
+                            Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
+                            /////output("Map element: %s",string(p));
+                            // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
+                            if(_mapelementValueText){
+                                p=string_append(p,string(_mapelementValueText)); // append 
+                                free_string(_mapelementValueText); // release AFTER copying over
+                            }
+                        }
                     }
+                    _mapelement=_mapelement->_next;
+                    if(!_mapelement)break;
+                    p=string_append(p,","); // only when there's a next map element to process
+                    ////output("%s","next");
                 }
-            }
-			_mapelement=_mapelement->_next;
-			if(!_mapelement)break;
-            p=string_append(p,","); // only when there's a next map element to process
-			////output("%s","next");
-		}
-		//////output("%s(%d)",string(p),string_length(p));
-		if(showcurlybraces)p=string_append_char(p,'}');
+            }else
+            if(_map->_first)p=string_append_char(p,'?');
+            //////output("%s(%d)",string(p),string_length(p));
+            if(showcurlybraces)p=string_append_char(p,'}');
+        }
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
 		if(!p){free_string(result);result=NULL;}
@@ -1649,7 +1665,7 @@ bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list){
             Mlistelement* _listelement=_list->_first;
             while(result&&_listelement){
                 // index and value of the list element are stored in a new list!!
-                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
+                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false,"listAppendedToMapList"); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
                 if(!_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
                 Mlist* _maplistelement=_maplistelementValue->value._list;
                 // if we fail to construct the maplist element or to add it
@@ -1751,7 +1767,7 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map){
             Mmapelement* _mapelement=_map->_first;
             while(result&&_mapelement){
                // index and value of the list element are stored in a new list!!
-                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false);
+                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false,"mapAppededToMapList");
                 Mlist* _maplistelement=(_maplistelementValue?_maplistelementValue->value._list:NULL);
                 if(_maplistelement){
                     // if we fail to construct the maplist element or to add it
@@ -1866,7 +1882,7 @@ Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_E
 
 Mlist* _getListOfType(Mvaluetype valuetype){
     // output("Allocating list (size: %zd).\n",sizeof(Mlist));
-    Mlist* _list=CALLOC(1,sizeof(Mlist),'L');
+    Mlist* _list=__list("getListOfType");
     _list->valuetype=valuetype;
     return _list;
 }/* VALIDATED */

@@ -1977,7 +1977,7 @@ Mvalue* l2m(Mvalue* value){
 Mvalue* l2ml(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_maplistValue=_getListValue(VT_LIST,false); // a map list ALWAYS requires element of type VT_LIST
+		_maplistValue=_getListValue(VT_LIST,false,"l2ml"); // a map list ALWAYS requires element of type VT_LIST
 		if(!listAppendedToMaplist(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _maplistValue;
@@ -1986,7 +1986,7 @@ Mvalue* l2ml(Mvalue* value){
 Mvalue* ml2l(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_maplistValue=_getListValue(value->type,false); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		_maplistValue=_getListValue(value->type,false,"ml2l"); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!maplistAppendedToList(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
 	return _maplistValue;
@@ -2004,7 +2004,7 @@ Mvalue* ml2m(Mvalue* value){
 Mvalue* m2ml(Mvalue* value){
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_MAP){
-		_maplistValue=_getListValue(VT_LIST,false); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
+		_maplistValue=_getListValue(VT_LIST,false,"m2ml"); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
 		if(!mapAppendedToMaplist(_maplistValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
 	return _maplistValue;
@@ -2012,7 +2012,7 @@ Mvalue* m2ml(Mvalue* value){
 Mvalue* m2l(Mvalue* value){
 	Mvalue* _listValue=NULL;
 	if(value&&value->type==VT_MAP){
-		_listValue=_getListValue(value->type,false);
+		_listValue=_getListValue(value->type,false,"m2l");
 		if(!mapAppendedToList(_listValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
 	return _listValue;
@@ -2714,7 +2714,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
-	Mvalue* _listValue=_getListValue(VT_UNDEFINED,weak); // replacing: getValueOfExpressionOfType(VT_LIST);
+	Mvalue* _listValue=_getListValue(VT_UNDEFINED,weak,"getValueOfList"); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	if(!_list){output("Failed to create a list to return.\n");return NULL;}
 	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.\n");return NULL;}
@@ -3224,7 +3224,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 													// NOTE no need to use assignValue here BECAUSE that would only result in copying the empty list or map again
 													// if the index is a list we will be duplicating
 													if(_flattenedIndexList->valuetype==VT_INTEGER){ // all integers in the index list
-														assignValue(valueholder,_getListValue(VT_UNDEFINED,false));
+														assignValue(valueholder,_getListValue(VT_UNDEFINED,false,"value holder list creator"));
 														if(amDebugging())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 													}else{ // not all integers in the index list
 														assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
@@ -3538,7 +3538,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 												// NOTE no need to use assignValue here BECAUSE that would only result in copying the empty list or map again
 												// if the index is a list we will be duplicating
 												if(_flattenedIndexList->valuetype==VT_INTEGER){ // all integers in the index list
-													assignValue(valueholder,_getListValue(VT_UNDEFINED,false));
+													assignValue(valueholder,_getListValue(VT_UNDEFINED,false,"value holder list creator"));
 													if(amDebugging())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 												}else{ // not all integers in the index list
 													assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));

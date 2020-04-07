@@ -1403,7 +1403,7 @@ bool completedListFunction(Mfunction* const _function,const char* const function
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED,false));
+        _function->_parameterMap=_getListMap("l",_getListValue(VT_UNDEFINED,false,"completedListFunction"));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered list function '%s' completed.\n",functionName);
             return true;
@@ -1417,7 +1417,7 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=_getListMap("l",_getListValue(VT_TOKEN,false));
+        _function->_parameterMap=_getListMap("l",_getListValue(VT_TOKEN,false,"completedTokenListFunction"));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered token list function '%s' completed.\n",functionName);
             return true;
@@ -1633,7 +1633,7 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){
         Mvalue* _commandValue=_getValueOfToken(command,false);
         if(_commandValue){
             if(!function->functionunion._userfunction->_bodyCommandList)
-                function->functionunion._userfunction->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
+                function->functionunion._userfunction->_bodyCommandList=__list("function body command list");
             if(appendedToList(function->functionunion._userfunction->_bodyCommandList,_commandValue,M_LL_INVALID))return true;
             output("%sFailed to add command to list of body of '%s'.\n",ERROR_PREFIX,functionName);
         }else

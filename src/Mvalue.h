@@ -71,6 +71,7 @@ typedef struct Mlistelement{
 // MDH@03MAY2019: we're going to allow a list to be sparse i.e. with each element we keep an offset
 //                this may come in handy if we fail to store something in a list
 typedef struct Mlist{
+    char *_creator;
     unsigned long long numberOfElements; // keep track of the total number of elements
     Mvaluetype valuetype; // we can force a list to have elements of the same type
     Mlistelement* _first;
@@ -133,7 +134,7 @@ Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
 Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure);
 Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char* text,bool freeonfailure);
-Mvalue* _getListValue(Mvaluetype listValuetype,bool weak); // returning an empty list with all values to be of type listValuetype
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
@@ -159,6 +160,7 @@ void free_value(Mvalue* _value);
 
 /*unsigned */long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 
+Mlist* __list(char* source);
 void free_list(Mlist* _list);
 Mlist* _getListCopy(Mlist const * const _list);
 

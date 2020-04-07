@@ -1141,7 +1141,7 @@ bool registerCommand(Mcommand* command){
 		// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
 		Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(command->_firstToken,false);
 		if(_commandToEvaluateTokenValue){
-			if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)getCurrentFunctionBodyInput()->_function->_bodyCommandList=CALLOC(1,sizeof(Mlist),'L');
+			if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)getCurrentFunctionBodyInput()->_function->_bodyCommandList=__list("body command list");
 			if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,_commandToEvaluateTokenValue,M_LL_INVALID)>0)return true;
 			outputError("Failed to add the command to the body of the function");
 		}
@@ -2763,7 +2763,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 	// if(!pushExecutionEnvironment(_Menvironment))return false;
 
 	// we're gonna need a list to store lists of command and result pairs
-	M_value=_getListValue(VT_MAP,false);
+	M_value=_getListValue(VT_MAP,false,"M command list");
 
 	// MDH@14NOV2019: typically M is created as an immutable variable BUT of course I can change the assigned M_value myself directly but the user can't!!
 	//                NOTE if we would have used setValue to set M to M_value it would copy the list that M_value holds instead of using M_value itself, setVariable won't do that
@@ -2877,8 +2877,16 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 	return result;
 }
 
+static Mstring* _separator=NULL;
 void showSeparatorLine(){
-	int columns=getCurrentNumberOfWindowTextColumns();while(--columns>=0)output("%s","\u2500"); // ASCII 196 is the character that spans an entire column in the middle (better then the underscore)
+	if(!_separator){_separator=__string();if(!_separator){output("No separator!");return;}}
+	int columns=getCurrentNumberOfWindowTextColumns();
+	if(columns<=0){outputWarning("No number of columns");return;}
+	// output("Number of columns: %d.\n",columns);
+	Mstring* p=_separator;
+	while(p&&string_length(_separator)<3*columns)p=string_append(p,"\u2500");
+	if(!p){outputWarning("No valid separator");return;}
+	output("%.*s",3*columns,string(_separator)); // ASCII 196 is the character that spans an entire column in the middle (better then the underscore)
 }
 
 int main(int argc, char **argv){
@@ -2922,6 +2930,10 @@ int main(int argc, char **argv){
 		}
 	}
 
+	// MDH@07APR2020 NOTE until we do the following allocation types will NOT get registered (which resulted in bug reports when they got freed by the garbage collector at the end)
+	// tell user whether allocation recording is active!!!
+	outputInfo(allocationRecordingInitialized()?"Allocation recording ready!":"No allocation recording!");
+
 	// BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!	
 	if(!preparedForUserInput()){
 		outputError("Failed to initialize the user session.");
@@ -2956,9 +2968,6 @@ int main(int argc, char **argv){
 	displayFlags();
 	newline();
 	
-	// tell user whether allocation recording is active!!!
-	outputInfo(allocationRecordingInitialized()?"Allocation recording ready!":"No allocation recording!");
-
 	// MDH@11NOV2019: at this point getNumberOfValues() still represents the actual number of remembered values (before values are removed from it)
 	if(amVerbose())output("M shell initialized with %llu predefined values.\n",getNumberOfValues());
 
