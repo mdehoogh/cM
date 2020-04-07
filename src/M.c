@@ -55,7 +55,8 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="12";char const * const M_DATE="12 March 2020, 18:00";
 //char const * const M_BUILD="14";char const * const M_DATE="23 March 2020, 18:00"; // introducing PROPERTY token
 //char const * const M_BUILD="15";char const * const M_DATE="26 March 2020, 18:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
-char const * const M_BUILD="16";char const * const M_DATE="31 March 2020, 15:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+//char const * const M_BUILD="16";char const * const M_DATE="31 March 2020, 15:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+char const * const M_BUILD="17";char const * const M_DATE="7 April 2020, 12:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -1013,7 +1014,6 @@ void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
 	newline();
-	int columns=getCurrentNumberOfWindowTextColumns();while(--columns>=0)outputChar('_');
 	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	//////if(inputMode==IM_COMMAND)
@@ -2861,7 +2861,7 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 	// options
 	// MDH@31MAR2020: with lowercase 'x' let's ask for confirmation
 	if(sessionSettingCharacter=='x')
-	{char c;output("Do you really want to exit M? ");inputCharRead(&c);outputChar(c);if(c=='Y'||c=='y')result='x';}else
+	{if(!getCurrentFunctionBodyInput()){char c;output("Do you really want to exit M? ");inputCharRead(&c);outputChar(c);newline();if(c=='Y'||c=='y')result='x';}else result='x';}else
 	if(sessionSettingCharacter=='X')result='x';else
 	if(sessionSettingCharacter=='s'||sessionSettingCharacter=='S')result=switchToShellMode(NULL);else
 	if(sessionSettingCharacter=='h'||sessionSettingCharacter=='H'){
@@ -2875,6 +2875,10 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 	}else // unprocessed
 		result=-1;
 	return result;
+}
+
+void showSeparatorLine(){
+	int columns=getCurrentNumberOfWindowTextColumns();while(--columns>=0)output("%s","\u2500"); // ASCII 196 is the character that spans an entire column in the middle (better then the underscore)
 }
 
 int main(int argc, char **argv){
@@ -3855,6 +3859,7 @@ int main(int argc, char **argv){
 			}else // Return key in control mode, always to return to command input!!
 				switchToCommandMode();
 		}
+		showSeparatorLine();
 	}
 	// 'normal' exit
 	exit(0);

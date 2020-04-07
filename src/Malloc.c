@@ -69,14 +69,14 @@ size_t addallocation(char allocationtype,size_t size,size_t nitems){
         size_t allocationtypeindex=getNumberOfAllocationTypes(); // the number of registered allocation types
         if(allocationtypeindex>0){ // yes, we should already have at least one allocation type
             char* _allocationtype=strchr(_allocationtypes,allocationtype);
-            if(!_allocationtype){ // haven't got this one yet!!!
-                allocationtypeindex=getNewAllocationTypeIndex(allocationtype,size);
-            }else{ // already got it
+            if(_allocationtype){ // already got it
+                // if(allocationtype!='S'&&allocationtype!='s')printf("Adding %zd allocations of type %c with size %zd.\n",nitems,allocationtype,size);
                 allocationtypeindex=(_allocationtype-_allocationtypes);
                 // NOTE text with variable length is allocated as type '"' and should not be checked!!
                 if(allocationtype!='"'&&size!=_allocationcounts[allocationtypeindex*5])
                     printf("*****************\nBUG: Different size (%zd) of data type '%c' (size: %zd) received!\n*****************\n",size,allocationtype,_allocationcounts[5*allocationtypeindex]);
-            }
+            }else // haven't got this one yet!!!
+                allocationtypeindex=getNewAllocationTypeIndex(allocationtype,size);
             if(allocationtypeindex>0){
                 _allocationcounts[allocationtypeindex*5+1]+=nitems; // another nitems allocated
                 _allocationcounts[0]+=(nitems*size); // keep track of the total amount of bytes used

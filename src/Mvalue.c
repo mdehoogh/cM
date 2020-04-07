@@ -1858,8 +1858,17 @@ Mdecimal* getValueDecimal(Mvalue* value){
 // MDH@03FEB2020: extract specific data elements wrapped in values
 Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_ENVIRONMENT?value->value._environment:NULL);}
 
-Mlist* _getListOfType(Mvaluetype valuetype){Mlist* _list=CALLOC(1,sizeof(Mlist),'L');_list->valuetype=valuetype;return _list;}/* VALIDATED */
-Mmap* _getMapOfType(Mvaluetype valuetype){Mmap* _map=CALLOC(1,sizeof(Mmap),'M');_map->valuetype=valuetype;return _map;}/* VALIDATED */
+Mlist* _getListOfType(Mvaluetype valuetype){
+    output("Allocating list (size: %zd).\n",sizeof(Mlist));
+    Mlist* _list=CALLOC(1,sizeof(Mlist),'L');
+    _list->valuetype=valuetype;
+    return _list;
+}/* VALIDATED */
+Mmap* _getMapOfType(Mvaluetype valuetype){
+    Mmap* _map=CALLOC(1,sizeof(Mmap),'M');
+    _map->valuetype=valuetype;
+    return _map;
+}/* VALIDATED */
 
 Mlist* listMadeWeak(Mlist* list){if(list)list->weak=true;return list;}
 Mmap* mapMadeWeak(Mmap* map){if(map)map->weak=true;return map;}
