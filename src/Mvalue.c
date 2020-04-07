@@ -388,7 +388,7 @@ Mlist* _getListIndices(Mlist const * const list){
 Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){
     Mlist* _list=NULL;
     if(value){
-        // if(amDebugging())
+        if(amDebugging())
             outputValue("Flattening '",value,"'.\n");
         _list=_getListOfType(VT_UNDEFINED);
         if(_list){
@@ -426,7 +426,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
             if(!success){free_list(_list);_list=NULL;} // on failure release the list
         }    
     }
-    // if(amDebugging())
+    if(amDebugging())
     {if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}}
     return _list;
 }

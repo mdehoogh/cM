@@ -1013,6 +1013,7 @@ void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
 	newline();
+	int columns=getCurrentNumberOfWindowTextColumns();while(--columns>=0)outputChar('_');
 	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	//////if(inputMode==IM_COMMAND)

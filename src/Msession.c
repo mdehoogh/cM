@@ -131,6 +131,8 @@ bool windowSizeDetermined() {
 int getNumberOfWindowTextLines(){return windowRows;}
 int getNumberOfWindowTextColumns(){return windowCols;}
 
+int getCurrentNumberOfWindowTextColumns(){windowSizeDetermined();return windowCols;}
+
 bool sessionInitialized(){
 	initDisplay();
     // interfaces with initDisplay() TODO perhaps initialize settings here for a common interactive session???

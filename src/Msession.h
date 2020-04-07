@@ -52,3 +52,5 @@ Mvalue* Mtc(Mvalue* _value);
 // MDH@16MAR2020: exposing the number of lines and columns per line in the window
 int getNumberOfWindowTextLines();
 int getNumberOfWindowTextColumns();
+
+int getCurrentNumberOfWindowTextColumns();
