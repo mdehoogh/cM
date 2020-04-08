@@ -172,6 +172,8 @@ void syncallocations(){
 #endif
 }
 
+// MDH@08APR2020: if ptr starts with an allocation_index size_t field we can store the result of addallocation into it
+//                so we have to ascertain that in the non-production version every structure that we allocate this way starts with
 #ifndef __PRODUCTION__
 void* Mmalloc(size_t nitems,size_t size,char type){
     void* ptr=(size>0&&nitems>0?malloc(size*nitems):NULL);
