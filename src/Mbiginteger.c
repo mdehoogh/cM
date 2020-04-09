@@ -5,13 +5,14 @@ extern const long long M_LL_INVALID,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){
     if(!_biginteger)return NULL;
     Mbiginteger* _bineg=__biginteger();
-    if(_bineg&&mp_neg(_biginteger,_bineg)!=MP_OKAY){free_biginteger(_bineg);_bineg=NULL;outputError("Failed to negate a big integer");}
+    if(_bineg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bineg))!=MP_OKAY)
+    {free_biginteger(_bineg);_bineg=NULL;outputError("Failed to negate a big integer");}
     return _bineg;
 }
 
 long long getBigintegerSign(Mbiginteger const * const biginteger){
     if(!biginteger)return M_LL_INVALID;
-    long long result=(mp_iszero(biginteger)==MP_YES?M_ZERO:(mp_isneg(biginteger)==MP_YES?M_NEGATIVE:M_POSITIVE)); // OOPS, comparing with MP_YES essential!!!
+    long long result=(mp_iszero(MP_INT_POINTER(biginteger))==MP_YES?M_ZERO:(mp_isneg(MP_INT_POINTER(biginteger))==MP_YES?M_NEGATIVE:M_POSITIVE)); // OOPS, comparing with MP_YES essential!!!
     if(amVerbose()){outputBiginteger("Sign of big integer '",biginteger,"':");output("%lld.\n",result);}
     return result;
 }

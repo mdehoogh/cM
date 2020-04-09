@@ -53,10 +53,8 @@ size_t getNewAllocationTypeIndex(char allocationtype,size_t size){
     return allocationtypeindex;
 }
 
+// MDH@09APR2020: distinguish between adding an allocation (local) and adding an allocationtype (global)
 size_t addallocation(char allocationtype,size_t size,size_t nitems){
-    if(!allocationtype)return 0; // force using allocationtype to prevent unused-parameter warning
-#ifndef __PRODUCTION__
-    // increase size if necessary
     size_t newl=allocations.l+nitems;
     while(newl>allocations.l){
         if(allocations._chars&&!(allocations.l&0xF))allocations._chars=realloc(allocations._chars,(allocations.l+16)); // add a 'block' if now full
@@ -64,26 +62,36 @@ size_t addallocation(char allocationtype,size_t size,size_t nitems){
         allocations._chars[allocations.l]=allocationtype;
         allocations.l++;
     }
-    if(nitems>0&&allocationtype!='*'){
-        // MDH@15NOV2019: add another size_t to _allocationcounts array if we need to
-        size_t allocationtypeindex=getNumberOfAllocationTypes(); // the number of registered allocation types
-        if(allocationtypeindex>0){ // yes, we should already have at least one allocation type
-            char* _allocationtype=strchr(_allocationtypes,allocationtype);
-            if(_allocationtype){ // already got it
-                // if(allocationtype!='S'&&allocationtype!='s')printf("Adding %zd allocations of type %c with size %zd.\n",nitems,allocationtype,size);
-                allocationtypeindex=(_allocationtype-_allocationtypes);
-                // NOTE text with variable length is allocated as type '"' and should not be checked!!
-                if(allocationtype!='s'&&size!=_allocationcounts[allocationtypeindex*5]){
-                    // printf("Allocation types: '%s'.\n",_allocationtypes);
-                    printf("*****************\nAllocation types: '%s'.\nBUG: Different size (%zd) of data type '%c' (size: %zd, count: %zd) received!\n*****************\n",_allocationtypes,size,allocationtype,_allocationcounts[5*allocationtypeindex],_allocationcounts[5*allocationtypeindex+1]);
-                }
-            }else // haven't got this one yet!!!
-                allocationtypeindex=getNewAllocationTypeIndex(allocationtype,size);
-            if(allocationtypeindex>0){
-                _allocationcounts[allocationtypeindex*5+1]+=nitems; // another nitems allocated
-                _allocationcounts[0]+=(nitems*size); // keep track of the total amount of bytes used
-                _allocationcounts[1]+=nitems; // another nitems allocated
-            } // increment the allocation type count and the total allocation count
+    return allocations.l; // returning the current length of allocations (which should be nonzero for sure!!!)
+}
+
+size_t addallocationtype(char allocationtype,size_t size,size_t nitems){
+    if(!allocationtype)return 0; // force using allocationtype to prevent unused-parameter warning
+#ifndef __PRODUCTION__
+    // increase size if necessary
+    if(nitems>0){
+        if(addallocation(allocationtype,size,nitems)==0)return 0; // if adding the allocations fail, we should return 0!!!
+        if(allocationtype!='*'){
+            // MDH@15NOV2019: add another size_t to _allocationcounts array if we need to
+            size_t allocationtypeindex=getNumberOfAllocationTypes(); // the number of registered allocation types
+            if(allocationtypeindex>0){ // yes, we should already have at least one allocation type
+                char* _allocationtype=strchr(_allocationtypes,allocationtype);
+                if(_allocationtype){ // already got it
+                    // if(allocationtype!='S'&&allocationtype!='s')printf("Adding %zd allocations of type %c with size %zd.\n",nitems,allocationtype,size);
+                    allocationtypeindex=(_allocationtype-_allocationtypes);
+                    // NOTE text with variable length is allocated as type '"' and should not be checked!!
+                    if(allocationtype!='s'&&size!=_allocationcounts[allocationtypeindex*5]){
+                        // printf("Allocation types: '%s'.\n",_allocationtypes);
+                        printf("*****************\nAllocation types: '%s'.\nBUG: Different size (%zd) of data type '%c' (size: %zd, count: %zd) received!\n*****************\n",_allocationtypes,size,allocationtype,_allocationcounts[5*allocationtypeindex],_allocationcounts[5*allocationtypeindex+1]);
+                    }
+                }else // haven't got this one yet!!!
+                    allocationtypeindex=getNewAllocationTypeIndex(allocationtype,size);
+                if(allocationtypeindex>0){
+                    _allocationcounts[allocationtypeindex*5+1]+=nitems; // another nitems allocated
+                    _allocationcounts[0]+=(nitems*size); // keep track of the total amount of bytes used
+                    _allocationcounts[1]+=nitems; // another nitems allocated
+                } // increment the allocation type count and the total allocation count
+            }
         }
     }
     return allocations.l;
@@ -141,7 +149,7 @@ long long getAllocationTypeFreed(char allocationtype){
 }
 
 // 'public' functions
-size_t allocationmark(){return addallocation(' ',0,0);}
+size_t allocationmark(){return addallocation(' ',0,0);} // MDH@09APR2020: I think calling addallocation() suffices here, instead of addallocationtype
 
 // unmark allocation returns the total number of encountered allocations
 size_t unmarkallocation(size_t mark){
@@ -166,7 +174,7 @@ void allocationreport(size_t mark){
 }
 void syncallocations(){
 #ifndef __PRODUCTION__
-    if(!allocations._chars)return;
+   if(!allocations._chars)return;
     while(allocations.l>0){if(allocations._chars[allocations.l-1]!='.')break;allocations.l--;}
     allocationreport(1);
 #endif
@@ -177,13 +185,25 @@ void syncallocations(){
 #ifndef __PRODUCTION__
 void* Mmalloc(size_t nitems,size_t size,char type){
     void* ptr=(size>0&&nitems>0?malloc(size*nitems):NULL);
-    if(ptr)addallocation(type,size,nitems); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
+    // MDH@09APR2020: addallocation() is now addallocationtype()
+    if(ptr){
+        size_t allocation_index=addallocationtype(type,size,nitems); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
+#ifndef __PRODUCTION__
+        *((size_t*)ptr)=allocation_index;
+#endif
+    }
     return ptr;
 }
 
 void* Mcalloc(size_t nitems,size_t size,char type){
     void* ptr=(nitems>0&&size>0?calloc(nitems,size):NULL);
-    if(ptr)addallocation(type,size,nitems);
+    // MDH@09APR2020: addallocation() is now addallocationtype()
+    if(ptr){
+        size_t allocation_index=addallocationtype(type,size,nitems);
+#ifndef __PRODUCTION__
+        *((size_t*)ptr)=allocation_index;
+#endif
+    }
     return ptr;
 }
 
@@ -205,6 +225,10 @@ void Mfree(void* ptr,char type){
         }else
             printf("BUG: Memory of unknown type '%c' to be freed!\n",type);
     }
+#ifndef __PRODUCTION__
+    size_t allocation_index=*((size_t*)ptr);
+    if(allocation_index>0)allocations._chars[--allocation_index]='-';
+#endif
     free(ptr);
     //////printf("!");
     // undo the allocation of the given type
@@ -227,6 +251,8 @@ void Mfree(void* ptr,char type){
 }
 
 // MDH@27NOV2019: now passing the number of items in as well, and the current number of items
+// MDH@09APR2020: from now on (v0.1.2) REALLOC is only to be used for all variable dynamic memory allocations
+//                and also for freeing (i.e. when occupied equals zero)
 void* Mrealloc(void* ptr,size_t from_nitems,size_t to_nitems,size_t size,char type){
     //////printf(".");
     // kind of like 'freeing' the space ptr is using now
@@ -235,26 +261,45 @@ void* Mrealloc(void* ptr,size_t from_nitems,size_t to_nitems,size_t size,char ty
     long long freed=from_nitems*size; /////// replacing: (ptr?sizeof(*ptr):0); // best to determine it here
     long long occupied=to_nitems*size; //// replacing: (newptr?sizeof(*newptr):0); // what we need to add
     if(freed!=occupied){ // amount changed
+#ifndef __PRODUCTION__
+        size_t allocation_index;
+        if(occupied==0){ // a deallocation, no reason to assume that will fail!!!
+            allocation_index=*((size_t*)ptr);
+            if(allocation_index>0)allocations._chars[allocation_index-1]='-';
+        }
+#endif
         newptr=realloc(ptr,occupied); // we have to reallocate nitems each of the given size
-        if(_allocationtypes&&_allocationcounts){
-            char* _allocationtype=strchr(_allocationtypes,type);
-            if(_allocationtype){
-                size_t allocationtypecountoffset=(_allocationtype-_allocationtypes)*5; // double the index to get at the first position of the size_t pair
-                if(allocationtypecountoffset>0){
-                    if(_allocationcounts[allocationtypecountoffset]!=size){
-                        printf("WARNING: Mrealloc() called on a data type that does not occupy a %zd bytes.",size);
-                        freed/=_allocationcounts[allocationtypecountoffset]; // which might round and we are in trouble!!!!
-                        occupied/=_allocationcounts[allocationtypecountoffset];
+        // newptr is allowed to be NULL if occupied equals 
+        if(occupied==0||newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
+            if(_allocationtypes&&_allocationcounts){
+                // MDH@09APR2020: this could be the first call to REALLOC with a given type
+#ifndef __PRODUCTION__
+                if(occupied>0){ // an allocation which means that type should be present in _allocationtypes, and if it is not we're going to register it
+                    if(freed==0){ // initial allocation, ALWAYS register a single allocation (TODO perhaps nitems should always be considered 1)
+                        allocation_index=addallocationtype(type,size,1);
+                        *((size_t*)newptr)=allocation_index; // TODO not sure whether realloc() will initialize to '\0' so we also write when allocation_index is 0!!!!
                     }
-                    _allocationcounts[allocationtypecountoffset+1]+=occupied; // increment what was occupied
-                    _allocationcounts[allocationtypecountoffset+2]+=freed; // increment what was freed
-                    _allocationcounts[1]+=occupied;
-                    _allocationcounts[2]+=freed;
-                    _allocationcounts[0]+=(_allocationcounts[allocationtypecountoffset+1]*(occupied-freed)); // update the number of bytes we've changed!!!
-                }else
-                    printf("BUG: Mrealloc() called on the global data type (*).\n");
-            }else 
-                printf("BUG: Mrealloc() called on an unknown data type pointer.\n");
+                }
+#endif
+                char* _allocationtype=strchr(_allocationtypes,type);
+                if(_allocationtype){
+                    size_t allocationtypecountoffset=(_allocationtype-_allocationtypes)*5; // double the index to get at the first position of the size_t pair
+                    if(allocationtypecountoffset>0){
+                        if(_allocationcounts[allocationtypecountoffset]!=size){
+                            printf("WARNING: Mrealloc() called on a data type that does not occupy a %zd bytes.",size);
+                            freed/=_allocationcounts[allocationtypecountoffset]; // which might round and we are in trouble!!!!
+                            occupied/=_allocationcounts[allocationtypecountoffset];
+                        }
+                        _allocationcounts[allocationtypecountoffset+1]+=occupied; // increment what was occupied
+                        _allocationcounts[allocationtypecountoffset+2]+=freed; // increment what was freed
+                        _allocationcounts[1]+=occupied;
+                        _allocationcounts[2]+=freed;
+                        _allocationcounts[0]+=(_allocationcounts[allocationtypecountoffset+1]*(occupied-freed)); // update the number of bytes we've changed!!!
+                    }else
+                        printf("BUG: Mrealloc() called on the global data type (*).\n");
+                }else 
+                    printf("BUG: Mrealloc() called on an unknown data type pointer.\n");
+            }
         }
     }
     return newptr;

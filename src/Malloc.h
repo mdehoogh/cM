@@ -5,7 +5,9 @@
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
-size_t addallocation(char allocationtype,size_t size,size_t nitems);
+size_t addallocation(char allocationtype,size_t size,size_t nitems); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
+size_t addallocationtype(char allocationtype,size_t size,size_t nitems);
+
 bool allocationRecordingInitialized();
 size_t allocationmark();
 size_t unmarkallocation(size_t mark);

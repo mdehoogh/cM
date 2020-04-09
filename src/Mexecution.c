@@ -96,37 +96,52 @@ bool initExecution(){
 void free_biginteger(Mbiginteger* biginteger){
     if(biginteger){
         if(amDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
+#ifndef __PRODUCTION__
+        mp_clear(biginteger->_bi);
+        FREE(biginteger->_bi,'b');
+#else
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
+#endif
         FREE(biginteger,'B'); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
     }else
     if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
 Mbiginteger* __biginteger(){
-    Mbiginteger* biginteger=(Mbiginteger*)CALLOC(1,sizeof(Mbiginteger),'B');
-    if(biginteger&&mp_init(biginteger)!=MP_OKAY){free_biginteger(biginteger);biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
-    return biginteger;
+    Mbiginteger* _biginteger=(Mbiginteger*)CALLOC(1,sizeof(Mbiginteger),'B');
+    if(_biginteger){
+#ifndef __PRODUCTION__
+        _biginteger->_bi=(mp_int*)CALLOC(1,sizeof(mp_int),'b');
+        if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE(_biginteger->_bi,'b');_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
+        if(!_biginteger->_bi){FREE(_biginteger,'B');_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
+#else
+        if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
+#endif
+    }
+    return _biginteger;
 }/* VALIDATED */
+// end of block that uses __PRODUCTION__ flag
+
+// MDH@09APR2020: for all methods that call mp_int methods now require calling MP_INT_POINTER() on Mbiginteger instances
 Mbiginteger* _getBiginteger(int64_t ll){
     Mbiginteger* biginteger=__biginteger();
-    if(biginteger)mp_set_i64((mp_int*)biginteger,ll); // even if l equals 0 set it TODO check is that necessary???
+    // MDH@09APR2020: in the non-production version we're keeping track of the allocations and get_mpint on Mbiginteger will return what is required
+    if(biginteger)mp_set_i64(MP_INT_POINTER(biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
     return biginteger;
 }/* VALIDATED */
 
 // replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
 Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){
     Mbiginteger* _bigintegerNeg=(_biginteger?__biginteger():NULL); // the result we will be returning
-    if(_bigintegerNeg&&mp_neg(_biginteger,_bigintegerNeg)!=MP_OKAY){free_biginteger(_bigintegerNeg);_bigintegerNeg=NULL;}
+    if(_bigintegerNeg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){free_biginteger(_bigintegerNeg);_bigintegerNeg=NULL;}
     return _bigintegerNeg;
 }// VALIDATED
 
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
 Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){
     Mbiginteger* bigintegerCopy=(biginteger?__biginteger():NULL);
-    if(bigintegerCopy&&mp_copy(biginteger,bigintegerCopy)!=MP_OKAY){free_biginteger(bigintegerCopy);bigintegerCopy=NULL;}
+    if(bigintegerCopy&&mp_copy(MP_INT_POINTER(biginteger),MP_INT_POINTER(bigintegerCopy))!=MP_OKAY){free_biginteger(bigintegerCopy);bigintegerCopy=NULL;}
     return bigintegerCopy;
 }/* VALIDATED */
-
-mp_int* _mp_int(){return (mp_int*)__biginteger();}/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
@@ -136,7 +151,9 @@ const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}
 const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}/* VALIDATED */
 const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}/* VALIDATED */
 
-long long isBigintegerOne(Mbiginteger* biginteger){return(biginteger?(mp_cmp((mp_int*)biginteger,getBigintegerOne())==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID);}/* VALIDATED */
+long long isBigintegerOne(Mbiginteger* biginteger){
+    return(biginteger?(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerOne()))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID);
+}/* VALIDATED */
 // END BIG INTEGER STUFF
 
 /////////mp_int* __mp_int(){return (mp_int*)MALLOC(1,sizeof(mp_int),'I');}
@@ -221,7 +238,11 @@ void free_text(Mtext* _text){
     // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
     //                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
     if(_text){
-        FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
+        // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
+        //                _text->_c is an array and yes strlen() can be applied to any char*
+        //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
+        REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"');
+        // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
     }else
     if(amDebugging())
         outputInfo("No text to free!");
@@ -578,13 +599,14 @@ long long getInteger(Mvalue* _value){
 */
 
 // BigInteger stuff
-Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
-    Mstring* _bigintegerText=__string();
+// MDH@09APR2020: certain functions only know the mp_int* and not the big integer
+static Mstring* _getMpintText(mp_int const * const _mpint){
+    Mstring* _mpintText=__string();
     ////outputChar('A');
-    if(_bigintegerText){
+    if(_mpintText){
         /// output("Initial big integer text length: %zu.\n",_bigintegerText->length);
         ///outputChar('B');
-        if(_biginteger){
+        if(_mpint){
             // determine the required size
 // MDH@13MAR2020: this is unfortunate because I would have wanted to solve everything with tommath.h
 #ifdef M_MP_DEVELOP
@@ -597,7 +619,7 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
             ///////if(amVerbose())outputInfo("Determining a big integer text representation.");
             // output("Big integer text length: %zu.\n",_bigintegerText->length);
             // output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));free_string(str_info);
-            if(mp_radix_size(_biginteger,10,&arepsize)==MP_OKAY){
+            if(mp_radix_size(_mpint,10,&arepsize)==MP_OKAY){
 #ifdef M_MP_DEVELOP
                 // if(arepsize>0)output("Length of big integer text representation: %zu.\n",arepsize-1);
                 if(arepsize<=SIZE_MAX){
@@ -613,14 +635,14 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
                     //                however string_synclength() didn't like the length being set to arepsize-1 I suppose because there would be no '\0' at that position in the text
                     //                as mp_toradix would write
                     uint8_t failure=0;
-                    if(string_setlength(_bigintegerText,arepsize)){
-                        if(mp_toradix(_biginteger,_bigintegerText->chars,10)==MP_OKAY){
-                            if(string_synclength(_bigintegerText)){
-                                size_t trailingZeroCount=string_trailing(_bigintegerText,'0');
+                    if(string_setlength(_mpintText,arepsize)){
+                        if(mp_toradix(_mpint,_mpintText->chars,10)==MP_OKAY){
+                            if(string_synclength(_mpintText)){
+                                size_t trailingZeroCount=string_trailing(_mpintText,'0');
                                 if(trailingZeroCount>=3){
-                                    if(string_shorten(_bigintegerText,trailingZeroCount)){ // 'remove' the trailing zeroes
-                                        if(string_append_char(_bigintegerText,'e')){
-                                            if(!string_append_ll(_bigintegerText,trailingZeroCount))
+                                    if(string_shorten(_mpintText,trailingZeroCount)){ // 'remove' the trailing zeroes
+                                        if(string_append_char(_mpintText,'e')){
+                                            if(!string_append_ll(_mpintText,trailingZeroCount))
                                                 failure=6;
                                         }else
                                             failure=5;
@@ -634,7 +656,7 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
                     }else
                         failure=1;
                     if(failure>0){
-                        free_string(_bigintegerText);_bigintegerText=NULL;
+                        free_string(_mpintText);_mpintText=NULL;
                         switch(failure){
                             case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",ERROR_PREFIX,arepsize);break;
                             case 2:outputError("Failed to determine the big integer representation");break;
@@ -655,8 +677,12 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
     }else
         output("%sFailed to create a text for storing the representation of a big integer.\n",ERROR_PREFIX);
     ///outputChar('H');
-    return _bigintegerText;
-}/* VALIDATED */
+    return _mpintText;
+}
+Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
+    if(!_biginteger)return __string();
+    return _getMpintText(MP_INT_POINTER(_biginteger));
+}
 
 Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
 
@@ -727,7 +753,7 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
     if(exp!=0){
         mp_set_u64(a,mantisse);
         if(amVerbose()){
-            Mstring* _mantisseBigIntegerText=_getBigintegerText(a);
+            Mstring* _mantisseBigIntegerText=_getMpintText(a); // MDH@09APR2020: ask _getMpintText(), replacing _getBigintegerText()
             output("Value after setting the fraction: %s.\n",string(_mantisseBigIntegerText));
             free_string(_mantisseBigIntegerText);
         }
@@ -741,7 +767,7 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){
             if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
         }
         if(amVerbose()){
-            Mstring* _bigIntegerText=_getBigintegerText(a);
+            Mstring* _bigIntegerText=_getMpintText(a); // MDH@09APR2020
             output("Value after applying the exponent: %s.\n",string(_bigIntegerText));
             free_string(_bigIntegerText);
         }
@@ -764,7 +790,7 @@ mp_err mp_set_longdouble(Mbiginteger *a, long double b){
     extractMantisseAndExponent(b,&mantisse,&exponent);
     // determine the sign, and the 15-bit power of two exponent
     ////////return mp_set_me_verbose(a,mantisse,exponent); 
-    return (amVerbose()?mp_set_me_verbose(a,mantisse,exponent):mp_set_me(a,mantisse,exponent));
+    return (amVerbose()?mp_set_me_verbose(MP_INT_POINTER(a),mantisse,exponent):mp_set_me(MP_INT_POINTER(a),mantisse,exponent));
     /*
     if(sizeof(long double)==16){
         int exp;
@@ -834,8 +860,9 @@ double mp_get_double(const Mbiginteger *a)
 */
 long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
 long double mp_get_long_double(const Mbiginteger* const a){
-    if(!a)return M_LD_NAN; // if a undefined, return NaN
-    int i=a->used;
+    mp_int* mpi_a=MP_INT_POINTER(a); // MDH@09APR2020: get the mp_int pointer from the big integer
+    if(!mpi_a)return M_LD_NAN; // if a undefined, return NaN
+    int i=mpi_a->used;
     if(i==0)return 0.0; // if a zero, return 0
     --i; // 0 if only one big integer digit, otherwise positive
     if(i&&!M_LD_DIGIT_MULTIPLIER){ // if we need the digit multiplier, get it
@@ -843,16 +870,16 @@ long double mp_get_long_double(const Mbiginteger* const a){
         int j=MP_DIGIT_BIT;
         while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
     }
-    long double d=(long double)a->dp[i]; // initialize d to the most significant big integer digit
-    if(amVerbose())output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",a->dp[i],LDBL_DIG,d,i);
+    long double d=(long double)mpi_a->dp[i]; // initialize d to the most significant big integer digit
+    if(amVerbose())output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",MP_INT_POINTER(a)->dp[i],LDBL_DIG,d,i);
     while(--i>=0){
         if(amVerbose())output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
         d*=M_LD_DIGIT_MULTIPLIER;
         if(amVerbose())output("Result of multiplying by '%Lf': '%.*Lf'.\n",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
-        d+=(long double)a->dp[i];
-        if(amVerbose())output("Result of adding '%lld': '%.*Lf'.\n",a->dp[i],LDBL_DIG,d);
+        d+=(long double)mpi_a->dp[i];
+        if(amVerbose())output("Result of adding '%lld': '%.*Lf'.\n",mpi_a->dp[i],LDBL_DIG,d);
     }
-    if(a->sign==MP_NEG&&!ldIsNaN(d))return -d;
+    if(mpi_a->sign==MP_NEG&&!ldIsNaN(d))return -d;
     if(amVerbose())output("Conversion of big integer to long double '%.*Lf' done!\n",LDBL_DIG,d);
     return d;
     // replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
@@ -1024,7 +1051,8 @@ size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,con
 
 // conversion from big integer to the long long it contains (when in range)
 long long biginteger2long(const Mbiginteger* const _biginteger){
-	return(_biginteger&&mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT?mp_get_i64(_biginteger):M_LL_INVALID);
+	return(_biginteger&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT
+                        &&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT?mp_get_i64(MP_INT_POINTER(_biginteger)):M_LL_INVALID);
 }/* VALIDATED */
 bool strIsZero(char* str){
     size_t l=strlen(str);

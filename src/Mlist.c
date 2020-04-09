@@ -250,14 +250,14 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){
                         // I need to subtract another rational
                         Mbiginteger* _squaredsum=__biginteger();
                         if(_squaredsum){
-                            if(mp_sqr(_sum,_squaredsum)==MP_OKAY){
+                            if(mp_sqr(MP_INT_POINTER(_sum),MP_INT_POINTER(_squaredsum))==MP_OKAY){
                                 Mrational* _tosubtract=_getRational(_getBigintegerCopy(_squaredsum),_getBigintegerCopy(_count),M_LD_NAN,false,true);
                                 if(_tosubtract){
                                     Mrational* _sumofsquaresRational=_getRationalDifference(_squaressumRational,_tosubtract);
                                     appendedToMap(_statisticsMap,"sumofsquares",_getRationalValue(_sumofsquaresRational,true));
                                     // next to divide by the count minus 1 to give us the variance
                                     Mbiginteger* _countminus1=_getBigintegerCopy(_count);
-                                    if(_countminus1&&mp_decr(_countminus1)==MP_OKAY){
+                                    if(_countminus1&&mp_decr(MP_INT_POINTER(_countminus1))==MP_OKAY){
                                         Mrational* _varianceRational=_getRationalBigintegerQuotient(_sumofsquaresRational,_countminus1);
                                         if(_varianceRational){
                                             appendedToMap(_statisticsMap,"variance",_getRationalValue(_varianceRational,true));
@@ -302,7 +302,7 @@ Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){
         if(biginteger){ // at least one valid integer in the list
             long long count=1,minimumindex=listelement->index,maximumindex=listelement->index; // counting the missings and the number of sample values (that are NOT missing)
             Mbiginteger *sumofsquares=__biginteger(),*sum=_getBigintegerCopy(biginteger),*minimum=_getBigintegerCopy(biginteger),*maximum=_getBigintegerCopy(biginteger);
-            if(sum&&minimum&&maximum&&sumofsquares&&mp_mul(biginteger,biginteger,sumofsquares)==MP_OKAY){
+            if(sum&&minimum&&maximum&&sumofsquares&&mp_mul(MP_INT_POINTER(biginteger),MP_INT_POINTER(biginteger),MP_INT_POINTER(sumofsquares))==MP_OKAY){
                 // every time we get a big integer to use to update the cumulative sample statistics we're going to update the helpers first
                 Mbiginteger *_newsum=__biginteger(),*_newssq=__biginteger(),*_newminimum=__biginteger(),*_newmaximum=__biginteger(),*_square=__biginteger();
                 if(_newsum&&_newssq&&_newminimum&&_newmaximum){
@@ -313,15 +313,15 @@ Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){
                             biginteger=_getValueBiginteger(listelement->_value);
                             if(biginteger){
                                 someerror=false;
-                                if(mp_mul(biginteger,biginteger,_square)!=MP_OKAY)someerror=true;
-                                if(!someerror)if(mp_cmp(biginteger,minimum)==MP_LT&&mp_copy(biginteger,_newminimum)!=MP_OKAY)someerror=true;
-                                if(!someerror)if(mp_cmp(maximum,biginteger)==MP_LT&&mp_copy(biginteger,_newmaximum)!=MP_OKAY)someerror=true;
-                                if(!someerror)if(mp_add(sum,biginteger,_newsum)!=MP_OKAY)someerror=true;
-                                if(!someerror)if(mp_add(sumofsquares,_square,_newssq)!=MP_OKAY)someerror=true;
+                                if(mp_mul(MP_INT_POINTER(biginteger),MP_INT_POINTER(biginteger),MP_INT_POINTER(_square))!=MP_OKAY)someerror=true;
+                                if(!someerror)if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(minimum))==MP_LT&&mp_copy(MP_INT_POINTER(biginteger),MP_INT_POINTER(_newminimum))!=MP_OKAY)someerror=true;
+                                if(!someerror)if(mp_cmp(MP_INT_POINTER(maximum),MP_INT_POINTER(biginteger))==MP_LT&&mp_copy(MP_INT_POINTER(biginteger),MP_INT_POINTER(_newmaximum))!=MP_OKAY)someerror=true;
+                                if(!someerror)if(mp_add(MP_INT_POINTER(sum),MP_INT_POINTER(biginteger),MP_INT_POINTER(_newsum))!=MP_OKAY)someerror=true;
+                                if(!someerror)if(mp_add(MP_INT_POINTER(sumofsquares),MP_INT_POINTER(_square),MP_INT_POINTER(_newssq))!=MP_OKAY)someerror=true;
                                 if(!someerror){
                                     // now we need to copy the new values over
                                     // if any of them fails we're in an unrecoverable situation
-                                    if(mp_copy(_newminimum,minimum)==MP_OKAY&&mp_copy(_newmaximum,maximum)==MP_OKAY&&mp_copy(_newsum,sum)==MP_OKAY&&mp_copy(_newssq,sumofsquares)==MP_OKAY)
+                                    if(mp_copy(MP_INT_POINTER(_newminimum),MP_INT_POINTER(minimum))==MP_OKAY&&mp_copy(MP_INT_POINTER(_newmaximum),MP_INT_POINTER(maximum))==MP_OKAY&&mp_copy(MP_INT_POINTER(_newsum),MP_INT_POINTER(sum))==MP_OKAY&&mp_copy(MP_INT_POINTER(_newssq),MP_INT_POINTER(sumofsquares))==MP_OKAY)
                                         count++;
                                     else
                                         someerror=true;

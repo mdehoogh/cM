@@ -529,8 +529,9 @@ Mvalue* Mfac(Mvalue* _value){
         if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
         _finalmultiplier=_getBiginteger(_value->value._integer->ll);
     }else{
-        if(mp_isneg(_value->value._biginteger)){outputError("Invalid (negative) big integer argument to factorial() function");return NULL;}
-        if(mp_cmp(_value->value._biginteger,getBigintegerThree())==MP_LT)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
+        if(mp_isneg(MP_INT_POINTER(_value->value._biginteger))){outputError("Invalid (negative) big integer argument to factorial() function");return NULL;}
+        if(mp_cmp(MP_INT_POINTER(_value->value._biginteger),MP_INT_POINTER(getBigintegerThree()))==MP_LT)
+            return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         _finalmultiplier=_getBigintegerCopy(_value->value._biginteger);
     }
     if(!_finalmultiplier){output("%s",ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");return NULL;}
@@ -542,9 +543,9 @@ Mvalue* Mfac(Mvalue* _value){
         // we could start at some intermediate value????
         Mbiginteger *_multiplier=_getBiginteger(3);
         if(_multiplier){
-            while(mp_cmp(_multiplier,_finalmultiplier)==MP_LT){
-                if(mp_incr(_multiplier)!=MP_OKAY){outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
-                if(mp_mul(_result,_multiplier,_result)!=MP_OKAY){outputError("Failed to multiply a big integer");_result=NULL;break;}
+            while(mp_cmp(MP_INT_POINTER(_multiplier),MP_INT_POINTER(_finalmultiplier))==MP_LT){
+                if(mp_incr(MP_INT_POINTER(_multiplier))!=MP_OKAY){outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
+                if(mp_mul(MP_INT_POINTER(_result),MP_INT_POINTER(_multiplier),MP_INT_POINTER(_result))!=MP_OKAY){outputError("Failed to multiply a big integer");_result=NULL;break;}
                 //////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
             }
             // get rid of intermediate big integers

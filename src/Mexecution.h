@@ -45,6 +45,9 @@ typedef enum Mvaluetype {VT_UNDEFINED=0,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DEC
 
 // TODO Minteger could become a union if we're storing multiple types of integers in it
 typedef struct Minteger{
+#ifndef __PRODUCTION__
+    size_t allocation_index;
+#endif
     long long ll; // signed 64-bit integer (for now)
 }Minteger;
 /*
@@ -54,25 +57,52 @@ typedef struct Mbiginteger{
 */
 // TODO Mfloat could become a union if we're storing multiple types of reals in it
 typedef struct Mfloat{
+#ifndef __PRODUCTION__
+    size_t allocation_index;
+#endif
     long double ld; // double precision floating point binary number (for now)
 }Mfloat;
 
-typedef mp_int Mbiginteger; // MDH@17JUN2019: use Mbiginteger the same as we would Mbiginteger, one-to-one correspondence with the structure used in libtommath 
+// MDH@09APR2020: keeping track of the allocations means we know need a pointer to an mp_int (which is internally allocated by libtommath)
+//                TODO it's probably prudent to in the future ALWAYS use Mbiginteger as a separate struct because mp_int is also of variable length (dynamically)
+//                     which should be managed by REALLOC somehow...
+#ifndef __PRODUCTION__
+typedef struct Mbiginteger{
+    size_t allocation_index;
+    mp_int* _bi;
+}Mbiginteger;
+#define MP_INT_POINTER(biginteger) (biginteger)->_bi
+#else
+    // MDH@17JUN2019: use Mbiginteger the same as we would Mbiginteger, one-to-one correspondence with the structure used in libtommath 
+typedef mp_int Mbiginteger;
+#define MP_INT_POINTER(biginteger) biginteger
+#endif
 
 typedef struct Mrational{
+#ifndef __PRODUCTION__
+    size_t allocation_index;
+#endif
     Mbiginteger* num;
     Mbiginteger* den;
     Mfloat* delta; // any deviation from the original long double
     bool normalized; // MDH@05JUN2019: remember whether or not normalized...
 }Mrational;
 
+// MDH@09APR2020: apart from the allocation index, if we want to know what size Mtext is (with _c being of unknown size, we need to add size unless we never allocate more than we need
+//                i.e. _c always ends with '\0' so strlen(_c) actually gives us the actual length
 typedef struct Mtext{
+#ifndef __PRODUCTION__
+    size_t allocation_index;
+#endif
     char presuffix;
     char _c[]; // by using an array and not a pointer, it's easy to make one out of an Mtext* by strcpy from string(Mstring)
 }Mtext;
 
 // MDH@17JUN2019: if we want to know when a decimal contains repeating fractions we should be able to remember how many decimals repeat themselves
 typedef struct Mdecimal{
+#ifndef __PRODUCTION__
+    size_t allocation_index;
+#endif
     mpd_t* mpd; // ok, for now use a pointer
     mpd_ssize_t repeating; // the number of decimals that repeat themselves at the end
     mpd_ssize_t prec; // MDH@25AUG2019: the precision used for creating this decimal (thus allowing to automatically set the decimal precision to use in computations)

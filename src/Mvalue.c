@@ -1611,21 +1611,24 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){
             {
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
                 Mbiginteger* _biginteger=__biginteger();
-                if(_biginteger&&mp_set_longdouble(_biginteger,_value->value._float->ld)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                if(_biginteger&&mp_set_longdouble(_biginteger,_value->value._float->ld)!=MP_OKAY)
+                {free_biginteger(_biginteger);_biginteger=NULL;}
                 if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
                 return _biginteger;
             }
         case VT_TEXT:
             {
                 Mbiginteger* _biginteger=__biginteger();
-                if(_biginteger&&mp_read_radix(_biginteger,_value->value._text->_c,10)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                if(_biginteger&&mp_read_radix(MP_INT_POINTER(_biginteger),_value->value._text->_c,10)!=MP_OKAY)
+                {free_biginteger(_biginteger);_biginteger=NULL;}
                 if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
                 return _biginteger;
             }
         case VT_TOKEN:
             {
                 Mbiginteger* _biginteger=__biginteger();
-                if(_biginteger&&mp_read_radix(_biginteger,string(_value->value._token->text),10)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                if(_biginteger&&mp_read_radix(MP_INT_POINTER(_biginteger),string(_value->value._token->text),10)!=MP_OKAY)
+                {free_biginteger(_biginteger);_biginteger=NULL;}
                 if(!_biginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
                 return _biginteger;
             }
@@ -2139,29 +2142,29 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){
     // TODO ignores delta for now
     if(_rational){
         // denominator equal to 1?
-        if(!_rational->den||mp_cmp(_rational->den,getBigintegerOne())==MP_EQ)return(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1));
+        if(!_rational->den||mp_cmp(MP_INT_POINTER(_rational->den),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1));
         // if the numerator equals 1, the result is 0
-        if(!_rational->num||mp_cmp(_rational->num,getBigintegerOne())==MP_EQ)return _getBiginteger(0); // with the numerator at least equal to 2 the result will always be 0
-        bool neg=mp_isneg(_rational->num); // determine whether negative or not
+        if(!_rational->num||mp_cmp(MP_INT_POINTER(_rational->num),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return _getBiginteger(0); // with the numerator at least equal to 2 the result will always be 0
+        bool neg=mp_isneg(MP_INT_POINTER(_rational->num)); // determine whether negative or not
         // get the absolute value of the numerator
         Mbiginteger* _dividend=NULL;
         Mbiginteger* _absnum=__biginteger(); // to be freed asap
         if(_absnum){ // freeable
-            if(mp_abs(_rational->num,_absnum)==MP_OKAY){
+            if(mp_abs(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_absnum))==MP_OKAY){
                 Mbiginteger* _twicenum=__biginteger();
                 if(_twicenum){ // freeable
-                    if(mp_mul_2(_absnum,_twicenum)==MP_OKAY){
+                    if(mp_mul_2(MP_INT_POINTER(_absnum),MP_INT_POINTER(_twicenum))==MP_OKAY){
                         Mbiginteger* _twiceden=__biginteger();
                         if(_twiceden){
-                            if(mp_mul_2(_rational->den,_twiceden)==MP_OKAY){
+                            if(mp_mul_2(MP_INT_POINTER(_rational->den),MP_INT_POINTER(_twiceden))==MP_OKAY){
                                 Mbiginteger* _remainder=__biginteger();
                                 if(_remainder){
                                     _dividend=__biginteger();
                                     if(_dividend){
-                                        bool success=(mp_div(_twicenum,_twiceden,_dividend,_remainder)==MP_OKAY);
+                                        bool success=(mp_div(MP_INT_POINTER(_twicenum),MP_INT_POINTER(_twiceden),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
                                         // increment _dividend if _remainder larger than denominator
-                                        if(success&&mp_cmp(_remainder,_rational->den)==MP_GT&&mp_incr(_dividend)!=MP_OKAY)success=false;
-                                        if(success&&neg&&mp_neg(_dividend,_dividend)!=MP_OKAY)success=false;
+                                        if(success&&mp_cmp(MP_INT_POINTER(_remainder),MP_INT_POINTER(_rational->den))==MP_GT&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
+                                        if(success&&neg&&mp_neg(MP_INT_POINTER(_dividend),MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
                                         if(!success){free_biginteger(_dividend);_dividend=NULL;}
                                     }else 
                                         outputError("Failed to create big integer dividend");
@@ -2195,17 +2198,18 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
         if(!_rational->num)return NULL; // if the numerator is undefined, the rational is undefined!!!!
         if(!_rational->den)return _getBigintegerCopy(_rational->num); // cannot get it much simpler if the rational already is integer
         // ASSERT both numerator and denominator are NOT NULL
-        bool neg=mp_isneg(_rational->num); // determine whether negative or not
+        bool neg=mp_isneg(MP_INT_POINTER(_rational->num)); // determine whether negative or not
         // get the absolute value of the numerator
         Mbiginteger* _absnum=__biginteger(); // to be freed asap
-        if(mp_abs(_rational->num,_absnum)!=MP_OKAY){free_biginteger(_absnum);outputError("Failed to compute the absolute of a big integer");return NULL;}
+        if(mp_abs(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_absnum))!=MP_OKAY)
+        {free_biginteger(_absnum);outputError("Failed to compute the absolute of a big integer");return NULL;}
         Mbiginteger *_dividend=__biginteger(),*_remainder=__biginteger();
-        bool success=(mp_div(_absnum,_rational->den,_dividend,_remainder)==MP_OKAY);
-        if(success&&mp_iszero(_remainder)!=MP_YES){ // division succeeded with a non-zero remainder
+        bool success=(mp_div(MP_INT_POINTER(_absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
+        if(success&&mp_iszero(MP_INT_POINTER(_remainder))!=MP_YES){ // division succeeded with a non-zero remainder
             if(neg){
-                if(mp_neg(_dividend,_dividend)==MP_OKAY){
+                if(mp_neg(MP_INT_POINTER(_dividend),MP_INT_POINTER(_dividend))==MP_OKAY){
                     // if flooring (instead of ceiling) we have to subtract one
-                    if(floor&&!towardszero&&mp_decr(_dividend)!=MP_OKAY){
+                    if(floor&&!towardszero&&mp_decr(MP_INT_POINTER(_dividend))!=MP_OKAY){
                         success=false;
                         outputError("Failed to decrement the truncated negative big integer");
                     }
@@ -2214,7 +2218,7 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
                     outputError("Failed to negate the big integer dividend");
                 }
             }else{
-                if(!floor&&!towardszero&&mp_incr(_dividend)!=MP_OKAY){
+                if(!floor&&!towardszero&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY){
                     success=false;
                     outputError("Failed to increment truncated positive big integer");
                 }
@@ -2306,7 +2310,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
     switch(value1->type){
         case VT_INTEGER:return(value1->value._integer->ll==value2->value._integer->ll);
         case VT_FLOAT:return(areFloatsEqual(value1->value._float,value2->value._float)); // MDH@25OCT2019: replacing ldEqual() with a call to areFloatsEqual()
-        case VT_BIGINTEGER:return(mp_cmp(value1->value._biginteger,value2->value._biginteger)==MP_EQ);
+        case VT_BIGINTEGER:return(mp_cmp(MP_INT_POINTER(value1->value._biginteger),MP_INT_POINTER(value2->value._biginteger))==MP_EQ);
         case VT_TEXT:return(value1->value._text->presuffix==value2->value._text->presuffix&&strcmp(value1->value._text->_c,value2->value._text->_c)==0);
         case VT_TOKEN:return string_equal(value1->value._token->text,value2->value._token->text);
         case VT_LIST:case VT_MAP:break;

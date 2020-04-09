@@ -14,11 +14,15 @@
 
 /** Create a String */
 Mstring* __string(){
-    Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
+    // MDH@09APR2020: because sizeof(Mstring) would not include what we need for the characters pointed to by chars, we need to allocated one BLOCK_SIZE of characters to start with
+    Mstring* ans=CALLOC(1,sizeof(Mstring)+sizeof(char)*BLOCK_SIZE,'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         // the size of each allocation is BLOCKSIZE characters
-        ans->chars=MALLOC(1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
+        // MDH@09APR2020: everything that is of dynamic size needs to be allocated using REALLOC even when freeing, that way we can keep track
+        //                of the amount allocated in Malloc.c/h explicitly
+        //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
+        ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
         // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
@@ -35,7 +39,8 @@ Mstring* _getString(const char* const s){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
-        ans->chars=MALLOC(++ans->blocks,sizeof(char)*BLOCK_SIZE,'s'); // here we increment ans->blocks (as we must)
+        // MDH@09APR2020: switching to using REALLOC for all dynamically allocated memory with variable length, like ans->chars!!!!
+        ans->chars=REALLOC(ans->chars,0,++ans->blocks,sizeof(char)*BLOCK_SIZE,'s'); // here we increment ans->blocks (as we must)
         if(ans->chars){
             //////////////strcpy(ans->chars,s);ans->length=l; // also copies the ending '\0' over but memcpy() does not have to check for '\0' so we use memcpy()
             ans->length=l; // MDH@21JUN2019: no need to copy '\0' at the end!!! replacing: ans->length=l++; // store l, then increment it, so memcpy() will also copy '\0' over!!!
@@ -80,7 +85,13 @@ Mstring* _stringCopy(Mstring* const src,size_t length){
 /** 
  * Free the memory associated with a String
  */
-void free_string(Mstring* str){if(str){if(str->chars)FREE(str->chars,'s');FREE(str,'S');}}
+void free_string(Mstring* str){
+    if(str){
+        // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
+        if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
+        FREE(str,'S');
+    }
+}
 
 size_t string_length(Mstring const * const str){return(str?str->length:0);}
 

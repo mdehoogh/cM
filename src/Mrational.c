@@ -14,7 +14,7 @@ mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
     //                HOWEVER we could safeguard against that??????
     if(a&&b){
         *_c=__biginteger();
-        return(!_c?MP_ERR:mp_mul(a,b,*_c)); // if both big integers are defined, return the multiplication in *_c
+        return(!_c?MP_ERR:mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c))); // if both big integers are defined, return the multiplication in *_c
     }
     if(!a&&!b)*_c=NULL;else
     if(!a)*_c=_getBigintegerCopy(b);else
@@ -38,8 +38,8 @@ mp_err _bidiv(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
     if(a||b){
         *_c=__biginteger();
         if(!_c)return MP_ERR;
-        if(a&&b)return mp_div(a,b,*_c,NULL); // if both big integers are defined, return the divisor in *_c ignoring the remainder!!!
-        return mp_copy((a?a:b),*_c); // copy either a or b
+        if(a&&b)return mp_div(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c),NULL); // if both big integers are defined, return the divisor in *_c ignoring the remainder!!!
+        return mp_copy((a?MP_INT_POINTER(a):MP_INT_POINTER(b)),MP_INT_POINTER(*_c)); // copy either a or b
     }
     // *_c should be NULL, so return MP_ERR if not NULL
     return (*_c?MP_OKAY:MP_ERR);
@@ -54,7 +54,7 @@ mp_err _bisub(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
     // assuming _c to not be NULL, and *_c to be NULL
     if(a&&b&&_c&&!*_c){
         *_c=__biginteger(); // get a big integer instance
-        return(*_c?mp_sub(a,b,*_c):MP_ERR); // if we have an instance put the difference of a and b in it, otherwise failure
+        return(*_c?mp_sub(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c)):MP_ERR); // if we have an instance put the difference of a and b in it, otherwise failure
     }
     return MP_ERR;
 }
@@ -62,7 +62,7 @@ mp_err _biadd(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
     // assuming _c to not be NULL, and *_c to be NULL
     if(a&&b&&_c&&!*_c){
         *_c=__biginteger(); // get a big integer instance
-        return(*_c?mp_add(a,b,*_c):MP_ERR); // if we have an instance put the difference of a and b in it, otherwise failure
+        return(*_c?mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c)):MP_ERR); // if we have an instance put the difference of a and b in it, otherwise failure
     }
     return MP_ERR;
 }
@@ -80,7 +80,7 @@ mp_err _qmul(Mrational* const c,Mrational const * const a,Mrational const * cons
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=_bimul(a->den,b->den,&_den);
     if(status==MP_OKAY){
-        if(_den&&mp_iszero(_den)==MP_YES){
+        if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES){
             status=MP_ERR;
             outputError("The denominator of the product of two rationals is zero");
         }else{
@@ -113,7 +113,7 @@ mp_err _qmul_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* c
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need all input pointers
     if(status==MP_OKAY)status=_bimul(a->den,NULL,&_den); // multiply denominators
-    if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+    if(status==MP_OKAY)if(!_den||mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
     if(status==MP_OKAY)status=_bimul(a->num,b,&_num); // multiply numerators
     if(status!=MP_OKAY){ // numerator and denominator not computed both
         if(_num)free_biginteger(_num);
@@ -133,7 +133,7 @@ mp_err _qdiv(Mrational* const c,const Mrational* const a,const Mrational* const 
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
     if(status==MP_OKAY)status=_bimul(a->den,b->num,&_den); // multiply denominator of a with numerator of a
-    if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+    if(status==MP_OKAY)if(!_den||mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
     if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num); // multiply numerator of a with denominator of b
     if(status!=MP_OKAY){ // numerator and denominator not computed both
         if(_num)free_biginteger(_num);
@@ -152,7 +152,7 @@ mp_err _qdiv_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* c
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
     if(status==MP_OKAY)status=_bimul(a->den,b,&_den); // multiply denominator of a with numerator of a
-    if(status==MP_OKAY)if(!_den||mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+    if(status==MP_OKAY)if(!_den||mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
     if(status==MP_OKAY)status=_bimul(a->num,NULL,&_num); // multiply numerator of a with denominator of b
     if(status!=MP_OKAY){ // numerator and denominator not computed both
         if(_num)free_biginteger(_num);
@@ -190,7 +190,7 @@ mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * con
             // ASSERT a and b both defined
             Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
             if(a->den||b->den)status=_bimul(a->den,b->den,&_den); // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
-            if(status==MP_OKAY)if(_den&&mp_iszero(_den)==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+            if(status==MP_OKAY)if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
             if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num1); // multiply numerator of a with denominator of b for the plus term of the result numerator
             if(status==MP_OKAY)status=_bimul(a->den,b->num,&_num2); // multiply denominator of a with numerator of b for the min term of the result numerator
             if(status==MP_OKAY)status=_bisub(_num1,_num2,&_num);
@@ -276,7 +276,7 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     }
     if(status==MP_OKAY){
         // MDH@02APR2020 I think we had a bug here because the denominator can be undefined so !_den|| replaced by _den&&
-        if(_den&&mp_iszero(_den)==MP_YES){
+        if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES){
             status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
             outputError("Denominator of the sum of two rationals equal to zero");
         }
@@ -389,7 +389,7 @@ bool _qeq(Mrational* q1,Mrational* q2,mp_err *status){
         Mbiginteger *_prod1=NULL,*_prod2=NULL;
         *status=_bimul(q1->num,q2->den,&_prod1);
         *status=_bimul(q1->den,q2->num,&_prod2);
-        bool result=(*status==MP_OKAY?mp_cmp(_prod1,_prod2)!=0:false);
+        bool result=(*status==MP_OKAY?mp_cmp(MP_INT_POINTER(_prod1),MP_INT_POINTER(_prod2))!=MP_NO:false);
         // free the help product big integers
         if(_prod1)free_biginteger(_prod1);
         if(_prod2)free_biginteger(_prod2);
@@ -611,7 +611,7 @@ Mrational* _getRationalBigintegerQuotient(Mrational const * const q,Mbiginteger 
     if(b&&!isBigintegerZero(b)){
         Mbiginteger* _newnum=_getBigintegerCopy(b);
         if(_newnum){
-            if(!q->den||mp_mul(_newnum,q->den,_newnum)==MP_OKAY){
+            if(!q->den||mp_mul(MP_INT_POINTER(_newnum),MP_INT_POINTER(q->den),MP_INT_POINTER(_newnum))==MP_OKAY){
                 long double newdelta=M_LD_NAN,qdelta=getFloatLongDouble(q->delta);
                 if(qdelta!=M_LD_NAN)newdelta=qdelta/mp_get_long_double(b);
                 _rationalBigintegerQuotient=_getRational(_getBigintegerCopy(q->num),_newnum,newdelta,true,true);
@@ -692,21 +692,21 @@ Mrational* _qsinorcos(Mrational const * const x,bool sin){
 				status=_qmul(_multnum,_multnum,_x4); // updating _multnum is easy as we only need to multiply it by x^4
 				// NOTE _4n starts equal to 3 (as _den starts as 3!), and the faculty stored in _multden needs to be updated 4 times
 				// so, we have to increment _4n four times and use each of these 4 values to update _multden to become the new faculty value to use
-                status=mp_incr(_4n);
-				status=mp_mul(_multden,_4n,_multden);
-				status=mp_incr(_4n); // now equal to (4n+1)
-				status=mp_mul(_multden,_4n,_multden);
+                status=mp_incr(MP_INT_POINTER(_4n));
+				status=mp_mul(MP_INT_POINTER(_multden),MP_INT_POINTER(_4n),MP_INT_POINTER(_multden));
+				status=mp_incr(MP_INT_POINTER(_4n)); // now equal to (4n+1)
+				status=mp_mul(MP_INT_POINTER(_multden),MP_INT_POINTER(_4n),MP_INT_POINTER(_multden));
 				// after two increments to _4n _multden is what we want it to be for computing the 
 				// _multnum and _multden updated, so we can now update _mult
 				status=_qdiv_bi(_mult,_multnum,_multden);
 				
-				status=mp_incr(_4n); // now equal to (4n+2)
-				status=mp_mul(_multden,_4n,_multden);
-				status=mp_copy(_4n,_den); // initialize _den to _4n
+				status=mp_incr(MP_INT_POINTER(_4n)); // now equal to (4n+2)
+				status=mp_mul(MP_INT_POINTER(_multden),MP_INT_POINTER(_4n),MP_INT_POINTER(_multden));
+				status=mp_copy(MP_INT_POINTER(_4n),MP_INT_POINTER(_den)); // initialize _den to _4n
 				
-				status=mp_incr(_4n); // now equal to (4n+3)
-				status=mp_mul(_multden,_4n,_multden);
-				status=mp_mul(_den,_4n,_den); // _den now equal to (4n+2)*(4n+3) as we need it to be
+				status=mp_incr(MP_INT_POINTER(_4n)); // now equal to (4n+3)
+				status=mp_mul(MP_INT_POINTER(_multden),MP_INT_POINTER(_4n),MP_INT_POINTER(_multden));
+				status=mp_mul(MP_INT_POINTER(_den),MP_INT_POINTER(_4n),MP_INT_POINTER(_den)); // _den now equal to (4n+2)*(4n+3) as we need it to be
 
 				// with _den computed we can now update _sub 
 				status=_qdiv_bi(_sub,_x4,_den);
@@ -765,11 +765,12 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 			if(amVerbose())output("Decimal text with exponent removed: '%s'.",decimalText);
 			exponentText++; // point to the first character of the exponent
             _exponent=__biginteger(); // need it before calling mp_read_radix()
-			if(mp_read_radix(_exponent,exponentText,10)!=MP_OKAY){
+			if(_exponent&&(mp_read_radix(MP_INT_POINTER(_exponent),exponentText,10)!=MP_OKAY)){
 				output("%sFailed to extract the exponent from its text representation '%s'.\n",ERROR_PREFIX,exponentText);
 				free_biginteger(_exponent);
 				_exponent=NULL;
 			}else
+            if(_exponent)
 			if(amVerbose())outputBiginteger("Exponent '",_exponent,"'.\n");
 		}
 		if(!exponentText||_exponent){ // either we do not have an exponentText or we have an exponent big integer (to apply later on)
@@ -780,20 +781,24 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 			if(amVerbose())output("With decimal part removed: '%s'.",decimalText);
 			// now ready to check the integer part 
 			Mbiginteger *_numerator=__biginteger(),*_denominator=NULL; // two big integers to free if unbound!!
-			if(mp_read_radix(_numerator,decimalText,10)==MP_OKAY){ // apparently a valid (big) integer
+			if(_numerator&&(mp_read_radix(MP_INT_POINTER(_numerator),decimalText,10)==MP_OKAY)){ // apparently a valid (big) integer
 				Mbiginteger* _decimalPartBiginteger=NULL; // freeable...
 				if(decimalPartText){
 					int decimalPartIndex=(int)(decimalPartText-decimalText);
 					decimalPartText++; // point to the first character of the decimal part
 					_decimalPartBiginteger=__biginteger();
-					if(_decimalPartBiginteger&&mp_read_radix(_decimalPartBiginteger,decimalPartText,10)==MP_OKAY){
+					if(_decimalPartBiginteger&&(mp_read_radix(MP_INT_POINTER(_decimalPartBiginteger),decimalPartText,10)==MP_OKAY)){
                         if(isBigintegerZero(_decimalPartBiginteger)!=M_TRUE){
 						    // compute the power of ten denominator
 						    Mbiginteger* _bi10=_getBiginteger(10); // must be freed (see three lines down)
                             if(_bi10){
                                 // make a denominator, and keep multiplying by 10, but if something goes wrong free and NULL it again to indicate an error
     						    _denominator=_getBiginteger(1);
-	    					    while(++decimalPartIndex<l){if(!_denominator)break;if(mp_mul(_denominator,_bi10,_denominator)!=MP_OKAY){free_biginteger(_denominator);_denominator=NULL;}}
+	    					    while(++decimalPartIndex<l){
+                                    if(!_denominator)break;
+                                    if(mp_mul(MP_INT_POINTER(_denominator),MP_INT_POINTER(_bi10),MP_INT_POINTER(_denominator))!=MP_OKAY)
+                                    {free_biginteger(_denominator);_denominator=NULL;}
+                                }
 		    				    free_biginteger(_bi10);
                             }
         					if(amVerbose())if(_denominator)outputBiginteger("Denominator: '",_denominator,"'.\n");
@@ -806,25 +811,32 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 				if(!decimalPartText||_denominator){
 					// if we have a _denominator and we fail to compute the appropriate numerator, we have to free all big integers
 					// NOTE do NOT free the numerator and denominator in the call to _getRational, as we free them if _rational ends of being NULL afterwards
-					if(!_denominator||(mp_mul(_numerator,_denominator,_numerator)==MP_OKAY&&mp_add(_numerator,_decimalPartBiginteger,_numerator)==MP_OKAY)){
+					if(!_denominator
+                            ||(mp_mul(MP_INT_POINTER(_numerator),MP_INT_POINTER(_denominator),MP_INT_POINTER(_numerator))==MP_OKAY
+                                &&mp_add(MP_INT_POINTER(_numerator),MP_INT_POINTER(_decimalPartBiginteger),MP_INT_POINTER(_numerator))==MP_OKAY)){
 						if(amVerbose())outputBiginteger("Numerator before applying the exponent: '",_numerator,"'.\n");
 						if(amVerbose())if(_denominator)outputBiginteger("Denominator before applying the exponent: '",_denominator,"'.\n");
 						// if we have an non-zero exponent, we have to adjust the numerator or denominator BEFORE trying to create the rational!!!
-						if(exponentText&&mp_iszero(_exponent)==MP_NO){
+						if(exponentText&&mp_iszero(MP_INT_POINTER(_exponent))==MP_NO){
 							Mbiginteger* _bi10=_getBiginteger(10);
 							if(_bi10){
-								if(mp_isneg(_exponent)==MP_YES){ // a negative exponent goes into the denominator
+								if(mp_isneg(MP_INT_POINTER(_exponent))==MP_YES){ // a negative exponent goes into the denominator
 									if(!_denominator)_denominator=_getBiginteger(1);
 									if(_denominator){
-										while(mp_iszero(_exponent)==MP_NO){
-											if(mp_mul(_denominator,_bi10,_denominator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
-											if(mp_incr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+										while(mp_iszero(MP_INT_POINTER(_exponent))==MP_NO){
+											if(mp_mul(MP_INT_POINTER(_denominator),MP_INT_POINTER(_bi10),MP_INT_POINTER(_denominator))!=MP_OKAY)
+                                            {free_biginteger(_exponent);_exponent=NULL;break;}
+											if(mp_incr(MP_INT_POINTER(_exponent))!=MP_OKAY)
+                                            {free_biginteger(_exponent);_exponent=NULL;break;}
 										}
-									}else{free_biginteger(_exponent);_exponent=NULL;}
+									}else
+                                    {free_biginteger(_exponent);_exponent=NULL;}
 								}else{ // a positive exponent goes into the numerator
-									while(mp_iszero(_exponent)==MP_NO){
-										if(mp_mul(_numerator,_bi10,_numerator)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
-										if(mp_decr(_exponent)!=MP_OKAY){free_biginteger(_exponent);_exponent=NULL;break;}
+									while(mp_iszero(MP_INT_POINTER(_exponent))==MP_NO){
+										if(mp_mul(MP_INT_POINTER(_numerator),MP_INT_POINTER(_bi10),MP_INT_POINTER(_numerator))!=MP_OKAY)
+                                        {free_biginteger(_exponent);_exponent=NULL;break;}
+										if(mp_decr(MP_INT_POINTER(_exponent))!=MP_OKAY)
+                                        {free_biginteger(_exponent);_exponent=NULL;break;}
 									}
 								}
 								free_biginteger(_bi10);
@@ -832,7 +844,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 						}
 						// check again whether we still have an exponent (when we should)
 						if(!exponentText||_exponent)
-                            if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)
+                            if(!neg||mp_neg(MP_INT_POINTER(_numerator),MP_INT_POINTER(_numerator))==MP_OKAY)
                                 rational=_getRational(_numerator,_denominator,0,true,false); // NOTE the 0 explicitly tells the rational that it represents a decimal representation!!!!!
 					}
 				}
@@ -868,13 +880,15 @@ void normalizeRational(Mrational* rational){
     Mbiginteger* _gcd=__biginteger(); // to be freed in all cases!
     if(!_gcd){outputError("Can't normalize a rational: failed to create the big integer to store the GCD");return;}
     // ASSERT at the end of the following block always free _gcd
-    if(mp_gcd(rational->num,rational->den,_gcd)==MP_OKAY){
-        if(mp_cmp(_gcd,getBigintegerOne())!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
+    if(mp_gcd(MP_INT_POINTER(rational->num),MP_INT_POINTER(rational->den),MP_INT_POINTER(_gcd))==MP_OKAY){
+        if(mp_cmp(MP_INT_POINTER(_gcd),MP_INT_POINTER(getBigintegerOne()))!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
             // won't do an in-place division as we need both to succeed, if only one does we would be in trouble
             Mbiginteger *_newnum=__biginteger(),*_newden=__biginteger(); // to be freed if failing to bind them!!!
-            if(_newnum&&_newden&&mp_div(rational->num,_gcd,_newnum,NULL)==MP_OKAY&&mp_div(rational->den,_gcd,_newden,NULL)==MP_OKAY){
+            if(_newnum&&_newden&&mp_div(MP_INT_POINTER(rational->num),MP_INT_POINTER(_gcd),MP_INT_POINTER(_newnum),NULL)==MP_OKAY
+                                &&mp_div(MP_INT_POINTER(rational->den),MP_INT_POINTER(_gcd),MP_INT_POINTER(_newden),NULL)==MP_OKAY){
                 free_biginteger(rational->num);rational->num=_newnum;
-                free_biginteger(rational->den);rational->den=NULL;if(isBigintegerOne(_newden))free_biginteger(_newden);else rational->den=_newden; // if _newden equals 1, get rid of it, otherwise assign
+                free_biginteger(rational->den);rational->den=NULL;
+                if(isBigintegerOne(_newden))free_biginteger(_newden);else rational->den=_newden; // if _newden equals 1, get rid of it, otherwise assign
                 rational->normalized=true;
             }else{ // if the normalization failed, newnum and newden are not bound to the rational!!
                 free_biginteger(_newnum);
@@ -917,7 +931,7 @@ Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long d
             if(_nonnullnumerator){
                 // MDH@15AUG2019: we prefer the numerator to be negative instead of the denominator
                 // MDH@10OCT2019: TODO wouldn't it be better to be able to toggle the signs???? YES but I can't find a function in tommath to do so!!!!
-                if(_denominator&&mp_isneg(_denominator)==MP_YES){ // the given denominator is negative             
+                if(_denominator&&mp_isneg(MP_INT_POINTER(_denominator))==MP_YES){ // the given denominator is negative             
                     if(amVerbose())outputInfo("Moving the sign from the denominator to the numerator of the rational.");
                     // we have to get negated versions of both the numerator and the denominator
                     // if we succeed in doing so we use those otherwise we stick to using the current ones
@@ -1100,21 +1114,28 @@ Mbiginteger* _rational2biginteger(Mrational* _rational){
             // if the numerator is NULL or 0 _biginteger should remain what it is (i.e. 0)
             if(_rational->num&&isBigintegerZero(_rational->num)!=M_TRUE){
                 Mbiginteger* absnum=NULL;
-                bool neg=mp_isneg(_rational->num);
-                if(neg){absnum=__biginteger();if(absnum&&mp_neg(_rational->num,absnum)!=MP_OKAY){free_biginteger(absnum);absnum=NULL;}}else absnum=_rational->num;
+                bool neg=mp_isneg(MP_INT_POINTER(_rational->num));
+                if(neg){
+                    absnum=__biginteger();
+                    if(absnum&&mp_neg(MP_INT_POINTER(_rational->num),MP_INT_POINTER(absnum))!=MP_OKAY){free_biginteger(absnum);absnum=NULL;}
+                }else 
+                    absnum=_rational->num;
                 // we need absnum, if we haven't got one, negating the negative numerator failed
-                if(!absnum||mp_div(absnum,_rational->den,_biginteger,NULL)!=MP_OKAY){
+                if(!absnum||mp_div(MP_INT_POINTER(absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_biginteger),NULL)!=MP_OKAY){
                     outputError("Failed to (integer) divide the rational numerator by its denominator");
                     free_biginteger(_biginteger);
                     _biginteger=NULL;
                 }else
                 if(absnum&&neg){ // we have to negate _biginteger
-                    if(mp_neg(_biginteger,_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;}
+                    if(mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_biginteger))!=MP_OKAY)
+                    {free_biginteger(_biginteger);_biginteger=NULL;}
                     free_biginteger(absnum); // free absnum
                 }
             }
-        }else // copy the numerator
-            if(mp_copy(_rational->num,_biginteger)!=MP_OKAY){outputError("Failed to copy the rational numerator");free_biginteger(_biginteger);_biginteger=NULL;}
+        }else{ // copy the numerator
+            if(mp_copy(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_biginteger))!=MP_OKAY)
+            {outputError("Failed to copy the rational numerator");free_biginteger(_biginteger);_biginteger=NULL;}
+        }
     }
     return _biginteger;
 }/* VALIDATED */
@@ -1154,7 +1175,7 @@ Mrational* _getLongDoubleRational(long double ld,int maxiter){
             // construct the last rational (i.e. the result) from p and q
             Mbiginteger *_numerator=_getBiginteger(p),*_denominator=_getBiginteger(q);
             if(_numerator&&_denominator) // we've got both of them
-                if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)
+                if(!neg||mp_neg(MP_INT_POINTER(_numerator),MP_INT_POINTER(_numerator))==MP_OKAY)
                     _rational=_getRational(_numerator,_denominator,delta,true,false); // NOTE there should always be a delta!!!!
             if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);}
         }else // long double is zero
@@ -1249,7 +1270,7 @@ long long isRationalOne(Mrational const * const rational){
         if(isLongDoubleUndefined(ld)!=M_TRUE&&isLongDoubleZero(ld)!=M_TRUE) // neither undefined, nor zero
             result=(isLongDoubleOne(getUnpureRationalNumerator(rational->num,rational->den,ld))?M_TRUE:M_FALSE);
         else // undefined or zero
-            result=(rational->den?(rational->num?mp_cmp(rational->den,rational->num)==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):M_TRUE));
+            result=(rational->den?(rational->num?mp_cmp(MP_INT_POINTER(rational->den),MP_INT_POINTER(rational->num))==MP_EQ:isBigintegerOne(rational->den)):(rational->num?isBigintegerOne(rational->num):M_TRUE));
         if(amVerbose())output(": %s.\n",(result==M_LL_INVALID?"UNKNOWN":(result==M_TRUE?"YES":"NO")));
     }
     return result;

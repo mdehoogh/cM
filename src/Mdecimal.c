@@ -179,19 +179,21 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){
                     // locally used dynamic variables
                     Mbiginteger *_num3=__biginteger(),*_bi10=_getBiginteger(10),*_den2=_getBiginteger(10),*_den1=_getBiginteger(1);
                     ////////output("Temporary dynamic variables created.\n");
-                    if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(_num3,repeatingText,10)==MP_OKAY){
+                    if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(MP_INT_POINTER(_num3),repeatingText,10)==MP_OKAY){
                         if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
-                        for(int i=decimal->repeating;i>1;i--)if(mp_mul(_den2,_bi10,_den2)!=MP_OKAY){outputError("Failed to multiply the second rational denominator part by 10");free_biginteger(_den2);_den2=NULL;break;}
-                        if(_den2&&mp_decr(_den2)==MP_OKAY){ // _den2 computed (as 9999....9)
+                        for(int i=decimal->repeating;i>1;i--)if(mp_mul(MP_INT_POINTER(_den2),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den2))!=MP_OKAY){outputError("Failed to multiply the second rational denominator part by 10");free_biginteger(_den2);_den2=NULL;break;}
+                        if(_den2&&mp_decr(MP_INT_POINTER(_den2))==MP_OKAY){ // _den2 computed (as 9999....9)
                             // let's determine the denominator
-                            mp_int* _den=NULL;
+                            Mbiginteger* _den=NULL;
                             int numberOfNonRepeatingDecimalDigits=(int)(repeatingText-periodText-2); // compute the number of non repeating decimals
                             ///////////////////mp_int* _den1=_getBiginteger(1);
                             if(numberOfNonRepeatingDecimalDigits>0){
-                                while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(_den1,_bi10,_den1)!=MP_OKAY){outputError("Failed to multiply the first rational denominator part by 10");free_biginteger(_den1);_den1=NULL;}
+                                while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
+								{outputError("Failed to multiply the first rational denominator part by 10");free_biginteger(_den1);_den1=NULL;}
                                 if(_den1){
                                     _den=__biginteger();
-                                    if(mp_mul(_den1,_den2,_den)!=MP_OKAY){free_biginteger(_den);_den=NULL;}else if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
+                                    if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY)
+									{free_biginteger(_den);_den=NULL;}else if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
                                 }
                             }else
                                 _den=_getBigintegerCopy(_den2);
@@ -205,7 +207,8 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){
                                 // add the fixed part of the decimal digits (treated as integer)
                                 if(_num&&strlen(periodText)){ // something between the period and the repeating digits
                                     Mbiginteger* _num2=__biginteger(); // _num2 is freed below, so that's good
-                                    if(mp_read_radix(_num2,periodText,10)!=MP_OKAY||mp_mul(_num2,_den2,_num2)!=MP_OKAY||mp_add(_num,_num2,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}
+                                    if(mp_read_radix(MP_INT_POINTER(_num2),periodText,10)!=MP_OKAY||mp_mul(MP_INT_POINTER(_num2),MP_INT_POINTER(_den2),MP_INT_POINTER(_num2))!=MP_OKAY||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num2),MP_INT_POINTER(_num))!=MP_OKAY)
+									{free_biginteger(_num);_num=NULL;}
                                     else 
                                     if(amVerbose())outputBiginteger("Non-repeating digits numerator part: '",_num2,"'.\n");
                                     free_biginteger(_num2);
@@ -214,16 +217,18 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){
                                     // _num to be bound or freed in this block!!!
                                     // add the part in front of the period multiplied by _den1 but it could be zero of course
                                     Mbiginteger* _num1=__biginteger(); // _mul1 freed below (which is reachable)
-                                    if(mp_read_radix(_num1,decimalText,10)==MP_OKAY){
+                                    if(mp_read_radix(MP_INT_POINTER(_num1),decimalText,10)==MP_OKAY){
                                         // of course the integer part could well be zero!!!!
                                         if(!isBigintegerZero(_num1)){
-                                            if(mp_mul(_num1,_den,_num1)!=MP_OKAY||mp_add(_num,_num1,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}else if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
+                                            if(mp_mul(MP_INT_POINTER(_num1),MP_INT_POINTER(_den),MP_INT_POINTER(_num1))!=MP_OKAY
+												||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY)
+											{free_biginteger(_num);_num=NULL;}else if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
                                         }
                                     }else{free_biginteger(_num);_num=NULL;}
                                     free_biginteger(_num1);    
                                 }
                                 // negate the numerator if the decimal is negative
-                                if(_num&&neg&&mp_neg(_num,_num)!=MP_OKAY){free_biginteger(_num);_num=NULL;}
+                                if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){free_biginteger(_num);_num=NULL;}
                                 if(_num)_rational=_getRational(_num,_den,M_LD_NAN,true,false);
                                 // if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
                                 if(!_rational){free_biginteger(_den);free_biginteger(_num);}
@@ -240,7 +245,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){
                     if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
                     Mbiginteger* _num=__biginteger();
                     if(_num){
-                        if(mp_read_radix(_num,decimalText,10)==MP_OKAY)_rational=_getRational(_num,NULL,M_LD_NAN,false,false);
+                        if(mp_read_radix(MP_INT_POINTER(_num),decimalText,10)==MP_OKAY)_rational=_getRational(_num,NULL,M_LD_NAN,false,false);
                         if(!_rational)free_biginteger(_num); // if no rational _num is unbound and must be freed
                     }
                 }
@@ -286,11 +291,11 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
     if(denominator){
         // local variables to be freed at the end (so NOT before)
 		// MDH@15OCT2019: take the sign into account
-		Mbiginteger *_nonnegativenumerator=(mp_isneg(numerator)?_getBigintegerNeg(numerator):numerator);
+		Mbiginteger *_nonnegativenumerator=(mp_isneg(MP_INT_POINTER(numerator))?_getBigintegerNeg(numerator):numerator);
 		if(_nonnegativenumerator){
 			Mbiginteger *_digit=__biginteger(),*_remainder=__biginteger(),*_bi10=_getBiginteger(10);
 			if(!_bi10){outputError("Failed to create big integer 10");return NULL;}
-			if(_digit&&_remainder&&_bi10&&mp_div(_nonnegativenumerator,denominator,_digit,_remainder)==MP_OKAY){
+			if(_digit&&_remainder&&_bi10&&mp_div(MP_INT_POINTER(_nonnegativenumerator),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))==MP_OKAY){
 				// the integer part is _dividend
 				_decimalText=_getBigintegerText(_digit);
 				if(_decimalText&&!isBigintegerZero(_remainder)){ // we've got a fraction to add!!!
@@ -317,7 +322,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
 						remainderIndex=0;
 						while(_remainderListelement){
 							///////////////if(amVerbose()){outputBiginteger("Comparing '",_remainderListelement->_value->value._biginteger,"'");outputBiginteger(" with remainder '",_remainder,"'.\n");}
-							if(mp_cmp(_remainderListelement->_biginteger,_remainder)==MP_EQ)break;
+							if(mp_cmp(MP_INT_POINTER(_remainderListelement->_biginteger),MP_INT_POINTER(_remainder))==MP_EQ)break;
 							// replacing: if(mp_cmp(_remainderListelement->_value->value._biginteger,_remainder)==MP_EQ)break;
 							remainderIndex++;
 							_remainderListelement=_remainderListelement->_next;
@@ -348,10 +353,12 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
 						if(!remainderValue){outputError("Failed to store the remainder");break;}
 						if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);outputError("Failed to remember the remainder in order to recognized the repeating fraction");break;}
 						*/
-						if(mp_mul(_remainder,_bi10,_remainder)!=MP_OKAY){outputError("Failed to multiply the remainder by 10");_p=NULL;break;}
+						if(mp_mul(MP_INT_POINTER(_remainder),MP_INT_POINTER(_bi10),MP_INT_POINTER(_remainder))!=MP_OKAY)
+						{outputError("Failed to multiply the remainder by 10");_p=NULL;break;}
 						if(amVerbose()){outputBiginteger("Dividing '",_remainder,"'");outputBiginteger(" by '",denominator,"'.\n");}
 						// _digit and _remainder are getting re-used here as well, which does not pose a problem (so we've created them once)
-						if(mp_div(_remainder,denominator,_digit,_remainder)!=MP_OKAY){outputError("Failed to perform a long division to obtain the next decimal digit");_p=NULL;break;}
+						if(mp_div(MP_INT_POINTER(_remainder),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))!=MP_OKAY)
+						{outputError("Failed to perform a long division to obtain the next decimal digit");_p=NULL;break;}
 						if(amVerbose()){outputBiginteger("Digit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.\n");}
 
 						// append the dividend to the decimal text
@@ -371,7 +378,10 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
 				}
 			}
 			// prepend the sign if the numerator is negative TODO what if this fails?????
-			if(mp_isneg(numerator)){if(_decimalText&&!string_insert_char(_decimalText,0,'-')){free_string(_decimalText);_decimalText=NULL;}free_biginteger(_nonnegativenumerator);}
+			if(mp_isneg(MP_INT_POINTER(numerator))){
+				if(_decimalText&&!string_insert_char(_decimalText,0,'-')){free_string(_decimalText);_decimalText=NULL;}
+				free_biginteger(_nonnegativenumerator);
+			}
 			// free all locally used pointers to dynamic memory
 			free_biginteger(_digit);free_biginteger(_remainder);free_biginteger(_bi10);
 		}

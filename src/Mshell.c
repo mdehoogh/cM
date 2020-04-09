@@ -1527,7 +1527,7 @@ Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	if(a&&b){
 		if(!isBigintegerZero(a)&&!isBigintegerZero(b)){
 			sum=__biginteger();
-			if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);sum=NULL;} // if the addition fails return 0
+			if(mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(sum))!=MP_OKAY){free_biginteger(sum);sum=NULL;} // if the addition fails return 0
 		}else
 			sum=_getBigintegerCopy(isBigintegerZero(a)?b:a);
 	}
@@ -1540,7 +1540,7 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	if(a&&b){
 		if(!isBigintegerOne(a)&&!isBigintegerOne(b)){
 			product=__biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
-			if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
+			if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(product))!=MP_OKAY){free_biginteger(product);product=NULL;}
 		}else
 			product=_getBigintegerCopy(isBigintegerOne(a)?b:a);
 	}
@@ -1555,7 +1555,7 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 	if(!a)return _getBigintegerCopy(b);
 	if(!b)return _getBigintegerCopy(a);
 	Mbiginteger* product=__biginteger();
-	if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
+	if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(product))!=MP_OKAY){free_biginteger(product);product=NULL;}
 	return product;
 }
 
@@ -1846,7 +1846,8 @@ Mvalue* pi_ql(Mvalue* value){
 						free_biginteger(_addendumDenominator);
 					}
 				}
-				if(mp_mul_2d(_rational->num,2,_rational->num)!=MP_OKAY){
+				// MDH@09APR2020: ok, this might be problematic if _rational_num is NULL so -> FIXED
+				if(!_rational->num||(mp_mul_2d(MP_INT_POINTER(_rational->num),2,MP_INT_POINTER(_rational->num))!=MP_OKAY)){
 					if(amVerbose()){output("%s",ERROR_PREFIX);outputRational("Failed to multiply the approximation of pi/4 (",_rational," by 4.\n");}
 					free_rational(_rational);
 					return NULL;
@@ -2379,7 +2380,7 @@ Mvalue* f(Mvalue* _value){
 		if(amVerbose()){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 		switch(_value->type){
 			case VT_INTEGER:_floatValue=_getFloatValue((long double)_value->value._integer->ll);break;
-			case VT_BIGINTEGER:_floatValue=_getFloatValue(mp_get_long_double(_value->value._biginteger));break;
+			case VT_BIGINTEGER:if(_value->value._biginteger)_floatValue=_getFloatValue(mp_get_long_double(_value->value._biginteger));break;
 			case VT_DECIMAL:_floatValue=_getFloatValue(getDecimalLongDouble(_value->value._decimal));break;
 			case VT_RATIONAL:_floatValue=_getFloatValue(getRationalLongDouble(_value->value._rational));break;
 			case VT_FLOAT:_floatValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
@@ -2525,24 +2526,24 @@ Mvalue* Mfibonacci(Mvalue* value){
 			if(isBigintegerNegative(_biginteger)!=M_TRUE){ // not a negative big integer
 				Mbiginteger *_counterBiginteger=_getBigintegerCopy(_biginteger); // the number of times we will have to do an addition
 				_fibonacciBiginteger=__biginteger(); // where the result should be stored
-				if(_fibonacciBiginteger&&_counterBiginteger)status=mp_decr(_counterBiginteger);else status=MP_ERR;
+				if(_fibonacciBiginteger&&_counterBiginteger)status=mp_decr(MP_INT_POINTER(_counterBiginteger));else status=MP_ERR;
 				if(status==MP_OKAY){
 					if(isBigintegerPositive(_counterBiginteger)==M_TRUE){ // at least one addition to do
 						Mbiginteger *_firstBiginteger=_getBiginteger(0),*_secondBiginteger=_getBiginteger(1);
 						if(_firstBiginteger&&_secondBiginteger){
 							// NOTE _counterBiginteger defines the number of times we need to add the first and second big integer
 							while(isBigintegerZero(_counterBiginteger)!=M_TRUE){ // the counter is not zero yet
-								if((status=mp_decr(_counterBiginteger))!=MP_OKAY)break;
-								if((status=mp_add(_firstBiginteger,_secondBiginteger,_fibonacciBiginteger))!=MP_OKAY)break;
+								if((status=mp_decr(MP_INT_POINTER(_counterBiginteger)))!=MP_OKAY)break;
+								if((status=mp_add(MP_INT_POINTER(_firstBiginteger),MP_INT_POINTER(_secondBiginteger),MP_INT_POINTER(_fibonacciBiginteger)))!=MP_OKAY)break;
 								// if we're smart we only need to exchange one big integer
-								if((status=mp_copy(_secondBiginteger,_firstBiginteger))!=MP_OKAY)break;
-								if((status=mp_copy(_fibonacciBiginteger,_secondBiginteger))!=MP_OKAY)break;
+								if((status=mp_copy(MP_INT_POINTER(_secondBiginteger),MP_INT_POINTER(_firstBiginteger)))!=MP_OKAY)break;
+								if((status=mp_copy(MP_INT_POINTER(_fibonacciBiginteger),MP_INT_POINTER(_secondBiginteger)))!=MP_OKAY)break;
 							}
 						}else 
 							outputError("Failed to initialize the Fibonacci sequence");
 						free_biginteger(_firstBiginteger);free_biginteger(_secondBiginteger);
 					}else // no additions
-						status=mp_copy(_biginteger,_fibonacciBiginteger);
+						status=mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_fibonacciBiginteger));
 				}else
 					outputError("Failed to initialize the Fibonacci sum");
 				free_biginteger(_counterBiginteger);
@@ -3822,8 +3823,8 @@ long long getBigintegerInteger(Mbiginteger* biginteger){
 	long long result=M_LL_INVALID;
 	if(biginteger){
 		if(amVerbose())outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
-		if(mp_cmp(biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(biginteger,getBigintegerLLMax())!=MP_GT){
-			result=mp_get_i64(biginteger);
+		if(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+			result=mp_get_i64(MP_INT_POINTER(biginteger));
 			if(amVerbose())outputInfo("Big integer converted to a small integer.");
 		}else
 			if(amVerbose())outputInfo("Big integer cannot be converted to a small integer.");
@@ -4169,9 +4170,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=__biginteger();
-					if(mp_read_radix(_biginteger,_significantTokenText,10)==MP_OKAY){
-						if(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT){
-							_valueReference->_value=_getIntegerValue(mp_get_i64(_biginteger));
+					if(mp_read_radix(MP_INT_POINTER(_biginteger),_significantTokenText,10)==MP_OKAY){
+						if(mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+							_valueReference->_value=_getIntegerValue(mp_get_i64(MP_INT_POINTER(_biginteger)));
               				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
 							free_biginteger(_biginteger);
 						}else
@@ -4498,7 +4499,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_sumBiginteger=__biginteger();
-			if(_sumBiginteger&&mp_add(_biginteger1,_biginteger2,_sumBiginteger)!=MP_OKAY){free_biginteger(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_sumBiginteger&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){free_biginteger(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert an integer to a big integer");
@@ -4623,7 +4624,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_differenceBiginteger=__biginteger();
-			if(_differenceBiginteger&&mp_sub(_biginteger1,_biginteger2,_differenceBiginteger)!=MP_OKAY){free_biginteger(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_differenceBiginteger&&mp_sub(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_differenceBiginteger))!=MP_OKAY){free_biginteger(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert an integer to a big integer");
@@ -4702,7 +4703,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_productBiginteger=__biginteger();
-			if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_productBiginteger&&mp_mul(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_productBiginteger))!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
@@ -4859,12 +4860,12 @@ Mbiginteger* _getBigintegerPowerWithPositiveBigintegerExponent(Mbiginteger* base
 		if(!isBigintegerOne(exponentBiginteger)){
 			// determine half the exponent
 			Mbiginteger* _halfexponentBiginteger=__biginteger();
-			if(mp_div_2(exponentBiginteger,_halfexponentBiginteger)==MP_OKAY){
+			if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
 				Mbiginteger* _halfresultBiginteger=_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,_halfexponentBiginteger);
 				if(_halfresultBiginteger){
 					Mbiginteger* _doublehalfresultBiginteger=__biginteger();
-					if(mp_sqr(_halfresultBiginteger,_doublehalfresultBiginteger)==MP_OKAY){
-						if(!mp_isodd(exponentBiginteger)||mp_mul(_doublehalfresultBiginteger,baseBiginteger,_doublehalfresultBiginteger)==MP_OKAY)
+					if(mp_sqr(MP_INT_POINTER(_halfresultBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY){
+						if(!mp_isodd(MP_INT_POINTER(exponentBiginteger))||mp_mul(MP_INT_POINTER(_doublehalfresultBiginteger),MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY)
 							_resultBiginteger=_doublehalfresultBiginteger;
 						else
 							free_biginteger(_doublehalfresultBiginteger);
@@ -4884,10 +4885,10 @@ Mvalue* _getBigintegerBigintegerPowerValue(Mbiginteger* baseBiginteger,Mbiginteg
 	bool neg=false;
 	if(baseBiginteger&&exponentBiginteger){
 		//////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
-		if(mp_iszero(baseBiginteger)==MP_NO){ // non-zero base
-			neg=(mp_isneg(exponentBiginteger)==MP_YES);
-			if(mp_iszero(exponentBiginteger)!=MP_YES){ // not zero
-				exponentBiginteger->sign=MP_ZPOS; // sneaky, sneaky!! ascertaining to use a positive exponent!
+		if(mp_iszero(MP_INT_POINTER(baseBiginteger))==MP_NO){ // non-zero base
+			neg=(mp_isneg(MP_INT_POINTER(exponentBiginteger))==MP_YES);
+			if(mp_iszero(MP_INT_POINTER(exponentBiginteger))!=MP_YES){ // not zero
+				MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS; // sneaky, sneaky!! ascertaining to use a positive exponent!
 				_bigintegerPower=_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,exponentBiginteger);
 			}else
 				_bigintegerPower=_getBiginteger(1);
@@ -4901,8 +4902,8 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 	// if the exponent is negative we simply exchange the numerator and the denominator!!	
 	Mrational* _rationalPower=NULL;
 	if(baseRational&&exponentBiginteger){
-		bool neg=(mp_isneg(exponentBiginteger)==MP_YES);
-		exponentBiginteger->sign=MP_ZPOS;
+		bool neg=(mp_isneg(MP_INT_POINTER(exponentBiginteger))==MP_YES);
+		MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS;
 		Mbiginteger *baseNumerator=(neg?baseRational->den:baseRational->num),*baseDenominator=(neg?baseRational->num:baseRational->den);
 		Mbiginteger *_numerator=_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger);
 		Mbiginteger *_denominator=_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger);
@@ -4970,7 +4971,7 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 			mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 			// determine half the exponent
 			Mbiginteger* _halfexponentBiginteger=__biginteger();
-			if(mp_div_2(exponentBiginteger,_halfexponentBiginteger)==MP_OKAY){
+			if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
 				Mdecimal* _halfresultDecimal=_getDecimalPowerWithPositiveBigintegerExponent(baseDecimal,_halfexponentBiginteger);
 				if(_halfresultDecimal){
 					Mdecimal* _doublehalfresultDecimal=__decimal(NULL,1,0);
@@ -4978,7 +4979,7 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 						uint32_t status=0;
 						mpd_qmul(_doublehalfresultDecimal->mpd,_halfresultDecimal->mpd,_halfresultDecimal->mpd,mpd_context,&status);
 						if((status&0xEFBF)==0){
-							if(mp_isodd(exponentBiginteger)){
+							if(mp_isodd(MP_INT_POINTER(exponentBiginteger))){
 								_resultDecimal=__decimal(mpd_context,0,0);
 								if(_resultDecimal){
 									mpd_qmul(_resultDecimal->mpd,_doublehalfresultDecimal->mpd,baseDecimal->mpd,mpd_context,&status);
@@ -5008,20 +5009,20 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 		if(!isBigintegerOne(baseBiginteger)&&!isBigintegerZero(exponentBiginteger)){
 			Mbiginteger *_multiplierBiginteger=_getBigintegerCopy(baseBiginteger),*_exponentBiginteger=_getBigintegerCopy(exponentBiginteger);
 			if(_multiplierBiginteger&&_exponentBiginteger){
-				if(mp_isodd(_exponentBiginteger)!=MP_YES)mp_set_i32(powerBiginteger,1);else result=mp_copy(baseBiginteger,powerBiginteger); // initialize powerBiginteger to 1
+				if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))!=MP_YES)mp_set_i32(MP_INT_POINTER(powerBiginteger),1);else result=mp_copy(MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(powerBiginteger)); // initialize powerBiginteger to 1
 				// can we do this iteratively???
 				while(result==MP_OKAY){
-					if(mp_iszero(_exponentBiginteger)==MP_YES)break;
+					if(mp_iszero(MP_INT_POINTER(_exponentBiginteger))==MP_YES)break;
 					// half the exponent
-					if((result=mp_div_2(_exponentBiginteger,_exponentBiginteger))!=MP_OKAY)break;
+					if((result=mp_div_2(MP_INT_POINTER(_exponentBiginteger),MP_INT_POINTER(_exponentBiginteger)))!=MP_OKAY)break;
 					// square the multiplier
-					if((result=mp_sqr(_multiplierBiginteger,_multiplierBiginteger))!=MP_OKAY)break;
-					if(mp_isodd(_exponentBiginteger)==MP_YES)if((result=mp_mul(powerBiginteger,_multiplierBiginteger,powerBiginteger))!=MP_OKAY)break;
+					if((result=mp_sqr(MP_INT_POINTER(_multiplierBiginteger),MP_INT_POINTER(_multiplierBiginteger)))!=MP_OKAY)break;
+					if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))==MP_YES)if((result=mp_mul(MP_INT_POINTER(powerBiginteger),MP_INT_POINTER(_multiplierBiginteger),MP_INT_POINTER(powerBiginteger)))!=MP_OKAY)break;
 				}
 			}
 			free_biginteger(_multiplierBiginteger);free_biginteger(_exponentBiginteger);
 		}else
-			result=mp_copy(baseBiginteger,powerBiginteger);
+			result=mp_copy(MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(powerBiginteger));
 	}
 	return result;
 }
@@ -5036,7 +5037,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 		if(!isBigintegerZero(rootDegreeBiginteger)){
 			// if either rational is one, return a copy of the root argument rational
 			if(!isBigintegerOne(rootDegreeBiginteger)&&!isRationalOne(rootArgumentRational)){ // neither equals 1
-				if(rootDegreeBiginteger->used==1){ // should ALWAYS be the case!!!!
+				if(MP_INT_POINTER(rootDegreeBiginteger)->used==1){ // should ALWAYS be the case!!!!
 					outputBiginteger("Computing the rational approximation to the ",rootDegreeBiginteger,"th root");
 					outputRational(" of ",rootArgumentRational,".\n");
 					Mbiginteger *p_a=rootArgumentRational->num,*q_a=(rootArgumentRational->den?rootArgumentRational->den:_getBiginteger(1)); // helpers that will contain the numerator and denominator of A (the root argument)
@@ -5046,10 +5047,10 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						mp_err result=MP_OKAY;
 						// MDH@13OCT2019: TODO if there's exactly one mp_digit being used in the root degree we can improve on the initial approximation
 						//                NOTE assuming that 
-						int64_t rootDegreeDigit=mp_get_i64(rootDegreeBiginteger);
+						int64_t rootDegreeDigit=mp_get_i64(MP_INT_POINTER(rootDegreeBiginteger));
 						// let's change the initial approximation of the root using the n root method on the big integer numerator and denominator
-						if((result=mp_n_root(p_a,(mp_digit)rootDegreeDigit,_pk))==MP_OKAY&&
-							(!q_a||(result=mp_n_root(q_a,(mp_digit)rootDegreeDigit,_qk))==MP_OKAY)){
+						if((result=mp_n_root(MP_INT_POINTER(p_a),(mp_digit)rootDegreeDigit,MP_INT_POINTER(_pk)))==MP_OKAY&&
+							(!q_a||(result=mp_n_root(MP_INT_POINTER(q_a),(mp_digit)rootDegreeDigit,MP_INT_POINTER(_qk)))==MP_OKAY)){
 							// TODO we could have a match already (currently discovered in the first step of the iterations below)
 							// _pk now not above n root of p_a
 							// _qk now not above n root of q_a
@@ -5062,7 +5063,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						if(result==MP_OKAY){
 							// try to initialize root degree times the denominator of the root argument (which could be NULL when it equals 1)
 							Mbiginteger* _np_a=_getBigintegerCopy(rootDegreeBiginteger);
-							if(_np_a&&q_a&&mp_mul(_np_a,q_a,_np_a)!=MP_OKAY){free_biginteger(_np_a);_np_a=NULL;}
+							if(_np_a&&q_a&&mp_mul(MP_INT_POINTER(_np_a),MP_INT_POINTER(q_a),MP_INT_POINTER(_np_a))!=MP_OKAY){free_biginteger(_np_a);_np_a=NULL;}
 							if(_np_a){
 								// we need some additional helper big integers
 								Mbiginteger *_pktothepowern=__biginteger(),*_qktothepowern=_getBiginteger(1),*_delta1=__biginteger(),*_delta2=__biginteger(),*_distancenumerator=__biginteger(),*_pktothepowernminus1=__biginteger(),*_divremainder=__biginteger(),*_gcd=__biginteger();
@@ -5093,13 +5094,13 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(mp_exptmod(_pk,rootDegreeBiginteger,NULL,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										if(mp_exptmod(_qk,rootDegreeBiginteger,NULL,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the denominator of the rational approximation");break;}
 										*/
-										if(!q_a||!_delta1||mp_mul(_pktothepowern,q_a,_delta1)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(!q_a||!_delta1||mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 1: ",_delta1,".\n");
-										if(!p_a||!_delta2||mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(!p_a||!_delta2||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
 										outputBiginteger("\tDelta 2: ",_delta2,".\n");
-										if(!_delta2||!_delta1||!_distancenumerator||mp_sub(_delta2,_delta1,_distancenumerator)!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
+										if(!_delta2||!_delta1||!_distancenumerator||mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){outputError("Failed to compute the delta in the rational approximation of the root of a rational");break;}
 										// we can compute the denominator of the distance as well which is q_a times _qktothepowern
-										if(!_qktothepowern||!q_a||!_distancedenominator||mp_mul(_qktothepowern,q_a,_distancedenominator)!=MP_OKAY){outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
+										if(!_qktothepowern||!q_a||!_distancedenominator||mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){outputError("Failed to compute the denominator of the distance to the rational root argument");break;}
 
 										outputBiginteger("\tDistance from (",_pk,"/");outputBiginteger(NULL,_qk,")");outputBiginteger("**",rootDegreeBiginteger," to ");
 										outputBiginteger("root argument (",p_a,"/");outputBiginteger(NULL,q_a,"): ");
@@ -5108,18 +5109,20 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(_rational){_decimal=_getRationalDecimal(_rational);free_rational(_rational);if(_decimal){outputDecimal("=",_decimal,NULL);free_decimal(_decimal);}}
 										outputChar('\n');
 
-										if(mp_iszero(_distancenumerator))break; // if delta is zero, exact hit (which I think can only happen when)
+										if(mp_iszero(MP_INT_POINTER(_distancenumerator)))break; // if delta is zero, exact hit (which I think can only happen when)
 										
-										if(mp_div(_pktothepowern,_pk,_pktothepowernminus1,_divremainder)!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
+										if(mp_div(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_pk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_divremainder))!=MP_OKAY){outputError("Failed to compute a helper big integer in the rational approximation of the root of a rational");break;}
 										// update _pk (next) and _qk (next)
-										if(mp_mul(_pktothepowern,_np_a,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-										if(mp_add(_nextpk,_distancenumerator,_nextpk)!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
-										if(mp_mul(_qk,_pktothepowernminus1,_nextqk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
-										if(mp_mul(_nextqk,_np_a,_nextqk)!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextpk))!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										if(mp_add(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_nextpk))!=MP_OKAY){outputError("Failed to update the numerator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_pktothepowernminus1),MP_INT_POINTER(_nextqk))!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_np_a),MP_INT_POINTER(_nextqk))!=MP_OKAY){outputError("Failed to update the denominator of the rational approximation to the root of a rational");break;}
 										// that's neat isn't it?
 										// how about normalizing _pk and _qk here, which might help
-										if(mp_gcd(_nextpk,_nextqk,_gcd)!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
-										if(!isBigintegerOne(_gcd)&&(mp_div(_nextpk,_gcd,_nextpk,_divremainder)!=MP_OKAY||mp_div(_nextqk,_gcd,_nextqk,_divremainder)!=MP_OKAY)){outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
+										if(mp_gcd(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd))!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the numerator and denominator approximation to the root of a rational");break;}
+										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_divremainder))!=MP_OKAY
+																	||mp_div(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_gcd),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_divremainder))!=MP_OKAY))
+										{outputError("Failed to normalize the numerator and denominator approximation to the root of a rational");break;}
 
 										// do the bracketing here (on the next pk and qk) 
 										// ASSERT we have to ascertain that the denominator remains the same!!!!!
@@ -5127,47 +5130,50 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										// how about using two big integers???? starting out with 
 										if(computeBigintegerPower(_nextpk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance numerator for bracketing.");break;}
 										if(computeBigintegerPower(_nextqk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){outputError("Failed to initialize the distance denominator for bracketing.");break;}
-										if(mp_mul(_pktothepowern,q_a,_delta1)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
-										if(mp_mul(_qktothepowern,p_a,_delta2)!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
-										if(mp_sub(_delta2,_delta1,_distancenumerator)!=MP_OKAY){outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
-										if(mp_mul(_qktothepowern,q_a,_distancedenominator)!=MP_OKAY){outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_pktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_delta1))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(p_a),MP_INT_POINTER(_delta2))!=MP_OKAY){outputError("Failed to compute delta1 in the rational approximation to the root of a rational");break;}
+										if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_delta1),MP_INT_POINTER(_distancenumerator))!=MP_OKAY){outputError("Failed to compute the new distance numerator in the rational approximation of the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_qktothepowern),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancedenominator))!=MP_OKAY){outputError("Failed to compute new distance denominator of the rational approximation of the root of a rational");break;}
 										outputBiginteger("\n\tDistance of the next Newtonian approximation (",_nextpk,"/");
 										outputBiginteger(NULL,_nextqk,"):");outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,").\n");
 
-										if(mp_copy(_nextpk,_pkonthisside)==MP_OKAY&&mp_copy(_nextpk,_pkontheotherside)==MP_OKAY&&mp_copy(_distancenumerator,_distanceonthisside)==MP_OKAY){
-											output("\tWill use the Newtonian approximation to bracket the rational root with two successive rationals");outputBiginteger(" with denominator ",_nextqk,".\n");
+										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pkonthisside))==MP_OKAY
+													&&mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pkontheotherside))==MP_OKAY
+													&&mp_copy(MP_INT_POINTER(_distancenumerator),MP_INT_POINTER(_distanceonthisside))==MP_OKAY){
+											output("\tWill use the Newtonian approximation to bracket the rational root with two successive rationals");
+											outputBiginteger(" with denominator ",_nextqk,".\n");
 											/* show the starting point of bracketing!!!
 											outputBiginteger("\tBracketing initialized starting at (",_nextpk,"/");outputBiginteger(NULL,_nextqk,")");
 											outputBiginteger(" with distance (",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,").\n");
 											*/
-											mp_set_i64(_deltapk,(mp_isneg(_distancenumerator)==MP_YES?-1:1));
+											mp_set_i64(MP_INT_POINTER(_deltapk),(mp_isneg(MP_INT_POINTER(_distancenumerator))==MP_YES?-1:1));
 											unsigned long long halvingiterations=0,bracketingiterations=0;
 											while(1){
-												if(mp_iszero(_deltapk)){ // we have two solutions, one on this side and one on the other side
+												if(mp_iszero(MP_INT_POINTER(_deltapk))){ // we have two solutions, one on this side and one on the other side
 													// the difference could be one between pkonthisside and pkontheotherside in which case we're done
-													if(mp_sub(_pkonthisside,_pkontheotherside,_pkdifference)!=MP_OKAY)break;
-													if(mp_cmp_mag(_pkdifference,_one)<=0)break;
-													if(mp_add(_pkonthisside,_pkontheotherside,_pkhalfway)!=MP_OKAY)break;
-													if(mp_div_2(_pkhalfway,_pkhalfway)!=MP_OKAY)break;
+													if(mp_sub(MP_INT_POINTER(_pkonthisside),MP_INT_POINTER(_pkontheotherside),MP_INT_POINTER(_pkdifference))!=MP_OKAY)break;
+													if(mp_cmp_mag(MP_INT_POINTER(_pkdifference),MP_INT_POINTER(_one))<=0)break;
+													if(mp_add(MP_INT_POINTER(_pkonthisside),MP_INT_POINTER(_pkontheotherside),MP_INT_POINTER(_pkhalfway))!=MP_OKAY)break;
+													if(mp_div_2(MP_INT_POINTER(_pkhalfway),MP_INT_POINTER(_pkhalfway))!=MP_OKAY)break;
 													if(computeBigintegerPower(_pkhalfway,rootDegreeBiginteger,_distancehalfway)!=MP_OKAY)break;
-													if(mp_mul(_distancehalfway,q_a,_distancehalfway)!=MP_OKAY)break;
-													if(mp_sub(_delta2,_distancehalfway,_distancehalfway)!=MP_OKAY)break;
+													if(mp_mul(MP_INT_POINTER(_distancehalfway),MP_INT_POINTER(q_a),MP_INT_POINTER(_distancehalfway))!=MP_OKAY)break;
+													if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_distancehalfway),MP_INT_POINTER(_distancehalfway))!=MP_OKAY)break;
 													//////outputBiginteger("\tDistance of half way numerator (",_pkhalfway,"/");outputBiginteger(NULL,_qk,"):");outputBiginteger(" ",_distancehalfway,".\n");
 													// replace the pk on the same side with the half way one, so soon the bracketing will end
-													if(mp_copy(_pkhalfway,(mp_isneg(_distancehalfway)==mp_isneg(_distanceontheotherside)?_pkontheotherside:_pkonthisside))!=MP_OKAY)break;
+													if(mp_copy(MP_INT_POINTER(_pkhalfway),(mp_isneg(MP_INT_POINTER(_distancehalfway))==mp_isneg(MP_INT_POINTER(_distanceontheotherside))?MP_INT_POINTER(_pkontheotherside):MP_INT_POINTER(_pkonthisside)))!=MP_OKAY)break;
 													halvingiterations++;
 												}else{
-													if(mp_add(_pkontheotherside,_deltapk,_pkontheotherside)!=MP_OKAY)break; // keep going 
+													if(mp_add(MP_INT_POINTER(_pkontheotherside),MP_INT_POINTER(_deltapk),MP_INT_POINTER(_pkontheotherside))!=MP_OKAY)break; // keep going 
 													// as we are computing _distanceontheotherside we can use it to store intermediate results
 													if(computeBigintegerPower(_pkontheotherside,rootDegreeBiginteger,_distanceontheotherside)!=MP_OKAY)break;
 													// what is the distance now???? NOTE _delta2 remains the same because _qk won't change!!!!
-													if(mp_mul(_distanceontheotherside,q_a,_distanceontheotherside)!=MP_OKAY)break;
-													if(mp_sub(_delta2,_distanceontheotherside,_distanceontheotherside)!=MP_OKAY)break;
+													if(mp_mul(MP_INT_POINTER(_distanceontheotherside),MP_INT_POINTER(q_a),MP_INT_POINTER(_distanceontheotherside))!=MP_OKAY)break;
+													if(mp_sub(MP_INT_POINTER(_delta2),MP_INT_POINTER(_distanceontheotherside),MP_INT_POINTER(_distanceontheotherside))!=MP_OKAY)break;
 													///////outputBiginteger("\tDistance of corrected numerator (",_pkontheotherside,"/");outputBiginteger(NULL,_qk,"):");outputBiginteger(" ",_distanceontheotherside,".\n");
-													if(mp_isneg(_distanceonthisside)==mp_isneg(_distanceontheotherside)){ // still on this side
-														if(mp_mul_2(_deltapk,_deltapk)!=MP_OKAY)break; // double _deltapk otherwise we're going to slow!!!
+													if(mp_isneg(MP_INT_POINTER(_distanceonthisside))==mp_isneg(MP_INT_POINTER(_distanceontheotherside))){ // still on this side
+														if(mp_mul_2(MP_INT_POINTER(_deltapk),MP_INT_POINTER(_deltapk))!=MP_OKAY)break; // double _deltapk otherwise we're going to slow!!!
 													}else // yes we're on the other side now, so make _deltapk 0
-														mp_set_i64(_deltapk,0);
+														mp_set_i64(MP_INT_POINTER(_deltapk),0);
 													bracketingiterations++;
 												}
 											}
@@ -5176,19 +5182,20 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											outputBiginteger("\tNumerator of approximation on this side of the root: ",_pkonthisside,NULL);outputBiginteger(" with distance ",_distanceonthisside,".\n");
 											outputBiginteger("\tNumerator of approximation on the other side of the root: ",_pkontheotherside,NULL);outputBiginteger(" with distance ",_distanceontheotherside,".\n");
 											// we need the one with a negative distance
-											if(mp_copy((mp_isneg(_distanceontheotherside)?_pkontheotherside:_pkonthisside),_nextpk)!=MP_OKAY)break;
+											if(mp_copy((mp_isneg(MP_INT_POINTER(_distanceontheotherside))?MP_INT_POINTER(_pkontheotherside):MP_INT_POINTER(_pkonthisside)),MP_INT_POINTER(_nextpk))!=MP_OKAY)break;
 											outputBiginteger("\tAccepted approximation numerator from bracketing: ",_nextpk,".\n");
 										}else
 											output("\t%sFailed to perform rational root bracketing.\n",ERROR_PREFIX);
 
-
 										// what's the change in approximation?
-										if(mp_mul(_pk,_nextqk,_num)!=MP_OKAY){outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
-										if(mp_mul(_qk,_nextpk,_num1)!=MP_OKAY){outputError("Failed to initialize the change to the rational root approximation");break;}
-										if(mp_sub(_num,_num1,_num)!=MP_OKAY){outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
-										if(mp_mul(_nextqk,_qk,_den)!=MP_OKAY){outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
-										if(mp_gcd(_num,_den,_gcd)!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
-										if(!isBigintegerOne(_gcd)&&(mp_div(_num,_gcd,_num,_divremainder)!=MP_OKAY||mp_div(_den,_gcd,_den,_divremainder)!=MP_OKAY)){outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
+										if(mp_mul(MP_INT_POINTER(_pk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_num))!=MP_OKAY){outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
+										if(mp_mul(MP_INT_POINTER(_qk),MP_INT_POINTER(_nextpk),MP_INT_POINTER(_num1))!=MP_OKAY){outputError("Failed to initialize the change to the rational root approximation");break;}
+										if(mp_sub(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){outputError("Failed to compute the numerator of the change to the rational root approximation");break;}
+										if(mp_mul(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk),MP_INT_POINTER(_den))!=MP_OKAY){outputError("Failed to compute the denominator of the change to the rational root approximation");break;}
+										if(mp_gcd(MP_INT_POINTER(_num),MP_INT_POINTER(_den),MP_INT_POINTER(_gcd))!=MP_OKAY){outputError("Failed to compute the greatest common denominator of the change in rational approximation to the root of a rational");break;}
+										if(!isBigintegerOne(_gcd)&&(mp_div(MP_INT_POINTER(_num),MP_INT_POINTER(_gcd),MP_INT_POINTER(_num),MP_INT_POINTER(_divremainder))!=MP_OKAY
+											||mp_div(MP_INT_POINTER(_den),MP_INT_POINTER(_gcd),MP_INT_POINTER(_den),MP_INT_POINTER(_divremainder))!=MP_OKAY))
+										{outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
 										output("\tChange in rational approximation: ",iter);outputBiginteger("(",_num,NULL);outputBiginteger("/",_den,")");
 										bool decimalprecisionreached=false;
 										_rational=_getRational(_getBigintegerCopy(_num),_getBigintegerCopy(_den),M_LD_NAN,false,true);
@@ -5206,8 +5213,8 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											output("\t%s...","Press Ctrl-C to stop, or any other key to continue...");(*inputCharReadFunction)(&c);outputChar('\n'); // wait for any key
 											if(c==3)break;
 										}
-										if(mp_copy(_nextpk,_pk)!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
-										if(mp_copy(_nextqk,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
+										if(mp_copy(MP_INT_POINTER(_nextpk),MP_INT_POINTER(_pk))!=MP_OKAY){outputError("Failed to update the numerator of the rational root approximation");break;}
+										if(mp_copy(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk))!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
 
 									}
 									free_biginteger(_pktothepowern);free_biginteger(_qktothepowern);free_biginteger(_delta1);free_biginteger(_delta2);free_biginteger(_distancenumerator);
@@ -5288,7 +5295,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 									Mbiginteger* _rootDegreeMinus1Biginteger=_getBigintegerCopy(rootDegreeBiginteger);
 									if(_rootDegreeMinus1Biginteger){
 										outputInfo("Root computation helper big integer created...");
-										if(mp_decr(_rootDegreeMinus1Biginteger)==MP_OKAY){
+										if(mp_decr(MP_INT_POINTER(_rootDegreeMinus1Biginteger))==MP_OKAY){
 											outputInfo("Root computation helper big integer initialized...");
 											// we need a product, a quotient and an addition help decimal
 											/*
@@ -5464,11 +5471,11 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 			else 
 			if(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0)_exponentRational=_getDecimalRational(_value2->value._decimal);
 			// MDH@14OCT2019: let's only do a rational approximation if the exponent is rational but the denominator is not too large i.e. using at most a single mp_digit (which might be large enough as it is though)
-			if(_exponentRational&&(!_exponentRational->den||_exponentRational->den->used==1)){ // the exponent is rational and the exponent denominator (which results in root finding is not too large)
+			if(_exponentRational&&(!_exponentRational->den||MP_INT_POINTER(_exponentRational->den)->used==1)){ // the exponent is rational and the exponent denominator (which results in root finding is not too large)
 				Mvalue* _rootValue=NULL; // the result of the computation of taking the power of a decimal to a rational exponent
 				//if(amVerbose())
 				outputRational("Computing a power with rational exponent ",_exponentRational,".\n");
-				bool neg=(_exponentRational->num->sign==MP_NEG);
+				bool neg=(MP_INT_POINTER(_exponentRational->num)->sign==MP_NEG);
 				Mbiginteger* _positiveExponentNumerator=(neg?_getBigintegerNeg(_exponentRational->num):_exponentRational->num);
 				Mbiginteger* exponentDenominator=_exponentRational->den;
 				if(_positiveExponentNumerator){ // we 
@@ -5479,13 +5486,16 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 						//                NO we can't because 2**(x/y) is NOT equal to 1/2**(y/x) as I conjectured, so we have to stick to the original approximation for now
 						// MDH@13OCT2019: if the numerator is negative we will have to invert the solution
 						
-						mp_ord numdencomp=mp_cmp(_positiveExponentNumerator,exponentDenominator);
+						mp_ord numdencomp=mp_cmp(MP_INT_POINTER(_positiveExponentNumerator),MP_INT_POINTER(exponentDenominator));
 						if(numdencomp!=MP_EQ){ // numerator and denominator are not equal
 							Mbiginteger *_integerdividend=__biginteger(),*_remainder=__biginteger(); // the defaults when the denominator equals NULL
 							// we divide the maximum of the numerator and the denominator by the minimum of the numerator and the denominator (which typically means that _integerdividend will always be nonzero essentially)
-							if(_integerdividend&&_remainder&&mp_div(_positiveExponentNumerator,exponentDenominator,_integerdividend,_remainder)==MP_OKAY){
+							if(_integerdividend
+									&&_remainder
+									&&mp_div(MP_INT_POINTER(_positiveExponentNumerator),MP_INT_POINTER(exponentDenominator),MP_INT_POINTER(_integerdividend),MP_INT_POINTER(_remainder))==MP_OKAY)
+							{
 								// if _integerdividend is not zero we may compute the multiplier
-								Mvalue* _multiplierValue=(mp_iszero(_integerdividend)!=MP_YES?_getBigintegerPowerValue(_value1,_integerdividend):NULL);
+								Mvalue* _multiplierValue=(mp_iszero(MP_INT_POINTER(_integerdividend))!=MP_YES?_getBigintegerPowerValue(_value1,_integerdividend):NULL);
 								// MDH@10OCT2019: we have a special situation when the root argument (_value1) is rational itself in which case we are computing the 
 								// instead of computing the power of the numerator we use the _remainder instead
 								Mvalue* rootArgumentValue=_getBigintegerPowerValue(_value1,_remainder); // NOTE will be released by the value garbage collector
@@ -5723,7 +5733,8 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_integerquotientBiginteger=__biginteger();
-			if(_integerquotientBiginteger&&mp_div(_biginteger1,_biginteger2,_integerquotientBiginteger,NULL)!=MP_OKAY){free_biginteger(_integerquotientBiginteger);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_integerquotientBiginteger&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_integerquotientBiginteger),NULL)!=MP_OKAY)
+			{free_biginteger(_integerquotientBiginteger);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
@@ -5834,7 +5845,8 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Moduloing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_moduloBiginteger=__biginteger();
-			if(_moduloBiginteger&&mp_div(_biginteger1,_biginteger2,NULL,_moduloBiginteger)!=MP_OKAY){free_biginteger(_moduloBiginteger);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_moduloBiginteger&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),NULL,MP_INT_POINTER(_moduloBiginteger))!=MP_OKAY)
+			{free_biginteger(_moduloBiginteger);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer division remainder: '",_moduloBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
@@ -5934,7 +5946,8 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-			if(_biginteger1&&_biginteger2&&mp_xor(_biginteger1,_biginteger2,_xorbiginteger)!=MP_OKAY){free_biginteger(_xorbiginteger);_xorbiginteger=NULL;}
+			if(_biginteger1&&_biginteger2&&mp_xor(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_xorbiginteger))!=MP_OKAY)
+			{free_biginteger(_xorbiginteger);_xorbiginteger=NULL;}
 			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 			return _getBigintegerValue(_xorbiginteger,true);
 		}else
@@ -5956,7 +5969,8 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-			if(_biginteger1&&_biginteger2&&mp_and(_biginteger1,_biginteger2,_bitwiseandbiginteger)!=MP_OKAY){free_biginteger(_bitwiseandbiginteger);_bitwiseandbiginteger=NULL;}
+			if(_biginteger1&&_biginteger2&&mp_and(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseandbiginteger))!=MP_OKAY)
+			{free_biginteger(_bitwiseandbiginteger);_bitwiseandbiginteger=NULL;}
 			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 			return _getBigintegerValue(_bitwiseandbiginteger,true);
 		}else
@@ -5978,7 +5992,8 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-			if(_biginteger1&&_biginteger2&&mp_or(_biginteger1,_biginteger2,_bitwiseorbiginteger)!=MP_OKAY){free_biginteger(_bitwiseorbiginteger);_bitwiseorbiginteger=NULL;}
+			if(_biginteger1&&_biginteger2&&mp_or(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseorbiginteger))!=MP_OKAY)
+			{free_biginteger(_bitwiseorbiginteger);_bitwiseorbiginteger=NULL;}
 			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 			return _getBigintegerValue(_bitwiseorbiginteger,true);
 		}else
@@ -6001,7 +6016,7 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_logicalandbiginteger=_getBiginteger(mp_iszero(_biginteger1)==MP_YES||mp_iszero(_biginteger2)==MP_YES?0:1); // if either is zero, the result is zero otherwise 1
+		if(_biginteger1&&_biginteger2)_logicalandbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_YES||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_YES?0:1); // if either is zero, the result is zero otherwise 1
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_logicalandbiginteger,true);
 	}	
@@ -6020,7 +6035,7 @@ Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		if(_biginteger1&&_biginteger2)_logicalorbiginteger=_getBiginteger(mp_iszero(_biginteger1)==MP_NO||mp_iszero(_biginteger2)==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		if(_biginteger1&&_biginteger2)_logicalorbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_NO||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getBigintegerValue(_logicalorbiginteger,true);
 	}
@@ -6053,7 +6068,7 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftleftBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift left
 		if(_shiftleftBiginteger){
-			if((shiftleftinteger<0?mp_div_2d(_value1->value._biginteger,-shiftleftinteger,_shiftleftBiginteger,NULL):mp_mul_2d(_value1->value._biginteger,shiftleftinteger,_shiftleftBiginteger))!=MP_OKAY){
+			if((shiftleftinteger<0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger)))!=MP_OKAY){
 				free_biginteger(_shiftleftBiginteger);_shiftleftBiginteger=NULL;
 				output("%s",ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
 			}else 
@@ -6075,14 +6090,14 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 				if(shiftleftinteger<0){ // naughty boy (or girl for that matter)... // actually a shift right
 					// multiply the denominator by 2 shiftleftinteger times
 					if(!_shiftleftRational->den)_shiftleftRational->den=_getBiginteger(1); // force having a non NULL denominator before trying to shift it
-					if(_shiftleftRational->den==NULL||mp_mul_2d(_shiftleftRational->den,-shiftleftinteger,_shiftleftRational->den)!=MP_OKAY){
+					if(_shiftleftRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftleftRational->den),-shiftleftinteger,MP_INT_POINTER(_shiftleftRational->den))!=MP_OKAY){
 						free_rational(_shiftleftRational);_shiftleftRational=NULL;
 						outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftleftRational){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational);}
 				}else{ 
-					if(mp_mul_2d(_shiftleftRational->num,shiftleftinteger,_shiftleftRational->num)!=MP_OKAY){
+					if(mp_mul_2d(MP_INT_POINTER(_shiftleftRational->num),shiftleftinteger,MP_INT_POINTER(_shiftleftRational->num))!=MP_OKAY){
 						free_rational(_shiftleftRational);_shiftleftRational=NULL;
 						outputError("Failed to double a rational");
 					}
@@ -6123,7 +6138,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 	if(_value1->type==VT_BIGINTEGER){
 		Mbiginteger* _shiftrightBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift right
 		if(_shiftrightBiginteger){
-			if((shiftrightinteger>0?mp_div_2d(_value1->value._biginteger,shiftrightinteger,_shiftrightBiginteger,NULL):mp_mul_2d(_value1->value._biginteger,-shiftrightinteger,_shiftrightBiginteger))!=MP_OKAY){
+			if((shiftrightinteger>0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger)))!=MP_OKAY){
 				free_biginteger(_shiftrightBiginteger);_shiftrightBiginteger=NULL;
 				output("%s",ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
 			}else 
@@ -6161,14 +6176,14 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 				if(shiftrightinteger>0){
 					// multiply the denominator by 2 shiftrightinteger times
 					if(!_shiftrightRational->den)_shiftrightRational->den=_getBiginteger(1); // force having a non NULL denominator before trying to shift it
-					if(_shiftrightRational->den==NULL||mp_mul_2d(_shiftrightRational->den,shiftrightinteger,_shiftrightRational->den)!=MP_OKAY){
+					if(_shiftrightRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftrightRational->den),shiftrightinteger,MP_INT_POINTER(_shiftrightRational->den))!=MP_OKAY){
 						free_rational(_shiftrightRational);_shiftrightRational=NULL;
 						outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftrightRational){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational);}
 				}else{ // naughty boy (or girl for that matter)...
-					if(mp_mul_2d(_shiftrightRational->num,-shiftrightinteger,_shiftrightRational->num)!=MP_OKAY){
+					if(mp_mul_2d(MP_INT_POINTER(_shiftrightRational->num),-shiftrightinteger,MP_INT_POINTER(_shiftrightRational->num))!=MP_OKAY){
 						free_rational(_shiftrightRational);_shiftrightRational=NULL;
 						outputError("Failed to double a rational");
 					}
@@ -6206,7 +6221,7 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getIntegerValue(llsmallerthan);
 	}
@@ -6255,7 +6270,7 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		long long lllargerthan=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long lllargerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getIntegerValue(lllargerthan);
 	}
@@ -6304,7 +6319,7 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		long long lllargerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long lllargerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getIntegerValue(lllargerthanorequalto);
 	}
@@ -6354,7 +6369,7 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		long long llunequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llunequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getIntegerValue(llunequalto);
 	}
@@ -6405,7 +6420,7 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		long long llequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getIntegerValue(llequalto);
 	}
@@ -6454,7 +6469,7 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
+		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
 		return _getIntegerValue(llsmallerthanorequalto);
 	}
