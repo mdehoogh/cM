@@ -56,7 +56,9 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="14";char const * const M_DATE="23 March 2020, 18:00"; // introducing PROPERTY token
 //char const * const M_BUILD="15";char const * const M_DATE="26 March 2020, 18:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 //char const * const M_BUILD="16";char const * const M_DATE="31 March 2020, 15:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
-char const * const M_BUILD="17";char const * const M_DATE="7 April 2020, 12:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+//char const * const M_BUILD="17";char const * const M_DATE="7 April 2020, 12:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+char const * const M_BUILD="18";char const * const M_DATE="9 April 2020, 12:00"; // last build of v0.1.1 before we start on v0.1.2 with memory management that we can check
+// make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
