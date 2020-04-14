@@ -17,6 +17,8 @@ char* _strdup(char const * const _c){
         // MDH@09APR2020: in order to be able to keep track of memory we should NOT use MALLOC here anymore because what we allocate 
         //                is of varying size which means that we should from now on use REALLOC to do so
         char* _hc=NULL;
+        // MDH@14APR2020: here we have a problem in that allocationIndex is stored in the first t_count occypying bytes
+        //                so we can't use REALLOC here to do the allocation which is a nuisance
         _hc=REALLOC(_hc,0,l,sizeof(char),'"');
         // replacing: char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
         if(_hc)memcpy(_hc,_c,sizeof(char)*l);else output("%sFailed to allocate memory to store '%s'.\n",ERROR_PREFIX,_c);

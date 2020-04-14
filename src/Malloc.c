@@ -311,6 +311,7 @@ void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char al
 #endif
         // MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
         newptr=(occupied>0?(freed>0?realloc(ptr,occupied):malloc(occupied)):NULL); // we have to reallocate nitems each of the given size
+            printf("Object of type '%c' reallocated from %llu to %llu!\n",allocationType,freed,occupied);
         // newptr is allowed to be NULL if occupied equals 
         if(occupied==0||newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
             if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){

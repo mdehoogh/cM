@@ -11,9 +11,12 @@
 #define BLOCK_SIZE 16
 
 typedef struct{
+#ifndef __PRODUCTION__
+    t_count allocationIndex;
+#endif
     char* chars;
     size_t length;
-    size_t blocks;
+    t_count blocks;
 }Mstring;
 
 void free_string(Mstring* str); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
