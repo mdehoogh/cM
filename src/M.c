@@ -1568,12 +1568,13 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 	return getValueOfExpression(getExecutionEnvironment()->_name,commandType,(TokenType[]){},0);
 }
 */
+/* MDH@14APR2020 removing:
 // MDH@29NOV2019: we're going to keep track of the system and user allocation counts
 size_t* getAllocationCountDifferences(size_t* from,size_t* to){
 	return NULL;
 }
-size_t *_systemallocationcounts,*_userallocationcounts;
-size_t *_lastcommandsystemallocationcounts,*_lastcommanduserallocationcounts;
+t_count *_systemallocationcounts,*_userallocationcounts;
+t_count *_lastcommandsystemallocationcounts,*_lastcommanduserallocationcounts;
 void prepareForEvaluatingCommand(){
 	// we need a new pre evaluation allocation counts
 	if(_lastcommandsystemallocationcounts)free(_lastcommandsystemallocationcounts);
@@ -1581,7 +1582,7 @@ void prepareForEvaluatingCommand(){
 	// using that we can update the system allocation counts by subtracting _lastcommanduserallocationcounts
 
 }
-
+*/
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //                instead of returning a bool we could return the command text (or NULL if failing to do so????)
@@ -3003,7 +3004,9 @@ int main(int argc, char **argv){
 	outputInfo("In any mode press the Enter key on an empty line to switch modes.");
 
 	// let's mark the allocations BEFORE we start looping
-	addallocation('!',0,0);
+	if(addAllocation('!',0,0)==0){
+		exit(3);
+	}
 
 	// MDH@13MAR2020: echo all requested output to the log file as well, I suppose we should use a timestamp in the name, so we get a different log for each session
 	Mstring* _outputFilename=_getTimestamp("%Y-%m-%d.%H:%M:%S");

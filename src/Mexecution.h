@@ -46,7 +46,7 @@ typedef enum Mvaluetype {VT_UNDEFINED=0,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DEC
 // TODO Minteger could become a union if we're storing multiple types of integers in it
 typedef struct Minteger{
 #ifndef __PRODUCTION__
-    size_t allocation_index;
+    t_count allocationIndex;
 #endif
     long long ll; // signed 64-bit integer (for now)
 }Minteger;
@@ -58,7 +58,7 @@ typedef struct Mbiginteger{
 // TODO Mfloat could become a union if we're storing multiple types of reals in it
 typedef struct Mfloat{
 #ifndef __PRODUCTION__
-    size_t allocation_index;
+    t_count allocationIndex;
 #endif
     long double ld; // double precision floating point binary number (for now)
 }Mfloat;
@@ -68,7 +68,7 @@ typedef struct Mfloat{
 //                     which should be managed by REALLOC somehow...
 #ifndef __PRODUCTION__
 typedef struct Mbiginteger{
-    size_t allocation_index;
+    t_count allocationIndex;
     mp_int* _bi;
 }Mbiginteger;
 #define MP_INT_POINTER(biginteger) (biginteger)->_bi
@@ -80,7 +80,7 @@ typedef mp_int Mbiginteger;
 
 typedef struct Mrational{
 #ifndef __PRODUCTION__
-    size_t allocation_index;
+    t_count allocationIndex;
 #endif
     Mbiginteger* num;
     Mbiginteger* den;
@@ -92,7 +92,7 @@ typedef struct Mrational{
 //                i.e. _c always ends with '\0' so strlen(_c) actually gives us the actual length
 typedef struct Mtext{
 #ifndef __PRODUCTION__
-    size_t allocation_index;
+    t_count allocationIndex;
 #endif
     char presuffix;
     char _c[]; // by using an array and not a pointer, it's easy to make one out of an Mtext* by strcpy from string(Mstring)
@@ -101,7 +101,7 @@ typedef struct Mtext{
 // MDH@17JUN2019: if we want to know when a decimal contains repeating fractions we should be able to remember how many decimals repeat themselves
 typedef struct Mdecimal{
 #ifndef __PRODUCTION__
-    size_t allocation_index;
+    t_count allocationIndex;
 #endif
     mpd_t* mpd; // ok, for now use a pointer
     mpd_ssize_t repeating; // the number of decimals that repeat themselves at the end

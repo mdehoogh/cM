@@ -274,8 +274,8 @@ const char* HEXCHARS[]={
     };
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
     // MDH@25NOV2019: we should get the allocation types and counts asap (otherwise they will change), unless they are passed in
-    char* _allocationtypes=_getAllocationTypes();
-    size_t* _allocationcounts=_getAllocationCounts();
+    t_allocationtype* _allocationTypes=_getAllocationTypes();
+    // MDH@14APR2020 now present in the allocation types: t_count* _allocationcounts=_getAllocationCounts();
     Mlist* _valuesTable=NULL;
     // let's create the list containing the column names
     Mlist* _valuesColumnNames=_getListOfType(VT_TEXT);
@@ -287,7 +287,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
         &&appendedToList(_valuesColumnNames,_getTextValue("'FREED       ",false),M_LL_INVALID)>0
         &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED ",false),M_LL_INVALID)>0
         &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED     ",false),M_LL_INVALID)>0){
-        size_t numberOfAllocationTypes=(_allocationtypes?sizeof(_allocationtypes)/sizeof(char):0);
+        t_count numberOfAllocationTypes=getNumberOfAllocationTypes();
         // get a table with the given values column names and number of rows (which are initialized to empty lists)
         // NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
         _valuesTable=_getTable(_valuesColumnNames,numberOfAllocationTypes,true);
@@ -295,12 +295,12 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
             if(numberOfAllocationTypes){
                 // we start with a general overview (the counts per type)
                 // NOTE dividing by sizeof(char) is far fetched
-                for(size_t i=0;i<numberOfAllocationTypes;i++){
+                for(t_count i=0;i<numberOfAllocationTypes;i++){
                     Mstring* _allocationTypeText=_getString("'");
                     if(_allocationTypeText
-                            &&string_append_char(_allocationTypeText,_allocationtypes[i])
+                            &&string_append_char(_allocationTypeText,_allocationTypes[i].type)
                             &&string_append(_allocationTypeText,"=0x")
-                            &&string_append(_allocationTypeText,HEXCHARS[_allocationtypes[i]]))
+                            &&string_append(_allocationTypeText,HEXCHARS[_allocationTypes[i].type]))
                     {
                         Mlist* _valuecountsList=_getListOfType(VT_UNDEFINED); // we're going to store the value counts in a map
                         if(_valuecountsList){
@@ -310,11 +310,11 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
                             if(appendedToList(_valuecountsList,_getIntegerValue(i+1),M_LL_INVALID)>0
                                 &&appendedToList(_valuecountsList,_getTextValue(string(_allocationTypeText),false),M_LL_INVALID)>0){
                                 // now the 5 counts
-                                appendedToList(_valuecountsList,(_allocationcounts[i*5]>0?_getIntegerValue(_allocationcounts[i*5]):_zeroTextValue),M_LL_INVALID);
-                                appendedToList(_valuecountsList,(_allocationcounts[1+i*5]>0?_getIntegerValue(_allocationcounts[1+i*5]):_zeroTextValue),M_LL_INVALID);
-                                appendedToList(_valuecountsList,(_allocationcounts[2+i*5]>0?_getIntegerValue(_allocationcounts[2+i*5]):_zeroTextValue),M_LL_INVALID);
-                                appendedToList(_valuecountsList,(_allocationcounts[3+i*5]>0?_getIntegerValue(_allocationcounts[3+i*5]):_zeroTextValue),M_LL_INVALID);
-                                appendedToList(_valuecountsList,(_allocationcounts[4+i*5]>0?_getIntegerValue(_allocationcounts[4+i*5]):_zeroTextValue),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].allocationsizeunion.size),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].occupied),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].freed),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].mark_occupied),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].mark_freed),M_LL_INVALID);
                                 if(appendedToList(_valuesTable,_getValueOfList(_valuecountsList,true),M_LL_INVALID)<=0)
                                     outputError("Failed to remember a values table row.");
                             }else{
@@ -336,7 +336,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
         }
     }else
         outputError("Failed to create the values table header.");
-    free(_allocationtypes);free(_allocationcounts); // being copies of the originals
+    free(_allocationTypes);
     return _valuesTable;
 }
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
@@ -346,26 +346,26 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
         appendedToMap(_valuesMap,"typecount",_getIntegerValue(numberOfAllocationTypes));
         if(numberOfAllocationTypes){
             // we start with a general overview (the counts per type)
-	        char* _allocationtypes=_getAllocationTypes();
-            size_t* _allocationcounts=_getAllocationCounts();
+	        t_allocationtype* _allocationTypes=_getAllocationTypes();
+            // MDH@14APR2020 replacing: size_t* _allocationcounts=_getAllocationCounts();
             Mstring *_allocationTypeText=__string(),*_allocationTypeCharactersText=_getString("'"); // free ASAP
             if(_allocationTypeText&&_allocationTypeCharactersText){
                 Mmap* _valuecountsMap=_getMapOfType(VT_MAP); // we're going to store the value counts in a map
                 // NOTE dividing by sizeof(char) is far fetched
                 for(size_t i=0;i<numberOfAllocationTypes;i++){
-                    if(string_append_char(_allocationTypeCharactersText,_allocationtypes[i])&&string_append_char(_allocationTypeText,_allocationtypes[i])){
+                    if(string_append_char(_allocationTypeCharactersText,_allocationTypes[i].type)&&string_append_char(_allocationTypeText,_allocationTypes[i].type)){
                         if(_valuecountsMap){
                             Mmap* _valuecountMap=_getMapOfType(VT_INTEGER);
                             if(_valuecountMap){
-                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(_allocationcounts[i*5+1]));
-                                appendedToMap(_valuecountMap,(i==0?"bytes allocated":"allocated"),_getIntegerValue(_allocationcounts[1+i*5]));
-                                appendedToMap(_valuecountMap,(i==0?"bytes freed":"freed"),_getIntegerValue(_allocationcounts[2+i*5]));
-                                appendedToMap(_valuecountMap,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(_allocationcounts[3+i*5]));
-                                appendedToMap(_valuecountMap,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(_allocationcounts[4+i*5]));
+                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(_allocationTypes[i].allocationsizeunion.size));
+                                appendedToMap(_valuecountMap,(i==0?"bytes allocated":"allocated"),_getIntegerValue(_allocationTypes[i].occupied));
+                                appendedToMap(_valuecountMap,(i==0?"bytes freed":"freed"),_getIntegerValue(_allocationTypes[i].freed));
+                                appendedToMap(_valuecountMap,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(_allocationTypes[i].mark_occupied));
+                                appendedToMap(_valuecountMap,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(_allocationTypes[i].mark_freed));
                                 if(!appendedToMap(_valuecountsMap,string(_allocationTypeText),_getValueOfMap(_valuecountMap,true)))
-                                    output("%sFailed to store the allocation count map of '%c'.\n",ERROR_PREFIX,_allocationtypes[i]);
+                                    output("%sFailed to store the allocation count map of '%c'.\n",ERROR_PREFIX,_allocationTypes[i].type);
                             }else
-                                output("%sFailed to create the allocation count map of '%c'.\n",ERROR_PREFIX,_allocationtypes[i]);
+                                output("%sFailed to create the allocation count map of '%c'.\n",ERROR_PREFIX,_allocationTypes[i].type);
                         }
                         string_setlength(_allocationTypeText,0);
                     }
@@ -376,8 +376,8 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
             free_string(_allocationTypeCharactersText);
             free_string(_allocationTypeText); // freed
             // MDH@25NOV2019: essential!!!
-            free(_allocationtypes);
-            free(_allocationcounts);
+            free(_allocationTypes);
+            // MDH@14APR2020: free(_allocationcounts);
         }else
             outputError("No allocation types/counts registered");
         // the variable names map with the structure as returned by _getVariableNamesMap of course
