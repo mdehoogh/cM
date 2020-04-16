@@ -22,8 +22,13 @@ Mstring* __string(){
         // MDH@09APR2020: everything that is of dynamic size needs to be allocated using REALLOC even when freeing, that way we can keep track
         //                of the amount allocated in Malloc.c/h explicitly
         //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
+        // MDH@16APR2020: using Mchars* instance
+        ans->_chars=__chars(/*sizeof(char)**/BLOCK_SIZE);
+        if(!ans->_chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1;
+        /* replacing:
         ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
+        */
         // MDH@21JUN2019 replacing: if(ans->chars){ans->blocks=1;ans->chars[0]='\0';}
     }
 #ifdef __DEBUGGING__
@@ -38,6 +43,17 @@ Mstring* _getString(const char* const s){
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
+        // MDH@17APR2020: Mchars* replacing char*
+        size_t blocks=1+(l/BLOCK_SIZE);
+        ans->_chars=__chars(blocks*/*sizeof(char)**/BLOCK_SIZE);
+        if(ans->_chars){
+            ans->length=l;
+            ans->blocks=blocks;
+            memcpy(ans->_chars->chars,s,ans->length); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
+        }else{ // failure
+            FREE(ans,'S');ans=NULL;
+        }
+        /* replacing:
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
         // MDH@09APR2020: switching to using REALLOC for all dynamically allocated memory with variable length, like ans->chars!!!!
         ans->chars=REALLOC(ans->chars,0,++ans->blocks,sizeof(char)*BLOCK_SIZE,'s'); // here we increment ans->blocks (as we must)
@@ -48,6 +64,7 @@ Mstring* _getString(const char* const s){
         }else{ // failure
             FREE(ans,'S');ans=NULL;
         }
+        */
     }
 #ifdef __DEBUGGING__
     if(!ans)printf("\nFailed to create a string.");
@@ -58,8 +75,9 @@ Mstring* _getString(const char* const s){
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
 Mstring* _stringCopy(Mstring* const src,size_t length){
     if(!src)return NULL;
-    src->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    Mstring* _result=_getString(src->chars);
+    // MDH@17APR2020: replacing src->chars by src->_chars->chars
+    src->_chars->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
+    Mstring* _result=_getString(src->_chars->chars);
     if(length>0)if(_result)string_setlength(_result,length);
     return _result;
     /* replacing:
@@ -87,8 +105,10 @@ Mstring* _stringCopy(Mstring* const src,size_t length){
  */
 void free_string(Mstring* str){
     if(str){
+        // MDH@17APR2020: replacing src->chars by src->_chars->chars
         // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
-        if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
+        if(!free_chars(str->_chars,str->blocks*/*sizeof(char)**/BLOCK_SIZE))printf("ERROR: Failed to release an Mchars.");
+        // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
         FREE(str,'S');
     }
 }
@@ -96,7 +116,7 @@ void free_string(Mstring* str){
 size_t string_length(Mstring const * const str){return(str?str->length:0);}
 
 /** Is the String empty? */
-bool string_empty(Mstring const * const str){return(string_length(str)==0);}
+bool string_empty(Mstring const * const str){return(str?str->length==0:true);} // MDH@17APR2020: removing 
 
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
 Mstring* string_setlength(Mstring* const str,size_t length){
@@ -107,13 +127,23 @@ Mstring* string_setlength(Mstring* const str,size_t length){
         // if we do not have enough blocks ascertain to have enough...
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
+            // MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
+            Mchars* new_chars=_resized(str->_chars,str->blocks*BLOCK_SIZE,blocks*BLOCK_SIZE);
+            if(!new_chars)return NULL; // failure
+            str->_chars=new_chars;
+            str->blocks=blocks;
+            /* replacing:
             char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
             if (!new_str)return NULL; // failure!!
             str->chars=new_str;
+            */
             str->blocks=blocks;
         }
         // fill with blanks??? for now that's OK
-        while(str->length<length){str->chars[str->length]=' ';str->length++;}
+        while(str->length<length){
+            str->_chars->chars[str->length]=' '; // MDH@17APR2020 replacing: str->chars[str->length]=' ';
+            str->length++;
+        }
         // MDH@21JUN2019 removing: str->chars[str->length]='\0'; // it's prudent to immediately set the end-of-text value (before filling)
     }else
     if(length<str->length){
@@ -126,8 +156,10 @@ Mstring* string_setlength(Mstring* const str,size_t length){
 Mstring* string_synclength(Mstring* const str){
     if(str){
         size_t l=str->length;
-        while(l>0)if(str->chars[--l]=='\0')break;
-        if(l>0||str->chars[0]=='\0')str->length=l; // if str->chars[l] does not equal 0 (i.e. '\0') (only possible if l equals 0) we should NOT change the length
+        // MDH@17APR2020: str replaced by strchars
+        Mchars* strchars=str->_chars;
+        while(l>0)if(strchars->chars[--l]=='\0')break; 
+        if(l>0||strchars->chars[0]=='\0')str->length=l; // if str->chars[l] does not equal 0 (i.e. '\0') (only possible if l equals 0) we should NOT change the length
     }
     return str;
 }
@@ -141,11 +173,13 @@ bool string_shorten(Mstring* const str,size_t length){
 }
 
 char string_char(const Mstring* const str,size_t pos){
-    return(str!=NULL?(pos<str->length?str->chars[pos]:'\0'):'\0');
+    // MDH@17APR2020: inserting ->_chars
+    return(str!=NULL?(pos<str->length?str->_chars->chars[pos]:'\0'):'\0');
 }
 
 char string_last_char(const Mstring* const str){
-    return(str!=NULL?(str->length>0?str->chars[str->length-1]:'\0'):'\0');
+    // MDH@17APR2020: inserting ->_chars
+    return(str!=NULL?(str->length>0?str->_chars->chars[str->length-1]:'\0'):'\0');
 }
 
 char string_removed_char(Mstring* const str,size_t pos){
@@ -154,11 +188,12 @@ char string_removed_char(Mstring* const str,size_t pos){
         size_t l=str->length;
         if(pos<l){
             --(str->length); // one less long
-            rc=str->chars[pos]; // remember the character that is being removed!!
+            Mchars* strchars=str->_chars; // str replaced by strchars
+            rc=strchars->chars[pos]; // remember the character that is being removed!!
             // we have to move characters pos through str->length down
             // NOTE we have \0 at position str->length, so we have to move that one as well!!!    
             char c;     
-            while(pos<l){str->chars[pos]=str->chars[pos+1];pos++;}
+            while(pos<l){strchars->chars[pos]=strchars->chars[pos+1];pos++;}
         }
     }
     return rc;
@@ -175,7 +210,8 @@ size_t string_removed(Mstring * const str,size_t pos,size_t length){ // MDH@03OC
                 // BUT because the arrays might overlap memmove should be used instead of strcpy as it guarantees 
                 ////// no need to do this when using memmove!!!!! str->chars[l]='\0';
                 removed=length; // all suggested characters will be 'removed'
-                memmove(str->chars+pos,str->chars+remainderpos,(sizeof(char))*(l-remainderpos)); // TODO sizeof(char) would be 1 always????
+                Mchars* strchars=str->_chars; // MDH@17APR2020: replacing str by strchars
+                memmove(strchars->chars+pos,strchars->chars+remainderpos,(sizeof(char))*(l-remainderpos)); // TODO sizeof(char) would be 1 always????
             }else // rest of string to remove i.e. l-pos characters
                 removed=l-pos; // l-pos elements will be 'removed'
             str->length-=removed;
@@ -198,17 +234,24 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
                 // do we need to get another block?    
                 if(l==str->blocks*BLOCK_SIZE){
                     /////////printf("Realloc string_insert_char().\n");
+                    // MDH@17APR2020: reallocating _chars (instead of str->chars)
+                    Mchars* new_chars=_resized(str->_chars,str->blocks*/*sizeof(char)**/BLOCK_SIZE,(str->blocks+1)*/*sizeof(char)**/BLOCK_SIZE);
+                    if(!new_chars)return NULL;
+                    str->_chars=new_chars;
+                    /* replacing:
                     char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                     if (new_str==NULL)return NULL;
+                    str->chars=new_str;
+                    */
                     ++(str->blocks);
                     ////// can't know the size of what new_str points to!!! printf("YY%lu-%dYY",sizeof(new_str),str->blocks);
-                    str->chars=new_str;
                 }
                 if(l>=str->blocks*BLOCK_SIZE)return NULL;
                 ///printf("%s",str->chars);
                 // we have to move characters at position pos onward one position up
-                while(l>pos){str->chars[l]=str->chars[l-1];l--;}
-                str->chars[pos]=c;
+                Mchars* strchars=str->_chars;
+                while(l>pos){strchars->chars[l]=strchars->chars[l-1];l--;}
+                strchars->chars[pos]=c;
                 ///printf("->%s",str->chars);
                 ++(str->length);
             }else // at end, we have to call string_append_char because str->last_char will change
@@ -229,14 +272,19 @@ Mstring* string_append_char(Mstring* const str,char c){
             /////printf("{%hu-%d}",l,str->blocks);
             if(l==str->blocks*BLOCK_SIZE){
                 //////////////printf("Realloc string_append_char().\n");
+                Mchars* new_chars=_resized(str->_chars,str->blocks*/*sizeof(char)**/BLOCK_SIZE,(str->blocks+1)*/*sizeof(char)**/BLOCK_SIZE);
+                if(!new_chars)return NULL;
+                str->_chars=new_chars;
+                /* replacing:
                 char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                 if (!new_str)return NULL; // failure!!
+                str->chars=new_str;
+                */
                 ++(str->blocks);
                 ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);
-                str->chars=new_str;
             }
             if(l>=str->blocks*BLOCK_SIZE)return NULL;
-            str->chars[str->length]=c;
+            str->_chars->chars[str->length]=c; // MDH@17APR2020 replacing: str->chars[str->length]=c;
             ++(str->length);
         }
         // MDH@21JUN2019 removing: str->chars[str->length]='\0';
@@ -248,15 +296,16 @@ Mstring* string_append_char(Mstring* const str,char c){
 Mstring* string_setchar(Mstring* const str,char c,size_t pos){
     if(!str)return NULL;
     if(pos>=str->length)return NULL;
-    str->chars[pos]=c;
+    str->_chars->chars[pos]=c; // MDH@17APR2020 inserting ->_chars
     // MDH@24SEP2019: if somebody is so smart to use '\0' for c we should adapt the length as well (which could happen in _getCompletion() in Menvironment.h/c)
     if(c=='\0')str->length=pos;
     return str;
 }
 char* _stringstart(const Mstring* const str,size_t length){
     if(!str)return NULL;
-    str->chars[str->length]='\0'; // mark the end of the string
-    char* _result=strdup(str->chars); // create a copy of the entire string
+    // MDH@17APR2020 inserting ->_chars
+    str->_chars->chars[str->length]='\0'; // mark the end of the string
+    char* _result=strdup(str->_chars->chars); // create a copy of the entire string
     if(_result)if(length>0&&length<str->length)_result[length]='\0'; // 'cut off' the part we don't want!!
     return _result;
 }
@@ -293,12 +342,13 @@ Mstring* string_prepend(Mstring* const str,char const * const pc){
     return str;
 }
 
+// MDH@17APR2020: inserting ->_chars between str and ->chars
 char* string_remainder(Mstring* const str,size_t firstpos){
     if(!str)return NULL;
     if(!firstpos)return string(str);
     if(firstpos>str->length)return NULL;
-    str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
-    return str->chars+firstpos;
+    str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
+    return str->_chars->chars+firstpos;
 }
 
 /** 
@@ -307,8 +357,8 @@ char* string_remainder(Mstring* const str,size_t firstpos){
 */
 char* string(Mstring* const str){
     if(!str)return NULL;
-    if(str->chars)str->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
-    return str->chars;
+    if(str->_chars)str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: added: mark the end of the text
+    return str->_chars->chars;
     // MDH@21JUN2019: replacing: return (str?str->chars:NULL);
 }
 
@@ -318,8 +368,9 @@ long long string_find(const Mstring* const str,char c){
         // MDH@16DEC2018: better to increment pos inside the condition
         // MDH@25OCT2019: type of pos changed from long long to size_t and pos<l replaced by pos!=l because I'm not sure if 0<0 evaluates to false for unsigned integers like size_t
         size_t pos=0,l=str->length; // first character to check
+        Mchars* strchars=str->_chars; // MDH@17APR2020: replacing str by strchars
         while(pos!=l){ // still within the text
-            if(str->chars[pos]==c)return pos; // if a match return pos
+            if(strchars->chars[pos]==c)return pos; // if a match return pos
             pos++; // keep looking
         }
     }
@@ -336,7 +387,8 @@ void string_reverse(Mstring* const str){
     if(!halfway)return;
     ///////////printf("\nReversing: '%s'.",string(str));
     char c;
-    while(halfway>=0){c=str->chars[halfway];str->chars[halfway]=str->chars[l-halfway];str->chars[l-halfway]=c;halfway--;}   
+    Mchars* strchars=str->_chars; // MDH@17APR2020: replacing str by strchars
+    while(halfway>=0){c=strchars->chars[halfway];strchars->chars[halfway]=strchars->chars[l-halfway];strchars->chars[l-halfway]=c;halfway--;}   
     //////////////printf("\nReversed: '%s'.",string(str));
 }
 
@@ -345,8 +397,8 @@ void string_reverse(Mstring* const str){
 //                this method will NOT change str->length ever, meaning that if you forget to put the character back you're in trouble
 char string_replacedchar(Mstring * const str,char c,size_t pos){
     if(!str||pos>=str->length)return '\0'; // NOTE even though str->chars[str->length] might not be '\0' we're still returning '\0' in that case, as if it was there (otherwise we would have to write '\0' first as we do in string())
-    char replacedchar=str->chars[pos];
-    str->chars[pos]=c;
+    char replacedchar=str->_chars->chars[pos];
+    str->_chars->chars[pos]=c;
     return replacedchar;
 }
 
@@ -355,7 +407,7 @@ size_t string_number_of_matching_chars(Mstring const * const str,char const * ch
     size_t numberOfMatchingCharacters=0;
     // if str and chars are used as value arguments so the pointers themselves shouldn't be constant
     if(str&&chars){
-        char* strchars=str->chars;
+        char* strchars=str->_chars->chars;
         if(strchars){
             strchars[str->length]='\0'; // perhaps important
             // as long as the same and not end-of-line character increment
@@ -375,9 +427,9 @@ bool string_equal(Mstring* str1,Mstring* str2){
     if(!str1||!str2)return false; // if either NULL not the same
     // ASSERT both are not NULL
     if(str1->length!=str2->length)return false; // if length not equal not the same
-    if(!str1->chars||!str2->chars)return false; // we need both chars arrays (actually should never be NULL though)
-    str1->chars[str1->length]='\0';str2->chars[str2->length]='\0'; // place end-of-text markers so we can use str_cmp for comparison
-    return(strcmp(str1->chars,str2->chars)==0);
+    if(!str1->_chars||!str2->_chars)return false; // we need both chars arrays (actually should never be NULL though)
+    str1->_chars->chars[str1->length]='\0';str2->_chars->chars[str2->length]='\0'; // place end-of-text markers so we can use str_cmp for comparison
+    return(strcmp(str1->_chars->chars,str2->_chars->chars)==0);
 }
 
 // MDH@13MAR2020: helper functions now implemented here (instead of in Mexecution.h/c)
@@ -457,11 +509,12 @@ Mstring* _string_info(Mstring* str){
             p=string_append_char(p,',');
             // let's append all the characters
             p=string_append(p,"Characters: ");
-            if(str->chars){
+            Mchars* strchars=str->_chars;
+            if(strchars){ // MDH@17APR2020: replacing str->chars by strchars
                 while(1){
                     p=string_append_ull(p,l);
                     p=string_append_char(p,'=');
-                    p=string_append_ull(p,str->chars[l]);
+                    p=string_append_ull(p,strchars->chars[l]);
                     if(l==0)break;
                     l--;
                     p=string_append_char(p,' ');
@@ -480,8 +533,9 @@ size_t string_trailing(Mstring* str,char c){
     size_t i,l=(str?str->length:0u);
     if(l>0){
         size_t i=l;
-        while(i>0&&str->chars[--i]==c);
-        if(str->chars[i]==c)return l; // all characters equaled c
+        Mchars* strchars=str->_chars;
+        while(i>0&&strchars->chars[--i]==c);
+        if(strchars->chars[i]==c)return l; // all characters equaled c
         return(l-i-1u);
     }
     return 0;

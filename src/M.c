@@ -157,7 +157,7 @@ Mstring* _getTimestamp(char const * const format){
 		if(p){
 	    	time_t now=time(NULL);
 			struct tm * nowlocal=localtime(&now);
-			p=string_setlength(p,strftime(p->chars,50,(format?format:"%Y-%m-%d %H:%M:%S"),nowlocal));
+			p=string_setlength(p,strftime(p->_chars->chars,50,(format?format:"%Y-%m-%d %H:%M:%S"),nowlocal));
 		}
 		if(!p){free_string(_timestamp);_timestamp=NULL;}
 	}
@@ -3005,6 +3005,7 @@ int main(int argc, char **argv){
 
 	// let's mark the allocations BEFORE we start looping
 	if(addAllocation('!',0,0)==0){
+		outputInfo("Failed to initialize allocation recording.");
 		exit(3);
 	}
 

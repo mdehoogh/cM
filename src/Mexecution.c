@@ -636,7 +636,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){
                     //                as mp_toradix would write
                     uint8_t failure=0;
                     if(string_setlength(_mpintText,arepsize)){
-                        if(mp_toradix(_mpint,_mpintText->chars,10)==MP_OKAY){
+                        if(mp_toradix(_mpint,_mpintText->_chars->chars,10)==MP_OKAY){ // MDH@17APR2020: TODO we should NOT actually use the internal structure of Mstring here!!
                             if(string_synclength(_mpintText)){
                                 size_t trailingZeroCount=string_trailing(_mpintText,'0');
                                 if(trailingZeroCount>=3){

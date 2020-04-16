@@ -4,9 +4,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include "Malloc.h"
+#include "Mchars.h"
 
 #define BLOCK_SIZE 16
 
@@ -14,9 +13,9 @@ typedef struct{
 #ifndef __PRODUCTION__
     t_count allocationIndex;
 #endif
-    char* chars;
+    Mchars* _chars; // MDH@17APR2020: replacing char* chars by Mchars* _chars so we can keep track of where it is allocated
     size_t length;
-    t_count blocks;
+    t_count blocks; // the number of allocated blocks of BLOCK_SIZE bytes of memory for _chars
 }Mstring;
 
 void free_string(Mstring* str); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
