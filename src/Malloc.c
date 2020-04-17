@@ -46,7 +46,7 @@ static t_count getNewAllocationTypeIndex(char allocationType,size_t size,t_count
         t_allocationsize* _allocationTypeSizeHistogram=(fixedsize?NULL:calloc(1,sizeof(t_allocationsize)));
         if(fixedsize||_allocationTypeSizeHistogram){
             // how about allocating memory for the histogram beforehand?
-            // printf("New allocation type #%zd: '%c' of size %zd!\n",allocationtypeindex,allocationtype,size);
+            printf("************** New allocation type #%llu: '%c' of size %zd!\n",numberOfAllocationTypes,allocationType,size);
             void* newAllocationTypes=realloc(_allocationTypes,sizeof(t_allocationtype)*(numberOfAllocationTypes+1));
             if(newAllocationTypes){           
                 _allocationTypes[numberOfAllocationTypes].type=allocationType;
@@ -64,8 +64,10 @@ static t_count getNewAllocationTypeIndex(char allocationType,size_t size,t_count
                     _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes[0].count=count;            
                 }
                 newAllocationTypeIndex=numberOfAllocationTypes++; // good to go
-            }else
-            if(!fixedsize)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
+            }else{
+                if(!fixedsize)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
+                printf("ERROR: Failed to register new allocation type '%c'.\n",allocationType);
+            }
         }
         /* MDH@14APR2020:
         // register the size and initialize the count to 0!!!
@@ -87,11 +89,13 @@ t_count addAllocation(char allocationType,size_t size,t_count count){
         t_count newl=allocations.l+count;
         while(newl>allocations.l){
             if(!(allocations.l&0xF)){ // allocations.l is a multiple of 16, so allocation._chars is full and we need a new block
+                printf("Expanding allocations.\n");
                 char* allocationchars=realloc(allocations._chars,(allocations.l+16));
                 if(!allocationchars)return 0; // realloc failure
                 allocations._chars=allocationchars;
             }
             allocations._chars[allocations.l++]=allocationType;
+            printf("Allocation #%llu of type '%c' registered.\n",allocations.l,allocationType);
         }
     }
     return allocations.l; // returning the current length of allocations (which should be nonzero for sure!!!)
@@ -110,11 +114,11 @@ static t_count registerAllocation(char allocationType,size_t size,t_count count,
         // how about registering the type first if we need to???????
         // increase size if necessary
         if(size>0&&count>0){
-            t_count allocationTypeIndex=getAllocationTypeIndex(allocationType); // the number of registered allocation types
+            long long allocationTypeIndex=getAllocationTypeIndex(allocationType); // the number of registered allocation types
             if(allocationTypeIndex<0)allocationTypeIndex=getNewAllocationTypeIndex(allocationType,size,count,fixedsize);
-            if(allocationTypeIndex>0){ // yes, we should already have at least one allocation type
+            if(allocationTypeIndex>=0){ // yes, we should already have at least one allocation type
                 allocationIndex=addAllocation(allocationType,size,count); // this is for registering the allocation BUT TODO should this be done here?????
-                /* MDH@14APR2020 
+                /* MDH@14APR2020
                 if(allocationIndex>0){
                     // MDH@15NOV2019: add another size_t to _allocationcounts array if we need to
                     _allocationcounts[allocationTypeIndex*5+1]+=nitems; // another nitems allocated
@@ -215,28 +219,28 @@ void syncallocations(){
 
 // MDH@08APR2020: if ptr starts with an allocation_index size_t field we can store the result of addallocation into it
 //                so we have to ascertain that in the non-production version every structure that we allocate this way starts with
-void* Mmalloc(size_t nitems,size_t size,char type){
+void* Mmalloc(t_count nitems,size_t size,char type){
     void* ptr=(size>0&&nitems>0?malloc(size*nitems):NULL);
     // MDH@09APR2020: addallocation() is now addallocationtype()
+#ifndef __PRODUCTION__
     if(ptr){
         // MDH@13APR2020: all Mmalloc calls represent fixed size allocations
         t_count allocationIndex=registerAllocation(type,size,nitems,true); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
-#ifndef __PRODUCTION__
         *((t_count*)ptr)=allocationIndex;
-#endif
     }
+#endif
     return ptr;
 }
 
-void* Mcalloc(size_t nitems,size_t size,char type){
+void* Mcalloc(t_count nitems,size_t size,char type){
     void* ptr=(nitems>0&&size>0?calloc(nitems,size):NULL);
     // MDH@09APR2020: addallocation() is now addallocationtype()
+#ifndef __PRODUCTION__
     if(ptr){
         t_count allocationIndex=registerAllocation(type,size,nitems,true);
-#ifndef __PRODUCTION__
         *((t_count*)ptr)=allocationIndex;
-#endif
     }
+#endif
     return ptr;
 }
 
@@ -311,7 +315,7 @@ void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char al
 #endif
         // MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
         newptr=(occupied>0?(freed>0?realloc(ptr,occupied):malloc(occupied)):NULL); // we have to reallocate nitems each of the given size
-            printf("Object of type '%c' reallocated from %llu to %llu!\n",allocationType,freed,occupied);
+        printf("Object of type '%c' reallocated from %llu to %llu!\n",allocationType,freed,occupied);
         // newptr is allowed to be NULL if occupied equals 
         if(occupied==0||newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
             if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){

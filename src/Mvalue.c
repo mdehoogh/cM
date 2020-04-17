@@ -37,7 +37,7 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
         return NULL;
     }
     _variable->immutable=immutable;
-    _variable->_name=_strdup(name); // create a dynamic pointer on the heap
+    _variable->_name=_getChars(name); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
     if(!_variable->_name){
         free_variable(_variable,true);
         output("%sFailed to allocate memory to store name '%s' of the new variable.\n",ERROR_PREFIX,name);
@@ -82,9 +82,10 @@ bool free_listelement(Mlistelement* _listelement,bool weak){
 void free_list(Mlist* _list){
     if(_list){
         // if(amDebugging())
-        {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator);outputChar('.');outputChar('\n');}
+        {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
         if(_list->_first){
-            if(_list->_creator)FREE(_list->_creator,'"');
+            // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters
+            if(_list->_creator)free_chars(_list->_creator,strlen(_list->_creator->chars));// MDH@17APR2020 replacing: FREE(_list->_creator,'"');
             free_listelement(_list->_first,_list->weak);
             _list->_first=NULL;
         }
@@ -163,8 +164,8 @@ void free_value(Mvalue* _value){
 Mlist* __list(char* source){
     Mlist* _list=CALLOC(1,sizeof(Mlist),'L');
     if(source){
-        _list->_creator=_strdup(source);
-        output("List creator: '%s'.\n",source);
+        _list->_creator=_getChars(source); // MDH@17APR2020 replacing: _strdup(source);
+        if(_list->_creator)output("List creator: '%s'.\n",_list->_creator->chars);
     }
     return _list;
 }
@@ -469,7 +470,7 @@ Mlist* _getMapAttributes(Mmap const * const map){
         // this is a bit of an issue because typically text should be enquoted
         Mstring* _attributeName=_getString("'");
         if(!_attributeName){outputError("Failed to duplicate a map attribute name");break;}
-        string_append(_attributeName,mapelement->_variable->_name); // append the attribute name
+        string_append(_attributeName,mapelement->_variable->_name->chars); // MDH@17APR2020: char* _name replaced by Mchars* _name // append the attribute name
         Mvalue* attributeValue=_getTextValue(string(_attributeName),false);
         free_string(_attributeName);
         if(!attributeValue){outputError("Failed to store a map attribute name");break;}
@@ -586,7 +587,7 @@ Mmap* _getMapCopy(Mmap const * const map){ // creates a 'deep' copy
                     if(_mapelement){
                         // create a variable with the same name and value as the variable in mapelement
                         // MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
-                        _mapelement->_variable=_getVariable(mapelementVariable->_name,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/);
+                        _mapelement->_variable=_getVariable(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/);
                         assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the value over
                         if(_map->_last)_map->_last->_next=_mapelement; // make the current last point to the new last
                         _map->_last=_mapelement; // replace current last by the new last
@@ -1200,7 +1201,7 @@ long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue
             if(!_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
                 if(amVerbose()){output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
                 Mmapelement* _mapelement=_map->_first;
-                while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+                while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
                 if(!_mapelement){ // not found
                     _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
@@ -1241,7 +1242,7 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName){
         Mmapelement* _mapelement=_map->_first;
         if(_mapelement){            
             // keep looking until there is a match
-            while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+            while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
             // if there is a match return the associated value
             if(_mapelement&&_mapelement->_variable)return _mapelement->_variable->_value;
         }
@@ -1255,7 +1256,7 @@ Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName){
         Mmapelement* _mapelement=_map->_first;
         if(_mapelement){            
             // keep looking until there is a match
-            while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name,attributeName))_mapelement=_mapelement->_next;
+            while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
             // if there is a match return the associated value
             if(_mapelement&&_mapelement->_variable)return &(_mapelement->_variable->_value);
         }
@@ -1345,7 +1346,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
                     if(_mapVariable){
                         // MDH@24MAY2019: surround with single quotes (for now) to indicate to the user that the attribute names are alphanumeric (even though user used integers)
                         if(showquotes)p=string_append_char(p,'\'');
-                        p=string_append(p,_mapVariable->_name);
+                        p=string_append(p,_mapVariable->_name->chars);
                         if(showquotes)p=string_append_char(p,'\'');
                         if(showmissings||!isValueUndefined(_mapVariable->_value)){
                             /////output("%s",string(p));
@@ -1427,7 +1428,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                         Mstring* p=valueText;
                         p=string_append_char(p,M_DEREFERENCE_CHARACTER);
                         if(_value->value._reference&&_value->value._reference->variable){ // MDH@11MAR2020: possibly a reference without a variable yet associated (typically used with reference function parameters)
-                            p=string_append(p,_value->value._reference->variable->_name);
+                            p=string_append(p,_value->value._reference->variable->_name->chars);
                             // append the reference index so we know which one it is
                             p=string_append_char(p,':');
                             p=appendll(p,_value->value._reference->referenceindex);
@@ -1462,7 +1463,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){
                                 Mmapelement* _parameterMapelement=function->_parameterMap->_first;
                                 while(p&&_parameterMapelement){
                                     if(_parameterMapelement->_variable){
-                                        p=string_append(p,_parameterMapelement->_variable->_name);
+                                        p=string_append(p,_parameterMapelement->_variable->_name->chars);
                                         p=string_append_char(p,':');
                                         Mstring* _parameterValueText=_getValueText(_parameterMapelement->_variable->_value,false);
                                         p=string_append(p,string(_parameterValueText));
@@ -1752,7 +1753,7 @@ bool mapAppendedToList(Mlist* const _list,const Mmap* const _map){
             Mmapelement* _mapelement=_map->_first;
             while(result&&_mapelement){
                 // only add those map elements of which the key can be converted to a positive integer
-                long long index=atoll(_mapelement->_variable->_name);
+                long long index=atoll(_mapelement->_variable->_name->chars);
                 if(index>0&&!appendedToList(_list,_mapelement->_variable->_value,index)){
                     outputError("Failed to append a map element to a list (using the integer value of the name as index)");
                     result=false;
@@ -1780,7 +1781,7 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map){
                     if(_attributeName){ // should be freed
                         Mstring* p=_attributeName;
                         p=string_append_char(p,'\'');
-                        p=string_append(p,_mapelement->_variable->_name);
+                        p=string_append(p,_mapelement->_variable->_name->chars);
                         if(p){
                             Mvalue* _attributeNameValue=_getTextValue(string(_attributeName),false);
                             if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,M_LL_INVALID)){
@@ -2130,7 +2131,7 @@ Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction){
     if(_map){
         _result=_getMapOfType(_map->valuetype);
         Mmapelement* _mapelement=_map->_first;
-        while(_mapelement&&appendedToMap(_result,_mapelement->_variable->_name,oneArgumentFunction(_mapelement->_variable->_value))==1)_mapelement=_mapelement->_next;
+        while(_mapelement&&appendedToMap(_result,_mapelement->_variable->_name->chars,oneArgumentFunction(_mapelement->_variable->_value))==1)_mapelement=_mapelement->_next;
     }
     return _result;
 }/* VALIDATED */
@@ -2319,7 +2320,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
         case VT_REFERENCE: // TODO this might be hard
             break;
         case VT_FUNCTION:return(value1->value._function==value2->value._function);
-        case VT_ENVIRONMENT:return(strcmp(value1->value._environment->_name,value2->value._environment->_name)==0); // TODO we might need to use the full name of the environment here though
+        case VT_ENVIRONMENT:return(strcmp(value1->value._environment->_name->chars,value2->value._environment->_name->chars)==0); // TODO we might need to use the full name of the environment here though
     }
     return false;
 }
@@ -2412,7 +2413,7 @@ Mstring* _getEnvironmentName(Menvironment* _environment){
         while(p&&_environment){
             if(string_length(p)>0)p=string_insert_char(p,0,'.');
             /////// printf("Prepending '%s'.\n",_environment->_name);
-            p=string_prepend(p,_environment->_name);
+            p=string_prepend(p,_environment->_name->chars);
             _environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
         }
         if(!p){free_string(_environmentName);_environmentName=NULL;}

@@ -38,7 +38,7 @@ typedef struct Mvalue{
 
 // MDH@26OCT2019: moved over from M.c so that we can store value references in values as well (like pointers, well not exactly like pointers)
 typedef struct Mvaluereference{
-	char* _name; // the name of the host variable or NULL if we're in a substructure
+	Mchars* _name; // the name of the host variable or NULL if we're in a substructure
 	Mvalue* _value; // either the host value (if no variable name is defined), or the value of the host variable
 	Mvalue* _itemid; // the item referenced!!!
 }Mvaluereference;
@@ -47,7 +47,7 @@ void free_valuereference(Mvaluereference* _valuereference);
 
 // a variable is a named value of a certain value type
 typedef struct Mvariable{
-    char* _name;
+    Mchars* _name;
     Mvaluetype valuetype; // MDH@01MAY2019: fixed type variables can only be assigned once, after that any value that is assigned to it has to have the same type as the first value
     Mvalue* _value;
     size_t referencecount; // MDH@04NOV2019: keep track of all its references
@@ -70,8 +70,10 @@ typedef struct Mlistelement{
 
 // MDH@03MAY2019: we're going to allow a list to be sparse i.e. with each element we keep an offset
 //                this may come in handy if we fail to store something in a list
+// MDH@17APR2020: variable size dynamic allocations should be 'managed' so we can tell how big they are
+//                of course we know the size of char* obviously BUT we should NOT use REALLOC on it, in which case we loose track of it
 typedef struct Mlist{
-    char *_creator;
+    Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
     unsigned long long numberOfElements; // keep track of the total number of elements
     Mvaluetype valuetype; // we can force a list to have elements of the same type
     Mlistelement* _first;
@@ -97,7 +99,7 @@ typedef struct Mmap{
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
 
 typedef struct Mexpressionlistelement{
-    char* binop; // the binary operator to apply to the operands
+    Mchars* _binop; // the binary operator to apply to the operands
     Mvalue* _value; // the second operand
     struct Mexpressionlistelement* _next;
 }Mexpressionlistelement;
@@ -320,7 +322,7 @@ typedef struct Mfunctionmap{
 // an environment is a bag of variables and functions
 // MDH@03FEB2020: all environments should be wrapped in Mvalue instances, so they won't get released until they can
 typedef struct Menvironment{
-    char* _name; // the name of the environment
+    Mchars* _name; // the name of the environment
     Mmap* _variableMap; // variables are stored by name
     Mfunctionmap* _functionMap; // this would be the map of M functions defined in this environment (i.e. not the C functions/constants)
     Mtoken* expressionToken; // MDH@17JUL2019: the current token of the expression being evaluated in this environment

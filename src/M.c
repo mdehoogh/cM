@@ -967,7 +967,7 @@ void showPrompt(){
 				*/
 				// MDH@19JUL2019: when dealing with a function body being entered, we show a different prompt
 				if(getCurrentFunctionBodyInput())
-					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getExecutionEnvironment()->_name));	// replacing: printf("%lu",(commandCount+1));
+					sprintf(str,"%lld",1+getNumberOfFunctionCommands(getExecutionEnvironment()->_name->chars));	// replacing: printf("%lu",(commandCount+1));
 				else
 					sprintf(str,"%lld",(commandCount+1));	// replacing: printf("%lu",(commandCount+1));
 				output("[%s]",str);

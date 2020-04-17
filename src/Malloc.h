@@ -52,8 +52,8 @@ long long getAllocationTypeFreed(char allocationType);
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign
 #ifndef __PRODUCTION__
-void* Mmalloc(size_t nitems,size_t size,char type);
-void* Mcalloc(size_t nitems,size_t size,char type);
+void* Mmalloc(t_count nitems,size_t size,char type);
+void* Mcalloc(t_count nitems,size_t size,char type);
 void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char type);
 void Mfree(void* ptr,char type);
 // use the substitutes

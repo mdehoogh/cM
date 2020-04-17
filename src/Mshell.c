@@ -199,14 +199,14 @@ bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap*
 	Mvariable* variableMapelementVariable;
 	while(executionEnvironmentInitialized&&variableMapelement){
 		variableMapelementVariable=variableMapelement->_variable;
-		if(strlen(variableMapelementVariable->_name)==0)continue; // no use to create a variable with no name
+		if(strlen(variableMapelementVariable->_name->chars)==0)continue; // no use to create a variable with no name
 		// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
-		if(!addVariable(_executionEnvironment,variableMapelementVariable->_name,variableMapelementVariable->valuetype,false)){
-			output("%sFailed to add variable '%s' as local variable.\n",ERROR_PREFIX,variableMapelementVariable->_name);
+		if(!addVariable(_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->valuetype,false)){
+			output("%sFailed to add variable '%s' as local variable.\n",ERROR_PREFIX,variableMapelementVariable->_name->chars);
 			executionEnvironmentInitialized=false;
 		}else
-		if(!setValue(_executionEnvironment,variableMapelementVariable->_name,variableMapelementVariable->_value)){
-			output("%sFailed to initialize local variable '%s'.\n",ERROR_PREFIX,variableMapelementVariable->_name);
+		if(!setValue(_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->_value)){
+			output("%sFailed to initialize local variable '%s'.\n",ERROR_PREFIX,variableMapelementVariable->_name->chars);
 			executionEnvironmentInitialized=false;
 		}else
 			variableMapelement=variableMapelement->_next;
@@ -224,7 +224,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 	Menvironment* _functionExecutionEnvironment=__environment(); // free asap
 	if(_functionExecutionEnvironment){
 		if(amVerbose())outputInfo("Registering the name of the function execution environment");
-		_functionExecutionEnvironment->_name=_strdup(functionName); // store the name of the function as environment name!!!
+		_functionExecutionEnvironment->_name=_getChars(functionName); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
 		//                we do not need to distinguish between the originals and the references (so we never loose the referenced functions
@@ -429,7 +429,7 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 	if(aValidCommandIndicator<=0)return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerbose())outputInfo("Evaluating...");
-	return getValueOfExpression(getExecutionEnvironment()->_name,commandType,(TokenType[]){},0);
+	return getValueOfExpression(getExecutionEnvironment()->_name->chars,commandType,(TokenType[]){},0);
 }
 
 // decimal stuff
@@ -542,7 +542,7 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){
 		if(doList&&doList->_first){ // something to do
 			Menvironment* _doEnvironment=__environment();
 			if(_doEnvironment){
-				_doEnvironment->_name=_strdup("do");
+				_doEnvironment->_name=_getChars("do");
 				// let's add variable $ as result variable and ! as exit flag variable
 				bool doEnvironmentInitialized=addVariable(_doEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_doEnvironment,"!",VT_INTEGER,false)&&setValue(_doEnvironment,"!",_getIntegerValue(0));
 				if(doEnvironmentInitialized){
@@ -593,7 +593,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 		}
 		Menvironment* _forEnvironment=__environment();
 		if(_forEnvironment){
-			_forEnvironment->_name=_strdup("for loop");
+			_forEnvironment->_name=_getChars("for loop");
 			// better wait with pushing until _forEnvironment is initialized appropriately
 			// MDH@11MAR2020: $ is NOT needed when there's an explicit result token value!!
 			bool forEnvironmentInitialized=(_resultTokenValue?true:addVariable(_forEnvironment,"$",VT_UNDEFINED,false))&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0));
@@ -849,7 +849,7 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
         // if the map contains property '' it's an existing property otherwise it's a non-existing property
         Mmap* map=variable->_value->value._map;
         if(!map)return -5;
-        Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name,lastPropertySeparator+1)))mapelement=mapelement->_next;
+        Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,lastPropertySeparator+1)))mapelement=mapelement->_next;
 		// point variable to the _variable in the map element
 		variable=(mapelement?mapelement->_variable:NULL);
     }else // ASSERT not a property reference!!!!!
@@ -1273,7 +1273,7 @@ Mvalue* Mevalfunction(Mvalue* value){
 				// just like with do() we have to evaluate the command in a subenvironment
 				Menvironment* _evalEnvironment=__environment();
 				if(_evalEnvironment){
-					_evalEnvironment->_name=_strdup("eval");
+					_evalEnvironment->_name=_getChars("eval");
 					if(pushExecutionEnvironment(_evalEnvironment)){
 						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
 						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
@@ -3128,21 +3128,21 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 		// MDH@14NOV2019: if no referened value is available we should use the name to obtain the value of the top level referenced value
 		if(!referencedValue){ // no actual referenced value stored (BUT that could actually be the value to return)
 			// if we do NOT have a name it's a literal
-			if(_valuereference->_name&&strlen(_valuereference->_name)>0){
+			if(_valuereference->_name&&strlen(_valuereference->_name->chars)>0){
 				// MDH@04NOV2019: now that we've added the TT_REFERENCE token, the name may start with @ to indicate a variable reference
-				if(_valuereference->_name[0]==M_DEREFERENCE_CHARACTER){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
+				if(_valuereference->_name->chars[0]==M_DEREFERENCE_CHARACTER){ // a reference to a variable which we need to leave as is i.e. wrap it inside a value
 					// I suppose we need to wrap a copy unless we make a separate reference thing where we store the name of the variable which could just be an Mstring?????
 					// MDH@11MAR2020: let's distinguish between an unnamed ref (with no variable name defined), and a named ref (where the variable SHOULD exist)
-					Mvariable* variable=getVariable(getExecutionEnvironment(),&_valuereference->_name[1],false);
-					if(variable||strlen(_valuereference->_name)==1){
+					Mvariable* variable=getVariable(getExecutionEnvironment(),&_valuereference->_name->chars[1],false);
+					if(variable||strlen(_valuereference->_name->chars)==1){
 						referencedValue=_getReferenceValue(_getReference(variable),true);
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
 						//                so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
 					}else
-						output("%sReferenced variable '%s' does not exist.\n",ERROR_PREFIX,_valuereference->_name+1);
+						output("%sReferenced variable '%s' does not exist.\n",ERROR_PREFIX,_valuereference->_name->chars+1);
 				}else // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
-					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name); // the value at the top level
+					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name->chars); // the value at the top level
 			}
 		}
 		// only composite values can be indexex...
@@ -3473,7 +3473,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 			// MDH@26MAR2020: BUT in order to be able to put a value into the variable we need the address of the value pointer, i.e. the value holder so to speak
 			//                i.e. we need a pointer to where the value pointer is stored, could we be using & on the value pointer being returned to get at the holder?????????
 			// MDH@28MAR2020: if we allow item index elements to be lists we need an array of value holders
-			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name);
+			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name->chars);
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 			if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
 				result=true;
@@ -3795,7 +3795,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 		}else{
 			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
 			//                the same way as happens when you use the defun internal function
-			if(setValue(getExecutionEnvironment(),_valuereference->_name,_newValue)){
+			if(setValue(getExecutionEnvironment(),_valuereference->_name->chars,_newValue)){
 				// NOTE even if the value itself is NULL, its address is never NULL
 				_valuereference->_value=_newValue; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_newValue);
 				result=true;
@@ -3805,7 +3805,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 					if(function->type==FT_USER){
 						Muserfunction* userfunction=function->functionunion._userfunction;
 						if(userfunction&&!userfunction->_bodyCommandList){
-							registerFunctionBodyRequest(_valuereference->_name);
+							registerFunctionBodyRequest(_valuereference->_name->chars);
 						}
 					}
 				}
@@ -4054,8 +4054,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			case TT_VARIABLE: // a value reference
 				// MDH@25MAR2020 allow indexing of new variables as well!!!! removing: if(expressionToken->type==TT_VARIABLE)
 				canbeindexedtheoretically=true;
-				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
-				if(amVerbose())output("Value reference variable name: '%s'.\n",_valueReference->_name);
+				// MDH@17APR2020: replacing char* by Mchars* so no need to NULL _significantTokenText anymore (so it will be freed below) (_getChars() will copy the characters)
+				_valueReference->_name=_getChars(_significantTokenText);
+				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
+				if(amVerbose())output("Value reference variable name: '%s'.\n",_valueReference->_name->chars);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
 				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
@@ -4119,8 +4121,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				//                for now we only allow referencing FULL variables i.e. not parts of variables like array or map elements although that seems to be a straightforward extension
 				//                so it's much similar to an unindexed variable at the moment
 				//                for now the only thing we're going to do is store the name of the reference (i.e. starting with @) (without value) so that whoever uses it will know how to resolve it!!!
-				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
-				if(amVerbose())output("Value reference referenced variable name: '%s'.\n",_valueReference->_name);
+				// MDH@17APR2020: here we go again
+				_valueReference->_name=_getChars(_significantTokenText);
+				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
+				if(amVerbose())output("Value reference referenced variable name: '%s'.\n",_valueReference->_name->chars);
 				break;			
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				// MDH@20JUN2019: some error in the following part because every now and then we get a segmentation fault!!!!
@@ -7180,7 +7184,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 
 	Menvironment* _Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
-		_Menvironment->_name=_strdup("M"); // TODO why make a dynamic copy???
+		_Menvironment->_name=_getChars("M"); // TODO why make a dynamic copy???
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'W');
 		if(environmentFunctionMap){

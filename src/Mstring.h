@@ -7,7 +7,9 @@
 
 #include "Mchars.h"
 
-#define BLOCK_SIZE 16
+// MDH@17APR2020: it's more convenient to define BLOCK_SIZE as the actual number of bytes we need for a specific number of characters
+#define M_BLOCK_CHARACTERS 16
+#define M_BLOCK_SIZE M_BLOCK_CHARACTERS*sizeof(char)
 
 typedef struct{
 #ifndef __PRODUCTION__

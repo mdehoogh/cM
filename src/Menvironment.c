@@ -106,7 +106,7 @@ Mstring* _getVariableNames(Menvironment const * const _environment,const char* c
                 while(p&&_variableMapelement){
                     if(_variableMapelement->_variable){
                         if(strlen(sep))if(!string_empty(p))p=string_append(p,sep);
-                        p=string_append(p,_variableMapelement->_variable->_name);
+                        p=string_append(p,_variableMapelement->_variable->_name->chars);
                     }
                     _variableMapelement=_variableMapelement->_next;
                 }
@@ -131,7 +131,7 @@ Mlist* _getVariableNamesList(Menvironment* environment){
                     if(variableMapelement->_variable){
                         Mstring* variableNameText=_getString("'");
                         if(variableNameText){
-                            if(string_append(variableNameText,variableMapelement->_variable->_name))
+                            if(string_append(variableNameText,variableMapelement->_variable->_name->chars))
                                 appendedToList(_variableNamesList,_getTextValue(string(variableNameText),false),M_LL_INVALID);
                             free_string(variableNameText);
                         }
@@ -158,7 +158,7 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){
             // determine the variable names map of the parent environment and wrap it
             Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(getValueEnvironment(environment->_parent)),true);
             // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
-            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,getValueEnvironment(environment->_parent)->_name,_parentVariableNamesMapValue)){
+            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
                 /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
                 output("%sFailed to register the variable names of the parent of '%s'.\n",ERROR_PREFIX,environment->_name);
             }
@@ -418,7 +418,7 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
             nextPropertySeparator=strchr(propertySeparator,M_PROPERTY_SEPARATOR_CHARACTER);
             if(nextPropertySeparator)propertySeparator[nextPropertySeparator-propertySeparator]='\0';
             if(report)output("Looking for property '%s' in '%s'.\n",propertySeparator,name);
-            mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name,propertySeparator)))mapelement=mapelement->_next;
+            mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,propertySeparator)))mapelement=mapelement->_next;
             if(nextPropertySeparator)propertySeparator[nextPropertySeparator-propertySeparator]=M_PROPERTY_SEPARATOR_CHARACTER; // put the property separator character back where it belongs
             if(!mapelement)return NULL; // if we did not find a matching map element (property) definitely not an existing property
             // ASSERT matching 'property' found
@@ -458,20 +458,20 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
         if(report)output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);
         return NULL;
     }
-    if(report)output("Looking for variable '%s' in '%s'.\n",name,environment->_name);
+    if(report)output("Looking for variable '%s' in '%s'.\n",name,environment->_name->chars);
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
     while(_variableMapelement&&
-            (!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name,name)))
+            (!_variableMapelement->_variable||strcmp(_variableMapelement->_variable->_name->chars,name)))
         _variableMapelement=_variableMapelement->_next;
     // MDH@20JUL2019: if found return
     if(_variableMapelement){
         if(report)
-            output("Variable '%s' found in environment '%s'.\n",name,environment->_name);
+            output("Variable '%s' found in environment '%s'.\n",name,environment->_name->chars);
         return _variableMapelement->_variable;
     }
-    if(report)output("Variable '%s' NOT found in environment '%s'.\n",name,environment->_name);
+    if(report)output("Variable '%s' NOT found in environment '%s'.\n",name,environment->_name->chars);
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (environment&&environment->_parent?getVariable(getValueEnvironment(environment->_parent),name,report):NULL);
 }/* VALIDATED */
@@ -489,7 +489,7 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
     while(_variableMapelement){
         variable=_variableMapelement->_variable;
         if(variable) // defined
-            if(strcmp(variable->_name,name)) // not the same as name
+            if(strcmp(variable->_name->chars,name)) // not the same as name
                 if(variable->immutable) // a constant
                     if(areValuesEqual(variable->_value,value))
                         break;
@@ -497,8 +497,8 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
     }
     // MDH@20JUL2019: if found return
     if(_variableMapelement){
-        if(amVerbose()){output("Variable '%s' found in environment '%s'",name,environment->_name);outputValue(" with value '",value,"'.\n");}
-        return _variableMapelement->_variable->_name;
+        if(amVerbose()){output("Variable '%s' found in environment '%s'",name,environment->_name->chars);outputValue(" with value '",value,"'.\n");}
+        return _variableMapelement->_variable->_name->chars;
     }
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (environment&&environment->_parent?getConstantWithValue(getValueEnvironment(environment->_parent),name,value):NULL);
@@ -520,13 +520,13 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 			if(_mapVariable){
                 // let's always show the name
                 if(showquotes)p=string_append_char(p,'\'');
-                p=string_append(p,_mapVariable->_name);
+                p=string_append(p,_mapVariable->_name->chars);
                 if(showquotes)p=string_append_char(p,'\'');
                 // 
                 hidevalue=!showhiddenvariablevalues;
                 if(hidevalue){ // check if truely a variable to hide
                     long long hiddenvariableindex=M_NUMBER_OF_HIDDEN_VARIABLES;
-                    while(--hiddenvariableindex>=0&&strcmp(M_HIDDEN_VARIABLE_NAMES[hiddenvariableindex],_mapVariable->_name)!=0);
+                    while(--hiddenvariableindex>=0&&strcmp(M_HIDDEN_VARIABLE_NAMES[hiddenvariableindex],_mapVariable->_name->chars)!=0);
                     if(hiddenvariableindex<0)hidevalue=false; // not a hidden variable
                 }
                 if(!hidevalue){
@@ -535,7 +535,7 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
                         /////output("%s",string(p));
                         p=string_append_char(p,'='); // TODO should we be using single quotes or double quotes or what???? technically it's the attribute name (without)
                         // MDH@24OCT2019: here we deviate from _getMapText() (see Mvalue.h/c) in that we try to find a constant with the same value (like PI or E or NULL)
-                        char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name,_mapVariable->_value);
+                        char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name->chars,_mapVariable->_value);
                         if(!constantWithValue){ // not a 'symbolic' value
                             /////output("%s",string(p));
                             Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
@@ -605,7 +605,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
                         Mmapelement* variableMapelement=variableMap->_first;
                         while(variableMapelement){
                             if(variableMapelement->_variable){
-                                variablename=variableMapelement->_variable->_name;
+                                variablename=variableMapelement->_variable->_name->chars;
                                 vnl=(variablename?strlen(variablename):0);
                                 if(vnl>l){ // the variable name is larger then name is
                                     numberOfMatchingCharacters=getNumberOfMatchingCharacters(name,variablename);
@@ -765,7 +765,7 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
             propertySeparator=strchr(property,M_PROPERTY_SEPARATOR_CHARACTER);
             if(propertySeparator)property[propertySeparator-property]='\0';
             // add the given property to the map BUT it might already be defined in the map!!!!!
-            Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(property,mapelement->_variable->_name)))mapelement=mapelement->_next;
+            Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(property,mapelement->_variable->_name->chars)))mapelement=mapelement->_next;
             if(!mapelement){ // property does not yet exist
                 Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
                 if(_variableMapelement){
@@ -1006,7 +1006,7 @@ Mfunction* getFunction(Menvironment const * const _environment,const char* const
             Mvariable* variable;
             while(variablemapelement){
                 variable=variablemapelement->_variable;
-                if(variable&&!strcmp(variable->_name,functionName)&&variable->_value&&variable->_value->type==VT_FUNCTION)
+                if(variable&&!strcmp(variable->_name->chars,functionName)&&variable->_value&&variable->_value->type==VT_FUNCTION)
                     return variable->_value->value._function;
                 variablemapelement=variablemapelement->_next;
             }
@@ -1046,8 +1046,9 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 // BUG FIX I suppose we need _variable to point to something
                 _argumentmapelement->_variable=(Mvariable*)CALLOC(1,sizeof(Mvariable),'V');
                 if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true);break;}
-                // probably can't simply assign??? let's use _strdup then
-                _argumentmapelement->_variable->_name=_strdup(functionParameterMapelement->_variable->_name);
+                // probably can't simply assign??? let's use _strdup then 
+                // MDH@17APR2020: _strdup() replaced by _getChars() as on so many other places today
+                _argumentmapelement->_variable->_name=_getChars(functionParameterMapelement->_variable->_name->chars);
                 if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true);break;}
                 // associate the argument list element value (if available)
                 // MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)

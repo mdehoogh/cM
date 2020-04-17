@@ -15,7 +15,7 @@
 /** Create a String */
 Mstring* __string(){
     // MDH@09APR2020: because sizeof(Mstring) would not include what we need for the characters pointed to by chars, we need to allocated one BLOCK_SIZE of characters to start with
-    Mstring* ans=CALLOC(1,sizeof(Mstring)+sizeof(char)*BLOCK_SIZE,'S');
+    Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         // the size of each allocation is BLOCKSIZE characters
@@ -23,7 +23,7 @@ Mstring* __string(){
         //                of the amount allocated in Malloc.c/h explicitly
         //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
         // MDH@16APR2020: using Mchars* instance
-        ans->_chars=__chars(/*sizeof(char)**/BLOCK_SIZE);
+        ans->_chars=__chars(M_BLOCK_SIZE);
         if(!ans->_chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1;
         /* replacing:
         ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
@@ -44,8 +44,8 @@ Mstring* _getString(const char* const s){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
         // MDH@17APR2020: Mchars* replacing char*
-        size_t blocks=1+(l/BLOCK_SIZE);
-        ans->_chars=__chars(blocks*/*sizeof(char)**/BLOCK_SIZE);
+        size_t blocks=1+(l/M_BLOCK_CHARACTERS);
+        ans->_chars=__chars(blocks*M_BLOCK_SIZE);
         if(ans->_chars){
             ans->length=l;
             ans->blocks=blocks;
@@ -71,6 +71,10 @@ Mstring* _getString(const char* const s){
 #endif
     return ans;
 }
+
+// MDH@17APR2020: it's best for every variable size allocation unit to have a method that will return its size to be used in a call to REALLOC as from_count
+static size_t getSizeOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_SIZE*str->blocks:0);}
+static size_t getNumberOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_CHARACTERS*str->blocks:0);}
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
 Mstring* _stringCopy(Mstring* const src,size_t length){
@@ -107,7 +111,7 @@ void free_string(Mstring* str){
     if(str){
         // MDH@17APR2020: replacing src->chars by src->_chars->chars
         // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
-        if(!free_chars(str->_chars,str->blocks*/*sizeof(char)**/BLOCK_SIZE))printf("ERROR: Failed to release an Mchars.");
+        if(!free_chars(str->_chars,getSizeOfChars(str)))printf("ERROR: Failed to release an Mchars.");
         // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
         FREE(str,'S');
     }
@@ -123,21 +127,21 @@ Mstring* string_setlength(Mstring* const str,size_t length){
     if(!str)return NULL;
     if(length>str->length){ // we're supposed to increment the length
         // how many blocks do we need
-        size_t blocks=(length/BLOCK_SIZE)+1;
+        size_t blocks=1+(length/M_BLOCK_CHARACTERS);
         // if we do not have enough blocks ascertain to have enough...
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
             // MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
-            Mchars* new_chars=_resized(str->_chars,str->blocks*BLOCK_SIZE,blocks*BLOCK_SIZE);
+            Mchars* new_chars=_resized(str->_chars,getSizeOfChars(str),blocks*M_BLOCK_SIZE);
             if(!new_chars)return NULL; // failure
-            str->_chars=new_chars;
             str->blocks=blocks;
+            str->_chars=new_chars;
             /* replacing:
             char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
             if (!new_str)return NULL; // failure!!
+            str->blocks=blocks;
             str->chars=new_str;
             */
-            str->blocks=blocks;
         }
         // fill with blanks??? for now that's OK
         while(str->length<length){
@@ -232,21 +236,22 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
             if(pos<l-1){ // a true insert, i.e. NOT replacing the last character!!
                 ////////printf("{%hu-%d}",l,str->blocks);
                 // do we need to get another block?    
-                if(l==str->blocks*BLOCK_SIZE){
+                if(l==getNumberOfChars(str)){
                     /////////printf("Realloc string_insert_char().\n");
                     // MDH@17APR2020: reallocating _chars (instead of str->chars)
-                    Mchars* new_chars=_resized(str->_chars,str->blocks*/*sizeof(char)**/BLOCK_SIZE,(str->blocks+1)*/*sizeof(char)**/BLOCK_SIZE);
+                    size_t sizeOfChars=getSizeOfChars(str);
+                    Mchars* new_chars=_resized(str->_chars,sizeOfChars,sizeOfChars+M_BLOCK_SIZE);
                     if(!new_chars)return NULL;
+                    ++(str->blocks);
                     str->_chars=new_chars;
                     /* replacing:
                     char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                     if (new_str==NULL)return NULL;
                     str->chars=new_str;
                     */
-                    ++(str->blocks);
                     ////// can't know the size of what new_str points to!!! printf("YY%lu-%dYY",sizeof(new_str),str->blocks);
                 }
-                if(l>=str->blocks*BLOCK_SIZE)return NULL;
+                if(l>=getSizeOfChars(str))return NULL;
                 ///printf("%s",str->chars);
                 // we have to move characters at position pos onward one position up
                 Mchars* strchars=str->_chars;
@@ -270,20 +275,22 @@ Mstring* string_append_char(Mstring* const str,char c){
         if(c){ // MDH@15NOV2019: appending '\0' makes no sense does it??????
             size_t l=str->length+1;
             /////printf("{%hu-%d}",l,str->blocks);
-            if(l==str->blocks*BLOCK_SIZE){
+            if(l==getNumberOfChars(str)){
                 //////////////printf("Realloc string_append_char().\n");
-                Mchars* new_chars=_resized(str->_chars,str->blocks*/*sizeof(char)**/BLOCK_SIZE,(str->blocks+1)*/*sizeof(char)**/BLOCK_SIZE);
+                size_t sizeOfChars=getSizeOfChars(str);
+                Mchars* new_chars=_resized(str->_chars,sizeOfChars,sizeOfChars+M_BLOCK_SIZE);
                 if(!new_chars)return NULL;
+                ++(str->blocks);
                 str->_chars=new_chars;
                 /* replacing:
                 char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                 if (!new_str)return NULL; // failure!!
+                ++(str->blocks);
                 str->chars=new_str;
                 */
-                ++(str->blocks);
                 ////////printf("XX%lu-%dXX",sizeof(*new_str),str->blocks);
             }
-            if(l>=str->blocks*BLOCK_SIZE)return NULL;
+            if(l>=getNumberOfChars(str))return NULL;
             str->_chars->chars[str->length]=c; // MDH@17APR2020 replacing: str->chars[str->length]=c;
             ++(str->length);
         }
