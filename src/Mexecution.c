@@ -17,7 +17,7 @@
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
-extern const char* const ERROR_PREFIX;
+extern const char* const M_ERROR_PREFIX;
 extern const long double M_LD_NAN; // we'll be needing this in Mexecution.c as well but M.c sets it!!
 extern const char* const M_UNDEFINED_VALUE_TEXT; // TODO might be called M_NULL_VALUETEXT though
 extern const mpd_context_t* _decimalContext;
@@ -107,10 +107,10 @@ void free_biginteger(Mbiginteger* biginteger){
     if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
 Mbiginteger* __biginteger(){
-    Mbiginteger* _biginteger=(Mbiginteger*)CALLOC(1,sizeof(Mbiginteger),'B');
+    Mbiginteger* _biginteger=(Mbiginteger*)CALLOC(sizeof(Mbiginteger),'B');
     if(_biginteger){
 #ifndef __PRODUCTION__
-        _biginteger->_bi=(mp_int*)CALLOC(1,sizeof(mp_int),'b');
+        _biginteger->_bi=(mp_int*)CALLOC(sizeof(mp_int),'b');
         if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE(_biginteger->_bi,'b');_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
         if(!_biginteger->_bi){FREE(_biginteger,'B');_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
 #else
@@ -658,7 +658,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){
                     if(failure>0){
                         free_string(_mpintText);_mpintText=NULL;
                         switch(failure){
-                            case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",ERROR_PREFIX,arepsize);break;
+                            case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",M_ERROR_PREFIX,arepsize);break;
                             case 2:outputError("Failed to determine the big integer representation");break;
                             case 3:outputError("Failed to sync the length of the big integer representation");break;
                             case 4:outputError("Failed to remove the trailing zeroes from the big integer representation.");break;
@@ -667,7 +667,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){
                         }
                     }
                 }else
-                    output("%sCan't store more than %u characters in a string.\n",ERROR_PREFIX,SIZE_MAX);
+                    output("%sCan't store more than %u characters in a string.\n",M_ERROR_PREFIX,SIZE_MAX);
             }else
                 outputError("Couldn't determine the size of a big integer");
             //if(amVerbose())
@@ -675,7 +675,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){
         }else
             outputError("No big integer to represent");
     }else
-        output("%sFailed to create a text for storing the representation of a big integer.\n",ERROR_PREFIX);
+        output("%sFailed to create a text for storing the representation of a big integer.\n",M_ERROR_PREFIX);
     ///outputChar('H');
     return _mpintText;
 }

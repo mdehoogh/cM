@@ -15,10 +15,10 @@
 #include "Msession.h"
 
 // the constants are defined in Mshell.c
-extern char const* const ERROR_PREFIX;
+extern char const* const M_ERROR_PREFIX;
 extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual info prefix text to use
-extern const char* const WARNING_PREFIX; // used in Mexecution.c as well (defined there as extern!!!)
-extern const char* const BUG_PREFIX; // MDH@05NOV2019: for reporting bugs
+extern const char* const M_WARNING_PREFIX; // used in Mexecution.c as well (defined there as extern!!!)
+extern const char* const M_BUG_PREFIX; // MDH@05NOV2019: for reporting bugs
 extern const char M_WHITESPACE_CHARACTER; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 extern const char M_NEWLINE_CHARACTER; // MDH@31OCT2019: the character to request a newline with!!!
 extern const char* const M_VARIABLE_NAME; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
@@ -908,7 +908,7 @@ bool updateImmediateFeedforwardTextOfUserInputCommand(){
 */
 // the following functions are user input command specific
 Mtoken* setLastUserInputCommandToken(Mtoken* lastUserInputCommandToken){
-	if(!_userInputCommand){inputError("%sNo user input command.",BUG_PREFIX);return NULL;}
+	if(!_userInputCommand){inputError("%sNo user input command.",M_BUG_PREFIX);return NULL;}
 	_userInputCommand->_lastToken=lastUserInputCommandToken;
 	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(lastUserInputCommandToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
 	return _userInputCommand->_lastToken;
@@ -1360,14 +1360,14 @@ void updateUserInputCommandIdentifierContinuation(){
 												if(removeLastUserInputCommandToken())
 													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
 												else
-													inputError("%sFailed to undo failing to mark the last character as erroneous.",BUG_PREFIX);
+													inputError("%sFailed to undo failing to mark the last character as erroneous.",M_BUG_PREFIX);
 											}else
 												reoutputToken(_errorToken);
 										}else
 											inputError("The supposed reference can never become an existing variable reference.");
 										// if we failed to create the error token, we have to append the removed character again (should be no problem because Mstring does not reduce the memory when deleting characters from the end)
 										if(_errorToken!=_userInputCommand->_lastToken){
-											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength)){inputError("%sCouldn't undo the adjustments made to an erroneous reference.",BUG_PREFIX);}
+											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength)){inputError("%sCouldn't undo the adjustments made to an erroneous reference.",M_BUG_PREFIX);}
 										}
 									}else
 										inputError("Failed to retrieve the last (erroneous) character in a variable reference.");
@@ -1375,7 +1375,7 @@ void updateUserInputCommandIdentifierContinuation(){
 								// if(amVerbose())
 								inputInfo("Reference complete!");
 							}else
-								inputError("%sLast character in reference vanished.",BUG_PREFIX);
+								inputError("%sLast character in reference vanished.",M_BUG_PREFIX);
 						}else
 							inputError("There is no existing variable that can be referenced anymore.");
 					}
@@ -1600,7 +1600,7 @@ bool evaluateCommand(Mvalue* *resultValue){
 			removeLastUserInputCommandToken();
 			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishToken(_userInputCommand->_lastToken);
 		}
-		//output("%sInvalid command indicator: %d.\n",ERROR_PREFIX,aValidCommandIndicator);
+		//output("%sInvalid command indicator: %d.\n",M_ERROR_PREFIX,aValidCommandIndicator);
 		return false;
 	}
 
@@ -2078,7 +2078,7 @@ void copyUserInputCommand(){
 				// move back until we find the token referenced (and we should find it)
 				while(referencedToken!=_tokenToCopy->expr){referencedToken=referencedToken->prev;newReferencedToken=newReferencedToken->prev;}
 				// ASSERT referencedToken now equals the token in the original command being referenced (which could be itself obviously), and newReferencedToken is a token in the new user input command that should be pointed to!!!
-				if(newReferencedToken)_newUserInputCommand->_lastToken->expr=newReferencedToken;else inputError("%sFailed to synchronize a token reference.",BUG_PREFIX);
+				if(newReferencedToken)_newUserInputCommand->_lastToken->expr=newReferencedToken;else inputError("%sFailed to synchronize a token reference.",M_BUG_PREFIX);
 			}else // nothing pointed to, so just in case
 				_newUserInputCommand->_lastToken->expr=NULL;
 			// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
@@ -2373,7 +2373,7 @@ char removedTokenCharacter(bool endOfInput){
 			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,endOfInput);
 		}
 	}else
-		inputInfo("%sNo command to remove characters from!",BUG_PREFIX);
+		inputInfo("%sNo command to remove characters from!",M_BUG_PREFIX);
 	return tokenCharacterRemoved;
 }
 
@@ -2432,7 +2432,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 		copyUserInputCommand();
 	/////outputChar('2');
 	// if _userInputCommand->_lastToken is now NULL something went wrong (in copyUserInputCommand or createUserInputCommand most likely)
-	if(!_userInputCommand){inputError("%sNo user input command.",BUG_PREFIX);return false;}
+	if(!_userInputCommand){inputError("%sNo user input command.",M_BUG_PREFIX);return false;}
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	/////outputChar('3');
 	clearInfo(); // MDH@28FEB2020: is responsible for the experienced problem
@@ -2753,7 +2753,7 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){
 			pclose(fp);
 			_commandOutputValue=_getValueOfList(_commandOutputList,true);
 		}else
-			output("%sFailed to execute OS command '%s'.\n",ERROR_PREFIX,string(_commandText));
+			output("%sFailed to execute OS command '%s'.\n",M_ERROR_PREFIX,string(_commandText));
 	}
 	if(_commandText)free_string(_commandText);
 	return _commandOutputValue;
@@ -2778,7 +2778,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 			errorflags|=1;
 		}
 		// if M_value wasn't bound to the M variable, it's memory will be freed by the garbage collector, by setting M_value to NULL we know we do not need to update the wrapped list
-		if(M_value->count==0){M_value=NULL;errorflags|=2;output("%sFailed to initialize %s.\n",ERROR_PREFIX,M_VARIABLE_NAME);}
+		if(M_value->count==0){M_value=NULL;errorflags|=2;output("%sFailed to initialize %s.\n",M_ERROR_PREFIX,M_VARIABLE_NAME);}
 	}else{
 		errorflags|=4;
 		outputWarning("Failed to create the list in which commands and their values will be stored. You won't be able to use it in your commands!");
@@ -2788,7 +2788,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 	if(M_value){
 		if(!completedValueFunction(_getFunction(_Menvironment,MFUNCTION_NAME),MFUNCTION_NAME,MM)){
 			errorflags|=8;
-			output("%sFailed to register function %s.",ERROR_PREFIX,MFUNCTION_NAME);
+			output("%sFailed to register function %s.",M_ERROR_PREFIX,MFUNCTION_NAME);
 		}else
 		if(amVerbose())
 			output("Function %s registered.\n",MFUNCTION_NAME);
@@ -3022,7 +3022,7 @@ int main(int argc, char **argv){
 				Mstring* _sessionStartTimestamp=_getTimestamp(NULL);outputToFile("M session start at ",string(_sessionStartTimestamp),".\n");if(_sessionStartTimestamp)free_string(_sessionStartTimestamp);
 				output("Session information will be written to %s.\n",string(_outputFilename));
 			}else
-				output("%sFailed to open %s for writing session information to.\n",ERROR_PREFIX,string(_outputFilename));
+				output("%sFailed to open %s for writing session information to.\n",M_ERROR_PREFIX,string(_outputFilename));
 		}else
 			outputError("No session log will be written, due to failing to compose the output filename.");
 		free_string(_outputFilename);
@@ -3204,7 +3204,7 @@ int main(int argc, char **argv){
 							if(tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,true)){
 								if(_userInputCommand->_lastToken->type==TT_VARIABLE)inputInfo("%s","Token recognized as variable!");
 							}else
-								inputInfo("%s%s",ERROR_PREFIX,"Checking the token for being a variable failed!");
+								inputInfo("%s%s",M_ERROR_PREFIX,"Checking the token for being a variable failed!");
 							char c;inputCharRead(&c);
 							*/
 						}
@@ -3637,7 +3637,7 @@ int main(int argc, char **argv){
 					signed char sessionSettingApplied=getSessionSettingApplied(inputChar); // try to process myself
 					// we can get 'n' or 'x' responses
 					if(sessionSettingApplied<0){
-						if(!settingApplied(inputChar))output("%sSetting character '%c' not recognized.\n",ERROR_PREFIX,inputChar);
+						if(!settingApplied(inputChar))output("%sSetting character '%c' not recognized.\n",M_ERROR_PREFIX,inputChar);
 					}else
 					if(sessionSettingApplied>0)inputCharType=sessionSettingApplied;
 					break;

@@ -20,8 +20,8 @@ extern const char* const DEFINEUSERFUNCTION_NAME; // the name of the define user
 extern const char* const DEFINEANONYMOUSFUNCTION_NAME; // the name of the define user function function
 extern const char* MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char* IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
-extern const char* const ERROR_PREFIX;
-extern const char* const WARNING_PREFIX;
+extern const char* const M_ERROR_PREFIX;
+extern const char* const M_WARNING_PREFIX;
 extern const char * const VALUETYPENAMES[];
 
 // moved over to the end of Mvalue.c
@@ -152,7 +152,7 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){
         Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment),true);
         if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,"",_localVariableNamesListValue)){
             /// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
-            output("%sFailed to register the local variable names of '%s'.\n",ERROR_PREFIX,environment->_name);
+            output("%sFailed to register the local variable names of '%s'.\n",M_ERROR_PREFIX,environment->_name);
         }
         if(environment->_parent){
             // determine the variable names map of the parent environment and wrap it
@@ -160,7 +160,7 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){
             // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
             if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
                 /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
-                output("%sFailed to register the variable names of the parent of '%s'.\n",ERROR_PREFIX,environment->_name);
+                output("%sFailed to register the variable names of the parent of '%s'.\n",M_ERROR_PREFIX,environment->_name);
             }
         }
     }
@@ -363,9 +363,9 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
                                 appendedToMap(_valuecountMap,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(_allocationTypes[i].mark_occupied));
                                 appendedToMap(_valuecountMap,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(_allocationTypes[i].mark_freed));
                                 if(!appendedToMap(_valuecountsMap,string(_allocationTypeText),_getValueOfMap(_valuecountMap,true)))
-                                    output("%sFailed to store the allocation count map of '%c'.\n",ERROR_PREFIX,_allocationTypes[i].type);
+                                    output("%sFailed to store the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
                             }else
-                                output("%sFailed to create the allocation count map of '%c'.\n",ERROR_PREFIX,_allocationTypes[i].type);
+                                output("%sFailed to create the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
                         }
                         string_setlength(_allocationTypeText,0);
                     }
@@ -455,7 +455,7 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
     Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
     Mmap* variableMap=(environment?environment->_variableMap:NULL);
     if(!variableMap){
-        if(report)output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);
+        if(report)output("%sNo variables in environment to find '%s' in.\n",M_ERROR_PREFIX,name);
         return NULL;
     }
     if(report)output("Looking for variable '%s' in '%s'.\n",name,environment->_name->chars);
@@ -481,7 +481,7 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
     // input valid
     Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
     Mmap* variableMap=(environment?environment->_variableMap:NULL);
-    if(!variableMap){output("%sNo variables in environment to find '%s' in.\n",ERROR_PREFIX,name);return NULL;}
+    if(!variableMap){output("%sNo variables in environment to find '%s' in.\n",M_ERROR_PREFIX,name);return NULL;}
     ///////////if(amVerbose())output("Looking for variable '%s'.\n",name);
     Mmapelement* _variableMapelement=variableMap->_first;
     // as long as variable is defined, and the variable's name is not equal to the given name, continue
@@ -746,9 +746,9 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
                     map->numberOfElements++;
                     if(amVerbose())output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
                 }else
-                    output("%sFailed to create a new map element for variable '%s'.",ERROR_PREFIX,name);
+                    output("%sFailed to create a new map element for variable '%s'.",M_ERROR_PREFIX,name);
             }else
-                output("%sNo (environment) variable map to add variable '%s' to.\n",ERROR_PREFIX,name);
+                output("%sNo (environment) variable map to add variable '%s' to.\n",M_ERROR_PREFIX,name);
         }
         if(!propertySeparator)return(_variable?true:false); // if not a property reference we're done anyway (and the result depends on whether or not _variable is NULL)
         // ASSERT some property reference, and we have to undo the '\0' character placement
@@ -782,7 +782,7 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
                     if(amVerbose())output("Property '%s' added.\n",property);
                 }else{ // failure
                     _variable=NULL;
-                    output("%sFailed to create a new map element to store property '%s'.",ERROR_PREFIX,property);
+                    output("%sFailed to create a new map element to store property '%s'.",M_ERROR_PREFIX,property);
                 }
             }else // property already exists
                 _variable=mapelement->_variable;
@@ -794,10 +794,10 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
         if(environment){
             Mmap* map=(_variable&&_variable->_value&&_variable->_value->type==VT_MAP?_variable->_value->value._map:NULL);
             bool result=false;
-            if(!map)output("%s'%s' does not hold a map value.",ERROR_PREFIX,name);else
-            if(map->immutable)output("%sCannot add a property to the immutable map stored in '%s'.",ERROR_PREFIX,name);else result=true; // TODO more specific please
+            if(!map)output("%s'%s' does not hold a map value.",M_ERROR_PREFIX,name);else
+            if(map->immutable)output("%sCannot add a property to the immutable map stored in '%s'.",M_ERROR_PREFIX,name);else result=true; // TODO more specific please
             name[firstPropertySeparator-name]=M_PROPERTY_SEPARATOR_CHARACTER;
-            if(result)if(!appendedToMap(map,firstPropertySeparator+1,NULL)){result=false;output("%sFailed to add property '%s'.",ERROR_PREFIX,firstPropertySeparator+1);}
+            if(result)if(!appendedToMap(map,firstPropertySeparator+1,NULL)){result=false;output("%sFailed to add property '%s'.",M_ERROR_PREFIX,firstPropertySeparator+1);}
             return result;
         }
         _variable=getVariable(environment,name,false);
@@ -828,14 +828,14 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
                     }
                     outputErrorAndText("Failed to create a new map element for variable ",name);
                 }else
-                    output("%sNo environment to add newly created variable %s to.\n",ERROR_PREFIX,name);
+                    output("%sNo environment to add newly created variable %s to.\n",M_ERROR_PREFIX,name);
                 // ASSERT failed to link the variable to the variable map!!
                 free_variable(_variable,true); // MDH@02NOV2019: no value yet assigned so we can pass in the weak flag
                 outputErrorAndText("Failed to link variable ",name);
             }else
                 outputErrorAndText("Failed to create variable ",name);
         }else
-            if(amVerbose())output("%sWon't add existing variable '%s'\n.",WARNING_PREFIX,name);
+            if(amVerbose())output("%sWon't add existing variable '%s'\n.",M_WARNING_PREFIX,name);
         */
     }else
         outputError("No variable name specified");
@@ -865,15 +865,15 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
                 ///////////////if(_variable->_value)_variable->_value->count++; // increment the reference count
                 return true; // releasing the value is my responsibility now...
             }
-            output("%sCannot set the value of variable `%s`: the new value is of the wrong type.\n",ERROR_PREFIX,name);
+            output("%sCannot set the value of variable `%s`: the new value is of the wrong type.\n",M_ERROR_PREFIX,name);
         }else
         if(variable->_value){
-            output("%sCannot change the value of variable '%s'",ERROR_PREFIX,name);
+            output("%sCannot change the value of variable '%s'",M_ERROR_PREFIX,name);
             outputValue(" from '",variable->_value,"'");outputValue(" to '",_value,"': it is not mutable!\n");
         }else
-            output("%sCannot initialize the value of variable '%s': it is not mutable!\n",ERROR_PREFIX,name);
+            output("%sCannot initialize the value of variable '%s': it is not mutable!\n",M_ERROR_PREFIX,name);
     }else
-        output("%sCannot set the value of variable '%s': it is unknown.\n",ERROR_PREFIX,name);
+        output("%sCannot set the value of variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
     return false;
 }/* VALIDATED */
 
@@ -902,16 +902,16 @@ bool setVariable(Menvironment * const _environment,char /*const*/ * const name,M
                 }
                 return true; // releasing the value is my responsibility now...
             }
-            output("%sCannot set variable '%s': the new value is of the wrong type.\n",ERROR_PREFIX,name);
+            output("%sCannot set variable '%s': the new value is of the wrong type.\n",M_ERROR_PREFIX,name);
         }else
         if(variable->_value){
-            output("%sCannot change the value of variable '%s'",ERROR_PREFIX,name);
+            output("%sCannot change the value of variable '%s'",M_ERROR_PREFIX,name);
             outputValue("from '",variable->_value,"'");
             outputValue(" to '",_value,"': it is not mutable.\n");
         }else
-            output("%sCannot initialize the value of variable '%s': it is not mutable!\n",ERROR_PREFIX,name);
+            output("%sCannot initialize the value of variable '%s': it is not mutable!\n",M_ERROR_PREFIX,name);
     }else
-        output("%sCannot set variable '%s': it is unknown to '%s'.\n",ERROR_PREFIX,name,(_environment?_environment:getExecutionEnvironment())->_name);
+        output("%sCannot set variable '%s': it is unknown to '%s'.\n",M_ERROR_PREFIX,name,(_environment?_environment:getExecutionEnvironment())->_name);
     return false;
 }/* VALIDATED */
 
@@ -925,20 +925,20 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
             if(variableValue!=_value){
                 unsigned long long index=appendedToList(variableValue->value._list,_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
                 if(index>0)return index;
-                output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",ERROR_PREFIX,name,(_value?_value->type:-1));
+                output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",M_ERROR_PREFIX,name,(_value?_value->type:-1));
             }else
                 outputError("Circular reference not allowed");
         }else
-            output("%sCannot append the value to variable '%s': it does not contain a list!\n",ERROR_PREFIX,name);
+            output("%sCannot append the value to variable '%s': it does not contain a list!\n",M_ERROR_PREFIX,name);
     }else
-        output("%sCannot set the value of variable '%s': it is unknown.\n",ERROR_PREFIX,name);
+        output("%sCannot set the value of variable '%s': it is unknown.\n",M_ERROR_PREFIX,name);
     return 0;
 }/* VALIDATED */
 
 Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const name){
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     Mvariable* variable=getVariable(_environment,name,false);
-    if(!variable){output("%sVariable '%s' not found.\n",ERROR_PREFIX,name);return NULL;}
+    if(!variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
     return variable->_value;
 }/* VALIDATED */
 
@@ -946,7 +946,7 @@ Mvalue* getValue(Menvironment const * const _environment,char /*const*/ * const 
 Mvalue** getValueHolder(Menvironment const * const _environment,char /*const*/ * const name){
     if(!_environment||!name){outputError("No environment or name specified");return NULL;}
     Mvariable* variable=getVariable(_environment,name,false);
-    if(!variable){output("%sVariable '%s' not found.\n",ERROR_PREFIX,name);return NULL;}
+    if(!variable){output("%sVariable '%s' not found.\n",M_ERROR_PREFIX,name);return NULL;}
     return &(variable->_value);
 }/* VALIDATED */
 
@@ -1030,7 +1030,7 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
     Mmap* _functionArgumentMap=NULL;
     // MDH@03MAR2020: _argumentList should also be allowed to be NULL (because then defaults would be used)
     if(_function/*&&_argumentList*/){
-        _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC(1,sizeof(Mmap),'M')); // MDH@02NOV2019: force the map to be weak
+        _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC(sizeof(Mmap),'M')); // MDH@02NOV2019: force the map to be weak
         Mmap* functionParameterMap=_function->_parameterMap;
         if(_functionArgumentMap&&functionParameterMap){
             if(amVerbose())outputInfo("Matching the function parameters!");
@@ -1041,10 +1041,10 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 argumentindex++; // the index of the argument we need
                 // if the current list element has an index below the one we need, get the next argument list element until we have found one with an index at least equal to argument index
                 while(argumentListelement&&argumentListelement->index<argumentindex)argumentListelement=argumentListelement->_next;
-                Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+                Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
                 if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
-                _argumentmapelement->_variable=(Mvariable*)CALLOC(1,sizeof(Mvariable),'V');
+                _argumentmapelement->_variable=(Mvariable*)CALLOC(sizeof(Mvariable),'V');
                 if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true);break;}
                 // probably can't simply assign??? let's use _strdup then 
                 // MDH@17APR2020: _strdup() replaced by _getChars() as on so many other places today
@@ -1082,7 +1082,7 @@ Mfunction* _getFunction(Menvironment * const _environment,const char* const name
     if(_environment&&name&&strlen(name)){
         _function=getFunction(_environment,name); // check for a function with the given name in the given environment
         if(!_function){ // doesn't exist yet
-            _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'=');
+            _function=(Mfunction*)CALLOC(sizeof(Mfunction),'=');
             if(_function){
                 ///////////_function->type=functionType;
                 /* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
@@ -1096,7 +1096,7 @@ Mfunction* _getFunction(Menvironment * const _environment,const char* const name
                     if(p){
                         Mfunctionmap* _functionmap=_environment->_functionMap;
                         if(_functionmap){
-                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(1,sizeof(Mfunctionmapelement),'+');
+                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(sizeof(Mfunctionmapelement),'+');
                             if(_functionmapelement){
                                 _functionmapelement->_name=_functionName; // MDH@10JUL2019: moved over to the function map element
                                 _functionmapelement->_function=_function; // no worries here
@@ -1118,11 +1118,11 @@ Mfunction* _getFunction(Menvironment * const _environment,const char* const name
                     if(!p){free_string(_functionName);_functionName=NULL;} // p==NULL indicates _functionName not bound in _function->_name
                     // try to append it to the functionMap, if we succeed store _functioName in ->_name
                 }else
-                    output("%sFailed to store function name '%s'.\n",ERROR_PREFIX,name);
+                    output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
                 // if we fail to register the name and/or the function with the environment free the function!!
                 if(!_functionName){free_function(_function);_function=NULL;}   
             }
-            if(!_function)output("%sFailed to create function '%s'.\n",ERROR_PREFIX,name);
+            if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
         }else
             output("NOTE: Function '%s' already exists.\n",name);
     }
@@ -1251,7 +1251,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
                 {
                     variable=value->value._reference->variable;
                     // it's best NOT to create the variable if it does not yet exist although we could
-                    if(!variable){output("%s",ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");return NULL;}
+                    if(!variable){output("%s",M_ERROR_PREFIX);outputValue("Cannot set the type of an non-existing variable through reference '",value,"'.\n");return NULL;}
                     break;
                 }
             default:outputError("Can not set the type of values that are scalar or text (representing the name of a variable)");return NULL;
@@ -1264,7 +1264,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
             // we should locate the character in either MUTABLE
             char valuetypechar=valuetypeValue->value._text->_c[0];
             char mutablevaluetypechar=getMutableValueTypeCharacter(valuetypechar);
-            if(!mutablevaluetypechar){output("%s",ERROR_PREFIX);outputValue("Invalid value type specification '",valuetypeValue,"'.\n");return NULL;}
+            if(!mutablevaluetypechar){output("%s",M_ERROR_PREFIX);outputValue("Invalid value type specification '",valuetypeValue,"'.\n");return NULL;}
             immutable=(mutablevaluetypechar==valuetypechar?M_FALSE:M_TRUE); // if the same we received the mutable variant
             valuetype=getCharacterOfMutableValueType(mutablevaluetypechar);
             /* replacing (which we would need to change whenever (IM)MUTABLEVALUETYPECHARS would change, which of course is easy to forget):
@@ -1299,7 +1299,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
                 if(valuetype!=variable->valuetype){ // a change of the value type intended (e.g. from undefined i.e. free to integer, or real or whatever)
                     // you cannot change the type of a variable that its current value is not (unless the value is undefined or the type of the value is undefined)
                     if(variable->_value&&variable->_value->type!=valuetype&&variable->_value->type!=VT_UNDEFINED){
-                        output("%sUnable to change the value type of %s to '%c' when its value is of type '%c'.\n",ERROR_PREFIX,variable->_name,MUTABLEVALUETYPECHARS[valuetype],MUTABLEVALUETYPECHARS[variable->_value->type]);
+                        output("%sUnable to change the value type of %s to '%c' when its value is of type '%c'.\n",M_ERROR_PREFIX,variable->_name,MUTABLEVALUETYPECHARS[valuetype],MUTABLEVALUETYPECHARS[variable->_value->type]);
                         return NULL;
                     }
                     variable->valuetype=valuetype; // update the value type
@@ -1342,7 +1342,7 @@ Mvalue* Msettype(Mvalue* value,Mvalue* valuetypeValue,Mvalue* immutableValue){
                 value->value._map->immutable=immutableflag;
                 if(amVerbose())output("List '%s' is now %smutable.\n",(value->value._list->immutable?"im":""));
             }else
-            if(amVerbose())output("%sUnable to change the mutability of a value of type %s.\n",ERROR_PREFIX,VALUETYPENAMES[value->type]);
+            if(amVerbose())output("%sUnable to change the mutability of a value of type %s.\n",M_ERROR_PREFIX,VALUETYPENAMES[value->type]);
         }
     }
     return Mtype(value);
@@ -1368,7 +1368,7 @@ bool completedValueFunction(Mfunction* const _function,const char* const functio
             if(amVerbose())output("Registered single value argument function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register single value argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register single value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1381,7 +1381,7 @@ bool completedFloatFunction(Mfunction* const _function,const char* const functio
             if(amVerbose())output("Registered single real argument function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register single real argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register single real argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1395,7 +1395,7 @@ bool completedIntegerFunction(Mfunction* const _function,const char* const funct
            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;    
         }
-        output("%sFailed to register single integer argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register single integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1409,7 +1409,7 @@ bool completedListFunction(Mfunction* const _function,const char* const function
             if(amVerbose())output("Registered list function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register single list argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register single list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1423,7 +1423,7 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
             if(amVerbose())output("Registered token list function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register single token list argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register single token list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1437,7 +1437,7 @@ bool completedIntegerBooleanFunction(Mfunction* const _function,const char* cons
             if(amVerbose())output("Registered integer boolean function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register integer boolean argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register integer boolean argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* NOT VALIDATED */
@@ -1450,7 +1450,7 @@ bool completedStringStringFunction(Mfunction* const _function,const char* const 
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register double string argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register double string argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1463,7 +1463,7 @@ bool completedFloatFloatFunction(Mfunction* const _function,const char* const fu
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register double real argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register double real argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1476,7 +1476,7 @@ bool completedStringMapTokenFunction(Mfunction* const _function,const char* cons
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register string map token argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register string map token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1489,7 +1489,7 @@ bool completedMapTokenFunction(Mfunction* const _function,const char* const func
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register map token argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register map token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1502,7 +1502,7 @@ bool completedValueTextValueFunction(Mfunction* const _function,const char* cons
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register a value text value argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register a value text value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1515,7 +1515,7 @@ bool completedTokenTokenFunction(Mfunction* const _function,const char* const fu
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register two token argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register two token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1528,7 +1528,7 @@ bool completedValueValueFunction(Mfunction* const _function,const char* const fu
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register two value argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register two value argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1541,7 +1541,7 @@ bool completedListValueFunction(Mfunction* const _function,const char* const fun
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register list value function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register list value function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1554,7 +1554,7 @@ bool completedListValueIntegerFunction(Mfunction* const _function,const char* co
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register list value integer function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register list value integer function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1567,7 +1567,7 @@ bool completedValueTokenTokenFunction(Mfunction* const _function,const char* con
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register three token argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register three token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1580,7 +1580,7 @@ bool completedThreeIntegersFunction(Mfunction* const _function,const char* const
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register three integer argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register three integer argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1593,7 +1593,7 @@ bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register four token argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register four token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1606,7 +1606,7 @@ bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register five token argument function '%s'.\n",ERROR_PREFIX,functionName);
+        output("%sFailed to register five token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */
@@ -1624,7 +1624,7 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 */
 unsigned long long getNumberOfFunctionCommands(const char* const functionName){
     Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
-    if(!function||function->type!=FT_USER){if(!function)output("%sFunction '%s' not found.\n",ERROR_PREFIX,functionName);return -1;}
+    if(!function||function->type!=FT_USER){if(!function)output("%sFunction '%s' not found.\n",M_ERROR_PREFIX,functionName);return -1;}
     return (function->functionunion._userfunction->_bodyCommandList?function->functionunion._userfunction->_bodyCommandList->numberOfElements:0);
 }
 bool registerFunctionCommand(const char* const functionName,Mtoken* command){
@@ -1636,11 +1636,11 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){
             if(!function->functionunion._userfunction->_bodyCommandList)
                 function->functionunion._userfunction->_bodyCommandList=__list("function body command list");
             if(appendedToList(function->functionunion._userfunction->_bodyCommandList,_commandValue,M_LL_INVALID))return true;
-            output("%sFailed to add command to list of body of '%s'.\n",ERROR_PREFIX,functionName);
+            output("%sFailed to add command to list of body of '%s'.\n",M_ERROR_PREFIX,functionName);
         }else
-            output("%sFailed to wrap a command of function '%s'.\n",ERROR_PREFIX,functionName);
+            output("%sFailed to wrap a command of function '%s'.\n",M_ERROR_PREFIX,functionName);
     }else
-        output("%s'%s' does not represent a user function.\n",ERROR_PREFIX,functionName);
+        output("%s'%s' does not represent a user function.\n",M_ERROR_PREFIX,functionName);
     return false;
 }
 
@@ -1649,7 +1649,7 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){
 Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
     Mvalue* _functionValue=NULL;
     if((!_parameterMapValue||_parameterMapValue->type==VT_MAP)&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-        Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'-');
+        Muserfunction* _userfunction=(Muserfunction*)CALLOC(sizeof(Muserfunction),'-');
         if(_userfunction){
             if(amVerbose())if(_parameterMapValue)outputValue("Defining an anonymous function with parameters ",_parameterMapValue,".\n");
             // user function expects a list of commands, so we have to wrap the single token (if any)
@@ -1659,7 +1659,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
                     outputError("Failed to store the inline command as body of an anonymous function.");
                 // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
             }
-            Mfunction* _function=(Mfunction*)CALLOC(1,sizeof(Mfunction),'=');
+            Mfunction* _function=(Mfunction*)CALLOC(sizeof(Mfunction),'=');
             if(_function){
                 // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                 //                so we have to make a copy of the parameter map
@@ -1682,7 +1682,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
     // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
     if(_nameValue&&_parameterMapValue){
         if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-            Muserfunction* _userfunction=(Muserfunction*)CALLOC(1,sizeof(Muserfunction),'-');
+            Muserfunction* _userfunction=(Muserfunction*)CALLOC(sizeof(Muserfunction),'-');
             if(_userfunction){
                 if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
                 Mtext* functionName=_nameValue->value._text;
@@ -1690,7 +1690,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                 if(_bodyTokenValue){
                     _userfunction->_bodyCommandList=_getListOfType(VT_TOKEN);
                     if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,_bodyTokenValue,M_LL_INVALID))
-                        output("%sFailed to store the inline command as body of function definition of '%s'.\n",ERROR_PREFIX,functionName->_c);
+                        output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
                     // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
                 }
                 //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
@@ -1707,7 +1707,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                     return _getIntegerValue(1);
                 }
                 ///////////free_value(_userfunctionValue); // freed
-                output("%sFailed to create function '%s'.\n",ERROR_PREFIX,functionName);
+                output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,functionName);
                 ///////}
             }
         }else

@@ -7,9 +7,9 @@
 
 // the texts to be used in certain message types
 extern const char* const INFO_PREFIX;
-extern const char* const ERROR_PREFIX;
-extern const char* const WARNING_PREFIX;
-extern const char* const BUG_PREFIX;
+extern const char* const M_ERROR_PREFIX;
+extern const char* const M_WARNING_PREFIX;
+extern const char* const M_BUG_PREFIX;
 
 void outputInfo(char const * const info){
     size_t l=(info?strlen(info):0);
@@ -22,8 +22,8 @@ void outputInfo(char const * const info){
 void outputWarning(char const * const warning){
     size_t l=(warning?strlen(warning):0);
     if(l==0)return;
-    if(!WARNING_PREFIX)return;
-    output("%s%s",WARNING_PREFIX,warning);
+    if(!M_WARNING_PREFIX)return;
+    output("%s%s",M_WARNING_PREFIX,warning);
     l--;if(warning[l]!='.'&&warning[l]!='!'&&warning[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
     newline();
 }
@@ -31,25 +31,25 @@ void outputWarning(char const * const warning){
 void outputError(char const * const error){
     size_t l=(error?strlen(error):0);
     if(l==0)return;
-    if(!ERROR_PREFIX)return;
-    output("%s%s",ERROR_PREFIX,error);
+    if(!M_ERROR_PREFIX)return;
+    output("%s%s",M_ERROR_PREFIX,error);
     l--;if(error[l]!='.'&&error[l]!='!'&&error[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
     newline();
-    // replacing: if(error)output("%s%s.\n",ERROR_PREFIX,error);
+    // replacing: if(error)output("%s%s.\n",M_ERROR_PREFIX,error);
 }
 
 void outputMemoryError(char const * const memoryerror){
-    if(memoryerror)output("%s%s. Probable cause: out of memory!\n",ERROR_PREFIX,memoryerror);
+    if(memoryerror)output("%s%s. Probable cause: out of memory!\n",M_ERROR_PREFIX,memoryerror);
 }
 
 // MDH@05NOV2019: might come in handy to be able to report bugs
-void outputErrorAndText(char const * const error,char const * const text){if(error)output("%s%s",ERROR_PREFIX,error);if(text)output(text);output(".\n");}
+void outputErrorAndText(char const * const error,char const * const text){if(error)output("%s%s",M_ERROR_PREFIX,error);if(text)output(text);output(".\n");}
 
 void outputBug(char const * const bug){
     size_t l=(bug?strlen(bug):0);
     if(l==0)return;
-    if(!BUG_PREFIX)return;
-    output("%s%s",BUG_PREFIX,bug);
+    if(!M_BUG_PREFIX)return;
+    output("%s%s",M_BUG_PREFIX,bug);
     l--;if(bug[l]!='.'&&bug[l]!='!'&&bug[l]!='?')outputChar('.'); // if the bug doesn't end with a period, exclamation sign or question mark put a period behind it
     newline();
 } 

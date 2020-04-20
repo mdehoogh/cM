@@ -21,9 +21,9 @@ const char* const DEFINEANONYMOUSFUNCTION_NAME="function"; // MDH@04MAR2020: an 
 const char* const MUTABLEVALUETYPECHARS="uoibdqftlmr"; // the characters associated with each of the value types
 const char* const IMMUTABLEVALUETYPECHARS="UOIBDQFTLMR"; // the characters associated with each of the value types
 const char* const INFO_PREFIX=""; // MDH@27FEB2020: as for now NO actual info prefix text to use
-const char* const ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
-const char* const WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
-const char* const BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
+const char* const M_ERROR_PREFIX="ERROR: "; // used in Mexecution.c as well (defined there as extern!!!)
+const char* const M_WARNING_PREFIX="WARNING: "; // used in Mexecution.c as well (defined there as extern!!!)
+const char* const M_BUG_PREFIX="BUG: "; // MDH@05NOV2019: for reporting bugs
 
 const char* M_HIDDEN_VARIABLE_NAMES[]={"M","?","_"}; // MDH@14NOV2019: the variable names not to show when the variables are shown (with their current value)
 const unsigned long long M_NUMBER_OF_HIDDEN_VARIABLES=3;// MDH@14NOV2019: yes, three of them
@@ -202,11 +202,11 @@ bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap*
 		if(strlen(variableMapelementVariable->_name->chars)==0)continue; // no use to create a variable with no name
 		// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
 		if(!addVariable(_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->valuetype,false)){
-			output("%sFailed to add variable '%s' as local variable.\n",ERROR_PREFIX,variableMapelementVariable->_name->chars);
+			output("%sFailed to add variable '%s' as local variable.\n",M_ERROR_PREFIX,variableMapelementVariable->_name->chars);
 			executionEnvironmentInitialized=false;
 		}else
 		if(!setValue(_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->_value)){
-			output("%sFailed to initialize local variable '%s'.\n",ERROR_PREFIX,variableMapelementVariable->_name->chars);
+			output("%sFailed to initialize local variable '%s'.\n",M_ERROR_PREFIX,variableMapelementVariable->_name->chars);
 			executionEnvironmentInitialized=false;
 		}else
 			variableMapelement=variableMapelement->_next;
@@ -384,7 +384,7 @@ int8_t isAValidCommandIndicator(Mcommand* command,bool report){
 			case TT_MAP:{if(report)outputError("Missing end of map");return -5;}
 			default:
 				{
-					if(report)output("%sUnknown expression with first token of type %s left unfinished.\n",ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
+					if(report)output("%sUnknown expression with first token of type %s left unfinished.\n",M_ERROR_PREFIX,TOKENTYPE_STRING[expressionToken->expr->type]);
 					return -6;
 				}
 		}
@@ -488,9 +488,9 @@ Mvalue* setdp(Mvalue* value){
 					M_DP=decimalprecision; // OOPS forgot this earlier TODO should we do this or not????
 					////DP_value->value._integer->ll=_decimalContext->prec;
 				}else
-					output("%sActive decimal context not replaced: failed to create a decimal context with precision %llu.\n",ERROR_PREFIX,decimalprecision);
+					output("%sActive decimal context not replaced: failed to create a decimal context with precision %llu.\n",M_ERROR_PREFIX,decimalprecision);
 			}else
-				output("%sRequested decimal precision (%llu) not activated: it should at least be 6.\n",ERROR_PREFIX,decimalprecision);
+				output("%sRequested decimal precision (%llu) not activated: it should at least be 6.\n",M_ERROR_PREFIX,decimalprecision);
 		}
 	}
 	return _getIntegerValue(olddecimalprecision);
@@ -697,7 +697,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 					forEnvironmentInitialized=false;
 				}
 			}else
-				output("%sFailed to add or initialize the for loop result and counter local variables $ and _.\n",ERROR_PREFIX);
+				output("%sFailed to add or initialize the for loop result and counter local variables $ and _.\n",M_ERROR_PREFIX);
 			if(!forEnvironmentInitialized){
 				free_environment(_forEnvironment); // have to free the environment myself
 				if(amVerbose())outputInfo("Uninitialized for loop environment discarded!");
@@ -887,7 +887,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 		if(variableExistsIndicator<0)
 			functionToken->type=TT_NEW_VARIABLE;
 		else // TODO what more can we do????
-			output("%sInvalid identifier name '%s'.",BUG_PREFIX,_identifierName);
+			output("%sInvalid identifier name '%s'.",M_BUG_PREFIX,_identifierName);
 	}
 	// replacing: functionToken->type=(command->_lastToken->argument!=1&&(existsInCommand(command,_identifierName,command->_lastToken->envid/* replacing:getSpecialFunctionCallToken(_userInputCommand->_lastToken)*/)||containsVariable(getExecutionEnvironment(),_identifierName,-1))?TT_VARIABLE:TT_NEW_VARIABLE); // MDH@07AUG2019: the function might have been created (and used) in the current command
 	free(_identifierName);
@@ -916,7 +916,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	// MDH@28MAR2019: if we're in a binary token type with the repeatable flag set AND the user has repeated the previous first token character the inputCharacterType should become R to get the right transition
 	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
-	if(!lastCommandToken){(*inputErrorFunction)("%sNo last command token.",BUG_PREFIX);return NULL;}
+	if(!lastCommandToken){(*inputErrorFunction)("%sNo last command token.",M_BUG_PREFIX);return NULL;}
 	if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
@@ -1280,11 +1280,11 @@ Mvalue* Mevalfunction(Mvalue* value){
 						_evalValue=getCommandValue(_evalCommand,'e');
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
-						output("%sUnable to setup the evaluation of '%s'.\n",ERROR_PREFIX,string(_evalValueText));
+						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 				}else
-					output("%sUnable to evaluate '%s'.\n",ERROR_PREFIX,string(_evalValueText));
+					output("%sUnable to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}else
-				output("%sUnable to evaluate the invalid command '%s'.\n",ERROR_PREFIX,string(_evalValueText));
+				output("%sUnable to evaluate the invalid command '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			free_token(_evalCommandToken); // clean up the command
 		}
 		free_string(_evalValueText);
@@ -1494,7 +1494,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	return _newCommandToken;
 }
 Mcommand* _getNewCommand(bool withFirstToken){
-	Mcommand* _command=CALLOC(1,sizeof(Mcommand),'K');
+	Mcommand* _command=CALLOC(sizeof(Mcommand),'K');
 	if(_command){
 		if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
@@ -1740,12 +1740,12 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
 	long long numberOfRequestedDecimals=getValueInteger(value);
 	if(numberOfRequestedDecimals==M_LL_INVALID){
-		output("%s",ERROR_PREFIX);
+		output("%s",M_ERROR_PREFIX);
 		outputValue("Argument '",value,"' to the pi() function should denote a valid small integer, which it does not.\n");
 		return NULL;
 	}
 	if(numberOfRequestedDecimals<6){
-		output("%sNumber of requested decimals to compute pi (%lld) should at least equal 6, which it does not.\n",ERROR_PREFIX,numberOfRequestedDecimals);
+		output("%sNumber of requested decimals to compute pi (%lld) should at least equal 6, which it does not.\n",M_ERROR_PREFIX,numberOfRequestedDecimals);
 		return NULL;
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
@@ -1799,13 +1799,13 @@ Mvalue* pi_ql(Mvalue* value){
 							Mbiginteger* _addendumNumerator=_getBiginteger(iter%2?-1:1); // the numerator is either 1 or -1
 							if(!_addendumNumerator){
 								free_biginteger(_addendumDenominator);
-								output("%sFailed to set the addendum numerator at iteration %u.\n",ERROR_PREFIX,iter);
+								output("%sFailed to set the addendum numerator at iteration %u.\n",M_ERROR_PREFIX,iter);
 								break;
 							}
 							// both _addendumNumerator and _addendumDenominator are now available to be bound in the rational
 							Mrational* _addendumRational=_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false,true);
 							if(!_addendumRational){ // failed to bind in the rational
-								output("%sFailed to compute the rational to add to the approximation of pi in step %u.",ERROR_PREFIX,iter);
+								output("%sFailed to compute the rational to add to the approximation of pi in step %u.",M_ERROR_PREFIX,iter);
 								break;
 							}
 							// add the addendum to the current rational
@@ -1816,7 +1816,7 @@ Mvalue* pi_ql(Mvalue* value){
 							Mrational* _newRational=_getRationalSum(_rational,_addendumRational); // _qsum replaced by _getRationalSum in Mrational.h/c
 							if(!_newRational){
 								// we have to free the addendum numerator and denominator
-								output("%sFailed to add this addendum at step %u in approximating pi.\n",ERROR_PREFIX,iter);
+								output("%sFailed to add this addendum at step %u in approximating pi.\n",M_ERROR_PREFIX,iter);
 								free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
 								break;
 							}
@@ -1848,7 +1848,7 @@ Mvalue* pi_ql(Mvalue* value){
 				}
 				// MDH@09APR2020: ok, this might be problematic if _rational_num is NULL so -> FIXED
 				if(!_rational->num||(mp_mul_2d(MP_INT_POINTER(_rational->num),2,MP_INT_POINTER(_rational->num))!=MP_OKAY)){
-					if(amVerbose()){output("%s",ERROR_PREFIX);outputRational("Failed to multiply the approximation of pi/4 (",_rational," by 4.\n");}
+					if(amVerbose()){output("%s",M_ERROR_PREFIX);outputRational("Failed to multiply the approximation of pi/4 (",_rational," by 4.\n");}
 					free_rational(_rational);
 					return NULL;
 				} // multiply the numerator by 4 i.e. 2**2
@@ -1882,7 +1882,7 @@ Mvalue* pi_q(Mvalue* value){
 							square=4*(iter+1)*iter+1;
 							////////////if(amVerbose())output("Square numerator: %llu.",square);
 							Mbiginteger* _bigintegerSquare=_getBiginteger(square);
-							if(!_bigintegerSquare){output("%sFailed to compute the big integer of square %llu.\n",ERROR_PREFIX,square);break;}
+							if(!_bigintegerSquare){output("%sFailed to compute the big integer of square %llu.\n",M_ERROR_PREFIX,square);break;}
 							if(amVerbose())output("%llu fractions yet to compute using numerator square '%llu'.\n",iter,square);
 							// the new denominator becomes 6+square/prev denominator=
 							Mbiginteger* _mult=_Imultiply(_denominatorRational->num,_bi6,false);
@@ -1905,7 +1905,7 @@ Mvalue* pi_q(Mvalue* value){
 					Mrational* _inverseDenominatorRational=_getInverseRational(_denominatorRational);
 					Mrational* _result=NULL;
 					if(!_inverseDenominatorRational){
-						output("%s",ERROR_PREFIX);outputRational("Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").\n");
+						output("%s",M_ERROR_PREFIX);outputRational("Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").\n");
 						free_rational(_rational);_rational=NULL;
 					}else
 						_result=_getRationalSum(_rational,_inverseDenominatorRational); // _qsum() replaced by _getRationalSum in Mrational.h/c
@@ -2770,7 +2770,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			unsigned long long newListElementIndex=appendedToList(_list,_listElementValue,listElementIndex);
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex==0){
-				output("%s",ERROR_PREFIX);
+				output("%s",M_ERROR_PREFIX);
 				outputValue("Failed to append list element '",_listElementValue,"'.\n");
 				break;
 			}
@@ -2813,7 +2813,7 @@ Mvalue* getValueOfMap(){
 		// MDH@22JUL2019: let's allow empty attribute name as well (why not!)
 		////////if(string_length(_attributeName)>0)
 		if(!appendedToMap(_map,string(_attributeName),_attributeValueValue)){
-			output("%s",ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
+			output("%s",M_ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
 		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
 		free_string(_attributeName); // ALWAYS free the name text
 		if(!expressionToken)break;
@@ -2860,11 +2860,11 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 						// the function result value (if set) takes precedence over the function evaluation value
 						return (functionResultValue?functionResultValue:functionEvaluationValue);
 					}else{
-						output("%sFailed to create the function execution environment of function '%s'.\n",ERROR_PREFIX,functionName);
+						output("%sFailed to create the function execution environment of function '%s'.\n",M_ERROR_PREFIX,functionName);
 						free_environment(_functionExecutionEnvironment);
 					}
 				}else
-					output("%sFailed to create the environment to execute function '%s'.\n",ERROR_PREFIX,functionName);
+					output("%sFailed to create the environment to execute function '%s'.\n",M_ERROR_PREFIX,functionName);
 				return NULL;
 			}
 			break;
@@ -2955,7 +2955,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){
 	FunctionBodyRequest* _functionBodyRequest=NULL;
 	if(functionName){
-		_functionBodyRequest=CALLOC(1,sizeof(FunctionBodyRequest),'9');
+		_functionBodyRequest=CALLOC(sizeof(FunctionBodyRequest),'9');
 		if(_functionBodyRequest){
 			_functionBodyRequest->_functionName=_strdup(functionName);
 			if(!_functionBodyRequest->_functionName){
@@ -2982,7 +2982,7 @@ FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequ
 static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 	if(!functionName||!strlen(functionName)){outputError("Invalid or missing function name.");return NULL;} // invalid input
 	// ASSERT a 'valid' function name
-	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",ERROR_PREFIX,functionName);return NULL;} // already have it
+	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",M_ERROR_PREFIX,functionName);return NULL;} // already have it
 	// technically it should not have been requested already (or exist)
 	FunctionBodyRequest* _functionBodyRequest=new_functionbodyrequest(functionName); // guarantees that functionName is defined
 	if(_functionBodyRequest){		
@@ -2991,7 +2991,7 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
 		if(amVerbose())output("The request for the body of function '%s' was created.\n",functionName);
 	}else
-		output("%sFailed to create the request for the body of function '%s'.\n",ERROR_PREFIX,functionName);
+		output("%sFailed to create the request for the body of function '%s'.\n",M_ERROR_PREFIX,functionName);
 	return _functionBodyRequest;
 }
 
@@ -3001,7 +3001,7 @@ FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInpu
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(1,sizeof(FunctionBodyInput),'8'); // free if not bound
+	_currentFunctionBodyInput=CALLOC(sizeof(FunctionBodyInput),'8'); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
 	if(function&&function->type==FT_USER){
@@ -3023,7 +3023,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		}else
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
-		output("%sCan't find function '%s' for accepting its body commands.\n",ERROR_PREFIX,_functionBodyRequest->_functionName);
+		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
 	FREE(_currentFunctionBodyInput,'H');
 	return false;
 }
@@ -3037,7 +3037,7 @@ bool startFunctionBodyInput(){
 	// MDH@02MAR2020 ADJUSTMENT: because _functionName is now a heap copy of the original function name (from the function argument list to 'function') we need to free it BEFORE returning the result
 	//                           now if we remember the pointer to it, we can release the request and STILL be able to release functionName afterwards!!!
 	bool functionBodyInputCreated=createFunctionBodyInput(_firstFunctionBodyRequest);
-	if(!functionBodyInputCreated)output("%sFailed to honour the request to input the body of function '%s'.\n",ERROR_PREFIX,_firstFunctionBodyRequest->_functionName);
+	if(!functionBodyInputCreated)output("%sFailed to honour the request to input the body of function '%s'.\n",M_ERROR_PREFIX,_firstFunctionBodyRequest->_functionName);
 	free_functionbodyrequest(_firstFunctionBodyRequest);_firstFunctionBodyRequest=NULL; // always free the function body request (if we succeed to request the function body input or not)
 	if(!functionBodyInputCreated){ // i.e. failed to start requesting for the body of the given function, so we should continue with the next one
 		// failed, so do the next one
@@ -3091,7 +3091,7 @@ bool endFunctionBodyInput(){
  */
 Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
-	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'5');
+	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5');
 	_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
 	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	return _valuereference;
@@ -3139,7 +3139,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
 						//                so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
 					}else
-						output("%sReferenced variable '%s' does not exist.\n",ERROR_PREFIX,_valuereference->_name->chars+1);
+						output("%sReferenced variable '%s' does not exist.\n",M_ERROR_PREFIX,_valuereference->_name->chars+1);
 				}else // a non-referenced variable which means we are supposed to return the value of the variable
 					// if there is no itemid we simply return the 'entire' value of the given variable
 					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name->chars); // the value at the top level
@@ -3272,7 +3272,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																					if(!newValueholder){
 																						if(appendedToMap(valueholderMap,string(_attributenameText),NULL)!=1)
-																							output("%sFailed to add property '%s'.\n",ERROR_PREFIX,string(_attributenameText));
+																							output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
 																						else
 																							newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																					}/*else{
@@ -3293,7 +3293,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 																	if(_valueIndexList)free_list(_valueIndexList);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 															}else
 															if((*valueholder)->type==VT_LIST){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
@@ -3320,7 +3320,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 																							if(amDebugging())
 																								output("List element at index #%zd retrieved.\n",listIndex);	
 																						}else
-																							output("%sFailed to add list element at index '%lld'.\n",ERROR_PREFIX,listIndex);
+																							output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
 																					}
 																				}else
 																					newValueholder=NULL;
@@ -3335,10 +3335,10 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 																	if(_valueIndexList)free_list(_valueIndexList);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-																// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
+																// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														}
 													}
 												}
@@ -3367,7 +3367,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 							while(--valueholderIndex>=0){
 								if(amDebugging())
 								{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
-								if(appendedToList(_resultList,*_valueholders[valueholderIndex],0)<=0){free_list(_resultList);_resultList=NULL;output("%sFailed to store value #%d.",ERROR_PREFIX,(valueholderIndex+1));break;}
+								if(appendedToList(_resultList,*_valueholders[valueholderIndex],0)<=0){free_list(_resultList);_resultList=NULL;output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));break;}
 							}
 							referencedValue=_getValueOfList(_resultList,true); // the result
 						}else
@@ -3399,7 +3399,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 								free_string(attributenameText);
 								continue;	
 							}
-							output("%s",ERROR_PREFIX);
+							output("%s",M_ERROR_PREFIX);
 							outputValue("Failed to convert assumed attribute name '",indexorattributenameListelementValue,"' to text.\n");		
 						}else
 						if(referencedValue->type==VT_LIST){
@@ -3427,13 +3427,13 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 									continue;
 								}
 								if(index){
-									output("%s",ERROR_PREFIX);
+									output("%s",M_ERROR_PREFIX);
 									outputValue("Assumed index '",indexorattributenameListelementValue,"' does not represent an integer.\n");
 								}else
 									outputError("A zero index is not allowed");
 							}
 						}else{
-							output("%s",ERROR_PREFIX);
+							output("%s",M_ERROR_PREFIX);
 							outputValue("'",referencedValue,"' cannot be indexed.\n");
 							referencedValue=NULL; // prevent further use TODO does this make sense?
 							break;
@@ -3601,7 +3601,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 																				newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																				if(!newValueholder){
 																					if(appendedToMap(valueholderMap,string(_attributenameText),NULL)!=1)
-																						output("%sFailed to add property '%s'.\n",ERROR_PREFIX,string(_attributenameText));
+																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
 																					else
 																						newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																				}/*else{
@@ -3622,7 +3622,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 																if(_valueIndexList)free_list(_valueIndexList);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														}else
 														if((*valueholder)->type==VT_LIST){
 															if(_flattenedIndexList->valuetype==VT_INTEGER){
@@ -3649,7 +3649,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 																						if(amDebugging())
 																							output("List element at index #%zd retrieved.\n",listIndex);	
 																					}else
-																						output("%sFailed to add list element at index '%lld'.\n",ERROR_PREFIX,listIndex);
+																						output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
 																				}
 																			}else
 																				newValueholder=NULL;
@@ -3664,10 +3664,10 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 																if(_valueIndexList)free_list(_valueIndexList);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-															// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
+															// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
 														}else
 															_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-														if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+														if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set list element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 													}
 												}
 											}
@@ -3729,7 +3729,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 													}
 													if(isValueUndefined(*_valueholders[valueholderIndex+numberOfNewValueholders])!=M_FALSE){
 														_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
-														output("%sFailed to create a list or map at index %zd.",ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
+														output("%sFailed to create a list or map at index %zd.",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														break;
 													}
 												}
@@ -3791,7 +3791,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				}
 				*/
 			}else
-				output("%sVariable '%s' cannot be indexed: its value is not a list or a map.\n",ERROR_PREFIX,_valuereference->_name);
+				output("%sVariable '%s' cannot be indexed: its value is not a list or a map.\n",M_ERROR_PREFIX,_valuereference->_name);
 		}else{
 			// MDH@04MAR2020: here we can determine whether the value assigned is a function without a body, in which case we should also ask for the body of this function next
 			//                the same way as happens when you use the defun internal function
@@ -3908,7 +3908,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	if(expressionToken){
 		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-		_valueReference=(Mvaluereference*)CALLOC(1,sizeof(Mvaluereference),'5');
+		_valueReference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5');
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
@@ -4015,7 +4015,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}else
 								if(strlen(definedFunctionName))
-									output("%sFailed to create function '%s'.",ERROR_PREFIX,definedFunctionName);
+									output("%sFailed to create function '%s'.",M_ERROR_PREFIX,definedFunctionName);
 								else
 									outputError("Name of function to create not defined.");
 							}
@@ -4031,7 +4031,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						}else
 							outputError("No function arguments");
 					}else
-						output("%sFunction '%s' unknown!\n",ERROR_PREFIX,_significantTokenText);
+						output("%sFunction '%s' unknown!\n",M_ERROR_PREFIX,_significantTokenText);
 				}
 				break;
 			case TT_NEW_VARIABLE: // a non-existing value reference
@@ -4046,7 +4046,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(amVerbose())output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getExecutionEnvironmentName();
-					output("%sFailed to add%s variable '%s' to environment '%s'.\n",ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
+					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					free_string(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!
 				}
@@ -4099,9 +4099,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						////
 					}else
 					if(indexListValue)
-						output("%sIndex of variable '%s' not a list!\n",ERROR_PREFIX,_valueReference->_name);
+						output("%sIndex of variable '%s' not a list!\n",M_ERROR_PREFIX,_valueReference->_name);
 					else
-						output("%sIndex of variable '%s' undefined!\n",ERROR_PREFIX,_valueReference->_name);	
+						output("%sIndex of variable '%s' undefined!\n",M_ERROR_PREFIX,_valueReference->_name);	
 				}else
 				if(amVerbose())output("Unindexed variable '%s'!\n",_valueReference->_name);
 				// MDH@29MAY2019: if we do NOT have an indexed value, retrieve the value...
@@ -4255,7 +4255,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			while(expressionToken&&expressionToken->next&&(expressionToken->next->type==TT_LIST||expressionToken->next->type==TT_PROPERTY)){
 				if(!itemIdsList){
 					itemIdsList=_getListOfType(VT_UNDEFINED); // we know we're going to need to list
-					if(!itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",ERROR_PREFIX,_valueReference->_name);break;}
+					if(!itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",M_ERROR_PREFIX,_valueReference->_name);break;}
 				}
 				expressionToken=nextEnvironmentExpressionToken();
 				// if(amDebugging())
@@ -4282,7 +4282,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 						Mvalue* propertyNameValue=_getTextValue(string(_propertyName),false); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
 						if(!propertyNameValue||!appendedToList(itemIdsList,propertyNameValue,M_LL_INVALID)){
-							output("%sFailed to add property name '%s' to the index list of '%s'.\n",ERROR_PREFIX,string(_propertyName),_valueReference->_name);
+							output("%sFailed to add property name '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
 							// TODO can't break here
 						}
 					}
@@ -5189,7 +5189,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 											if(mp_copy((mp_isneg(MP_INT_POINTER(_distanceontheotherside))?MP_INT_POINTER(_pkontheotherside):MP_INT_POINTER(_pkonthisside)),MP_INT_POINTER(_nextpk))!=MP_OKAY)break;
 											outputBiginteger("\tAccepted approximation numerator from bracketing: ",_nextpk,".\n");
 										}else
-											output("\t%sFailed to perform rational root bracketing.\n",ERROR_PREFIX);
+											output("\t%sFailed to perform rational root bracketing.\n",M_ERROR_PREFIX);
 
 										// what's the change in approximation?
 										if(mp_mul(MP_INT_POINTER(_pk),MP_INT_POINTER(_nextqk),MP_INT_POINTER(_num))!=MP_OKAY){outputError("Failed to initialize the numerator of the change to the rational root approximation");break;}
@@ -5359,7 +5359,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 													free_mpd(_bigintegerRootDecimal->mpd);_bigintegerRootDecimal->mpd=mpd_qncopy(_nextBigintegerRootDecimal->mpd);
 												}
 												if((status&0xEFBF)!=0){
-													output("%sRoot computation ended with error code " PRIu32 ".\n",ERROR_PREFIX,status);
+													output("%sRoot computation ended with error code " PRIu32 ".\n",M_ERROR_PREFIX,status);
 													free_decimal(_bigintegerRootDecimal);
 												}else{
 													_bigintegerRootValue=_getDecimalValue(_bigintegerRootDecimal,true);
@@ -5395,13 +5395,13 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 					free_decimal(_rootDegreeDecimal);
 					outputInfo("Root computation degree decimal released...");
 				}else{
-					output("%s",ERROR_PREFIX);outputBiginteger("Failed to convert root degree '",rootDegreeBiginteger,"' to a decimal.\n");
+					output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to convert root degree '",rootDegreeBiginteger,"' to a decimal.\n");
 				}
 			}else
 				outputError("Failed to create a decimal context for computing a decimal root");
 			if(rootArgumentValue->type!=VT_DECIMAL)free_decimal(_rootArgumentDecimal);
 		}else{
-			output("%s",ERROR_PREFIX);outputValue("Failed to convert root argument '",rootArgumentValue,"' to a decimal.\n");
+			output("%s",M_ERROR_PREFIX);outputValue("Failed to convert root argument '",rootArgumentValue,"' to a decimal.\n");
 		}
 	}
 	return _bigintegerRootValue;
@@ -6074,7 +6074,7 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 		if(_shiftleftBiginteger){
 			if((shiftleftinteger<0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger)))!=MP_OKAY){
 				free_biginteger(_shiftleftBiginteger);_shiftleftBiginteger=NULL;
-				output("%s",ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
+				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
 			}else 
 				outputError("Failed to shift left a big integer");
 		}else
@@ -6144,7 +6144,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 		if(_shiftrightBiginteger){
 			if((shiftrightinteger>0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger)))!=MP_OKAY){
 				free_biginteger(_shiftrightBiginteger);_shiftrightBiginteger=NULL;
-				output("%s",ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
+				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
 			}else 
 				outputError("Failed to shift right a big integer");
 		}else
@@ -6159,7 +6159,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 				if(_biginteger1){
 					if(amVerbose()){outputBiginteger("Shifting big integer '",_biginteger1,"' left");output(" by %" PRIi64 ".\n",shr);}
 					if((shr>0?mp_div_2d(_biginteger1,shr,_biginteger1,NULL):mp_mul_2d(_biginteger1,-shr,_biginteger1))==MP_OKAY)return _getBigintegerValue(_biginteger1,true);
-					output("%s",ERROR_PREFIX);outputBiginteger("Failed to shift '",_biginteger1,"' to the right.\n");			
+					output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_biginteger1,"' to the right.\n");			
 					free_biginteger(_biginteger1);
 				}
 			}
@@ -6712,7 +6712,7 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '!' :result=unequalto(_value1,_value2);break;
 			case '=' :result=equalto(_value1,_value2);break;
 			case ':' :result=Mrange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
-			default:output("%sUnknown binary operator '%s'.\n",ERROR_PREFIX,operator);
+			default:output("%sUnknown binary operator '%s'.\n",M_ERROR_PREFIX,operator);
 		}
 		if(amVerbose()){if(result)outputValue("Result of applying binary operator: '",result,"'.\n");else outputInfo("No result!");}
 	}
@@ -6825,7 +6825,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		///////////output("Number of allocated formula elements before: %zd.\n",getAllocationTypeCount('4'));
 
 		Mvaluereference* _valuereference;
-		Mformulaelement* formula=CALLOC(1,sizeof(Mformulaelement),'4');
+		Mformulaelement* formula=CALLOC(sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
 		size_t formulaElementCount=1;
 
@@ -6918,7 +6918,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
 				if(amVerbose())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
-				_formulaelement->_next=(Mformulaelement*)CALLOC(1,sizeof(Mformulaelement),'4');
+				_formulaelement->_next=(Mformulaelement*)CALLOC(sizeof(Mformulaelement),'4');
 				formulaElementCount++;
 				_formulaelement=_formulaelement->_next;
 				expressionToken=nextEnvironmentExpressionToken();
@@ -6946,7 +6946,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				/*
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getExecutionEnvironmentName();
-					output("%sFailed to add%s variable '%s' to environment '%s'.\n",ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
+					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					free_string(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!
 				}
@@ -7186,7 +7186,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	if(_Menvironment){
 		_Menvironment->_name=_getChars("M"); // TODO why make a dynamic copy???
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
-		Mfunctionmap* environmentFunctionMap=CALLOC(1,sizeof(Mfunctionmap),'W');
+		Mfunctionmap* environmentFunctionMap=CALLOC(sizeof(Mfunctionmap),'W');
 		if(environmentFunctionMap){
 
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????

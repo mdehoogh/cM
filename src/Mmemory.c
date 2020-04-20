@@ -4,7 +4,7 @@
 
 #include "Mmemory.h"
 
-extern char const * const ERROR_PREFIX;
+extern char const * const M_ERROR_PREFIX;
 
 /**
  * _strdup() adds writing a error message to strdup()
@@ -21,13 +21,13 @@ char* _strdup(char const * const _c){
         //                so we can't use REALLOC here to do the allocation which is a nuisance
         _hc=REALLOC(_hc,0,l,sizeof(char),'"');
         // replacing: char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
-        if(_hc)memcpy(_hc,_c,sizeof(char)*l);else output("%sFailed to allocate memory to store '%s'.\n",ERROR_PREFIX,_c);
+        if(_hc)memcpy(_hc,_c,sizeof(char)*l);else output("%sFailed to allocate memory to store '%s'.\n",M_ERROR_PREFIX,_c);
         //*/
         /* replacing:
         char* _hc=strdup(_c);
         */
         if(_hc)return _hc;
-        output("%sFailed to make a dynamic copy of '%s'.\n",ERROR_PREFIX,_c);
+        output("%sFailed to make a dynamic copy of '%s'.\n",M_ERROR_PREFIX,_c);
     }else
         output("No text to copy!\n");
     return NULL;

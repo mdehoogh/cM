@@ -3,7 +3,7 @@
 // MDH@27FEB2020 replacing: #include "Msession.h"
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
-extern const char * const ERROR_PREFIX;
+extern const char * const M_ERROR_PREFIX;
 extern const long double M_LD_NAN;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 
@@ -269,7 +269,7 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     if(status==MP_OKAY){
         status=_bimul(a->den,b->den,&_den); // multiply denominators to become the result denominator
         if(status!=MP_OKAY)
-            output("%sFailed to multiply the denominators of two rationals (error code: %d).\n",ERROR_PREFIX,status);
+            output("%sFailed to multiply the denominators of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
         else
         if(amVerbose())
             outputInfo("Denominators of two rationals multiplied");
@@ -285,7 +285,7 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     if(status==MP_OKAY){
         status=_bimul(a->num,b->den,&_num1);
         if(status!=MP_OKAY)
-            output("%sFailed to multiply the numerator and denominator of two rationals (error code: %d).\n",ERROR_PREFIX,status);
+            output("%sFailed to multiply the numerator and denominator of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
         else
         if(amVerbose())
             outputInfo("Numerator and denominator of two rationals multiplied.");
@@ -293,7 +293,7 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     if(status==MP_OKAY){
         status=_bimul(a->den,b->num,&_num2);
         if(status!=MP_OKAY)
-            output("%sFailed to multiply the denominator and numerator of two rationals (error code: %d).\n",ERROR_PREFIX,status); // multiply denominator of a with numerator of b for the min term of the result numerator
+            output("%sFailed to multiply the denominator and numerator of two rationals (error code: %d).\n",M_ERROR_PREFIX,status); // multiply denominator of a with numerator of b for the min term of the result numerator
         else
         if(amVerbose())
             outputInfo("Denominator and numerator of two rationals multiplied.");
@@ -301,7 +301,7 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     if(status==MP_OKAY){
         status=_biadd(_num1,_num2,&_num);
         if(status!=MP_OKAY)
-            output("%sFailed to add two rational numerators (error code: %d).",ERROR_PREFIX,status); // add the numerator parts
+            output("%sFailed to add two rational numerators (error code: %d).",M_ERROR_PREFIX,status); // add the numerator parts
         else
         if(amVerbose())
             outputInfo("Numerators of two rationals added.");
@@ -438,10 +438,10 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
                 }
             }
         }else
-            output("%sFailed to compute the pure sum of two rationals (error code: %d).\n",ERROR_PREFIX,status);
+            output("%sFailed to compute the pure sum of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
         if(status!=MP_OKAY){
             free_rational(_rational);_rational=NULL;
-            // output("%s",ERROR_PREFIX);
+            // output("%s",M_ERROR_PREFIX);
             // outputRational("Failed to compute the sum of rational ",q1,NULL);
             // outputRational(" and rational ",q2,".\n");
         }
@@ -563,13 +563,13 @@ Mrational* _getRationalProduct(Mrational const * const q1,Mrational const * cons
                 // if failed to compute the delta mark error
                 if(q1->delta&&q2->delta)if(!_rational->delta){
                     status=MP_ERR;
-                    output("%s",ERROR_PREFIX);
+                    output("%s",M_ERROR_PREFIX);
                     outputRational("Failed to update the delta of the product of rational ",q1,NULL);
                     outputRational(" and ",q2,".\n");
                 }
             }
         }else{
-            output("%s",ERROR_PREFIX);
+            output("%s",M_ERROR_PREFIX);
             outputRational("Failed to multiply rational ",q1,NULL);
             outputRational(" and ",q2,".\n");
         }
@@ -714,7 +714,7 @@ Mrational* _qsinorcos(Mrational const * const x,bool sin){
             }
 
         }else{
-            output("%sFailed to initialize the result of computing the %ssine",ERROR_PREFIX,(sin?"":"co"));outputRational(" of '",x,"'.\n");
+            output("%sFailed to initialize the result of computing the %ssine",M_ERROR_PREFIX,(sin?"":"co"));outputRational(" of '",x,"'.\n");
         }
 		if(_intermediateResult)free_rational(_intermediateResult);
 		// if accuracy was reached, but we still had some more iterations left we can add the accumulated remainder
@@ -766,7 +766,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 			exponentText++; // point to the first character of the exponent
             _exponent=__biginteger(); // need it before calling mp_read_radix()
 			if(_exponent&&(mp_read_radix(MP_INT_POINTER(_exponent),exponentText,10)!=MP_OKAY)){
-				output("%sFailed to extract the exponent from its text representation '%s'.\n",ERROR_PREFIX,exponentText);
+				output("%sFailed to extract the exponent from its text representation '%s'.\n",M_ERROR_PREFIX,exponentText);
 				free_biginteger(_exponent);
 				_exponent=NULL;
 			}else
@@ -850,7 +850,7 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 				}
                 free_biginteger(_decimalPartBiginteger);
 			}else
-				output("%sInteger part of rational text '%s' invalid.\n",ERROR_PREFIX,decimalText);
+				output("%sInteger part of rational text '%s' invalid.\n",M_ERROR_PREFIX,decimalText);
 			// if we haven't got a rational that binded _numerator and _denominator free both of them
 			if(!rational){free_biginteger(_numerator);free_biginteger(_denominator);}
 		}
@@ -905,7 +905,7 @@ void normalizeRational(Mrational* rational){
 // MDH@07JUN2019: _getRational does NOT free the numerator and denominator supplied!!!
 //                as it does not know whether _numerator or _denominator should be released on failure
 Mrational* __rational(){
-    Mrational* _rational=(Mrational*)CALLOC(1,sizeof(Mrational),'R');
+    Mrational* _rational=(Mrational*)CALLOC(sizeof(Mrational),'R');
     if(!_rational)outputMemoryError("Failed to create a rational");
     if(_rational->num||_rational->den||_rational->delta)outputBug("New rational numerator, denominator and delta not all considered undefined");
     return _rational;

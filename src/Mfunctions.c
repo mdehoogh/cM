@@ -4,7 +4,7 @@
 #include "Mfunctions.h"
 
 extern char const * const VALUETYPENAMES[];
-extern char const * const ERROR_PREFIX;
+extern char const * const M_ERROR_PREFIX;
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_NEGATIVE,M_POSITIVE;
 extern const long double M_LD_NAN,M_LD_PI;
 extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
@@ -534,7 +534,7 @@ Mvalue* Mfac(Mvalue* _value){
             return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         _finalmultiplier=_getBigintegerCopy(_value->value._biginteger);
     }
-    if(!_finalmultiplier){output("%s",ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");return NULL;}
+    if(!_finalmultiplier){output("%s",M_ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");return NULL;}
     if(amVerbose()&&amDebugging())outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
     Mbiginteger* _result=_getBiginteger(6); // the smallest value to return
     if(_result){

@@ -8,8 +8,8 @@ extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
-extern const char * const ERROR_PREFIX;
-extern const char * const WARNING_PREFIX;
+extern const char * const M_ERROR_PREFIX;
+extern const char * const M_WARNING_PREFIX;
 extern const char * const M_NULL_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value that is NULL
 extern const char * const M_UNDEFINED_VALUE_TEXT; // MDH@31OCT2019: the text to use to represent a value of type VT_UNDEFINED
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
@@ -40,7 +40,7 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
     _variable->_name=_getChars(name); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
     if(!_variable->_name){
         free_variable(_variable,true);
-        output("%sFailed to allocate memory to store name '%s' of the new variable.\n",ERROR_PREFIX,name);
+        output("%sFailed to allocate memory to store name '%s' of the new variable.\n",M_ERROR_PREFIX,name);
         return NULL;
     }
     _variable->valuetype=valuetype;
@@ -222,7 +222,7 @@ size_t getNumberOfRemovedValues(bool showInfo){
                 }else
                 if(showInfo)outputInfo("\tStill in use!");
             }else
-                output("%sNo value stored in value #%llu.\n",ERROR_PREFIX,checked);
+                output("%sNo value stored in value #%llu.\n",M_ERROR_PREFIX,checked);
             _valueListelement=_valueListelement->_next;
         }
         if(showInfo)output("Number of values checked: %llu.\nNumber of value list elements to free: %llu.\n",checked,tofree);
@@ -256,7 +256,7 @@ size_t getNumberOfRemovedValues(bool showInfo){
         }
     }
     if(tofree){
-        if(tofree>removed)output("%sFailed to free %llu unused value list elements.\n",WARNING_PREFIX,(tofree-removed));else 
+        if(tofree>removed)output("%sFailed to free %llu unused value list elements.\n",M_WARNING_PREFIX,(tofree-removed));else 
         if(showInfo)outputInfo("All unused value list elements freed!");
     }
     return removed;
@@ -343,7 +343,7 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     }else
     if(_biginteger){
         if(freeonfailure)free_biginteger(_biginteger);
-        if(amVerbose()){output("%s",ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
+        if(amVerbose()){output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
     }else
     if(amVerbose())outputInfo("No big integer to wrap.");
     return _bigintegerValue;
@@ -594,7 +594,7 @@ Mmap* _getMapCopy(Mmap const * const map){ // creates a 'deep' copy
                         if(!_map->_first)_map->_first=_map->_last; // initialize first if necessary
                         _map->numberOfElements++; // count one more
                     }else
-                        output("%sFailed to copy map attribute '%s'.\n",ERROR_PREFIX,mapelementVariable->_name);
+                        output("%sFailed to copy map attribute '%s'.\n",M_ERROR_PREFIX,mapelementVariable->_name);
                 }
                 mapelement=mapelement->_next;
             }
@@ -684,7 +684,7 @@ Mmap* _getIntegerBooleanMap(char* name1,char* name2){
             free_mapelement(_mapelement1,false);
             free_mapelement(_mapelement2,false);
         }else
-            output("%sMap element attribute keys '%s' and '%s' undefined or the same.\n",ERROR_PREFIX,name1,name2);
+            output("%sMap element attribute keys '%s' and '%s' undefined or the same.\n",M_ERROR_PREFIX,name1,name2);
     }else
         outputError("Not both map element attribute keys defined");
     return NULL;
@@ -716,7 +716,7 @@ Mmap* _getStringStringMap(char* name1,char* name2){
             free_mapelement(_mapelement1,false);
             free_mapelement(_mapelement2,false);
         }else
-            output("%sMap element attribute keys '%s' and '%s' undefined or the same.\n",ERROR_PREFIX,name1,name2);
+            output("%sMap element attribute keys '%s' and '%s' undefined or the same.\n",M_ERROR_PREFIX,name1,name2);
     }else
         outputError("Not both map element attribute keys defined");
     return NULL;
@@ -1051,7 +1051,7 @@ void checkList(Mlist* _list){
                 while(true){
                     if(l==0)outputError("More elements in list than accounted for");
                     l--;
-                    if(_listelement->index<=listelementindex)output("%sList element index (%lld) below the expected list element index (%lld).\n",ERROR_PREFIX,_listelement->index,listelementindex);
+                    if(_listelement->index<=listelementindex)output("%sList element index (%lld) below the expected list element index (%lld).\n",M_ERROR_PREFIX,_listelement->index,listelementindex);
                     listelementindex=_listelement->index;
                     if(!_listelement->_next){
                         if(_list->_last!=_listelement)outputError("Registered last list element not equal to the actual last list element");
@@ -1061,9 +1061,9 @@ void checkList(Mlist* _list){
                     _listelement=_listelement->_next;
                 }
                 if(l>0)outputError("Less elements in list than accounted for");else 
-                if(l<0)output("%s%lld more elements in list than counted.\n",ERROR_PREFIX,(-l));
+                if(l<0)output("%s%lld more elements in list than counted.\n",M_ERROR_PREFIX,(-l));
             }else
-                output("%sList with %lld elements does not have a first element!\n",ERROR_PREFIX,l);
+                output("%sList with %lld elements does not have a first element!\n",M_ERROR_PREFIX,l);
         }else{
             if(_list->_first)outputError("Empty list with first element");
             if(_list->_last)outputError("Empty list with last element");
@@ -1085,7 +1085,7 @@ void checkList(Mlist* _list){
     // MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
     if(_value&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
     if(_value->type!=_list->valuetype)
-    {output("%s",ERROR_PREFIX);outputValue("Unable to add '",_value,"' to a list: it is of the wrong type.");return 0;}
+    {output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_value,"' to a list: it is of the wrong type.");return 0;}
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     // MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
@@ -1093,7 +1093,7 @@ void checkList(Mlist* _list){
     if(index==M_LL_INVALID){if(lastindex==M_LL_MAX){outputError("Unable to append to a list: it is full");return 0;};index=lastindex+1;} // MDH@17OCT2019: we need to be able to append as well (can't use 0 anymore!!!!)
     if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
     // MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
-    if(index<0){output("%sIndex %lld of (new) list element too small.\n",ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
+    if(index<0){output("%sIndex %lld of (new) list element too small.\n",M_ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
     if(amVerbose())outputValue((index>0?"Appending '":"Prepending '"),_value,"' to a list.\n");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
@@ -1227,7 +1227,7 @@ long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue
                     result=M_TRUE;
                 }
             }else{
-                output("%s",ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a list: it is of the wrong type.\n");
+                output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a list: it is of the wrong type.\n");
             }
         }else 
             outputError("Unable to change the map: it is immutable");
@@ -2043,7 +2043,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     delta=(ld*q)-p;
                     ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
                     _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false,true); // construct the intermediate result without normalizing
-                    if(!_rational){output("%sFailed to construct the rational approximation %lld/%lld",ERROR_PREFIX,p,q);break;}
+                    if(!_rational){output("%sFailed to construct the rational approximation %lld/%lld",M_ERROR_PREFIX,p,q);break;}
                     // NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
                     Mvalue* _rationalValue=_getRationalValue(_rational,true);
@@ -2249,7 +2249,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){
                     uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
                     mpd_qtrunc(_truncDecimal->mpd,_decimal->mpd,mpd_context,&status);
                     if((status&0xEFBF)==0)return _truncDecimal;
-                    output("%s",ERROR_PREFIX);outputDecimal("Failed to truncate decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                    output("%s",M_ERROR_PREFIX);outputDecimal("Failed to truncate decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
                     free_decimal(_truncDecimal);
                 }
             }else
@@ -2259,7 +2259,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){
                     uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
                     mpd_qfloor(_floorDecimal->mpd,_decimal->mpd,mpd_context,&status);
                     if((status&0xEFBF)==0)return _floorDecimal;
-                    output("%s",ERROR_PREFIX);outputDecimal("Failed to floor decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                    output("%s",M_ERROR_PREFIX);outputDecimal("Failed to floor decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
                     free_decimal(_floorDecimal);
                 }                    
             }else{
@@ -2268,7 +2268,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){
                     uint32_t status=0; // OOPS initializing to 0 absolute necessary!!!
                     mpd_qceil(_ceilDecimal->mpd,_decimal->mpd,mpd_context,&status);
                     if((status&0xEFBF)==0)return _ceilDecimal;
-                    output("%s",ERROR_PREFIX);outputDecimal("Failed to ceil decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                    output("%s",M_ERROR_PREFIX);outputDecimal("Failed to ceil decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
                     free_decimal(_ceilDecimal);
                 }
             }
@@ -2288,7 +2288,7 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){
                 uint32_t status=0;
                 mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
                 if((status&0xEFBF)==0)return _roundDecimal;
-                output("%s",ERROR_PREFIX);outputDecimal("Failed to round decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
+                output("%s",M_ERROR_PREFIX);outputDecimal("Failed to round decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
                 free_decimal(_roundDecimal);
             }
         }else

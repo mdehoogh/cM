@@ -5,6 +5,10 @@
 
 #include "Malloc.h"
 
+extern char const * const M_ERROR_PREFIX;
+extern char const * const M_WARNING_PREFIX;
+extern char const * const M_BUG_PREFIX;
+
 // MDH@15NOV2019: want to keep track of the number of allocations for each type (with character id)
 t_allocationtype* _allocationTypes=NULL; // the unique allocation type characters
 t_count numberOfAllocationTypes=0; // keep track of the number of allocation types
@@ -289,7 +293,7 @@ void Mfree(void* ptr,char allocationType){
             }
             */
         }else
-            printf("BUG: Memory of unknown type '%c' to be freed!\n",allocationType);
+            printf("%sMemory of unknown type '%c' to be freed!\n",M_BUG_PREFIX,allocationType);
     }
     // MDH@14APR2020 NOTE: the following is about removing the allocation
 #ifndef __PRODUCTION__
@@ -297,18 +301,24 @@ void Mfree(void* ptr,char allocationType){
 #endif
     free(ptr);
 #ifndef __PRODUCTION__
-    if(_alloc->allocationType!=allocationType){printf("ERROR: Allocation type of freed memory '%c' does not match provided allocation type '%c'.\n",_alloc->allocationType,allocationType);return;}
-    if(_alloc->allocationIndex==0){printf("No allocation index registered for allocation of type '%c'.\n",allocationType);return;}
+    if(_alloc->allocationType!=allocationType){printf("%sAllocation type of freed memory '%c' does not match provided allocation type '%c'.\n",M_BUG_PREFIX,_alloc->allocationType,allocationType);return;}
+    if(_alloc->allocationIndex==0){
+        printf("%sNo allocation index registered for allocation of type '%c'.\n",M_BUG_PREFIX,allocationType);
+        return;
+    }
 #endif
-    if(!allocations._chars){printf("Allocation types not recorded!\n");return;}
-    if(allocations.l==0){printf("Nothing allocated to free.\n");return;}
+    if(!allocations._chars){printf("%sAllocation types not recorded!\n",M_ERROR_PREFIX);return;}
+    if(allocations.l==0){printf("%sNothing allocated to free.\n",M_WARNING_PREFIX);return;}
 #ifndef __PRODUCTION__
-    if(_alloc->allocationIndex>allocations.l){printf("ERROR: Retrieved allocation position %zd exceeds maximum allocation position %zd.",_alloc->allocationIndex,allocations.l);return;}
+    if(_alloc->allocationIndex>allocations.l){
+        printf("%sRetrieved allocation position %llu exceeds maximum allocation position %llu.",M_BUG_PREFIX,_alloc->allocationIndex,allocations.l);
+        return;
+    }
     _alloc->allocationIndex--;
     if(allocations._chars[_alloc->allocationIndex]==allocationType)
         allocations._chars[_alloc->allocationIndex]=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
     else
-        printf("ERROR: Allocation type of freed memory '%c' (at index %zd) does not match provided allocation type '%c'.\n",allocations._chars[_alloc->allocationIndex],_alloc->allocationIndex,allocationType);
+        printf("%sAllocation type of freed memory '%c' (at index %llu) does not match provided allocation type '%c'.\n",M_BUG_PREFIX,allocations._chars[_alloc->allocationIndex],_alloc->allocationIndex,allocationType);
 #else
     t_count pos=allocations.l-1;
     while(pos>0){
@@ -344,34 +354,51 @@ void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char al
     // kind of like 'freeing' the space ptr is using now
     // step 1. take out what has been registered before...
     t_count freed=from_count*size; /////// replacing: (ptr?sizeof(*ptr):0); // best to determine it here
+#ifndef __PRODUCTION__
+    Malloc* _alloc=(ptr?(freed>0?(Malloc*)(ptr+freed):NULL):NULL);
+#endif
     t_count occupied=to_count*size; //// replacing: (newptr?sizeof(*newptr):0); // what we need to add
     if(freed!=occupied){ // amount changed
         t_count allocationIndex=0;
 #ifndef __PRODUCTION__
-        Malloc* _alloc=(Malloc*)(ptr+freed);
-        if(occupied==0){ // a deallocation, no reason to assume that will fail!!!
-            allocationIndex=_alloc->allocationIndex-1;
-            if(allocationIndex>=0)allocations._chars[allocationIndex]=' ';
+        if(_alloc){ 
+            if(_alloc->allocationType!=allocationType)
+                printf("%sThe allocation type '%c' stored with the data does not match the provided allocation type '%c'.\n",M_BUG_PREFIX,_alloc->allocationType,allocationType);
+            // MDH@20APR2020 ASSERT: freed>0 as freed!=occupied
+            allocationIndex=_alloc->allocationIndex;
+            if(allocationIndex>0){
+                allocationIndex--;
+                if(allocations._chars[allocationIndex]!=_alloc->allocationType)
+                    printf("%sThe stored allocation type '%c' does not match the provided allocation type '%c'.\n",M_BUG_PREFIX,allocations._chars[allocationIndex],allocationType);
+                allocations._chars[allocationIndex]=' ';
+            }else
+                printf("%sThe allocation index stored with the data is zero!",M_ERROR_PREFIX);
         }
 #endif
         // MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
         if(occupied>0){
+#ifndef __PRODUCTION__
+            newptr=(freed>0?realloc(ptr,occupied+sizeof(Malloc)):malloc(occupied+sizeof(Malloc))); // we have to reallocate nitems each of the given size
+#else
             newptr=(freed>0?realloc(ptr,occupied):malloc(occupied)); // we have to reallocate nitems each of the given size
-            printf("Object of type '%c' reallocated from %llu to %llu!\n",allocationType,freed,occupied);
+#endif
         }else
             free(ptr);
+        printf("Object of type '%c' resized from %llu to %llu!\n",allocationType,freed,occupied);
         // newptr is allowed to be NULL if occupied equals 
         if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
+#ifndef __PRODUCTION__
+            if(occupied>0){
+                if(!_alloc){ // first time allocation (i.e. freed equals zero)
+                    _alloc=(Malloc*)(ptr+occupied);
+                    _alloc->allocationType=allocationType;
+                    _alloc->allocationIndex=registerAllocation(allocationType,size,to_count,false);
+                }else // not a first time allocation, so we can simply copy the allocation over
+                    *((Malloc*)(ptr+occupied))=*_alloc; // copying the allocation structure over
+            }
+#endif
             if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
                 // MDH@09APR2020: this could be the first call to REALLOC with a given type
-#ifndef __PRODUCTION__
-                if(occupied>0){ // an allocation which means that type should be present in _allocationtypes, and if it is not we're going to register it
-                    if(freed==0){ // initial allocation, ALWAYS register a single allocation (TODO perhaps nitems should always be considered 1)
-                        allocationIndex=registerAllocation(allocationType,size,to_count,false);
-                        *((t_count*)newptr)=allocationIndex; // TODO not sure whether realloc() will initialize to '\0' so we also write when allocation_index is 0!!!!
-                    }
-                }
-#endif
                 long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
                 if(allocationTypeIndex<0)allocationTypeIndex=getNewAllocationTypeIndex(allocationType,size,to_count,false);
                 if(allocationTypeIndex>=0){
@@ -410,5 +437,5 @@ void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char al
             }
         }
     }
-    return(occupied==0?NULL:newptr);
+    return newptr;
 }

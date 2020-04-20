@@ -2,7 +2,7 @@
 
 extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 extern long double M_LD_NAN;
-extern char const * const ERROR_PREFIX;
+extern char const * const M_ERROR_PREFIX;
 
 Mvalue* Mempty(Mvalue* value){
     long long result=M_LL_INVALID;
@@ -111,7 +111,7 @@ Mvalue* removedFromList(Mlist* list,long long listIndex){
             }else
                 outputError("Cannot remove a list element: the list is immutable");
         }else
-            output("%sInvalid list index %lld.\n",ERROR_PREFIX,listIndex);
+            output("%sInvalid list index %lld.\n",M_ERROR_PREFIX,listIndex);
     }else
         outputError("No list to remove from");
     return removedValue;
