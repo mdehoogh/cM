@@ -156,7 +156,7 @@ long long isBigintegerOne(Mbiginteger* biginteger){
 }/* VALIDATED */
 // END BIG INTEGER STUFF
 
-/////////mp_int* __mp_int(){return (mp_int*)MALLOC(1,sizeof(mp_int),'I');}
+/////////mp_int* __mp_int(){return (mp_int*)MALLOC(sizeof(mp_int),'I');}
 // long double to rational or representation
 typedef struct {
     uint64_t mantisse;
@@ -266,7 +266,7 @@ void free_float(Mfloat* _float){
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
 Minteger* _getInteger(long long ll){
-    Minteger* _integer=MALLOC(1,sizeof(Minteger),'I');
+    Minteger* _integer=MALLOC(sizeof(Minteger),'I');
     if(_integer)_integer->ll=ll;
     return _integer;
 }/* VALIDATED */
@@ -282,7 +282,7 @@ Mbiginteger*__biginteger(z_t zt){
 long double getFloatLongDouble(Mfloat const * const _float){return(_float?_float->ld:M_LD_NAN);}
 
 Mfloat* _getFloat(long double ld){
-    Mfloat* _float=MALLOC(1,sizeof(Mfloat),'F'); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
+    Mfloat* _float=MALLOC(sizeof(Mfloat),'F'); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
     if(_float)_float->ld=ld;
     return _float;
 }/* VALIDATED */
@@ -560,7 +560,7 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string){
 */
 /*
 Minteger* _getInteger(long long ll){
-    Minteger* integer=MALLOC(1,sizeof(Minteger),'i');if(integer)integer->ll=ll;return integer;
+    Minteger* integer=MALLOC(sizeof(Minteger),'i');if(integer)integer->ll=ll;return integer;
 }
 */
 

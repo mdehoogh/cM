@@ -134,13 +134,13 @@ static t_count registerAllocation(char allocationType,size_t size,t_count count,
 
 // MDH@15NOV2019: allow access to the allocation counts
 // MDH@25NOV2019: let's return copies, so that we can get a frozen snapshot instead of something that can change
+/* MDH@14APR2020: not used anymore
 t_count* _getAllocationCounts(){
-    /* MDH@14APR2020: not used anymore
     size_t sizeallocationcounts=(_allocationcounts?numberofallocationtypes*sizeof(size_t)*5:0);
     return(sizeallocationcounts>0?memcpy((char*)malloc(sizeallocationcounts),_allocationcounts,sizeallocationcounts):NULL);
-    */
     return NULL;
 }
+*/
 t_allocationtype* _getAllocationTypes(){
     size_t allocationTypesSize=(_allocationTypes?numberOfAllocationTypes*sizeof(t_allocationtype):0);
     return(allocationTypesSize>0?memcpy(malloc(allocationTypesSize),_allocationTypes,allocationTypesSize):NULL);
@@ -217,46 +217,70 @@ void syncallocations(){
 #endif
 }
 
+#ifndef __PRODUCTION__
+typedef struct{
+    char allocationType;
+    t_count allocationIndex;
+}Malloc;
+#endif
+
 // MDH@08APR2020: if ptr starts with an allocation_index size_t field we can store the result of addallocation into it
 //                so we have to ascertain that in the non-production version every structure that we allocate this way starts with
-void* Mmalloc(t_count nitems,size_t size,char type){
-    void* ptr=(size>0&&nitems>0?malloc(size*nitems):NULL);
-    // MDH@09APR2020: addallocation() is now addallocationtype()
+void* Mmalloc(size_t size,char type){
+    void* ptr=NULL;
+    if(size>0){
+// MDH@09APR2020: addallocation() is now addallocationtype()
 #ifndef __PRODUCTION__
-    if(ptr){
-        // MDH@13APR2020: all Mmalloc calls represent fixed size allocations
-        t_count allocationIndex=registerAllocation(type,size,nitems,true); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
-        *((t_count*)ptr)=allocationIndex;
-    }
+        ptr=malloc(size+sizeof(Malloc));
+        if(ptr){
+            // MDH@13APR2020: all Mmalloc calls represent fixed size allocations
+            t_count allocationIndex=registerAllocation(type,size,1,true); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
+            Malloc* _alloc=(Malloc*)(ptr+size);
+            _alloc->allocationType=type; // register the type
+            _alloc->allocationIndex=allocationIndex;
+        }
+#else
+        ptr=malloc(size);
 #endif
+    }
     return ptr;
 }
 
-void* Mcalloc(t_count nitems,size_t size,char type){
-    void* ptr=(nitems>0&&size>0?calloc(nitems,size):NULL);
-    // MDH@09APR2020: addallocation() is now addallocationtype()
+void* Mcalloc(size_t size,char type){
+    void* ptr=NULL;
+    if(size>0){
 #ifndef __PRODUCTION__
-    if(ptr){
-        t_count allocationIndex=registerAllocation(type,size,nitems,true);
-        *((t_count*)ptr)=allocationIndex;
-    }
+        ptr=calloc(1,size+sizeof(Malloc)); // MDH@20APR2020: calloc doesn't care about the items!!!!!
+        if(ptr){
+            t_count allocationIndex=registerAllocation(type,size,1,true);
+            // MDH@09APR2020: addallocation() is now addallocationtype()
+            Malloc* _alloc=(Malloc*)(ptr+size-sizeof(Malloc));
+            _alloc->allocationType=type; // register the type
+            _alloc->allocationIndex=allocationIndex;
+        }
+#else
+        ptr=calloc(1,size);
 #endif
+    }
     return ptr;
 }
 
+// MDH@20APR2020: unfortunately we need to know the size of what was allocated which is easy for fixed size allocation but problematic for variable size records
+//                unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
 void Mfree(void* ptr,char allocationType){
     if(!ptr)return;
     /////printf("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     // MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
-    char* _allocationtype=NULL;
+    size_t size=0; // MDH@20APR2020: we need to determine the size from what we stored with the allocation type
     if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
         long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
         // assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
         if(allocationTypeIndex>=0){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
             _allocationTypes[allocationTypeIndex].count--;
             // assuming this is a fixed size allocation type
-            _allocationTypes[allocationTypeIndex].freed+=_allocationTypes[allocationTypeIndex].allocationsizeunion.size;
+            size=_allocationTypes[allocationTypeIndex].allocationsizeunion.size;
+            _allocationTypes[allocationTypeIndex].freed+=size;
             /* MDH@14APR2020 replacing:
             allocationtypecountoffset=5*allocationTypeIndex;
             if(allocationtypecountoffset>=0){ // success (and not the accumulative (zero) one!!!)
@@ -269,19 +293,31 @@ void Mfree(void* ptr,char allocationType){
     }
     // MDH@14APR2020 NOTE: the following is about removing the allocation
 #ifndef __PRODUCTION__
-    t_count allocationIndex=*((t_count*)ptr);
-    if(allocationIndex>0)allocations._chars[--allocationIndex]=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
+    Malloc* _alloc=(Malloc*)(ptr+size);
+#endif
     free(ptr);
-    //////printf("!");
-    // undo the allocation of the given type
+#ifndef __PRODUCTION__
+    if(_alloc->allocationType!=allocationType){printf("ERROR: Allocation type of freed memory '%c' does not match provided allocation type '%c'.\n",_alloc->allocationType,allocationType);return;}
+    if(_alloc->allocationIndex==0){printf("No allocation index registered for allocation of type '%c'.\n",allocationType);return;}
+#endif
     if(!allocations._chars){printf("Allocation types not recorded!\n");return;}
     if(allocations.l==0){printf("Nothing allocated to free.\n");return;}
+#ifndef __PRODUCTION__
+    if(_alloc->allocationIndex>allocations.l){printf("ERROR: Retrieved allocation position %zd exceeds maximum allocation position %zd.",_alloc->allocationIndex,allocations.l);return;}
+    _alloc->allocationIndex--;
+    if(allocations._chars[_alloc->allocationIndex]==allocationType)
+        allocations._chars[_alloc->allocationIndex]=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
+    else
+        printf("ERROR: Allocation type of freed memory '%c' (at index %zd) does not match provided allocation type '%c'.\n",allocations._chars[_alloc->allocationIndex],_alloc->allocationIndex,allocationType);
+#else
     t_count pos=allocations.l-1;
     while(pos>0){
-        if(allocations._chars[pos]==' '){/*printf("Allocation of type '%c' not encountered.\n",type);*/break;}
-        if(allocations._chars[pos]==allocationType){allocations._chars[pos]='.';break;}
+        if(allocations._chars[pos]==allocationType){allocations._chars[pos]=' ';break;}
         pos--;
     }
+#endif
+    //////printf("!");
+    // undo the allocation of the given type
     /* MDH@14APR2020 removing:
     ///////printf("!");
     // MDH@15NOV2019: if this is an existing type
@@ -292,32 +328,40 @@ void Mfree(void* ptr,char allocationType){
     }
     */
     ////////printf("!\n");
-#endif
+}
+
+// MDH@20APR2020: 
+void Mresized(void* ptr,t_count from_count,t_count to_count,size_t size,char allocationType){
+
 }
 
 // MDH@27NOV2019: now passing the number of items in as well, and the current number of items
 // MDH@09APR2020: from now on (v0.1.2) REALLOC is only to be used for all variable dynamic memory allocations
 //                and also for freeing (i.e. when occupied equals zero)
 void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char allocationType){
+    void* newptr=ptr; // by default return the original pointer!!!
     //////printf(".");
     // kind of like 'freeing' the space ptr is using now
     // step 1. take out what has been registered before...
-    void* newptr=ptr; // by default return the original pointer!!!
     t_count freed=from_count*size; /////// replacing: (ptr?sizeof(*ptr):0); // best to determine it here
     t_count occupied=to_count*size; //// replacing: (newptr?sizeof(*newptr):0); // what we need to add
     if(freed!=occupied){ // amount changed
+        t_count allocationIndex=0;
 #ifndef __PRODUCTION__
-        t_count allocationIndex;
+        Malloc* _alloc=(Malloc*)(ptr+freed);
         if(occupied==0){ // a deallocation, no reason to assume that will fail!!!
-            allocationIndex=*((size_t*)ptr);
-            if(allocationIndex>0)allocations._chars[allocationIndex-1]=' ';
+            allocationIndex=_alloc->allocationIndex-1;
+            if(allocationIndex>=0)allocations._chars[allocationIndex]=' ';
         }
 #endif
         // MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
-        newptr=(occupied>0?(freed>0?realloc(ptr,occupied):malloc(occupied)):NULL); // we have to reallocate nitems each of the given size
-        printf("Object of type '%c' reallocated from %llu to %llu!\n",allocationType,freed,occupied);
+        if(occupied>0){
+            newptr=(freed>0?realloc(ptr,occupied):malloc(occupied)); // we have to reallocate nitems each of the given size
+            printf("Object of type '%c' reallocated from %llu to %llu!\n",allocationType,freed,occupied);
+        }else
+            free(ptr);
         // newptr is allowed to be NULL if occupied equals 
-        if(occupied==0||newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
+        if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
             if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
                 // MDH@09APR2020: this could be the first call to REALLOC with a given type
 #ifndef __PRODUCTION__
@@ -366,5 +410,5 @@ void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char al
             }
         }
     }
-    return newptr;
+    return(occupied==0?NULL:newptr);
 }

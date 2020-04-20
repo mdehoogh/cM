@@ -52,19 +52,19 @@ long long getAllocationTypeFreed(char allocationType);
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign
 #ifndef __PRODUCTION__
-void* Mmalloc(t_count nitems,size_t size,char type);
-void* Mcalloc(t_count nitems,size_t size,char type);
+void* Mmalloc(size_t size,char type);
+void* Mcalloc(size_t size,char type);
 void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char type);
-void Mfree(void* ptr,char type);
+void Mfree(void* ptr,char type); // releasing a single item of a fixed size allocation type
 // use the substitutes
-#define MALLOC(nitems,size,type) Mmalloc((nitems),(size),(type))
-#define CALLOC(nitems,size,type) Mcalloc((nitems),(size),(type))
+#define MALLOC(size,type) Mmalloc((size),(type))
+#define CALLOC(size,type) Mcalloc((size),(type))
 #define REALLOC(ptr,from_count,to_count,size,type) Mrealloc((ptr),(from_count),(to_count),(size),(type))
 #define FREE(ptr,type) Mfree((ptr),(type))
 #else
 // use the system methods
-#define MALLOC(nitems,size,type) malloc((nitems)*(size))
-#define CALLOC(nitems,size,type) calloc((nitems),(size))
+#define MALLOC(size,type) malloc((nitems)*(size))
+#define CALLOC(size,type) calloc(1,(size))
 #define FREE(ptr,type) free(ptr)
 #define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc((ptr),(to_nitems)*(size))
 #endif

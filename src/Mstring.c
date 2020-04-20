@@ -15,7 +15,7 @@
 /** Create a String */
 Mstring* __string(){
     // MDH@09APR2020: because sizeof(Mstring) would not include what we need for the characters pointed to by chars, we need to allocated one BLOCK_SIZE of characters to start with
-    Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
+    Mstring* ans=CALLOC(sizeof(Mstring),'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         // the size of each allocation is BLOCKSIZE characters
@@ -39,7 +39,7 @@ Mstring* __string(){
 
 Mstring* _getString(const char* const s){
     if(!s)return NULL;
-    Mstring* ans=CALLOC(1,sizeof(Mstring),'S');
+    Mstring* ans=CALLOC(sizeof(Mstring),'S');
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);

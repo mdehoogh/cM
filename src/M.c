@@ -40,7 +40,11 @@ extern const long long M_LL_INVALID;
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
-char const * const M_VERSION="0.1.1";
+// MDH@20APR2020: definitely not the first build but I think I forgot to switch to builds here (as opposed to git branching)
+char const * const M_VERSION="0.1.2";
+char const * const M_BUILD="1";char const * const M_DATE="20 April 2020, 17:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+
+//char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
 //char const * const M_BUILD="2";char const * const M_DATE="17 November 2019, 19:00";
 //char const * const M_BUILD="3";char const * const M_DATE="18 November 2019, 17:00";
@@ -56,7 +60,7 @@ char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="14";char const * const M_DATE="23 March 2020, 18:00"; // introducing PROPERTY token
 //char const * const M_BUILD="15";char const * const M_DATE="26 March 2020, 18:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 //char const * const M_BUILD="16";char const * const M_DATE="31 March 2020, 15:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
-char const * const M_BUILD="17";char const * const M_DATE="7 April 2020, 12:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+//char const * const M_BUILD="17";char const * const M_DATE="7 April 2020, 12:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 
 //char const * const M_VERSION="0.1.0";
 //char const * const M_BUILD="1";char const * const M_DATE="21 October 2019, 17:00";
@@ -348,7 +352,7 @@ typedef struct Muserinputline{
 }Muserinputline;
 Muserinputline* _userinputline=NULL;
 Muserinputline* __userinputline(){
-	Muserinputline* _newUserinputline=CALLOC(1,sizeof(Muserinputline),'6');
+	Muserinputline* _newUserinputline=CALLOC(sizeof(Muserinputline),'6');
 	if(_newUserinputline){
 		_newUserinputline->_prev=_userinputline;
 		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
@@ -658,7 +662,7 @@ void setLastTokenAutocompletionText(char* _text){
 	}else{ // not present yet, so add (i.e. prepend!!)
 		if(strlen(_text)>0){
 			if(amDebugging())inputInfo("Prepending auto completion text '%s' of token '%s' with offset %zu.",_text,string(_userInputCommand->_lastToken->text),_userInputCommand->_lastToken->offset);
-			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'7');
+			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(sizeof(Mtokenautocompletiontext),'7');
 			if(_tokenautocompletiontext){
 				deleteAutocompletionText(); // I guess this is a bit confusing
 				_tokenautocompletiontext->_text=_text; // and bound
@@ -845,7 +849,7 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 			result=_lastConsumedAutocompletiontext;
 		}else{
 			// TODO for now always use an anonymous (nontoken) prepend
-			Mtokenautocompletiontext* autocompletiontext=CALLOC(1,sizeof(Mtokenautocompletiontext),'7');
+			Mtokenautocompletiontext* autocompletiontext=CALLOC(sizeof(Mtokenautocompletiontext),'7');
 			if(autocompletiontext){
 				Mstring* _string=__string(); // free asap
 				if(_string){

@@ -31,7 +31,7 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
         outputError("No variable name defined");
         return NULL;
     }
-    Mvariable* _variable=(Mvariable*)CALLOC(1,sizeof(Mvariable),'V'); // all pointers will be NULL!!
+    Mvariable* _variable=(Mvariable*)CALLOC(sizeof(Mvariable),'V'); // all pointers will be NULL!!
     if(!_variable){
         outputErrorAndText("Failed to allocate memory to store variable ",name);
         return NULL;
@@ -162,7 +162,7 @@ void free_value(Mvalue* _value){
 }/* VALIDATED */
 
 Mlist* __list(char* source){
-    Mlist* _list=CALLOC(1,sizeof(Mlist),'L');
+    Mlist* _list=CALLOC(sizeof(Mlist),'L');
     if(source){
         _list->_creator=_getChars(source); // MDH@17APR2020 replacing: _strdup(source);
         if(_list->_creator)output("List creator: '%s'.\n",_list->_creator->chars);
@@ -178,9 +178,9 @@ Mvalue* __value(char const * const descriptor){
     if(!_valueList)_valueList=__list("global value list");
     if(_valueList){
         _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
-        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l'); // both pointers NULL
+        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(sizeof(Mlistelement),'l'); // both pointers NULL
         if(_valueListelement){
-            _value=(Mvalue*)CALLOC(1,sizeof(Mvalue),'X'); // MDH@07APR2020: should be 'X' not 'Y'
+            _value=(Mvalue*)CALLOC(sizeof(Mvalue),'X'); // MDH@07APR2020: should be 'X' not 'Y'
             if(_value){
                 // shouldn't pose a problem now...
                 _valueListelement->_value=_value;
@@ -295,7 +295,7 @@ bool incrementReferenceCount(Mvalue* _value){
 }/* VALIDATED */
 // interface functions that use the above functions
 // wrapping the different value type instances
-Mvalue* _getUndefinedValue(){return (Mvalue*)CALLOC(1,sizeof(Mvalue),'U');}/* VALIDATED */
+Mvalue* _getUndefinedValue(){return (Mvalue*)CALLOC(sizeof(Mvalue),'U');}/* VALIDATED */
 /*
 Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
     if(!_userfunction)return NULL;
@@ -307,7 +307,7 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 // MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
 Mreference* _getReference(Mvariable* variable){
     // MDH@11MAR2020: variable can now be NULL
-    Mreference* _reference=CALLOC(1,sizeof(Mreference),'Q');
+    Mreference* _reference=CALLOC(sizeof(Mreference),'Q');
     if(_reference){_reference->variable=variable;if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
     return _reference;
 }
@@ -484,7 +484,7 @@ Mlist* _getMapAttributes(Mmap const * const map){
 }
 
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){
-    Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+    Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
     if(!_map)return NULL;
     _map->weak=weak;
     _map->valuetype=mapValuetype;
@@ -532,9 +532,9 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){
     if(name&&_floatValue){
         Mvariable* _realVariable=_getVariable(name,VT_FLOAT,true);
         if(_realVariable){
-            Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     assignValue(&_realVariable->_value,_floatValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
                     _mapelement->_variable=_realVariable;
@@ -557,9 +557,9 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){
 Mmap* _getMap(char* name){
     Mvariable* _variable=_getVariable(name,VT_UNDEFINED,true);
     if(_variable){
-        Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+        Mmapelement* _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
         if(_mapelement){
-            Mmap* _map=CALLOC(1,sizeof(Mmap),'M');
+            Mmap* _map=CALLOC(sizeof(Mmap),'M');
             if(_map){
                 _map->numberOfElements=1;
                 _mapelement->_variable=_variable;
@@ -583,7 +583,7 @@ Mmap* _getMapCopy(Mmap const * const map){ // creates a 'deep' copy
             while(mapelement){
                 mapelementVariable=mapelement->_variable;
                 if(mapelementVariable){
-                    _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // new map element to hold a copy
+                    _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m'); // new map element to hold a copy
                     if(_mapelement){
                         // create a variable with the same name and value as the variable in mapelement
                         // MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
@@ -610,7 +610,7 @@ Mlist* _getListCopy(Mlist const * const list){ // creates a 'deep' copy
         if(_list){
             Mlistelement *listelement=list->_first,*_listelement=NULL;
             while(listelement){
-                _listelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l');
+                _listelement=(Mlistelement*)CALLOC(sizeof(Mlistelement),'l');
                 if(_listelement){
                     // 'copy' the value over, here we have the same problem as with copying any other value: if the value to copy is composite (a list or a map) we should copy by value i.e. point to a new map or list and not to the original
                     // technically we could let assignValue() take care of that 
@@ -636,9 +636,9 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
     if(name&&_integerValue){
         Mvariable* _integerVariable=_getVariable(name,VT_INTEGER,true);
         if(_integerVariable){
-            Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     assignValue(&_integerVariable->_value,_integerValue); ///////  incrementReferenceCount(_integerValue); // now bound to the integer variable
                     _mapelement->_variable=_integerVariable;
@@ -660,10 +660,10 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
 Mmap* _getIntegerBooleanMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_INTEGER,true);
                     _mapelement2->_variable=_getVariable(name2,VT_INTEGER,true);
@@ -692,10 +692,10 @@ Mmap* _getIntegerBooleanMap(char* name1,char* name2){
 Mmap* _getStringStringMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_TEXT,true);
                     _mapelement2->_variable=_getVariable(name2,VT_TEXT,true);
@@ -724,10 +724,10 @@ Mmap* _getStringStringMap(char* name1,char* name2){
 Mmap* _getFloatFloatMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_FLOAT,true);
                     _mapelement2->_variable=_getVariable(name2,VT_FLOAT,true);
@@ -751,10 +751,10 @@ Mmap* _getFloatFloatMap(char* name1,char* name2){
 Mmap* _getMapTokenMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_MAP,true);
                     _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
@@ -779,9 +779,9 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
     if(name&&_listValue){
         Mvariable* _listVariable=_getVariable(name,VT_LIST,true);
         if(_listVariable){
-            Mmapelement* _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     assignValue(&_listVariable->_value,_listValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
                     _mapelement->_variable=_listVariable;
@@ -804,11 +804,11 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2&&_mapelement3){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_TEXT,true);
                     _mapelement2->_variable=_getVariable(name2,VT_MAP,true);
@@ -835,10 +835,10 @@ Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){
 Mmap* _getTokenTokenMap(char* name1,char* name2){
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_TOKEN,true);
                     _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
@@ -862,11 +862,11 @@ Mmap* _getTokenTokenMap(char* name1,char* name2){
 Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){
     if(name1&&name2&&name3){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2&&_mapelement3){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_UNDEFINED,true);
                     _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
@@ -893,11 +893,11 @@ Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){
     if(name1&&name2&&name3){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2&&_mapelement3){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_INTEGER,true);
                     _mapelement2->_variable=_getVariable(name2,VT_INTEGER,true);
@@ -924,11 +924,11 @@ Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){
     if(name1&&name2&&name3){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2&&_mapelement3){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_LIST,true); // must be a list
                     _mapelement2->_variable=_getVariable(name2,VT_UNDEFINED,true); // any value will do
@@ -956,12 +956,12 @@ Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name
     if(name1&&name2&&name3&&name4){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
             strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name3,name4)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_TOKEN,true);
                     _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
@@ -995,13 +995,13 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
             strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name2,name5)&&
             strcmp(name3,name4)&&strcmp(name3,name5)&&
             strcmp(name4,name5)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
-            Mmapelement* _mapelement5=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+            Mmapelement* _mapelement5=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4&&_mapelement5){
-                Mmap* _map=(Mmap*)CALLOC(1,sizeof(Mmap),'M');
+                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M');
                 if(_map){
                     _mapelement1->_variable=_getVariable(name1,VT_TOKEN,true);
                     _mapelement2->_variable=_getVariable(name2,VT_TOKEN,true);
@@ -1112,7 +1112,7 @@ void checkList(Mlist* _list){
         _prevListelement=_list->_last;
     // if we do not have a list element ascertain to have one
     if(!_listelement){ // not yet present in list, so we have to create a new element
-        _listelement=(Mlistelement*)CALLOC(1,sizeof(Mlistelement),'l');
+        _listelement=(Mlistelement*)CALLOC(sizeof(Mlistelement),'l');
         if(!_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
     }
     // MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
@@ -1203,7 +1203,7 @@ long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue
                 Mmapelement* _mapelement=_map->_first;
                 while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
                 if(!_mapelement){ // not found
-                    _mapelement=(Mmapelement*)CALLOC(1,sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
+                    _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
                         // MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
                         _mapelement->_variable=_getVariable(attributeName,VT_UNDEFINED,false); // TODO why would this 'variable' be mutable, and allowing all values????
@@ -1891,7 +1891,7 @@ Mlist* _getListOfType(Mvaluetype valuetype){
     return _list;
 }/* VALIDATED */
 Mmap* _getMapOfType(Mvaluetype valuetype){
-    Mmap* _map=CALLOC(1,sizeof(Mmap),'M');
+    Mmap* _map=CALLOC(sizeof(Mmap),'M');
     _map->valuetype=valuetype;
     return _map;
 }/* VALIDATED */
@@ -2400,9 +2400,9 @@ void free_environment(Menvironment* _environment){
     }
 }/* VALIDATED */
 Menvironment* __environment(){
-    Menvironment* _environment=CALLOC(1,sizeof(Menvironment),'E');
+    Menvironment* _environment=CALLOC(sizeof(Menvironment),'E');
     if(!_environment)return NULL;
-    _environment->_variableMap=CALLOC(1,sizeof(Mmap),'M'); // ascertain that the environment contains a variable map
+    _environment->_variableMap=CALLOC(sizeof(Mmap),'M'); // ascertain that the environment contains a variable map
     if(!_environment->_variableMap){free_environment(_environment);_environment=NULL;}
     return _environment;
 }/* VALIDATED */

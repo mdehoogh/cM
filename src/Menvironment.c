@@ -732,7 +732,7 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
             Mmap* map=(environment?environment->_variableMap:NULL); // the map to add the variable
             if(map){
                 if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
-                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
+                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'m');
                 if(_variableMapelement){
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
@@ -767,7 +767,7 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
             // add the given property to the map BUT it might already be defined in the map!!!!!
             Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(property,mapelement->_variable->_name->chars)))mapelement=mapelement->_next;
             if(!mapelement){ // property does not yet exist
-                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
+                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'m');
                 if(_variableMapelement){
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
@@ -814,7 +814,7 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
                 while(environment&&(!environment->_variableMap||environment->_variableMap->immutable))environment=getValueEnvironment(environment->_parent);
                 if(environment){
                     if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
-                    Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(1,sizeof(Mmapelement),'m');
+                    Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'m');
                     if(_variableMapelement){
                         // store the references
                         _variableMapelement->_next=NULL;

@@ -3168,7 +3168,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 					//                this works for lists not for maps
 					// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-					Mvalue*** _valueholders=MALLOC(1,sizeof(void*),'_'); // set immediately so MALLOC suffices
+					Mvalue*** _valueholders=MALLOC(sizeof(void*),'_'); // set immediately so MALLOC suffices
 					if(_valueholders){
 						size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 						bool result=true;
@@ -3483,7 +3483,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 				//                this works for lists not for maps
 				// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-				Mvalue*** _valueholders=MALLOC(1,sizeof(void*),'_'); // set immediately so MALLOC suffices
+				Mvalue*** _valueholders=MALLOC(sizeof(void*),'_'); // set immediately so MALLOC suffices
 				if(_valueholders){
 					size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 					_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
