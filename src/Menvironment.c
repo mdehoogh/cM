@@ -287,7 +287,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
         &&appendedToList(_valuesColumnNames,_getTextValue("'FREED       ",false),M_LL_INVALID)>0
         &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED ",false),M_LL_INVALID)>0
         &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED     ",false),M_LL_INVALID)>0){
-        t_count numberOfAllocationTypes=getNumberOfAllocationTypes();
+        long long numberOfAllocationTypes=getNumberOfAllocationTypes();
         // get a table with the given values column names and number of rows (which are initialized to empty lists)
         // NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
         _valuesTable=_getTable(_valuesColumnNames,numberOfAllocationTypes,true);
@@ -295,7 +295,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
             if(numberOfAllocationTypes){
                 // we start with a general overview (the counts per type)
                 // NOTE dividing by sizeof(char) is far fetched
-                for(t_count i=0;i<numberOfAllocationTypes;i++){
+                for(long long i=0;i<numberOfAllocationTypes;i++){
                     Mstring* _allocationTypeText=_getString("'");
                     if(_allocationTypeText
                             &&string_append_char(_allocationTypeText,_allocationTypes[i].type)

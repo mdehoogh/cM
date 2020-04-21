@@ -4,13 +4,13 @@
 #include "Mmessage.h"
 
 // MDH@14APR2020
-typedef unsigned long long t_count;
+// typedef unsigned t_count long long;
 
 // MDH@13APR2020: we're going to keep histograms for each of the allocation type
 //                we can make a union to distinguish between fixed size and variable size allocations
 typedef struct{
     size_t  size; // the 'id' of the allocation class
-    t_count count;
+    long long count;
 }t_allocationsize;
 
 // when dealing with a variable size allocation type, we're storing 
@@ -21,28 +21,28 @@ typedef union{
 
 typedef struct{
     char type;
-    t_count occupied; // number of bytes occupied
-    t_count freed; // number of bytes freed
-    t_count mark_occupied; // marked number of bytes occupied
-    t_count mark_freed; // marked number of bytes freed
-    t_count count; // either the total number of fixed size allocations, or the total number of size categories
+    long long occupied; // number of bytes occupied
+    long long freed; // number of bytes freed
+    long long mark_occupied; // marked number of bytes occupied
+    long long mark_freed; // marked number of bytes freed
+    long long count; // either the total number of fixed size allocations, or the total number of size categories
     t_allocationsizeunion allocationsizeunion; // either the size of a fixed size allocation type of a pointer to the allocation sizes of a variable type allocation type
 }t_allocationtype;
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
-t_count addAllocation(char allocationType,size_t size,t_count count); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
-// t_count registerAllocation(char allocationType,size_t size,t_count count);
+long long addAllocation(char allocationType/*,size_t size*//*,long long count*/); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
+// long long registerAllocation(char allocationType,size_t size,long long count);
 
 bool allocationRecordingInitialized();
-t_count allocationmark();
-t_count unmarkallocation(t_count mark);
-void allocationreport(t_count mark); // report on the current allocation status
+long long allocationmark();
+long long unmarkallocation(long long mark);
+void allocationreport(long long mark); // report on the current allocation status
 void syncallocations();
 
 // MDH@15NOV2019: keeping track of the allocation counts and the allocation types
-t_count getNumberOfAllocationTypes();
-t_count* _getAllocationCounts();
+long long getNumberOfAllocationTypes();
+long long* _getAllocationCounts();
 t_allocationtype* _getAllocationTypes();
 bool resetAllocationTypes();
 void markAllocationCounts();
@@ -54,7 +54,7 @@ long long getAllocationTypeFreed(char allocationType);
 #ifndef __PRODUCTION__
 void* Mmalloc(size_t size,char type);
 void* Mcalloc(size_t size,char type);
-void* Mrealloc(void* ptr,t_count from_count,t_count to_count,size_t size,char type);
+void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,char type);
 void Mfree(void* ptr,char type); // releasing a single item of a fixed size allocation type
 // use the substitutes
 #define MALLOC(size,type) Mmalloc((size),(type))

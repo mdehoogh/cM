@@ -1577,8 +1577,8 @@ Mvalue* getCommandValue(Mcommand* command,char commandType){
 size_t* getAllocationCountDifferences(size_t* from,size_t* to){
 	return NULL;
 }
-t_count *_systemallocationcounts,*_userallocationcounts;
-t_count *_lastcommandsystemallocationcounts,*_lastcommanduserallocationcounts;
+long long *_systemallocationcounts,*_userallocationcounts;
+long long *_lastcommandsystemallocationcounts,*_lastcommanduserallocationcounts;
 void prepareForEvaluatingCommand(){
 	// we need a new pre evaluation allocation counts
 	if(_lastcommandsystemallocationcounts)free(_lastcommandsystemallocationcounts);
@@ -2914,6 +2914,14 @@ int main(int argc, char **argv){
 
 #endif
 
+	// MDH@07APR2020 NOTE until we do the following allocation types will NOT get registered (which resulted in bug reports when they got freed by the garbage collector at the end)
+	// tell user whether allocation recording is active!!!
+	outputInfo(allocationRecordingInitialized()?"Allocation recording ready!":"No allocation recording!");
+	if(addAllocation('!'/*,0*//*,1*/)<=0){
+		outputInfo("Failed to initialize allocation recording.");
+		exit(3);
+	}
+
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
 	Mstring* _settingsCharacterText=__string();
@@ -2934,10 +2942,6 @@ int main(int argc, char **argv){
 			}
 		}
 	}
-
-	// MDH@07APR2020 NOTE until we do the following allocation types will NOT get registered (which resulted in bug reports when they got freed by the garbage collector at the end)
-	// tell user whether allocation recording is active!!!
-	outputInfo(allocationRecordingInitialized()?"Allocation recording ready!":"No allocation recording!");
 
 	// BEFORE using the command-line parameters (will effectuate wrap mode and color scheme) as it will clear the screen!	
 	if(!preparedForUserInput()){
@@ -3008,10 +3012,6 @@ int main(int argc, char **argv){
 	outputInfo("In any mode press the Enter key on an empty line to switch modes.");
 
 	// let's mark the allocations BEFORE we start looping
-	if(addAllocation('!',0,0)==0){
-		outputInfo("Failed to initialize allocation recording.");
-		exit(3);
-	}
 
 	// MDH@13MAR2020: echo all requested output to the log file as well, I suppose we should use a timestamp in the name, so we get a different log for each session
 	Mstring* _outputFilename=_getTimestamp("%Y-%m-%d.%H:%M:%S");
