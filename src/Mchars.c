@@ -1,7 +1,11 @@
 /**
  * implementation of Mchars.h
  */
+#include <stdio.h>
+
 #include "Mchars.h"
+
+extern char const * const M_WARNING_PREFIX;
 
 // I guess it's prudent to pass in how many initial characters you want to be able to store in the result
 // NOTE this would mean that an external party should somehow keep track of the number of characters that can be stored in the character array
@@ -10,9 +14,9 @@ Mchars* __chars(size_t size,long long count){
     // for actual use the number of blocks need to be defined
     return REALLOC(NULL,0,count,size,'s');
 }
-bool free_chars(Mchars const * const _chars,size_t size,long long count){
+void free_chars(Mchars const * const _chars,size_t size,long long count){
     // typically the caller would need to tell us the current number of characters stored in _chars
-    return(!_chars||!REALLOC(_chars,count,0,size,'s'));
+    if(!_chars)printf("%sNo Mchars to free.\n",M_WARNING_PREFIX);else REALLOC(_chars,count,0,size,'s');
 }
 
 // if you want to host a known list of characters ('\0' delimited) call _getChars()

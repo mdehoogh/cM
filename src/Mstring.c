@@ -111,7 +111,7 @@ void free_string(Mstring* str){
     if(str){
         // MDH@17APR2020: replacing src->chars by src->_chars->chars
         // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
-        if(!free_chars(str->_chars,M_BLOCK_SIZE,str->blocks))printf("ERROR: Failed to release an Mchars.");
+        free_chars(str->_chars,M_BLOCK_SIZE,str->blocks);
         // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
         FREE(str,'S');
     }
@@ -132,7 +132,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
             // MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
-            Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,getSizeOfChars(str),blocks*M_BLOCK_SIZE);
+            Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks);
             if(!new_chars)return NULL; // failure
             str->blocks=blocks;
             str->_chars=new_chars;

@@ -14,7 +14,7 @@ typedef struct {
 }Mchars;
 
 Mchars* __chars(size_t size,long long count);
-bool free_chars(Mchars const * const _chars,size_t size,long long count);
+void free_chars(Mchars const * const _chars,size_t size,long long count);
 
 // get Mchars* that contains exactly the characters in chars (nothing more), and the size is 1 (for single characters)
 Mchars* _getChars(char const * const chars);

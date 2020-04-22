@@ -42,7 +42,8 @@ extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in M
 
 // MDH@20APR2020: definitely not the first build but I think I forgot to switch to builds here (as opposed to git branching)
 char const * const M_VERSION="0.1.2";
-char const * const M_BUILD="1";char const * const M_DATE="20 April 2020, 17:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+// char const * const M_BUILD="1";char const * const M_DATE="21 April 2020, 17:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+char const * const M_BUILD="2";char const * const M_DATE="22 April 2020"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 
 //char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
