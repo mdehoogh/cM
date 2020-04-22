@@ -11,7 +11,7 @@ extern char const * const M_WARNING_PREFIX;
 extern char const * const M_BUG_PREFIX;
 
 static void info(char const * fmt,...){
-    va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
+    // va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
