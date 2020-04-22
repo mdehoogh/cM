@@ -2917,11 +2917,14 @@ int main(int argc, char **argv){
 
 	// MDH@07APR2020 NOTE until we do the following allocation types will NOT get registered (which resulted in bug reports when they got freed by the garbage collector at the end)
 	// tell user whether allocation recording is active!!!
-	outputInfo(allocationRecordingInitialized()?"Allocation recording ready!":"No allocation recording!");
-	if(addAllocation('!'/*,0*//*,1*/)<=0){
-		outputInfo("Failed to initialize allocation recording.");
-		exit(3);
-	}
+	if(allocationRecordingInitialized()){
+		if(addAllocation('!'/*,0*//*,1*/)<=0){
+			output("%sFailed to initialize allocation recording.",M_ERROR_PREFIX);
+			exit(3);
+		}
+		outputInfo("Allocation recording ready!");
+	}else
+		outputInfo("No allocation recording!");
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
