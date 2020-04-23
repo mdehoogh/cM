@@ -266,6 +266,16 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
     return str;
 }
 
+// MDH@23APR2020: could come in handy (similar to string_prepend)
+Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc){
+    if(str&&pc){
+        char c;
+        size_t index=0;
+        while((c=pc[index])){if(!string_setchar(str,c,pos))break;index++;pos++;} // increment index at the end is better than at the beginning TODO can we do even better?
+    }
+    return str;
+}
+
 /** 
  * Add a character to the end of the String 
  * NOTE: returns NULL on failure
@@ -334,7 +344,7 @@ Mstring* string_append(Mstring * const str,char const * const pc){
     if(str&&pc){ // something to append (to)
         char c;
         size_t index=0;
-        while((c=pc[index++]))if(!string_append_char(str,c))return NULL;
+        while((c=pc[index++])){if(!string_append_char(str,c))return NULL;/*output("***** %c appended! ******\n",c);*/}
         /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
     }
     return str;

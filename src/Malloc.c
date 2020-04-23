@@ -17,6 +17,23 @@ static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list 
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 static void bug(char const * fmt,...){printf("%s",M_BUG_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 
+#ifndef __PRODUCTION__
+typedef struct{
+    char allocationType;
+    long long allocationIndex;
+}Malloc;
+#endif
+
+static void dump(char* _c,size_t count,size_t size){
+    printf("Contents: '");
+    size_t l=0;
+    while(l<count){if(l>0){if(size>1&&l>0&&l%size)printf("%c",'|');else printf("%c",' ');}printf("%c=%hhu",*_c,*_c);_c++;l++;}
+#ifndef __PRODUCTION__
+    printf(" + %c",*_c);l=1;while(l<sizeof(Malloc)){_c++;printf(".%x",*_c);l++;}
+#endif
+    printf("%s","'.\n");
+}
+
 // MDH@15NOV2019: want to keep track of the number of allocations for each type (with character id)
 t_allocationtype* _allocationTypes=NULL; // the unique allocation type characters
 long long numberOfAllocationTypes=0; // keep track of the number of allocation types
@@ -46,7 +63,7 @@ bool allocationRecordingInitialized(){
 #else
     allocations._chars=NULL;
 #endif
-    return(/* superfluous: allocations._chars&&*/_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/);
+    return(/* superfluous: allocations._chars&&*/_allocationTypes!=NULL/* MDH@14APR2020: &&_allocationcounts*/);
     // replacing: if(!allocations._chars)info("ERROR: Failed to initialize recording allocations.\n");else info("Allocation recording initialized.\n");
 }
 
@@ -127,10 +144,10 @@ long long addAllocation(char allocationType/*,size_t size,*//*,long long count*/
             if(!allocationchars){error("Allocation could not be remembered.\n");return 0;} // realloc failure
             allocations._chars=allocationchars;
         }
-        allocations._chars[allocations.l++]=allocationType;
+        allocations._chars[allocations.l]=allocationType;
         info("Allocation of type '%c' remembered at position %llu.\n",allocationType,allocations.l);
     // }
-    return allocations.l; // returning the current length of allocations (which should be nonzero for sure!!!)
+    return allocations.l++; // returning the position where the allocation is stored, and incrementing the length of the allocations unless we replace allocations.l by allocations.lastIndex
 }
 
 // MDH@14APR2020: addAllocationType renamed to registerAllocation
@@ -245,10 +262,6 @@ void syncallocations(){
 }
 
 #ifndef __PRODUCTION__
-typedef struct{
-    char allocationType;
-    long long allocationIndex;
-}Malloc;
 // MDH@21APR2020: general function to store allocation info with the dynamically allocated memory
 static void attachAllocationInfo(void* ptr,char allocationType,size_t size,bool fixedsize){
     // ASSERT all arguments supposedly valid i.e. ptr!=NULL, size>0
@@ -321,27 +334,27 @@ void Mfree(void* ptr,char allocationType){
     // MDH@14APR2020 NOTE: the following is about removing the allocation
 #ifndef __PRODUCTION__
     Malloc* _alloc=(Malloc*)(((char*)ptr)+size);
-#endif
-    free(ptr);
-#ifndef __PRODUCTION__
-    if(_alloc->allocationType!=allocationType){bug("Allocation type of freed memory '%c' does not match provided allocation type '%c'.\n",_alloc->allocationType,allocationType);return;}
-    if(_alloc->allocationIndex==0){
-        bug("No allocation index registered for allocation of type '%c'.\n",allocationType);
+    if(_alloc->allocationType!=allocationType){
+        bug("Allocation type of dynamic memory '%c' (%u) freed of size %zd does not match provided allocation type '%c'.\n",_alloc->allocationType,_alloc->allocationType,size,allocationType);
+        dump(ptr,size,size);
+        free(ptr);
         return;
     }
+    // if(_alloc->allocationIndex<=0)bug("No allocation index registered for allocation of type '%c'.\n",allocationType);
 #endif
-    if(!allocations._chars){error("Allocation types not recorded!\n");return;}
-    if(allocations.l==0){warning("Nothing allocated to free.");return;}
+    if(!allocations._chars)error("Allocation types not recorded!\n");
+    if(allocations.l==0)warning("Nothing allocated to free.\n");
 #ifndef __PRODUCTION__
-    if(_alloc->allocationIndex>allocations.l){
-        bug("Retrieved allocation position %llu exceeds maximum allocation position %llu.",_alloc->allocationIndex,allocations.l);
-        return;
+    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
+        if(allocations._chars[_alloc->allocationIndex]!=allocationType){
+            bug("Allocation type of dynamic memory '%c' (=%u) (at index %llu) does not match provided allocation type '%c'.\n",allocations._chars[_alloc->allocationIndex],allocations._chars[_alloc->allocationIndex],_alloc->allocationIndex,allocationType);
+            dump(ptr,size,size);
+        }else
+            allocations._chars[_alloc->allocationIndex]=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
+    }else{
+        bug("Retrieved allocation position %llu out of range [0,%llu).",_alloc->allocationIndex,allocations.l);
+        dump(ptr,size,size);
     }
-    _alloc->allocationIndex--;
-    if(allocations._chars[_alloc->allocationIndex]==allocationType)
-        allocations._chars[_alloc->allocationIndex]=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
-    else
-        bug("Allocation type of freed memory '%c' (at index %llu) does not match provided allocation type '%c'.\n",allocations._chars[_alloc->allocationIndex],_alloc->allocationIndex,allocationType);
 #else
     long long pos=allocations.l-1;
     while(pos>0){
@@ -349,6 +362,7 @@ void Mfree(void* ptr,char allocationType){
         pos--;
     }
 #endif
+    free(ptr);
     //////info("!");
     // undo the allocation of the given type
     /* MDH@14APR2020 removing:
@@ -384,22 +398,32 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
 #endif
     size_t occupied=to_count*size; //// replacing: (newptr?sizeof(*newptr):0); // what we need to add
     if(freed!=occupied){ // amount changed
-        long long allocationIndex=0;
+        long long allocationIndex=-1;
 #ifndef __PRODUCTION__
-        if(_alloc){ 
-            if(_alloc->allocationType!=allocationType)
+        Malloc newAllocation={allocationType,0}; // default to the given allocation type
+        if(_alloc){
+            newAllocation.allocationType=_alloc->allocationType;
+            newAllocation.allocationIndex=_alloc->allocationIndex;
+            // we need to get the allocation type and index out BEFORE memory is reallocated!!!!!
+            if(_alloc->allocationType!=allocationType){
                 bug("The allocation type '%c' stored with the data at byte %zd does not match the provided allocation type '%c'.\n",_alloc->allocationType,freed,allocationType);
+                // let's dump the current contents as text?
+                dump(ptr,freed,size);
+            }
             // MDH@20APR2020 ASSERT: freed>0 as freed!=occupied
             allocationIndex=_alloc->allocationIndex;
-            if(allocationIndex>0){
-                allocationIndex--;
-                if(allocations._chars[allocationIndex]!=_alloc->allocationType)
+            if(allocationIndex>=0&&allocationIndex<allocations.l){
+                if(allocations._chars[allocationIndex]!=_alloc->allocationType){
                     bug("Type '%c' of remembered allocation #%llu does not match the provided allocation type '%c'.\n",allocations._chars[allocationIndex],allocationIndex,_alloc->allocationType);
+                    dump(ptr,freed,size);
+                }
                 // MDH@22APR2020 BUG FIX: do NOT clear the remembered allocation type unless the memory is freed!!!!
                 if(occupied==0) // MDH@22APR2020 ADDITION
                     allocations._chars[allocationIndex]=' ';
-            }else
-                error("The allocation index stored with the data is zero!\n");
+            }else{
+                bug("Allocation index %zd stored with the data at position %llu (resized to %llu) of size %zd is out of range [0,%llu)!\n",allocationIndex,freed,occupied,size,allocations.l);
+                dump(ptr,freed,size);
+            }
         }
 #endif
         // MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
@@ -427,8 +451,12 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
                     info("Allocation index %llu stored.\n",_alloc->allocationIndex);
                     // info("Allocation information stored...\n");
                 }else{ // not a first time allocation, so we can simply copy the allocation over
-                    *((Malloc*)(((char*)newptr)+occupied))=*_alloc; // copying the allocation structure over // OOPS ptr replaced by newptr (what it should be I guess)
-                    info("Allocation information copied...\n");
+                    Malloc* _newalloc=(Malloc*)(((char*)newptr)+occupied);
+                    _newalloc->allocationType=newAllocation.allocationType;
+                    _newalloc->allocationIndex=newAllocation.allocationIndex;
+                    // replacing: memcpy(_newalloc,_alloc,sizeof(Malloc)); // replacing:  *((Malloc*)(((char*)newptr)+occupied))=*_alloc; // copying the allocation structure over // OOPS ptr replaced by newptr (what it should be I guess)
+                    info("%zd allocation information bytes copied...\n",sizeof(Malloc));
+                    // printf("New allocation type %c (%c) - allocation index %llu (%llu).\n",_newalloc->allocationType,_alloc->allocationType,_newalloc->allocationIndex,_alloc->allocationIndex);
                 }
             }
 #endif

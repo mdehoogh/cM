@@ -91,9 +91,10 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
             // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
             // NOTE if _decimal->repeating always use fixed-point notation
             char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT->mpd_context);
-            ///////////output("Decimal rep: '%s'.\n",_decimalRep);
+            // output("Decimal rep: '%s'.\n",_decimalChars);
             if(_decimalChars){
                 _p=string_append(_p,_decimalChars);
+				// output("Decimal characters appended!");
                 if(_p){
 					if(_decimal->repeating){
                     	_p=string_insert_char(_p,string_length(_p)-_decimal->repeating,'[');
@@ -103,8 +104,10 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
 						char* _period=strchr(_decimalChars,'.');
 						if(_period){
 							if(!strchr(_decimalChars,'e')){
+								// output("**** Inserting blanks! ****\n");
 								size_t periodpos=(_period-_decimalChars); // index position of the period
 								while(periodpos+51<string_length(_p)){string_insert_char(_p,periodpos+51,' ');periodpos+=51;}
+								// output("**** Blanks inserted! ****\n");
 							}
 						}
 					}

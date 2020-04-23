@@ -54,6 +54,7 @@ size_t string_removed(Mstring * const str,size_t pos,size_t length); // MDH@03OC
 Mstring* string_insert_char(Mstring * const str,size_t pos,char c);
 Mstring* string_append_char(Mstring * const str,char c);
 Mstring* string_setchar(Mstring * const str,char c,size_t pos);
+Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc); // MDH@23APR2020: if we want to quickly replace a substring we can use string_setchars (does NOT change the length!!!)
 
 // MDH@26FEB2019: can we append a text as a whole???
 Mstring* string_append(Mstring * const str,char const * const pc);

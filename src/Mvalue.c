@@ -85,7 +85,7 @@ void free_list(Mlist* _list){
         {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
         if(_list->_first){
             // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters
-            if(_list->_creator)free_chars(_list->_creator,1,strlen(_list->_creator->chars));// MDH@17APR2020 replacing: FREE(_list->_creator,'"');
+            if(_list->_creator)free_chars(_list->_creator,1,strlen(_list->_creator->chars)+1);// MDH@17APR2020 replacing: FREE(_list->_creator,'"');
             free_listelement(_list->_first,_list->weak);
             _list->_first=NULL;
         }
