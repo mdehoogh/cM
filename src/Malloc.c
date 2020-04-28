@@ -101,8 +101,9 @@ static long long getNewAllocationTypeIndex(char allocationType,size_t size,long 
                     }else{
                         _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes=_allocationTypeSizeHistogram;
                         _allocationTypes[numberOfAllocationTypes].count=1;
-                        _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes[0].size=size;
-                        _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes[0].count=count;            
+                        // this is a bit 'verwarrend' but count is the size of what's allocated, and it's always a single allocation (as stored in the count field)
+                        _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes[0].size=count;
+                        _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes[0].count=1;            
                     }
                     newAllocationTypeIndex=numberOfAllocationTypes++; // good to go
                     info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
@@ -160,7 +161,31 @@ static long long registerAllocation(char allocationType,size_t size,long long co
             long long allocationTypeIndex=getNewAllocationTypeIndex(allocationType,size,count,fixedsize);
             if(allocationTypeIndex>=0){ // yes, we should already have at least one allocation type
                 allocationIndex=addAllocation(allocationType/*,size*//*,count*/); // this is for registering the allocation BUT TODO should this be done here?????
-                if(allocationIndex<0)error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,allocationType,size);
+                if(allocationIndex>=0){
+                    t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
+                    if(!fixedsize){
+                        // store in histogram
+                        t_allocationsize* histogram=allocationType.allocationsizeunion._allocationsizes;
+                        long long category=allocationType.count;
+                        while(--category>=0&&histogram[category].size!=count)
+                        ;
+                        t_allocationsize allocationSize;
+                        if(category<0){ // does not yet exist
+                            histogram=realloc(histogram,sizeof(t_allocationsize)*(allocationType.count+1));
+                            if(histogram){
+                                category=allocationType.count++;
+                                histogram[category].count=0;
+                                histogram[category].count=size;
+                            }
+                        }
+                        if(category>=0)
+                            histogram[category].count++;
+                        else
+                            error("Failed to count %lld allocation(s) of type '%c' and size %zd.\n",count,allocationType,size);
+                    }else // fixed size allocation, so increment count with the number of allocations (1 in general for static allocations)
+                        allocationType.count+=count;
+                }else
+                    error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,allocationType,size);
                 /* MDH@14APR2020
                 if(allocationIndex>0){
                     // MDH@15NOV2019: add another size_t to _allocationcounts array if we need to
@@ -175,7 +200,35 @@ static long long registerAllocation(char allocationType,size_t size,long long co
     }
     return allocationIndex;
 }
-
+static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool fixedsize){
+    // NOTE the given size is actually the count i.e. the number of units allocated
+    if(allocationTypeIndex>=0&&allocationTypeIndex<numberOfAllocationTypes){
+        t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
+        if(size>0){
+            if(!fixedsize){
+                // lookup the size as size in the histogram (should be there)
+                t_allocationsize* histogram=(allocationType.count>0?allocationType.allocationsizeunion._allocationsizes:NULL);
+                if(histogram){
+                    long long category=allocationType.count;
+                    while(--category>=0&&histogram[category].size!=size)
+                    ;
+                    if(category>=0){ // found it
+                        if(histogram[category].count>0){
+                            histogram[category].count--; // one down
+                            return true;
+                        }
+                    }
+                }
+            }else
+            if(allocationType.count>=size){
+                allocationType.count-=size;
+                return true;
+            }
+        }
+        bug("Failed to unregister %zd %s-size allocations of type '%c'.\n",size,(fixedsize?"fixed":"variable"),allocationType.type);
+    }
+    return false;
+}
 // MDH@15NOV2019: allow access to the allocation counts
 // MDH@25NOV2019: let's return copies, so that we can get a frozen snapshot instead of something that can change
 /* MDH@14APR2020: not used anymore
@@ -439,6 +492,9 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
         // newptr is allowed to be NULL if occupied equals 
         if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
 #ifndef __PRODUCTION__
+            if(freed>0){
+                unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false); // MDH@28APR2020
+            }
             if(occupied>0){
                 info("Number of dynamically allocated bytes: %zd.\n",occupied+sizeof(Malloc));
                 if(!_alloc){ // first time allocation (i.e. freed equals zero)

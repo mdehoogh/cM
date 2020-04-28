@@ -10,7 +10,7 @@
 //                we can make a union to distinguish between fixed size and variable size allocations
 typedef struct{
     size_t  size; // the 'id' of the allocation class
-    long long count;
+    long long count; // how many we have of this 'size'
 }t_allocationsize;
 
 // when dealing with a variable size allocation type, we're storing 
