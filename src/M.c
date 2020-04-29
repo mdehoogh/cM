@@ -1204,7 +1204,7 @@ typedef struct Minitialization{
 Minitialization *_lastInitialization=NULL; // stack of initializations
 void free_initialization(Minitialization* _initialization){if(_initialization){if(_initialization->_variableName)free(_initialization->_variableName);FREE(_initialization,'I');}}
 bool pushInitialization(char* variableName){
-	Minitialization* _initialization=(variableName&&strlen(variableName)?CALLOC(1,sizeof(Minitialization),'I'):NULL);
+	Minitialization* _initialization=(variableName&&strlen(variableName)?CALLOC(sizeof(Minitialization),'I'):NULL);
 	if(_initialization){
 		_initialization->_variableName=_strdup(variableName);
 		if(_initialization->_variableName){

@@ -102,8 +102,8 @@ static long long getNewAllocationTypeIndex(char allocationType,size_t size,long 
                         _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes=_allocationTypeSizeHistogram;
                         _allocationTypes[numberOfAllocationTypes].count=1;
                         // this is a bit 'verwarrend' but count is the size of what's allocated, and it's always a single allocation (as stored in the count field)
-                        _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes[0].size=count;
-                        _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes[0].count=1;            
+                        _allocationTypeSizeHistogram->size=count;
+                        _allocationTypeSizeHistogram->count=1;            
                     }
                     newAllocationTypeIndex=numberOfAllocationTypes++; // good to go
                     info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
@@ -166,16 +166,19 @@ static long long registerAllocation(char allocationType,size_t size,long long co
                     if(!fixedsize){
                         // store in histogram
                         t_allocationsize* histogram=allocationType.allocationsizeunion._allocationsizes;
+                        if(histogram)allocationType.count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
                         long long category=allocationType.count;
                         while(--category>=0&&histogram[category].size!=count)
                         ;
-                        t_allocationsize allocationSize;
                         if(category<0){ // does not yet exist
-                            histogram=realloc(histogram,sizeof(t_allocationsize)*(allocationType.count+1));
+                            printf("Adding category %lld with count %lld of size %zd to the histogram.\n",allocationType.count+1,count,size);
+                            histogram=(allocationType.count>0?realloc(histogram,sizeof(t_allocationsize)*(allocationType.count+1)):malloc(sizeof(t_allocationsize)));
                             if(histogram){
-                                category=allocationType.count++;
-                                histogram[category].count=0;
-                                histogram[category].count=size;
+                                category=allocationType.count;
+                                allocationType.allocationsizeunion._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
+                                histogram[category].count=0; // will be incremented below!!!!
+                                histogram[category].size=count;
+                                allocationType.count++; // another histogram category (and count represents the number of categories)
                             }
                         }
                         if(category>=0)
@@ -225,7 +228,7 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
                 return true;
             }
         }
-        bug("Failed to unregister %zd %s-size allocations of type '%c'.\n",size,(fixedsize?"fixed":"variable"),allocationType.type);
+        bug("Failed to unregister %zd %s-size allocation%s of type '%c'.\n",size,(fixedsize?"fixed":"variable"),(size>1?"s":""),allocationType.type);
     }
     return false;
 }
@@ -439,18 +442,20 @@ void Mresized(void* ptr,long long from_count,long long to_count,size_t size,char
 // MDH@09APR2020: from now on (v0.1.2) REALLOC is only to be used for all variable dynamic memory allocations
 //                and also for freeing (i.e. when occupied equals zero)
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,char allocationType){
+    if(from_count<0||to_count<0){bug("%s.\n","Number of bytes to free or occupy negative");return NULL;}
     // info("Size of Malloc: %zd, size of long long: %zd.\n",sizeof(Malloc),sizeof(long long));
     void* newptr=ptr; // by default return the original pointer!!!
     //////info(".");
     // kind of like 'freeing' the space ptr is using now
     // step 1. take out what has been registered before...
-    size_t freed=from_count*size; /////// replacing: (ptr?sizeof(*ptr):0); // best to determine it here
+    // MDH@29APR2020: ascertaining that freed equals 0 when ptr is NULL (no matter what from_count is!!!!)
+    size_t freed=(ptr?size*from_count:0); /////// replacing: (ptr?sizeof(*ptr):0); // best to determine it here
+    size_t occupied=size*to_count; //// replacing: (newptr?sizeof(*newptr):0); // what we need to add
 #ifndef __PRODUCTION__
     info("\n*************************** Reallocating %llu blocks of size %zd to %llu blocks of dynamic memory of type '%c' ***************************\n",from_count,size,to_count,allocationType);
-    Malloc* _alloc=(ptr?(freed>0?(Malloc*)(((char*)ptr)+freed):NULL):NULL);
 #endif
-    size_t occupied=to_count*size; //// replacing: (newptr?sizeof(*newptr):0); // what we need to add
     if(freed!=occupied){ // amount changed
+        Malloc* _alloc=(freed>0?(Malloc*)(((char*)ptr)+freed):NULL); // pointer to Malloc allocation registration appendix
         long long allocationIndex=-1;
 #ifndef __PRODUCTION__
         Malloc newAllocation={allocationType,0}; // default to the given allocation type
@@ -482,13 +487,16 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
         // MDH@14APR2020: if a (re)alloc use malloc if first time otherwise use realloc
         if(occupied>0){
 #ifndef __PRODUCTION__
-            newptr=(freed>0?realloc(ptr,occupied+sizeof(Malloc)):malloc(occupied+sizeof(Malloc))); // we have to reallocate nitems each of the given size
+            if(freed>0)
+                newptr=realloc(ptr,occupied+sizeof(Malloc));
+            else
+                newptr=malloc(occupied+sizeof(Malloc)); // we have to reallocate nitems each of the given size
 #else
             newptr=(freed>0?realloc(ptr,occupied):malloc(occupied)); // we have to reallocate nitems each of the given size
 #endif
         }else
             free(ptr);
-        info("Object of type '%c' resized from %zd to %zd!\n",allocationType,freed,occupied);
+        printf("Object of type '%c' resized from %zd to %zd!\n",allocationType,freed,occupied);
         // newptr is allowed to be NULL if occupied equals 
         if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
 #ifndef __PRODUCTION__

@@ -7160,7 +7160,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	NAI_value=_getIntegerValue(M_LL_INVALID);
 
 	// MDH@06NOV2019: NULL_value remains NULL for ever...
-	UNDEFINED_value=__value();
+	UNDEFINED_value=__value("undefined");
 	if(!UNDEFINED_value){outputError("Failed to initialize UNDEFINED.");return false;}
 
 	// MDH@23OCT2019: we really want NULL to be a variable with NO value, so we can actually use it to NULL a value!!
@@ -7184,7 +7184,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 
 	Menvironment* _Menvironment=__environment(); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
+		if(amVerbose())output("M environment created.\n");
 		_Menvironment->_name=_getChars("M"); // TODO why make a dynamic copy???
+		if(amVerbose())output("M environment named.\n");
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC(sizeof(Mfunctionmap),'W');
 		if(environmentFunctionMap){

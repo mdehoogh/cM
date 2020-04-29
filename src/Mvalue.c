@@ -2401,9 +2401,9 @@ void free_environment(Menvironment* _environment){
 }/* VALIDATED */
 Menvironment* __environment(){
     Menvironment* _environment=CALLOC(sizeof(Menvironment),'E');
-    if(!_environment)return NULL;
+    if(!_environment){outputError("Failed to create an environment");return NULL;}
     _environment->_variableMap=CALLOC(sizeof(Mmap),'M'); // ascertain that the environment contains a variable map
-    if(!_environment->_variableMap){free_environment(_environment);_environment=NULL;}
+    if(!_environment->_variableMap){free_environment(_environment);_environment=NULL;outputError("Failed to create the new environment variable map");}
     return _environment;
 }/* VALIDATED */
 Mstring* _getEnvironmentName(Menvironment* _environment){

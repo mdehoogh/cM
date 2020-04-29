@@ -18,15 +18,24 @@ mpd_t* get_mpd_copy(mpd_context_t const * mpd_context,mpd_t* mpd){
 	return _mpd;
 }
 
+
+void free_sincoselement(Msincoselement* _sincoselement){
+    if(_sincoselement){
+		if(_sincoselement->_next)free_sincoselement(_sincoselement->_next); // unlikely though
+        free_mpd(_sincoselement->_angle);free_mpd(_sincoselement->_sine);free_mpd(_sincoselement->_cosine);
+        FREE(_sincoselement,'#');
+    }
+}
+
 mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){
-	mpd_context_t* _mpd_context=(mpd_context_t*)calloc(1,sizeof(mpd_context_t));
+	mpd_context_t* _mpd_context=(mpd_context_t*)CALLOC(sizeof(mpd_context_t),'c'); // MDH@29APR2020: calloc replaced by CALLOC for sure, because it must match FREE(,'c') on mpd_context (see below)
 	if(_mpd_context){
-		if(amVerbose())output("New context with precision %lld created.\n",decimalprecision);
+		if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
 		// initialize the new context to the default context (specification)
 		mpd_init(_mpd_context,decimalprecision);
-		if(amVerbose())output("Context with precision %u initialized.\n",mpd_getprec(_mpd_context));
+		if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(_mpd_context));
 	}else
-		outputError("Failed to create a new context");
+		outputError("Failed to create a new decimal context");
 	return _mpd_context;
 }
 
@@ -37,6 +46,11 @@ void free_decimalcontext(Mdecimalcontext* _decimalcontext){
 	if(_decimalcontext->pidiv2)free_mpd(_decimalcontext->pidiv2);
 	if(_decimalcontext->pidiv4)free_mpd(_decimalcontext->pidiv4);
 	if(_decimalcontext->e)free_mpd(_decimalcontext->e);
+	// MDH@29APR2020: some additional stuff to free
+	if(_decimalcontext->predefinedsinedeltaangle)free_mpd(_decimalcontext->predefinedsinedeltaangle);
+	for(int index=256;index>=0;index--)if(_decimalcontext->predefinedsines[index])free_mpd(_decimalcontext->predefinedsines[index]);
+	if(_decimalcontext->_firstCordicelement)free_sincoselement(_decimalcontext->_firstCordicelement);
+	if(_decimalcontext->_firstSincoselement)free_sincoselement(_decimalcontext->_firstSincoselement);
 	FREE(_decimalcontext,'C');
 }
 
@@ -1788,14 +1802,6 @@ typedef struct mpd_relative_angle{
 	mpd_t* _delta_angle; // the (positive) difference with the given sincoselement angle
 	bool negative; // whether or not a negative relative angle
 }mpd_relative_angle_t;
-
-void free_sincoselement(Msincoselement* _sincoselement){
-    if(_sincoselement){
-		if(_sincoselement->_next)free_sincoselement(_sincoselement->_next); // unlikely though
-        free_mpd(_sincoselement->_angle);free_mpd(_sincoselement->_sine);free_mpd(_sincoselement->_cosine);
-        FREE(_sincoselement,'#');
-    }
-}
 
 void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle){
 	free_sincoselement(_mpd_relative_angle->sincoselement); // MDH@11SEP2019: now we do need to free the Msincoselement*

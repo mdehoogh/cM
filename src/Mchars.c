@@ -24,9 +24,10 @@ void free_chars(Mchars const * const _chars,size_t size,long long count){
 Mchars* _getChars(char const * const chars){
     Mchars* _chars=NULL;
     if(chars){
-        size_t l=strlen(chars)+1;
+        long long l=strlen(chars)+1;
+        // output("Allocating %zd characters for storing '%s'.\n",l,chars);
         _chars=(chars?__chars(1,l):NULL);
-        if(_chars)memcpy(_chars->chars,chars,l);
+        if(_chars)memcpy(_chars->chars,chars,l);else outputError("Failed to store the character array");
     }
     return _chars;
 }
