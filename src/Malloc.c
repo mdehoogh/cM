@@ -11,7 +11,7 @@ extern char const * const M_WARNING_PREFIX;
 extern char const * const M_BUG_PREFIX;
 
 static void info(char const * fmt,...){
-    // va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
+    va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
@@ -152,28 +152,29 @@ long long addAllocation(char allocationType/*,size_t size,*//*,long long count*/
 }
 
 // MDH@14APR2020: addAllocationType renamed to registerAllocation
-static long long registerAllocation(char allocationType,size_t size,long long count,bool fixedsize){
+static long long registerAllocation(char type,size_t size,long long count,bool fixedsize){
     long long allocationIndex=0;
-    if(allocationType!='\0'&&allocationType!='*'){
+    if(type!='\0'&&type!='*'){
         // how about registering the type first if we need to???????
         // increase size if necessary
         if(size>0&&count>0){
-            long long allocationTypeIndex=getNewAllocationTypeIndex(allocationType,size,count,fixedsize);
+            long long allocationTypeIndex=getNewAllocationTypeIndex(type,size,count,fixedsize);
             if(allocationTypeIndex>=0){ // yes, we should already have at least one allocation type
-                allocationIndex=addAllocation(allocationType/*,size*//*,count*/); // this is for registering the allocation BUT TODO should this be done here?????
+                allocationIndex=addAllocation(type/*,size*//*,count*/); // this is for registering the allocation BUT TODO should this be done here?????
                 if(allocationIndex>=0){
                     t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
                     if(!fixedsize){
                         // store in histogram
                         t_allocationsize* histogram=allocationType.allocationsizeunion._allocationsizes;
-                        if(histogram)allocationType.count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
+                        if(!histogram)allocationType.count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
                         long long category=allocationType.count;
                         while(--category>=0&&histogram[category].size!=count)
                         ;
                         if(category<0){ // does not yet exist
-                            printf("Adding category %lld with count %lld of size %zd to the histogram.\n",allocationType.count+1,count,size);
-                            histogram=(allocationType.count>0?realloc(histogram,sizeof(t_allocationsize)*(allocationType.count+1)):malloc(sizeof(t_allocationsize)));
+                            printf("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",allocationType.count+1,count,size,type);
+                            histogram=(histogram?realloc(histogram,sizeof(t_allocationsize)*(allocationType.count+1)):malloc(sizeof(t_allocationsize)));
                             if(histogram){
+                                printf("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",allocationType.count+1,count,type);
                                 category=allocationType.count;
                                 allocationType.allocationsizeunion._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
                                 histogram[category].count=0; // will be incremented below!!!!
@@ -184,11 +185,11 @@ static long long registerAllocation(char allocationType,size_t size,long long co
                         if(category>=0)
                             histogram[category].count++;
                         else
-                            error("Failed to count %lld allocation(s) of type '%c' and size %zd.\n",count,allocationType,size);
+                            error("Failed to count %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
                     }else // fixed size allocation, so increment count with the number of allocations (1 in general for static allocations)
                         allocationType.count+=count;
                 }else
-                    error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,allocationType,size);
+                    error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
                 /* MDH@14APR2020
                 if(allocationIndex>0){
                     // MDH@15NOV2019: add another size_t to _allocationcounts array if we need to
@@ -198,7 +199,7 @@ static long long registerAllocation(char allocationType,size_t size,long long co
                 }
                 */
             }else
-                error("Failed to register allocation of type '%c' and size %zd (error code: %lld).\n",allocationType,size,allocationTypeIndex);
+                error("Failed to register allocation of type '%c' and size %zd (error code: %lld).\n",type,size,allocationTypeIndex);
         }
     }
     return allocationIndex;
@@ -220,15 +221,18 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
                             histogram[category].count--; // one down
                             return true;
                         }
-                    }
+                        bug("Unable to unregister the allocation of size %zd of type '%c': no registered allocation count.\n",size,allocationType.type);
+                    }else
+                        bug("Unable to unregister the allocation of size %zd of type '%c': allocation type unknown.\n",size,allocationType.type);
                 }
-            }else
-            if(allocationType.count>=size){
-                allocationType.count-=size;
-                return true;
+            }else{
+                if(allocationType.count>=size){
+                    allocationType.count-=size;
+                    return true;
+                }
+                bug("Failed to unregister %zd fixed-size allocation%s of type '%c'.\n",size,(size>1?"s":""),allocationType.type);
             }
         }
-        bug("Failed to unregister %zd %s-size allocation%s of type '%c'.\n",size,(fixedsize?"fixed":"variable"),(size>1?"s":""),allocationType.type);
     }
     return false;
 }

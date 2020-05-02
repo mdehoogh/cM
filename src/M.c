@@ -43,7 +43,8 @@ extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in M
 // MDH@20APR2020: definitely not the first build but I think I forgot to switch to builds here (as opposed to git branching)
 char const * const M_VERSION="0.1.2";
 // char const * const M_BUILD="1";char const * const M_DATE="21 April 2020, 17:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
-char const * const M_BUILD="2";char const * const M_DATE="22 April 2020"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+// char const * const M_BUILD="2";char const * const M_DATE="22 April 2020"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
+char const * const M_BUILD="3";char const * const M_DATE="02 May 2020"; // dynamic allocation debugging debugging
 
 //char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";
@@ -616,7 +617,7 @@ char* _getLastTokenAutoCompletionText(){
 void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext){
 	if(!_autocompletiontext)return;
 	if(_autocompletiontext->_next)free_tokenautocompletiontext(_autocompletiontext->_next);
-	if(_autocompletiontext->_text)free_chars(_autocompletiontext->_text,1,strlen(_autocompletiontext->_text->chars)+1);
+	if(_autocompletiontext->_text)freeChars(_autocompletiontext->_text); // MDH@02MAY2020: switching to freeChars() given that _getChars() was used to create it
 	FREE(_autocompletiontext,'7'); // MDH@07APR2020: _autocompletiontext is an Mstring* so release as 'S'
 }
 
@@ -781,7 +782,7 @@ bool deleteFirstAutocompletionCharacter(char firstAutocompletionCharacter,bool c
 				}else{ // a true delete
 					// replace the current text by what's behind the first character (if any)
 					tokenautocompletiontext->_text=(l>1?_getChars(p->chars+1):NULL);
-					free_chars(p,1,l+1); // free the currently used dynamic memory still pointed to by p
+					freeChars(p); // free the currently used dynamic memory still pointed to by p
 					if(!tokenautocompletiontext->_text){ // nothing left (or failing to copy the remainder over)
 						Mtokenautocompletiontext* nexttokenautocompletiontext=tokenautocompletiontext->_next; // remember where to link the previous to
 						tokenautocompletiontext->_next=NULL;free_tokenautocompletiontext(tokenautocompletiontext); // get rid of the feed forward text
@@ -815,7 +816,7 @@ char getFirstAutocompletionCharacterRemoved(){
 				if(amVerbose())inputInfo("First feed forward character '%c'.",firstAutocompletionCharacterRemoved);
 				// replace the current text by what's behind the first character (if any)
 				tokenautocompletiontext->_text=(l>1?_getChars(p->chars+1):NULL);
-				free_chars(p,1,l+1); // free the currently used dynamic memory still pointed to by p
+				freeChars(p); // free the currently used dynamic memory still pointed to by p
 				if(!tokenautocompletiontext->_text){ // nothing left (or failing to copy the remainder over)
 					Mtokenautocompletiontext* nexttokenautocompletiontext=tokenautocompletiontext->_next; // remember where to link the previous to
 					tokenautocompletiontext->_next=NULL;free_tokenautocompletiontext(tokenautocompletiontext); // get rid of the feed forward text
