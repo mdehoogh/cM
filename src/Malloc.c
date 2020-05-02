@@ -11,7 +11,7 @@ extern char const * const M_WARNING_PREFIX;
 extern char const * const M_BUG_PREFIX;
 
 static void info(char const * fmt,...){
-    va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
+    // va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
@@ -162,24 +162,26 @@ static long long registerAllocation(char type,size_t size,long long count,bool f
             if(allocationTypeIndex>=0){ // yes, we should already have at least one allocation type
                 allocationIndex=addAllocation(type/*,size*//*,count*/); // this is for registering the allocation BUT TODO should this be done here?????
                 if(allocationIndex>=0){
-                    t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
+                    //t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
                     if(!fixedsize){
                         // store in histogram
-                        t_allocationsize* histogram=allocationType.allocationsizeunion._allocationsizes;
-                        if(!histogram)allocationType.count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
-                        long long category=allocationType.count;
+                        t_allocationsize* histogram=_allocationTypes[allocationTypeIndex].allocationsizeunion._allocationsizes;
+                        if(!histogram)_allocationTypes[allocationTypeIndex].count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
+                        long long category=_allocationTypes[allocationTypeIndex].count;
                         while(--category>=0&&histogram[category].size!=count)
                         ;
                         if(category<0){ // does not yet exist
-                            printf("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",allocationType.count+1,count,size,type);
-                            histogram=(histogram?realloc(histogram,sizeof(t_allocationsize)*(allocationType.count+1)):malloc(sizeof(t_allocationsize)));
+                            printf("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",_allocationTypes[allocationTypeIndex].count+1,count,size,type);
+                            if(histogram)
+                                histogram=realloc(histogram,sizeof(t_allocationsize)*(_allocationTypes[allocationTypeIndex].count+1));
+                            else
+                                histogram=malloc(sizeof(t_allocationsize));
                             if(histogram){
-                                printf("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",allocationType.count+1,count,type);
-                                category=allocationType.count;
-                                allocationType.allocationsizeunion._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
+                                _allocationTypes[allocationTypeIndex].allocationsizeunion._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
+                                category=_allocationTypes[allocationTypeIndex].count++; // another histogram category (and count represents the number of categories)
                                 histogram[category].count=0; // will be incremented below!!!!
                                 histogram[category].size=count;
-                                allocationType.count++; // another histogram category (and count represents the number of categories)
+                                printf("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",_allocationTypes[allocationTypeIndex].count+1,count,type);
                             }
                         }
                         if(category>=0)
@@ -187,7 +189,7 @@ static long long registerAllocation(char type,size_t size,long long count,bool f
                         else
                             error("Failed to count %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
                     }else // fixed size allocation, so increment count with the number of allocations (1 in general for static allocations)
-                        allocationType.count+=count;
+                        _allocationTypes[allocationTypeIndex].count+=count;
                 }else
                     error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
                 /* MDH@14APR2020
@@ -215,7 +217,9 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
                 if(histogram){
                     long long category=allocationType.count;
                     while(--category>=0&&histogram[category].size!=size)
+                    printf(" %lld*%zd",histogram[category].count,histogram[category].size);
                     ;
+                    printf("\n");
                     if(category>=0){ // found it
                         if(histogram[category].count>0){
                             histogram[category].count--; // one down
@@ -223,7 +227,7 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
                         }
                         bug("Unable to unregister the allocation of size %zd of type '%c': no registered allocation count.\n",size,allocationType.type);
                     }else
-                        bug("Unable to unregister the allocation of size %zd of type '%c': allocation type unknown.\n",size,allocationType.type);
+                        bug("Unable to unregister the allocation of size %zd of type '%c': allocation type category unknown.\n",size,allocationType.type);
                 }
             }else{
                 if(allocationType.count>=size){
@@ -323,10 +327,10 @@ void syncallocations(){
 
 #ifndef __PRODUCTION__
 // MDH@21APR2020: general function to store allocation info with the dynamically allocated memory
-static void attachAllocationInfo(void* ptr,char allocationType,size_t size,bool fixedsize){
+static void attachAllocationInfo(void* ptr,char allocationType,size_t size){
     // ASSERT all arguments supposedly valid i.e. ptr!=NULL, size>0
     // MDH@13APR2020: all Mmalloc calls represent fixed size allocations
-    long long allocationIndex=registerAllocation(allocationType,size,1,fixedsize); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
+    long long allocationIndex=registerAllocation(allocationType,size,1,true); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
     Malloc* _alloc=(Malloc*)((char*)ptr+size);
     _alloc->allocationType=allocationType; // register the type
     _alloc->allocationIndex=allocationIndex;
@@ -342,7 +346,7 @@ void* Mmalloc(size_t size,char type){
 #ifndef __PRODUCTION__
         info("\n*************************** Allocating %zd bytes of dynamic memory of type '%c' ***************************\n",size,type);
         ptr=malloc(size+sizeof(Malloc));
-        if(ptr)attachAllocationInfo(ptr,type,size,true);
+        if(ptr)attachAllocationInfo(ptr,type,size);
 #else
         ptr=malloc(size);
 #endif
@@ -356,7 +360,7 @@ void* Mcalloc(size_t size,char type){
 #ifndef __PRODUCTION__
         info("\n*************************** Allocating %zd initialized bytes of dynamic memory of type '%c' ***************************\n",size,type);
         ptr=calloc(1,size+sizeof(Malloc)); // MDH@20APR2020: calloc doesn't care about the items!!!!!
-        if(ptr)attachAllocationInfo(ptr,type,size,true);
+        if(ptr)attachAllocationInfo(ptr,type,size);
 #else
         ptr=calloc(1,size);
 #endif
@@ -377,10 +381,15 @@ void Mfree(void* ptr,char allocationType){
         long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
         // assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
         if(allocationTypeIndex>=0){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
+            size=_allocationTypes[allocationTypeIndex].allocationsizeunion.size; // extract the (fixed) size
+            if(!unregisterAllocation(allocationTypeIndex,1,true))
+                bug("Failed to free the dynamic memory of an allocation of type '%c' (size: %zd).\n",allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
+            /* replacing what would no longer work:
             _allocationTypes[allocationTypeIndex].count--;
             // assuming this is a fixed size allocation type
             size=_allocationTypes[allocationTypeIndex].allocationsizeunion.size;
             _allocationTypes[allocationTypeIndex].freed+=size;
+            */
             /* MDH@14APR2020 replacing:
             allocationtypecountoffset=5*allocationTypeIndex;
             if(allocationtypecountoffset>=0){ // success (and not the accumulative (zero) one!!!)
@@ -516,7 +525,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
                     _alloc->allocationType=allocationType;
                     info("Allocation type stored!\n");
                     _alloc->allocationIndex=registerAllocation(allocationType,size,to_count,false);
-                    info("Allocation index %llu stored.\n",_alloc->allocationIndex);
+                    printf("Allocation index %llu stored.\n",_alloc->allocationIndex);
                     // info("Allocation information stored...\n");
                 }else{ // not a first time allocation, so we can simply copy the allocation over
                     Malloc* _newalloc=(Malloc*)(((char*)newptr)+occupied);
