@@ -9,8 +9,8 @@
 // MDH@13APR2020: we're going to keep histograms for each of the allocation type
 //                we can make a union to distinguish between fixed size and variable size allocations
 typedef struct{
-    size_t  size; // the 'id' of the allocation class
-    long long count; // how many we have of this 'size'
+    size_t class; // the 'id' of the allocation class
+    unsigned long long count; // how many we have of this 'size'
 }t_allocationsize;
 
 // when dealing with a variable size allocation type, we're storing 
@@ -21,11 +21,11 @@ typedef union{
 
 typedef struct{
     char type;
-    long long occupied; // number of bytes occupied
-    long long freed; // number of bytes freed
-    long long mark_occupied; // marked number of bytes occupied
-    long long mark_freed; // marked number of bytes freed
-    long long count; // either the total number of fixed size allocations, or the total number of size categories
+    unsigned long long occupied; // number of bytes occupied
+    unsigned long long freed; // number of bytes freed
+    unsigned long long mark_occupied; // marked number of bytes occupied
+    unsigned long long mark_freed; // marked number of bytes freed
+    unsigned long long count; // either the total number of fixed size allocations, or the total number of size categories
     t_allocationsizeunion allocationsizeunion; // either the size of a fixed size allocation type of a pointer to the allocation sizes of a variable type allocation type
 }t_allocationtype;
 

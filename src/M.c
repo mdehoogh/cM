@@ -44,7 +44,8 @@ extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in M
 char const * const M_VERSION="0.1.2";
 // char const * const M_BUILD="1";char const * const M_DATE="21 April 2020, 17:00"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
 // char const * const M_BUILD="2";char const * const M_DATE="22 April 2020"; // make M to create lists and maps automatically when using indexing to properties and array elements that are not there yet
-char const * const M_BUILD="3";char const * const M_DATE="02 May 2020"; // dynamic allocation debugging debugging
+// char const * const M_BUILD="3";char const * const M_DATE="02 May 2020"; // dynamic allocation debugging debugging
+char const * const M_BUILD="4";char const * const M_DATE="03 May 2020"; // dynamic allocation debugging debugging
 
 //char const * const M_VERSION="0.1.1";
 //char const * const M_BUILD="1";char const * const M_DATE="15 November 2019, 18:00";

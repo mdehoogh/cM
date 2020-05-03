@@ -23,7 +23,8 @@ Mstring* __string(){
         //                of the amount allocated in Malloc.c/h explicitly
         //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
         // MDH@16APR2020: using Mchars* instance
-        ans->_chars=__chars(1,M_BLOCK_SIZE,'s');
+        // MDH@03MAY2020 OOPS the size should go first!!!
+        ans->_chars=__chars(M_BLOCK_SIZE,1,'s');
         if(!ans->_chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1;
         /* replacing:
         ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
