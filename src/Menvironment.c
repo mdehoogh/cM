@@ -274,7 +274,7 @@ const char* HEXCHARS[]={
     };
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
     // MDH@25NOV2019: we should get the allocation types and counts asap (otherwise they will change), unless they are passed in
-    t_allocationtype* _allocationTypes=_getAllocationTypes();
+    Mallocationtype* _allocationTypes=_getAllocationTypes();
     // MDH@14APR2020 now present in the allocation types: t_count* _allocationcounts=_getAllocationCounts();
     Mlist* _valuesTable=NULL;
     // let's create the list containing the column names
@@ -346,7 +346,7 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
         appendedToMap(_valuesMap,"typecount",_getIntegerValue(numberOfAllocationTypes));
         if(numberOfAllocationTypes){
             // we start with a general overview (the counts per type)
-	        t_allocationtype* _allocationTypes=_getAllocationTypes();
+	        Mallocationtype* _allocationTypes=_getAllocationTypes();
             // MDH@14APR2020 replacing: size_t* _allocationcounts=_getAllocationCounts();
             Mstring *_allocationTypeText=__string(),*_allocationTypeCharactersText=_getString("'"); // free ASAP
             if(_allocationTypeText&&_allocationTypeCharactersText){

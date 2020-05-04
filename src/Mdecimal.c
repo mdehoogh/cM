@@ -64,7 +64,7 @@ void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement){
 	if(!_decimalcontextElement)return;
 	if(_decimalcontextElement->_next)free_decimalcontextElement(_decimalcontextElement->_next); // free whatever it is pointing to
 	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext); // free whatever decimal context it is referring to
-	FREE(_decimalcontextElement,'C');
+	FREE(_decimalcontextElement,'e');
 }
 static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;
 // to get the unique decimal context with the requested precision
@@ -74,9 +74,9 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){
 	MdecimalcontextElement *decimalcontextElement=_firstDecimalcontextElement;
 	while(decimalcontextElement&&decimalcontextElement->_decimalcontext->mpd_context->prec!=prec)decimalcontextElement=decimalcontextElement->_next;
 	if(!decimalcontextElement){ // not existing
-		decimalcontextElement=CALLOC(sizeof(MdecimalcontextElement),'C');
+		decimalcontextElement=CALLOC(sizeof(MdecimalcontextElement),'e');
 		if(decimalcontextElement){
-			decimalcontextElement->_decimalcontext=CALLOC(sizeof(Mdecimalcontext),'c');
+			decimalcontextElement->_decimalcontext=CALLOC(sizeof(Mdecimalcontext),'C');
 			if(decimalcontextElement->_decimalcontext){
 				decimalcontextElement->_decimalcontext->mpd_context=__mpd_context(prec);
 				if(decimalcontextElement->_decimalcontext->mpd_context){

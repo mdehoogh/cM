@@ -11,13 +11,13 @@
 typedef struct{
     size_t class; // the 'id' of the allocation class
     unsigned long long count; // how many we have of this 'size'
-}t_allocationsize;
+}Mallocationsize;
 
 // when dealing with a variable size allocation type, we're storing 
 typedef union{
     size_t size; // the size of any fixed size allocation type
-    t_allocationsize* _allocationsizes;
-}t_allocationsizeunion;
+    Mallocationsize* _allocationsizes;
+}Mallocationsizeunion;
 
 typedef struct{
     char type;
@@ -25,9 +25,9 @@ typedef struct{
     unsigned long long freed; // number of bytes freed
     unsigned long long mark_occupied; // marked number of bytes occupied
     unsigned long long mark_freed; // marked number of bytes freed
-    unsigned long long count; // either the total number of fixed size allocations, or the total number of size categories
-    t_allocationsizeunion allocationsizeunion; // either the size of a fixed size allocation type of a pointer to the allocation sizes of a variable type allocation type
-}t_allocationtype;
+    long long count; // counting up for fixed-size allocation, and down for variable-size allocation (so we can distinguish between them!!!)
+    Mallocationsizeunion allocationsizeunion; // either the size of a fixed size allocation type of a pointer to the allocation sizes of a variable type allocation type
+}Mallocationtype;
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
@@ -43,7 +43,7 @@ void syncallocations();
 // MDH@15NOV2019: keeping track of the allocation counts and the allocation types
 long long getNumberOfAllocationTypes();
 long long* _getAllocationCounts();
-t_allocationtype* _getAllocationTypes();
+Mallocationtype* _getAllocationTypes();
 bool resetAllocationTypes();
 void markAllocationCounts();
 long long getAllocationTypeAllocated(char allocationType);
@@ -68,4 +68,15 @@ void Mfree(void* ptr,char type); // releasing a single item of a fixed size allo
 #define FREE(ptr,type) free(ptr)
 #define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc((ptr),(to_nitems)*(size))
 #endif
+
+// MDH@04MAY2020: asking for the allocation type sizes
+typedef struct{
+    char type;
+    unsigned long long size;
+}Mallocationtypesize;
+
+// for requesting some or all allocation type sizes
+Mallocationtypesize* getAllocationTypeSizes(char const * const types,unsigned long long *numberOfAllocationTypes);
+
+
 

@@ -2958,6 +2958,7 @@ int main(int argc, char **argv){
 		resetOutputColor();
 		exit(1);
 	}
+	outputInfo("User session initialized.");
 
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
