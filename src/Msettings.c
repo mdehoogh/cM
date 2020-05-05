@@ -48,7 +48,7 @@ void setAcceptinghistorycommand(bool newAcceptinghistorycommand){
 
 // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
 void activateWrapmode(){
-    //??????? outputControlText(wrapping?"?6l":"?7l"); // 7h used to be 6l doesn't seem to work though
+    outputControlText(wrapping?"?7h":"?7l"); // 7h used to be 6l doesn't seem to work though, 6h === 7l????
     output("Will %swrap!\n",(wrapping?"":"not "));
 }
 // M settings
