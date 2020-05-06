@@ -119,8 +119,8 @@ void initDisplay(){
 	/*
 	outputControlText("=3h"); // 80x25 color mode
 	outputControlText("?3l"); // switch to 132 column mode (if possible)
-	outputControlText("0m");
 	*/
+	outputControlText("0m");
 	setColorscheme(getColorscheme());
 	resetOutputColor(); // MDH@16MAR2020: think we need this
 	clearScreenFromCursor(); // activate the current color scheme
