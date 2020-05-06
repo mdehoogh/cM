@@ -49,7 +49,10 @@ size_t outputToFile(char const * const prefix,char const * const str,char const 
 }
 
 // convenience methods delegating to output() so all output (to stdout by default) goes through function output()
-size_t outputChar(char c){return output("%c",c);} // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
+size_t outputChar(char c){
+    char s[2]={c,'\0'};
+    return output("%s",s); //(putchar(c)<0?0:1);//return output("%c",c);
+} // MDH@18APR2019: individual characters can use outputChar (which might have used putchar)
 
 size_t newline(){return outputChar('\n');}
 

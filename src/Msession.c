@@ -98,24 +98,32 @@ void setBackColor(char const * const colortext){
 	output(ES"48;5;%sm",colortext);
 }
 
-void resetOutputColor(){setColor(getInfoColor());setBackColor(getBackgroundColor());}
+void resetOutputColor(){
+	setColor(getInfoColor());
+	setBackColor(getBackgroundColor());
+}
 
 // MDH@27FEB2020: delegating to outputInfo after resetting the output color
-void outputLine(char* s){resetOutputColor();output("%s\n",s);} // for writing a single line of output text in the info color
-
+void outputLine(char* s){
+	resetOutputColor();
+	output("%s\n",s);
+} // for writing a single line of output text in the info color
+/*
 void activateColorscheme(){
 	setBackColor(getBackgroundColor()); // MDH@17OCT2019 replacing: output(ES"%sm",getBackgroundColor()); // TODO can't use outputControlText here!!!
 	clearScreenFromCursor(); // MDH@30OCT2019 replacing: clearDisplay();
 	///////outputLine((colorscheme?"Will assume white background!":"Will assume black background!"));
 }
-
+*/
 void initDisplay(){
+	/*
 	outputControlText("=3h"); // 80x25 color mode
 	outputControlText("?3l"); // switch to 132 column mode (if possible)
 	outputControlText("0m");
+	*/
 	setColorscheme(getColorscheme());
-	activateColorscheme(); // activate the current color scheme
 	resetOutputColor(); // MDH@16MAR2020: think we need this
+	clearScreenFromCursor(); // activate the current color scheme
 	///////setWrapping(amWrapping()); // activate the current wrap mode!!!
 }
 
