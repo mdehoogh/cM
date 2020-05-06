@@ -624,6 +624,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
 }
 
 static unsigned long long getAllocationTypeSize(Mallocationtype allocationType){
+    output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
     return(allocationType.occupied-allocationType.freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
 }
 Mallocationtypesize* _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes){

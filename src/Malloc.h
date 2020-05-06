@@ -76,7 +76,7 @@ typedef struct{
 }Mallocationtypesize;
 
 // for requesting some or all allocation type sizes
-Mallocationtypesize* getAllocationTypeSizes(char const * const types,unsigned long long *numberOfAllocationTypes);
+Mallocationtypesize* _getAllocationTypeSizes(char const * const types,unsigned long long *numberOfAllocationTypes);
 
 
 

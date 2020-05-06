@@ -1017,12 +1017,25 @@ bool showContinuedPrompt(){
 	return true;
 	/// can't call this here!!!! outputTokenColor(_userInputCommand->_lastToken);
 }
+// MDH@06MAY2020
+void outputMemoryUsage(){
+	unsigned long long numberOfAllocationTypeSizes=0;
+	Mallocationtypesize* _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes);
+	if(_allocationTypeSizes){
+		if(numberOfAllocationTypeSizes>0){
+			output("Number of dynamically allocated memory: %llu.\n",_allocationTypeSizes[0].size);
+		}
+		free(_allocationTypeSizes);
+	}
+}/* VALIDATED */
+
 // MDH@30OCT2019 END
 void promptForUserInput(){
 	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode();
 	resetOutputColor();
 	newline();
+	outputMemoryUsage();
 	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	//////if(inputMode==IM_COMMAND)
