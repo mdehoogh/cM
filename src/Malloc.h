@@ -13,11 +13,13 @@ typedef struct{
     unsigned long long count; // how many we have of this 'size'
 }Mallocationsize;
 
+/*
 // when dealing with a variable size allocation type, we're storing 
 typedef union{
     size_t size; // the size of any fixed size allocation type
     Mallocationsize* _allocationsizes;
 }Mallocationsizeunion;
+*/
 
 typedef struct{
     char type;
@@ -26,7 +28,8 @@ typedef struct{
     unsigned long long mark_occupied; // marked number of bytes occupied
     unsigned long long mark_freed; // marked number of bytes freed
     long long count; // counting up for fixed-size allocation, and down for variable-size allocation (so we can distinguish between them!!!)
-    Mallocationsizeunion allocationsizeunion; // either the size of a fixed size allocation type of a pointer to the allocation sizes of a variable type allocation type
+    size_t size; // the size of each record
+    Mallocationsize* _allocationsizes; // only used for variable-size allocations
 }Mallocationtype;
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark

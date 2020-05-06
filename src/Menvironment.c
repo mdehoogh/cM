@@ -310,7 +310,8 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
                             if(appendedToList(_valuecountsList,_getIntegerValue(i+1),M_LL_INVALID)>0
                                 &&appendedToList(_valuecountsList,_getTextValue(string(_allocationTypeText),false),M_LL_INVALID)>0){
                                 // now the 5 counts
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].allocationsizeunion.size),M_LL_INVALID);
+                                // TODO how about the count???????
+                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size),M_LL_INVALID);
                                 appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].occupied),M_LL_INVALID);
                                 appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].freed),M_LL_INVALID);
                                 appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].mark_occupied),M_LL_INVALID);
@@ -357,7 +358,7 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
                         if(_valuecountsMap){
                             Mmap* _valuecountMap=_getMapOfType(VT_INTEGER);
                             if(_valuecountMap){
-                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(_allocationTypes[i].allocationsizeunion.size));
+                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size));
                                 appendedToMap(_valuecountMap,(i==0?"bytes allocated":"allocated"),_getIntegerValue(_allocationTypes[i].occupied));
                                 appendedToMap(_valuecountMap,(i==0?"bytes freed":"freed"),_getIntegerValue(_allocationTypes[i].freed));
                                 appendedToMap(_valuecountMap,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(_allocationTypes[i].mark_occupied));

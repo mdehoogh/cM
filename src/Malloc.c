@@ -87,27 +87,29 @@ static long long getNewAllocationTypeIndex(char allocationType,size_t size,long 
             if(fixedsize||_allocationTypeSizeHistogram){
                 // how about allocating memory for the histogram beforehand?
                 void* newAllocationTypes=realloc(_allocationTypes,sizeof(Mallocationtype)*(numberOfAllocationTypes+1));
-                if(newAllocationTypes){    
+                if(newAllocationTypes){   
                     info("New allocation type record created.\n");
+                    newAllocationTypeIndex=numberOfAllocationTypes++; 
+                    info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
                     // MDH@14APR2020: _allocationcounts=realloc(_allocationcounts,(sizeof(size_t)*(allocationtypeindex+1))*5); // for every type we store 5 size_t values, one to keep the item count, and one to keep the size
                     _allocationTypes=newAllocationTypes;
-                    _allocationTypes[numberOfAllocationTypes].type=allocationType;
-                    _allocationTypes[numberOfAllocationTypes].allocationsizeunion.size=size;
-                    /* MDH@04MAY2020
-                    _allocationTypes[numberOfAllocationTypes].occupied=0;
-                    _allocationTypes[numberOfAllocationTypes].freed=0;
-                    */
+                    _allocationTypes[newAllocationTypeIndex].type=allocationType;
+                    _allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size=size;
+                    // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+                    // MDH@06MAY2020: essential to ascertain that occupied and freed are initialized to zero!!!!
+                    _allocationTypes[newAllocationTypeIndex].occupied=0;
+                    _allocationTypes[newAllocationTypeIndex].freed=0;
                     info("New allocation type '%c' registered!\n",allocationType);       
                     if(!fixedsize){
-                        _allocationTypes[numberOfAllocationTypes].allocationsizeunion._allocationsizes=_allocationTypeSizeHistogram;
-                        _allocationTypes[numberOfAllocationTypes].count=-1; // MDH@04MAY2020: counting down to indicate variable-size allocations
+                        // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+                        _allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=_allocationTypeSizeHistogram;
+                        // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+                        _allocationTypes[newAllocationTypeIndex].count=-1; // MDH@04MAY2020: counting down to indicate variable-size allocations
                         // this is a bit 'verwarrend' but count is the size of what's allocated, and it's always a single allocation (as stored in the count field)
                         _allocationTypeSizeHistogram->class=count;
                         _allocationTypeSizeHistogram->count=1;            
                     }else
-                        _allocationTypes[numberOfAllocationTypes].count=count;
-                    newAllocationTypeIndex=numberOfAllocationTypes++; // good to go
-                    info("Number of allocation types: %lld.\n",numberOfAllocationTypes);
+                        _allocationTypes[newAllocationTypeIndex].count=count;
                 }else{
                     if(!fixedsize)free(_allocationTypeSizeHistogram); // MDH@14APR2020: don't forget to free what we've allocated beforehand
                     error("Failed to register new allocation type '%c'.\n",allocationType);
@@ -123,6 +125,7 @@ static long long getNewAllocationTypeIndex(char allocationType,size_t size,long 
             _allocationcounts[(allocationtypeindex*5)+4]=0; // mark number of frees
             */
         }
+        // if(newAllocationTypeIndex>=0)output("Final size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
         return newAllocationTypeIndex;
     }
     error("No allocation types!");
@@ -159,11 +162,12 @@ static long long registerReallocation(char type,size_t size,long long count,long
     if(size>0&&count>0){
         long long allocationTypeIndex=getNewAllocationTypeIndex(type,size,count,false);
         if(allocationTypeIndex>=0){ // yes, we should already have at least one allocation type
+            // output("Current size of allocation type #%lld ('%c'): %zd.\n",allocationTypeIndex,_allocationTypes[allocationTypeIndex].type,_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
             if(allocationIndex<0)allocationIndex=addAllocation(type); // if new, register the allocation
             if(allocationIndex>=0){
                 //t_allocationtype allocationType=_allocationTypes[allocationTypeIndex];
                 // store in histogram
-                Mallocationsize* histogram=_allocationTypes[allocationTypeIndex].allocationsizeunion._allocationsizes;
+                Mallocationsize* histogram=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes;
                 if(!histogram)_allocationTypes[allocationTypeIndex].count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
                 long long numberOfHistogramCategories=-_allocationTypes[allocationTypeIndex].count;
                 long long category=numberOfHistogramCategories; // MDH@04MAY2020: negate because we're counting backwards for variable-size allocations now
@@ -177,7 +181,7 @@ static long long registerReallocation(char type,size_t size,long long count,long
                         histogram=malloc(sizeof(Mallocationsize));
                     if(!histogram)return -1;
                     if(histogram){
-                        _allocationTypes[allocationTypeIndex].allocationsizeunion._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
+                        _allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes=histogram; // MDH@29APR2020 ADDITION: Oops, suppose this is important as well
                         category=numberOfHistogramCategories; // MDH@04MAY2020: the negative value of the count represents the number of histogram categories
                         _allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
                         histogram[category].count=0; // will be incremented below!!!!
@@ -192,7 +196,13 @@ static long long registerReallocation(char type,size_t size,long long count,long
                 }else{
                     histogram[category].count++;
                     // MDH@04MAY2020: register the additional bytes (where class represents the number of units of what was reallocated and size the unit size)
-                    _allocationTypes[allocationTypeIndex].occupied+=(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+                    // output("Size of allocation type #%lld ('%c'): %zd.\n",allocationTypeIndex,_allocationTypes[allocationTypeIndex].type,_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
+                    unsigned long long increment=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; //histogram[category].class;
+                    // output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
+                    increment*=histogram[category].class;
+                    // output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
+                    _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+                    // output("Occupied of allocation type #%lld ('%c'): %llu (incremented by %llu * %llu).\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,histogram[category],_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
                 }
             }else{
                 error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
@@ -218,7 +228,7 @@ static long long registerAllocation(char type,size_t size,long long count){
                 if(allocationIndex>=0){
                     _allocationTypes[allocationTypeIndex].count+=count;
                     // MDH@04MAY2020: keep track of what we have allocated right now
-                    _allocationTypes[allocationTypeIndex].occupied+=(count*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+                    _allocationTypes[allocationTypeIndex].occupied+=(count*_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
                 }else
                     error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
                 /* MDH@14APR2020
@@ -240,10 +250,10 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
     bool result=false;
     if(allocationTypeIndex>=0&&allocationTypeIndex<numberOfAllocationTypes){
         if(size>0){
-            Mallocationtype allocationType=_allocationTypes[allocationTypeIndex];
             if(!fixedsize){
+                Mallocationtype allocationType=_allocationTypes[allocationTypeIndex];
                 // lookup the size as size in the histogram (should be there)
-                Mallocationsize* histogram=(allocationType.count<0?allocationType.allocationsizeunion._allocationsizes:NULL);
+                Mallocationsize* histogram=(allocationType.count<0?allocationType/*.allocationsizeunion*/._allocationsizes:NULL);
                 if(histogram){
                     long long category=-allocationType.count;
                     while(--category>=0&&histogram[category].class!=size)
@@ -260,14 +270,15 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
                         bug("Unable to unregister the allocation of size %zd of type '%c': allocation type category unknown.\n",size,allocationType.type);
                 }
             }else{
-                if(allocationType.count>=size){
-                    allocationType.count-=size;
+                if(_allocationTypes[allocationTypeIndex].count>=size){
+                    _allocationTypes[allocationTypeIndex].count-=size;
                     result=true;
                 }else
-                    bug("Failed to unregister %zd fixed-size allocation%s of type '%c'.\n",size,(size>1?"s":""),allocationType.type);
+                    bug("Failed to unregister %zd fixed-size allocation%s of type '%c'.\n",size,(size>1?"s":""),_allocationTypes[allocationTypeIndex].type);
             }
             // MDH@04MAY2020: increment freed with size times the fixed size of this allocation type
-            if(result)allocationType.freed+=allocationType.allocationsizeunion.size*size; 
+            // MDH@06MAY2020 BUG FIX: do NOT use allocationType here as that would be a copy not the original!!!!!
+            if(result)_allocationTypes[allocationTypeIndex].freed+=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size*size; 
         }
     }
     return result;
@@ -419,7 +430,7 @@ void Mfree(void* ptr,char allocationType){
         long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
         // assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
         if(allocationTypeIndex>=0){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
-            size=_allocationTypes[allocationTypeIndex].allocationsizeunion.size; // extract the (fixed) size
+            size=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; // extract the (fixed) size
             if(!unregisterAllocation(allocationTypeIndex,1,true))
                 bug("Failed to free the dynamic memory of an allocation of type '%c' (size: %zd).\n",allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
             /* replacing what would no longer work:
@@ -540,8 +551,8 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
 #ifndef __PRODUCTION__
             if(freed>0)
                 newptr=realloc(ptr,occupied+sizeof(Malloc));
-            else
-                newptr=malloc(occupied+sizeof(Malloc)); // we have to reallocate nitems each of the given size
+            else // use calloc instead of malloc will automatically initialize occupied and freed as it should
+                newptr=calloc(1,occupied+sizeof(Malloc)); // we have to reallocate nitems each of the given size
 #else
             newptr=(freed>0?realloc(ptr,occupied):malloc(occupied)); // we have to reallocate nitems each of the given size
 #endif
@@ -550,6 +561,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
         info("Variable-size allocation of type '%c' resized from %zd to %zd!\n",allocationType,freed,occupied);
         // newptr is allowed to be NULL if occupied equals 
         if(newptr){ // success (newptr will be NULL when occupied==0, but that also indicates success)
+            
 #ifndef __PRODUCTION__
             if(freed>0){
                 unregisterAllocation(getAllocationTypeIndex(allocationType),from_count,false); // MDH@28APR2020
@@ -624,7 +636,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
 }
 
 static unsigned long long getAllocationTypeSize(Mallocationtype allocationType){
-    output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
+    // output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
     return(allocationType.occupied-allocationType.freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
 }
 Mallocationtypesize* _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes){
