@@ -1625,7 +1625,7 @@ bool evaluateCommand(Mvalue* *resultValue){
 	markAllocationCounts(); // remember the allocation counts at the start of evaluating a command!!!
 
 	if(amDebugging())
-		output("Number of allocated/freed formula elements before evaluating the command: (%zd,%zd).\n",getAllocationTypeAllocated('4'),getAllocationTypeFreed('4'));
+		output("Number of allocated/freed formula elements before evaluating the command: (%zd,%zd).\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 
 	// evaluating means getting the value of the expression that _userInputCommand->_firstToken points to
 	// NOTE that the first token is always a dummy token (which will at most contain the whitespace at the start of the command)
@@ -1663,7 +1663,7 @@ bool evaluateCommand(Mvalue* *resultValue){
 	///////if(amVerbose())outputInfo("Command to release!");
 
 	if(amDebugging())
-		output("Number of allocated/freed formula elements after evaluating the command: (%zd,%zd).\n",getAllocationTypeAllocated('4'),getAllocationTypeFreed('4'));
+		output("Number of allocated/freed formula elements after evaluating the command: (%llu,%llu).\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 
 	////////if(amVerbose())outputInfo("Command released!");
 	return true;

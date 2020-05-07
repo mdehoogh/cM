@@ -21,15 +21,27 @@ typedef union{
 }Mallocationsizeunion;
 */
 
+// MDH@07MAY2020: it's a good idea to be able to keep a stack of occupied/free elements
+//                unfortunately each Mallocationtype needs to have a fixed size as all the types are stored in the same structure
+//                technically we could store all allocation marks in a separate single length structure, one for each of the allocation types
+//                then we can give each allocation mark sequence the same number of marks
+//                BUT we want to prevent a lot of shifting
 typedef struct{
-    char type;
     unsigned long long occupied; // number of bytes occupied
     unsigned long long freed; // number of bytes freed
+}Mallocationmark;
+
+typedef struct{
+    char type;
     unsigned long long mark_occupied; // marked number of bytes occupied
     unsigned long long mark_freed; // marked number of bytes freed
     long long count; // counting up for fixed-size allocation, and down for variable-size allocation (so we can distinguish between them!!!)
     size_t size; // the size of each record
     Mallocationsize* _allocationsizes; // only used for variable-size allocations
+    /*
+    unsigned long long lastMarkIndex; // MDH@07MAY2020: the last mark index (which should be initialized to 0)
+    Mallocationmark* _allocationmarks; // a single element to store the pointer to the allocation marks (at least one)
+    */
 }Mallocationtype;
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
@@ -48,9 +60,9 @@ long long getNumberOfAllocationTypes();
 long long* _getAllocationCounts();
 Mallocationtype* _getAllocationTypes();
 bool resetAllocationTypes();
-void markAllocationCounts();
-long long getAllocationTypeAllocated(char allocationType);
-long long getAllocationTypeFreed(char allocationType);
+bool markAllocationCounts();
+long long getAllocationTypeOccupied(char allocationType,unsigned long long history);
+long long getAllocationTypeFreed(char allocationType,unsigned long long history);
 
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign
@@ -73,6 +85,7 @@ void Mfree(void* ptr,char type); // releasing a single item of a fixed size allo
 #endif
 
 // MDH@04MAY2020: asking for the allocation type sizes
+// MDH@07MAY2020: we could pass back all the allocation values of all the marks
 typedef struct{
     char type;
     unsigned long long size;

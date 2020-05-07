@@ -285,8 +285,9 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
         &&appendedToList(_valuesColumnNames,_getTextValue("'SIZE        ",false),M_LL_INVALID)>0
         &&appendedToList(_valuesColumnNames,_getTextValue("'ALLOCATED   ",false),M_LL_INVALID)>0
         &&appendedToList(_valuesColumnNames,_getTextValue("'FREED       ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED     ",false),M_LL_INVALID)>0){
+        // &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED ",false),M_LL_INVALID)>0
+        // &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED     ",false),M_LL_INVALID)>0
+        ){
         long long numberOfAllocationTypes=getNumberOfAllocationTypes();
         // get a table with the given values column names and number of rows (which are initialized to empty lists)
         // NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
@@ -312,10 +313,10 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
                                 // now the 5 counts
                                 // TODO how about the count???????
                                 appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].occupied),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].freed),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].mark_occupied),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i].mark_freed),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,0)),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)),M_LL_INVALID);
+                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,1)),M_LL_INVALID);
                                 if(appendedToList(_valuesTable,_getValueOfList(_valuecountsList,true),M_LL_INVALID)<=0)
                                     outputError("Failed to remember a values table row.");
                             }else{
@@ -359,10 +360,10 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
                             Mmap* _valuecountMap=_getMapOfType(VT_INTEGER);
                             if(_valuecountMap){
                                 appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size));
-                                appendedToMap(_valuecountMap,(i==0?"bytes allocated":"allocated"),_getIntegerValue(_allocationTypes[i].occupied));
-                                appendedToMap(_valuecountMap,(i==0?"bytes freed":"freed"),_getIntegerValue(_allocationTypes[i].freed));
-                                appendedToMap(_valuecountMap,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(_allocationTypes[i].mark_occupied));
-                                appendedToMap(_valuecountMap,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(_allocationTypes[i].mark_freed));
+                                appendedToMap(_valuecountMap,(i==0?"bytes allocated":"allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,0)/*_allocationTypes[i].occupied*/));
+                                appendedToMap(_valuecountMap,(i==0?"bytes freed":"freed"),_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)/*_allocationTypes[i].freed*/));
+                                appendedToMap(_valuecountMap,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_occupied*/));
+                                appendedToMap(_valuecountMap,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_freed*/));
                                 if(!appendedToMap(_valuecountsMap,string(_allocationTypeText),_getValueOfMap(_valuecountMap,true)))
                                     output("%sFailed to store the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
                             }else

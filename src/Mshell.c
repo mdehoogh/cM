@@ -6958,8 +6958,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			if(amVerbose())output("Number of assignments: %u.\n",numberOfAssignments);
 			
-			size_t allocated=getAllocationTypeAllocated('4'),freed=getAllocationTypeFreed('4');
-			if(amDebugging())output("Type '4' BEFORE: allocated: %zd - freed: %zd.\n",allocated,freed);
+			unsigned long long allocated=getAllocationTypeOccupied('4',0),freed=getAllocationTypeFreed('4',0);
+			if(amDebugging())output("Type '4' BEFORE: allocated: %llu - freed: %llu.\n",allocated,freed);
 
 			// MDH@14OCT2019: applying binary operators typically is done taking operator precedence into account which means we cannot apply lower precedence binary operators until higher precedence binary operators are applied first
 			//                which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
@@ -7014,9 +7014,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			*/
 			if(amVerbose())outputValue("Result: '",_result,"'.\n");
 
-			allocated=getAllocationTypeAllocated('4');freed=getAllocationTypeFreed('4');
 			if(amDebugging())
-				output("Type '4' AFTER: allocated: %zd - freed: %zd.\n",allocated,freed);
+			{allocated=getAllocationTypeOccupied('4',0);freed=getAllocationTypeFreed('4',0);output("Type '4' AFTER: allocated: %zd - freed: %zd.\n",allocated,freed);}
 
 			// perform assignments right-to-left (which is a little problematic though)
 			if(numberOfAssignments){

@@ -35,9 +35,56 @@ static void dump(char* _c,size_t count,size_t size){
 }
 
 // MDH@15NOV2019: want to keep track of the number of allocations for each type (with character id)
-Mallocationtype* _allocationTypes=NULL; // the unique allocation type characters
-long long numberOfAllocationTypes=0; // keep track of the number of allocation types
+static Mallocationtype* _allocationTypes=NULL; // the unique allocation type characters
+static unsigned long long numberOfAllocationTypes=0; // keep track of the number of allocation types
 // MDH@14APR2020 now being stored as part of the allocationtypes: size_t* _allocationcounts=NULL; // the size of the type is stored every odd size_t
+
+// MDH@07MAY2020: keep track of all allocation marks
+static unsigned long long numberOfAllocationMarks=1; // we need at least one mark (TODO this could change if we decide to not do this in the production version)
+static unsigned long long numberOfAllocationMarkTypes=0; // keep track of the number of types we have marks of
+static Mallocationmark* _allocationTypeMarks=NULL;
+// as we're expecting more marks to be added then types we do mark 1 type 1, mark 1 type 2, etc.
+// every time a new allocation type is created we need to expand the allocation marks
+static bool updateAllocationTypeMarks(){
+    // ascertain that numberOfAllocationMarkTypes is at least numberOfAllocationTypes
+    // ASSERT numberOfAllocationMarkTypes should NEVER be larger than numberOfAllocationTypes
+    unsigned long long numberOfNewAllocationMarkTypes=numberOfAllocationTypes-numberOfAllocationMarkTypes; // the number of new allocation type marks we need
+    if(numberOfNewAllocationMarkTypes>0){
+        unsigned long long totalnumberOfAllocationMarks=numberOfAllocationTypes*numberOfAllocationMarks;
+        if(totalnumberOfAllocationMarks>0){
+            size_t allocationMarksSize=sizeof(Mallocationmark)*totalnumberOfAllocationMarks; // the maximum size we need
+            Mallocationmark* newAllocationTypeMarks=(!_allocationTypeMarks?malloc(allocationMarksSize):realloc(_allocationTypeMarks,allocationMarksSize));
+            if(numberOfAllocationMarks>0&&newAllocationTypeMarks>0){
+                _allocationTypeMarks=newAllocationTypeMarks;
+                // we'll have to do some shifting...
+                // because we do NOT need to shift the first mark we can use unsigned long long for allocationTypeMark
+                unsigned long long shift=numberOfAllocationMarks*numberOfNewAllocationMarkTypes;
+                unsigned long long allocationTypeMarkIndex=numberOfAllocationMarks*numberOfAllocationTypes; // one above the last one we have to change
+                unsigned long long allocationMarkType;
+                while(1){
+                    shift-=numberOfNewAllocationMarkTypes;
+                    allocationMarkType=numberOfAllocationTypes; // ASSERT must be positive
+                    while(1){
+                        allocationTypeMarkIndex--;
+                        if(allocationTypeMarkIndex<numberOfAllocationMarkTypes)break; // no need to initialize/move the first mark values
+                        if(allocationMarkType>=numberOfAllocationMarkTypes){ // haven't got it yet
+                            _allocationTypeMarks[allocationTypeMarkIndex].occupied=0;
+                            _allocationTypeMarks[allocationTypeMarkIndex].freed=0;
+                        }else
+                            _allocationTypeMarks[allocationTypeMarkIndex]=_allocationTypeMarks[allocationTypeMarkIndex-shift];
+                        allocationMarkType--;
+                        if(allocationMarkType==0)break;
+                    }
+                    if(shift==0)break; // done with last initialization/move
+                }
+                numberOfAllocationMarkTypes=numberOfAllocationTypes;
+            }
+        }
+    }
+    // if we have it we return true, false otherwise
+    return(numberOfAllocationMarkTypes>=numberOfAllocationTypes);
+}
+// MDH@07MAY2020 END
 
 // helper functions
 // we need a local something to store the allocation types in
@@ -63,6 +110,10 @@ bool allocationRecordingInitialized(){
 #else
     allocations._chars=NULL;
 #endif
+    // MDH@07MAY2020: reset the number of allocation marks we need  
+    numberOfAllocationMarks=1;
+    if(_allocationTypeMarks){free(_allocationTypeMarks);_allocationTypeMarks=NULL;} 
+    // MDH@07MAY2020 END
     return(/* superfluous: allocations._chars&&*/_allocationTypes!=NULL/* MDH@14APR2020: &&_allocationcounts*/);
     // replacing: if(!allocations._chars)info("ERROR: Failed to initialize recording allocations.\n");else info("Allocation recording initialized.\n");
 }
@@ -96,9 +147,12 @@ static long long getNewAllocationTypeIndex(char allocationType,size_t size,long 
                     _allocationTypes[newAllocationTypeIndex].type=allocationType;
                     _allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size=size;
                     // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
+                    updateAllocationTypeMarks(); // MDH@07MAY2020: to be called each time a new allocation type is added (i.e. when numberOfAllocationTypes is incremented!!!!!)
+                    /* replacing:
                     // MDH@06MAY2020: essential to ascertain that occupied and freed are initialized to zero!!!!
                     _allocationTypes[newAllocationTypeIndex].occupied=0;
                     _allocationTypes[newAllocationTypeIndex].freed=0;
+                    */
                     info("New allocation type '%c' registered!\n",allocationType);       
                     if(!fixedsize){
                         // output("Size of allocation type #%lld ('%c'): %zd.\n",newAllocationTypeIndex,allocationType,_allocationTypes[newAllocationTypeIndex]/*.allocationsizeunion*/.size);
@@ -155,6 +209,20 @@ long long addAllocation(char allocationType/*,size_t size,*//*,long long count*/
     return allocations.l++; // returning the position where the allocation is stored, and incrementing the length of the allocations unless we replace allocations.l by allocations.lastIndex
 }
 
+static void incrementAllocationTypeOccupied(long long allocationTypeIndex,unsigned long long increment){
+    if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
+    if(!_allocationTypeMarks||numberOfAllocationMarks==0)return; // too bad
+    if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
+    _allocationTypeMarks[(numberOfAllocationMarks-1)*numberOfAllocationMarkTypes+allocationTypeIndex].occupied+=increment;
+    // replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+}
+static void incrementAllocationTypeFreed(long long allocationTypeIndex,unsigned long long increment){
+    if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
+    if(!_allocationTypeMarks||numberOfAllocationMarks==0)return; // too bad
+    if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
+    _allocationTypeMarks[(numberOfAllocationMarks-1)*numberOfAllocationMarkTypes+allocationTypeIndex].freed+=increment;
+    // replacing: _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+}
 // MDH@14APR2020: addAllocationType renamed to registerAllocation
 // MDH@03MAY2020: it's preferable to distinguish between a fixed-size allocation (always new), and a variable-size
 //                (re)allocation possibly new (allocationIndex<0)
@@ -201,7 +269,7 @@ static long long registerReallocation(char type,size_t size,long long count,long
                     // output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
                     increment*=histogram[category].class;
                     // output("Occupied of allocation type #%lld ('%c'): %llu to be incremented by %zd.\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,increment);
-                    _allocationTypes[allocationTypeIndex].occupied+=increment; ///(histogram[category].class*_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
+                    incrementAllocationTypeOccupied(allocationTypeIndex,increment);
                     // output("Occupied of allocation type #%lld ('%c'): %llu (incremented by %llu * %llu).\n",allocationTypeIndex,type,_allocationTypes[allocationTypeIndex].occupied,histogram[category],_allocationTypes[allocationTypeIndex].allocationsizeunion.size);
                 }
             }else{
@@ -228,7 +296,8 @@ static long long registerAllocation(char type,size_t size,long long count){
                 if(allocationIndex>=0){
                     _allocationTypes[allocationTypeIndex].count+=count;
                     // MDH@04MAY2020: keep track of what we have allocated right now
-                    _allocationTypes[allocationTypeIndex].occupied+=(count*_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
+                    incrementAllocationTypeOccupied(allocationTypeIndex,count*_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size); // MDH@07MAY2020
+                    // replacing: _allocationTypes[allocationTypeIndex].occupied+=(count*_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size);
                 }else
                     error("Failed to add %lld allocation(s) of type '%c' and size %zd.\n",count,type,size);
                 /* MDH@14APR2020
@@ -278,7 +347,8 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
             }
             // MDH@04MAY2020: increment freed with size times the fixed size of this allocation type
             // MDH@06MAY2020 BUG FIX: do NOT use allocationType here as that would be a copy not the original!!!!!
-            if(result)_allocationTypes[allocationTypeIndex].freed+=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size*size; 
+            if(result)incrementAllocationTypeFreed(allocationTypeIndex,_allocationTypes[allocationTypeIndex].size*size); 
+            // replacing: _allocationTypes[allocationTypeIndex].freed+=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size*size; 
         }
     }
     return result;
@@ -306,32 +376,61 @@ bool resetAllocationTypes(){
     ////////info("Allocation type counts reset.\n");
     return allocationRecordingInitialized();
 }
-// MDH@25NOV2019: markAllcoationTypes() remembers the current allocation type counts in the 4th and 5th element
-void markAllocationCounts(){
+// MDH@25NOV2019: markAllocationTypes() remembers the current allocation type counts in the 4th and 5th element
+bool markAllocationCounts(){
+    // MDH@07MAY2020: we have to add a new mark
+    size_t totalNumberOfAllocationTypeMarksNow=numberOfAllocationMarks*numberOfAllocationMarkTypes;
+    size_t totalNumberOfAllocationTypeMarks=totalNumberOfAllocationTypeMarksNow+numberOfAllocationMarkTypes;
+    Mallocationmark* newAllocationTypeMarks=(_allocationTypeMarks?realloc(_allocationTypeMarks,totalNumberOfAllocationTypeMarks*sizeof(Mallocationmark)):calloc(totalNumberOfAllocationTypeMarks,sizeof(Mallocationmark)));
+    if(newAllocationTypeMarks){
+        _allocationTypeMarks=newAllocationTypeMarks;
+        if(totalNumberOfAllocationTypeMarksNow>0){
+            // we need to copy the previous mark over
+            while(1){
+                totalNumberOfAllocationTypeMarks--;
+                _allocationTypeMarks[totalNumberOfAllocationTypeMarks]=_allocationTypeMarks[totalNumberOfAllocationTypeMarks-numberOfAllocationMarkTypes];
+                if(totalNumberOfAllocationTypeMarks==totalNumberOfAllocationTypeMarksNow)break;
+            }
+        }
+        numberOfAllocationMarks++;
+        return true;
+    }
+    return false;
+    /* replacing:
     long long numberOfAllocationTypes=getNumberOfAllocationTypes();
     while(numberOfAllocationTypes>0){
         numberOfAllocationTypes--;
         _allocationTypes[numberOfAllocationTypes].mark_occupied=_allocationTypes[numberOfAllocationTypes].occupied;
         _allocationTypes[numberOfAllocationTypes].mark_freed=_allocationTypes[numberOfAllocationTypes].freed;
-        /* MDH@14APR2020 replacing:
-        _allocationcounts[5*numberOfAllocationTypes+3]=_allocationcounts[5*numberOfAllocationTypes+1];
-        _allocationcounts[5*numberOfAllocationTypes+4]=_allocationcounts[5*numberOfAllocationTypes+2];
-        */
+        // // MDH@14APR2020 replacing:
+        // _allocationcounts[5*numberOfAllocationTypes+3]=_allocationcounts[5*numberOfAllocationTypes+1];
+        // _allocationcounts[5*numberOfAllocationTypes+4]=_allocationcounts[5*numberOfAllocationTypes+2];
     }
+    */
 }
-long long getAllocationTypeAllocated(char allocationType){
+long long getAllocationTypeOccupied(char allocationType,unsigned long long history){
     long long allocationTypeAllocated=-2; // if there's some error
     if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
         long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
-        allocationTypeAllocated=(allocationTypeIndex>=0?_allocationTypes[allocationTypeIndex].occupied:-1);
+        if(allocationTypeIndex<0)return -1;
+        // MDH@07MAY2020
+        if(!_allocationTypeMarks||allocationTypeIndex>=numberOfAllocationMarkTypes)return -3;
+        if(history>=numberOfAllocationMarks)return -4;
+        allocationTypeAllocated=_allocationTypeMarks[numberOfAllocationMarkTypes*(numberOfAllocationMarks-1-history)+allocationTypeIndex].occupied;
+        // replacing: allocationTypeAllocated=_allocationTypes[allocationTypeIndex].occupied;
     }
     return allocationTypeAllocated;
 }
-long long getAllocationTypeFreed(char allocationType){
+long long getAllocationTypeFreed(char allocationType, unsigned long long history){
     long long allocationTypeFreed=-2; // if there's some error
     if(_allocationTypes/* MDH@14APR2020: &&_allocationcounts*/){
         long long allocationTypeIndex=getAllocationTypeIndex(allocationType);
-        allocationTypeFreed=(allocationTypeIndex>=0?_allocationTypes[allocationTypeIndex].freed:-1);
+        if(allocationTypeIndex<0)return -1;
+        // MDH@07MAY2020
+        if(!_allocationTypeMarks||allocationTypeIndex>=numberOfAllocationMarkTypes)return -3;
+        if(history>=numberOfAllocationMarks)return -4;
+        allocationTypeFreed=_allocationTypeMarks[numberOfAllocationMarkTypes*(numberOfAllocationMarks-1-history)+allocationTypeIndex].freed;
+        // replacing: allocationTypeFreed=(allocationTypeIndex>=0?_allocationTypes[allocationTypeIndex].freed:-1);
     }
     return allocationTypeFreed;
 }
@@ -635,9 +734,12 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
     return newptr;
 }
 
-static unsigned long long getAllocationTypeSize(Mallocationtype allocationType){
+static unsigned long long getAllocationTypeSize(unsigned long long allocationTypeIndex){
     // output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
-    return(allocationType.occupied-allocationType.freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
+    if(allocationTypeIndex<0||!_allocationTypeMarks||allocationTypeIndex>=numberOfAllocationMarkTypes)return 0;
+    Mallocationmark allocationMark=_allocationTypeMarks[(numberOfAllocationMarks-1)*numberOfAllocationMarkTypes+allocationTypeIndex];
+    return allocationMark.occupied-allocationMark.freed;
+    // replacing: return(_allocationTypes[allocationTypeIndex].occupied-_allocationTypes[allocationTypeIndex].freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
 }
 Mallocationtypesize* _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes){
     // returning one more than 
@@ -646,7 +748,7 @@ Mallocationtypesize* _getAllocationTypeSizes(char const * const types,unsigned l
     if(_allocationTypeSizes){
         unsigned long long allocated=0,allocationTypeSizeIndex=0,allocationTypeSize;
         for(unsigned long long allocationTypeIndex=0;allocationTypeIndex<numberOfAllocationTypes;allocationTypeIndex++){
-            allocationTypeSize=getAllocationTypeSize(_allocationTypes[allocationTypeIndex]);
+            allocationTypeSize=getAllocationTypeSize(allocationTypeIndex);
             if(types&&(strlen(types)==0||strchr(types,_allocationTypes[allocationTypeIndex].type))){
                 allocationTypeSizeIndex++;
                 _allocationTypeSizes[allocationTypeSizeIndex].type=_allocationTypes[allocationTypeIndex].type;
