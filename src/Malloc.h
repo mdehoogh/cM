@@ -87,12 +87,12 @@ void Mfree(void* ptr,char type); // releasing a single item of a fixed size allo
 // MDH@04MAY2020: asking for the allocation type sizes
 // MDH@07MAY2020: we could pass back all the allocation values of all the marks
 typedef struct{
-    char type;
-    unsigned long long size;
+    // char type; // we'll be storing the type in the first element of sizes!!!!
+    unsigned long long sizes[1]; // at least one size being returned
 }Mallocationtypesize;
 
 // for requesting some or all allocation type sizes
-Mallocationtypesize* _getAllocationTypeSizes(char const * const types,unsigned long long *numberOfAllocationTypes);
+unsigned long long * _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes,long long *_numberOfAllocationMarks);
 
 
 

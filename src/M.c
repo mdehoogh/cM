@@ -1019,11 +1019,12 @@ bool showContinuedPrompt(){
 }
 // MDH@06MAY2020
 void outputMemoryUsage(){
-	unsigned long long numberOfAllocationTypeSizes=0;
-	Mallocationtypesize* _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes);
+	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
+	long long numberOfAllocationMarks=-1; // i.e. only interested in the last (=current) mark
+	unsigned long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
 	if(_allocationTypeSizes){
-		if(numberOfAllocationTypeSizes>0){
-			output("Number of dynamically allocated memory: %llu.\n",_allocationTypeSizes[0].size);
+		if(numberOfAllocationTypeSizes>0&&numberOfAllocationMarks>0){
+			output("Dynamically allocated memory: %llu.\n",_allocationTypeSizes[1]);
 		}
 		free(_allocationTypeSizes);
 	}

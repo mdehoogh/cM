@@ -734,30 +734,49 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
     return newptr;
 }
 
-static unsigned long long getAllocationTypeSize(unsigned long long allocationTypeIndex){
+static unsigned long long getAllocationTypeSize(unsigned long long allocationTypeIndex,unsigned long long allocationMarkIndex){
     // output("Allocated by type '%c': %lld - %lld.\n",allocationType.type,allocationType.occupied,allocationType.freed);
-    if(allocationTypeIndex<0||!_allocationTypeMarks||allocationTypeIndex>=numberOfAllocationMarkTypes)return 0;
-    Mallocationmark allocationMark=_allocationTypeMarks[(numberOfAllocationMarks-1)*numberOfAllocationMarkTypes+allocationTypeIndex];
+    if(allocationTypeIndex<0||!_allocationTypeMarks||allocationTypeIndex>=numberOfAllocationMarkTypes||allocationMarkIndex>=numberOfAllocationMarks)return 0;
+    Mallocationmark allocationMark=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationTypeIndex];
     return allocationMark.occupied-allocationMark.freed;
     // replacing: return(_allocationTypes[allocationTypeIndex].occupied-_allocationTypes[allocationTypeIndex].freed); // MDH@04MAY2020: assuming occupied and freed are kept up to date all the time
 }
-Mallocationtypesize* _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes){
+// MDH@07MAY2020: passing in the number of allocation marks requested (<0=one, 0=all, otherwise the number given, returning what is actually returned)
+unsigned long long * _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes,long long *_numberOfAllocationMarks){
     // returning one more than 
+    if(!_numberOfAllocationTypes||!_numberOfAllocationMarks)return NULL;
+    if(!_allocationTypeMarks||numberOfAllocationMarks==0)return NULL; // no marked allocations
     *_numberOfAllocationTypes=(types?(strlen(types)==0?numberOfAllocationTypes:strlen(types)):0)+1;
-    Mallocationtypesize *_allocationTypeSizes=malloc(sizeof(Mallocationtypesize)*(*_numberOfAllocationTypes));
+    // compute the number of allocation marks to return (add 1 because we always return the total count)
+    unsigned long long numberOfAllocationMarksToReturn=(_numberOfAllocationMarks<0?1:(*_numberOfAllocationMarks>0?*_numberOfAllocationMarks:numberOfAllocationMarks));
+    if(numberOfAllocationMarksToReturn>numberOfAllocationMarks)numberOfAllocationMarksToReturn=numberOfAllocationMarks;
+    // allocate exactly what we need (calloc will ascertain to initialize to zero all overall sizes in the first 'record')
+    unsigned long long * _allocationTypeSizes=calloc((1+numberOfAllocationMarksToReturn)*(*_numberOfAllocationTypes),sizeof(unsigned long long));
     if(_allocationTypeSizes){
-        unsigned long long allocated=0,allocationTypeSizeIndex=0,allocationTypeSize;
+        *_numberOfAllocationMarks=numberOfAllocationMarksToReturn;
+        // register the types
+        _allocationTypeSizes[0]=(int)'*'; // if you insist
+        unsigned long long allocationTypeSizeIndex=0;
         for(unsigned long long allocationTypeIndex=0;allocationTypeIndex<numberOfAllocationTypes;allocationTypeIndex++){
-            allocationTypeSize=getAllocationTypeSize(allocationTypeIndex);
             if(types&&(strlen(types)==0||strchr(types,_allocationTypes[allocationTypeIndex].type))){
                 allocationTypeSizeIndex++;
-                _allocationTypeSizes[allocationTypeSizeIndex].type=_allocationTypes[allocationTypeIndex].type;
-                _allocationTypeSizes[allocationTypeSizeIndex].size=allocationTypeSize;
+                _allocationTypeSizes[allocationTypeSizeIndex*(numberOfAllocationMarksToReturn+1)]=_allocationTypes[allocationTypeIndex].type;
             }
-            allocated+=allocationTypeSize;
         }
-        _allocationTypeSizes[0].type='*'; // if you insist
-        _allocationTypeSizes[0].size=allocated;
+        // register the sizes fior each of the marks to return
+        unsigned long long allocationTypeSize=0;
+        unsigned long long allocationTypeMark=0;
+        while(++allocationTypeMark<=numberOfAllocationMarksToReturn){
+            allocationTypeSizeIndex=0;
+            for(unsigned long long allocationTypeIndex=0;allocationTypeIndex<numberOfAllocationTypes;allocationTypeIndex++){
+                allocationTypeSize=getAllocationTypeSize(allocationTypeIndex,numberOfAllocationMarks-allocationTypeMark);
+                if(types&&(strlen(types)==0||strchr(types,_allocationTypes[allocationTypeIndex].type))){
+                    allocationTypeSizeIndex++;
+                    _allocationTypeSizes[allocationTypeMark+allocationTypeSizeIndex*(numberOfAllocationMarksToReturn+1)]=allocationTypeSize;
+                }
+                _allocationTypeSizes[allocationTypeMark]+=allocationTypeSize; // always register the size with the total record...
+            }
+        }
     }else
         *_numberOfAllocationTypes=0; // none returned!!!!
     return _allocationTypeSizes;
