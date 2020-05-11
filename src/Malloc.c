@@ -40,6 +40,7 @@ static unsigned long long numberOfAllocationTypes=0; // keep track of the number
 // MDH@14APR2020 now being stored as part of the allocationtypes: size_t* _allocationcounts=NULL; // the size of the type is stored every odd size_t
 
 // MDH@07MAY2020: keep track of all allocation marks
+static unsigned long long firstActiveAllocationMark=0,lastActiveAllocationMark=-1; // MDH@11MAY2020: as marks get deleted (from the back the firstAllocationMark changes)
 static unsigned long long numberOfAllocationMarks=1; // we need at least one mark (TODO this could change if we decide to not do this in the production version)
 static unsigned long long numberOfAllocationMarkTypes=0; // keep track of the number of types we have marks of
 static Mallocationmark* _allocationTypeMarks=NULL;
@@ -377,25 +378,40 @@ bool resetAllocationTypes(){
     return allocationRecordingInitialized();
 }
 // MDH@25NOV2019: markAllocationTypes() remembers the current allocation type counts in the 4th and 5th element
-bool markAllocationCounts(){
-    // MDH@07MAY2020: we have to add a new mark
-    size_t totalNumberOfAllocationTypeMarksNow=numberOfAllocationMarks*numberOfAllocationMarkTypes;
-    size_t totalNumberOfAllocationTypeMarks=totalNumberOfAllocationTypeMarksNow+numberOfAllocationMarkTypes;
-    Mallocationmark* newAllocationTypeMarks=(_allocationTypeMarks?realloc(_allocationTypeMarks,totalNumberOfAllocationTypeMarks*sizeof(Mallocationmark)):calloc(totalNumberOfAllocationTypeMarks,sizeof(Mallocationmark)));
-    if(newAllocationTypeMarks){
+// MDH@11MAY2020: either we can use a reusable allocation mark or append one
+bool addAllocationMark(){
+    // if we can't increment the last active allocation mark without bumping into the first active allocation mark we have to add an allocation mark
+    unsigned long long newLastActiveAllocationMark=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
+    if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
+        // MDH@07MAY2020: we have to add a new mark
+        size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
+         Mallocationmark* newAllocationTypeMarks=(_allocationTypeMarks?realloc(_allocationTypeMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark)):calloc(newNumberOfAllocationTypeMarks,sizeof(Mallocationmark)));
+        if(!newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
         _allocationTypeMarks=newAllocationTypeMarks;
-        if(totalNumberOfAllocationTypeMarksNow>0){
-            // we need to copy the previous mark over
-            while(1){
-                totalNumberOfAllocationTypeMarks--;
-                _allocationTypeMarks[totalNumberOfAllocationTypeMarks]=_allocationTypeMarks[totalNumberOfAllocationTypeMarks-numberOfAllocationMarkTypes];
-                if(totalNumberOfAllocationTypeMarks==totalNumberOfAllocationTypeMarksNow)break;
-            }
-        }
+        if(newLastActiveAllocationMark>0){ // we need room at where the first active allocation mark is now (the oldest allocation mark)
+            // we move all allocation marks one mark up starting at firstActiveAllocationMark up until numberOfAllocationMarks
+            unsigned long long numberOfAllocationTypeMarks=(firstActiveAllocationMark+1)*numberOfAllocationMarkTypes; // the last allocation info to copy
+            while(--newNumberOfAllocationTypeMarks>=numberOfAllocationTypeMarks)
+                _allocationTypeMarks[newNumberOfAllocationTypeMarks]=_allocationTypeMarks[newNumberOfAllocationTypeMarks-numberOfAllocationMarkTypes];
+        }else // instead of writing the new mark at position 0, we can simply write it at the room we created!!!
+            newLastActiveAllocationMark=numberOfAllocationMarks;
         numberOfAllocationMarks++;
-        return true;
     }
-    return false;
+    // we have to make room for the new allocation and copy the current last active mark over
+    // moving over lastActiveAllocationMark to newLastActiveAllocationMark (nonoverlapping allocation type marks so we can use memcpy)
+    memcpy(_allocationTypeMarks+(newLastActiveAllocationMark*numberOfAllocationMarkTypes)
+          ,_allocationTypeMarks+(lastActiveAllocationMark*numberOfAllocationMarkTypes)
+          ,numberOfAllocationMarkTypes*sizeof(Mallocationmark));
+    /* replacing:
+    unsigned long long allocationMarkType=numberOfAllocationMarkTypes;
+    while(1){
+        allocationMarkType--;
+        _allocationTypeMarks[newLastActiveAllocationMark*numberOfAllocationMarkTypes+allocationMarkType]=_allocationTypeMarks[lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationMarkType];
+        if(allocationMarkType==0)break;
+    }
+    */
+    lastActiveAllocationMark=newLastActiveAllocationMark;
+    return true;
     /* replacing:
     long long numberOfAllocationTypes=getNumberOfAllocationTypes();
     while(numberOfAllocationTypes>0){
@@ -436,8 +452,19 @@ long long getAllocationTypeFreed(char allocationType, unsigned long long history
 }
 
 // 'public' functions
+// MDH@11MAY2020 some new functions
+bool dropOldestAllocationMark(){
+    if(firstActiveAllocationMark>=0){
+        firstActiveAllocationMark=(firstActiveAllocationMark+1)%numberOfAllocationMarks;
+        return true;
+    }
+    return false;
+}
+unsigned long long getNumberOfAllocationMarks(){return numberOfAllocationMarks;}
+
+/* MDH@11MAY2020: replaced by other functions 
 // MDH@21APR2020 the mark changed to \0 but we might consider using another character to indicate such a mark
-long long allocationmark(){return addAllocation('\0'/*,0*//*,1*/);} // MDH@09APR2020: I think calling addallocation() suffices here, instead of addallocationtype
+long long allocationmark(){return addAllocation('\0');} // MDH@09APR2020: I think calling addallocation() suffices here, instead of addallocationtype
 
 // unmark allocation returns the total number of encountered allocations
 long long unmarkallocation(long long mark){
@@ -466,6 +493,7 @@ void syncallocations(){
     allocationreport(1);
 #endif
 }
+*/
 
 #ifndef __PRODUCTION__
 // MDH@21APR2020: general function to store allocation info with the dynamically allocated memory

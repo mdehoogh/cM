@@ -50,19 +50,23 @@ long long addAllocation(char allocationType/*,size_t size*//*,long long count*/)
 // long long registerAllocation(char allocationType,size_t size,long long count);
 
 bool allocationRecordingInitialized();
+/*
 long long allocationmark();
 long long unmarkallocation(long long mark);
 void allocationreport(long long mark); // report on the current allocation status
 void syncallocations();
-
+*/
 // MDH@15NOV2019: keeping track of the allocation counts and the allocation types
+unsigned long long getNumberOfAllocationMarks(); // MDH@11MAY2020: expose the number of allocation marks
 long long getNumberOfAllocationTypes();
 long long* _getAllocationCounts();
 Mallocationtype* _getAllocationTypes();
 bool resetAllocationTypes();
-bool markAllocationCounts();
 long long getAllocationTypeOccupied(char allocationType,unsigned long long history);
 long long getAllocationTypeFreed(char allocationType,unsigned long long history);
+// MDH@11MAY2020: allow adding an allocation mark and dropping the oldest one
+bool addAllocationMark();
+bool dropOldestAllocationMark();
 
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign

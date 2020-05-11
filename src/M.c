@@ -1018,7 +1018,7 @@ bool showContinuedPrompt(){
 	/// can't call this here!!!! outputTokenColor(_userInputCommand->_lastToken);
 }
 // MDH@06MAY2020
-void outputMemoryUsage(){
+void outputTotalMemoryUsage(){
 	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
 	long long numberOfAllocationMarks=-1; // i.e. only interested in the last (=current) mark
 	unsigned long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
@@ -1029,6 +1029,31 @@ void outputMemoryUsage(){
 		free(_allocationTypeSizes);
 	}
 }/* VALIDATED */
+// MDH@11MAY2020: if we want to know what changed since the previous mark as for the incremental memory usage
+//                it's easiest to ask for all and only show the changes
+void outputIncrementalMemoryUsage(){
+	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
+	long long numberOfAllocationMarks=2; // interested in the last two marks (to allow us to compute the difference)
+	unsigned long long * _allocationTypeSizes=_getAllocationTypeSizes("",&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
+	if(_allocationTypeSizes){
+		if(numberOfAllocationTypeSizes>=3&&numberOfAllocationMarks>=2){
+			long long increment;
+			char allocationType;
+			// there will be 3 values per type: the type itself, what is now occupied, and what was occupied before
+			output("Changes to the dynamically allocated memory:\n");
+			output("Type\tIncrement\n");
+			for(unsigned long long allocationTypeSizeIndex=0;allocationTypeSizeIndex<numberOfAllocationTypeSizes;){
+				allocationType=(char)_allocationTypeSizes[allocationTypeSizeIndex++];
+				increment=_allocationTypeSizes[allocationTypeSizeIndex++];
+				increment-=_allocationTypeSizes[allocationTypeSizeIndex++];
+				if(increment==0)continue;
+				output("%c\t%lld\n",allocationType,increment);
+			}
+		}else
+			outputError("Failed to obtain (and output) the incremental memory usage.");
+		free(_allocationTypeSizes);
+	}
+}/* VALIDATED */
 
 // MDH@30OCT2019 END
 void promptForUserInput(){
@@ -1036,7 +1061,7 @@ void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
 	newline();
-	outputMemoryUsage();
+	outputTotalMemoryUsage();
 	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	//////if(inputMode==IM_COMMAND)
@@ -1606,11 +1631,16 @@ void prepareForEvaluatingCommand(){
 
 }
 */
+
+bool allocationMarkAdded=false;
+
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //                instead of returning a bool we could return the command text (or NULL if failing to do so????)
 bool evaluateCommand(Mvalue* *resultValue){
 	
+	allocationMarkAdded=false;
+
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,true);
 	if(aValidCommandIndicator<=0){
@@ -1623,7 +1653,7 @@ bool evaluateCommand(Mvalue* *resultValue){
 		return false;
 	}
 
-	markAllocationCounts(); // remember the allocation counts at the start of evaluating a command!!!
+	if(amVerbose())allocationMarkAdded=addAllocationMark(); // remember the allocation counts at the start of evaluating a command!!!
 
 	if(amDebugging())
 		output("Number of allocated/freed formula elements before evaluating the command: (%zd,%zd).\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
@@ -3831,16 +3861,16 @@ int main(int argc, char **argv){
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand&&_userInputCommand->_firstToken){ // technically something to evaluate
 					if(amVerbose())outputCommandInfo(_userInputCommand);
-					size_t mark=allocationmark();
-					if(amVerbose())output("Mark: %zu.\n",mark);
+					// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 					Mvalue* userInputCommandResultValue=NULL;
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
 					newline();
-					if(mark>0){
-						if(amVerbose())output("Left after unmarking: %zu.\n",unmarkallocation(mark));
-						if(amDebugging())allocationreport(1); //syncallocations(); // will also do allocationreport(1)
+					if(allocationMarkAdded){
+						outputIncrementalMemoryUsage(); // replacing: output("Left after unmarking: %zu.\n",unmarkallocation(mark));
+						dropOldestAllocationMark(); // 'drop' the last allocation (well actually the last one)
+						// MDH@if(amDebugging())allocationreport(1); //syncallocations(); // will also do allocationreport(1)
 					}else
-					if(amVerbose())outputInfo("No allocations to unmark.");
+					if(amVerbose())outputError("No allocations to unmark.");
 					// TODO the next part should be improved, as it is getting a bit messy
 					Mstring* _userInputCommandText=_getCommandText(false); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
 					if(!commandEvaluated){
