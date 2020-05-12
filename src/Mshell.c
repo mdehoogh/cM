@@ -7060,17 +7060,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
-			if(amVerbose()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
+			if(amVerbose()&&amDebugging()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
-			///if(amVerbose())
-			if(amDebugging())
-				output("Freeing %zd formula elements.\n",formulaElementCount);
+			if(amVerbose()&&amDebugging())output("Freeing %zd formula elements.\n",formulaElementCount);
 			size_t numberOfFormulaElementsFreed=free_formulaelement(formula);
 			newline();
-			if(amDebugging())
-				output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+			if(amVerbose()&&amDebugging())output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
 			/* replacing:
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;

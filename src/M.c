@@ -1031,12 +1031,12 @@ void outputTotalMemoryUsage(){
 }/* VALIDATED */
 // MDH@11MAY2020: if we want to know what changed since the previous mark as for the incremental memory usage
 //                it's easiest to ask for all and only show the changes
-void outputIncrementalMemoryUsage(){
+long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMarks){
 	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
-	long long numberOfAllocationMarks=2; // interested in the last two marks (to allow us to compute the difference)
+	long long numberOfAllocationMarks=incrementalNumberOfAllocationMarks; // interested in the last two marks (to allow us to compute the difference)
 	unsigned long long * _allocationTypeSizes=_getAllocationTypeSizes("",&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
 	if(_allocationTypeSizes){
-		if(numberOfAllocationTypeSizes>=3&&numberOfAllocationMarks>=2){
+		if(numberOfAllocationTypeSizes>=3&&numberOfAllocationMarks>=incrementalNumberOfAllocationMarks){
 			long long increment;
 			char allocationType;
 			// there will be 3 values per type: the type itself, what is now occupied, and what was occupied before
@@ -1053,6 +1053,7 @@ void outputIncrementalMemoryUsage(){
 			outputError("Failed to obtain (and output) the incremental memory usage.");
 		free(_allocationTypeSizes);
 	}
+	return numberOfAllocationMarks;
 }/* VALIDATED */
 
 // MDH@30OCT2019 END
@@ -1632,15 +1633,13 @@ void prepareForEvaluatingCommand(){
 }
 */
 
-bool allocationMarkAdded=false;
+long long allocationMarkAdded=0;
 
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
 //                instead of returning a bool we could return the command text (or NULL if failing to do so????)
 bool evaluateCommand(Mvalue* *resultValue){
 	
-	allocationMarkAdded=false;
-
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
 	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,true);
 	if(aValidCommandIndicator<=0){
@@ -1653,7 +1652,10 @@ bool evaluateCommand(Mvalue* *resultValue){
 		return false;
 	}
 
-	if(amVerbose())allocationMarkAdded=addAllocationMark(); // remember the allocation counts at the start of evaluating a command!!!
+	allocationMarkAdded=0;
+	if(amVerbose()){
+		if(addAllocationMark())allocationMarkAdded++;else outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
+	}
 
 	if(amDebugging())
 		output("Number of allocated/freed formula elements before evaluating the command: (%zd,%zd).\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
@@ -3865,12 +3867,10 @@ int main(int argc, char **argv){
 					Mvalue* userInputCommandResultValue=NULL;
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
 					newline();
-					if(allocationMarkAdded){
-						outputIncrementalMemoryUsage(); // replacing: output("Left after unmarking: %zu.\n",unmarkallocation(mark));
-						dropOldestAllocationMark(); // 'drop' the last allocation (well actually the last one)
-						// MDH@if(amDebugging())allocationreport(1); //syncallocations(); // will also do allocationreport(1)
-					}else
-					if(amVerbose())outputError("No allocations to unmark.");
+					// let's mark the allocation directly behind evaluating the command
+					if(allocationMarkAdded>0){
+						if(addAllocationMark())allocationMarkAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
+					}
 					// TODO the next part should be improved, as it is getting a bit messy
 					Mstring* _userInputCommandText=_getCommandText(false); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
 					if(!commandEvaluated){
@@ -3911,14 +3911,20 @@ int main(int argc, char **argv){
 
 					// garbage collection: remove any values not used anymore...
 					// if(amDebugging())
-					outputInfo("Removing unreferenced values.");
-					size_t removedValueCount=getNumberOfRemovedValues(amVerbose()/*&&amDebugging()*/);
-					// if(amDebugging())
+					if(amVerbose())outputInfo("Removing unreferenced values.");
+					size_t removedValueCount=getNumberOfRemovedValues(amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
+					if(amVerbose())
 					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
 					if(getFirstFunctionBodyRequest()&&!startFunctionBodyInput())outputError("Failed to start requesting the body of a new function");
+
+					// MDH@12MAY2020: output two incremental out
+					if(allocationMarkAdded>0){
+						if(outputIncrementalMemoryUsage(allocationMarkAdded)!=allocationMarkAdded)outputError("Not all command allocation marks output.");
+						while(--allocationMarkAdded>=0)dropOldestAllocationMark(); // drop as many allocation marks as we have created
+					}
 
 				}else{
 					// MDH@14AUG2019: if a user presses Enter when there's no command but still feedforwardText it looses feedforwardText but we do switch to the control mode as I think that is what the user wants (if only to look at the list of variables)

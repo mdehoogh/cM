@@ -41,7 +41,7 @@ static unsigned long long numberOfAllocationTypes=0; // keep track of the number
 
 // MDH@07MAY2020: keep track of all allocation marks
 static unsigned long long firstActiveAllocationMark=0,lastActiveAllocationMark=-1; // MDH@11MAY2020: as marks get deleted (from the back the firstAllocationMark changes)
-static unsigned long long numberOfAllocationMarks=1; // we need at least one mark (TODO this could change if we decide to not do this in the production version)
+static unsigned long long numberOfAllocationMarks=0; // we need at least one mark (TODO this could change if we decide to not do this in the production version)
 static unsigned long long numberOfAllocationMarkTypes=0; // keep track of the number of types we have marks of
 static Mallocationmark* _allocationTypeMarks=NULL;
 // as we're expecting more marks to be added then types we do mark 1 type 1, mark 1 type 2, etc.
@@ -96,6 +96,9 @@ struct{
 
 // you HAVE to call this method to be able to register allocations
 bool allocationRecordingInitialized(){
+    
+    bool result=false;
+
     printf("Initializing allocation recording...\n");
     allocations.l=0;
 #ifndef __PRODUCTION__
@@ -111,11 +114,22 @@ bool allocationRecordingInitialized(){
 #else
     allocations._chars=NULL;
 #endif
-    // MDH@07MAY2020: reset the number of allocation marks we need  
-    numberOfAllocationMarks=1;
+    // MDH@07MAY2020: get rid of the current allocation type marks
+    numberOfAllocationMarks=0;
+    numberOfAllocationMarkTypes=0;
     if(_allocationTypeMarks){free(_allocationTypeMarks);_allocationTypeMarks=NULL;} 
-    // MDH@07MAY2020 END
-    return(/* superfluous: allocations._chars&&*/_allocationTypes!=NULL/* MDH@14APR2020: &&_allocationcounts*/);
+
+    if(!_allocationTypes)return false;
+
+    // MDH@12MAY2020: I suppose that if we have allocation types we can create them
+    // assuming we have a single (global) allocation type (i.e. *)
+    if(numberOfAllocationTypes>0){ // we should have a single allocation mark (which will be expanded with new types (or marks) being registered)
+        _allocationTypeMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
+        if(!_allocationTypeMarks)return false;
+        if(_allocationTypeMarks){numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;}
+    }
+
+    return true;
     // replacing: if(!allocations._chars)info("ERROR: Failed to initialize recording allocations.\n");else info("Allocation recording initialized.\n");
 }
 
@@ -385,7 +399,7 @@ bool addAllocationMark(){
     if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
         // MDH@07MAY2020: we have to add a new mark
         size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
-         Mallocationmark* newAllocationTypeMarks=(_allocationTypeMarks?realloc(_allocationTypeMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark)):calloc(newNumberOfAllocationTypeMarks,sizeof(Mallocationmark)));
+        Mallocationmark* newAllocationTypeMarks=(_allocationTypeMarks?realloc(_allocationTypeMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark)):calloc(newNumberOfAllocationTypeMarks,sizeof(Mallocationmark)));
         if(!newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
         _allocationTypeMarks=newAllocationTypeMarks;
         if(newLastActiveAllocationMark>0){ // we need room at where the first active allocation mark is now (the oldest allocation mark)

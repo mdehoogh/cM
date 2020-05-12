@@ -249,7 +249,7 @@ void free_text(Mtext* _text){
 }/* VALIDATED */
 void free_integer(Minteger* _integer){
     if(_integer){
-        if(amVerbose())output("Freeing integer %llu.\n",_integer->ll);
+        if(amVerbose()&&amDebugging())output("Freeing integer %llu.\n",_integer->ll);
         FREE(_integer,'I');
     }else
     if(amDebugging())outputInfo("No integer to free!");

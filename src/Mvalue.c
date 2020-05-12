@@ -81,7 +81,7 @@ bool free_listelement(Mlistelement* _listelement,bool weak){
 }/* VALIDATED */
 void free_list(Mlist* _list){
     if(_list){
-        // if(amDebugging())
+        if(amVerbose()&&amDebugging())
         {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
         if(_list->_first){
             // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters

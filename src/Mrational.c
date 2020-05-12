@@ -320,8 +320,8 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     }else{ // numerator and denominator computed
         ////outputBiginteger("Storing numerator '",_num,"'");outputBiginteger(" and denominator '",_den,"'.\n");
         // too bad we have to clear the current numerator and denominator pointers (if any)
-        if(c&&c->num){if(amVerbose())outputInfo("Freeing previous numerator.");free_biginteger(c->num);}
-        if(c&&c->den){if(amVerbose())outputInfo("Freeing previous denominator.");free_biginteger(c->den);}
+        if(c&&c->num){if(amVerbose()&&amDebugging())outputInfo("Freeing previous numerator.");free_biginteger(c->num);}
+        if(c&&c->den){if(amVerbose()&&amDebugging())outputInfo("Freeing previous denominator.");free_biginteger(c->den);}
         /////outputInfo("Previous numerator and denominator released.");
         c->num=_num;c->den=_den;
         /////outputInfo("Numerator and denominator stored.");
