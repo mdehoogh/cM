@@ -95,7 +95,7 @@ bool initExecution(){
  */
 void free_biginteger(Mbiginteger* biginteger){
     if(biginteger){
-        if(amDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
+        if(amVerbose()&&amDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
 #ifndef __PRODUCTION__
         mp_clear(biginteger->_bi);
         FREE(biginteger->_bi,'b');
@@ -256,7 +256,7 @@ void free_integer(Minteger* _integer){
 }/* VALIDATED */
 void free_float(Mfloat* _float){
     if(_float){
-        if(amVerbose())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
+        if(amVerbose()&&amDebugging())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
         FREE(_float,'F');
     }else
     if(amDebugging())outputInfo("No real to free!");

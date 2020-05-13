@@ -532,7 +532,7 @@ void free_mpd(mpd_t* _mpd){if(_mpd)mpd_del(_mpd);}/* VALIDATED */
  */
 void free_decimal(Mdecimal* decimal){
     if(decimal){
-        ////////if(amVerbose())output("Freeing decimal.\n");
+        if(amVerbose()&&amDebugging())output("Freeing decimal.\n");
         if(decimal->mpd)free_mpd(decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
         FREE(decimal,'D');
     }else

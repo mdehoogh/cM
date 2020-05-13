@@ -338,7 +338,7 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
 /**
  * \brief copies \p a into \p b
  */
-mp_err _qcopy(Mrational* const b,Mrational const * const a){
+mp_err _qcopy(Mrational * const b,Mrational const * const a){
     mp_err status=(a&&b?MP_OKAY:MP_ERR);
     if(status==MP_OKAY){
         // get copies of numerator, denominator and delta of the source

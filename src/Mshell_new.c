@@ -3636,10 +3636,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
-							if(amVerbose()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
+							if(amVerbose()&&amDebugging()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
 							free_map(_functionCallArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
-							if(amVerbose())outputInfo("Function argument map freed!");
+							if(amVerbose()&&amDebugging())outputInfo("Function argument map freed!");
 						}else
 							outputError("No function arguments");
 					}else

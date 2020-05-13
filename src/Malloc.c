@@ -92,7 +92,7 @@ static bool updateAllocationTypeMarks(){
 struct{
     long long l; // the number of allocation types stored
     char* _chars; // the allocation type characters
-}allocations;
+}allocations={0,NULL};
 
 // you HAVE to call this method to be able to register allocations
 bool allocationRecordingInitialized(){
@@ -100,34 +100,43 @@ bool allocationRecordingInitialized(){
     bool result=false;
 
     printf("Initializing allocation recording...\n");
-    allocations.l=0;
+
+    // MDH@13MAY2020: remove whatever is currently allocated
+    if(allocations._chars){
+        free(allocations._chars);
+        allocations._chars=NULL;
+        printf("\tHistory of allocation type ids released...\n");
+    }
+    if(allocations.l>0){printf("\t%lld registered allocation type ids released...\n",allocations.l);allocations.l=0;}
+
+    if(_allocationTypeMarks){free(_allocationTypeMarks);_allocationTypeMarks=NULL;printf("\tHistory of allocation marks released...\n");} 
+    if(numberOfAllocationMarks*numberOfAllocationMarkTypes>0)printf("\t%lld allocation marks of %lld types released...\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
+    numberOfAllocationMarks=0;numberOfAllocationMarkTypes=0;
+
 #ifndef __PRODUCTION__
     allocations._chars=malloc(16); // starting out with one block
-    if(allocations._chars){
+    if(!allocations._chars)return false;
+    printf("\tHistory of allocation type ids initialized...\n");
+
+    // keep all current allocation types (if any)
+    if(numberOfAllocationTypes==0){
         _allocationTypes=calloc(1,sizeof(Mallocationtype));
         if(_allocationTypes){
             numberOfAllocationTypes=1;
             _allocationTypes[0].type='*';
         } // always keep track of the total allocation count, which we mark with a wildcard *
-        // MDH@14APR2020: if(numberofallocationtypes>0)_allocationcounts=calloc(5,sizeof(size_t)); // start out with two size_t items one to store the count and one to store the size!!
     }
-#else
-    allocations._chars=NULL;
+    if(numberOfAllocationTypes==0)return false;
+    printf("\tAllocation type registration initialized...\n");
+        // MDH@14APR2020: if(numberofallocationtypes>0)_allocationcounts=calloc(5,sizeof(size_t)); // start out with two size_t items one to store the count and one to store the size!!
 #endif
-    // MDH@07MAY2020: get rid of the current allocation type marks
-    numberOfAllocationMarks=0;
-    numberOfAllocationMarkTypes=0;
-    if(_allocationTypeMarks){free(_allocationTypeMarks);_allocationTypeMarks=NULL;} 
-
-    if(!_allocationTypes)return false;
 
     // MDH@12MAY2020: I suppose that if we have allocation types we can create them
     // assuming we have a single (global) allocation type (i.e. *)
-    if(numberOfAllocationTypes>0){ // we should have a single allocation mark (which will be expanded with new types (or marks) being registered)
-        _allocationTypeMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
-        if(!_allocationTypeMarks)return false;
-        if(_allocationTypeMarks){numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;}
-    }
+    _allocationTypeMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
+    if(!_allocationTypeMarks)return false;
+    numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;
+    printf("\tAllocation marks registration initialized...\n");
 
     return true;
     // replacing: if(!allocations._chars)info("ERROR: Failed to initialize recording allocations.\n");else info("Allocation recording initialized.\n");
@@ -385,9 +394,11 @@ Mallocationtype* _getAllocationTypes(){
 bool resetAllocationTypes(){
     /////info("Resetting allocation type counts.\n");
     // best to free the lot, the reinitialize
+    /* MDH@13MAY2020: now all addressed by allocationRecordingInitialized() (NOTE that we got a free error because we didn't NULL allocations._chars in the last line commented out)
     if(_allocationTypes)free(_allocationTypes);
     // MDH@14APR2020: if(_allocationcounts)free(_allocationcounts);
     if(allocations._chars)free(allocations._chars);
+    */
     ////////info("Allocation type counts reset.\n");
     return allocationRecordingInitialized();
 }

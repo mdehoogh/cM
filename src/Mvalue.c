@@ -156,7 +156,7 @@ void free_value(Mvalue* _value){
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         FREE(_value,'X');
-        if(amVerbose())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
+        if(amVerbose()&&amDebugging())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
     }else
         outputBug("No value to free!");
 }/* VALIDATED */
@@ -165,7 +165,10 @@ Mlist* __list(char* source){
     Mlist* _list=CALLOC(sizeof(Mlist),'L');
     if(source){
         _list->_creator=_getChars(source); // MDH@17APR2020 replacing: _strdup(source);
-        if(_list->_creator)output("List creator: '%s'.\n",_list->_creator->chars);
+        if(_list->_creator){
+            if(amVerbose()&&amDebugging())output("List creator: '%s'.\n",_list->_creator->chars);
+        }else
+            output("%sFailed to register list creator '%s'.\n",M_ERROR_PREFIX,source);
     }
     return _list;
 }
@@ -189,12 +192,12 @@ Mvalue* __value(char const * const descriptor){
                 _valueList->numberOfElements++;
                 // MDH@11NOV2019: by remembering the number of elements as index, removing intermediate elements will NOT prevent informing about what element was removed!!!
                 _valueListelement->index=_valueList->numberOfElements;
-                if(descriptor)if(amVerbose())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
+                if(descriptor)if(amVerbose()&&amDebugging())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
             }else // couldn't get a new value, so free the value list element immediately
                 FREE(_valueListelement,'l');
         }
     }
-    if(!_value)if(amVerbose())outputError("Failed to create value!");
+    if(!_value)outputError("Failed to create value!"); // serious enough to report
     return _value;
 }/* VALIDATED */
 

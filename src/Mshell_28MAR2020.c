@@ -3630,7 +3630,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
-							if(amVerbose()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
+							if(amVerbose()&&amDebugging()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
 							free_map(_functionCallArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerbose())outputInfo("Function argument map freed!");
@@ -6526,17 +6526,15 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
-			if(amVerbose()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
+			if(amVerbose()&&amDebugging()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
 			///if(amVerbose())
-			if(amDebugging())
-				output("Freeing %zd formula elements.\n",formulaElementCount);
+			if(amVerbose()&&amDebugging())output("Freeing %zd formula elements.\n",formulaElementCount);
 			size_t numberOfFormulaElementsFreed=free_formulaelement(formula);
 			newline();
-			if(amDebugging())
-				output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+			if(amVerbose()&&amDebugging())output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
 			/* replacing:
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;
