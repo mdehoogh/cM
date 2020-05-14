@@ -125,7 +125,7 @@ void free_map(Mmap* _map){
 // MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
 void free_valuereference(Mvaluereference* _valuereference){
     if(_valuereference){
-        if(_valuereference->_name){free(_valuereference->_name);_valuereference->_name=NULL;}
+        if(_valuereference->_name){freeChars(_valuereference->_name);_valuereference->_name=NULL;}
         /* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
         if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
         */
@@ -1097,7 +1097,7 @@ void checkList(Mlist* _list){
     if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
     // MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
     if(index<0){output("%sIndex %lld of (new) list element too small.\n",M_ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
-    if(amVerbose())outputValue((index>0?"Appending '":"Prepending '"),_value,"' to a list.\n");
+    if(amVerbose()&&amDebugging())outputValue((index>0?"Appending '":"Prepending '"),_value,"' to a list.\n");
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
     Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index>0&&index<=lastindex?_list->_first:NULL);
@@ -1202,7 +1202,8 @@ long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue
         if(!_map->immutable){ // the map is mutable
             // MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
             if(!_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
-                if(amVerbose()){output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
+                if(amVerbose()&&amDebugging())
+                {output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
                 Mmapelement* _mapelement=_map->_first;
                 while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
                 if(!_mapelement){ // not found
@@ -2106,11 +2107,11 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){
         // NOTE the new map and list value get a reference count of 1 below as soon as they are bound to the value holder (as should be the case)
         //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
         if(_value->type==VT_MAP){
-            if(amVerbose())outputValue("Copying map ",_value,".\n");
+            // if(amVerbose()&&amDebugging())outputValue("Copying map ",_value,".\n");
             _value=_getValueOfMap(_getMapCopy(_value->value._map),true);
         }else
         if(_value->type==VT_LIST){
-            if(amVerbose())outputValue("Copying list ",_value,".\n");
+            // if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
             _value=_getValueOfList(_getListCopy(_value->value._list),true);
         }
     }

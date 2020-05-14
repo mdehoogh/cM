@@ -1021,7 +1021,7 @@ bool showContinuedPrompt(){
 void outputTotalMemoryUsage(){
 	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
 	long long numberOfAllocationMarks=-1; // i.e. only interested in the last (=current) mark
-	unsigned long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
+	long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
 	if(_allocationTypeSizes){
 		if(numberOfAllocationTypeSizes>0&&numberOfAllocationMarks>0){
 			output("Dynamically allocated memory: %llu.\n",_allocationTypeSizes[1]);
@@ -1033,21 +1033,58 @@ void outputTotalMemoryUsage(){
 //                it's easiest to ask for all and only show the changes
 long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMarks){
 	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
-	long long numberOfAllocationMarks=incrementalNumberOfAllocationMarks; // interested in the last two marks (to allow us to compute the difference)
-	unsigned long long * _allocationTypeSizes=_getAllocationTypeSizes("",&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
+	long long numberOfAllocationMarks=incrementalNumberOfAllocationMarks+1; // request at least one more allocation mark than increments we need 
+	long long * _allocationTypeSizes=_getAllocationTypeSizes("",&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
+	if(amVerbose()&&amDebugging())
+		output("Number of allocation type sizes received: %lld. Number of allocation marks received: %lld.\n",numberOfAllocationTypeSizes,numberOfAllocationMarks);
 	if(_allocationTypeSizes){
-		if(numberOfAllocationTypeSizes>=3&&numberOfAllocationMarks>=incrementalNumberOfAllocationMarks){
-			long long increment;
+		// I suppose we need at least two allocation marks returned so we can determine at least one increment
+		if(numberOfAllocationMarks>1){
+			// for(unsigned long long allocationTypeSizeIndex=0;allocationTypeSizeIndex<numberOfAllocationTypeSizes;allocationTypeSizeIndex++){
+			// 	if(allocationTypeSizeIndex%(numberOfAllocationMarks+1)==0)outputChar('|');
+			// 	output("\t%llu:%lld",allocationTypeSizeIndex,_allocationTypeSizes[allocationTypeSizeIndex]);
+			// }
+			// outputChar('\n');
+			long long increment,decrement,allocationMark;
 			char allocationType;
 			// there will be 3 values per type: the type itself, what is now occupied, and what was occupied before
-			output("Changes to the dynamically allocated memory:\n");
-			output("Type\tIncrement\n");
+			output("Dynamically allocated memory:\n");
+			output("Type\tNow\t  Then\t  Chronological changes\n");
 			for(unsigned long long allocationTypeSizeIndex=0;allocationTypeSizeIndex<numberOfAllocationTypeSizes;){
-				allocationType=(char)_allocationTypeSizes[allocationTypeSizeIndex++];
-				increment=_allocationTypeSizes[allocationTypeSizeIndex++];
-				increment-=_allocationTypeSizes[allocationTypeSizeIndex++];
-				if(increment==0)continue;
-				output("%c\t%lld\n",allocationType,increment);
+				allocationType=(char)_allocationTypeSizes[allocationTypeSizeIndex++]; // by incrementing the loop index we end up on the first memory item
+				// at least one of the allocation mark must be different
+				allocationMark=numberOfAllocationMarks;
+				while(--allocationMark>0&&_allocationTypeSizes[allocationTypeSizeIndex+allocationMark]==_allocationTypeSizes[allocationTypeSizeIndex+allocationMark-1])
+				;
+				if(allocationMark>0){
+					output("%c\t%lld",allocationType,_allocationTypeSizes[allocationTypeSizeIndex]); // showing the current allocation type size 
+					output("\t= %lld",_allocationTypeSizes[allocationTypeSizeIndex+numberOfAllocationMarks-1]); // what it was originally
+					// let's show the increments starting at the oldest (later) mark
+					allocationMark=numberOfAllocationMarks-1; // count numberOfAllocationMarks
+					increment=_allocationTypeSizes[allocationTypeSizeIndex];decrement=_allocationTypeSizes[allocationTypeSizeIndex+allocationMark];
+					/*
+					outputChar('\t');
+					if(increment<0||decrement<0)outputChar('?');
+					if(increment!=decrement){
+						if(increment>decrement)outputChar('+');
+						output("%lld",increment-decrement);
+					}
+					*/
+					while(--allocationMark>=0){
+						increment=_allocationTypeSizes[allocationTypeSizeIndex+allocationMark];
+						outputChar('\t');
+						if(increment<0||decrement<0)outputChar('?');
+						if(increment!=decrement){
+							if(increment>decrement)
+								output("+ %lld",increment-decrement); // replacing: output("\t%lld:%lld:%lld",increment-decrement,allocationTypeSizeIndex,allocationMark);
+							else
+								output("- %lld",decrement-increment); // replacing: output("\t%lld:%lld:%lld",increment-decrement,allocationTypeSizeIndex,allocationMark);
+							decrement=increment;
+						}
+					}
+					outputChar('\n');
+				}
+				allocationTypeSizeIndex+=numberOfAllocationMarks;
 			}
 		}else
 			outputError("Failed to obtain (and output) the incremental memory usage.");
@@ -3901,7 +3938,7 @@ int main(int argc, char **argv){
 							if(!string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
 								outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
 							else
-							if(amVerbose())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
+							if(amVerbose()&&amDebugging())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
 						}
 					}
 					free_string(_userInputCommandText); // MDH@14NOV2019: freed
@@ -3922,7 +3959,7 @@ int main(int argc, char **argv){
 
 					// MDH@12MAY2020: output two incremental out
 					if(allocationMarkAdded>0){
-						if(outputIncrementalMemoryUsage(allocationMarkAdded)!=allocationMarkAdded)outputError("Not all command allocation marks output.");
+						if(outputIncrementalMemoryUsage(allocationMarkAdded)<allocationMarkAdded)outputError("Not all command allocation marks output.");
 						while(--allocationMarkAdded>=0)dropOldestAllocationMark(); // drop as many allocation marks as we have created
 					}
 

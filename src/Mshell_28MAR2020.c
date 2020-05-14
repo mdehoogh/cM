@@ -6548,11 +6548,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			newline();
 			*/
-			if(amVerbose())outputInfo("Formula elements freed.");
+			if(amVerbose()&&amDebugging())outputInfo("Formula elements freed.");
 		}else
-		if(amVerbose())output("No result of expression '%s' to store.",info);
+		if(amVerbose()&&amDebugging())output("No result of expression '%s' to store.",info);
 	}
-	if(amVerbose()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
+	if(amVerbose()&&amDebugging()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 /**

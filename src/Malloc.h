@@ -33,8 +33,10 @@ typedef struct{
 
 typedef struct{
     char type;
+    /*
     unsigned long long mark_occupied; // marked number of bytes occupied
     unsigned long long mark_freed; // marked number of bytes freed
+    */
     long long count; // counting up for fixed-size allocation, and down for variable-size allocation (so we can distinguish between them!!!)
     size_t size; // the size of each record
     Mallocationsize* _allocationsizes; // only used for variable-size allocations
@@ -96,7 +98,8 @@ typedef struct{
 }Mallocationtypesize;
 
 // for requesting some or all allocation type sizes
-unsigned long long * _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes,long long *_numberOfAllocationMarks);
+long long * _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes,long long *_numberOfAllocationMarks);
 
+void outputAllocationTypeMarks();
 
 

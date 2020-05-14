@@ -3092,8 +3092,10 @@ bool endFunctionBodyInput(){
 Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
 	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5');
-	_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
-	if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
+	if(_valuereference){
+		_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
+		if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
+	}
 	return _valuereference;
 }
 /* MDH@26OCT2019: moved over to Mvalue.h/c as we need it there so we can have value references as well!!!!!
@@ -4323,7 +4325,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 				// MDH@17NOV2019: applying a unary operator is dangerous because we may set the value BUT that's NOT enough
 				//                because if the name and/or item id remains it will be used again later on
-				if(_valueReference->_name){free(_valueReference->_name);_valueReference->_name=NULL;}
+				if(_valueReference->_name){freeChars(_valueReference->_name);_valueReference->_name=NULL;}
 				if(_valueReference->_itemid){ // this is is a value wrapping a list of indices
 					// conform what would happen in free_valuereference!!! 
 					// TODO consider alternative creating a new value reference
@@ -6692,7 +6694,8 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 	Mvalue* result=NULL;
 	if(_value1&&_value2){
-		if(amVerbose()){outputValue("Computing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.\n");}
+		// if(amVerbose())
+		{outputValue("Computing '",_value1,NULL);output("' %s '",operator);outputValue(NULL,_value2,"'.\n");}
 		switch(operator[0]){
 			// real arithmetic
 			case '+' :result=add(_value1,_value2);break;
@@ -6752,6 +6755,17 @@ typedef struct Mformulaelement{
 	struct Mformulaelement* _next;
 	struct Mformulaelement* _prev; // MDH@21MAY2019: unfortunately needed for moving back!!
 }Mformulaelement;
+Mformulaelement* __formulaelement(char* source){
+	// output("BEFORE FORMULA ELEMENT ALLOCATION MARKS:\n");outputAllocationTypeMarks();
+	Mformulaelement* _formulaelement=CALLOC(sizeof(Mformulaelement),'4');
+	/*
+	if(_formulaelement){
+		output("FORMULA ELEMENT %s ALLOCATED: %zd:%zd.\n",source,getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
+	}else
+		output("%sFailed to create formula element '%s'.\n",M_ERROR_PREFIX,source);
+	*/
+	return _formulaelement;
+}
 size_t free_formulaelement(Mformulaelement* _formulaelement){
 	// return the total number of formula elements freed
 	size_t result=0;
@@ -6761,6 +6775,7 @@ size_t free_formulaelement(Mformulaelement* _formulaelement){
 		if(_formulaelement->_operand)free_valuereference(_formulaelement->_operand);
 		FREE(_formulaelement,'4');
 		result+=1; // another one
+		// output("FORMULA ELEMENT FREED: %zd:%zd.\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 		// outputChar('.');
 	}
 	return result;
@@ -6825,9 +6840,9 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		///////////output("Number of allocated formula elements before: %zd.\n",getAllocationTypeCount('4'));
 
 		Mvaluereference* _valuereference;
-		Mformulaelement* formula=CALLOC(sizeof(Mformulaelement),'4');
+		Mformulaelement* formula=__formulaelement("root"); // replacing: CALLOC(sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
-		size_t formulaElementCount=1;
+		size_t formulaElementCount=(_formulaelement?1:0);
 
 		int8_t endTokenTypeIndex; // max. 127 token types should suffice!!!
 
@@ -6918,9 +6933,13 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
 				if(amVerbose())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
-				_formulaelement->_next=(Mformulaelement*)CALLOC(sizeof(Mformulaelement),'4');
-				formulaElementCount++;
+				_formulaelement->_next=__formulaelement("successor");
 				_formulaelement=_formulaelement->_next;
+				if(!_formulaelement){
+					outputError("Failed to create a new formula element.");
+					break;
+				}
+				formulaElementCount++;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
 			if(amVerbose())outputInfo("No further formula elements!");
@@ -6929,7 +6948,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		// evaluate the formula
 		if(formula){
 
-			if(amVerbose())outputValue("First formula value: '",formula->_operand->_value,"'.\n");
+			if(amVerbose()){
+				outputValue("First formula value: '",formula->_operand->_value,"'.\n");
+				output("Number of formula elements: %zd.\n",formulaElementCount);
+			}
 
 			// skip all assignments
 			// MDH@11AUG2019: how about creating ALL new variables IMMEDIATELY BEFORE evaluating the right-hand-side therefore allowing the use of these new variables in the right-hand-side in formulas as we have accepted??????
@@ -6959,7 +6981,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			if(amVerbose())output("Number of assignments: %u.\n",numberOfAssignments);
 			
 			unsigned long long allocated=getAllocationTypeOccupied('4',0),freed=getAllocationTypeFreed('4',0);
-			if(amDebugging())output("Type '4' BEFORE: allocated: %llu - freed: %llu.\n",allocated,freed);
+			// if(amDebugging())
+				output("Type '4' BEFORE: allocated: %llu - freed: %llu.\n",allocated,freed);
 
 			// MDH@14OCT2019: applying binary operators typically is done taking operator precedence into account which means we cannot apply lower precedence binary operators until higher precedence binary operators are applied first
 			//                which again means that you can apply an operator as soon as the next one does not have a higher priority which means that after applying the highest order operators we have apply the next highest order operator
@@ -6977,20 +7000,28 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					_formulaelement->_operand->_value=_result;
 					// MDH@02NOV2019 replacing: assignValue(&(_formulaelement->_operand->_value),_result);
 					// but because _result could be NULL we have to force _name to be NULL just in case 
-					if(_formulaelement->_operand->_name){free(_formulaelement->_operand->_name);_formulaelement->_operand->_name=NULL;}
+					if(_formulaelement->_operand->_name){freeChars(_formulaelement->_operand->_name);_formulaelement->_operand->_name=NULL;}
 					// we need to point the formula operand to the next of the consumed formula element, so the consumed formula element won't be used again in computations
 					nextformulaelement=_formulaelement->_next;
 					// point the formula element now storing the result to the next of the consumed formula element
 					_formulaelement->_next=nextformulaelement->_next;
 					// release the applied operator, and replace it by the successor operator
-					free_string(_formulaelement->_operator);_formulaelement->_operator=nextformulaelement->_operator;
+					// MDH@14MAY2020: if we make a copy of the next operator we can free the disconnected formula element entirely
+					free_string(_formulaelement->_operator);
+					_formulaelement->_operator=_getString(string(nextformulaelement->_operator));
+					nextformulaelement->_next=NULL;free_formulaelement(nextformulaelement); // NULL next of the nextformulaelement so it won't free all successive formula elements left to be applied
+					formulaElementCount--;
+					/* replacing:
+					_formulaelement->operator=nextformulaelement->_operator;
 					// can't reach the consumed formula element anymore, so release whatever it contains (except for the operator which we have retained)
-					free_valuereference(nextformulaelement->_operand); // free the consumed operand
-					if(!nextformulaelement)
-						outputInfo("No formula element to free!");
-					else
+					free_valuereference(nextformulaelement->_operand);// free the consumed operand
+					nextformulaelement->_operand=NULL; // MDH@14MAY2020: it's prudent to NULL the pointer, so no-one will try to free the value reference again
+					if(nextformulaelement){
 						FREE(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
-					formulaElementCount--; // one less to free!!!
+						formulaElementCount--; // one less to free!!!
+					}else
+						outputInfo("No formula element to free!");
+					*/
 					// if we have a formula element behind us of which the operator has not yet been applied we go back there (because my operator has changed!!!!!)
 					if(_formulaelement->_prev)_formulaelement=_formulaelement->_prev;
 					// is there a formula element in front of it that has not yet been applied?????
@@ -7012,10 +7043,13 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				_formulaelement=_formulaelement->_next;
 			}
 			*/
-			if(amVerbose())outputValue("Result: '",_result,"'.\n");
 
-			if(amDebugging())
-			{allocated=getAllocationTypeOccupied('4',0);freed=getAllocationTypeFreed('4',0);output("Type '4' AFTER: allocated: %zd - freed: %zd.\n",allocated,freed);}
+			if(amVerbose()&&amDebugging())
+			{
+				outputValue("Result: '",_result,"'.\n");
+				allocated=getAllocationTypeOccupied('4',0);freed=getAllocationTypeFreed('4',0);
+				output("Type '4' AFTER: allocated: %zd - freed: %zd - left to free: %zd\n",allocated,freed,formulaElementCount);
+			}
 
 			// perform assignments right-to-left (which is a little problematic though)
 			if(numberOfAssignments){
@@ -7060,14 +7094,22 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
-			if(amVerbose()&&amDebugging()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
+			if(amVerbose()&&amDebugging())
+			{outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
+			
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
-			if(amVerbose()&&amDebugging())output("Freeing %zd formula elements.\n",formulaElementCount);
+			if(amVerbose()&&amDebugging())
+				output("Freeing %zd formula elements.\n",formulaElementCount);
+			outputAllocationTypeMarks();
+
+			// MDH@14MAY2020 think we shouldn't free formula actually as its pointer is passed to a formula element which is freed eventually:
 			size_t numberOfFormulaElementsFreed=free_formulaelement(formula);
-			newline();
-			if(amVerbose()&&amDebugging())output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+			if(amVerbose()&&amDebugging())
+				output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+
+			//*/
 			/* replacing:
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;
@@ -7081,11 +7123,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			newline();
 			*/
-			if(amVerbose())outputInfo("Formula elements freed.");
+			if(amVerbose()&&amDebugging())outputInfo("Formula elements freed.");
 		}else
-		if(amVerbose())output("No result of expression '%s' to store.",info);
+		if(amVerbose()&&amDebugging())output("No result of expression '%s' to store.",info);
 	}
-	if(amVerbose()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
+	if(amVerbose()&&amDebugging()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 /**
