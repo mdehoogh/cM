@@ -331,7 +331,8 @@ Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
     return _decimalValue;
 }/* VALIDATED */
 Mvalue* _getIntegerValue(long long ll){
-    if(amVerbose())output("Wrapping integer '%lld'.\n",ll);
+    if(amVerboseDebugging())
+        output("Wrapping integer '%lld'.\n",ll);
     Mvalue* _integerValue=__value("integer");
     if(_integerValue){
         _integerValue->value._integer=_getInteger(ll);
@@ -346,9 +347,11 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
     }else
     if(_biginteger){
         if(freeonfailure)free_biginteger(_biginteger);
-        if(amVerbose()){output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
+        if(amVerboseDebugging())
+            {output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
     }else
-    if(amVerbose())outputInfo("No big integer to wrap.");
+    if(amVerboseDebugging())
+        outputInfo("No big integer to wrap.");
     return _bigintegerValue;
 }/* VALIDATED */
 Mvalue* _getFloatValue(long double ld){
@@ -357,7 +360,9 @@ Mvalue* _getFloatValue(long double ld){
     if(_floatValue){
         _floatValue->value._float=_getFloat(ld);
         if(!_floatValue->value._float){free_value(_floatValue);_floatValue=NULL;}else _floatValue->type=VT_FLOAT;
-    }
+    }else
+    if(amVerboseDebugging())
+        outputInfo("No float to wrap.");
     return _floatValue;
 }/* VALIDATED */
 Mvalue* _getTextValue(char* _s,bool freeonfailure){
@@ -409,7 +414,7 @@ Mlist* _getListIndices(Mlist const * const list){
 Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){
     Mlist* _list=NULL;
     if(value){
-        if(amDebugging())
+        if(amVerboseDebugging())
             outputValue("Flattening '",value,"'.\n");
         _list=_getListOfType(VT_UNDEFINED);
         if(_list){
@@ -447,8 +452,8 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
             if(!success){free_list(_list);_list=NULL;} // on failure release the list
         }    
     }
-    if(amDebugging())
-    {if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}}
+    if(amVerboseDebugging())
+        {if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}}
     return _list;
 }
 Mvalue* getFirstScalarValue(Mvalue* value){
@@ -544,7 +549,8 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     _map->_last=_mapelement;
-                    if(amDebugging())outputInfo("Returning the single float map!");
+                    if(amVerboseDebugging())
+                        outputInfo("Returning the single float map!");
                     return _map;
                 }
                 outputError("Failed to create the float variable map");
@@ -647,7 +653,8 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){
                     _mapelement->_variable=_integerVariable;
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
-                    if(amVerbose())outputInfo("Returning the single integer map!");
+                    if(amVerboseDebugging())
+                        outputInfo("Returning the single integer map!");
                     return _map;
                 }
                 outputError("Failed to create the integer variable map");
@@ -1918,52 +1925,60 @@ long long getValueSign(Mvalue const * const value){
 long long isValueZero(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
-        if(amVerbose())outputValue("Checking whether '",value,"' is zero");
+        if(amVerboseDebugging())
+            outputValue("Checking whether '",value,"' is zero");
         if(value->type==VT_INTEGER)result=isIntegerZero(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerZero(value->value._biginteger);else
         if(value->type==VT_FLOAT)result=isFloatZero(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalZero(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalZero(value->value._rational);
     }
-    if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
+    if(amVerboseDebugging())
+        output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     return result;
 }/* VALIDATED */
 long long isValueOne(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
-        if(amVerbose())outputValue("Checking whether '",value,"' equals one");
+        if(amVerboseDebugging())
+            outputValue("Checking whether '",value,"' equals one");
         if(value->type==VT_INTEGER)result=isIntegerOne(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerOne(value->value._biginteger);else
         if(value->type==VT_FLOAT)result=isFloatOne(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalOne(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalOne(value->value._rational);
-        if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
+        if(amVerboseDebugging())
+            output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     }
     return result;
 }/* VALIDATED */
 long long isValuePositive(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
-        if(amVerbose())outputValue("Checking whether '",value,"' is positive");
+        if(amVerboseDebugging())
+            outputValue("Checking whether '",value,"' is positive");
         if(value->type==VT_INTEGER)result=isIntegerPositive(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerPositive(value->value._biginteger);else
         if(value->type==VT_FLOAT)result=isFloatPositive(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalPositive(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalPositive(value->value._rational); // assuming the numerator is never NULL and the denominator is always positive
-        if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
+        if(amVerboseDebugging())
+            output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     }
     return result;
 }/* VALIDATED */
 long long isValueNegative(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value){
-        if(amVerbose())outputValue("Checking whether '",value,"' is negative");
+        if(amVerboseDebugging())
+            outputValue("Checking whether '",value,"' is negative");
         if(value->type==VT_INTEGER)result=isIntegerNegative(value->value._integer);else
         if(value->type==VT_BIGINTEGER)result=isBigintegerNegative(value->value._biginteger);else
         if(value->type==VT_FLOAT)result=isFloatNegative(value->value._float);else
         if(value->type==VT_DECIMAL)result=isDecimalNegative(value->value._decimal);else
         if(value->type==VT_RATIONAL)result=isRationalNegative(value->value._rational);
-        if(amVerbose())output(": %s.\n",(result==M_TRUE?"YES":"NO"));
+        if(amVerboseDebugging())
+            output(": %s.\n",(result==M_TRUE?"YES":"NO"));
     }
     return result;
 }/* VALIDATED */

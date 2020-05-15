@@ -24,6 +24,8 @@ bool amDebugging(){return debugging;}
 bool amMatchingparentheses(){return matchingparentheses;}
 bool amAcceptinghistorycommand(){return acceptinghistorycommand;}
 
+bool amVerboseDebugging(){return verbose&&debugging;} // MDH@15MAY2020: convenience function
+
 // flags used in (interactive) session mode
 void setAssisting(bool newAssisting){
     assisting=newAssisting;

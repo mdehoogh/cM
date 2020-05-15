@@ -519,8 +519,13 @@ Mvalue* Mfacd(Mvalue* _value){
 
 // TODO remember intermediate values in some list, that we can use as starting point
 Mvalue* Mfac(Mvalue* _value){
-    if(!_value){if(amVerbose())outputInfo("No argument to factorial() function!");return NULL;}
-    if(amVerbose())outputValue("Argument of factorial() function: '",_value,"'.\n");
+    if(!_value){
+        if(amVerboseDebugging())
+            outputInfo("No argument to factorial() function!");
+        return NULL;
+    }
+    if(amVerboseDebugging())
+        outputValue("Argument of factorial() function: '",_value,"'.\n");
     if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){outputValue("\nERROR: Non-integer argument '",_value,"' to factorial() function!");return NULL;}
     // some special cases (i.e. the input number is smaller than 2)
     Mbiginteger* _finalmultiplier=NULL;
@@ -534,8 +539,12 @@ Mvalue* Mfac(Mvalue* _value){
             return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         _finalmultiplier=_getBigintegerCopy(_value->value._biginteger);
     }
-    if(!_finalmultiplier){output("%s",M_ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");return NULL;}
-    if(amVerbose()&&amDebugging())outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
+    if(!_finalmultiplier){
+        output("%s",M_ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");
+        return NULL;
+    }
+    if(amVerboseDebugging())
+        outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
     Mbiginteger* _result=_getBiginteger(6); // the smallest value to return
     if(_result){
         clock_t then=(amVerbose()?clock():0);
@@ -552,11 +561,13 @@ Mvalue* Mfac(Mvalue* _value){
             free_biginteger(_multiplier);
         }else        
             outputError("Failed to create big integer 3");
-        if(amVerbose()){outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/1000);}
+        if(amVerboseDebugging())
+            {outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/1000);}
     }else
         outputError("Failed to create big integer 6");
     free_biginteger(_finalmultiplier);
-    if(amVerbose())outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
+    if(amVerboseDebugging())
+        outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
     return (_result?_getBigintegerValue(_result,true):NULL);
     /* replacing:
     // 39 is about the maximum that we can store in a long long

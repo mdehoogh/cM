@@ -220,7 +220,7 @@ obviously when defining the function body there will be no commands to execute
  */
 Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-	if(amVerbose()&&amDebugging())outputMap("Function execution argument map: ",_argumentMap,".\n");
+	if(amVerboseDebugging())outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=__environment(); // free asap
 	if(_functionExecutionEnvironment){
 		if(amVerbose())outputInfo("Registering the name of the function execution environment");
@@ -633,12 +633,12 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							outputChar('\n');resetOutputColor();
 							*/
 							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
-							if(amVerbose()&&amDebugging())outputValue("For loop condition value: '",_conditionValue,"'.\n");
+							if(amVerboseDebugging())outputValue("For loop condition value: '",_conditionValue,"'.\n");
 							// a for loop should continue unless the condition value is zero or undefined
 							if(isValueZero(_conditionValue)!=M_FALSE)break; // condition evaluates to zero or is undefined
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
 							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
-							if(amVerbose()&&amDebugging()){
+							if(amVerboseDebugging()){
 								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
 								outputValue(" evaluates to '",_conditionValue,"'.\n");
 							}
@@ -651,7 +651,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								newline();resetOutputColor();
 								*/
 								_forBodyValue=getValueOfExpression("for loop",'l',(TokenType[]){},0);
-								if(amVerbose()&&amDebugging()){
+								if(amVerboseDebugging()){
 									outputValue("For loop body in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
@@ -666,7 +666,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								newline();resetOutputColor();
 								*/
 								_forIncrementValue=getValueOfExpression("for increment",'i',(TokenType[]){},0);
-								if(amVerbose()&&amDebugging()){
+								if(amVerboseDebugging()){
 									outputValue("For loop increment in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forIncrementValue,"'.\n");
 								}
@@ -685,13 +685,13 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							_result=getValue(_forEnvironment,"$"); // get the result
 							if(!_result){
 								_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
-								if(amVerbose()&&amDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
+								if(amVerboseDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
 							}else
-							if(amVerbose()&&amDebugging())outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
+							if(amVerboseDebugging())outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
 						}
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
-					if(amVerbose()&&amDebugging())outputInfo("For loop environment popped.");
+					if(amVerboseDebugging())outputInfo("For loop environment popped.");
 				}else{
 					outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
@@ -3428,19 +3428,23 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 long long getBigintegerInteger(Mbiginteger* biginteger){
 	long long result=M_LL_INVALID;
 	if(biginteger){
-		if(amVerbose())outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
+		if(amVerboseDebugging())
+			outputBiginteger("Trying to convert big integer '",biginteger,"' to a small integer.\n");
 		if(mp_cmp(biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(biginteger,getBigintegerLLMax())!=MP_GT){
 			result=mp_get_i64(biginteger);
-			if(amVerbose())outputInfo("Big integer converted to a small integer.");
+			if(amVerboseDebugging())
+				outputInfo("Big integer converted to a small integer.");
 		}else
-			if(amVerbose())outputInfo("Big integer cannot be converted to a small integer.");
+		if(amVerboseDebugging())
+			outputInfo("Big integer cannot be converted to a small integer.");
 	}
-	if(amVerbose()&&amDebugging())output("Small integer result: %lld.\n",result);
+	if(amVerboseDebugging())
+		output("Small integer result: %lld.\n",result);
 	return result;
 }
 
 Mvalue* applyUnaryOperator(char operator,Mvalue* _value){
-	if(amVerbose()){
+	if(amVerboseDebugging()){
 		output("Applying unary operator '%c'",operator);
 		if(_value){outputValue(" to value '",_value,"'");output(" of type %u.\n",_value->type);}else output(".\n");
 	}
@@ -3497,7 +3501,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	Mvaluereference* _valueReference=NULL;
 
-	if(amVerbose())output("getValueReference() extracting a(n) '%s' value that starts with token '%s' of type '%s'.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(amVerboseDebugging())
+		output("getValueReference() extracting a(n) '%s' value that starts with token '%s' of type '%s'.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
 	Mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
 		
@@ -3509,11 +3514,13 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 		}
 		expressionToken=nextEnvironmentExpressionToken();
 	}
-	if(amVerbose()){if(unaryOperators)output("Unary operators: '%s'.\n",string(unaryOperators));else output("No unary operators!\n");}
+	if(amVerboseDebugging())
+	{if(unaryOperators)output("Unary operators: '%s'.\n",string(unaryOperators));else output("No unary operators!\n");}
 	// ASSERT unary operators extracted
 
 	if(expressionToken){
-		if(amVerbose())output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerboseDebugging())
+			output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		_valueReference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5');
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
@@ -3543,11 +3550,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						// MDH@25JUL2019: adding if, while and for functions
 						unsigned long long numberOfFunctionParameters=(function->_parameterMap?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
 						if(!strcmp(_significantTokenText,DEFINEANONYMOUSFUNCTION_NAME)){
-							if(amVerbose())outputInfo("Definition of an anonymous function encountered!");
+							if(amVerboseDebugging())outputInfo("Definition of an anonymous function encountered!");
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-1; // i.e. evaluate the first argument only in the current context
 						}else
 						if(!strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){
-							if(amVerbose())outputInfo("Definition of a user function encountered!");
+							if(amVerboseDebugging())outputInfo("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-2;	// i.e. evaluate the first two arguments only in the current context
 						}else
 						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)||!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
@@ -3561,15 +3568,15 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// the do function is special in that it allows an infinite number of arguments although the function itself expects them wrapped in a single Mvalue
 							numberOfFunctionParameters=LLONG_MAX; // replacing 1 with the actual number of parameters we allow for the function
 						}
-						if(amVerbose())output("Call of function '%s' that takes %llu arguments.\n",_significantTokenText,numberOfFunctionParameters);
+						if(amVerboseDebugging())output("Call of function '%s' that takes %llu arguments.\n",_significantTokenText,numberOfFunctionParameters);
 						// 1. get the list of function arguments, which depends on the function!!
 						expressionToken=nextEnvironmentExpressionToken();
 						// MDH@02NOB2019: force the arguments value list to be weak
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate,true);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
-							if(amVerbose())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
-							if(amVerbose())if(inputCharReadFunction){char c;output("Press any key to continue...");(*inputCharReadFunction)(&c);}
+							if(amVerboseDebugging())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
+							if(amVerboseDebugging())if(inputCharReadFunction){char c;output("Press any key to continue...");(*inputCharReadFunction)(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
@@ -3602,9 +3609,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// MDH@19JUL2019: we need to know when a function is being created, so we can ask for the body commands in command mode
 							// MDH@02MAR2020 BUG FIX: extract the function name BEFORE the function call is evaluated!!!!
 							char* definedFunctionName=(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)?NULL:_functionCallArgumentMap->_first->_variable->_value->value._text->_c);
-							if(definedFunctionName)if(amVerbose()){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
+							if(amVerboseDebugging())
+								if(definedFunctionName){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
 							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
-							if(amVerbose()){output("Result of calling '%s'",_significantTokenText);outputValue(": '",functionCallValue,"'.\n");}
+							if(amVerboseDebugging())
+							{output("Result of calling '%s'",_significantTokenText);outputValue(": '",functionCallValue,"'.\n");}
 							// if this was a call to the 'define user function' function
 							if(definedFunctionName){ // MDH@02MAR2020: replacing: !strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)){ // a function being defined
 								// is the result 1???
@@ -3618,9 +3627,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 									if(definedFunction&&definedFunction->type==FT_USER&&!definedFunction->functionunion._userfunction->_bodyCommandList)
 										registerFunctionBodyRequest(definedFunctionName);
 									else
-									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
+									if(amVerboseDebugging())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}else
-								if(strlen(definedFunctionName))
+								if(strlen(definedFunctionName)>0)
 									output("%sFailed to create function '%s'.",M_ERROR_PREFIX,definedFunctionName);
 								else
 									outputError("Name of function to create not defined.");
@@ -3630,10 +3639,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							// except getValueOfFunctionCall() doesn't CORRECTION can't harm can it????
 							expressionToken=getEnvironmentExpressionToken(); // essential to update after calling a function that updates the expression token
 							// we have to free the map ourselves (this is what the _ in front of getFunctionArgumentMap means)
-							if(amVerbose()&&amDebugging()){outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
+							if(amVerboseDebugging())
+								{outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
 							free_map(_functionCallArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
-							if(amVerbose())outputInfo("Function argument map freed!");
+							if(amVerboseDebugging())
+								outputInfo("Function argument map freed!");
 						}else
 							outputError("No function arguments");
 					}else
@@ -3649,19 +3660,22 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				// MDH@09AUG2019: I suppose only explicit local variables (in special function calls) should not be checked to exist in parent environments, but otherwise they should
 				//                we could give a warning if this variable is defined inside a special function call and is not a local variable
 				////////if(amVerbose())
-				if(amVerbose())output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
+				if(amVerboseDebugging())
+					output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getExecutionEnvironmentName();
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					free_string(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!
 				}
-				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
+				if(amVerboseDebugging())
+					if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
 			case TT_VARIABLE: // a value reference
 				// MDH@25MAR2020 allow indexing of new variables as well!!!! removing: if(expressionToken->type==TT_VARIABLE)
 				canbeindexedtheoretically=true;
 				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
-				if(amVerbose())output("Value reference variable name: '%s'.\n",_valueReference->_name);
+				if(amVerboseDebugging())
+					output("Value reference variable name: '%s'.\n",_valueReference->_name);
 				// NOTE do NOT assign the value of an indexed expression because it we did (as we done) the value would be returned as result and not the value at the given index
 				///////////////////assignValue(&_valueReference->_value,getValue(_Menvironment,_valueReference->_name)); // store a reference to the value
 				/////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
@@ -3717,7 +3731,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					// MDH@02NOV2019: replacing: assignValue(&_valueReference->_value,getValue(getExecutionEnvironment(),_valueReference->_name));
 				}
 				*/
-				if(amVerbose())outputValuereference("YYYYYYYYYYYYY Completed variable value reference: '",_valueReference,"'.\n");
+				if(amVerboseDebugging())
+					outputValuereference("Completed variable value reference: '",_valueReference,"'.\n");
 				break;
 			case TT_REFERENCE:
 				// TODO might allow indexing in the future???
@@ -3726,7 +3741,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				//                so it's much similar to an unindexed variable at the moment
 				//                for now the only thing we're going to do is store the name of the reference (i.e. starting with @) (without value) so that whoever uses it will know how to resolve it!!!
 				_valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
-				if(amVerbose())output("Value reference referenced variable name: '%s'.\n",_valueReference->_name);
+				if(amVerboseDebugging())
+					output("Value reference referenced variable name: '%s'.\n",_valueReference->_name);
 				break;			
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				// MDH@20JUN2019: some error in the following part because every now and then we get a segmentation fault!!!!
@@ -3739,24 +3755,31 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					Mstring* pRealText=_realText;
 					if(pRealText){
 						char* _realSignificantTokenText=_stringstart(expressionToken->text,expressionToken->significantCharacterCount); // free asap
-						if(amVerbose())output("Integer part of decimal text: '%s'.\n",string(pRealText));
+						if(amVerboseDebugging())
+							output("Integer part of decimal text: '%s'.\n",string(pRealText));
 						pRealText=string_append(pRealText,_realSignificantTokenText);
-						if(amDebugging())outputInfo("Fractional part appended!");
+						if(amVerboseDebugging())
+							outputInfo("Fractional part appended!");
 						if(strlen(_realSignificantTokenText)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
-						if(amVerbose())output("Parsing '%s' to a decimal.\n",string(pRealText));
+						if(amVerboseDebugging())
+							output("Parsing '%s' to a decimal.\n",string(pRealText));
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
 						//                the problem is that we need a context, and therefore a decimal precision 
 						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
 						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
 						free(_realSignificantTokenText); // freed!!!
-						if(amDebugging())output("Real part string length: %u.\n",l);
+						if(amVerboseDebugging())
+							output("Real part string length: %u.\n",l);
 						if(getDP()<l)outputWarning("More decimals present in literal than expected. Rounding may occur.");
-						if(amDebugging())outputInfo("Decimal precision checked!");
+						if(amVerboseDebugging())
+							outputInfo("Decimal precision checked!");
 						Mdecimal* _decimal=__decimal(get_default_mpd_context(),0,0);
-						if(amDebugging())outputInfo("Decimal created!");
+						if(amVerboseDebugging())
+							outputInfo("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
-							if(amDebugging())outputInfo("Decimal initialized.");
+							if(amVerboseDebugging())
+								outputInfo("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
 								assignValue(&_valueReference->_value,_getDecimalValue(_decimal,true));
 							else
@@ -3768,9 +3791,11 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getRationalValue(_rational));
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
-						if(amDebugging())outputInfo("Releasing decimal text.");
+						if(amVerboseDebugging())
+							outputInfo("Releasing decimal text.");
 						free_string(_realText);
-						if(amDebugging())outputInfo("Decimal text released.");
+						if(amVerboseDebugging())
+							outputInfo("Decimal text released.");
 					}else
 						outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
@@ -3810,7 +3835,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					canbeindexedtheoretically=true;
 					Mvalue* _mapValue=getValueOfMap();
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-					// if(amVerbose())
+					if(amVerboseDebugging())
 						outputValue("Map extracted: '",_mapValue,"'.\n");
 					_valueReference=_getValuereference(_mapValue);
 				}
@@ -3820,21 +3845,23 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					canbeindexedtheoretically=true;
 					Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0,false);
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-					if(amVerbose())outputInfo("Going to wrap the list extracted!");
+					if(amVerboseDebugging())
+						outputInfo("Going to wrap the list extracted!");
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
 					if(_expressionListValue->value._list->numberOfElements==1){
 						_valueReference=_getValuereference(_expressionListValue->value._list->_first->_value);
 					}else
 						_valueReference=_getValuereference(_expressionListValue);
-					if(amVerbose())outputInfo("Extracted list wrapped!");
+					if(amVerboseDebugging())
+						outputInfo("Extracted list wrapped!");
 				}
 				break;
 			default:
 				break;
 		}
 		if(_significantTokenText)free(_significantTokenText); // free the (duplicated significant) token text
-		if(amVerbose()){
+		if(amVerboseDebugging()){
 			if(_valueReference){
 				outputInfo("Extracted reference:");
 				if(_valueReference->_name)output("\tName: '%s'.\n",_valueReference->_name);else outputInfo("\tNo name!");
@@ -3861,8 +3888,8 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}
 				expressionToken=nextEnvironmentExpressionToken();
 				// if(amDebugging())
-				if(amVerbose())
-				{output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
+				if(amVerboseDebugging())
+					{output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 				if(expressionToken->type==TT_LIST){
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
@@ -3892,15 +3919,14 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					if(_propertyName)free_string(_propertyName);
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-				// if(amDebugging())
-				if(amVerbose())
-				{output("End of augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
+				if(amVerboseDebugging())
+					{output("End of augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 			}
 			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
 			if(itemIdsList){
 				assignValue(&_valueReference->_itemid,_getValueOfList(itemIdsList,true));
-				//if(amVerbose()&&amDebugging())
-				outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
+				if(amVerboseDebugging())
+					outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
 			}
 		}
 
@@ -3915,7 +3941,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			while(l>0&&_valueReference){
 				unaryOperator=string_char(unaryOperators,--l);
 				referencedValue=getReferencedValue(_valueReference);
-				if(amVerbose()){
+				if(amVerboseDebugging()){
 					output("Applying unary operators: '%c'",unaryOperator);
 					outputValue(" to '",referencedValue,"'.\n");
 				}
@@ -3937,16 +3963,18 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					*/
 				}
 			}
-			if(amVerbose())outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
+			if(amVerboseDebugging())
+				outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
 		}else
-			if(amVerbose())outputInfo("No unary operators to apply!");
+		if(amVerboseDebugging())
+			outputInfo("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=nextEnvironmentExpressionToken();
 
 	}
 
-	if(amVerbose()){
+	if(amVerboseDebugging()){
 		if(_valueReference->_value){
 			outputValue("Value result: '",_valueReference->_value,"'");
 			output(" of type '%s'.\n",VALUETYPENAMES[_valueReference->_value->type]);
@@ -4103,10 +4131,12 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger *_biginteger2=(smallinteger2?_getBiginteger(_value2->value._integer->ll):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
-			if(amVerbose()){outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
+			if(amVerboseDebugging())
+				{outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_sumBiginteger=__biginteger();
 			if(_sumBiginteger&&mp_add(_biginteger1,_biginteger2,_sumBiginteger)!=MP_OKAY){free_biginteger(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-			if(amVerbose()){outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");}
+			if(amVerboseDebugging())
+				outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
 			outputError("Failed to convert an integer to a big integer");
 		if(smallinteger1)free_biginteger(_biginteger1);
@@ -6325,10 +6355,10 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				//                TODO this also means that we can have an index on a value (not per se a variable)
 				//                TODO are we allowing indexing strings as well??????
 				/* MDH@17NOV2019: moved over to getValueReference() where it actually belongs
-				if(amVerbose()&&amDebugging())
+				if(amVerboseDebugging())
 				{output("Possible augmented list item ids expression token");outputToken(expressionToken);outputChar('\n');}
 				while(expressionToken&&expressionToken->type==TT_LIST){
-					if(amVerbose()&&amDebugging())
+					if(amVerboseDebugging())
 					{output("First augmented item id(s) token");outputToken(expressionToken);outputChar('\n');}
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
@@ -6349,7 +6379,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 							// indexListValue will be removed by the garbage collector
 						}else // no item id yet, so the same way as is done before set _itemid to the index list value
 							assignValue(&operandValueReference->_itemid,indexListValue);
-						if(amVerbose()&&amDebugging())
+						if(amVerboseDebugging())
 							outputValue("Augmented item ids: ",operandValueReference->_itemid,".\n");
 					}
 					expressionToken=nextEnvironmentExpressionToken();
@@ -6526,15 +6556,15 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
-			if(amVerbose()&&amDebugging()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
+			if(amVerboseDebugging()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
 			///if(amVerbose())
-			if(amVerbose()&&amDebugging())output("Freeing %zd formula elements.\n",formulaElementCount);
+			if(amVerboseDebugging())output("Freeing %zd formula elements.\n",formulaElementCount);
 			size_t numberOfFormulaElementsFreed=free_formulaelement(formula);
 			newline();
-			if(amVerbose()&&amDebugging())output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+			if(amVerboseDebugging())output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
 			/* replacing:
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;
@@ -6548,11 +6578,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			newline();
 			*/
-			if(amVerbose()&&amDebugging())outputInfo("Formula elements freed.");
+			if(amVerboseDebugging())outputInfo("Formula elements freed.");
 		}else
-		if(amVerbose()&&amDebugging())output("No result of expression '%s' to store.",info);
+		if(amVerboseDebugging())output("No result of expression '%s' to store.",info);
 	}
-	if(amVerbose()&&amDebugging()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
+	if(amVerboseDebugging()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 /**

@@ -670,8 +670,8 @@ static Mstring* _getMpintText(mp_int const * const _mpint){
                     output("%sCan't store more than %u characters in a string.\n",M_ERROR_PREFIX,SIZE_MAX);
             }else
                 outputError("Couldn't determine the size of a big integer");
-            //if(amVerbose())
-            // output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
+            if(amVerboseDebugging())
+                output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
         }else
             outputError("No big integer to represent");
     }else
@@ -688,17 +688,21 @@ Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
 
 Mbiginteger* getBigintegerLLMin(){
     if(!_biLLMin){
-        if(amVerbose())outputInfo("Determining the big integer equivalent of the smallest small integer.");
+        if(amVerboseDebugging())
+            outputInfo("Determining the big integer equivalent of the smallest small integer.");
         _biLLMin=_getBiginteger(M_LL_MIN);
-        if(amVerbose())outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
+        if(amVerboseDebugging())
+            outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
     }
     return _biLLMin;
 }/* VALIDATED */
 Mbiginteger* getBigintegerLLMax(){
     if(!_biLLMax){
-        if(amVerbose())outputInfo("Determining the big integer equivalent of the largest small integer.");
+        if(amVerboseDebugging())
+            outputInfo("Determining the big integer equivalent of the largest small integer.");
         _biLLMax=_getBiginteger(M_LL_MAX);
-        if(amVerbose())outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
+        if(amVerboseDebugging())
+            outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
     }
     return _biLLMax;
 }/* VALIDATED */

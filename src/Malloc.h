@@ -63,12 +63,14 @@ unsigned long long getNumberOfAllocationMarks(); // MDH@11MAY2020: expose the nu
 long long getNumberOfAllocationTypes();
 long long* _getAllocationCounts();
 Mallocationtype* _getAllocationTypes();
+
 bool resetAllocationTypes();
+
 long long getAllocationTypeOccupied(char allocationType,unsigned long long history);
 long long getAllocationTypeFreed(char allocationType,unsigned long long history);
 // MDH@11MAY2020: allow adding an allocation mark and dropping the oldest one
-bool addAllocationMark();
-bool dropOldestAllocationMark();
+bool allocationMarkAdded();
+bool oldestAllocationMarkDropped();
 
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign

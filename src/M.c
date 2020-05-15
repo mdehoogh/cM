@@ -1019,14 +1019,20 @@ bool showContinuedPrompt(){
 }
 // MDH@06MAY2020
 void outputTotalMemoryUsage(){
-	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
-	long long numberOfAllocationMarks=-1; // i.e. only interested in the last (=current) mark
-	long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
-	if(_allocationTypeSizes){
-		if(numberOfAllocationTypeSizes>0&&numberOfAllocationMarks>0){
-			output("Dynamically allocated memory: %llu.\n",_allocationTypeSizes[1]);
-		}
-		free(_allocationTypeSizes);
+	if(!amVerbose()){
+		unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
+		long long numberOfAllocationMarks=-1; // i.e. only interested in the last (=current) mark
+		long long * _allocationTypeSizes=_getAllocationTypeSizes(NULL,&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
+		if(_allocationTypeSizes){
+			if(numberOfAllocationTypeSizes>0&&numberOfAllocationMarks>0){
+				output("Dynamically allocated memory: %llu bytes.\n",_allocationTypeSizes[1]);
+			}
+			free(_allocationTypeSizes);
+		}else
+			outputError("No memory allocation information available!");
+	}else{ // verbose information will also show all the current allocation marks
+		output("Dynamic memory allocation:\n");
+		outputAllocationTypeMarks("\t");
 	}
 }/* VALIDATED */
 // MDH@11MAY2020: if we want to know what changed since the previous mark as for the incremental memory usage
@@ -1047,18 +1053,23 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 			// outputChar('\n');
 			long long increment,decrement,allocationMark;
 			char allocationType;
+			unsigned long long allocationTypeInfo,allocationTypeSize,allocationSize;
 			// there will be 3 values per type: the type itself, what is now occupied, and what was occupied before
-			output("Dynamically allocated memory:\n");
-			output("Type\tNow\t  Then\t  Chronological changes\n");
+			output("Dynamically allocated memory units:\n");
+			output("Type\tB/unit\tNow\t  Then\t  Chronological changes\n");
 			for(unsigned long long allocationTypeSizeIndex=0;allocationTypeSizeIndex<numberOfAllocationTypeSizes;){
-				allocationType=(char)_allocationTypeSizes[allocationTypeSizeIndex++]; // by incrementing the loop index we end up on the first memory item
+				allocationTypeInfo=_allocationTypeSizes[allocationTypeSizeIndex++]; // by incrementing the loop index we end up on the first memory item
+				allocationType=allocationTypeInfo&0x7F; // the type character is stored in the lower 7 bits!!!
+				allocationTypeSize=allocationTypeInfo>>8; // the size is stored in the remainder bytes
 				// at least one of the allocation mark must be different
 				allocationMark=numberOfAllocationMarks;
 				while(--allocationMark>0&&_allocationTypeSizes[allocationTypeSizeIndex+allocationMark]==_allocationTypeSizes[allocationTypeSizeIndex+allocationMark-1])
 				;
 				if(allocationMark>0){
-					output("%c\t%lld",allocationType,_allocationTypeSizes[allocationTypeSizeIndex]); // showing the current allocation type size 
-					output("\t= %lld",_allocationTypeSizes[allocationTypeSizeIndex+numberOfAllocationMarks-1]); // what it was originally
+					allocationSize=_allocationTypeSizes[allocationTypeSizeIndex];
+					output("%c\t%llu\t%lld",allocationType,allocationTypeSize,(allocationTypeSize>0?(allocationSize/allocationTypeSize):allocationSize)); // showing the current allocation type size 
+					allocationSize=_allocationTypeSizes[allocationTypeSizeIndex+numberOfAllocationMarks-1];
+					output("\t= %lld",(allocationTypeSize>0?(allocationSize/allocationTypeSize):allocationSize)); // what it was originally
 					// let's show the increments starting at the oldest (later) mark
 					allocationMark=numberOfAllocationMarks-1; // count numberOfAllocationMarks
 					increment=_allocationTypeSizes[allocationTypeSizeIndex];decrement=_allocationTypeSizes[allocationTypeSizeIndex+allocationMark];
@@ -1076,9 +1087,9 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 						if(increment<0||decrement<0)outputChar('?');
 						if(increment!=decrement){
 							if(increment>decrement)
-								output("+ %lld",increment-decrement); // replacing: output("\t%lld:%lld:%lld",increment-decrement,allocationTypeSizeIndex,allocationMark);
+								output("+ %lld",allocationTypeSize>0?(increment-decrement)/allocationTypeSize:increment-decrement); // replacing: output("\t%lld:%lld:%lld",increment-decrement,allocationTypeSizeIndex,allocationMark);
 							else
-								output("- %lld",decrement-increment); // replacing: output("\t%lld:%lld:%lld",increment-decrement,allocationTypeSizeIndex,allocationMark);
+								output("- %lld",allocationTypeSize>0?(decrement-increment)/allocationTypeSize:decrement-increment); // replacing: output("\t%lld:%lld:%lld",increment-decrement,allocationTypeSizeIndex,allocationMark);
 							decrement=increment;
 						}
 					}
@@ -1099,7 +1110,6 @@ void promptForUserInput(){
 	enableRawmode();
 	resetOutputColor();
 	newline();
-	outputTotalMemoryUsage();
 	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
 	showPrompt();
 	//////if(inputMode==IM_COMMAND)
@@ -1256,10 +1266,12 @@ void reset(){
 		outputInfo("No commands to delete!");
 #ifndef __PRODUCTION__
 	////syncallocations();
-	if(resetAllocationTypes())
+	Mstring* _hms=_getTimestamp("%H:%M:%S");
+	if(resetAllocationTypes(string(_hms)))
 		outputInfo("Allocation type recording reset.");
 	else
 		outputWarning("Failed to reset the allocation type count recording.");
+	free_string(_hms);
 #endif
 }
 
@@ -1669,8 +1681,7 @@ void prepareForEvaluatingCommand(){
 
 }
 */
-
-long long allocationMarkAdded=0;
+long long allocationMarksAdded=0;
 
 // anything the user types is a sequence of tokens which we can store in a linked list
 // MDH@14NOV2019: passing in the address for storing the Mvalue* of the evaluation result
@@ -1689,9 +1700,9 @@ bool evaluateCommand(Mvalue* *resultValue){
 		return false;
 	}
 
-	allocationMarkAdded=0;
+	allocationMarksAdded=0;
 	if(amVerbose()){
-		if(addAllocationMark())allocationMarkAdded++;else outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
+		if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocation before evaluating the command."); // mark the allocations at the start of evaluating a command!!!
 	}
 
 	if(amDebugging())
@@ -3009,7 +3020,7 @@ int main(int argc, char **argv){
 	if(allocationRecordingInitialized()){
 		if(addAllocation('!'/*,0*//*,1*/)<0){
 			output("%sFailed to initialize allocation recording.",M_ERROR_PREFIX);
-			exit(3);
+			exit(1);
 		}
 		outputInfo("Allocation recording ready!");
 	}else
@@ -3040,7 +3051,7 @@ int main(int argc, char **argv){
 	if(!preparedForUserInput()){
 		outputError("Failed to initialize the user session.");
 		resetOutputColor();
-		exit(1);
+		exit(2);
 	}
 	outputInfo("User session initialized.");
 
@@ -3049,7 +3060,7 @@ int main(int argc, char **argv){
 	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),inputCharRead,inputInfo,inputError,outputToken,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
 		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
-		exit(1);
+		exit(3);
 	}
 	outputInfo("Shell initialized.");
 	if(_settingsCharacterText)free_string(_settingsCharacterText);
@@ -3122,7 +3133,16 @@ int main(int argc, char **argv){
 		free_string(_outputFilename);
 	}
 
+	if(getNumberOfAllocationMarks()==0){
+		if(!allocationMarkAdded()){
+			outputError("Failed to create the first allocation mark!");
+			exit(3);
+		}
+	}
+
 	while(1){ // command loop
+
+		outputTotalMemoryUsage(); // have to think about this though
 
 		// if we're supposed to start a new command (i.e. it's not a command continuation)
 		promptForUserInput();
@@ -3905,8 +3925,8 @@ int main(int argc, char **argv){
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
 					newline();
 					// let's mark the allocation directly behind evaluating the command
-					if(allocationMarkAdded>0){
-						if(addAllocationMark())allocationMarkAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
+					if(allocationMarksAdded>0){
+						if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
 					}
 					// TODO the next part should be improved, as it is getting a bit messy
 					Mstring* _userInputCommandText=_getCommandText(false); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
@@ -3958,9 +3978,10 @@ int main(int argc, char **argv){
 					if(getFirstFunctionBodyRequest()&&!startFunctionBodyInput())outputError("Failed to start requesting the body of a new function");
 
 					// MDH@12MAY2020: output two incremental out
-					if(allocationMarkAdded>0){
-						if(outputIncrementalMemoryUsage(allocationMarkAdded)<allocationMarkAdded)outputError("Not all command allocation marks output.");
-						while(--allocationMarkAdded>=0)dropOldestAllocationMark(); // drop as many allocation marks as we have created
+					if(allocationMarksAdded>0){
+						outputTotalMemoryUsage();
+						if(outputIncrementalMemoryUsage(allocationMarksAdded)<allocationMarksAdded)outputError("Not all command allocation marks output.");
+						while(--allocationMarksAdded>=0)if(!oldestAllocationMarkDropped())break; // drop as many allocation marks as we have created
 					}
 
 				}else{
@@ -3978,6 +3999,7 @@ int main(int argc, char **argv){
 				switchToCommandMode();
 		}
 		showSeparatorLine();
+		if(!allocationMarkAdded())outputError("Failed to add a new memory allocation mark.");
 	}
 	// 'normal' exit
 	exit(0);

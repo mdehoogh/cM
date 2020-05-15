@@ -14,6 +14,8 @@ bool amMatchingparentheses();
 bool amAcceptinghistorycommand();
 bool amWrapping();
 
+bool amVerboseDebugging();
+
 // setters
 void setVerbose(bool newVerbose);
 void setAssisting(bool newAssisting);

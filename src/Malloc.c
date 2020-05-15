@@ -3,12 +3,15 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include "Malloc.h"
 
 extern char const * const M_ERROR_PREFIX;
 extern char const * const M_WARNING_PREFIX;
 extern char const * const M_BUG_PREFIX;
+
+static char const * const HMS_FORMAT_STRING="%H:%M:%S";
 
 static void info(char const * fmt,...){
     // va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
@@ -44,19 +47,41 @@ static unsigned long long firstActiveAllocationMark=0,lastActiveAllocationMark=-
 static unsigned long long numberOfAllocationMarks=0; // we need at least one mark (TODO this could change if we decide to not do this in the production version)
 static unsigned long long numberOfAllocationMarkTypes=0; // keep track of the number of types we have marks of
 static Mallocationmark* _allocationTypeMarks=NULL;
+static char* *_allocationTypeMarkIds=NULL; // the pointer to the list of allocation type mark ids
+
 // as we're expecting more marks to be added then types we do mark 1 type 1, mark 1 type 2, etc.
 // every time a new allocation type is created we need to expand the allocation marks
-void outputAllocationTypeMarks(){
-    output("Allocation marks of %llu types:\n",numberOfAllocationMarkTypes);
-    for(unsigned long long allocationMarkIndex=0;allocationMarkIndex<numberOfAllocationMarks;allocationMarkIndex++){
-        output("\tMark #%llu:\n\t\t",allocationMarkIndex+1);
+void outputAllocationTypeMarks(char* linePrefix){
+    size_t size;
+    unsigned long long freed,occupied,totaloccupied,totalfreed;
+    // output("%llu allocation marks of %llu types:\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
+    // I suppose it's best to write the types first
+    output("%s#\tTime\tType ->",linePrefix);
+    for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++)
+        if(_allocationTypes[allocationMarkTypeIndex].size>0)
+            output("\t%c",_allocationTypes[allocationMarkTypeIndex].type);
+    output("\tTotal (bytes)\n");
+    // how about showing the oldest until the newest
+    unsigned long long allocationMarkIndex=(lastActiveAllocationMark+1)%numberOfAllocationMarks; // the successor of the last active allocation mark
+    while(1){
+        output("%s%llu\t%s",linePrefix,allocationMarkIndex+1,_allocationTypeMarkIds[allocationMarkIndex]);
+        if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+        totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
         for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
-            output(" %c)%llu-%llu"
-                    ,_allocationTypes[allocationMarkTypeIndex].type
-                    ,_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied
-                    ,_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed);
+            size=_allocationTypes[allocationMarkTypeIndex].size;
+            if(size==0)continue; // only the case for the * allocation type mark
+            outputChar('\t');// output(" %c:",_allocationTypes[allocationMarkTypeIndex].type);
+            // how about showing the number of elements instead of the size??????
+            occupied=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
+            freed=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
+            output("%llu",(occupied-freed)/size);
+            totaloccupied+=occupied;
+            totalfreed+=freed;
         }
+        output("\t%llu = %llu - %llu",totaloccupied-totalfreed,totaloccupied,totalfreed);
         outputChar('\n');
+        if(allocationMarkIndex==lastActiveAllocationMark)break; // final active allocation mark output
+        allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks;
     }
 }
 static bool updateAllocationTypeMarks(){
@@ -146,12 +171,22 @@ bool allocationRecordingInitialized(){
     printf("\tAllocation type registration initialized...\n");
         // MDH@14APR2020: if(numberofallocationtypes>0)_allocationcounts=calloc(5,sizeof(size_t)); // start out with two size_t items one to store the count and one to store the size!!
 #endif
-
     // MDH@12MAY2020: I suppose that if we have allocation types we can create them
     // assuming we have a single (global) allocation type (i.e. *)
+    _allocationTypeMarkIds=calloc(1,sizeof(char*)); // a single char* that is initialized to NULL!!!!
+    if(!_allocationTypeMarkIds)return false;
+
+    time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
+    _allocationTypeMarkIds[0]=strdup(hms);
+    if(!_allocationTypeMarkIds[0]){free(_allocationTypeMarkIds);return false;}
+
     _allocationTypeMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
-    if(!_allocationTypeMarks)return false;
-    numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;
+    if(!_allocationTypeMarks){free(_allocationTypeMarkIds);return false;}
+    
+    numberOfAllocationMarks=1;
+    firstActiveAllocationMark=0;
+    lastActiveAllocationMark=0;
+    numberOfAllocationMarkTypes=numberOfAllocationTypes;
     printf("\tAllocation marks registration initialized...\n");
 
     return true;
@@ -253,7 +288,7 @@ static void incrementAllocationTypeOccupied(long long allocationTypeIndex,unsign
     if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
     if(!_allocationTypeMarks||numberOfAllocationMarks==0)return; // too bad
     if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
-    unsigned long long allocationTypeMarkIndex=(numberOfAllocationMarks-1)*numberOfAllocationMarkTypes+allocationTypeIndex;
+    unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
     // output("Allocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationTypeMarks[allocationTypeMarkIndex].occupied);
     _allocationTypeMarks[allocationTypeMarkIndex].occupied+=increment;
     // output(" to %llu.\n",_allocationTypeMarks[allocationTypeMarkIndex].occupied);
@@ -263,7 +298,7 @@ static void incrementAllocationTypeFreed(long long allocationTypeIndex,unsigned 
     if(allocationTypeIndex<0)return; // should never happen though TODO make a bug
     if(!_allocationTypeMarks||numberOfAllocationMarks==0)return; // too bad
     if(allocationTypeIndex>=numberOfAllocationMarkTypes){warning("Type #%lld not markable.");return;}
-    unsigned long long allocationTypeMarkIndex=(numberOfAllocationMarks-1)*numberOfAllocationMarkTypes+allocationTypeIndex;
+    unsigned long long allocationTypeMarkIndex=lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationTypeIndex;
     // output("Deallocations of type '%c' at index %llu incremented from %llu",_allocationTypes[allocationTypeIndex].type,allocationTypeMarkIndex,_allocationTypeMarks[allocationTypeMarkIndex].freed);
     _allocationTypeMarks[allocationTypeMarkIndex].freed+=increment;
     // output(" to %llu.\n",_allocationTypeMarks[allocationTypeMarkIndex].freed);
@@ -425,42 +460,69 @@ bool resetAllocationTypes(){
     if(allocations._chars)free(allocations._chars);
     */
     ////////info("Allocation type counts reset.\n");
+    free(_allocationTypeMarks);numberOfAllocationMarks=0;free(_allocationTypeMarkIds);
+
     return allocationRecordingInitialized();
+
 }
+
 // MDH@25NOV2019: markAllocationTypes() remembers the current allocation type counts in the 4th and 5th element
 // MDH@11MAY2020: either we can use a reusable allocation mark or append one
-bool addAllocationMark(){
-    // if we can't increment the last active allocation mark without bumping into the first active allocation mark we have to add an allocation mark
-    unsigned long long newLastActiveAllocationMark=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
-    if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
-        // MDH@07MAY2020: we have to add a new mark
-        size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
-        Mallocationmark* newAllocationTypeMarks=(_allocationTypeMarks?realloc(_allocationTypeMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark)):calloc(newNumberOfAllocationTypeMarks,sizeof(Mallocationmark)));
-        if(!newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
-        _allocationTypeMarks=newAllocationTypeMarks;
-        if(newLastActiveAllocationMark>0){ // we need room at where the first active allocation mark is now (the oldest allocation mark)
-            // we move all allocation marks one mark up starting at firstActiveAllocationMark up until numberOfAllocationMarks
-            unsigned long long numberOfAllocationTypeMarks=(firstActiveAllocationMark+1)*numberOfAllocationMarkTypes; // the last allocation info to copy
-            while(--newNumberOfAllocationTypeMarks>=numberOfAllocationTypeMarks)
-                _allocationTypeMarks[newNumberOfAllocationTypeMarks]=_allocationTypeMarks[newNumberOfAllocationTypeMarks-numberOfAllocationMarkTypes];
-        }else // instead of writing the new mark at position 0, we can simply write it at the room we created!!!
-            newLastActiveAllocationMark=numberOfAllocationMarks;
-        numberOfAllocationMarks++;
+bool allocationMarkAdded(){
+    if(_allocationTypeMarks){
+        // if we can't increment the last active allocation mark without bumping into the first active allocation mark we have to add an allocation mark
+        unsigned long long newLastActiveAllocationMark=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
+        if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
+            char** newAllocationTypeMarkIds=realloc(_allocationTypeMarkIds,(numberOfAllocationMarks+1)*sizeof(char*));
+            if(!newAllocationTypeMarkIds)return false;
+            _allocationTypeMarkIds=newAllocationTypeMarkIds;
+            // MDH@07MAY2020: we have to add a new mark
+            size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
+
+            Mallocationmark* newAllocationTypeMarks=realloc(_allocationTypeMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark));
+            if(!newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
+            _allocationTypeMarks=newAllocationTypeMarks;
+            if(newLastActiveAllocationMark>0){ // we need room at where the first active allocation mark is now (the oldest allocation mark)
+                // we move all allocation marks one mark up starting at firstActiveAllocationMark up until numberOfAllocationMarks
+                unsigned long long numberOfAllocationTypeMarks=(firstActiveAllocationMark+1)*numberOfAllocationMarkTypes; // the last allocation info to copy
+                while(--newNumberOfAllocationTypeMarks>=numberOfAllocationTypeMarks)
+                    _allocationTypeMarks[newNumberOfAllocationTypeMarks]=_allocationTypeMarks[newNumberOfAllocationTypeMarks-numberOfAllocationMarkTypes];
+            }else // instead of writing the new mark at position 0, we can simply write it at the room we created!!!
+                newLastActiveAllocationMark=numberOfAllocationMarks;
+            numberOfAllocationMarks++;
+        }else // free the mark id that is going to be replaced!!!!
+        if(_allocationTypeMarkIds[newLastActiveAllocationMark])free(_allocationTypeMarkIds[newLastActiveAllocationMark]);
+
+        // we have to make room for the new allocation and copy the current last active mark over
+        // moving over lastActiveAllocationMark to newLastActiveAllocationMark (nonoverlapping allocation type marks so we can use memcpy)
+        memcpy(_allocationTypeMarks+(newLastActiveAllocationMark*numberOfAllocationMarkTypes)
+            ,_allocationTypeMarks+(lastActiveAllocationMark*numberOfAllocationMarkTypes)
+            ,numberOfAllocationMarkTypes*sizeof(Mallocationmark));
+        /* replacing:
+        unsigned long long allocationMarkType=numberOfAllocationMarkTypes;
+        while(1){
+            allocationMarkType--;
+            _allocationTypeMarks[newLastActiveAllocationMark*numberOfAllocationMarkTypes+allocationMarkType]=_allocationTypeMarks[lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationMarkType];
+            if(allocationMarkType==0)break;
+        }
+        */
+        lastActiveAllocationMark=newLastActiveAllocationMark;
+
+   }else{
+
+        _allocationTypeMarkIds=calloc(1,sizeof(char*));
+        if(!_allocationTypeMarkIds)return false;
+
+        _allocationTypeMarks=calloc(numberOfAllocationTypes,sizeof(Mallocationmark));
+        if(!_allocationTypeMarks){free(_allocationTypeMarkIds);return false;}
+
+        numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;
+        printf("\tAllocation marks registration initialized...\n");        
     }
-    // we have to make room for the new allocation and copy the current last active mark over
-    // moving over lastActiveAllocationMark to newLastActiveAllocationMark (nonoverlapping allocation type marks so we can use memcpy)
-    memcpy(_allocationTypeMarks+(newLastActiveAllocationMark*numberOfAllocationMarkTypes)
-          ,_allocationTypeMarks+(lastActiveAllocationMark*numberOfAllocationMarkTypes)
-          ,numberOfAllocationMarkTypes*sizeof(Mallocationmark));
-    /* replacing:
-    unsigned long long allocationMarkType=numberOfAllocationMarkTypes;
-    while(1){
-        allocationMarkType--;
-        _allocationTypeMarks[newLastActiveAllocationMark*numberOfAllocationMarkTypes+allocationMarkType]=_allocationTypeMarks[lastActiveAllocationMark*numberOfAllocationMarkTypes+allocationMarkType];
-        if(allocationMarkType==0)break;
-    }
-    */
-    lastActiveAllocationMark=newLastActiveAllocationMark;
+ 
+    time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
+    _allocationTypeMarkIds[lastActiveAllocationMark]=strdup(hms); // TODO for now assume that strdup() will NOT fail!!!! of course if it does it will return NULL so that's OK
+ 
     return true;
     /* replacing:
     long long numberOfAllocationTypes=getNumberOfAllocationTypes();
@@ -503,7 +565,7 @@ long long getAllocationTypeFreed(char allocationType, unsigned long long history
 
 // 'public' functions
 // MDH@11MAY2020 some new functions
-bool dropOldestAllocationMark(){
+bool oldestAllocationMarkDropped(){
     if(firstActiveAllocationMark>=0){
         firstActiveAllocationMark=(firstActiveAllocationMark+1)%numberOfAllocationMarks;
         return true;
@@ -858,10 +920,15 @@ long long * _getAllocationTypeSizes(char const * const types,unsigned long long 
         // register the types
         _allocationTypeSizes[0]=(int)'*'; // if you insist
         allocationTypeSizeIndex=0;
+        unsigned long long allocationTypeInfo=0;
         for(unsigned long long allocationTypeIndex=0;allocationTypeIndex<numberOfAllocationTypes;allocationTypeIndex++){
             if(types&&(strlen(types)==0||strchr(types,_allocationTypes[allocationTypeIndex].type))){
                 allocationTypeSizeIndex++;
-                _allocationTypeSizes[allocationTypeSizeIndex*(numberOfAllocationMarksToReturn+1)]=_allocationTypes[allocationTypeIndex].type;
+                // we can store a little more than just the type
+                allocationTypeInfo=_allocationTypes[allocationTypeIndex].type;
+                if(_allocationTypes[allocationTypeIndex]._allocationsizes)allocationTypeInfo+=128; // variable size
+                allocationTypeInfo+=(_allocationTypes[allocationTypeIndex].size<<8); // shift in the size of the allocation type
+                _allocationTypeSizes[allocationTypeSizeIndex*(numberOfAllocationMarksToReturn+1)]=allocationTypeInfo;
             }
             // if(allocationTypeSizeIndex==numberOfAllocationTypesToReturn)break;
         }
