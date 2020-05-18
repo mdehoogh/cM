@@ -48,7 +48,7 @@ typedef struct{
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
-long long addAllocation(char allocationType/*,size_t size*//*,long long count*/); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
+long long addAllocation(char allocationType,int32_t ownerId); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
 // long long registerAllocation(char allocationType,size_t size,long long count);
 
 bool allocationRecordingInitialized();
@@ -74,22 +74,28 @@ bool oldestAllocationMarkDropped();
 
 // changed to always use my Mmalloc, Mcalloc, Mfree unless a truely production version is intended
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign
+
+// MDH@18MAY2020: for passing along (pointer) ownership DISOWNED and OWNED are introduced
 #ifndef __PRODUCTION__
-void* Mmalloc(size_t size,char type);
-void* Mcalloc(size_t size,char type);
-void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,char type);
-void Mfree(void* ptr,char type); // releasing a single item of a fixed size allocation type
+void* Mmalloc(size_t size,char type,int32_t ownerId);
+void* Mcalloc(size_t size,char type,int32_t ownerId);
+void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,char type,int32_t ownerId);
+void Mfree(void* ptr,char type,int32_t ownerId); // releasing a single item of a fixed size allocation type
 // use the substitutes
-#define MALLOC(size,type) Mmalloc((size),(type))
-#define CALLOC(size,type) Mcalloc((size),(type))
-#define REALLOC(ptr,from_count,to_count,size,type) Mrealloc((ptr),(from_count),(to_count),(size),(type))
-#define FREE(ptr,type) Mfree((ptr),(type))
+#define MALLOC(size,type,ownerId) Mmalloc((size),(type),(ownerId))
+#define CALLOC(size,type,ownerId) Mcalloc((size),(type),(ownerId))
+#define REALLOC(ptr,from_count,to_count,size,type,ownerId) Mrealloc((ptr),(from_count),(to_count),(size),(type),(ownerId))
+#define FREE(ptr,type,ownerId) Mfree((ptr),(type),(ownerId))
+#define DISOWNED(ptr,size,ownerId) Mdisowned((ptr),(size),(ownerId))
+#define OWNED(ptr,size,ownerId) Mowned((ptr),(size),(ownerId))
 #else
 // use the system methods
-#define MALLOC(size,type) malloc((nitems)*(size))
-#define CALLOC(size,type) calloc(1,(size))
-#define FREE(ptr,type) free(ptr)
-#define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc((ptr),(to_nitems)*(size))
+#define MALLOC(size,type,ownerId) malloc((nitems)*(size))
+#define CALLOC(size,type,ownerId) calloc(1,(size))
+#define FREE(ptr,type,ownerId) free(ptr)
+#define REALLOC(ptr,from_nitems,to_nitems,size,type,ownerId) realloc((ptr),(to_nitems)*(size))
+#define DISOWNED(ptr,size,ownerId) (ptr)
+#define OWNED(ptr,size,ownerId) (ptr)
 #endif
 
 // MDH@04MAY2020: asking for the allocation type sizes
@@ -103,5 +109,3 @@ typedef struct{
 long long * _getAllocationTypeSizes(char const * const types,unsigned long long *_numberOfAllocationTypes,long long *_numberOfAllocationMarks);
 
 void outputAllocationTypeMarks();
-
-

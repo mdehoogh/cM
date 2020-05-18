@@ -4,6 +4,10 @@
 
 #include "Mshell.h"
 
+// MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
+static uint32_t const MODULE_ID=1;
+static int32_t getOwnerId(uint16_t functionId){return(functionId>>12?0:(MODULE_ID<<12)+functionId);}
+
 Mvalue* NULL_value=NULL;
 // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
 
@@ -1494,7 +1498,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	return _newCommandToken;
 }
 Mcommand* _getNewCommand(bool withFirstToken){
-	Mcommand* _command=CALLOC(sizeof(Mcommand),'K');
+	Mcommand* _command=CALLOC(sizeof(Mcommand),'K',getOwnerId(1));
 	if(_command){
 		if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
@@ -1504,7 +1508,7 @@ Mcommand* _getNewCommand(bool withFirstToken){
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
-				FREE(_command,'K');_command=NULL;
+				FREE(_command,'K',getOwnerId(1));_command=NULL;
 				if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
 			}
 		}
@@ -2955,7 +2959,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){
 	FunctionBodyRequest* _functionBodyRequest=NULL;
 	if(functionName){
-		_functionBodyRequest=CALLOC(sizeof(FunctionBodyRequest),'9');
+		_functionBodyRequest=CALLOC(sizeof(FunctionBodyRequest),'9',getOwnerId(2));
 		if(_functionBodyRequest){
 			_functionBodyRequest->_functionName=_strdup(functionName);
 			if(!_functionBodyRequest->_functionName){
@@ -3000,8 +3004,9 @@ FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInpu
 // MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
+	int32_t foid=getOwnerId(3);
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(sizeof(FunctionBodyInput),'8'); // free if not bound
+	_currentFunctionBodyInput=CALLOC(sizeof(FunctionBodyInput),'8',foid); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
 	if(function&&function->type==FT_USER){
@@ -3024,7 +3029,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
-	FREE(_currentFunctionBodyInput,'H');
+	FREE(_currentFunctionBodyInput,'H',foid);
 	return false;
 }
 bool startFunctionBodyInput(){
@@ -3091,12 +3096,13 @@ bool endFunctionBodyInput(){
  */
 Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
-	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5');
+	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5',getOwnerId(4));
 	if(_valuereference){
 		_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
 		if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	}
-	return _valuereference;
+	// MDH@18MAY2020: whatever you return should be disowned before passing along (and BOUND by the receiver)
+	return DISOWNED(_valuereference,getOwnerId(4));
 }
 /* MDH@26OCT2019: moved over to Mvalue.h/c as we need it there so we can have value references as well!!!!!
 void free_valuereference(Mvaluereference* _valuereference){
@@ -3121,6 +3127,7 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 // two essential methods for getting and setting referenced values
 // MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){
+	int32_t foid=getOwnerId(5);
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
 	///////if(amVerbose())outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
@@ -3170,7 +3177,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 					//                this works for lists not for maps
 					// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-					Mvalue*** _valueholders=MALLOC(sizeof(void*),'_'); // set immediately so MALLOC suffices
+					Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',foid); // set immediately so MALLOC suffices
 					if(_valueholders){
 						size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 						bool result=true;
@@ -3202,7 +3209,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 										if(amDebugging())
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
-										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_',foid):_valueholders);
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3375,7 +3382,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-						FREE(_valueholders,'_');
+						FREE(_valueholders,'_',foid);
 					}
 				}
 				/* replacing:
@@ -3458,6 +3465,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
+	int32_t foid=getOwnerId(6);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
 		if(amVerboseDebugging()){
@@ -3487,7 +3495,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 				//                this works for lists not for maps
 				// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-				Mvalue*** _valueholders=MALLOC(sizeof(void*),'_'); // set immediately so MALLOC suffices
+				Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',foid); // set immediately so MALLOC suffices
 				if(_valueholders){
 					size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 					_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
@@ -3518,7 +3526,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 									if(amVerboseDebugging())
 										outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 									// which we now did
-									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_',foid):_valueholders);
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3785,7 +3793,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 					}
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-					FREE(_valueholders,'_');
+					FREE(_valueholders,'_',foid);
 				}
 				/*
 				}else
@@ -3895,6 +3903,8 @@ void outputLastTokenChar(Mtoken* _token){
 
 Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
 	
+	int32_t foid=getOwnerId(7);
+
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
 
 	Mvaluereference* _valueReference=NULL;
@@ -3919,7 +3929,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 	if(expressionToken){
 		if(amVerboseDebugging())
 			output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-		_valueReference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5');
+		_valueReference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5',foid);
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
@@ -4233,7 +4243,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 			case TT_LIST: // a list literal
 				canbeindexedtheoretically=true;
-				_valueReference=_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false));
+				_valueReference=OWNED(_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false)),foid);
 				break;
 			case TT_MAP: // a map literal
 				{
@@ -4242,7 +4252,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					if(amVerboseDebugging())
 						outputValue("Map extracted: '",_mapValue,"'.\n");
-					_valueReference=_getValuereference(_mapValue);
+					_valueReference=OWNED(_getValuereference(_mapValue),foid);
 				}
 				break;
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
@@ -4255,9 +4265,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
 					if(_expressionListValue->value._list->numberOfElements==1){
-						_valueReference=_getValuereference(_expressionListValue->value._list->_first->_value);
+						_valueReference=OWNED(_getValuereference(_expressionListValue->value._list->_first->_value),foid);
 					}else
-						_valueReference=_getValuereference(_expressionListValue);
+						_valueReference=OWNED(_getValuereference(_expressionListValue),foid);
 					if(amVerboseDebugging())
 						outputInfo("Extracted list wrapped!");
 				}
@@ -4386,7 +4396,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			outputInfo("No value result!");
 	}
 	
-	return _valueReference;
+	return DISOWNED(_valueReference,foid);
 
 	/*
 		// it could be an assignment in which case we remove the assignee and assigned value
@@ -6865,6 +6875,9 @@ char* getSignificantTokenText(Mtoken* token){
  * it composes a list of value references to which operators are to be applied
  */
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
+
+	int32_t foid=getOwnerId(8);
+
 	Mvalue* _expressionValue=NULL;
 
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
@@ -6886,7 +6899,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		///////////output("Number of allocated formula elements before: %zd.\n",getAllocationTypeCount('4'));
 
 		Mvaluereference* _valuereference;
-		Mformulaelement* formula=__formulaelement("root"); // replacing: CALLOC(sizeof(Mformulaelement),'4');
+		Mformulaelement* formula=OWNED(__formulaelement("root"),foid); // replacing: CALLOC(sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
 		size_t formulaElementCount=(_formulaelement?1:0);
 
