@@ -109,46 +109,46 @@ typedef struct Mexpressionlist{
     Mexpressionlistelement* _next;
 }Mexpressionlist;
 
-void free_map(Mmap* _map);
+void free_map(Mmap* _map,int32_t oid);
 
-Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
+Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter,int32_t oid); // convert a long double to its rational equivalent and wraps it in a value
 
-Mmap* _getMap(char *name);
-Mmap* _getMapCopy(Mmap const * const map);
-Mmap* _getFloatMap(char* name,Mvalue* _floatValue);
-Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
-Mmap* _getListMap(char* name,Mvalue* _listValue);
-Mmap* _getStringStringMap(char* name1,char* name2);
-Mmap* _getFloatFloatMap(char* name1,char* name2);
+Mmap* _getMap(char *name,int32_t oid);
+Mmap* _getMapCopy(Mmap const * const map,int32_t oid);
+Mmap* _getFloatMap(char* name,Mvalue* _floatValue,int32_t oid);
+Mmap* _getIntegerMap(char* name,Mvalue* _integerValue,int32_t oid);
+Mmap* _getListMap(char* name,Mvalue* _listValue,int32_t oid);
+Mmap* _getStringStringMap(char* name1,char* name2,int32_t oid);
+Mmap* _getFloatFloatMap(char* name1,char* name2,int32_t oid);
 long long isMapUndefined(Mmap* map);
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 // data wrappers
-Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
+Mvalue* _getUndefinedValue(int32_t oid); // it's also possible to ask for an undefined value!!!
 // and allow asking for a reference value wrapper
-Mvalue* _getIntegerValue(long long ll);
-Mvalue* _getCharTextValue(char _c);
+Mvalue* _getIntegerValue(long long ll,int32_t oid);
+Mvalue* _getCharTextValue(char _c,int32_t oid);
 
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
-Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure); // MDH@31MAY2019: we cannot use a big integer long here
-Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure);
-Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure);
-Mvalue* _getFloatValue(long double ld);
-Mvalue* _getTextValue(char* text,bool freeonfailure);
-Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
-Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty map with all values to be of type mapValuetype
+Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure,int32_t oid); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure,int32_t oid); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure,int32_t oid);
+Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure,int32_t oid);
+Mvalue* _getFloatValue(long double ld,int32_t oid);
+Mvalue* _getTextValue(char* text,bool freeonfailure,int32_t oid);
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source,int32_t oid); // returning an empty list with all values to be of type listValuetype
+Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,int32_t oid); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
-Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure);
-Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure);
-Mvalue* _getValueOfReal(Mfloat* _real,bool freeonfailure);
-Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure);
-Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure);
+Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure,int32_t oid);
+Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure,int32_t oid);
+Mvalue* _getValueOfReal(Mfloat* _real,bool freeonfailure,int32_t oid);
+Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure,int32_t oid);
+Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure,int32_t oid);
 
-Mlist* _getListOfType(Mvaluetype valuetype);
-Mmap* _getMapOfType(Mvaluetype valuetype);
+Mlist* _getListOfType(Mvaluetype valuetype,int32_t oid);
+Mmap* _getMapOfType(Mvaluetype valuetype,int32_t oid);
 
 Mlist* listMadeWeak(Mlist* list);
 Mmap* mapMadeWeak(Mmap* map);
@@ -157,19 +157,19 @@ Mmap* mapMadeWeak(Mmap* map);
 bool decrementReferenceCount(Mvalue* _value);
 bool incrementReferenceCount(Mvalue* _value);
 
-void free_value(Mvalue* _value);
+void free_value(Mvalue* _value,int32_t oid);
 //////////Mstring* appendld(Mstring* mstr,long double ld);
 
 /*unsigned */long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 
-Mlist* __list(char* source);
-void free_list(Mlist* _list);
-Mlist* _getListCopy(Mlist const * const _list);
+Mlist* __list(char* source,int32_t oid);
+void free_list(Mlist* _list,int32_t oid);
+Mlist* _getListCopy(Mlist const * const _list,int32_t oid);
 
-Mlist* _getListIndices(Mlist const * const _list);
-Mlist* _getMapAttributes(Mmap const * const _map);
+Mlist* _getListIndices(Mlist const * const _list,int32_t oid);
+Mlist* _getMapAttributes(Mmap const * const _map,int32_t oid);
 
-Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
+Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed,int32_t oid); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
 Mvalue* getFirstScalarValue(Mvalue* value);
 
 long long isListUndefined(Mlist* list);
@@ -187,28 +187,28 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 Mvalue** getValueHolderAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
 Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName);
 
-Mstring* _getListText(Mlist* _list);
-Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings);
+Mstring* _getListText(Mlist* _list,int32_t oid);
+Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings,int32_t oid);
 
 void outputList(char const * const prefix,Mlist* list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
 void outputMap(char const * const prefix,Mmap* map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
 
-Mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
+Mstring* _getValueText(const Mvalue* const _value,bool dequoted,int32_t oid); // flag only applicable to string values!!!
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(const Mvalue* const _value);
 size_t outputValue(const char* const prefix,const Mvalue* value,const char* const suffix);
 
-Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3);
-Mmap* _getMapTokenMap(char* name1,char* name2);
-Mmap* _getTokenTokenMap(char* name1,char* name2);
-Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
-Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);
-Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4);
-Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5);
+Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3,int32_t oid);
+Mmap* _getMapTokenMap(char* name1,char* name2,int32_t oid);
+Mmap* _getTokenTokenMap(char* name1,char* name2,int32_t oid);
+Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3,int32_t oid);
+Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3,int32_t oid);
+Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char* name4,int32_t oid);
+Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5,int32_t oid);
 
-Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
-Mmap* _getIntegerBooleanMap(char* name1,char* name2);
+Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3,int32_t oid);
+Mmap* _getIntegerBooleanMap(char* name1,char* name2,int32_t oid);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
@@ -231,16 +231,16 @@ long long isValueUndefined(Mvalue* value); // expose as well
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue const * _value);
 
-Mvalue* __value(); // TODO expose __value()????? yes
+Mvalue* __value(int32_t oid); // TODO expose __value()????? yes
 
 size_t getNumberOfRemovedValues(bool showInfo);
 unsigned long long getNumberOfValues();
 
-Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);
-void free_variable(Mvariable* _variable,bool weak);
+Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable,int32_t oid);
+void free_variable(Mvariable* _variable,bool weak,int32_t oid);
 
-bool free_mapelement(Mmapelement* _mapelement,bool weak);
-bool free_listelement(Mlistelement* _listelement,bool weak);
+bool free_mapelement(Mmapelement* _mapelement,bool weak,int32_t oid);
+bool free_listelement(Mlistelement* _listelement,bool weak,int32_t oid);
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
@@ -253,11 +253,11 @@ Mlist* appliedToList(Mlist* _list,OneArgumentFunction oneArgumentFunction);
 Mmap* appliedToMap(Mmap* _map,OneArgumentFunction oneArgumentFunction);
 
 // some conversion functions that might be moved to some more specialized 'module'
-Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero); // TODO probably to be moved to Mrational.h/c
-Mbiginteger* _getRoundedRationalInteger(Mrational* _rational);
+Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszero,int32_t oid); // TODO probably to be moved to Mrational.h/c
+Mbiginteger* _getRoundedRationalInteger(Mrational* _rational,int32_t oid);
 
-Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero);
-Mdecimal* _getRoundedDecimal(Mdecimal* _decimal);
+Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero,int32_t oid);
+Mdecimal* _getRoundedDecimal(Mdecimal* _decimal,int32_t oid);
 
 Mdecimal* _getValueDecimal(Mvalue* _value);
 Mdecimal* getValueDecimal(Mvalue* _value);
@@ -330,15 +330,14 @@ typedef struct Menvironment{
     Mvalue* execution; // MDH@03FEB2020 replacing: struct Menvironment* _execution; // the environment that was executing before this one was popped!!
 }Menvironment;
 
-Menvironment* __environment(); // creates a new (empty) environment
-Mstring* _getEnvironmentName(Menvironment* _environment); // for use in prompting
-void free_environment(Menvironment* _environment);
-Mstring* _getEnvironmentName(Menvironment* _environment);
+Menvironment* __environment(int32_t oid); // creates a new (empty) environment
+Mstring* _getEnvironmentName(Menvironment* _environment,int32_t oid); // for use in prompting
+void free_environment(Menvironment* _environment,int32_t oid);
 Menvironment* getEnvironmentParent(Menvironment* _environment);
 
-bool free_function(Mfunction* _function);
+bool free_function(Mfunction* _function,int32_t oid);
 
 Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 
-Mvalue* _getValueOfFunction(Mfunction* _function,bool freeonfailure);
-Mvalue* _getValueOfEnvironment(Menvironment* _environment,bool freeonfailure);
+Mvalue* _getValueOfFunction(Mfunction* _function,bool freeonfailure,int32_t oid);
+Mvalue* _getValueOfEnvironment(Menvironment* _environment,bool freeonfailure,int32_t oid);

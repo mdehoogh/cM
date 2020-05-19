@@ -1,5 +1,8 @@
 #include "Mrational.h"
 
+static int32_t const MODULE_ID=(11<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 // MDH@27FEB2020 replacing: #include "Msession.h"
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;

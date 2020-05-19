@@ -1,5 +1,8 @@
 #include "Msettings.h"
 
+static int32_t const MODULE_ID=(6<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 // Edit flags
 bool acceptinghistorycommand=true; // whether to immediately accept a history command
 bool matchingparentheses=true;  // by default will 'match' parentheses

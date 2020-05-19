@@ -159,7 +159,7 @@ typedef struct Mtoken{
 }Mtoken;
 
 Mtoken* __token();
-void free_token(Mtoken* _token);
+Mtoken* free_token(Mtoken* _token);
 
 /* a list of Mexpressions holds the body of an M function
 typedef struct Mexpression{

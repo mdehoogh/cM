@@ -1,10 +1,13 @@
 #include "Mlist.h"
 
+static int32_t const MODULE_ID=(14<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 extern long double M_LD_NAN;
 extern char const * const M_ERROR_PREFIX;
 
-Mvalue* Mempty(Mvalue* value){
+Mvalue* Mempty(Mvalue* value){int32_t foid=getOwnerId(1);
     long long result=M_LL_INVALID;
     if(value)
     switch(value->type){
@@ -14,7 +17,7 @@ Mvalue* Mempty(Mvalue* value){
     }
     return _getIntegerValue(result);
 }
-Mvalue* Mkeys(Mvalue* value){
+Mvalue* Mkeys(Mvalue* value){int32_t foid=getOwnerId(2);
     if(value)
     switch(value->type){
         case VT_MAP:return _getValueOfList(_getMapAttributes(value->value._map),true);

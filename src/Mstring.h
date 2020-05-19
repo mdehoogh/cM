@@ -20,18 +20,18 @@ typedef struct{
     long long blocks; // the number of allocated blocks of BLOCK_SIZE bytes of memory for _chars
 }Mstring;
 
-void free_string(Mstring* str); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
+Mstring* free_string(Mstring* str,int32_t oid); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
 
 // functions that create new string instances (and therefore start with _)
-Mstring* __string();
-Mstring* _getString(char const * const s); // convenient constructor
+Mstring* __string(int32_t oid);
+Mstring* _getString(char const * const s,int32_t oid); // convenient constructor
 // copying
-Mstring* _stringCopy(Mstring* const src,size_t length);
+Mstring* _stringCopy(Mstring* const src,size_t length,int32_t oid);
 
 bool string_empty(Mstring const * const str);
 
 size_t string_length(Mstring const * const str);
-Mstring* string_setlength(Mstring * const str, size_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
+Mstring* string_setlength(Mstring * const str, size_t length,int32_t oid); // MDH@26FEB2018: we might want to set the length (to a smaller one)
 
 Mstring* string_synclength(Mstring * const str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
 

@@ -3,13 +3,16 @@
 
 #include "Mfunctions.h"
 
+static int32_t const MODULE_ID=(15<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 extern char const * const VALUETYPENAMES[];
 extern char const * const M_ERROR_PREFIX;
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_NEGATIVE,M_POSITIVE;
 extern const long double M_LD_NAN,M_LD_PI;
 extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
 
-void outputDecimalStatus(uint32_t status){
+void outputDecimalStatus(uint32_t status){int32_t foid=getOwnerId(1);
 	if(status>0){
 		outputInfo("Decimal computations error report.");
 		if(status&MPD_IEEE_Invalid_operation)outputInfo("\tIEEE Invalid operation error.");

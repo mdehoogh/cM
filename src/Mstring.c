@@ -4,6 +4,8 @@
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //                TODO if blocks is zero failed to 
+static int32_t MODULE_ID=(5<<4);
+static int32_t getOwnerId(uint16_t functionId){return(functionId>>12?0:(MODULE_ID<<12)+functionId);}
 
 /** MDH@25DEC2018: 
  *  this code is from the Internet to implement a mutable string
@@ -13,9 +15,9 @@
  */
 
 /** Create a String */
-Mstring* __string(){
+Mstring* __string(int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(1));
     // MDH@09APR2020: because sizeof(Mstring) would not include what we need for the characters pointed to by chars, we need to allocated one BLOCK_SIZE of characters to start with
-    Mstring* ans=CALLOC(sizeof(Mstring),'S');
+    Mstring* ans=CALLOC(sizeof(Mstring),'S',foid);
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         // the size of each allocation is BLOCKSIZE characters
@@ -24,8 +26,8 @@ Mstring* __string(){
         //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
         // MDH@16APR2020: using Mchars* instance
         // MDH@03MAY2020 OOPS the size should go first!!!
-        ans->_chars=__chars(M_BLOCK_SIZE,1,'s');
-        if(!ans->_chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1;
+        ans->_chars=__chars(M_BLOCK_SIZE,1,'s',foid);
+        if(!ans->_chars){FREE(ans,'S',foid);ans=NULL;}else ans->blocks=1;
         /* replacing:
         ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
@@ -38,21 +40,21 @@ Mstring* __string(){
     return ans;
 }
 
-Mstring* _getString(const char* const s){
+Mstring* _getString(const char* const s,int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(2));
     if(!s)return NULL;
-    Mstring* ans=CALLOC(sizeof(Mstring),'S');
+    Mstring* ans=CALLOC(sizeof(Mstring),'S',foid);
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
         // MDH@17APR2020: Mchars* replacing char*
         size_t blocks=1+(l/M_BLOCK_CHARACTERS);
-        ans->_chars=__chars(M_BLOCK_SIZE,blocks,'s');
+        ans->_chars=__chars(M_BLOCK_SIZE,blocks,'s',foid);
         if(ans->_chars){
             ans->length=l;
             ans->blocks=blocks;
             memcpy(ans->_chars->chars,s,ans->length); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
         }else{ // failure
-            FREE(ans,'S');ans=NULL;
+            FREE(ans,'S',foid);ans=NULL;
         }
         /* replacing:
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
@@ -70,6 +72,7 @@ Mstring* _getString(const char* const s){
 #ifdef __DEBUGGING__
     if(!ans)printf("\nFailed to create a string.");
 #endif
+    // MDH@19MAY2020: do NOT disown ans because whoever's receiving it should obtain ownership and you can only grab ownership on pointers currently being owned unless disowning
     return ans;
 }
 
@@ -78,11 +81,11 @@ static size_t getSizeOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_SIZE*
 static size_t getNumberOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_CHARACTERS*str->blocks:0);}
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
-Mstring* _stringCopy(Mstring* const src,size_t length){
+Mstring* _stringCopy(Mstring* const src,size_t length,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(3));
     if(!src)return NULL;
     // MDH@17APR2020: replacing src->chars by src->_chars->chars
     src->_chars->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    Mstring* _result=_getString(src->_chars->chars);
+    Mstring* _result=_getString(src->_chars->chars,foid);
     if(length>0)if(_result)string_setlength(_result,length);
     return _result;
     /* replacing:
@@ -108,14 +111,19 @@ Mstring* _stringCopy(Mstring* const src,size_t length){
 /** 
  * Free the memory associated with a String
  */
-void free_string(Mstring* str){
-    if(str){
+// MDH@18MAY2020: you can see what a nuisance it is to free a string for somebody else because the caller needs to DISOWN it first, then I have to obtain ownership otherwise I can't free it
+//                then there's str->_chars that we need to take ownership off as well
+Mstring* free_string(Mstring* str,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(4));    
+    // in order to be able to free_chars but perhaps we do not need to disown str->_chars before calling free_chars????????
+    if(OWNED(str,sizeof(Mstring),foid)&&OWNED(str->_chars,M_BLOCK_SIZE*str->blocks,foid)){
         // MDH@17APR2020: replacing src->chars by src->_chars->chars
         // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
-        free_chars(str->_chars,M_BLOCK_SIZE,str->blocks,'s');
+        free_chars(DISOWNED(str->_chars,M_BLOCK_SIZE*str->blocks,foid),M_BLOCK_SIZE,str->blocks,'s');
         // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
-        FREE(str,'S');
+        FREE(str,'S',foid);
+        return NULL;
     }
+    return str;
 }
 
 size_t string_length(Mstring const * const str){return(str?str->length:0);}
@@ -124,7 +132,7 @@ size_t string_length(Mstring const * const str){return(str?str->length:0);}
 bool string_empty(Mstring const * const str){return(str?str->length==0:true);} // MDH@17APR2020: removing 
 
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
-Mstring* string_setlength(Mstring* const str,size_t length){
+Mstring* string_setlength(Mstring* const str,size_t length,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(5));
     if(!str)return NULL;
     if(length>str->length){ // we're supposed to increment the length
         // how many blocks do we need
@@ -133,7 +141,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
             // MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
-            Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s');
+            Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s',foid);
             if(!new_chars)return NULL; // failure
             str->blocks=blocks;
             str->_chars=new_chars;

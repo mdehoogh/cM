@@ -7,6 +7,9 @@
 
 #include "Malloc.h"
 
+static int32_t const MODULE_ID=(3<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 extern char const * const M_ERROR_PREFIX;
 extern char const * const M_WARNING_PREFIX;
 extern char const * const M_BUG_PREFIX;
@@ -22,8 +25,9 @@ static void bug(char const * fmt,...){printf("%s",M_BUG_PREFIX);va_list args;va_
 
 #ifndef __PRODUCTION__
 typedef struct{
-    char allocationType;
-    long long allocationIndex;
+    int32_t allocationIndex; // MDH@19MAY2020: assuming 32 bits will suffice
+    int32_t ownerId:24; // MDH@19MAY2020: storing the owner id as well
+    unsigned char allocationType;
 }Malloc;
 #endif
 
@@ -697,6 +701,13 @@ void* Mowned(void* ptr,size_t size,int32_t ownerId){
             bug("Failed to disown a memory allocation: it is not registered.");
     }
     return ptr;
+}
+int32_t Mowner(void* ptr,size_t size){
+    if(ptr&&size>0){
+        Malloc* _alloc=(Malloc*)(((char*)ptr)+size);
+        return _alloc->ownerId;
+    }
+    return 0;
 }
 #endif
 

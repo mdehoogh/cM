@@ -4,6 +4,9 @@
 
 #include "Mvalue.h"
 
+static int32_t const MODULE_ID=(13<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
@@ -18,28 +21,26 @@ extern const long double LD_PI; // for Mfacd()
 extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (default) decimal context
 extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 
-void free_variable(Mvariable* _variable,bool weak){
-    if(_variable){
-        if(_variable->_name)free(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
-        if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
-        FREE(_variable,'V');
-    }
+void free_variable(Mvariable* _variable,bool weak,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(1));
+    if(_variable->_name)free(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
+    if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
+    FREE(_variable,'V',foid);
 }/* VALIDATED */
-Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
+Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(1));
     // MDH@14NOV2019: maps might have attributes with no name (i.e. the empty string)
     if(!name){
         outputError("No variable name defined");
         return NULL;
     }
-    Mvariable* _variable=(Mvariable*)CALLOC(sizeof(Mvariable),'V'); // all pointers will be NULL!!
+    Mvariable* _variable=(Mvariable*)CALLOC(sizeof(Mvariable),'V',foid); // all pointers will be NULL!!
     if(!_variable){
         outputErrorAndText("Failed to allocate memory to store variable ",name);
         return NULL;
     }
     _variable->immutable=immutable;
-    _variable->_name=_getChars(name); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
+    _variable->_name=_getChars(name,foid); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
     if(!_variable->_name){
-        free_variable(_variable,true);
+        free_variable(_variable,true,foid);
         output("%sFailed to allocate memory to store name '%s' of the new variable.\n",M_ERROR_PREFIX,name);
         return NULL;
     }
@@ -67,123 +68,87 @@ Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable){
     }else
         _variable->_value=NULL;
     */
-    return _variable;
+    return(oid>0?_variable:DISOWNED(_variable,sizeof(Mvariable),foid));
 }/* VALIDATED */
 
-bool free_listelement(Mlistelement* _listelement,bool weak){
-    if(_listelement){
+bool free_listelement(Mlistelement* _listelement,bool weak,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(2));
+    if(OWNED(_listelement,sizeof(Mlistelement),foid)){
         if(_listelement->_next){free_listelement(_listelement->_next,weak);_listelement->_next=NULL;}
         if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
-        FREE(_listelement,'l');
+        FREE(_listelement,'l',foid);
         return true;
     }
     return false;
 }/* VALIDATED */
-void free_list(Mlist* _list){
-    if(_list){
-        if(amVerbose()&&amDebugging())
-        {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
-        if(_list->_first){
-            // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters
-            if(_list->_creator)freeChars(_list->_creator);// MDH@17APR2020 replacing: FREE(_list->_creator,'"');
-            free_listelement(_list->_first,_list->weak);
-            _list->_first=NULL;
-        }
-        FREE(_list,'L');
-    }
-}/* VALIDATED */
-bool free_mapelement(Mmapelement* _mapelement,bool weak){
-    if(_mapelement){
-        if(amVerbose()&&amDebugging())output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
-        if(_mapelement->_next){
-            if(!free_mapelement(_mapelement->_next,weak))outputError("Failed to free a map element!");//////else outputInfo("Next map element freed!");
-            _mapelement->_next=NULL;
-        }
-        if(_mapelement->_variable){
-            if(_mapelement->_variable->_name){
-                if(amVerbose()&&amDebugging())output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
-            }else
-                outputWarning("Unnamed map attribute!");
-            free_variable(_mapelement->_variable,weak);
-            _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
-        }else
-            outputWarning("No map attribute to free!");
-        FREE(_mapelement,'m');
-        if(amVerbose()&&amDebugging())outputInfo("\tMap element freed!");
-        return true;
-    }
-    return false;
-}/* VALIDATED */
-void free_map(Mmap* _map){
-    if(_map){
-        if(amDebugging()&&amVerbose())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
-        if(_map->_first){free_mapelement(_map->_first,_map->weak);_map->_first=NULL;}else outputInfo("No map attributes to free!");
-        FREE(_map,'M');
-    }
-}/* VALIDATED */
-
-// MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
-void free_valuereference(Mvaluereference* _valuereference){
-    if(_valuereference){
-        if(_valuereference->_name){freeChars(_valuereference->_name);_valuereference->_name=NULL;}
-        /* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
-        if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
-        */
-        if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
-        FREE(_valuereference,'5'); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
-    }
-}/* VALIDATED */
-
-// MDH@01MAY2019: 'local' function for freeing a value
-void free_value(Mvalue* _value){
-    if(_value){
-        //////if(amVerbose()){output("Value of type '%s'",VALUETYPENAMES[_value->type]);outputValue(" to free: '",_value,"'.\n");}
-        // I do not need to free the value itself, only the pointers inside it
-        switch(_value->type){
-            case VT_UNDEFINED:break;
-            case VT_TOKEN:if(_value->value._token){free_token(_value->value._token);_value->value._token=NULL;}break;
-            case VT_INTEGER:if(_value->value._integer){free_integer(_value->value._integer);_value->value._integer=NULL;}break;
-            case VT_BIGINTEGER:if(_value->value._biginteger){free_biginteger(_value->value._biginteger);_value->value._biginteger=NULL;}break;
-            case VT_DECIMAL:if(_value->value._decimal){free_decimal(_value->value._decimal);_value->value._decimal=NULL;}break;
-            case VT_RATIONAL:if(_value->value._rational){free_rational(_value->value._rational);_value->value._rational=NULL;}break;
-            case VT_FLOAT:if(_value->value._float){free_float(_value->value._float);_value->value._float=NULL;}break;
-            case VT_TEXT:if(_value->value._text){free_text(_value->value._text);_value->value._text=NULL;}break;
-            case VT_LIST:if(_value->value._list){free_list(_value->value._list);_value->value._list=NULL;}break;
-            case VT_MAP:if(_value->value._map){free_map(_value->value._map);_value->value._map=NULL;}break;
-            case VT_REFERENCE:if(_value->value._reference){free_reference(_value->value._reference);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
-            case VT_FUNCTION:if(_value->value._function){free_function(_value->value._function);_value->value._function=NULL;}break;
-            case VT_ENVIRONMENT:if(_value->value._environment){free_environment(_value->value._environment);_value->value._environment=NULL;}break;
-            //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
-        }
-        FREE(_value,'X');
-        if(amVerbose()&&amDebugging())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
-    }else
-        outputBug("No value to free!");
-}/* VALIDATED */
-
-Mlist* __list(char* source){
-    Mlist* _list=CALLOC(sizeof(Mlist),'L');
+Mlist* __list(char* source,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(3));
+    Mlist* _list=CALLOC(sizeof(Mlist),'L',foid);
     if(source){
-        _list->_creator=_getChars(source); // MDH@17APR2020 replacing: _strdup(source);
+        _list->_creator=OWNED(_getChars(source),strlen(source)+1,foid); // MDH@17APR2020 replacing: _strdup(source);
         if(_list->_creator){
-            if(amVerbose()&&amDebugging())output("List creator: '%s'.\n",_list->_creator->chars);
+            if(amVerboseDebugging())output("List creator: '%s'.\n",_list->_creator->chars);
         }else
             output("%sFailed to register list creator '%s'.\n",M_ERROR_PREFIX,source);
     }
     return _list;
 }
+void free_list(Mlist* _list,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(3));
+    if(amVerboseDebugging())
+    {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
+    if(_list->_first){
+        // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters
+        if(_list->_creator)freeChars(_list->_creator,len(_list->_creator->chars)+1,foid);// MDH@17APR2020 replacing: FREE(_list->_creator,'"');
+        free_listelement(_list->_first,_list->weak,foid);
+        _list->_first=NULL;
+    }
+    FREE(_list,'L',foid);
+}/* VALIDATED */
+
+bool free_mapelement(Mmapelement* _mapelement,bool weak,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(4));
+    if(amVerbose()&&amDebugging())output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
+    if(_mapelement->_next){
+        if(!free_mapelement(_mapelement->_next,weak))outputError("Failed to free a map element!");//////else outputInfo("Next map element freed!");
+        _mapelement->_next=NULL;
+    }
+    if(_mapelement->_variable){
+        if(_mapelement->_variable->_name){
+            if(amVerboseDebugging())output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
+        }else
+            outputWarning("Unnamed map attribute!");
+        free_variable(_mapelement->_variable,weak,foid);
+        _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
+    }else
+        outputWarning("No map attribute to free!");
+    FREE(_mapelement,'m',foid);
+    if(amVerboseDebugging())outputInfo("\tMap element freed!");
+    return true;
+}/* VALIDATED */
+void free_map(Mmap* _map,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(5));
+    if(amVerboseDebugging())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
+    if(_map->_first){free_mapelement(_map->_first,_map->weak,foid);_map->_first=NULL;}else outputInfo("No map attributes to free!");
+    FREE(_map,'M',foid);
+}/* VALIDATED */
+
+// MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
+void free_valuereference(Mvaluereference* _valuereference,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(7));
+    if(_valuereference->_name){freeChars(_valuereference->_name);_valuereference->_name=NULL;}
+    /* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
+    if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
+    */
+    if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
+    FREE(_valuereference,'5',foid); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
+}/* VALIDATED */
 
 // manage a list of created values
 // if we make a map out of it, we can annote the value with a name????
 Mlist* _valueList=NULL;
-Mvalue* __value(char const * const descriptor){
+Mvalue* __value(char const * const descriptor,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(10));
     Mvalue* _value=NULL;
-    if(!_valueList)_valueList=__list("global value list");
+    if(!_valueList)_valueList=__list("global value list",getOwnerId(0)); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
     if(_valueList){
         _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
-        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(sizeof(Mlistelement),'l'); // both pointers NULL
+        Mlistelement* _valueListelement=(Mlistelement*)CALLOC(sizeof(Mlistelement),'l',foid); // both pointers NULL
         if(_valueListelement){
-            _value=(Mvalue*)CALLOC(sizeof(Mvalue),'X'); // MDH@07APR2020: should be 'X' not 'Y'
+            _value=(Mvalue*)CALLOC(sizeof(Mvalue),'X',-foid); // MDH@07APR2020: should be 'X' not 'Y' // MDH@18MAY2020: immediately disown the Mvalue, because we return it 
             if(_value){
                 // shouldn't pose a problem now...
                 _valueListelement->_value=_value;
@@ -194,18 +159,45 @@ Mvalue* __value(char const * const descriptor){
                 _valueListelement->index=_valueList->numberOfElements;
                 if(descriptor)if(amVerbose()&&amDebugging())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
             }else // couldn't get a new value, so free the value list element immediately
-                FREE(_valueListelement,'l');
+                FREE(_valueListelement,'l',foid);
         }
     }
     if(!_value)outputError("Failed to create value!"); // serious enough to report
-    return _value;
+    return(oid>0?_value:DISOWNED(_value,sizeof(Mvalue),foid));
 }/* VALIDATED */
+// MDH@01MAY2019: 'local' function for freeing a value
+void free_value(Mvalue* _value,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(10));
+    //////if(amVerbose()){output("Value of type '%s'",VALUETYPENAMES[_value->type]);outputValue(" to free: '",_value,"'.\n");}
+    // I do not need to free the value itself, only the pointers inside it
+    if(_value){
+        switch(_value->type){
+            case VT_UNDEFINED:break;
+            case VT_TOKEN:if(_value->value._token){free_token(_value->value._token,foid);_value->value._token=NULL;}break;
+            case VT_INTEGER:if(_value->value._integer){free_integer(_value->value._integer,foid);_value->value._integer=NULL;}break;
+            case VT_BIGINTEGER:if(_value->value._biginteger){free_biginteger(_value->value._biginteger,foid);_value->value._biginteger=NULL;}break;
+            case VT_DECIMAL:if(_value->value._decimal){free_decimal(_value->value._decimal,foid);_value->value._decimal=NULL;}break;
+            case VT_RATIONAL:if(_value->value._rational){free_rational(_value->value._rational,foid);_value->value._rational=NULL;}break;
+            case VT_FLOAT:if(_value->value._float){free_float(_value->value._float,foid);_value->value._float=NULL;}break;
+            case VT_TEXT:if(_value->value._text){free_text(_value->value._text,foid);_value->value._text=NULL;}break;
+            case VT_LIST:if(_value->value._list){free_list(_value->value._list,foid);_value->value._list=NULL;}break;
+            case VT_MAP:if(_value->value._map){free_map(_value->value._map,foid);_value->value._map=NULL;}break;
+            case VT_REFERENCE:if(_value->value._reference){free_reference(_value->value._reference,foid);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
+            case VT_FUNCTION:if(_value->value._function){free_function(_value->value._function,foid);_value->value._function=NULL;}break;
+            case VT_ENVIRONMENT:if(_value->value._environment){free_environment(_value->value._environment,foid);_value->value._environment=NULL;}break;
+            //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
+        }
+        FREE(_value,'X',foid);
+        if(amVerboseDebugging())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
+    }else
+        outputBug("No value to free!");
+}/* VALIDATED */
+
 
 extern const char* const VALUETYPENAMES[];
 
 // can be asked to remove unused values
 // TODO check whether it functions correctly (think so though)
-size_t getNumberOfRemovedValues(bool showInfo){
+size_t getNumberOfRemovedValues(bool showInfo){int32_t foid=getOwnerId(11);
     unsigned long long tofree=0,removed=0;
     if(_valueList){
         if(showInfo)output("Garbage collecting unused values.\n");
@@ -265,9 +257,12 @@ size_t getNumberOfRemovedValues(bool showInfo){
     return removed;
 }/* VALIDATED */
 
-unsigned long long getNumberOfValues(){return (_valueList?_valueList->numberOfElements:0);}/* VALIDATED */
+unsigned long long getNumberOfValues(){
+    int32_t foid=getOwnerId(12);
+    return (_valueList?_valueList->numberOfElements:0);
+}/* VALIDATED */
 
-bool decrementReferenceCount(Mvalue* _value){
+bool decrementReferenceCount(Mvalue* _value){int32_t foid=getOwnerId(13);
     if(_value){
         if(_value->count){
             (_value->count)--;
@@ -281,14 +276,14 @@ bool decrementReferenceCount(Mvalue* _value){
             */
             return true;
         }
-        Mstring* _valueText=_getValueText(_value,false);
+        Mstring* _valueText=_getValueText(_value,false,foid);
         output("BUG: Reference count of '%s' of type '%c' already zero.\n",string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
-        free_string(_valueText);
+        free_string(_valueText,foid);
     }else
     if(amVerbose())outputInfo("No value to decrement the reference count of.");
     return true;
 }/* VALIDATED */
-bool incrementReferenceCount(Mvalue* _value){
+bool incrementReferenceCount(Mvalue* _value){int32_t foid=getOwnerId(14);
     if(_value){
         (_value->count)++;
         return true;
@@ -298,7 +293,10 @@ bool incrementReferenceCount(Mvalue* _value){
 }/* VALIDATED */
 // interface functions that use the above functions
 // wrapping the different value type instances
-Mvalue* _getUndefinedValue(){return (Mvalue*)CALLOC(sizeof(Mvalue),'U');}/* VALIDATED */
+Mvalue* _getUndefinedValue(int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(15));
+    Mvalue* _undefinedValue=(Mvalue*)CALLOC(sizeof(Mvalue),'U',foid);
+    return(oid>0?_undefinedValue:DISOWNED(_undefinedValue,sizeof(Mvalue),foid));
+}/* VALIDATED */
 /*
 Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
     if(!_userfunction)return NULL;
@@ -308,52 +306,68 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 }// VALIDATED 
 */
 // MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
-Mreference* _getReference(Mvariable* variable){
+Mreference* _getReference(Mvariable* variable,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(16));
     // MDH@11MAR2020: variable can now be NULL
-    Mreference* _reference=CALLOC(sizeof(Mreference),'Q');
+    Mreference* _reference=CALLOC(sizeof(Mreference),'Q',foid);
     if(_reference){_reference->variable=variable;if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
-    return _reference;
+    return(oid>0?_reference:DISOWNED(_reference,sizeof(Mreference),foid));
 }
-void free_reference(Mreference* reference){
-    if(reference){reference->variable->referencecount--;FREE(reference,'Q');}
+void free_reference(Mreference* reference,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(16));
+    if(!reference)return;
+    if(reference->variable)reference->variable->referencecount--;
+    FREE(reference,'Q',foid);
 }
-Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure){
+Mvalue* _getReferenceValue(Mreference* _reference,bool freeonfailure,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(17));
+    // MDH@19MAY2020: should we check whether _reference is ownable???????
     if(!_reference){outputWarning("No reference to wrap.");return NULL;}
-    Mvalue* _referenceValue=__value("reference");
-    if(_referenceValue){_referenceValue->type=VT_REFERENCE;_referenceValue->value._reference=_reference;}else if(freeonfailure)free_reference(_reference);
-    return _referenceValue;
+    Mvalue* _referenceValue=__value("reference",foid);
+    if(_referenceValue){
+        _referenceValue->type=VT_REFERENCE;
+        // I suppose the value should become the owner of the reference!!
+        _referenceValue->value._reference=OWNED(_reference,sizeof(Mreference),foid);
+    }
+    if(!_referenceValue||!_referenceValue->value._reference)if(freeonfailure)free_reference(_reference,foid);
+    return(oid>0?_referenceValue:DISOWNED(_referenceValue,sizeof(Mreference),foid));
 }
-Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure){
+
+Mvalue* _getDecimalValue(Mdecimal* _decimal,bool freeonfailure,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(18));
     if(!_decimal){outputInfo("No decimal to wrap.");return NULL;}
-    Mvalue* _decimalValue=__value("decimal");
+    Mvalue* _decimalValue=__value("decimal",foid);
     //////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
-    if(_decimalValue){_decimalValue->type=VT_DECIMAL;_decimalValue->value._decimal=_decimal;}else if(freeonfailure)free_decimal(_decimal);
-    return _decimalValue;
+    if(_decimalValue){
+        _decimalValue->type=VT_DECIMAL;
+        _decimalValue->value._decimal=OWNED(_decimal,sizeof(Mdecimal),foid);
+    }
+    if(!_decimalValue||!_decimalValue->value._decimal)if(freeonfailure)free_decimal(_decimal,foid);
+    return(oid>0?_decimalValue:DISOWNED(_decimalValue,sizeof(Mvalue),foid));
 }/* VALIDATED */
-Mvalue* _getIntegerValue(long long ll){
-    if(amVerboseDebugging())
-        output("Wrapping integer '%lld'.\n",ll);
-    Mvalue* _integerValue=__value("integer");
+
+Mvalue* _getIntegerValue(long long ll,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(19));
+    if(amVerboseDebugging())output("Wrapping integer '%lld'.\n",ll);
+    Mvalue* _integerValue=__value("integer",foid);
     if(_integerValue){
         _integerValue->value._integer=_getInteger(ll);
-        if(!_integerValue->value._integer){free_value(_integerValue);_integerValue=NULL;}else _integerValue->type=VT_INTEGER;
+        if(!_integerValue->value._integer){free_value(_integerValue,foid);_integerValue=NULL;}else _integerValue->type=VT_INTEGER;
     }
-    return _integerValue;
+    return(oid>0?_integerValue:DISOWNED(_integerValue,sizeof(Mvalue),foid));
 }/* VALIDATED */
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure){
-    Mvalue* _bigintegerValue=(_biginteger?__value("biginteger"):NULL);
+
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,bool freeonfailure,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(20));
+    Mvalue* _bigintegerValue=(_biginteger?__value("biginteger",foid):NULL);
     if(_bigintegerValue){
-        _bigintegerValue->type=VT_BIGINTEGER;_bigintegerValue->value._biginteger=_biginteger;
-    }else
-    if(_biginteger){
-        if(freeonfailure)free_biginteger(_biginteger);
+        _bigintegerValue->type=VT_BIGINTEGER;
+        _bigintegerValue->value._biginteger=OWNED(_biginteger,sizeof(Mbiginteger),foid);
+    }
+    if(!_bigintegerValue||!_bigintegerValue->value._biginteger){
+        if(freeonfailure)free_biginteger(_biginteger,foid);
         if(amVerboseDebugging())
             {output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
     }else
     if(amVerboseDebugging())
         outputInfo("No big integer to wrap.");
-    return _bigintegerValue;
+    return(oid>0?_bigintegerValue:DISOWNED(_bigintegerValue,sizeof(Mvalue),foid));
 }/* VALIDATED */
+
 Mvalue* _getFloatValue(long double ld){
     if(amVerbose())output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
     Mvalue* _floatValue=__value("long double");
@@ -2402,9 +2416,16 @@ void free_userfunction(Muserfunction* _userfunction){
 // END RELEASERS
 
 // Menvironment stuff
-void free_environment(Menvironment* _environment){
+Menvironment* __environment(int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(100));
+    Menvironment* _environment=CALLOC(sizeof(Menvironment),'E',foid);
+    if(!_environment){outputError("Failed to create an environment");return NULL;}
+    _environment->_variableMap=CALLOC(sizeof(Mmap),'M',abs(foid)); // ascertain that the environment contains a variable map
+    if(!_environment->_variableMap){free_environment(_environment,foid);_environment=NULL;outputError("Failed to create the new environment variable map");}
+    return _environment;
+}/* VALIDATED */
+void free_environment(Menvironment* _environment,int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(100));
     if(_environment){
-        if(_environment->_name){free(_environment->_name);_environment->_name=NULL;}
+        if(_environment->_name){freeChars(_environment->_name);_environment->_name=NULL;}
         assignValue(&_environment->_parent,NULL); // MDH@03FEB2020 replacing:
         assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
         free_map(_environment->_variableMap);
@@ -2418,15 +2439,11 @@ void free_environment(Menvironment* _environment){
         FREE(_environment,'E');
     }
 }/* VALIDATED */
-Menvironment* __environment(){
-    Menvironment* _environment=CALLOC(sizeof(Menvironment),'E');
-    if(!_environment){outputError("Failed to create an environment");return NULL;}
-    _environment->_variableMap=CALLOC(sizeof(Mmap),'M'); // ascertain that the environment contains a variable map
-    if(!_environment->_variableMap){free_environment(_environment);_environment=NULL;outputError("Failed to create the new environment variable map");}
-    return _environment;
+Menvironment* getEnvironmentParent(Menvironment* _environment){
+    return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
 }/* VALIDATED */
-Mstring* _getEnvironmentName(Menvironment* _environment){
-    Mstring* _environmentName=__string();
+Mstring* _getEnvironmentName(Menvironment* _environment){int32_t foid=getOwnerId(101);
+    Mstring* _environmentName=__string(foid);
     if(_environmentName){
         Mstring* p=_environmentName;
         while(p&&_environment){
@@ -2435,13 +2452,10 @@ Mstring* _getEnvironmentName(Menvironment* _environment){
             p=string_prepend(p,_environment->_name->chars);
             _environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
         }
-        if(!p){free_string(_environmentName);_environmentName=NULL;}
+        if(!p){free_string(_environmentName,foid);_environmentName=NULL;}
     }
     return _environmentName;
 }
-Menvironment* getEnvironmentParent(Menvironment* _environment){
-    return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
-}/* VALIDATED */
 
 // additional function for wrapping environments and functions
 Mvalue* _getValueOfFunction(Mfunction* _function,bool freeonfailure){

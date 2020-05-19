@@ -14,6 +14,9 @@
 // MDH@27FEB2020: on top of environment management we have the 'shell' for setting up the root M environment
 #include "Msession.h"
 
+static int32_t const MODULE_ID=(127<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 // the constants are defined in Mshell.c
 extern char const* const M_ERROR_PREFIX;
 extern const char* const INFO_PREFIX; // MDH@27FEB2020: as for now NO actual info prefix text to use
@@ -88,7 +91,7 @@ char const * const M_BUILD="5";char const * const M_DATE="06 May 2020"; // dynam
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
 // the list of token type ids in the corresponding order!!!
-static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
+static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){int32_t foid=getOwnerId(1);
 	uint8_t tokentype_id=TOKENTYPE_IDS[tokenType];
 	////////output("(%d)",tokentype_id);
 	switch(tokentype_id>>6){
@@ -104,17 +107,17 @@ static const char* getTokenColor(enum TOKENTYPE_ENUM tokenType){
 	}
 	return "";
 }
-static void outputTokenTypeColor(TokenType tokenType){
+static void outputTokenTypeColor(TokenType tokenType){int32_t foid=getOwnerId(2);
 	setBackColor(getBackgroundColor());
 	setColor(getTokenColor(tokenType));
 }
-static void outputTokenColor(Mtoken* _token){
+static void outputTokenColor(Mtoken* _token){int32_t foid=getOwnerId(3);
 	if(_token)outputTokenTypeColor(_token->type);
 	///////printf("[%d]",_userInputCommand->_lastToken->type);
 	// ah, the token colors will be a problem with the new type definitions, I suppose we need to distinguish between the operator and non-operator tokens	
 }
 // I guess we could allow the user to specify another eps value through the QEPS command line argument!!!
-static void outputCommandInfo(Mcommand* command){
+static void outputCommandInfo(Mcommand* command){int32_t foid=getOwnerId(4);
 	if(!command||!command->_lastToken)return;
 	// MDH@12AUG2019: identifiers first
 	Mtoken* identifierToken=command->_lastToken->prevIdentifier;
@@ -158,7 +161,7 @@ static void outputCommandInfo(Mcommand* command){
 	}
 }
 
-Mstring* _getTimestamp(char const * const format){
+Mstring* _getTimestamp(char const * const format){int32_t foid=getOwnerId(5);
 	Mstring* _timestamp=__string();
 	if(_timestamp){
 		Mstring* p=string_setlength(_timestamp,50);
@@ -172,7 +175,7 @@ Mstring* _getTimestamp(char const * const format){
 	return _timestamp;
 }
 
-void writeTimestamp(FILE* _file){
+void writeTimestamp(FILE* _file){int32_t foid=getOwnerId(6);
 	if(_file){
 		Mstring* _timestamp=_getTimestamp(NULL);
 		if(_timestamp){
@@ -194,7 +197,7 @@ FILE* debugfile=NULL;
 #ifdef __GNUC__
     __attribute__((format(printf, 1, 2)))
 #endif
-void debugWrite(const char* fmt,...){
+void debugWrite(const char* fmt,...){int32_t foid=getOwnerId(6);
 	if(!debugfile){
 		debugfile=fopen("./Mdebug.txt","a+t"); // append (or create) in text mode
 		fputc('\n',debugfile); // start with a single empty line (separating the sessions)
@@ -257,7 +260,7 @@ char* _getFormattedText(uint8_t maxlength,char* fmt,...){
 #endif
 */
 
-Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
+Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){int32_t foid=getOwnerId(7);
 	Mstring* s=__string();
 	if(s){
 		Mstring* p=string_append_char(s,'[');
@@ -296,12 +299,12 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){
 	}
 	return s;
 }
-void outputFunctions(){
+void outputFunctions(){int32_t foid=getOwnerId(8);
 	Mstring* _functionsText=_getFunctionMapText(getExecutionEnvironment()->_functionMap);
 	output("\nFunctions: %s.\n",string(_functionsText));
 	free_string(_functionsText);
 }/* VALIDATED */
-void outputVariables(){
+void outputVariables(){int32_t foid=getOwnerId(9);
 	// much easier now that we get the text of any Mvalue (like the variable map of an environment!)
 	// MDH@24OCT2019: now using _getVariableMapText() instead of _getMapText() because the former is environment aware and can show the symbols with the same value (if any)
 	Mstring* _variablesText=_getVariableMapText(getExecutionEnvironment(),false,false,true,false); // do NOT show the hidden variables!!!
@@ -327,10 +330,10 @@ void storeCursor(){printf("\0337");}
 void restoreCursor(){printf("\0338");}
 */
 
-void displayFlags(){
+void displayFlags(){int32_t foid=getOwnerId(10);
 	output("Edit flags: %c%c%c%c%c - Display flags: %c%c.\n",amAssisting()?'A':'a',amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amAcceptinghistorycommand()?'U':'u',amWrapping()?'W':'w',48+getColorscheme());
 }
-void outputFlags(){
+void outputFlags(){int32_t foid=getOwnerId(11);
 	output("%c%c%c%c%c%c%c",amAssisting()?'A':'a',(48+getColorscheme()),amDebugging()?'D':'d',amMatchingparentheses()?'M':'m',amVerbose()?'V':'v',amWrapping()?'W':'w',amAcceptinghistorycommand()?'U':'u');
 }
 
@@ -340,7 +343,7 @@ Mstring* shellCommand=NULL;
 Mcommand* _userInputCommand=NULL; // the current input command
 
 // keeping track of both the cursor position and the total command length
-size_t getUserInputLength(){
+size_t getUserInputLength(){int32_t foid=getOwnerId(12);
 	if(inputMode==IM_COMMAND)return(_userInputCommand&&_userInputCommand->_lastToken?_userInputCommand->_lastToken->offset+string_length(_userInputCommand->_lastToken->text):0);
 	if(inputMode==IM_SHELL)return string_length(shellCommand);
 	return 0;
@@ -355,8 +358,8 @@ typedef struct Muserinputline{
 	struct Muserinputline *_prev; // for accessing previous lines
 }Muserinputline;
 Muserinputline* _userinputline=NULL;
-Muserinputline* __userinputline(){
-	Muserinputline* _newUserinputline=CALLOC(sizeof(Muserinputline),'6');
+Muserinputline* __userinputline(){int32_t foid=getOwnerId(13);
+	Muserinputline* _newUserinputline=CALLOC(sizeof(Muserinputline),'6',foid);
 	if(_newUserinputline){
 		_newUserinputline->_prev=_userinputline;
 		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
@@ -366,43 +369,45 @@ Muserinputline* __userinputline(){
 	return _newUserinputline;
 }
 // call free_userinputline() when starting a new user input command
-size_t free_userinputline(){
+size_t free_userinputline(){int32_t foid=getOwnerId(13); // the same foid as __userinputline
 	size_t numberOfUserInputLines=0;
 	Muserinputline* prevUserinputline;
 	while(_userinputline){
 		numberOfUserInputLines++;
 		prevUserinputline=_userinputline->_prev;
-		FREE(_userinputline,'6');
+		FREE(_userinputline,'6',foid);
 		_userinputline=prevUserinputline;
 	}
 	return numberOfUserInputLines;
 }
-void removeUserinputline(){
+void removeUserinputline(){int32_t foid=getOwnerId(13);
 	Muserinputline* prevUserinputline=_userinputline->_prev;
-	FREE(_userinputline,'6');
+	FREE(_userinputline,'6',foid);
 	_userinputline=prevUserinputline;
 }
 // MDH@30OCT2019 END
-size_t toInfoInputLine(){
+size_t toInfoInputLine(){int32_t foid=getOwnerId(14);
 	size_t linesUp=0;
     size_t lines=(_userinputline?_userinputline->index:0)+1;
 	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();
     return linesUp;
 } // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
 // output functions that require access to the current token
-void outputUserInputCommandTokenColor(){
+void outputUserInputCommandTokenColor(){int32_t foid=getOwnerId(15);
 	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
 }
 uint8_t promptLength=0;
-void returnToUserInputCommandCursorPosition(){
+void returnToUserInputCommandCursorPosition(){int32_t foid=getOwnerId(16);
 	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
 	toStartOfLine();
 	moveCursorRight(promptLength+getUserInputLength()-(_userinputline?_userinputline->offset:0)); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
 	outputUserInputCommandTokenColor();
 }
-void toUserInputCursorPosition(size_t linesDown){while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();}
+void toUserInputCursorPosition(size_t linesDown){int32_t foid=getOwnerId(17);
+	while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();
+}
 // MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
-static void inputInfo(const char* const fmt,...){
+static void inputInfo(const char* const fmt,...){int32_t foid=getOwnerId(18);
 	if(fmt&&strlen(fmt)){ // we have a format
 		// outputChar('X');
 		size_t linesMovedUp=toInfoInputLine();
@@ -413,7 +418,7 @@ static void inputInfo(const char* const fmt,...){
 		toUserInputCursorPosition(linesMovedUp);
 	}
 }
-static void inputError(const char* const fmt,...){
+static void inputError(const char* const fmt,...){int32_t foid=getOwnerId(19);
 	if(fmt&&strlen(fmt)){ // we have a format
 		size_t linesMovedUp=toInfoInputLine();
 		setColor(getErrorColor());setBackColor(getBackgroundColor());
@@ -428,17 +433,17 @@ static void inputError(const char* const fmt,...){
 // it's possible that manual feed forward text is empty so it will block the identifier continuation text when that is the case!!
 Mstring* _manualFeedforwardText=NULL;
 size_t numberOfIdentifierContinuationManualFeedforwardCharacters=0; // MDH@06OCT2019: determine the number of manual feed forward characterr matching the identifier continuation
-bool manualFeedforwardCharacterPrepended(char c){
+bool manualFeedforwardCharacterPrepended(char c){int32_t foid=getOwnerId(20);
 	if(!c)return false;
 	if(!_manualFeedforwardText)_manualFeedforwardText=__string();
 	return(_manualFeedforwardText&&string_insert_char(_manualFeedforwardText,0,c));
 }
-bool prependedToManualFeedforwardText(char const * const characters){
+bool prependedToManualFeedforwardText(char const * const characters){int32_t foid=getOwnerId(21);
 	if(!characters)return false;
 	if(!_manualFeedforwardText)_manualFeedforwardText=__string();
 	return string_prepend(_manualFeedforwardText,characters);
 }
-char getFirstManualFeedforwardCharacterRemoved(){
+char getFirstManualFeedforwardCharacterRemoved(){int32_t foid=getOwnerId(22);
 	return(_manualFeedforwardText?string_removed_char(_manualFeedforwardText,0):'\0');
 }
 
@@ -448,7 +453,7 @@ char getFirstManualFeedforwardCharacterRemoved(){
 // MDH@28OCT2019: not needed here anymore... Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the sequence of tokens starting with _userInputCommand->_firstToken
 // MDH@02OCT2019: might need this in multiple places!!
 // MDH@04NOV2019: added TT_REFERENCE tokens as well
-bool inIdentifierToken(Mtoken* lastCommandToken){
+bool inIdentifierToken(Mtoken* lastCommandToken){int32_t foid=getOwnerId(23);
 	return(lastCommandToken?lastCommandToken->type==TT_VARIABLE||lastCommandToken->type==TT_FUNCTION||lastCommandToken->type==TT_NEW_VARIABLE||lastCommandToken->type==TT_REFERENCE:false);
 }
 
@@ -457,11 +462,11 @@ Mtoken* _userInputCommand->_lastToken=NULL; // the last token in the command inp
 */
 bool userInputCommandIdentifierContinuationNeedsUpdating=false; // whether or not the identifier has changed
 char* _identifierContinuationCharacters=NULL; // the single text that we can continue the current identifier token with
-char getFirstIdentifierContinuationCharacter(){
+char getFirstIdentifierContinuationCharacter(){int32_t foid=getOwnerId(24);
 	inputInfo("%s","Determining the first identifier continuation character!");
 	return(_identifierContinuationCharacters?_identifierContinuationCharacters[0]:'\0');
 }
-bool deleteFirstIdentifierContinuationCharacter(){
+bool deleteFirstIdentifierContinuationCharacter(){int32_t foid=getOwnerId(25);
 	if(!_identifierContinuationCharacters)return false;
 	// not undefined or empty...
 	char* newIdentifierContinuationText=(strlen(_identifierContinuationCharacters)>1?strdup(_identifierContinuationCharacters+1):NULL); // get dynamic copy of remainder, ignore if we fail!!!
@@ -471,7 +476,7 @@ bool deleteFirstIdentifierContinuationCharacter(){
 }
 char* _identifierContinuationOptionalCharacters=NULL; // the set of characters expected next of existing identifiers
 // MDH@26SEP2019: we create a separate method that will determine the last token identifier continuation text and continuation characters
-void deleteIdentifierContinuation(){
+void deleteIdentifierContinuation(){int32_t foid=getOwnerId(26);
 	if(_identifierContinuationOptionalCharacters){free(_identifierContinuationOptionalCharacters);_identifierContinuationOptionalCharacters=NULL;}
 	if(_identifierContinuationCharacters){free(_identifierContinuationCharacters);_identifierContinuationCharacters=NULL;}
 }
@@ -491,7 +496,7 @@ typedef struct Mtokenautocompletiontext{
 //                right arrow reads the first feed forward character, gets it accepted and then moves the feed forward character to the consumed feed forward texts
 Mtokenautocompletiontext *_firstTokenautocompletiontext=NULL,*_lastConsumedAutocompletiontext=NULL;
 // MDH@26SEP2019: it's prudent to store the identifier continuation text separated from the rest of the (autogenerated) feed forward text
-Mstring* _getAutoCompletionText(char sep){
+Mstring* _getAutoCompletionText(char sep){int32_t foid=getOwnerId(27);
 	// constructs the total feed forward text
 	Mstring* _autocompletionText=__string();
 	if(_autocompletionText){
@@ -531,16 +536,16 @@ size_t numberOfBehindPromptCharactersWritten=0; // MDH@25SEP2019: the total numb
 
 // the globally constructed behind cursor text (without separator!!!)
 Mstring* _autoCompletionText=NULL; // MDH@27FEB2019: we keep track of the auto completion text
-void deleteAutocompletionText(){
+void deleteAutocompletionText(){int32_t foid=getOwnerId(28);
 	if(_autoCompletionText){
 		if(amDebugging())inputInfo("Deleting autocompletion text.");
-		free_string(_autoCompletionText);
+		free_string(DISOWNED(_autoCompletionText,sizeof(Mstring),foid)); // MDH@19MAY2020: TODO should we disown ->chars before calling free_string????
 		_autoCompletionText=NULL;
 	}else
 	if(amDebugging())inputInfo("No auto completion text to delete.");
 }
-void updateAutoCompletionText(){
-	if(_autoCompletionText)free_string(_autoCompletionText); // free what we might currently have
+void updateAutoCompletionText(){int32_t foid=getOwnerId(28);
+	if(_autoCompletionText&&free_string(DISOWNED(_autoCompletionText,sizeof(Mstring),foid)))outputError("Failed to free the autocompletion text!"); // free what we might currently have
 	_autoCompletionText=_getAutoCompletionText('\0'); // get the new characters
 	// merge with identifier continuation text
 	if(_autoCompletionText&&_identifierContinuationCharacters){
@@ -561,7 +566,7 @@ void updateAutoCompletionText(){
 	}
 }
 
-char getTokenTypeFeedforwardCharacter(TokenType tokenType){
+char getTokenTypeFeedforwardCharacter(TokenType tokenType){int32_t foid=getOwnerId(29);
 	// some token types have an associated feed forward character!!!
 	switch(tokenType){
 		case TT_BINARY_aErU:return '=';
@@ -580,7 +585,7 @@ char getTokenTypeFeedforwardCharacter(TokenType tokenType){
 // MDH@24SEP2019: we do not always want to set the identifier continuation characters
 // MDH@03OCT2019: now excluding the last token immediate feed forward text because that is being taken care of whenever the last token (type) change
 //                because of this only the matching parentheses feed forward characters remain so TODO simplify this
-char* _getLastTokenAutoCompletionText(){
+char* _getLastTokenAutoCompletionText(){int32_t foid=getOwnerId(30);
 	char* tokenAutoCompletionText=""; // on the stack
 	if(amMatchingparentheses())
 	if(_userInputCommand&&_userInputCommand->_lastToken)
@@ -616,17 +621,17 @@ char* _getLastTokenAutoCompletionText(){
 	return strdup(tokenAutoCompletionText); // TODO I suppose we might decide to no longer create a copy on the heap here (due to separating identifier continuation text from other feed forward text)
 }
 
-void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext){
+void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext){int32_t foid=getOwnerId(31);
 	if(!_autocompletiontext)return;
 	if(_autocompletiontext->_next)free_tokenautocompletiontext(_autocompletiontext->_next);
 	if(_autocompletiontext->_text)freeChars(_autocompletiontext->_text); // MDH@02MAY2020: switching to freeChars() given that _getChars() was used to create it
-	FREE(_autocompletiontext,'7'); // MDH@07APR2020: _autocompletiontext is an Mstring* so release as 'S'
+	FREE(_autocompletiontext,'7',foid); // MDH@07APR2020: _autocompletiontext is an Mstring* so release as 'S'
 }
 
 // MDH@04OCT2019: if we remember the immediate feed forward token we can determine whether or not we need to remove the associated feed forward text
 Mtoken* immediateFeedforwardToken=NULL;
 
-void deleteTokenautocompletiontexts(){
+void deleteTokenautocompletiontexts(){int32_t foid=getOwnerId(31);
 	deleteAutocompletionText();
 	////////if(amDebugging())inputInfo("Autocompletion text deleted.");
 	/////////////////numberOfBehindPromptCharactersWritten=getCommandLength(); // MDH@25SEP2019: TODO if you know a better place to do this then here let me know
@@ -641,7 +646,7 @@ void deleteTokenautocompletionCharacters(size_t numberOfTokenAutocompletionChara
 }
 */
 // every time feed forward text is to be added, it is prepended to the list of feed forward texts setting the token pointer to _userInputCommand->_lastToken
-Mtokenautocompletiontext* getTokenAutocompletionText(Mtoken* token){
+Mtokenautocompletiontext* getTokenAutocompletionText(Mtoken* token){int32_t foid=getOwnerId(31);
 	Mtokenautocompletiontext* tokenautocompletiontext=_firstTokenautocompletiontext;
 	while(tokenautocompletiontext&&tokenautocompletiontext->token!=token)tokenautocompletiontext=tokenautocompletiontext->_next;
 	return tokenautocompletiontext;
@@ -651,7 +656,7 @@ Mtokenautocompletiontext* getTokenAutocompletionText(Mtoken* token){
 //                it should be remembered that these characters were associated with this token
 //                so that when the feed forward text for a given token is set
 //                the removed token characters and the actual feed forward characters of the token can be combined
-void setLastTokenAutocompletionText(char* _text){
+void setLastTokenAutocompletionText(char* _text){int32_t foid=getOwnerId(32);
 	// do not prepend empty feed forward texts!!!
 	if(!_text)return;
 	// MDH@01OCT2019: BUG FIX it would be wrong to NOT update the last token feed forward text when no text is specified as we were doing
@@ -662,14 +667,14 @@ void setLastTokenAutocompletionText(char* _text){
 	if(lastTokenAutocompletionText){ // yes, so replace the text contents
 		if(lastTokenAutocompletionText->_text)free(lastTokenAutocompletionText->_text);
 		deleteAutocompletionText();
-		lastTokenAutocompletionText->_text=_getChars(_text); // _text now bound!! // MDH@23APR2020 NO not bound, as _text replaced by _getChars(_text)
+		lastTokenAutocompletionText->_text=_getChars(_text,foid); // _text now bound!! // MDH@23APR2020 NO not bound, as _text replaced by _getChars(_text)
 	}else{ // not present yet, so add (i.e. prepend!!)
 		if(strlen(_text)>0){
 			if(amDebugging())inputInfo("Prepending auto completion text '%s' of token '%s' with offset %zu.",_text,string(_userInputCommand->_lastToken->text),_userInputCommand->_lastToken->offset);
-			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(sizeof(Mtokenautocompletiontext),'7');
+			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(sizeof(Mtokenautocompletiontext),'7',foid);
 			if(_tokenautocompletiontext){
 				deleteAutocompletionText(); // I guess this is a bit confusing
-				_tokenautocompletiontext->_text=_getChars(_text); // MDH@23APR2020: not bound because _getChars() copies the text as well
+				_tokenautocompletiontext->_text=_getChars(_text,foid); // MDH@23APR2020: not bound because _getChars() copies the text as well
 				_tokenautocompletiontext->token=_userInputCommand->_lastToken;
 				// how about skipping all anonymous feed forward texts????
 				// if the first one is anonymous mark that one as last anonymous feed forward text
@@ -694,7 +699,7 @@ void setLastTokenAutocompletionText(char* _text){
 
 // MDH@01OCT2019: in general when a token is removed its associated (autogenerated) suggested (identifier continuation and feed forward text) should be removed as well
 //                NOTE deleteAutocompletionTextOfToken delegates to deleteAutocompletionTextOfToken
-bool deleteAutocompletionTextOfToken(Mtoken* token){
+bool deleteAutocompletionTextOfToken(Mtoken* token){int32_t foid=getOwnerId(33);
 	// locate the (autogenerated) feed forward text associated with this token (most likely the first one)
 	Mtokenautocompletiontext *prevtokenautocompletiontext=NULL,*tokenautocompletiontext=_firstTokenautocompletiontext;
 	while(tokenautocompletiontext&&tokenautocompletiontext->token!=token){prevtokenautocompletiontext=tokenautocompletiontext;tokenautocompletiontext=prevtokenautocompletiontext->_next;}
@@ -708,7 +713,7 @@ bool deleteAutocompletionTextOfToken(Mtoken* token){
 	return true;
 }
 
-char getImmediateFeedforwardCharacterOfUserInputCommand(){
+char getImmediateFeedforwardCharacterOfUserInputCommand(){int32_t foid=getOwnerId(34);
 	// returns the character that might directly follow the current token (matching parentheses feed forward characters excluded)
 	Mtoken* token=(_userInputCommand?_userInputCommand->_lastToken:NULL);
 	if(token)
@@ -743,7 +748,7 @@ void removeFirstFeedforwardCharacterFromLastTokenWhenMatching(char inputChar){
 //                however, suppose accepting this character as command characters fails, it would make sense to NOT actually remove the feed forward character until after accepting it?????????
 //                I suppose the initial solution should be to extract the character and once used successfully remove it
 //                so, replacing getFirstAutocompletionCharacterRemoved() by getFirstAutocompletionCharacter() and a function to actually delete that first feed forward character (and either consume or delete it)
-char getFirstAutocompletionCharacter(bool autogenerated){
+char getFirstAutocompletionCharacter(bool autogenerated){int32_t foid=getOwnerId(35);
 	// if autogenerated is set any first character should be returned, if not, the first feed forward character should be in a feed forward text associated with a token (i.e. autogenerated)
 	// most of time _firstTokenautocompletiontext will contain that first feed forward character
 	Mtokenautocompletiontext *tokenautocompletiontext=_firstTokenautocompletiontext;
@@ -753,7 +758,7 @@ char getFirstAutocompletionCharacter(bool autogenerated){
 	}
 	return '\0';
 }
-bool deleteFirstAutocompletionCharacter(char firstAutocompletionCharacter,bool consumed){
+bool deleteFirstAutocompletionCharacter(char firstAutocompletionCharacter,bool consumed){int32_t foid=getOwnerId(36);
 	if(firstAutocompletionCharacter!='\0'){
 		// find it
 		Mtokenautocompletiontext *prevtokenautocompletiontext=NULL,*tokenautocompletiontext=_firstTokenautocompletiontext;
@@ -783,7 +788,7 @@ bool deleteFirstAutocompletionCharacter(char firstAutocompletionCharacter,bool c
 					}
 				}else{ // a true delete
 					// replace the current text by what's behind the first character (if any)
-					tokenautocompletiontext->_text=(l>1?_getChars(p->chars+1):NULL);
+					tokenautocompletiontext->_text=(l>1?_getChars(p->chars+1,foid):NULL);
 					freeChars(p); // free the currently used dynamic memory still pointed to by p
 					if(!tokenautocompletiontext->_text){ // nothing left (or failing to copy the remainder over)
 						Mtokenautocompletiontext* nexttokenautocompletiontext=tokenautocompletiontext->_next; // remember where to link the previous to
@@ -802,7 +807,7 @@ bool deleteFirstAutocompletionCharacter(char firstAutocompletionCharacter,bool c
 	return false;
 }
 // MDH@30SEP2019: TODO still using the following for true feed forward deletes but should in due course be replaced by using the above two methods
-char getFirstAutocompletionCharacterRemoved(){
+char getFirstAutocompletionCharacterRemoved(){int32_t foid=getOwnerId(37);
 	if(amVerbose())inputInfo("%s","Determining the first feed forward character!");
 	char firstAutocompletionCharacterRemoved='\0';
 	// find first feed forward text with text (so skipping all without text)
@@ -817,7 +822,7 @@ char getFirstAutocompletionCharacterRemoved(){
 				deleteAutocompletionText(); // ESSENTIAL otherwise it wouldn't update the feed forward text when it needs to (when writing the behind cursor text!!)
 				if(amVerbose())inputInfo("First feed forward character '%c'.",firstAutocompletionCharacterRemoved);
 				// replace the current text by what's behind the first character (if any)
-				tokenautocompletiontext->_text=(l>1?_getChars(p->chars+1):NULL);
+				tokenautocompletiontext->_text=(l>1?_getChars(p->chars+1,foid):NULL);
 				freeChars(p); // free the currently used dynamic memory still pointed to by p
 				if(!tokenautocompletiontext->_text){ // nothing left (or failing to copy the remainder over)
 					Mtokenautocompletiontext* nexttokenautocompletiontext=tokenautocompletiontext->_next; // remember where to link the previous to
@@ -841,7 +846,7 @@ char getFirstAutocompletionCharacterRemoved(){
 // MDH@30SEP2019: now we should unconsume this character if it was last consumed
 // MDH@04SEP2019: immediate feed forward characters should ALWAYS be prepended explicitly and so true is to be passed in for \p new
 //                NOTE currently there are only two calls, one to prepend an immediate feed forward character (which should always be flagged as new), and left arrow prepending which is marked as false
-Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool new){
+Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool new){int32_t foid=getOwnerId(38);
 	Mtokenautocompletiontext* result=NULL;
 	if(c){
 		// possible recently consumed...
@@ -854,9 +859,9 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 			result=_lastConsumedAutocompletiontext;
 		}else{
 			// TODO for now always use an anonymous (nontoken) prepend
-			Mtokenautocompletiontext* autocompletiontext=CALLOC(sizeof(Mtokenautocompletiontext),'7');
+			Mtokenautocompletiontext* autocompletiontext=CALLOC(sizeof(Mtokenautocompletiontext),'7',foid);
 			if(autocompletiontext){
-				Mstring* _string=__string(); // free asap
+				Mstring* _string=__string(foid); // free asap
 				if(_string){
 					string_append_char(_string,c);
 					/*
@@ -866,9 +871,9 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 						autocompletiontext->_text=NULL; // just in case (of what?)
 					}
 					*/
-					autocompletiontext->_text=_getChars(string(_string));
+					autocompletiontext->_text=_getChars(string(_string),foid);
 					// free the memory occupied by the vessel
-					free_string(_string);
+					free_string(_string,foid);
 					// if our feed forward text is not the current first fft make it so
 					if(autocompletiontext!=_firstTokenautocompletiontext){autocompletiontext->_next=_firstTokenautocompletiontext;_firstTokenautocompletiontext=autocompletiontext;}
 					result=autocompletiontext; // remember the 
@@ -888,7 +893,7 @@ Mtokenautocompletiontext*  getAutocompletionTextOfCharacterPrepended(char c,bool
 // MDH@04OCT2019: deciding to keep the immediate feed forward text separate from the other feed forward texts, that way it is easier to merge the identifier continuation and feed forward texts
 Mstring* _immediateFeedforwardText=NULL;
 bool immediateFeedforwardToBeUpdated=false;
-bool updateImmediateFeedforwardTextOfUserInputCommand(){
+bool updateImmediateFeedforwardTextOfUserInputCommand(){int32_t foid=getOwnerId(39);
 	if(!_immediateFeedforwardText)return false; // should have one
 	char lastTokenImmediateFeedforwardCharacter=getImmediateFeedforwardCharacterOfUserInputCommand();
 	return(!lastTokenImmediateFeedforwardCharacter||!string_append_char(_immediateFeedforwardText,lastTokenImmediateFeedforwardCharacter));
@@ -912,7 +917,7 @@ bool updateImmediateFeedforwardTextOfUserInputCommand(){
 }
 */
 // the following functions are user input command specific
-Mtoken* setLastUserInputCommandToken(Mtoken* lastUserInputCommandToken){
+Mtoken* setLastUserInputCommandToken(Mtoken* lastUserInputCommandToken){int32_t foid=getOwnerId(40);
 	if(!_userInputCommand){inputError("%sNo user input command.",M_BUG_PREFIX);return NULL;}
 	_userInputCommand->_lastToken=lastUserInputCommandToken;
 	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=inIdentifierToken(lastUserInputCommandToken); // MDH@02OCT2019: as we're setting the type of the token AFTER creating it, we wait until after doing so to update identifierContinuationIsDirty!!	
@@ -948,12 +953,12 @@ size_t getNumberOfSuggestedCharacters(){return(_suggestedText?string_length(_sug
 size_t getCommandLength(){return getUserInputLength()+getNumberOfSuggestedCharacters();} // TODO not correct this way!!!!
 
 // request body of function moved over to Mshell.h/c
-void outputTimestamp(){				
-	Mstring* _promptTimestamp=_getTimestamp(NULL); // get a timestamp
+void outputTimestamp(){int32_t foid=getOwnerId(41);
+	Mstring* _promptTimestamp=_getTimestamp(NULL); // should return a disowned timestamp, so we do not need to obtain ownership that we need to detach on calling free_string
 	outputToFile(NULL,string(_promptTimestamp),">\n"); // pass it along to echoToOutputFile to show in front of < that indicates the start of an output fragment
 	if(_promptTimestamp)free_string(_promptTimestamp);
 }
-void showPrompt(){
+void showPrompt(){int32_t foid=getOwnerId(42);
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
 	///////////printf("%d-",commandIndex);
@@ -1005,7 +1010,7 @@ void showPrompt(){
 }
 
 // MDH@30OCT2019: we'd like to be able to continue a command on the next line
-bool showContinuedPrompt(){
+bool showContinuedPrompt(){int32_t foid=getOwnerId(44);
 	// ASSERT only to be called in command mode with _userInputCommand not NULL
 	// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
 	if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
@@ -1018,7 +1023,7 @@ bool showContinuedPrompt(){
 	/// can't call this here!!!! outputTokenColor(_userInputCommand->_lastToken);
 }
 // MDH@06MAY2020
-void outputTotalMemoryUsage(){
+void outputTotalMemoryUsage(){int32_t foid=getOwnerId(45);
 	if(!amVerbose()){
 		unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
 		long long numberOfAllocationMarks=-1; // i.e. only interested in the last (=current) mark
@@ -1037,7 +1042,7 @@ void outputTotalMemoryUsage(){
 }/* VALIDATED */
 // MDH@11MAY2020: if we want to know what changed since the previous mark as for the incremental memory usage
 //                it's easiest to ask for all and only show the changes
-long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMarks){
+long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMarks){int32_t foid=getOwnerId(46);
 	unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
 	long long numberOfAllocationMarks=incrementalNumberOfAllocationMarks+1; // request at least one more allocation mark than increments we need 
 	long long * _allocationTypeSizes=_getAllocationTypeSizes("",&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
@@ -1105,7 +1110,7 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 }/* VALIDATED */
 
 // MDH@30OCT2019 END
-void promptForUserInput(){
+void promptForUserInput(){int32_t foid=getOwnerId(47);
 	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
 	enableRawmode();
 	resetOutputColor();
@@ -1134,7 +1139,7 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 
-static size_t outputToken(Mtoken* _token){
+static size_t outputToken(Mtoken* _token){int32_t foid=getOwnerId(48);
 	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
 	if(numberOfCharactersToOutput>0){
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
@@ -1155,7 +1160,7 @@ static size_t outputToken(Mtoken* _token){
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
 // MDH@30APR2019: when a function returns to a variable and the other way round
-static void reoutputToken(Mtoken* _token){
+static void reoutputToken(Mtoken* _token){int32_t foid=getOwnerId(49);
 	if(!_token)return;
 	// outputChar('X');
 	size_t tokenLength=(_token->text?string_length(_token->text):0);
@@ -1178,14 +1183,14 @@ void clearInfo(){
 	toUserInputCursorPosition(toInfoInputLine());
 } // MDH@30OCT2019: toInfoInputLine() automatically clears the info input line!!!
 
-void inputInfoCommand(Mcommand* command){
+void inputInfoCommand(Mcommand* command){int32_t foid=getOwnerId(50);
 	size_t linesMovedUp=toInfoInputLine();
 	resetOutputColor();
 	if(command){Mtoken* token=command->_firstToken;while(token){output("%s|",string(token->text));token=token->next;}}
 	toUserInputCursorPosition(linesMovedUp);
 }
 
-void outputStatus(char inputChar,char inputCharType){
+void outputStatus(char inputChar,char inputCharType){int32_t foid=getOwnerId(51);
 	////////printf("[%u,%u]",getUserInputLength(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
@@ -1193,7 +1198,7 @@ void outputStatus(char inputChar,char inputCharType){
 	free_string(_separatedBehindCursorText);
 	//////outputInfo("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
 }
-void outputDebugInfo(){
+void outputDebugInfo(){int32_t foid=getOwnerId(52);
 	////////printf("[%u,%u]",getUserInputLength(),getCommandLength());
 	Mstring* _separatedBehindCursorText=_getAutoCompletionText('|');
 	/////////debugWrite("Status: Cursor position=%u - command length=%u - behind cursor text='%s'.",getUserInputLength(),getCommandLength(),string(feedforwardText));
@@ -1221,7 +1226,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 #define COMMAND_BLOCKSIZE 8
 Mcommand** commands=NULL; // array for storing the pointers to the first token of all commands entered
 uint32_t commandBlocks=0;
-bool registerCommand(Mcommand* command){
+bool registerCommand(Mcommand* command){int32_t foid=getOwnerId(53);
 	if(!command)return false;
 	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
@@ -1245,7 +1250,7 @@ bool registerCommand(Mcommand* command){
 	return false;
 }
 // MDH@21JUN2019: reset() takes care of removing all stored commands
-void reset(){
+void reset(){int32_t foid=getOwnerId(54);
 	newline();
 	if(commandCount>0){
 		output("Delete all remembered commands? ");
@@ -1398,7 +1403,7 @@ bool continuesOperator(Mtoken* _userInputCommand->_lastToken,char inputChar){
 bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
 
 // removeLastToken() removes the last user input command token, delegating the actual removal to removeLastCommandToken now defined in Mshell.h/c
-bool removeLastUserInputCommandToken(){
+bool removeLastUserInputCommandToken(){int32_t foid=getOwnerId(55);
 	if(!_userInputCommand||!_userInputCommand->_lastToken)return false;
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
 	deleteAutocompletionTextOfToken(_userInputCommand->_lastToken);
@@ -1407,7 +1412,7 @@ bool removeLastUserInputCommandToken(){
 }
 
 // MDH@04NOV2019: moved from line 1800 or so over here as it calls removeLastUserInputCommandToken() and we do not like to have to use prototypes TODO remove all prototype() definitions
-void updateUserInputCommandIdentifierContinuation(){
+void updateUserInputCommandIdentifierContinuation(){int32_t foid=getOwnerId(56);
 	// MDH@30OCT2019: simplified updating the identifier continuation a bit so wee do not need to be afraid that it won't work AND we no longer need the userInputCommandIdentifierContinuationNeedsUpdating flag!!!!
 	//                BUT right after a delete we should be allowed to set the flag so the continuation will be deleted and nothing more
 	//                OK, to make delete work, I have to check the NeedsUpdating flag which should be set to true when the token is set
@@ -1514,7 +1519,7 @@ void updateUserInputCommandIdentifierContinuation(){
 	if(amDebugging())inputInfo("User input command identifier continuation updated.");
 }/* VALIDATED */
 
-Mstring* _getCommandText(bool color){
+Mstring* _getCommandText(bool color){int32_t foid=getOwnerId(57);
 	Mstring* commandText=__string();
 	Mtoken* commandToken=_userInputCommand->_firstToken; // TODO can we get rid of using commandcount-1 here????
 	while(commandToken){
@@ -2995,7 +3000,7 @@ void showSeparatorLine(){
 	output("%.*s",3*columns,string(_separator)); // ASCII 196 is the character that spans an entire column in the middle (better then the underscore)
 }
 
-int main(int argc, char **argv){
+int main(int argc, char **argv){int32_t foid=getOwnerId(0); // using 0 is kind of an exception to the rule that every function has a positive function id
 
 	COMMAND_PROCESSOR_AVAILABLE=system(NULL); // check if there's a command processor available
 
@@ -3018,7 +3023,7 @@ int main(int argc, char **argv){
 	// MDH@07APR2020 NOTE until we do the following allocation types will NOT get registered (which resulted in bug reports when they got freed by the garbage collector at the end)
 	// tell user whether allocation recording is active!!!
 	if(allocationRecordingInitialized()){
-		if(addAllocation('!'/*,0*//*,1*/)<0){
+		if(addAllocation('!',foid)<0){
 			output("%sFailed to initialize allocation recording.",M_ERROR_PREFIX);
 			exit(1);
 		}

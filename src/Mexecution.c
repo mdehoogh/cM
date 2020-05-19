@@ -15,6 +15,9 @@
 
 #include "Mexecution.h"
 
+static int32_t const MODULE_ID=(9<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
 extern const char* const M_ERROR_PREFIX;

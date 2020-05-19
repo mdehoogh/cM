@@ -13,10 +13,10 @@ typedef struct {
     char chars[1];
 }Mchars;
 
-Mchars* __chars(size_t size,long long count,char type);
-Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,long long to_count,char type);
-void free_chars(Mchars const * const _chars,size_t size,long long count,char type);
+Mchars* __chars(size_t size,long long count,char type,int32_t oid);
+Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,long long to_count,char type,int32_t oid);
+Mchars* free_chars(Mchars const * const _chars,size_t size,long long count,char type,int32_t oid);
 
 // get Mchars* that contains exactly the characters in chars (nothing more), and the size is 1 (for single characters)
-Mchars* _getChars(char const * const chars);
-void freeChars(Mchars const * const _chars);
+Mchars* _getChars(char const * const chars,int32_t oid);
+void freeChars(Mchars const * const _chars,int32_t oid);

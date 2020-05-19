@@ -4,6 +4,9 @@
 
 #include "Mmemory.h"
 
+static int32_t const MODULE_ID=(8<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 extern char const * const M_ERROR_PREFIX;
 
 /**

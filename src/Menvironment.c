@@ -7,6 +7,9 @@
 
 #include "Menvironment.h"
 
+static int32_t const MODULE_ID=(16<<4);
+static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
@@ -29,16 +32,20 @@ extern const char * const VALUETYPENAMES[];
 // keep track of the current execution environment
 // MDH@03FEB2020: now wrapped inside a value
 static Mvalue* _executionEnvironmentValue=NULL;
-Menvironment* getExecutionEnvironment(){return getValueEnvironment(_executionEnvironmentValue);} // convenience method for obtaining the current execution environment from its wrapper
-Mstring* _getExecutionEnvironmentName(){return _getEnvironmentName(getExecutionEnvironment());}
-void outputExecutionEnvironmentName(char* prefix,char* suffix){
+Menvironment* getExecutionEnvironment(){int32_t foid=getOwnerId(1);
+    return getValueEnvironment(_executionEnvironmentValue);
+} // convenience method for obtaining the current execution environment from its wrapper
+Mstring* _getExecutionEnvironmentName(){
+    return _getEnvironmentName(getExecutionEnvironment());
+}
+void outputExecutionEnvironmentName(char* prefix,char* suffix){int32_t foid=getOwnerId(2);
     if(prefix)output("%s",prefix);
     Mstring* _environmentName=_getExecutionEnvironmentName();
     output("%s",string(_environmentName));
     if(suffix)output("%s",suffix);
     free_string(_environmentName);
 }
-bool pushExecutionEnvironment(Menvironment* _environment){
+bool pushExecutionEnvironment(Menvironment* _environment){int32_t foid=getOwnerId(3);
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
     Mvalue* _environmentValue=(_environment?_getValueOfEnvironment(_environment,false):NULL);
     if(!_environmentValue)return false;
@@ -51,7 +58,7 @@ bool pushExecutionEnvironment(Menvironment* _environment){
     if(amVerbose())outputExecutionEnvironmentName("New execution environment '","'.\n");
     return true;
 }/* NOT VALIDATED */
-void popExecutionEnvironment(){
+void popExecutionEnvironment(){int32_t foid=getOwnerId(4);
     Menvironment* _executionEnvironment=getExecutionEnvironment();
     if(!_executionEnvironment){outputBug("No environment left to pop!");return;} // nothing to pop
     // NOTE only execution environments that have a parent can be popped!!!
@@ -63,7 +70,9 @@ void popExecutionEnvironment(){
     assignValue(&_executionEnvironmentValue,_nextExecutionEnvironmentValue); // MDH@03FEB2020 replacing: _executionEnvironment=_previousExecutionEnvironment;
     if(amVerbose())outputExecutionEnvironmentName("Returned to execution environment '","'.\n");
 }/* NOT VALIDATED */
-Mvalue* getEnvironment(){return _executionEnvironmentValue;}/* VALIDATED */
+Mvalue* getEnvironment(){
+    return _executionEnvironmentValue;
+}/* VALIDATED */
 
 Mtoken* getEnvironmentExpressionToken(){
     // MDH@22JUL2019: let's allow breaking here
