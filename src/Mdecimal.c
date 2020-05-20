@@ -13,25 +13,25 @@ extern long double const M_LD_NAN;
 extern char const * const M_ERROR_PREFIX; // TODO rename to M_ERROR_PREFIX
 extern Mdecimalcontext* const M_DECIMALCONTEXT; // ASSERT should not be NULL whenever M is up and running
 
-mpd_t* get_mpd_copy(mpd_context_t const * mpd_context,mpd_t* mpd){
+mpd_t* get_mpd_copy(mpd_context_t const * mpd_context,mpd_t* mpd){int32_t foid=getOwnerId(1);
 	if(!mpd)return NULL;
 	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
-	mpd_t* _mpd=__mpd(mpd_context,0);
-	if(_mpd){uint32_t status=0;mpd_qcopy(_mpd,mpd,&status);if((status&0xEFBF)!=0){free_mpd(_mpd);_mpd=NULL;}}
-	return _mpd;
+	mpd_t* _mpd=OWNED(__mpd(mpd_context,0),foid);
+	if(_mpd){uint32_t status=0;mpd_qcopy(_mpd,mpd,&status);if((status&0xEFBF)!=0){free_mpd(DISOWNED(_mpd,foid));_mpd=NULL;}}
+	return DISOWNED(_mpd,foid);
 }
 
-
-void free_sincoselement(Msincoselement* _sincoselement){
+void free_sincoselement(Msincoselement* _sincoselement){int32_t foid=getOwnerId(2);
     if(_sincoselement){
 		if(_sincoselement->_next)free_sincoselement(_sincoselement->_next); // unlikely though
-        free_mpd(_sincoselement->_angle);free_mpd(_sincoselement->_sine);free_mpd(_sincoselement->_cosine);
-        FREE(_sincoselement,'#');
+        free_mpd(_sincoselement->_angle);free_mpd(_sincoselement->_sine);free_mpd(_sincoselement->_cosine); // MDH@20MAY2020: TODO whoever calls free_sincoselement needs to disown it first
+        void* ptr=OWNED(_sincoselement,foid);
+		if(ptr)FREE(ptr,'#',foid);else bug("Failed to obtain ownership of a sincos element.");
     }
 }
 
-mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){
-	mpd_context_t* _mpd_context=(mpd_context_t*)CALLOC(sizeof(mpd_context_t),'c'); // MDH@29APR2020: calloc replaced by CALLOC for sure, because it must match FREE(,'c') on mpd_context (see below)
+mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){int32_t foid=getOwnerId(3);
+	mpd_context_t* _mpd_context=(mpd_context_t*)CALLOC(sizeof(mpd_context_t),'c',foid); // MDH@29APR2020: calloc replaced by CALLOC for sure, because it must match FREE(,'c') on mpd_context (see below)
 	if(_mpd_context){
 		if(amVerbose())output("New decimal context with precision %lld created.\n",decimalprecision);
 		// initialize the new context to the default context (specification)
@@ -39,11 +39,12 @@ mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){
 		if(amVerbose())output("Decimal context with precision %u initialized.\n",mpd_getprec(_mpd_context));
 	}else
 		outputError("Failed to create a new decimal context");
-	return _mpd_context;
+	return DISOWNED(_mpd_context,foid);
 }
 
-void free_decimalcontext(Mdecimalcontext* _decimalcontext){
-	if(_decimalcontext->mpd_context)FREE(_decimalcontext->mpd_context,'c');
+void free_decimalcontext(Mdecimalcontext* _decimalcontext){int32_t foid=getOwnerId(4);
+	if(!_decimalcontext)return;
+	if(_decimalcontext->mpd_context)FREE(OWNED(_decimalcontext->mpd_context,foid),'c',foid);
 	if(_decimalcontext->pi)free_mpd(_decimalcontext->pi);
 	if(_decimalcontext->pimul2)free_mpd(_decimalcontext->pimul2);
 	if(_decimalcontext->pidiv2)free_mpd(_decimalcontext->pidiv2);
@@ -54,7 +55,8 @@ void free_decimalcontext(Mdecimalcontext* _decimalcontext){
 	for(int index=256;index>=0;index--)if(_decimalcontext->predefinedsines[index])free_mpd(_decimalcontext->predefinedsines[index]);
 	if(_decimalcontext->_firstCordicelement)free_sincoselement(_decimalcontext->_firstCordicelement);
 	if(_decimalcontext->_firstSincoselement)free_sincoselement(_decimalcontext->_firstSincoselement);
-	FREE(_decimalcontext,'C');
+	void* ptr=OWNED(_decimalcontext,foid);
+	if(ptr)FREE(ptr,'C',foid);
 }
 
 // if we want to keep a list of all decimal contexts, we need to be able to iterate over all decimal contexts to see if it is already there
@@ -63,50 +65,51 @@ typedef struct MdecimalcontextElement{
 	Mdecimalcontext* _decimalcontext;
 	struct MdecimalcontextElement* _next;
 }MdecimalcontextElement;
-void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement){
+void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement){int32_t foid=getOwnerId(5);
 	if(!_decimalcontextElement)return;
 	if(_decimalcontextElement->_next)free_decimalcontextElement(_decimalcontextElement->_next); // free whatever it is pointing to
 	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext); // free whatever decimal context it is referring to
-	FREE(_decimalcontextElement,'e');
+	void* ptr=OWNED(_decimalcontextElement,foid);
+	if(ptr)FREE(ptr,'e',foid);else bug("Failed to obtain the ownership of a decimal context element.");
 }
 static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;
 // to get the unique decimal context with the requested precision
-Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){
-	// do we already have it?
+static Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec){
 	if(prec<6)return NULL; // prec needs to be at least 6
 	MdecimalcontextElement *decimalcontextElement=_firstDecimalcontextElement;
 	while(decimalcontextElement&&decimalcontextElement->_decimalcontext->mpd_context->prec!=prec)decimalcontextElement=decimalcontextElement->_next;
-	if(!decimalcontextElement){ // not existing
-		decimalcontextElement=CALLOC(sizeof(MdecimalcontextElement),'e');
-		if(decimalcontextElement){
-			decimalcontextElement->_decimalcontext=CALLOC(sizeof(Mdecimalcontext),'C');
-			if(decimalcontextElement->_decimalcontext){
-				decimalcontextElement->_decimalcontext->mpd_context=__mpd_context(prec);
-				if(decimalcontextElement->_decimalcontext->mpd_context){
-					if(_lastDecimalcontextElement)_lastDecimalcontextElement->_next=decimalcontextElement;
-					_lastDecimalcontextElement=decimalcontextElement;
-					if(!_firstDecimalcontextElement)_firstDecimalcontextElement=_lastDecimalcontextElement;
-				}else{
-					free_decimalcontextElement(decimalcontextElement);decimalcontextElement=NULL;
-				}
-			}else{
-				free_decimalcontextElement(decimalcontextElement);decimalcontextElement=NULL;
-			}
-		}else
-			output("%sFailed to create the decimal context with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
-	}
 	return(decimalcontextElement?decimalcontextElement->_decimalcontext:NULL);
+}
+Mdecimalcontext* _getNewDecimalcontext(mpd_ssize_t prec){int32_t foid=getOwnerId(0); // NOTE a global so use module level id
+	Mdecimalcontext* decimalcontextElement=CALLOC(sizeof(MdecimalcontextElement),'e',foid);
+	if(decimalcontextElement){
+		decimalcontextElement->_decimalcontext=CALLOC(sizeof(Mdecimalcontext),'C',foid);
+		if(decimalcontextElement->_decimalcontext){
+			decimalcontextElement->_decimalcontext->mpd_context=OWNED(__mpd_context(prec),foid);
+			if(decimalcontextElement->_decimalcontext->mpd_context){
+				if(_lastDecimalcontextElement)_lastDecimalcontextElement->_next=decimalcontextElement;
+				_lastDecimalcontextElement=decimalcontextElement;
+				if(!_firstDecimalcontextElement)_firstDecimalcontextElement=_lastDecimalcontextElement;
+				return decimalcontextElement->_decimalcontext;
+			}
+			DISOWNED(decimalcontextElement->_decimalcontext,foid);
+		}
+		free_decimalcontextElement(DISOWNED(decimalcontextElement,foid));
+	}else
+		output("%sFailed to create the decimal context with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
+	return NULL;
 }
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
-Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
-    Mstring* _decimalText=__string();
+Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){int32_t foid=getOwnerId(7);
+    Mstring* _decimalText=OWNED(__string(),foid);
     if(_decimalText){
 		if(_decimal&&_decimal->mpd){
 			/////////outputChar('D');
             Mstring* _p=_decimalText;
             // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
             // NOTE if _decimal->repeating always use fixed-point notation
+			// MDH@20MAY2020 _decimalChars here eludes the dynamic allocation registration so essential to validate this function
             char* _decimalChars=mpd_format(_decimal->mpd,(fixedpoint||_decimal->repeating?"f":"g"),M_DECIMALCONTEXT->mpd_context);
             // output("Decimal rep: '%s'.\n",_decimalChars);
             if(_decimalChars){
@@ -132,11 +135,11 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
                 free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
             }else
                 _p=NULL;
-            if(!_p){free_string(_decimalText);_decimalText=NULL;}
+            if(!_p){free_string(DISOWNED(_decimalText,foid));_decimalText=NULL;}
         }else
 			string_append_char(_decimalText,'?');
     }else outputChar('?');
-    return _decimalText;
+    return DISOWNED(_decimalText,foid);
 }/* VALIDATED */
 
 /**
@@ -144,11 +147,14 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){
  * \param _decimal the decimal to copy
  * \return a copy of \p _decimal on success, or NULL otherwise
  */
-Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){
-	Mdecimalcontext* decimalcontext=(_decimal?_getDecimalcontext(_decimal->prec):NULL);
+Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){int32_t foid=getOwnerId(8);
+	if(!_decimal)return NULL;
+	Mdecimalcontext* decimalcontext=getDecimalcontext(_decimal->prec);if(!decimalcontext)decimalcontext=_getNewDecimalContext(_decimal->prec);
     if(!decimalcontext)return NULL;
-	mpd_t* _mpd=get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd); // make a copy
-	return(_mpd?_getDecimal(_mpd,_decimal->prec,_decimal->repeating,true):NULL); // if failing to wrap the mpd copy free it
+	mpd_t* _mpd=OWNED(get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd),foid); // make a copy
+	if(!_mpd)return NULL;
+	Mdecimal* _decimalCopy=OWNED(_getDecimal(_mpd,_decimal->prec,_decimal->repeating,true),foid);
+	return DISOWNED(_decimalCopy,foid); // if failing to wrap the mpd copy free it
 	/* replacing:
 	// TODO use get_mpd_copy() to copy the mpd in _decimal to speed things up, and use the
     Mdecimal* _decimalCopy=__decimal(M_DECIMALCONTEXT->mpd_context,0,_decimal->repeating);
@@ -168,18 +174,20 @@ typedef struct MbigintegerListelement{
     Mbiginteger* _biginteger;
     struct MbigintegerListelement* _next;
 }MbigintegerListelement;
-void free_bigintegerListelement(MbigintegerListelement* _bile){
+// MDH@20MAY2020: you can't free what isn't yours to start with, we can make it easy by allowing passing in the owner id of the big integer list element
+static void free_bigintegerListelement(MbigintegerListelement* _bile,int32_t oid){
     // ASSERT assume _bile to not be NULL
-    if(_bile->_next)free_bigintegerListelement(_bile->_next);
-    if(_bile->_biginteger)free_biginteger(_bile->_biginteger);
+    if(_bile->_next)free_bigintegerListelement(_bile->_next,oid);
+    if(_bile->_biginteger)free_biginteger(DISOWNED(_bile->_biginteger,oid));
+	FREE(_bile,'x',oid);
 }/* VALIDATED */
 
 // MDH@17JUN2019: convert a decimal (back) to a rational
-Mrational* _getDecimalRational(Mdecimal const * const decimal){
+Mrational* _getDecimalRational(Mdecimal const * const decimal){int32_t foid=getOwnerId(9);
     Mrational* _rational=NULL;
     if(decimal){
         // get the decimal text in fixed point format if it is not repeating, otherwise we always get in in fixed point but then without the closing ]
-        Mstring* _decimalText=_getDecimalText(decimal,decimal->repeating>0); // replacing: mpd_to_sci(_decimal->mpd,0);
+        Mstring* _decimalText=OWNED(_getDecimalText(decimal,decimal->repeating>0),foid); // replacing: mpd_to_sci(_decimal->mpd,0);
         if(_decimalText){
             char* decimalText=string(_decimalText); // a pointer to the chars array in _decimalString, so you can't free _decimalText until being finished with decimalText
             if(amVerbose())output("Decimal text to parse to rational: '%s'.\n",decimalText);
@@ -197,104 +205,128 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){
                     ////////output("Repeating text: '%s'.\n",repeatingText);
                     // 2. extract the big integer representing the repeating digits (which will be the third part of the numerator)
                     // locally used dynamic variables
-                    Mbiginteger *_num3=__biginteger(),*_bi10=_getBiginteger(10),*_den2=_getBiginteger(10),*_den1=_getBiginteger(1);
+                    Mbiginteger *_num3=OWNED(__biginteger(),foid),*_bi10=OWNED(_getBiginteger(10),foid),*_den2=OWNED(_getBiginteger(10),foid),*_den1=OWNED(_getBiginteger(1),foid);
                     ////////output("Temporary dynamic variables created.\n");
                     if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(MP_INT_POINTER(_num3),repeatingText,10)==MP_OKAY){
                         if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
-                        for(int i=decimal->repeating;i>1;i--)if(mp_mul(MP_INT_POINTER(_den2),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den2))!=MP_OKAY){outputError("Failed to multiply the second rational denominator part by 10");free_biginteger(_den2);_den2=NULL;break;}
+                        for(int i=decimal->repeating;i>1;i--)if(mp_mul(MP_INT_POINTER(_den2),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den2))!=MP_OKAY){
+							outputError("Failed to multiply the second rational denominator part by 10");
+							free_biginteger(DISOWNED(_den2,foid));
+							_den2=NULL;
+							break;
+						}
                         if(_den2&&mp_decr(MP_INT_POINTER(_den2))==MP_OKAY){ // _den2 computed (as 9999....9)
                             // let's determine the denominator
                             Mbiginteger* _den=NULL;
                             int numberOfNonRepeatingDecimalDigits=(int)(repeatingText-periodText-2); // compute the number of non repeating decimals
                             ///////////////////mp_int* _den1=_getBiginteger(1);
                             if(numberOfNonRepeatingDecimalDigits>0){
-                                while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
-								{outputError("Failed to multiply the first rational denominator part by 10");free_biginteger(_den1);_den1=NULL;}
+                                while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))
+									if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
+									{outputError("Failed to multiply the first rational denominator part by 10");free_biginteger(DISOWNED(_den1,foid));_den1=NULL;}
                                 if(_den1){
-                                    _den=__biginteger();
-                                    if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY)
-									{free_biginteger(_den);_den=NULL;}else if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
+                                    _den=OWNED(__biginteger(),foid);
+                                    if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY){
+										free_biginteger(DISOWNED(_den,foid));
+										_den=NULL;
+									}else 
+									if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
                                 }
                             }else
-                                _den=_getBigintegerCopy(_den2);
+                                _den=OWNED(_getBigintegerCopy(_den2),foid);
                             if(_den){ // denominator computed successfully, either to be bound or freed in this block
                                 *periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
                                 periodText++; // point periodText to the first digit behind the decimal period
                                 if(amVerbose())output("Behind period text: '%s'.\n",periodText);
                                 
                                 // the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
-                                Mbiginteger* _num=_getBigintegerCopy(_num3); // initialize _num to the repeating digits integer
+                                Mbiginteger* _num=OWNED(_getBigintegerCopy(_num3),foid); // initialize _num to the repeating digits integer
                                 // add the fixed part of the decimal digits (treated as integer)
                                 if(_num&&strlen(periodText)){ // something between the period and the repeating digits
-                                    Mbiginteger* _num2=__biginteger(); // _num2 is freed below, so that's good
-                                    if(mp_read_radix(MP_INT_POINTER(_num2),periodText,10)!=MP_OKAY||mp_mul(MP_INT_POINTER(_num2),MP_INT_POINTER(_den2),MP_INT_POINTER(_num2))!=MP_OKAY||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num2),MP_INT_POINTER(_num))!=MP_OKAY)
-									{free_biginteger(_num);_num=NULL;}
-                                    else 
+                                    Mbiginteger* _num2=OWNED(__biginteger(),foid); // _num2 is freed below, so that's good
+                                    if(mp_read_radix(MP_INT_POINTER(_num2),periodText,10)!=MP_OKAY||mp_mul(MP_INT_POINTER(_num2),MP_INT_POINTER(_den2),MP_INT_POINTER(_num2))!=MP_OKAY||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num2),MP_INT_POINTER(_num))!=MP_OKAY){
+										free_biginteger(DISOWNED(_num,foid));
+										_num=NULL;
+									}else 
                                     if(amVerbose())outputBiginteger("Non-repeating digits numerator part: '",_num2,"'.\n");
-                                    free_biginteger(_num2);
+                                    free_biginteger(DISOWNED(_num2,foid));
                                 }
                                 if(_num){ // so far so good
                                     // _num to be bound or freed in this block!!!
                                     // add the part in front of the period multiplied by _den1 but it could be zero of course
-                                    Mbiginteger* _num1=__biginteger(); // _mul1 freed below (which is reachable)
+                                    Mbiginteger* _num1=OWNED(__biginteger(),foid); // _mul1 freed below (which is reachable)
                                     if(mp_read_radix(MP_INT_POINTER(_num1),decimalText,10)==MP_OKAY){
                                         // of course the integer part could well be zero!!!!
                                         if(!isBigintegerZero(_num1)){
                                             if(mp_mul(MP_INT_POINTER(_num1),MP_INT_POINTER(_den),MP_INT_POINTER(_num1))!=MP_OKAY
-												||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY)
-											{free_biginteger(_num);_num=NULL;}else if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
+												||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){
+													free_biginteger(DISOWNED(_num,foid));
+													_num=NULL;
+											}else
+											if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
                                         }
-                                    }else{free_biginteger(_num);_num=NULL;}
-                                    free_biginteger(_num1);    
+                                    }else{
+										free_biginteger(DISOWNED(_num,foid));
+										_num=NULL;
+									}
+                                    free_biginteger(DISOWNED(_num1,foid));    
                                 }
                                 // negate the numerator if the decimal is negative
-                                if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){free_biginteger(_num);_num=NULL;}
-                                if(_num)_rational=_getRational(_num,_den,M_LD_NAN,true,false);
+                                if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){
+									free_biginteger(DISOWNED(_num,foid));
+									_num=NULL;
+								}
+                                if(_num)_rational=OWNED(_getRational(_num,_den,M_LD_NAN,true,false),foid);
                                 // if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
-                                if(!_rational){free_biginteger(_den);free_biginteger(_num);}
+                                if(!_rational){
+									free_biginteger(DISOWNED(_den,foid));
+									free_biginteger(DISOWNED(_num,foid));
+								}
                             }
                         }else
                             outputError("Failed to compute the second denominator multiplier");
                     }else
                         outputError("Failed to construct the integer containing the repeating digits");
-                    free_biginteger(_num3);
-                    free_biginteger(_bi10);
-                    free_biginteger(_den2);
-                    free_biginteger(_den1);
+                    free_biginteger(DISOWNED(_num3,foid));
+                    free_biginteger(DISOWNED(_bi10,foid));
+                    free_biginteger(DISOWNED(_den2,foid));
+                    free_biginteger(DISOWNED(_den1,foid));
                 }else{
                     if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
-                    Mbiginteger* _num=__biginteger();
+                    Mbiginteger* _num=OWNED(__biginteger(),foid);
                     if(_num){
-                        if(mp_read_radix(MP_INT_POINTER(_num),decimalText,10)==MP_OKAY)_rational=_getRational(_num,NULL,M_LD_NAN,false,false);
-                        if(!_rational)free_biginteger(_num); // if no rational _num is unbound and must be freed
+                        if(mp_read_radix(MP_INT_POINTER(_num),decimalText,10)==MP_OKAY)
+							_rational=OWNED(_getRational(_num,NULL,M_LD_NAN,false,false),foid);
+                        if(!_rational)free_biginteger(DISOWNED(_num,foid)); // if no rational _num is unbound and must be freed
                     }
                 }
             }else // we can go through the text????
-                _rational=_getDecimalTextRational(decimalText);
-            free_string(_decimalText); // OOPS use free_string() not free()!
+                _rational=OWNED(_getDecimalTextRational(decimalText),foid);
+            free_string(DISOWNED(_decimalText,foid)); // OOPS use free_string() not free()!
         }else
             outputError("Failed to convert the decimal to text");
     }
-    return _rational;
+    return DISOWNED(_rational,foid);
 }/* VALIDATED */
 
 // MDH@08OCT2019: TODO do we have this already somewhere else??????
-Mdecimal* _getBigintegerDecimal(Mbiginteger const * const biginteger){
+Mdecimal* _getBigintegerDecimal(Mbiginteger const * const biginteger){int32_t foid=getOwnerId(10);
 	Mdecimal* _bigintegerDecimal=NULL;
 	if(biginteger){
-		Mstring* _bigintegerText=_getBigintegerText(biginteger);
+		Mstring* _bigintegerText=OWNED(_getBigintegerText(biginteger),foid);
 		if(_bigintegerText){
-			_bigintegerDecimal=_getTextDecimal(string(_bigintegerText),0);
-			free_string(_bigintegerText);
+			_bigintegerDecimal=OWNED(_getTextDecimal(string(_bigintegerText),0),foid);
+			free_string(DISOWNED(_bigintegerText,foid));
 		}
 	}
-	return _bigintegerDecimal;
+	return DISOWNED(_bigintegerDecimal,foid);
 }/* VALIDATED */
 
-long double getDecimalLongDouble(Mdecimal* _decimal){
+long double getDecimalLongDouble(Mdecimal* _decimal){int32_t foid=getOwnerId(11);
 	// easiest way is to transform to text first, and take if from there...
 	long double ldDecimal=M_LD_NAN;
 	if(_decimal){
+		// MDH@20MAY2020: TODO same here _decimalText escaping memory management
 		char* _decimalText=mpd_to_sci(_decimal->mpd,0); // NOTE do NOT use _getDecimalText here!!!
 		if(_decimalText){ldDecimal=_strtold(_decimalText,ldDecimal);free(_decimalText);} // no need for this anymore
 	}
@@ -302,7 +334,7 @@ long double getDecimalLongDouble(Mdecimal* _decimal){
 }/* VALIDATED */
 
 // MDH@09OCT2019: TODO think we forgot to take the delta into account (if any)
-Mdecimal* _getRationalDecimal(Mrational const * const _rational){
+Mdecimal* _getRationalDecimal(Mrational const * const _rational){int32_t foid=getOwnerId(12);
     if(!_rational){outputError("No rational to convert to a decimal");return NULL;}
     // _decimalText is a local variable that when set should be freed before returning!!!
     Mstring* _decimalText=NULL;
@@ -311,13 +343,13 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
     if(denominator){
         // local variables to be freed at the end (so NOT before)
 		// MDH@15OCT2019: take the sign into account
-		Mbiginteger *_nonnegativenumerator=(mp_isneg(MP_INT_POINTER(numerator))?_getBigintegerNeg(numerator):numerator);
+		Mbiginteger *_nonnegativenumerator=(mp_isneg(MP_INT_POINTER(numerator))?OWNED(_getBigintegerNeg(numerator),foid):numerator);
 		if(_nonnegativenumerator){
-			Mbiginteger *_digit=__biginteger(),*_remainder=__biginteger(),*_bi10=_getBiginteger(10);
-			if(!_bi10){outputError("Failed to create big integer 10");return NULL;}
+			Mbiginteger *_digit=OWNED(__biginteger(),foid),*_remainder=OWNED(__biginteger(),foid),Mbiginteger* _bi10=OWNED(_getBiginteger(10),foid);
+			// MDH@20MAY2020 can't do this because there would be dangling owned pointers: if(!_bi10){outputError("Failed to create big integer 10");return NULL;}
 			if(_digit&&_remainder&&_bi10&&mp_div(MP_INT_POINTER(_nonnegativenumerator),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))==MP_OKAY){
 				// the integer part is _dividend
-				_decimalText=_getBigintegerText(_digit);
+				_decimalText=OWNED(_getBigintegerText(_digit),foid);
 				if(_decimalText&&!isBigintegerZero(_remainder)){ // we've got a fraction to add!!!
 					Mstring* _p=string_append_char(_decimalText,'.'); // append the decimal period, storing the result in _p so we will know when that failed...
 					// in order to find the repeating fraction we have to continue computing the remainders
@@ -354,15 +386,16 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
 						}
 
 						// remainder hasn't appeared before so store it in the list of remainders
-						_remainderListelement=(MbigintegerListelement*)calloc(1,sizeof(MbigintegerListelement)); // NOTE re-use of _remainderListelement
+						_remainderListelement=(MbigintegerListelement*)CALLOC(sizeof(MbigintegerListelement),'b',foid); // NOTE re-use of _remainderListelement
 						if(!_remainderListelement){outputError("Failed to create a big integer list element for storing the new remainder");_p=NULL;break;}
 
 						// at this point we have a new remainder list element (in _remainderListelement) that should be bound or freed
-						_remainderListelement->_biginteger=_getBigintegerCopy(_remainder); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
+						_remainderListelement->_biginteger=OWNED(_getBigintegerCopy(_remainder),foid); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
 						if(!_remainderListelement->_biginteger){
 							outputError("Failed to store the remainder");
-							free(_remainderListelement); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
-							_p=NULL;break;
+							FREE(_remainderListelement,'b',foid); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
+							_p=NULL;
+							break;
 						}
 						// 'store' _remainderListelement in the list (this means that we can be certain that _remainderListelement will be freed after the loop ends)
 						if(!lastRemainderListelement)_firstRemainderListelement=_remainderListelement;else lastRemainderListelement->_next=_remainderListelement;
@@ -373,48 +406,65 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){
 						if(!remainderValue){outputError("Failed to store the remainder");break;}
 						if(appendedToList(_remainderList,remainderValue,0)<=0){free_value(remainderValue);outputError("Failed to remember the remainder in order to recognized the repeating fraction");break;}
 						*/
-						if(mp_mul(MP_INT_POINTER(_remainder),MP_INT_POINTER(_bi10),MP_INT_POINTER(_remainder))!=MP_OKAY)
-						{outputError("Failed to multiply the remainder by 10");_p=NULL;break;}
+						if(mp_mul(MP_INT_POINTER(_remainder),MP_INT_POINTER(_bi10),MP_INT_POINTER(_remainder))!=MP_OKAY){
+							outputError("Failed to multiply the remainder by 10");
+							_p=NULL;
+							break;
+						}
 						if(amVerbose()){outputBiginteger("Dividing '",_remainder,"'");outputBiginteger(" by '",denominator,"'.\n");}
+						
 						// _digit and _remainder are getting re-used here as well, which does not pose a problem (so we've created them once)
-						if(mp_div(MP_INT_POINTER(_remainder),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))!=MP_OKAY)
-						{outputError("Failed to perform a long division to obtain the next decimal digit");_p=NULL;break;}
+						if(mp_div(MP_INT_POINTER(_remainder),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))!=MP_OKAY){
+							outputError("Failed to perform a long division to obtain the next decimal digit");
+							_p=NULL;
+							break;
+						}
 						if(amVerbose()){outputBiginteger("Digit: '",_digit,"'");outputBiginteger(" and remainder '",_remainder,"'.\n");}
 
 						// append the dividend to the decimal text
 						// NOTE that _digitText is freed as soon as possible
-						_digitText=_getBigintegerText(_digit);
-						if(!_digitText){outputError("Failed to store the next decimal character");_p=NULL;break;}
+						_digitText=OWNED(_getBigintegerText(_digit),foid);
+						if(!_digitText){
+							outputError("Failed to store the next decimal character");
+							_p=NULL;
+							break;
+						}
 						_p=string_append(_p,string(_digitText));
-						free_string(_digitText);
+						free_string(DISOWNED(_digitText,foid));
 
 						if(amVerbose())if(_p)output("Decimal text so far: '%s'.\n",string(_p));
 
 						// if the remainder is zero (NOW stored in _remainderListelement->_biginteger instead of _remainder), we're done (it's a finite decimal fraction)
-						if(isBigintegerZero(_remainderListelement->_biginteger)){if(amVerbose())outputInfo("Remainder is zero, so the decimal is finished.");break;}
+						if(isBigintegerZero(_remainderListelement->_biginteger)){
+							if(amVerbose())outputInfo("Remainder is zero, so the decimal is finished.");
+							break;
+						}
 					}
 					if(_firstRemainderListelement)free_bigintegerListelement(_firstRemainderListelement); // replacing: free_list(_remainderList);
-					if(!_p){free_string(_decimalText);_decimalText=NULL;} // some failure occurred
+					if(!_p){free_string(DISOWNED(_decimalText,foid));_decimalText=NULL;} // some failure occurred
 				}
 			}
 			// prepend the sign if the numerator is negative TODO what if this fails?????
 			if(mp_isneg(MP_INT_POINTER(numerator))){
-				if(_decimalText&&!string_insert_char(_decimalText,0,'-')){free_string(_decimalText);_decimalText=NULL;}
-				free_biginteger(_nonnegativenumerator);
+				if(_decimalText&&!string_insert_char(_decimalText,0,'-')){free_string(DISOWNED(_decimalText,foid));_decimalText=NULL;}
+				free_biginteger(DISOWNED(_nonnegativenumerator,foid));
 			}
 			// free all locally used pointers to dynamic memory
-			free_biginteger(_digit);free_biginteger(_remainder);free_biginteger(_bi10);
+			free_biginteger(DISOWNED(_digit,foid));free_biginteger(DISOWNED(_remainder,foid));free_biginteger(DISOWNED(_bi10,foid));
 		}
     }else
-        _decimalText=_getBigintegerText(numerator);
+        _decimalText=OWNED(getBigintegerText(numerator),foid);
     // parse _decimalText to a decimal
     Mdecimal* _decimal=NULL;
     if(_decimalText){
-        _decimal=_getTextDecimal(string(_decimalText),repeating);
-        if(!_decimal)output("%sFailed to parse decimal text '%s' of the corresponding rational",M_ERROR_PREFIX,string(_decimalText));else if(amVerbose())outputDecimal("Decimal of rational: '",_decimal,"'.\n");
-        free_string(_decimalText);
+        _decimal=OWNED(_getTextDecimal(string(_decimalText),repeating),foid);
+        if(!_decimal)
+			output("%sFailed to parse decimal text '%s' of the corresponding rational",M_ERROR_PREFIX,string(_decimalText));
+		else 
+		if(amVerbose())outputDecimal("Decimal of rational: '",_decimal,"'.\n");
+        free_string(DISOWNED(_decimalText,foid));
     }
-    return _decimal;
+    return DISOWNED(_decimal,foid);
 }/* VALIDATED */
 
 // decimalerrorstatus() filter out the rounding and inexact 'errors'
@@ -503,7 +553,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
  * \param value the (initial) value of the returned mpd_t instance
  * \return on success the mpd_t instance equal to \p value, NULL otherwise
  */
-mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){
+mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){int32_t foid=getOwnerId(13); // MDH@20MAY2020: TODO mpd_qnew NOT under memory allocation management!!!
     mpd_t* _mpd=NULL;
 	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
     // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
@@ -528,24 +578,27 @@ mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){
  * \brief frees \p mpd, calling mpd_del()
  * \param mpd the mpdecimal instance to free
  */
-void free_mpd(mpd_t* _mpd){if(_mpd)mpd_del(_mpd);}/* VALIDATED */
+void free_mpd(mpd_t* _mpd){int32_t foid=getOwnerId(14);
+	if(_mpd)mpd_del(_mpd);
+}/* VALIDATED */
 
 /**
  * \brief frees \p decimal, delegating to free_mpd() for freeing the contained mpdecimal instance
  */
-void free_decimal(Mdecimal* decimal){
-    if(decimal){
-        if(amVerbose()&&amDebugging())output("Freeing decimal.\n");
-        if(decimal->mpd)free_mpd(decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
-        FREE(decimal,'D');
-    }else
-    	outputError("No decimal to free");
+void free_decimal(Mdecimal* decimal){int32_t foid=getOwnerId(15);
+	if(!decimal)return;
+    if(amVerboseDebugging())output("Freeing decimal.\n");
+    if(decimal->mpd)free_mpd(decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
+    FREE(OWNED(decimal,foid),'D',foid);
 }/* VALIDATED */
 
 /**
  * \brief returns an uninitialized but cleared decimal (i.e. without an initialized mpd pointer)
  */
-Mdecimal* __adecimal(){return (Mdecimal*)CALLOC(sizeof(Mdecimal),'D');} /* VALIDATED */
+Mdecimal* __adecimal(){int32_t foid=getOwnerId(16);
+	Mdecimal* _adecimal=(Mdecimal*)CALLOC(sizeof(Mdecimal),'D',foid);
+	return DISOWNED(_adecimal,foid);
+} /* VALIDATED */
 
 /**
  * \brief returns a decimal initialized to \p value with the precision specified by \p mpd_context and number of repeating digits equal to \p repeating
@@ -553,41 +606,41 @@ Mdecimal* __adecimal(){return (Mdecimal*)CALLOC(sizeof(Mdecimal),'D');} /* VALID
  * \param value the initial (integer) value of the decimal
  * \param repeating the number of repeating decimal digits at the end
  */
-Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating){
+Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating){int32_t foid=getOwnerId(17);
     Mdecimal* _decimal=NULL;
     if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context; // use the application-wide decimal context if no context is defined
     if(mpd_context){
-        _decimal=__adecimal(); // get an uninitialized decimal
+        _decimal=OWNED(__adecimal(),foid); // get an uninitialized decimal
         if(_decimal){
             _decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
             if(_decimal->mpd){
                 _decimal->repeating=repeating;
                 _decimal->prec=mpd_context->prec;
             }else{
-                FREE(_decimal,'D');
+                FREE(_decimal,'D',foid);
                 _decimal=NULL;
             }
         }else
             outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
     }else
         outputError("No context to create decimal in");
-    return _decimal;
+    return DISOWNED(_decimal,foid);
 }/* VALIDATED */
 
 // MDH@29AUG2019: as mpd_t does not itself store the precision with which the decimal was created AND an Mdecimal* does store the precision I've added the prec parameter
 /**
  * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
  */
-Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){
+Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){int32_t foid=getOwnerId(18);
     if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
-    Mdecimal* _decimal=__adecimal(); // always using the default decimal context
+    Mdecimal* _decimal=OWNED(_adecimal(),foid); // always using the default decimal context
     if(_decimal){
 		////////output("Wrapping decimal with precision %u.\n",prec);
 		_decimal->mpd=_mpd;_decimal->prec=prec;_decimal->repeating=repeating;
 		////////output("Decimal with precision %u wrapped.\n",prec);
 	}else
 	if(freeonfailure)free_mpd(_mpd);
-    return _decimal;
+    return DISOWNED(_decimal,foid);
 }/* VALIDATED */
 
 /**

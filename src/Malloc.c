@@ -625,7 +625,7 @@ static bool attachAllocationInfo(void* ptr,char type,int32_t ownerId,size_t size
     // MDH@13APR2020: all Mmalloc calls represent fixed size allocations
     long long allocationIndex=registerAllocation(type,ownerId,size,1); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
     if(allocationIndex<0)return false;
-    Malloc* _alloc=(Malloc*)((char*)ptr+size);
+    Malloc* _alloc=(Malloc*)ptr/*((char*)ptr+size)*/;
     _alloc->allocationType=type; // register the type
     _alloc->allocationIndex=allocationIndex;
     return true;
@@ -648,7 +648,7 @@ void* Mmalloc(size_t size,char type,int32_t ownerId){
         ptr=malloc(size);
 #endif
     }
-    return ptr;
+    return ((char*)ptr)+sizeof(Malloc);
 }
 
 void* Mcalloc(size_t size,char type,int32_t ownerId){
@@ -664,16 +664,16 @@ void* Mcalloc(size_t size,char type,int32_t ownerId){
         ptr=calloc(1,size);
 #endif
     }
-    return ptr;
+    return ((char*)ptr)+sizeof(Malloc);
 }
 
 // MDH@18MAY2020: passing along ownership is done through macros DISOWNED and OWNED 
 //                unfortunately we need to know the size so we can find the allocation id
 #ifndef __PRODUCTION__
-void* Mdisowned(void* ptr,size_t size,int32_t ownerId){
+void* Mdisowned(void* ptr/*,size_t size*/,int32_t ownerId){
     // you can only disown what you own!!
-    if(ptr&&size>0&&ownerId>0){
-        Malloc* _alloc=(Malloc*)(((char*)ptr)+size);
+    if(ptr/*&&size>0*/&&ownerId>0){
+        Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/*+size*/);
         if(_alloc->allocationIndex>0){
             // let's toggle the ownership if it matches
             if(allocations._owners[_alloc->allocationIndex].id==ownerId)
@@ -685,9 +685,10 @@ void* Mdisowned(void* ptr,size_t size,int32_t ownerId){
     }
     return ptr;
 }
-void* Mowned(void* ptr,size_t size,int32_t ownerId){
-    if(ptr&&size>0&&ownerId>0){
-        Malloc* _alloc=(Malloc*)(((char*)ptr)+size);
+void* Mowned(void* ptr/*,size_t size*/,int32_t ownerId){
+    // MDH@20MAY2020: you can only own something if disowned by the previous owner (in which case ownerId should be negative)
+    if(ptr/*&&size>0*/&&ownerId>0){
+        Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
         if(_alloc->allocationIndex>0){
             // let's toggle the ownership if it matches
             if(allocations._owners[_alloc->allocationIndex].id<0)
@@ -715,6 +716,7 @@ int32_t Mowner(void* ptr,size_t size){
 //                unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
 void Mfree(void* ptr,char allocationType,int32_t ownerId){
     if(!ptr)return;
+    ptr=((char*)ptr)-sizeof(Malloc); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
     info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",allocationType);
     /////info("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
@@ -745,7 +747,7 @@ void Mfree(void* ptr,char allocationType,int32_t ownerId){
     }
     // MDH@14APR2020 NOTE: the following is about removing the allocation
 #ifndef __PRODUCTION__
-    Malloc* _alloc=(Malloc*)(((char*)ptr)+size);
+    Malloc* _alloc=(Malloc*)ptr;/* MDH@20MAY2020: (((char*)ptr)+size)*/;
     if(_alloc->allocationType!=allocationType){
         bug("Allocation type of dynamic memory '%c' (%u) freed of size %zd does not match provided allocation type '%c'.\n",_alloc->allocationType,_alloc->allocationType,size,allocationType);
         dump(ptr,size,size);
@@ -818,7 +820,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
     info("\n*************************** Reallocating %llu blocks of size %zd to %llu blocks of dynamic memory of type '%c' ***************************\n",from_count,size,to_count,allocationType);
 #endif
     if(freed!=occupied){ // amount changed
-        Malloc* _alloc=(freed>0?(Malloc*)(((char*)ptr)+freed):NULL); // pointer to Malloc allocation registration appendix
+        Malloc* _alloc=(freed>0?(Malloc*)ptr/* MDH@20MAY2020: (((char*)ptr)+freed)*/:NULL); // pointer to Malloc allocation registration appendix
         long long allocationIndex=-1;
 #ifndef __PRODUCTION__
         Malloc newAllocation={allocationType,0}; // default to the given allocation type
@@ -881,7 +883,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
                         _alloc->allocationIndex=allocationIndex;
                         info("New allocation information stored...\n");
                     }else{ // not a first time allocation, so we can simply copy the allocation over
-                        Malloc* _newalloc=(Malloc*)(((char*)newptr)+occupied);
+                        Malloc* _newalloc=(Malloc*)newptr;/* MDH@20MAR2020: (((char*)newptr)+occupied)*/;
                         _newalloc->allocationType=newAllocation.allocationType;
                         _newalloc->allocationIndex=newAllocation.allocationIndex;
                         // replacing: memcpy(_newalloc,_alloc,sizeof(Malloc)); // replacing:  *((Malloc*)(((char*)newptr)+occupied))=*_alloc; // copying the allocation structure over // OOPS ptr replaced by newptr (what it should be I guess)
@@ -933,7 +935,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,cha
             */
         }
     }
-    return newptr;
+    return ((char*)newptr)+sizeof(Malloc);
 }
 
 static long long getAllocationTypeSize(unsigned long long allocationTypeIndex,unsigned long long allocationMarkIndex){

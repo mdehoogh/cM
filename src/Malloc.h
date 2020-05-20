@@ -86,16 +86,16 @@ void Mfree(void* ptr,char type,int32_t ownerId); // releasing a single item of a
 #define CALLOC(size,type,ownerId) Mcalloc((size),(type),(ownerId))
 #define REALLOC(ptr,from_count,to_count,size,type,ownerId) Mrealloc((ptr),(from_count),(to_count),(size),(type),(ownerId))
 #define FREE(ptr,type,ownerId) Mfree((ptr),(type),(ownerId))
-#define DISOWNED(ptr,size,ownerId) Mdisowned((ptr),(size),(ownerId))
-#define OWNED(ptr,size,ownerId) Mowned((ptr),(size),(ownerId))
+#define DISOWNED(ptr,ownerId) Mdisowned((ptr),(ownerId))
+#define OWNED(ptr,ownerId) Mowned((ptr),(ownerId))
 #else
 // use the system methods
 #define MALLOC(size,type,ownerId) malloc((nitems)*(size))
 #define CALLOC(size,type,ownerId) calloc(1,(size))
 #define FREE(ptr,type,ownerId) free(ptr)
 #define REALLOC(ptr,from_nitems,to_nitems,size,type,ownerId) realloc((ptr),(to_nitems)*(size))
-#define DISOWNED(ptr,size,ownerId) (ptr)
-#define OWNED(ptr,size,ownerId) (ptr)
+#define DISOWNED(ptr,ownerId) (ptr)
+#define OWNED(ptr,ownerId) (ptr)
 #endif
 
 // MDH@04MAY2020: asking for the allocation type sizes
