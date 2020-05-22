@@ -145,7 +145,7 @@ Mvalue* _getValueOfList(Mlist* _list,bool freeonfailure,int32_t oid);
 Mvalue* _getValueOfInteger(Minteger* _integer,bool freeonfailure,int32_t oid);
 Mvalue* _getValueOfReal(Mfloat* _real,bool freeonfailure,int32_t oid);
 Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure,int32_t oid);
-Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure,int32_t oid);
+Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure);
 
 Mlist* _getListOfType(Mvaluetype valuetype,int32_t oid);
 Mmap* _getMapOfType(Mvaluetype valuetype,int32_t oid);

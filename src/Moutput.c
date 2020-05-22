@@ -10,8 +10,8 @@
 
 #include "Moutput.h"
 
-static int32_t const MODULE_ID=(1<<4);
-static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+static uint32_t const MODULE_ID=1;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
 static FILE* outputFile=NULL;
 

@@ -4,10 +4,10 @@
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //                TODO if blocks is zero failed to 
-static int32_t MODULE_ID=(5<<4);
-static int32_t getOwnerId(uint16_t functionId){return(functionId>>12?0:(MODULE_ID<<12)+functionId);}
+static uint32_t MODULE_ID=5;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
-/** MDH@25DEC2018: 
+/** MDH@25DEC2018:
  *  this code is from the Internet to implement a mutable string
  *  however, letting string_get_all() return a string allocated on the heap which means it needs to be freed is 
  *  not a good idea, as we will need to release the returned pointer afterwards
@@ -15,9 +15,9 @@ static int32_t getOwnerId(uint16_t functionId){return(functionId>>12?0:(MODULE_I
  */
 
 /** Create a String */
-Mstring* __string(int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(1));
+Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
     // MDH@09APR2020: because sizeof(Mstring) would not include what we need for the characters pointed to by chars, we need to allocated one BLOCK_SIZE of characters to start with
-    Mstring* ans=CALLOC(sizeof(Mstring),'S',foid);
+    Mstring* ans=CALLOC(sizeof(Mstring),'S',owner);
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         // the size of each allocation is BLOCKSIZE characters
@@ -26,8 +26,8 @@ Mstring* __string(int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(1));
         //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
         // MDH@16APR2020: using Mchars* instance
         // MDH@03MAY2020 OOPS the size should go first!!!
-        ans->_chars=__chars(M_BLOCK_SIZE,1,'s',foid);
-        if(!ans->_chars){FREE(ans,'S',foid);ans=NULL;}else ans->blocks=1;
+        ans->_chars=OWNED_BY(__chars(M_BLOCK_SIZE,1,'s'),ans);
+        if(!ans->_chars){FREE(ans,'S',owner);ans=NULL;}else ans->blocks=1;
         /* replacing:
         ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
@@ -37,24 +37,25 @@ Mstring* __string(int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(1));
 #ifdef __DEBUGGING__
     if(!ans)printf("\nFailed to create a string.");
 #endif
-    return ans;
+    return DISOWNED(ans,owner);
 }
 
-Mstring* _getString(const char* const s,int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(2));
+Mstring* _getString(const char* const s){Mallocationowner owner=getOwner(__LINE__);
     if(!s)return NULL;
-    Mstring* ans=CALLOC(sizeof(Mstring),'S',foid);
+    Mstring* ans=CALLOC(sizeof(Mstring),'S',owner);
     if(ans){
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         size_t l=strlen(s);
         // MDH@17APR2020: Mchars* replacing char*
         size_t blocks=1+(l/M_BLOCK_CHARACTERS);
-        ans->_chars=__chars(M_BLOCK_SIZE,blocks,'s',foid);
+        // NOTE __chars will return a disowned pointer which can then be owned by ans unless we create a subowned macro that will simply increment the level of ownership
+        ans->_chars=SUBOWNED(OWNED(__chars(M_BLOCK_SIZE,blocks,'s'),owner));
         if(ans->_chars){
             ans->length=l;
             ans->blocks=blocks;
             memcpy(ans->_chars->chars,s,ans->length); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
         }else{ // failure
-            FREE(ans,'S',foid);ans=NULL;
+            FREE(ans,'S',owner);ans=NULL;
         }
         /* replacing:
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
@@ -73,7 +74,7 @@ Mstring* _getString(const char* const s,int32_t oid){int32_t foid=(oid>0?oid:-ge
     if(!ans)printf("\nFailed to create a string.");
 #endif
     // MDH@19MAY2020: do NOT disown ans because whoever's receiving it should obtain ownership and you can only grab ownership on pointers currently being owned unless disowning
-    return ans;
+    return DISOWNED(ans,owner);
 }
 
 // MDH@17APR2020: it's best for every variable size allocation unit to have a method that will return its size to be used in a call to REALLOC as from_count
@@ -81,11 +82,12 @@ static size_t getSizeOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_SIZE*
 static size_t getNumberOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_CHARACTERS*str->blocks:0);}
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
-Mstring* _stringCopy(Mstring* const src,size_t length,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(3));
+Mstring* _stringCopy(Mstring* const src,size_t length){Mallocationowner owner=getOwner(__LINE__);
+
     if(!src)return NULL;
     // MDH@17APR2020: replacing src->chars by src->_chars->chars
     src->_chars->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    Mstring* _result=_getString(src->_chars->chars,foid);
+    Mstring* _result=OWNED(_getString(src->_chars->chars),owner);
     if(length>0)if(_result)string_setlength(_result,length);
     return _result;
     /* replacing:
@@ -113,14 +115,15 @@ Mstring* _stringCopy(Mstring* const src,size_t length,int32_t oid){int32_t foid=
  */
 // MDH@18MAY2020: you can see what a nuisance it is to free a string for somebody else because the caller needs to DISOWN it first, then I have to obtain ownership otherwise I can't free it
 //                then there's str->_chars that we need to take ownership off as well
-Mstring* free_string(Mstring* str,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(4));    
+Mstring* free_string(Mstring* str,Mallocationowner owner){   
     // in order to be able to free_chars but perhaps we do not need to disown str->_chars before calling free_chars????????
-    if(OWNED(str,sizeof(Mstring),foid)&&OWNED(str->_chars,M_BLOCK_SIZE*str->blocks,foid)){
+    if(str){
         // MDH@17APR2020: replacing src->chars by src->_chars->chars
         // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
-        free_chars(DISOWNED(str->_chars,M_BLOCK_SIZE*str->blocks,foid),M_BLOCK_SIZE,str->blocks,'s');
+        // MDH@22MAY2020: subpointers can be disowned by passing in the superpointer owner i.e. it is NOT necessary to pass in it's own owner id (which indicates it is a subpointer)
+        free_chars(DISOWNED(str->_chars,owner),M_BLOCK_SIZE,str->blocks,'s');
         // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
-        FREE(str,'S',foid);
+        FREE(str,'S',owner);
         return NULL;
     }
     return str;
@@ -132,8 +135,13 @@ size_t string_length(Mstring const * const str){return(str?str->length:0);}
 bool string_empty(Mstring const * const str){return(str?str->length==0:true);} // MDH@17APR2020: removing 
 
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
-Mstring* string_setlength(Mstring* const str,size_t length,int32_t oid){int32_t foid=(oid>0?oid:getOwnerId(5));
-    if(!str)return NULL;
+Mstring* string_setlength(Mstring* const str,size_t length,Mallocationowner owner){
+    // MDH@22MAY2020: here we have a bit of an issue, because str->chars might change, although str won't change in which case we really need the oid from the caller
+    //                unless we could extract ownership from str->chars itself????
+    //                unless we decide that subpointers do not need to be owned?????
+    //                it's obviously that they are NOT owned by a function (or module), ok, so that will be the decision
+    //                nevertheless instead of a foid we could pass in the pointer of which it is a subclass
+    // if(!OWNED(str,owner))return NULL;
     if(length>str->length){ // we're supposed to increment the length
         // how many blocks do we need
         size_t blocks=1+(length/M_BLOCK_CHARACTERS);
@@ -141,10 +149,10 @@ Mstring* string_setlength(Mstring* const str,size_t length,int32_t oid){int32_t 
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
             // MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
-            Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s',foid);
+            Mchars* new_chars=OWNED(_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s'),owner); // MDH@22MAY2020: by using -foid we disown it immediately
             if(!new_chars)return NULL; // failure
             str->blocks=blocks;
-            str->_chars=new_chars;
+            str->_chars=SUBOWNED(new_chars); // as soon as new_chars is stored in str->_chars which is a subpointer, we move the ownership to 0 i.e. it is safe if the containing pointer is
             /* replacing:
             char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
             if (!new_str)return NULL; // failure!!

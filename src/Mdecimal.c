@@ -5,8 +5,8 @@
 
 #include "Mdecimal.h"
 
-static int32_t const MODULE_ID=(12<<4);
-static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+static uint32_t const MODULE_ID=12;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 extern long double const M_LD_NAN;

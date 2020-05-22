@@ -1,16 +1,16 @@
 #include "Mbiginteger.h"
 
 static int32_t const MODULE_ID=(10<<4);
-static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
 extern const long long M_LL_INVALID,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 
-Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){
+Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){Mallocationowner owner=getOwner(__LINE__);
     if(!_biginteger)return NULL;
-    Mbiginteger* _bineg=__biginteger();
+    Mbiginteger* _bineg=OWNED(__biginteger(),owner);
     if(_bineg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bineg))!=MP_OKAY)
-    {free_biginteger(_bineg);_bineg=NULL;outputError("Failed to negate a big integer");}
-    return _bineg;
+    {free_biginteger(_bineg,owner);_bineg=NULL;outputError("Failed to negate a big integer");}
+    return DISOWNED(_bineg,owner);
 }
 
 long long getBigintegerSign(Mbiginteger const * const biginteger){

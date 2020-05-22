@@ -4,8 +4,8 @@
 
 #include "Mvalue.h"
 
-static int32_t const MODULE_ID=(13<<4);
-static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+static uint32_t const MODULE_ID=13;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
@@ -534,10 +534,10 @@ Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){
     if(_value){_value->type=VT_MAP;_value->value._map=_map;}else if(freeonfailure)free_map(_map);
     return _value;
 }/* VALIDATED */
-Mvalue* _getValueOfToken(Mtoken* _token,bool freeonfailure){
+Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner){
     if(!_token)return NULL;
-    Mvalue* _value=__value("token");
-    if(_value){_value->type=VT_TOKEN;_value->value._token=_token;}else if(freeonfailure)free_token(_token);
+    Mvalue* _value=OWNED(__value("token"),owner);
+    if(_value){_value->type=VT_TOKEN;_value->value._token=SUBOWNED(OWNED(_token,owner),1);}else if(freeonfailure)free_token(_token);
     return _value;
 }/* VALIDATED */
 /* TODO move elsewhere

@@ -5,8 +5,8 @@
 #include "Mshell.h"
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
-static int32_t const MODULE_ID=(17>>4);
-static int32_t getOwnerId(uint16_t functionId){return(functionId>>12?0:(MODULE_ID<<12)+functionId);}
+static uint32_t const MODULE_ID=17;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
 Mvalue* NULL_value=NULL;
 // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()

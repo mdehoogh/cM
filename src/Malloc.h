@@ -77,25 +77,36 @@ bool oldestAllocationMarkDropped();
 
 // MDH@18MAY2020: for passing along (pointer) ownership DISOWNED and OWNED are introduced
 #ifndef __PRODUCTION__
-void* Mmalloc(size_t size,char type,int32_t ownerId);
-void* Mcalloc(size_t size,char type,int32_t ownerId);
-void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,char type,int32_t ownerId);
-void Mfree(void* ptr,char type,int32_t ownerId); // releasing a single item of a fixed size allocation type
+// MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
+typedef struct{
+    uint32_t id:24; // the owner id (typically a function or a module itself)
+    uint8_t level:7; // the subpointer level
+    uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
+}Mallocationowner;
+//Mallocationowner getOwner(uint16_t module,uint32_t functionId);
+void* Mmalloc(size_t size,char type,Mallocationowner owner);
+void* Mcalloc(size_t size,char type,Mallocationowner owner);
+void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,char type,Mallocationowner owner);
+void Mfree(void* ptr,char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
 // use the substitutes
-#define MALLOC(size,type,ownerId) Mmalloc((size),(type),(ownerId))
-#define CALLOC(size,type,ownerId) Mcalloc((size),(type),(ownerId))
-#define REALLOC(ptr,from_count,to_count,size,type,ownerId) Mrealloc((ptr),(from_count),(to_count),(size),(type),(ownerId))
-#define FREE(ptr,type,ownerId) Mfree((ptr),(type),(ownerId))
-#define DISOWNED(ptr,ownerId) Mdisowned((ptr),(ownerId))
-#define OWNED(ptr,ownerId) Mowned((ptr),(ownerId))
+#define MALLOC(size,type,owner) Mmalloc((size),(type),(owner))
+#define CALLOC(size,type,owner) Mcalloc((size),(type),(owner))
+#define REALLOC(ptr,from_count,to_count,size,type,owner) Mrealloc((ptr),(from_count),(to_count),(size),(type),(owner))
+#define FREE(ptr,type,owner) Mfree((ptr),(type),(owner))
+#define DISOWNED(ptr,owner) Mdisowned((ptr),(owner))
+#define OWNED(ptr,owner) Mowned((ptr),(owner))
+#define OWNED_BY(subptr,ptr) Mownedby((subptr),(ptr))
+#define SUBOWNED(ptr,level) Msubowned((ptr),(level))
 #else
 // use the system methods
-#define MALLOC(size,type,ownerId) malloc((nitems)*(size))
-#define CALLOC(size,type,ownerId) calloc(1,(size))
-#define FREE(ptr,type,ownerId) free(ptr)
-#define REALLOC(ptr,from_nitems,to_nitems,size,type,ownerId) realloc((ptr),(to_nitems)*(size))
-#define DISOWNED(ptr,ownerId) (ptr)
-#define OWNED(ptr,ownerId) (ptr)
+#define MALLOC(size,type,owner) malloc((nitems)*(size))
+#define CALLOC(size,type,owner) calloc(1,(size))
+#define FREE(ptr,type,owner) free(ptr)
+#define REALLOC(ptr,from_nitems,to_nitems,size,type,owner) realloc((ptr),(to_nitems)*(size))
+#define DISOWNED(ptr,owner) (ptr)
+#define OWNED(ptr,owner) (ptr)
+#define OWNED_BY(ptr,owner) (ptr)
+#define SUBOWNED(ptr,level) (ptr)
 #endif
 
 // MDH@04MAY2020: asking for the allocation type sizes

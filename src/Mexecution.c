@@ -16,7 +16,7 @@
 #include "Mexecution.h"
 
 static int32_t const MODULE_ID=(9<<4);
-static int32_t getOwnerId(uint16_t id){return(id>>12?0:(MODULE_ID<<12)+id);}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
@@ -53,14 +53,14 @@ bool isLittleEndian(){
  * \return the newly created Mstring containing the binary representation on success, NULL on failure
  * needs to be freed with free_string() after use (e.g. of its string representation) as indicated by the _ that starts the name
  */
-Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){
-    Mstring* _binaryText=__string();
+Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _binaryText=OWNED(__string(),owner);
     if(_binaryText){
         Mstring* _p=_binaryText;
         int l=64;
         while(--l>=0&&_p){_p=string_append_char(_p,ul&1?'1':'0');ul>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
         if(presuffix)_p=string_append_char(_p,presuffix);
-        if(!_p){free_string(_binaryText);_binaryText=NULL;}else string_reverse(_p);
+        if(!_p){free_string(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
     }
     return _binaryText;
 }/* VALIDATED */
@@ -96,31 +96,31 @@ bool initExecution(){
 /** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
  *  \return a newly created big integer
  */
-void free_biginteger(Mbiginteger* biginteger){
+void free_biginteger(Mbiginteger* biginteger,Mallocationowner owner){
     if(biginteger){
-        if(amVerbose()&&amDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
+        if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
 #ifndef __PRODUCTION__
         mp_clear(biginteger->_bi);
-        FREE(biginteger->_bi,'b');
+        FREE(biginteger->_bi,'b',owner);
 #else
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
 #endif
-        FREE(biginteger,'B'); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
+        FREE(biginteger,'B',owner); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
     }else
     if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
-Mbiginteger* __biginteger(){
-    Mbiginteger* _biginteger=(Mbiginteger*)CALLOC(sizeof(Mbiginteger),'B');
+Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* _biginteger=(Mbiginteger*)CALLOC(sizeof(Mbiginteger),'B',owner);
     if(_biginteger){
 #ifndef __PRODUCTION__
-        _biginteger->_bi=(mp_int*)CALLOC(sizeof(mp_int),'b');
-        if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE(_biginteger->_bi,'b');_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
-        if(!_biginteger->_bi){FREE(_biginteger,'B');_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
+        _biginteger->_bi=SUBOWNED((mp_int*)CALLOC(sizeof(mp_int),'b',owner));
+        if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE(_biginteger->_bi,'b',owner);_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
+        if(!_biginteger->_bi){FREE(_biginteger,'B',owner);_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
 #else
         if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
 #endif
     }
-    return _biginteger;
+    return DISOWNED(_biginteger,owner);
 }/* VALIDATED */
 // end of block that uses __PRODUCTION__ flag
 
