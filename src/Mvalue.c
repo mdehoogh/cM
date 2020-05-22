@@ -537,7 +537,7 @@ Mvalue* _getValueOfMap(Mmap* _map,bool freeonfailure){
 Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner){
     if(!_token)return NULL;
     Mvalue* _value=OWNED(__value("token"),owner);
-    if(_value){_value->type=VT_TOKEN;_value->value._token=SUBOWNED(OWNED(_token,owner),1);}else if(freeonfailure)free_token(_token);
+    if(_value){_value->type=VT_TOKEN;_value->value._token=SUBOWNED(OWNED(_token,owner),1);}else if(owner.id>0)free_token(_token,owner);
     return _value;
 }/* VALIDATED */
 /* TODO move elsewhere
