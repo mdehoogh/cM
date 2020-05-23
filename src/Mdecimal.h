@@ -35,7 +35,7 @@ typedef struct Mdecimalcontext{
 // MDH@29AUG2019: create a decimal context with __decimalcontext passing in the required precision
 Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision
 
-void free_decimal(Mdecimal* decimal);
+void free_decimal(Mdecimal* decimal,Mallocationowner owner_decimal);
 
 Mdecimal* __adecimal(); // returning a completely blank decimal (e.g. to be used with mpd_copy_negate otherwise we'd have the old pointer hanging around with an allocated decimal that won't get freed anywhere ever)
 Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating); // pass in NULL for mpd_context to use the application-wide decimal context!!

@@ -184,7 +184,7 @@ Mfloat* _getFloatNeg(Mfloat* afloat);
 
 // BIG INTEGER STUFF
 // TODO should be moved over to Mbiginteger.h/c
-void free_biginteger(Mbiginteger* _biginteger);
+void free_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger);
 Mbiginteger* __biginteger();
 Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger);
 Mbiginteger* _getBiginteger(int64_t l);

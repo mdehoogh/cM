@@ -96,16 +96,16 @@ bool initExecution(){
 /** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
  *  \return a newly created big integer
  */
-void free_biginteger(Mbiginteger* biginteger,Mallocationowner owner){
+void free_biginteger(Mbiginteger* biginteger,Mallocationowner owner_biginteger){
     if(biginteger){
         if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
 #ifndef __PRODUCTION__
         mp_clear(biginteger->_bi);
-        FREE(biginteger->_bi,'b',owner);
+        FREE(biginteger->_bi,'b',owner_biginteger);
 #else
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
 #endif
-        FREE(biginteger,'B',owner); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
+        FREE(biginteger,'B',owner_biginteger); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
     }else
     if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
@@ -113,7 +113,7 @@ Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
     Mbiginteger* _biginteger=(Mbiginteger*)CALLOC(sizeof(Mbiginteger),'B',owner);
     if(_biginteger){
 #ifndef __PRODUCTION__
-        _biginteger->_bi=SUBOWNED((mp_int*)CALLOC(sizeof(mp_int),'b',owner));
+        _biginteger->_bi=(mp_int*)SUBOWNED(CALLOC(sizeof(mp_int),'b',owner),1);
         if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE(_biginteger->_bi,'b',owner);_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
         if(!_biginteger->_bi){FREE(_biginteger,'B',owner);_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
 #else
@@ -125,25 +125,26 @@ Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
 // end of block that uses __PRODUCTION__ flag
 
 // MDH@09APR2020: for all methods that call mp_int methods now require calling MP_INT_POINTER() on Mbiginteger instances
-Mbiginteger* _getBiginteger(int64_t ll){
-    Mbiginteger* biginteger=__biginteger();
+Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* biginteger=OWNED(__biginteger(),owner);
     // MDH@09APR2020: in the non-production version we're keeping track of the allocations and get_mpint on Mbiginteger will return what is required
     if(biginteger)mp_set_i64(MP_INT_POINTER(biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
-    return biginteger;
+    return DISOWNED(biginteger,owner);
 }/* VALIDATED */
 
 // replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
-Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){
-    Mbiginteger* _bigintegerNeg=(_biginteger?__biginteger():NULL); // the result we will be returning
-    if(_bigintegerNeg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){free_biginteger(_bigintegerNeg);_bigintegerNeg=NULL;}
-    return _bigintegerNeg;
+Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* _bigintegerNeg=OWNED(_biginteger?__biginteger():NULL,owner); // the result we will be returning
+    if(_bigintegerNeg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){free_biginteger(_bigintegerNeg,owner);_bigintegerNeg=NULL;}
+    return DISOWNED(_bigintegerNeg,owner);
 }// VALIDATED
 
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
-Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){
-    Mbiginteger* bigintegerCopy=(biginteger?__biginteger():NULL);
-    if(bigintegerCopy&&mp_copy(MP_INT_POINTER(biginteger),MP_INT_POINTER(bigintegerCopy))!=MP_OKAY){free_biginteger(bigintegerCopy);bigintegerCopy=NULL;}
-    return bigintegerCopy;
+Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* _bigintegerCopy=OWNED(biginteger?__biginteger():NULL,owner);
+    if(!_bigintegerCopy)return NULL;
+    if(mp_copy(MP_INT_POINTER(biginteger),MP_INT_POINTER(_bigintegerCopy))!=MP_OKAY){free_biginteger(_bigintegerCopy,owner);_bigintegerCopy=NULL;}
+    return DISOWNED(_bigintegerCopy,owner);
 }/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)

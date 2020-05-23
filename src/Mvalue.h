@@ -134,10 +134,10 @@ Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner); // MD
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner); // MDH@31MAY2019: we cannot use a big integer long here
 Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner);
 Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner);
-Mvalue* _getFloatValue(long double ld,int32_t oid);
-Mvalue* _getTextValue(char* text,bool freeonfailure,int32_t oid);
-Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source,int32_t oid); // returning an empty list with all values to be of type listValuetype
-Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak,int32_t oid); // returning an empty map with all values to be of type mapValuetype
+Mvalue* _getFloatValue(long double ld);
+Mvalue* _getTextValue(char* text,Mallocationowner owner);
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
+Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
@@ -162,7 +162,7 @@ void free_value(Mvalue* _value,Mallocationowner owner);
 
 /*unsigned */long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 
-Mlist* __list(char* source,Mallocationowner owner);
+Mlist* __list(char* source);
 void free_list(Mlist* _list,Mallocationowner owner);
 Mlist* _getListCopy(Mlist const * const _list);
 
@@ -231,7 +231,7 @@ long long isValueUndefined(Mvalue* value); // expose as well
 // MDH@20MAY2019: it's best to store a value at a single location (to replace all assignments to _value structure elements)
 void assignValue(Mvalue** _valueholder,Mvalue const * _value);
 
-Mvalue* __value(int32_t oid); // TODO expose __value()????? yes
+Mvalue* __value(char const * const descriptor); // TODO expose __value()????? yes
 
 size_t getNumberOfRemovedValues(bool showInfo);
 unsigned long long getNumberOfValues();
@@ -339,5 +339,5 @@ bool free_function(Mfunction* _function,Mallocationowner owner);
 
 Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 
-Mvalue* _getValueOfFunction(Mfunction* _function,Mallocationowner owner);
-Mvalue* _getValueOfEnvironment(Menvironment* _environment,Mallocationowner owner);
+Mvalue* _getValueOfFunction(Mfunction* _function);
+Mvalue* _getValueOfEnvironment(Menvironment* _environment);

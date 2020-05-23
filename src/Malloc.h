@@ -79,9 +79,9 @@ bool oldestAllocationMarkDropped();
 #ifndef __PRODUCTION__
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
 typedef struct{
-    uint32_t id:24; // the owner id (typically a function or a module itself)
-    uint8_t level:7; // the subpointer level
     uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
+    uint8_t level:7; // the subpointer level
+    uint32_t id:24; // the owner id (typically a function or a module itself)
 }Mallocationowner;
 //Mallocationowner getOwner(uint16_t module,uint32_t functionId);
 void* Mmalloc(size_t size,char type,Mallocationowner owner);

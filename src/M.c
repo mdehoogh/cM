@@ -15,7 +15,7 @@
 #include "Msession.h"
 
 static uint32_t const MODULE_ID=0; // the 'main' module always has module id 0
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id,0,0};}
 
 // the constants are defined in Mshell.c
 extern char const* const M_ERROR_PREFIX;

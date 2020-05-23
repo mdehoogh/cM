@@ -553,7 +553,7 @@ mpd_context_t* get_mpd_context(mpd_ssize_t decimalprecision){
  * \param value the (initial) value of the returned mpd_t instance
  * \return on success the mpd_t instance equal to \p value, NULL otherwise
  */
-mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){int32_t foid=getOwnerId(13); // MDH@20MAY2020: TODO mpd_qnew NOT under memory allocation management!!!
+mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){ // MDH@20MAY2020: TODO mpd_qnew NOT under memory allocation management!!!
     mpd_t* _mpd=NULL;
 	if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context;
     // using mpd_qnew over mpd_new because we want to return NULL on failure!!!
@@ -578,26 +578,26 @@ mpd_t* __mpd(mpd_context_t const * mpd_context,int64_t value){int32_t foid=getOw
  * \brief frees \p mpd, calling mpd_del()
  * \param mpd the mpdecimal instance to free
  */
-void free_mpd(mpd_t* _mpd){int32_t foid=getOwnerId(14);
+void free_mpd(mpd_t* _mpd){
 	if(_mpd)mpd_del(_mpd);
 }/* VALIDATED */
 
 /**
  * \brief frees \p decimal, delegating to free_mpd() for freeing the contained mpdecimal instance
  */
-void free_decimal(Mdecimal* decimal){int32_t foid=getOwnerId(15);
+void free_decimal(Mdecimal* decimal,Mallocationowner owner){
 	if(!decimal)return;
     if(amVerboseDebugging())output("Freeing decimal.\n");
     if(decimal->mpd)free_mpd(decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
-    FREE(OWNED(decimal,foid),'D',foid);
+    FREE(decimal,'D',owner);
 }/* VALIDATED */
 
 /**
  * \brief returns an uninitialized but cleared decimal (i.e. without an initialized mpd pointer)
  */
-Mdecimal* __adecimal(){int32_t foid=getOwnerId(16);
-	Mdecimal* _adecimal=(Mdecimal*)CALLOC(sizeof(Mdecimal),'D',foid);
-	return DISOWNED(_adecimal,foid);
+Mdecimal* __adecimal(){Mallocationowner owner=getOwner(__LINE__);
+	Mdecimal* _adecimal=(Mdecimal*)CALLOC(sizeof(Mdecimal),'D',owner);
+	return DISOWNED(_adecimal,owner);
 } /* VALIDATED */
 
 /**
@@ -606,47 +606,47 @@ Mdecimal* __adecimal(){int32_t foid=getOwnerId(16);
  * \param value the initial (integer) value of the decimal
  * \param repeating the number of repeating decimal digits at the end
  */
-Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating){int32_t foid=getOwnerId(17);
+Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating){Mallocationowner owner=getOwner(__LINE__);
     Mdecimal* _decimal=NULL;
     if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context; // use the application-wide decimal context if no context is defined
     if(mpd_context){
-        _decimal=OWNED(__adecimal(),foid); // get an uninitialized decimal
+        _decimal=OWNED(__adecimal(),owner); // get an uninitialized decimal
         if(_decimal){
             _decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
             if(_decimal->mpd){
                 _decimal->repeating=repeating;
                 _decimal->prec=mpd_context->prec;
             }else{
-                FREE(_decimal,'D',foid);
+                FREE(_decimal,'D',owner);
                 _decimal=NULL;
             }
         }else
             outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
     }else
         outputError("No context to create decimal in");
-    return DISOWNED(_decimal,foid);
+    return DISOWNED(_decimal,owner);
 }/* VALIDATED */
 
 // MDH@29AUG2019: as mpd_t does not itself store the precision with which the decimal was created AND an Mdecimal* does store the precision I've added the prec parameter
 /**
  * \brief returns a decimal with mpdecimal instance with the default decimal context equal to \p mpd and number of repeating digits equal to \p repeating, freeing the _mpd on failure
  */
-Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){int32_t foid=getOwnerId(18);
+Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){Mallocationowner owner=getOwner(__LINE__);
     if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
-    Mdecimal* _decimal=OWNED(_adecimal(),foid); // always using the default decimal context
+    Mdecimal* _decimal=OWNED(_adecimal(),owner); // always using the default decimal context
     if(_decimal){
 		////////output("Wrapping decimal with precision %u.\n",prec);
 		_decimal->mpd=_mpd;_decimal->prec=prec;_decimal->repeating=repeating;
 		////////output("Decimal with precision %u wrapped.\n",prec);
 	}else
 	if(freeonfailure)free_mpd(_mpd);
-    return DISOWNED(_decimal,foid);
+    return DISOWNED(_decimal,owner);
 }/* VALIDATED */
 
 /**
  * \brief adds two pure decimals
  */
-Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		// the decimal with the highest decimal context determines the context to use
@@ -656,42 +656,44 @@ Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the sum
-			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qadd(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			_decimal=OWNED(__decimal(mpd_context,0,false),owner);
+			if(!_decimal)return NULL;
+			uint32_t status=0;mpd_qadd(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the sum of two decimals");}
+			if((status&0xEFBF)!=0){free_decimal(_decimal,owner);_decimal=NULL;outputError("Failed to compute the sum of two decimals");}
 		}
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 //MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
 //               which will make it a little harder to compute the decimal sum
 //               how about returning to the associated rational multiply and convert back to a decimal???????
-Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
-			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			Mrational *_r1=OWNED(_getDecimalRational(d1),owner),*_r2=OWNED(_getDecimalRational(d2),owner);
 			if(_r1&&_r2){
-				Mrational* _r=_getRationalSum(_r1,_r2); // compute the sum of two rationals
+				Mrational* _r=OWNED(_getRationalSum(_r1,_r2),owner); // compute the sum of two rationals
 				if(_r){
-					_decimal=_getRationalDecimal(_r);
-					free_rational(_r);
+					_decimal=OWNED(_getRationalDecimal(_r),owner);
+					free_rational(_r,owner);
 				}else
 					outputError("Failed to compute the sum of two rational decimals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
-			free_rational(_r1);
-			free_rational(_r2);
+			free_rational(_r1,owner);
+			free_rational(_r2,owner);
 		}else // pure decimals
-			_decimal=_dadd(d1,d2); // just add
+			_decimal=OWNED(_dadd(d1,d2),owner); // just add
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 
 /**
  * \brief subtracts two pure decimals
  */
-Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		// the decimal with the highest decimal context determines the context to use
@@ -701,42 +703,44 @@ Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the sum
-			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qsub(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			_decimal=OWNED(__decimal(mpd_context,0,false),owner);
+			if(!_decimal)return NULL;
+			uint32_t status=0;mpd_qsub(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the difference of two decimals");}
+			if((status&0xEFBF)!=0){free_decimal(_decimal,owner);_decimal=NULL;outputError("Failed to compute the difference of two decimals");}
 		}
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 //MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
 //               which will make it a little harder to compute the decimal sum
 //               how about returning to the associated rational multiply and convert back to a decimal???????
-Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
-			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			Mrational *_r1=OWNED(_getDecimalRational(d1),owner),*_r2=OWNED(_getDecimalRational(d2),owner);
 			if(_r1&&_r2){
-				Mrational* _r=_getRationalDifference(_r1,_r2); // compute the product of two rationals
+				Mrational* _r=OWNED(_getRationalDifference(_r1,_r2),owner); // compute the product of two rationals
 				if(_r){
-					_decimal=_getRationalDecimal(_r);
-					free_rational(_r);
+					_decimal=OWNED(_getRationalDecimal(_r),owner);
+					free_rational(_r,owner);
 				}else
 					outputError("Failed to compute the difference of two rationalized decimals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
-			free_rational(_r1);
-			free_rational(_r2);
+			free_rational(_r1,owner);
+			free_rational(_r2,owner);
 		}else // pure decimals
-			_decimal=_dsub(d1,d2); // just subtract
+			_decimal=OWNED(_dsub(d1,d2),owner); // just subtract
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 
 /**
  * \brief computes the quotient of two pure decimals
  */
-Mdecimal* _ddiv(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _ddiv(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		// the decimal with the highest decimal context determines the context to use
@@ -746,42 +750,44 @@ Mdecimal* _ddiv(Mdecimal const * const d1,Mdecimal const * const d2){
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the quotient
-			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qdiv(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			_decimal=OWNED(__decimal(mpd_context,0,false),owner);
+			if(!_decimal)return NULL;
+			uint32_t status=0;mpd_qdiv(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the quotient of two decimals");}
+			if((status&0xEFBF)!=0){free_decimal(_decimal,owner);_decimal=NULL;outputError("Failed to compute the quotient of two decimals");}
 		}
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 /**
  * \brief computes the quotient of any two decimals (including repeating ones)
  */
-Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _getDecimalQuotient(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
-			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			Mrational *_r1=OWNED(_getDecimalRational(d1),owner),*_r2=OWNED(_getDecimalRational(d2),owner);
 			if(_r1&&_r2){
-				Mrational* _r=_getRationalQuotient(_r1,_r2); // compute the quotient of two rationals
+				Mrational* _r=OWNED(_getRationalQuotient(_r1,_r2),owner); // compute the quotient of two rationals
 				if(_r){
-					_decimal=_getRationalDecimal(_r);
-					free_rational(_r);
+					_decimal=OWNED(_getRationalDecimal(_r),owner);
+					free_rational(_r,owner);
 				}else
 					outputError("Failed to compute the quotient of two rationals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
-			free_rational(_r1);
-			free_rational(_r2);
+			free_rational(_r1,owner);
+			free_rational(_r2,owner);
 		}else // pure decimals
-			_decimal=_ddiv(d1,d2); // just multiply
+			_decimal=OWNED(_ddiv(d1,d2),owner); // just multiply
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 
 /**
  * \brief computes the product of two pure decimals
  */
-Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		// the decimal with the highest decimal context determines the context to use
@@ -791,48 +797,50 @@ Mdecimal* _dmul(Mdecimal const * const d1,Mdecimal const * const d2){
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the quotient
-			_decimal=__decimal(mpd_context,0,false);uint32_t status=0;mpd_qmul(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
+			_decimal=OWNED(__decimal(mpd_context,0,false),owner);
+			if(!_decimal)return NULL;
+			uint32_t status=0;mpd_qmul(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){free_decimal(_decimal);_decimal=NULL;outputError("Failed to compute the quotient of two decimals");}
+			if((status&0xEFBF)!=0){free_decimal(_decimal,owner);_decimal=NULL;outputError("Failed to compute the quotient of two decimals");}
 		}
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 //MDH@19SEP2019: if we multiply two decimals we need to take the repeating digits into account (which we didn't do so far)
 //               which will make it a little harder to compute the decimal product
 //               how about returning to the associated rational multiply and convert back to a decimal???????
-Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2){
+Mdecimal* _getDecimalProduct(Mdecimal const * const d1,Mdecimal const * const d2){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
-			Mrational *_r1=_getDecimalRational(d1),*_r2=_getDecimalRational(d2);
+			Mrational *_r1=OWNED(_getDecimalRational(d1),owner),*_r2=OWNED(_getDecimalRational(d2),owner);
 			if(_r1&&_r2){
-				Mrational* _r=_getRationalProduct(_r1,_r2); // compute the product of two rationals
+				Mrational* _r=OWNED(_getRationalProduct(_r1,_r2),owned); // compute the product of two rationals
 				if(_r){
-					_decimal=_getRationalDecimal(_r);
-					free_rational(_r);
+					_decimal=OWNER(_getRationalDecimal(_r),owner);
+					free_rational(_r,owner);
 				}else
 					outputError("Failed to compute the product of two rational decimals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
-			free_rational(_r1);
-			free_rational(_r2);
+			free_rational(_r1,owner);
+			free_rational(_r2,owner);
 		}else // pure decimals
-			_decimal=_dmul(d1,d2); // just multiply
+			_decimal=OWNED(_dmul(d1,d2),owner); // just multiply
 	}
-	return _decimal;
+	return DISOWNED(_decimal,owner);
 }
 
 /**
  * \brief returns a decimal parsed from \p decimalText using the default decimal context and repeating number of digits \p repeating
  */
-Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){
+Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){Mallocationowner owner=getOwner(__LINE__);
     Mdecimal* _textDecimal=NULL;
     if(decimalText&&strlen(decimalText)){
         if(amVerbose())output("Parsing decimal text '%s'.\n",decimalText);
         // can we find a repeating fraction????? this would be the case if behind the period we'd have xxxx<yyy><yyy><yyy>
         // the rounding at the end of course could prove to be problematic
-        _textDecimal=__decimal(NULL,0,repeating);
+        _textDecimal=OWNED(__decimal(NULL,0,repeating),owner);
         if(_textDecimal){
 			uint32_t status=0;
             mpd_qset_string(_textDecimal->mpd,decimalText,M_DECIMALCONTEXT->mpd_context,&status); // NOTE here we have to pass in the default decimal context
@@ -842,13 +850,13 @@ Mdecimal* _getTextDecimal(char const * const decimalText,uint64_t repeating){
         ////////////if(!_textDecimal)output("%sFailed to create a decimal from '%s'.\n",M_ERROR_PREFIX,decimalText);
     }else
         outputError("No decimal text to parse");
-    return _textDecimal;
+    return DISOWNED(_textDecimal,owner);
 }/* VALIDATED */
 
 // END BASE STUFF
 
 // MDH@09NOV2019: one can decide to compute the predefined sines table or not (when only pi is required)
-Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
+Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mallocationowner owner=getOwner(__LINE__);
 
 	// if decimalContext equals NULL use the global decimal context, in _decimalContext
 	if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
@@ -868,87 +876,24 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 
 		// initialize the variables we need for the iterations
 #ifdef __ADEBUG__
-		Mdecimal *lasts=__decimal(mpd_context,0,0),*t=__decimal(mpd_context,3,0),*s=__decimal(mpd_context,3,0),*n=__decimal(mpd_context,1,0),*na=__decimal(mpd_context,0,0),*d=__decimal(mpd_context,0,0),*da=__decimal(mpd_context,24,0);
+		Mdecimal *lasts=OWNED(__decimal(mpd_context,0,0),owner),*t=OWNED(__decimal(mpd_context,3,0),owner),*s=OWNED(__decimal(mpd_context,3,0),owner);
+		Mdecimal *n=OWNED(__decimal(mpd_context,1,0),owner),*na=OWNED(__decimal(mpd_context,0,0),owner),*d=OWNED(__decimal(mpd_context,0,0),owner);
+		Mdecimal *da=OWNED(__decimal(mpd_context,24,0),owner);
 		// some constant decimals we need
-		Mdecimal *d8=__decimal(mpd_context,8,0),*d32=__decimal(mpd_context,32,0);
+		Mdecimal *d8=OWNED(__decimal(mpd_context,8,0),owner),*d32=OWNED(__decimal(mpd_context,32,0),owner);
 #else
 		mpd_t *lasts=__mpd(mpd_context,0),*t=__mpd(mpd_context,3),*s=__mpd(mpd_context,3),*n=__mpd(mpd_context,1),*na=__mpd(mpd_context,0),*d=__mpd(mpd_context,0),*da=__mpd(mpd_context,24);
 		// some constant decimals we need
 		mpd_t *d8=__mpd(mpd_context,8),*d32=__mpd(mpd_context,32);
 #endif
-		if(!lasts||!t||!s||!n||!na||!d||!da||!d8||!d32){outputError("Failed to create all helper decimals");return NULL;}
-		if(amVerbose())outputInfo("\tInitial helper decimals created!");
-		unsigned long long iter=0;
-		if(amVerbose()){
-			output("\tIteration %u:",iter);
-#ifdef __ADEBUG__
-			char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
-			char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
-			char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
-			char* _n=mpd_to_sci(n->mpd,0);output(" n=%s",_n);free(_n);
-			char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
-			char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
-			char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
-#else
-			char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
-			char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
-			char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
-			char* _n=mpd_to_sci(n,0);output(" n=%s",_n);free(_n);
-			char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
-			char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
-			char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
-#endif
-			newline();
-		}
 		clock_t now=0,then=(!amVerbose()?clock():-1); // if not running verbose, show number of iterations executed per second
-		long long iterthen=iter,seconds=0; // report every second
-		int cmp;
-		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
-		outputInfo("In the approximation two additional decimal digits will be computed after which rounding will be applied cutting off the two extra decimals.");
-		if(then>=0)output("Iterations per second (abort by pressing any key):");
-		bool interrupted=false;
-		while(!mpd_error(mpd_context)){
-			///// doesn't work I think!!! if(kbhit()!=0)break;
-			iter++;
-			//if(!amVerbose()){
-			if(then>=0){
-				now=clock();
-				if(now>=0){
-					if(now-then>=1000000){
-						then=now;
-						seconds++;
-						output(" %lld",iter-iterthen);
-						if(kbhit()>0){interrupted=true;newline();outputError("Not all decimals of pi reported guaranteed to be correct, as its computation was interrupted by the user!");break;} // MDH@11NOV2019: allow breaking
-						iterthen=iter;
-					}/*else outputChar('.');*/
-				}
-			}
-#ifdef __ADEBUG__
-			//if(amVerbose())output("Iteration: %lld: ",iter);
-			cmp=mpd_cmp(lasts->mpd,s->mpd,mpd_context); // lasts == s ?
-			//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
-			if(!cmp){if(amVerbose())output("Done!\n");break;}
-			//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
-			if(cmp==INT_MAX){output("Something went wrong!\n");break;}
-			//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
-			mpd_copy(lasts->mpd,s->mpd,mpd_context); // lasts = s
-			//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
-			mpd_add(n->mpd,n->mpd,na->mpd,mpd_context);
-			//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
-			mpd_add(na->mpd,na->mpd,d8->mpd,mpd_context); // increment n by na and na by 8
-			//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
-			mpd_add(d->mpd,d->mpd,da->mpd,mpd_context);
-			//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
-			mpd_add(da->mpd,da->mpd,d32->mpd,mpd_context); // increment d by da and da by 32
-			//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
-			mpd_mul(t->mpd,t->mpd,n->mpd,mpd_context);
-			//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
-			mpd_div(t->mpd,t->mpd,d->mpd,mpd_context); // multiply t by n and divide t by d
-			//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
-			mpd_add(s->mpd,s->mpd,t->mpd,mpd_context); // add t to s
-			//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+		// DONE:TODO don't do this because you do need to free whatever was allocated!!!
+		if(lasts&&t&&s&&n&&na&&d&&da&&d8&&d32){
+			if(amVerbose())outputInfo("\tInitial helper decimals created!");
+			unsigned long long iter=0;
 			if(amVerbose()){
-				output("Iteration %u:",iter);
+				output("\tIteration %u:",iter);
+#ifdef __ADEBUG__
 				char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
 				char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
 				char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
@@ -956,98 +901,166 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 				char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
 				char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
 				char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
-				outputChar('\n');
-			}
 #else
-			//if(amVerbose())output("Iteration: %lld: ",iter);
-			cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
-			//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
-			if(!cmp){if(amVerbose())output("\tDone!\n");break;}
-			//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
-			if(cmp==INT_MAX){outputError("Something went wrong!");break;}
-			//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
-			mpd_copy(lasts,s,mpd_context); // lasts = s
-			//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
-			mpd_add(n,n,na,mpd_context);
-			//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
-			mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
-			//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
-			mpd_add(d,d,da,mpd_context);
-			//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
-			mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
-			//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
-			mpd_mul(t,t,n,mpd_context);
-			//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
-			mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
-			//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
-			mpd_add(s,s,t,mpd_context); // add t to s
-			//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
-			if(amVerbose()){
-				if(amDebugging()){
-					output("Iteration %u:",iter);
-					//char* _lasts=mpd_to_sci(lasts,0);if(_lasts){output(" lasts=%s");free(_lasts);}else output(" ?");
-					char* _t=mpd_to_sci(t,0);if(_t){output(" t=%s",_t);free(_t);}else output(" ?");
-					char* _s=mpd_to_sci(s,0);if(_s){output(" s=%s",_s);free(_s);}else output(" ?");
-					char* _n=mpd_to_sci(n,0);if(_n){output(" n=%s",_n);free(_n);}else output(" ?");
-					char* _na=mpd_to_sci(na,0);if(_na){output(" na=%s",_na);free(_na);}else output(" ?");
-					char* _d=mpd_to_sci(d,0);if(_d){output(" d=%s",_d);free(_d);}else output(" ?");
-					char* _da=mpd_to_sci(da,0);if(_da){output(" da=%s",_da);free(_da);}else output(" ?");
-					outputChar('\n');				
-				}else{
-					if((iter%100)==0)output("Iteration %u.\n",iter);
-				}
-			}
+				char* _lasts=mpd_to_sci(lasts,0);output(" lasts=%s");free(_lasts);
+				char* _t=mpd_to_sci(t,0);output(" t=%s",_t);free(_t);
+				char* _s=mpd_to_sci(s,0);output(" s=%s",_s);free(_s);
+				char* _n=mpd_to_sci(n,0);output(" n=%s",_n);free(_n);
+				char* _na=mpd_to_sci(na,0);output(" na=%s",_na);free(_na);
+				char* _d=mpd_to_sci(d,0);output(" d=%s",_d);free(_d);
+				char* _da=mpd_to_sci(da,0);output(" da=%s",_da);free(_da);
 #endif
-		}
-		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
-		uint32_t status=0;
-		mpd_qfinalize(s,mpd_context,&status);
-		if((status&0xEFBF)!=0){
-			outputError("Failed to finalize pi");
-		}else
-		if(!interrupted){
-			// if(then>=0)if(!interrupted){outputChar('.');newline();}
-			//output("Number of iterations to compute pi to %lld decimals: %lld.\n",mpd_context->prec,iter);
-			if(mpd_context){
-				// store pi, pi/2 and pi/4 in the decimal context (all or none) BEFORE readjusting the precision i.e. if no error occurred
-				if(!mpd_error(mpd_context)){
-					mpd_t *_pi=get_mpd_copy(mpd_context,s);
-					if(_pi){
-						// MDH@05AUG2019: it's relatively simple to compute the sin/cosine of angles like 15, 30, 45, 60, 75 so we can start with storing multiples of pi/12 which of course include all we need!!!
-						//                how about storing the sine and cosines of these values along with these predefined angles?????
-						mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
-						if(_pidiv2&&_pidiv4&&_pimul2){
-							mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
-							mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
-							mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
-						}else // _pi not bound in decimalcontext, so free
-							status=0xFFFFFFFF;
-						if((status&0xEFBF)==0){
-							decimalcontext->pi=_pi;
-							decimalcontext->pidiv2=_pidiv2;
-							decimalcontext->pidiv4=_pidiv4;
-							decimalcontext->pimul2=_pimul2;
-						}else{
-							free_mpd(_pimul2);
-							free_mpd(_pi);
-							free_mpd(_pidiv2);
-							free_mpd(_pidiv4);
+				newline();
+			}
+			long long iterthen=iter,seconds=0; // report every second
+			int cmp;
+			mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
+			outputInfo("In the approximation two additional decimal digits will be computed after which rounding will be applied cutting off the two extra decimals.");
+			if(then>=0)output("Iterations per second (abort by pressing any key):");
+			bool interrupted=false;
+			while(!mpd_error(mpd_context)){
+				///// doesn't work I think!!! if(kbhit()!=0)break;
+				iter++;
+				//if(!amVerbose()){
+				if(then>=0){
+					now=clock();
+					if(now>=0){
+						if(now-then>=1000000){
+							then=now;
+							seconds++;
+							output(" %lld",iter-iterthen);
+							if(kbhit()>0){interrupted=true;newline();outputError("Not all decimals of pi reported guaranteed to be correct, as its computation was interrupted by the user!");break;} // MDH@11NOV2019: allow breaking
+							iterthen=iter;
+						}/*else outputChar('.');*/
+					}
+				}
+#ifdef __ADEBUG__
+				//if(amVerbose())output("Iteration: %lld: ",iter);
+				cmp=mpd_cmp(lasts->mpd,s->mpd,mpd_context); // lasts == s ?
+				//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
+				if(!cmp){if(amVerbose())output("Done!\n");break;}
+				//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
+				if(cmp==INT_MAX){output("Something went wrong!\n");break;}
+				//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
+				mpd_copy(lasts->mpd,s->mpd,mpd_context); // lasts = s
+				//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
+				mpd_add(n->mpd,n->mpd,na->mpd,mpd_context);
+				//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
+				mpd_add(na->mpd,na->mpd,d8->mpd,mpd_context); // increment n by na and na by 8
+				//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
+				mpd_add(d->mpd,d->mpd,da->mpd,mpd_context);
+				//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
+				mpd_add(da->mpd,da->mpd,d32->mpd,mpd_context); // increment d by da and da by 32
+				//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
+				mpd_mul(t->mpd,t->mpd,n->mpd,mpd_context);
+				//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
+				mpd_div(t->mpd,t->mpd,d->mpd,mpd_context); // multiply t by n and divide t by d
+				//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
+				mpd_add(s->mpd,s->mpd,t->mpd,mpd_context); // add t to s
+				//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+				if(amVerbose()){
+					output("Iteration %u:",iter);
+					char* _lasts=mpd_to_sci(lasts->mpd,0);output(" lasts=%s");free(_lasts);
+					char* _t=mpd_to_sci(t->mpd,0);output(" t=%s",_t);free(_t);
+					char* _s=mpd_to_sci(s->mpd,0);output(" s=%s",_s);free(_s);
+					char* _n=mpd_to_sci(n->mpd,0);output(" n=%s",_n);free(_n);
+					char* _na=mpd_to_sci(na->mpd,0);output(" na=%s",_na);free(_na);
+					char* _d=mpd_to_sci(d->mpd,0);output(" d=%s",_d);free(_d);
+					char* _da=mpd_to_sci(da->mpd,0);output(" da=%s",_da);free(_da);
+					outputChar('\n');
+				}
+#else
+				//if(amVerbose())output("Iteration: %lld: ",iter);
+				cmp=mpd_cmp(lasts,s,mpd_context); // lasts == s ?
+				//if(amVerbose()){output("a\t");if(mpd_error(mpd_context))break;}
+				if(!cmp){if(amVerbose())output("\tDone!\n");break;}
+				//if(amVerbose()){output("b\t");if(mpd_error(mpd_context))break;}
+				if(cmp==INT_MAX){outputError("Something went wrong!");break;}
+				//if(amVerbose()){output("c\t");if(mpd_error(mpd_context))break;output("lasts = (s) = %s",Mdecimalo_sci(s,0));}
+				mpd_copy(lasts,s,mpd_context); // lasts = s
+				//if(amVerbose()){output("d\t",Mdecimalo_sci(lasts,0));if(mpd_error(mpd_context))break;output("n = (n=%s) + (na=)%s",Mdecimalo_sci(n,0),Mdecimalo_sci(na,0));}
+				mpd_add(n,n,na,mpd_context);
+				//if(amVerbose()){output(" = %s\ne\t",Mdecimalo_sci(n,0));if(mpd_error(mpd_context))break;output("na = (na=%s) + 8",Mdecimalo_sci(na,0));}
+				mpd_add(na,na,d8,mpd_context); // increment n by na and na by 8
+				//if(amVerbose()){output(" = %s\nf\t",Mdecimalo_sci(na,0));if(mpd_error(mpd_context))break;output("d = (d=%s) + (da=%s)",Mdecimalo_sci(d,0),Mdecimalo_sci(da,0));}
+				mpd_add(d,d,da,mpd_context);
+				//if(amVerbose()){output(" = %s\ng\t",Mdecimalo_sci(d,0));if(mpd_error(mpd_context))break;output("da = (da=%s) + 32",Mdecimalo_sci(da,0));}
+				mpd_add(da,da,d32,mpd_context); // increment d by da and da by 32
+				//if(amVerbose()){output(" = %s\nh\t",Mdecimalo_sci(da,0));if(mpd_error(mpd_context))break;output("t = (t=%s) * (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(n,0));}
+				mpd_mul(t,t,n,mpd_context);
+				//if(amVerbose()){output(" = %s\ni\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("t = (t=%s) / (n=%s)",Mdecimalo_sci(t,0),Mdecimalo_sci(d,0));}
+				mpd_div(t,t,d,mpd_context); // multiply t by n and divide t by d
+				//if(amVerbose()){output(" = %s\nj\t",Mdecimalo_sci(t,0));if(mpd_error(mpd_context))break;output("s = (s=%s) + (t=%s)",Mdecimalo_sci(s,0),Mdecimalo_sci(t,0));}
+				mpd_add(s,s,t,mpd_context); // add t to s
+				//if(amVerbose()){output(" = %s\nk\t",Mdecimalo_sci(s,0));if(mpd_error(mpd_context))break;}
+				if(amVerbose()){
+					if(amDebugging()){
+						output("Iteration %u:",iter);
+						//char* _lasts=mpd_to_sci(lasts,0);if(_lasts){output(" lasts=%s");free(_lasts);}else output(" ?");
+						char* _t=mpd_to_sci(t,0);if(_t){output(" t=%s",_t);free(_t);}else output(" ?");
+						char* _s=mpd_to_sci(s,0);if(_s){output(" s=%s",_s);free(_s);}else output(" ?");
+						char* _n=mpd_to_sci(n,0);if(_n){output(" n=%s",_n);free(_n);}else output(" ?");
+						char* _na=mpd_to_sci(na,0);if(_na){output(" na=%s",_na);free(_na);}else output(" ?");
+						char* _d=mpd_to_sci(d,0);if(_d){output(" d=%s",_d);free(_d);}else output(" ?");
+						char* _da=mpd_to_sci(da,0);if(_da){output(" da=%s",_da);free(_da);}else output(" ?");
+						outputChar('\n');				
+					}else{
+						if((iter%100)==0)output("Iteration %u.\n",iter);
+					}
+				}
+#endif
+			}
+			mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // decrement the precision by 2
+			uint32_t status=0;
+			mpd_qfinalize(s,mpd_context,&status);
+			if((status&0xEFBF)!=0){
+				outputError("Failed to finalize pi");
+			}else
+			if(!interrupted){
+				// if(then>=0)if(!interrupted){outputChar('.');newline();}
+				//output("Number of iterations to compute pi to %lld decimals: %lld.\n",mpd_context->prec,iter);
+				if(mpd_context){
+					// store pi, pi/2 and pi/4 in the decimal context (all or none) BEFORE readjusting the precision i.e. if no error occurred
+					if(!mpd_error(mpd_context)){
+						mpd_t *_pi=get_mpd_copy(mpd_context,s);
+						if(_pi){
+							// MDH@05AUG2019: it's relatively simple to compute the sin/cosine of angles like 15, 30, 45, 60, 75 so we can start with storing multiples of pi/12 which of course include all we need!!!
+							//                how about storing the sine and cosines of these values along with these predefined angles?????
+							mpd_t *_pidiv2=__mpd(mpd_context,0),*_pidiv4=__mpd(mpd_context,0),*_pimul2=__mpd(mpd_context,0);
+							if(_pidiv2&&_pidiv4&&_pimul2){
+								mpd_qdiv_u32(_pidiv2,_pi,2,mpd_context,&status);
+								mpd_qdiv_u32(_pidiv4,_pi,4,mpd_context,&status);
+								mpd_qadd(_pimul2,_pi,_pi,mpd_context,&status); // NOTE better to simply double pi by adding it to itself???????
+							}else // _pi not bound in decimalcontext, so free
+								status=0xFFFFFFFF;
+							if((status&0xEFBF)==0){
+								decimalcontext->pi=_pi;
+								decimalcontext->pidiv2=_pidiv2;
+								decimalcontext->pidiv4=_pidiv4;
+								decimalcontext->pimul2=_pimul2;
+							}else{
+								free_mpd(_pimul2);
+								free_mpd(_pi);
+								free_mpd(_pidiv2);
+								free_mpd(_pidiv4);
+							}
 						}
 					}
 				}
 			}
-		}
-		// MDH@11NOV2019: if we actually failed to store pi (when it was computed uninterrupted to start with!)
-		if(!decimalcontext->pi)
-			outputError("Failed to store the decimal approximation of pi in the decimal context");
-		else
-			outputInfo("The decimal approximation of pi was stored in the decimal context.");
-		// TODO should I mpd_finalize the pi values stored? or for now leave them unrounded?????????
+			// MDH@11NOV2019: if we actually failed to store pi (when it was computed uninterrupted to start with!)
+			if(!decimalcontext->pi)
+				outputError("Failed to store the decimal approximation of pi in the decimal context");
+			else
+				outputInfo("The decimal approximation of pi was stored in the decimal context.");
+			// TODO should I mpd_finalize the pi values stored? or for now leave them unrounded?????????
+		}else
+			outputError("Failed to create all helper decimals");
 
 		// get rid of all the decimals we used
 #ifdef __ADEBUG__
-		free_decimal(lasts);free_decimal(t);free_decimal(n);free_decimal(na);free_decimal(d);free_decimal(da);
-		free_decimal(d8);free_decimal(d32);
+		free_decimal(lasts,owner);free_decimal(t,owner);free_decimal(n,owner);free_decimal(na,owner);free_decimal(d,owner);free_decimal(da,owner);
+		free_decimal(d8,owner);free_decimal(d32,owner);
 #else
 		free_mpd(lasts);free_mpd(t);free_mpd(n);free_mpd(na);free_mpd(d);free_mpd(da);
 		free_mpd(d8);free_mpd(d32);
@@ -1076,7 +1089,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			if(_s){output("Final approximation of pi ( NOT rounded to %llu decimals but with two additional decimals): %s.\n",decimalprecision,_s);free(_s);}
 		}
 
-		_decimal=_getDecimal(s,decimalprecision,0,true);
+		_decimal=OWNED(_getDecimal(s,decimalprecision,0,true),owner);
 
 		output("Number of milliseconds passed in total (for computing and storing pi): %lld.\n",(clock()-then)/1000);
 
@@ -1084,7 +1097,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 
 		if(amVerbose())outputInfo("NOTE: Returning the decimal approximation of pi stored in the decimal context.");
 		// a copy to return
-		_decimal=_getDecimal(get_mpd_copy(mpd_context,decimalcontext->pi),decimalprecision,0,true);
+		_decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,decimalcontext->pi),decimalprecision,0,true),owner);
 
 	}
 	
@@ -1111,7 +1124,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 			mpd_t *_pidiv12=get_mpd_copy(mpd_context,_pi),*_sqrt2div2=__mpd(mpd_context,2),*_sqrt3div2=__mpd(mpd_context,3);
 			// some values only need to be computed once but are used twice in the table, by precomputing them a reference is stored in the table so we won't have to free them
 			// we can use _sin90 when we need 1 in computations
-			Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+			Mdecimal* _intermediateResult=OWNED(amVerbose()?__decimal(mpd_context,0,0):NULL,owner);
 			
 			// MDH@11SEP2019: computing the predefined sines means starting with the sine of 90 degrees 
 			mpd_t *_0=__mpd(mpd_context,0),*_1=__mpd(mpd_context,1),*_predefined=__mpd(mpd_context,0),*_rotationsine=__mpd(mpd_context,0),*_rotationcosine=__mpd(mpd_context,0),*_t1=__mpd(mpd_context,0),*_t2=__mpd(mpd_context,0),*_t3=__mpd(mpd_context,0),*_t4=__mpd(mpd_context,0);
@@ -1181,7 +1194,9 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 					}
 				}
 			}
-			free_mpd(_rotationsine);free_mpd(_rotationcosine);free_mpd(_0);free_mpd(_1);free_mpd(_predefined);free_mpd(_t1);free_mpd(_t2);free_mpd(_t3);free_mpd(_t4);
+			free_mpd(_rotationsine);free_mpd(_rotationcosine);
+			free_mpd(_0);free_mpd(_1);free_mpd(_predefined);
+			free_mpd(_t1);free_mpd(_t2);free_mpd(_t3);free_mpd(_t4);
 
 			mpd_t *_sin15=__mpd(mpd_context,0),*_cos15=__mpd(mpd_context,0),*_sin30=__mpd(mpd_context,0),*_cos30=__mpd(mpd_context,0),*_sin45=__mpd(mpd_context,0),*_sin90=__mpd(mpd_context,1),*_cos90=__mpd(mpd_context,0);
 			if(_pidiv12&&_sqrt2div2&&_sqrt3div2&&_sin15&&_cos15&&_sin30&&_cos30&&_sin45&&_sin90&&_cos90){
@@ -1300,7 +1315,10 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 				free_mpd(_cordicangle);free_mpd(_cordiccosine);free_mpd(_cordicsine);free_mpd(_cordictangent);
 			}else
 				status=0xFFFFFFFF;
-			if(_intermediateResult){_intermediateResult->mpd=NULL;free_decimal(_intermediateResult);} // OOPS you gotta do this
+			if(_intermediateResult){
+				_intermediateResult->mpd=NULL; // OOPS you gotta do this MDH@23MAY2020 TODO do we?????????
+				free_decimal(_intermediateResult,owner);
+			}
 			if((status&0xEFBF)!=0){
 				if(status!=0xFFFFFFFF){
 					outputError("Failed to store predefined (co)sines in the decimal context");
@@ -1314,7 +1332,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 		}
 	}
 
-	return _decimal; // freeonfailure=true means if we do not manage to wrap _pi in a decimal free it
+	return DISOWNED(_decimal,owner); // freeonfailure=true means if we do not manage to wrap _pi in a decimal free it
 
 	/* replacing:
 	if(!mpd_context){if(decimalprecision>0)outputError("Failed to obtain the requested decimal context");else outputError("No (default) decimal context available");return NULL;}
@@ -1327,17 +1345,17 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){
 //                NOTE this implementation is almost the same as that of _dsquarerootofsinorcossquared() except that it does not do the conversion to a cosine and square rooting
 //                NOTE this has the disadvantage that sin squared is approximated with two additional decimals but conversion and square rooting will take place AFTER returning to the original precision
 //                DONE we solve that by taking changing the precision to the _dsine/_dcosine functions
-mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const x){
+mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const x){Mallocationowner owner=getOwner(__LINE__);
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinsquared=NULL;
 	if(mpd_context&&x){
 		if(amVerbose()){
-			Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);
-			if(_decimal){output("Computing the square of the sine");outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}
+			Mdecimal* _decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true),owner);
+			if(_decimal){output("Computing the square of the sine");outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal,owner);}
 		}
 		uint32_t status=0;
 		/////////// REMOVED: mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2 decimal digits
-		Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+		Mdecimal* _intermediateResult=OWNED(amVerbose()?__decimal(mpd_context,0,0):NULL,owner);
 		
 		// ok denominator is multiplied by 2 to start with (so dividing by 2 immediately)
 		mpd_t*_1=__mpd(mpd_context,1); // fixed
@@ -1437,7 +1455,10 @@ mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const 
 			free_mpd(_sinsquared);_sinsquared=NULL;
 		}else
 		if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");}
-		if(_intermediateResult)free_decimal(_intermediateResult); // free verbose intermediate result decimal
+		if(_intermediateResult){
+			// _intermediateResult->mpd=NULL; // MDH@23MAY2020 added, but TODO not sure about this wasn't there before
+			free_decimal(_intermediateResult,owner);
+		} // free verbose intermediate result decimal
 	}
 	////////if(!_sinsquared)outputError("Sine result vanished!");
 	return _sinsquared;
@@ -1450,14 +1471,21 @@ mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const 
  * \p sin true to return the square root of the sine squared, or the square root of the cosine squared
  * because the same terms are used to compute the sine and the cosine it is guaranteed that sin^2+cos^2=1 (as long as mpd_sqrt is correctly square rooting of course)
  */
-mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd_t const * const x,bool sin){
+mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd_t const * const x,bool sin){Mallocationowner owner=getOwner(__LINE__);
 	// I suppose it's best to compute the sine squared first and turn it into a cosine before square rooting, that should guarantee that the squared sum of sine and cosine with the same x is 1
 	mpd_t* _sinsquared=NULL;
 	if(mpd_context&&x){
-		if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true);if(_decimal){output("Computing the square of the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal);}}
+		if(amVerbose()){
+			Mdecimal* _decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true),owner);
+			if(_decimal){
+				output("Computing the square of the %s",(sin?"sine":"cosine"));
+				outputDecimal(" of '",_decimal,"'.\n");
+				free_decimal(_decimal,owner);
+			}
+		}
 		uint32_t status=0;
 		mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2
-		Mdecimal* _intermediateResult=(amVerbose()?__decimal(mpd_context,0,0):NULL);
+		Mdecimal* _intermediateResult=OWNED(amVerbose()?__decimal(mpd_context,0,0):NULL,owner);
 		
 		// ok denominator is multiplied by 2 to start with (so dividing by 2 immediately)
 		mpd_t*_1=__mpd(mpd_context,1); // fixed
@@ -1553,7 +1581,10 @@ mpd_t* _dsquarerootofsinorcossquared(mpd_context_t const * const mpd_context,mpd
 			free_mpd(_sinsquared);_sinsquared=NULL;
 		}else
 		if(_intermediateResult){mpd_qcopy(_intermediateResult->mpd,_sinsquared,&status);outputDecimal("Final (rounded) result: '",_intermediateResult,"'.\n");}
-		if(_intermediateResult)free_decimal(_intermediateResult); // free verbose intermediate result decimal
+		if(_intermediateResult){
+			// _intermediateResult->mpd=NULL; // MDH@23MAY2020: TODO should we do this?????????
+			free_decimal(_intermediateResult,owner); // free verbose intermediate result decimal
+		}
 	}
 	////////if(!_sinsquared)outputError("Sine result vanished!");
 	return _sinsquared;
