@@ -380,58 +380,58 @@ Mvalue* _getFloatValue(long double ld){
         outputInfo("No float to wrap.");
     return _floatValue;
 }/* VALIDATED */
-Mvalue* _getTextValue(char* _s,bool freeonfailure){
+Mvalue* _getTextValue(char* _s/*bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
     if(!_s)return NULL; // when no input, no go
     Mvalue* _textValue=NULL; // the result, when NULL check freeonfailure
-    Mtext* _text=_getText(_s); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
+    Mtext* _text=OWNED(_getText(_s),owner); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
     if(_text){
-        _textValue=__value("text");
-        if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}else free_text(_text); // always free the Mtext if it is not bound!!!
+        _textValue=OWNED(__value("text"),owner);
+        if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=SUBOWNED(_text,1);}else free_text(_text,owner); // always free the Mtext if it is not bound!!!
     }
-    if(!_textValue)if(freeonfailure)free(_s);
-    return _textValue;
+    // if(!_textValue)if(freeonfailure)free(_s);
+    return DISOWNED(_textValue,owner);
 }/* VALIDATED */
-Mvalue* _getCharTextValue(char _c){
-    Mtext* _text=(_c?_getCharText(_c):NULL); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
-    Mvalue* _textValue=(_text?__value("char"):NULL);
-    if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=_text;}else if(_text)free_text(_text); // ah do NOT forget to free _text if we haven't been able to create a value!!
-    return _textValue;
+Mvalue* _getCharTextValue(char _c){Mallocationowner owner=getOwner(__LINE__);
+    Mtext* _text=(_c?OWNED(_getCharText(_c),owner):NULL); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
+    Mvalue* _textValue=(_text?OWNED(__value("char"),owner):NULL);
+    if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=SUBOWNED(_text,1);}else if(_text)free_text(_text,owner); // ah do NOT forget to free _text if we haven't been able to create a value!!
+    return DISOWNED(_textValue,owner);
 }/* VALIDATED */
 // we can force all listelements to have the same type????
-Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){
-    Mlist* _list=__list((source?source:"_getListValue"));
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
+    Mlist* _list=OWNED(__list((source?source:"_getListValue")),owner);
     if(!_list)return NULL;
     _list->weak=weak;
     _list->valuetype=listValuetype; // register what type of elements this list should have
-    Mvalue* _listvalue=__value(weak?"weak list":"strong list");
-    if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=_list;}else free_list(_list);
-    return _listvalue;
+    Mvalue* _listvalue=OWNED(__value(weak?"weak list":"strong list"),owner);
+    if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=SUBOWNED(_list,1);}else free_list(_list,owner);
+    return DISOWNED(_listvalue,owner);
 }/* VALIDATED */
-Mlist* _getListIndices(Mlist const * const list){
-    Mlist* _list=_getListOfType(VT_INTEGER);
+Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner(__LINE__);
+    Mlist* _list=OWNED(_getListOfType(VT_INTEGER),owner);
     if(!_list)return NULL;
     Mlistelement* listelement=list->_first;
     while(listelement){
-        Mvalue* indexValue=_getIntegerValue(listelement->index);
+        Mvalue* indexValue=OWNED(_getIntegerValue(listelement->index),owner);
         if(appendedToList(_list,indexValue,M_LL_INVALID)==0){
             // NO need to free indexValue because it is a Value!!!
             outputError("Failed to append list element index");break;
         }
         listelement=listelement->_next;
     }
-    return _list;
+    return DISOWNED(_list,owner);
 }/* VALIDATED */
 
 // MDH@30MAR2020: the general idea of flattening a list is that all elements of the list are not lists anymore
 //                let's assume that NULL means something went wrong, caller should take care of situation where value is NULL unless ?TODO? we allow putting a NULL value in the list
 //                reversed tells _getFlattenedList to prepend instead of append
 // MDH@06APR2020: passing in a flatten level that is decremented on each element and when it reaches 0 no flattening has to occur
-Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){
+Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _list=NULL;
     if(value){
         if(amVerboseDebugging())
             outputValue("Flattening '",value,"'.\n");
-        _list=_getListOfType(VT_UNDEFINED);
+        _list=OWNED(_getListOfType(VT_UNDEFINED),owner);
         if(_list){
             bool success=true;
             if(value->type==VT_LIST){
@@ -444,7 +444,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
                         // MDH@31MAR2020: a little more effort to check if the value is a list in which case flattening is required, otherwise it is not
                         // MDH@06APR2020: if flattenLevel>0 we need to add all list elements individually instead of all together
                         if(flattenLevel>0&&valueListelement->_value->type==VT_LIST){
-                            Mlist* _subList=_getFlattenedList(valueListelement->_value,(flattenLevel>0?flattenLevel-1:0),reversed);
+                            Mlist* _subList=OWNED(_getFlattenedList(valueListelement->_value,(flattenLevel>0?flattenLevel-1:0),reversed),owner);
                             if(_subList){
                                 Mlistelement* valueSubListelement=_subList->_first;
                                 while(valueSubListelement){
@@ -453,7 +453,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
                                     valueSubListelement=valueSubListelement->_next;
                                 }
                                 // ALWAYS free _sublist
-                                free_list(_subList);
+                                free_list(_subList,owner);
                             }else
                                 success=false;
                         }else
@@ -464,12 +464,12 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
                 }
             }else // a single element to add to the list
                 if(appendedToList(_list,value,M_LL_INVALID)<=0)success=false;
-            if(!success){free_list(_list);_list=NULL;} // on failure release the list
+            if(!success){free_list(_list,owner);_list=NULL;} // on failure release the list
         }    
     }
     if(amVerboseDebugging())
         {if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}}
-    return _list;
+    return DISOWNED(_list,owner);
 }
 Mvalue* getFirstScalarValue(Mvalue* value){
     if(!value)return NULL;
@@ -512,16 +512,24 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
     _map->weak=weak;
     _map->valuetype=mapValuetype;
     Mvalue* _mapvalue=OWNED(__value(weak?"weak map":"strong map"),owner);
-    if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=SUBOWNED(_map,1);}else free_map(_map,owned);
-    return _mapvalue;
+    if(_mapvalue){_mapvalue->type=VT_MAP;_mapvalue->value._map=SUBOWNED(_map,1);}else free_map(_map,owner);
+    return DISOWNED(_mapvalue,owner);
 }/* VALIDATED */
 
 // some other wrappers
-Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner){
-    if(!_integer)return NULL;
-    Mvalue* _value=__value("integer");
-    if(_value){_value->type=VT_INTEGER;_value->value._integer=_integer;}else if(freeonfailure)free_integer(_integer);
-    return _value;
+// if something is wrapped in a value it should get the ownership of the value
+// the question now is what owner_integer actually means
+// the point is that we cannot free an integer or obtain ownership if owner_integer is not correct
+// however, it should be possibly to bind _integer to the value that is created in which case we should be able to obtain ownership
+// meaning that whatever we receive should be a disowned integer unless we do a super own
+Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer){
+    if(!_integer||owner_integer.id==0)return NULL;
+    Mvalue* _value=OWNED(__value("integer"),owner); // make the value create have the same owner as the integer
+    if(_value){
+        _value->type=VT_INTEGER;_value->value._integer=SUBOWNED(OWNED(_integer,owner),1);
+    }else
+        free_integer(_integer,owner_integer);
+    return DISOWNED(_value,owner);
 }/* VALIDATED */
 Mvalue* _getValueOfFloat(Mfloat* _float,Mallocationowner owner){
     if(!_float)return NULL;

@@ -2388,20 +2388,26 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL){
 		Mrational* rational=_value->value._rational;
-		if(floatIsUndefinedOrZero(rational->delta))return _value;
+		if(!rational||floatIsUndefinedOrZero(rational->delta))return _value;
 		long double rationaldelta=getReal(rational->delta);
 		Mrational* _purifiedRational=NULL;
-		Mrational* _pureRational=OWNED(_getRational(_getBigintegerCopy(rational->num),_getBigintegerCopy(rational->den),M_LD_NAN,true,true),owner);
+		// create a copy of the numerator and denominator of the provided rational
+		Mbiginteger* _num=OWNED(_getBigintegerCopy(rational->num),owner),*_den=OWNED(_getBigintegerCopy(rational->den),owner);
+		Mrational* _pureRational=(_num?OWNED(_getRational(_num,_den,M_LD_NAN,true,false),owner):NULL);
 		if(_pureRational){
 			_purifiedRational=OWNED(_getPurifiedRational(_pureRational,rationaldelta),owner);
 			free_rational(_pureRational,owner);
-			if(!_purifiedRational)outputError("Failed to purify a rational");
 		}else
 			outputError("Failed to create a pure rational");
+		if(!_purifiedRational){ // failed to wrap the numerator and denominator (copy), so considered unbound, and so to be freed!!!!
+			free_biginteger(_num,owner);free_biginteger(_den,owner);
+			outputError("Failed to purify a rational");
+			return NULL;
+		}
 		return DISOWNED(OWNED(_getRationalValue(_purifiedRational,true),owner),owner);
 	}
 	if(_value->type==VT_FLOAT)return DISOWNED(OWNED(_getRationalValue(OWNED(_getLongDoubleRational(_value->value._float->ld,250),owner),true),owner),owner); // forcefully free the _getLongDoubleRational if we failed to wrap it
-	Mvalue* _rationalValue=OWNED(OWNED(_getRationalValue(OWNED(_getValueRational(_value),true),owner),owner),owner); // make a rational from it and wrap it again
+	Mvalue* _rationalValue=OWNED(_getRationalValue(OWNED(_getValueRational(_value),true),owner),owner); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
 	return DISOWNED(_rationalValue,owner);
 }
@@ -2409,27 +2415,25 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 // convert to a real
 
 // TODO complete with conversion from big integer and rational
-Mvalue* f(Mvalue* _value){
-	Mvalue* _floatValue=NAF_value;
-	if(_value){
-		if(amVerbose()){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
-		switch(_value->type){
-			case VT_INTEGER:_floatValue=_getFloatValue((long double)_value->value._integer->ll);break;
-			case VT_BIGINTEGER:if(_value->value._biginteger)_floatValue=_getFloatValue(mp_get_long_double(_value->value._biginteger));break;
-			case VT_DECIMAL:_floatValue=_getFloatValue(getDecimalLongDouble(_value->value._decimal));break;
-			case VT_RATIONAL:_floatValue=_getFloatValue(getRationalLongDouble(_value->value._rational));break;
-			case VT_FLOAT:_floatValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
-			case VT_TEXT:_floatValue=_getFloatValue(_strtold(_value->value._text->_c,getNAR()));break;
-			default:break;
-		}
+Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _floatValue=NULL;
+	if(amVerboseDebugging()){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
+	switch(_value->type){
+		case VT_INTEGER:_floatValue=OWNED(_getFloatValue((long double)_value->value._integer->ll),owner);break;
+		case VT_BIGINTEGER:if(_value->value._biginteger)_floatValue=OWNED(_getFloatValue(mp_get_long_double(_value->value._biginteger)),owner);break;
+		case VT_DECIMAL:_floatValue=OWNED(_getFloatValue(OWNED(getDecimalLongDouble(_value->value._decimal),owner)),owner);break;
+		case VT_RATIONAL:_floatValue=OWNED(_getFloatValue(OWNED(getRationalLongDouble(_value->value._rational),owner)),owner);break;
+		case VT_FLOAT:_floatValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
+		case VT_TEXT:_floatValue=OWNED(_getFloatValue(_strtold(_value->value._text->_c,getNAR())),owner);break;
+		default:return NAF_value; // if NAF_value is returned, we do NOT disown it as we would with _floatValue being created here!!!
 	}
 	if(amVerbose())outputValue("Converted to '",_floatValue,"'.\n");
-	return _floatValue;
+	return DISOWNED(_floatValue,owner);
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
-Mvalue* t(Mvalue* value,Mvalue* format){
+Mvalue* t(Mvalue* value,Mvalue* format){if(!format||!format->type==VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* result=NULL;
-	Mstring* _valueText=_getValueText(value,true); // typically dequoted
+	Mstring* _valueText=OWNED(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
 		if(amVerbose()){outputValue("Text representation of '",value,"' before formatting: ");output("'%s'.\n",string(_valueText));}
 		if(format){
@@ -2447,12 +2451,12 @@ Mvalue* t(Mvalue* value,Mvalue* format){
 		}
 		if(string_insert_char(_valueText,0,(value->type==VT_TEXT?value->value._text->presuffix:'\''))){ // prepend a quote character otherwise we're in trouble in _getTextValue
 			if(amVerbose()){outputValue("Text representation of '",value,"': ");output("'%s'.\n",string(_valueText));}
-			result=_getTextValue(string(_valueText),false);
+			result=OWNED(_getTextValue(string(_valueText)),owner);
 		}else
 			outputError("Failed to prepend a quote character to a text representation");
-		free_string(_valueText);
+		free_string(_valueText,owner);
 	}
-	return result;
+	return DISOWNED(result,owner);
 }
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){

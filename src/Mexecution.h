@@ -119,7 +119,7 @@ Mtext* _getText(char* _c);
 Mtext* _getCharText(char _char);
 
 ////////Menvironment* getExecutionEnvironment();
-void free_integer(Minteger* _integer);
+void free_integer(Minteger* _integer,Mallocationowner owner);
 void free_float(Mfloat* _float,Mallocationowner owner);
 
 bool strIsZero(char* str);
