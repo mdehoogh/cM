@@ -1,7 +1,8 @@
 #include "Mrational.h"
 
 static uint32_t const MODULE_ID=11;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static uint32_t const MODULE_OWNER_ID=(MODULE_ID<<16);
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,MODULE_OWNER_ID+id};}
 
 // MDH@27FEB2020 replacing: #include "Msession.h"
 
@@ -10,18 +11,19 @@ extern const char * const M_ERROR_PREFIX;
 extern const long double M_LD_NAN;
 extern const long double M_LD_Q_EPS; // the threshold for accepting a rational approximation of a long double
 
-mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){
+mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){Mallocationowner owner=getOwner(__LINE__);
     // assuming _c equals NULL
     // MDH@02APR2020: big integers equal to NULL (i.e. undefined) should be considered equal to 1
     //                which technically means that we would be returning 1 as result
     //                HOWEVER we could safeguard against that??????
     if(a&&b){
-        *_c=__biginteger();
+        // MDH@24MAY2020: this is a bit of a issue, as *_c is created here, so owned here, it's probably best to disown it as well immediately because there NEVER is a local variable holding the pointer
+        *_c=DISOWNED(OWNED(__biginteger(),owner),owner); 
         return(!_c?MP_ERR:mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c))); // if both big integers are defined, return the multiplication in *_c
     }
     if(!a&&!b)*_c=NULL;else
-    if(!a)*_c=_getBigintegerCopy(b);else
-    if(!b)*_c=_getBigintegerCopy(a);
+    if(!a)*_c=DISOWNED(OWNED(_getBigintegerCopy(b),owner),owner);else
+    if(!b)*_c=DISOWNED(OWNED(_getBigintegerCopy(a),owner),owner);
     return MP_OKAY;
     // MDH@02APR2020 END
     /* replacing:
@@ -35,11 +37,11 @@ mp_err _bimul(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
     return (*_c?MP_OKAY:MP_ERR);
     */
 }
-mp_err _bidiv(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){
+mp_err _bidiv(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){Mallocationowner owner=getOwner(__LINE__);
     // MDH@02APR2020: TODO should we do the same here???????
     // assuming _c equals NULL
     if(a||b){
-        *_c=__biginteger();
+        *_c=DISOWNED(OWNED(__biginteger(),owner),owner);
         if(!_c)return MP_ERR;
         if(a&&b)return mp_div(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c),NULL); // if both big integers are defined, return the divisor in *_c ignoring the remainder!!!
         return mp_copy((a?MP_INT_POINTER(a):MP_INT_POINTER(b)),MP_INT_POINTER(*_c)); // copy either a or b
@@ -53,18 +55,18 @@ mp_err _bidiv(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
  * \p b
  * \p _c
  */
-mp_err _bisub(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){
+mp_err _bisub(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){Mallocationowner owner=getOwner(__LINE__);
     // assuming _c to not be NULL, and *_c to be NULL
     if(a&&b&&_c&&!*_c){
-        *_c=__biginteger(); // get a big integer instance
+        *_c=DISOWNED(OWNED(__biginteger(),owner),owner); // get a big integer instance
         return(*_c?mp_sub(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c)):MP_ERR); // if we have an instance put the difference of a and b in it, otherwise failure
     }
     return MP_ERR;
 }
-mp_err _biadd(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){
+mp_err _biadd(Mbiginteger const * const a,Mbiginteger const * const b,Mbiginteger ** _c){Mallocationowner owner=getOwner(__LINE__);
     // assuming _c to not be NULL, and *_c to be NULL
     if(a&&b&&_c&&!*_c){
-        *_c=__biginteger(); // get a big integer instance
+        *_c=DISOWNED(OWNED(__biginteger(),owner),owner); // get a big integer instance
         return(*_c?mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(*_c)):MP_ERR); // if we have an instance put the difference of a and b in it, otherwise failure
     }
     return MP_ERR;
@@ -74,20 +76,20 @@ mp_err _biadd(Mbiginteger const * const a,Mbiginteger const * const b,Mbigintege
 /**
  * \brief computes the product of \p a and \p b and puts the result in \p c
  */
-mp_err _qmul(Mrational* const c,Mrational const * const a,Mrational const * const b){
+mp_err _qmul(Mrational * const c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
     // MDH@03APR2020: rewriting of computing _qmul with more precise error reporting...
     if(!a||!b||!c){
         outputError("Cannot compute the product of two rationals: input missing");
         return MP_ERR;
     }
     Mbiginteger *_num=NULL,*_den=NULL;
-    mp_err status=_bimul(a->den,b->den,&_den);
+    mp_err status=_bimul(a->den,b->den,&_den);OWNED(_den,owner);
     if(status==MP_OKAY){
         if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES){
             status=MP_ERR;
             outputError("The denominator of the product of two rationals is zero");
         }else{
-            status=_bimul(a->num,b->num,&_num);
+            status=_bimul(a->num,b->num,&_num);OWNED(_num,owner);
             if(status!=MP_OKAY)outputError("Failed to compute the product of the rational numerators");
         }
     }else
@@ -100,11 +102,11 @@ mp_err _qmul(Mrational* const c,Mrational const * const a,Mrational const * cons
     if(status==MP_OKAY)status=_bimul(a->num,b->num,&_num); // multiply numerators
     */
     if(status!=MP_OKAY){ // numerator and denominator not computed both
-        if(_num)free_biginteger(_num);
-        if(_den)free_biginteger(_den);
+        if(_num)free_biginteger(_num,owner);
+        if(_den)free_biginteger(_den,owner);
     }else{ // numerator and denominator computed
-        c->num=_num;
-        c->den=_den;
+        c->num=DISOWNED(_num,owner);
+        c->den=DISOWNED(_den,owner);
         if(!c->normalized)normalizeRational(c);
     }
     return status;
@@ -112,18 +114,18 @@ mp_err _qmul(Mrational* const c,Mrational const * const a,Mrational const * cons
 /**
  * \brief computes the product of \p a and big integer \p b and puts the result in \p c
  */
-mp_err _qmul_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* const b){
+mp_err _qmul_bi(Mrational * const c,Mrational const * const a,Mbiginteger const * const b){Mallocationowner owner=getOwner(__LINE__);
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need all input pointers
-    if(status==MP_OKAY)status=_bimul(a->den,NULL,&_den); // multiply denominators
+    if(status==MP_OKAY){status=_bimul(a->den,NULL,&_den);owned(_den,owner);} // multiply denominators
     if(status==MP_OKAY)if(!_den||mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-    if(status==MP_OKAY)status=_bimul(a->num,b,&_num); // multiply numerators
+    if(status==MP_OKAY){status=_bimul(a->num,b,&_num);OWNED(_num,owner); // multiply numerators
     if(status!=MP_OKAY){ // numerator and denominator not computed both
-        if(_num)free_biginteger(_num);
-        if(_den)free_biginteger(_den);
+        if(_num)free_biginteger(_num,owner);
+        if(_den)free_biginteger(_den,owner);
     }else{ // numerator and denominator computed
-        c->num=_num;
-        c->den=_den;
+        c->num=DISOWNED(_num,owner);
+        c->den=DISOWNED(_den,owner);
         if(!c->normalized)normalizeRational(c);
     }
     return status;
@@ -132,18 +134,18 @@ mp_err _qmul_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* c
 /**
  * \brief computes the quotient of \p a and \p b and puts the result in \p c
  */
-mp_err _qdiv(Mrational* const c,const Mrational* const a,const Mrational* const b){
+mp_err _qdiv(Mrational * const c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
-    if(status==MP_OKAY)status=_bimul(a->den,b->num,&_den); // multiply denominator of a with numerator of a
+    if(status==MP_OKAY){status=_bimul(a->den,b->num,&_den);OWNED(_den,owner); // multiply denominator of a with numerator of a
     if(status==MP_OKAY)if(!_den||mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-    if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num); // multiply numerator of a with denominator of b
+    if(status==MP_OKAY){status=_bimul(a->num,b->den,&_num);OWNED(_num,owner); // multiply numerator of a with denominator of b
     if(status!=MP_OKAY){ // numerator and denominator not computed both
-        if(_num)free_biginteger(_num);
-        if(_den)free_biginteger(_den);
+        if(_num)free_biginteger(_num,owner);
+        if(_den)free_biginteger(_den,owner);
     }else{ // numerator and denominator computed
-        c->num=_num;
-        c->den=_den;
+        c->num=DISOWNED(_num,owner);
+        c->den=DISOWNED(_den,owner);
         if(!c->normalized)normalizeRational(c);
     }
     return status;
@@ -151,18 +153,18 @@ mp_err _qdiv(Mrational* const c,const Mrational* const a,const Mrational* const 
 /**
  * \brief computes the quotient of rational \p a and big integer \p b and puts the result in \p c
  */
-mp_err _qdiv_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* const b){
+mp_err _qdiv_bi(Mrational * const c,Mrational const * const a,Mbiginteger const * const b){Mallocationowner owner=getOwner(__LINE__);
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
-    if(status==MP_OKAY)status=_bimul(a->den,b,&_den); // multiply denominator of a with numerator of a
+    if(status==MP_OKAY){status=_bimul(a->den,b,&_den);OWNED(_den,owner);} // multiply denominator of a with numerator of a
     if(status==MP_OKAY)if(!_den||mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-    if(status==MP_OKAY)status=_bimul(a->num,NULL,&_num); // multiply numerator of a with denominator of b
+    if(status==MP_OKAY){status=_bimul(a->num,NULL,&_num);OWNED(_num,owner);} // multiply numerator of a with denominator of b
     if(status!=MP_OKAY){ // numerator and denominator not computed both
-        if(_num)free_biginteger(_num);
-        if(_den)free_biginteger(_den);
+        if(_num)free_biginteger(_num,owner);
+        if(_den)free_biginteger(_den,owner);
     }else{ // numerator and denominator computed
-        c->num=_num;
-        c->den=_den;
+        c->num=DISOWNED(_num,owner);
+        c->den=DISOWNED(_den,owner);
         if(!c->normalized)normalizeRational(c);
     }
     return status;
@@ -172,40 +174,40 @@ mp_err _qdiv_bi(Mrational* const c,const Mrational* const a,const Mbiginteger* c
 /**
  * \brief computes the difference of \p a and \p b and puts the result in \p c
  */
-mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * const b){
-    mp_err status=(c&&(a||b)?MP_OKAY:MP_ERR);
+mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
+    mp_err status=((c&&!c->num&&!c->den)&&(a||b)?MP_OKAY:MP_ERR); // MDH@24MAY2020: demanding that c->num and c->den are currently undefined!!!
     if(status==MP_OKAY){ // c and at least a or b provided
         // should we NULL the numerator and denominator of c?????
-        if(c->num){free_biginteger(c->num);c->num=NULL;}
+        // if(c->num){free_biginteger(c->num);c->num=NULL;} // MDH@24MAY2020 DONE commented out:TODO we cannot do this unless we know the owner of the numerator
         // TODO do we need to NULL the denominator????? if(c->den){free_biginteger(c->den);c->den=NULL;}
         // if b is not defined, or zero, copy a into c
         if(!b||!b->num||isBigintegerZero(b->num)==M_TRUE){ // b is undefined or zero: return a
             if(amVerbose())outputInfo("Second rational argument undefined or zero.");
-            if(a->num){c->num=_getBigintegerCopy(a->num);if(!c->num)return MP_ERR;}
-            if(a->den){c->den=_getBigintegerCopy(a->den);if(!c->den)return MP_ERR;}
+            if(a->num){c->num=DISOWNED(OWNED(_getBigintegerCopy(a->num),owner),owner);if(!c->num)return MP_ERR;}
+            if(a->den){c->den=DISOWNED(OWNED(_getBigintegerCopy(a->den),owner),owner);if(!c->den){free_biginteger(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
         }else
         if(!a||!a->num||isBigintegerZero(a->num)==M_TRUE){ // a is undefined or zero: return b
             if(amVerbose())outputInfo("First rational argument undefined or zero.");
-            if(b->num){c->num=_getBigintegerCopy(b->num);if(!c->num)return MP_ERR;}
-            if(b->den){c->den=_getBigintegerCopy(b->den);if(!c->den)return MP_ERR;}
+            if(b->num){c->num=DISOWNED(OWNED(_getBigintegerCopy(b->num),owner),owner);if(!c->num)return MP_ERR;}
+            if(b->den){c->den=DISOWNED(OWNED(_getBigintegerCopy(b->den),owner),owner);if(!c->den){free_biginteger(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
         }else{
             if(amVerbose())outputInfo("Subtracting two pure rationals.");
             // ASSERT a and b both defined
             Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
-            if(a->den||b->den)status=_bimul(a->den,b->den,&_den); // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
+            if(a->den||b->den){status=_bimul(a->den,b->den,&_den);OWNED(_den,owner);} // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
             if(status==MP_OKAY)if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-            if(status==MP_OKAY)status=_bimul(a->num,b->den,&_num1); // multiply numerator of a with denominator of b for the plus term of the result numerator
-            if(status==MP_OKAY)status=_bimul(a->den,b->num,&_num2); // multiply denominator of a with numerator of b for the min term of the result numerator
-            if(status==MP_OKAY)status=_bisub(_num1,_num2,&_num);
+            if(status==MP_OKAY){status=_bimul(a->num,b->den,&_num1);OWNED(_num1,owner);} // multiply numerator of a with denominator of b for the plus term of the result numerator
+            if(status==MP_OKAY){status=_bimul(a->den,b->num,&_num2);OWNED(_num2,owner);} // multiply denominator of a with numerator of b for the min term of the result numerator
+            if(status==MP_OKAY){status=_bisub(_num1,_num2,&_num);OWNED(_num,owner);}
             // loose the numerator parts (are not stored in the result rational anyway)
-            if(_num1)free_biginteger(_num1);
-            if(_num2)free_biginteger(_num2);
+            if(_num1)free_biginteger(_num1,owner);
+            if(_num2)free_biginteger(_num2,owner);
             if(status!=MP_OKAY){ // numerator and denominator not computed both
-                if(_num)free_biginteger(_num);
-                if(_den)free_biginteger(_den);
+                if(_num)free_biginteger(_num,owner);
+                if(_den)free_biginteger(_den,owner);
             }else{ // numerator and denominator computed
-                c->num=_num;
-                c->den=_den;
+                c->num=DISOWNED(_num,owner);
+                c->den=DISOWNED(_den,owner);
                 /////// not on pure rationals!!!! c->delta=_floatdifference(a->delta,b->delta);
                 if(!c->normalized)normalizeRational(c);
             }
@@ -228,13 +230,13 @@ long double floatsum(Mfloat* _float1,Mfloat* _float2){
     // both are defined BUT then we still have the problem that either could be undefined
     return ldsum(_float1->ld,_float2->ld);
 }
-Mfloat* _floatsum(Mfloat* r1,Mfloat* r2){
+Mfloat* _floatsum(Mfloat* r1,Mfloat* r2){Mallocationowner owner=getOwner(__LINE__);
     // if either real is defined a sum real is to be produced
     // NOTE _getReal ALWAYS returns a real (if possible) so even when M_LD_NAN is in it
-    if(floatIsUndefinedOrZero(r2))return _getFloatCopy(r1);
-    if(floatIsUndefinedOrZero(r1))return _getFloatCopy(r2);
+    if(floatIsUndefinedOrZero(r2))return DISOWNED(OWNED(_getFloatCopy(r1),owner),owner);
+    if(floatIsUndefinedOrZero(r1))return DISOWNED(OWNED(_getFloatCopy(r2),owner),owner);
     // ASSERT neither is undefined or zero
-    return _getFloat(floatsum(r1,r2));
+    return DISOWNED(OWNED(_getFloat(floatsum(r1,r2)),owner),owner);
 }
 // for the computation of the difference of two reals
 long double lddifference(long double ld1,long double ld2){
@@ -250,31 +252,36 @@ long double floatdifference(Mfloat* _float1,Mfloat* _float2){
     // both are defined BUT then we still have the problem that either could be undefined
     return lddifference(_float1->ld,_float2->ld);
 }
-Mfloat* _floatdifference(Mfloat* r1,Mfloat* r2){
-    if(floatIsUndefinedOrZero(r2))return _getFloatCopy(r1);
-    if(floatIsUndefinedOrZero(r1))return _getFloatNeg(r2);
-    return _getFloat(floatdifference(r1,r2));
+Mfloat* _floatdifference(Mfloat* r1,Mfloat* r2){Mallocationowner owner=getOwner(__LINE__);
+    if(floatIsUndefinedOrZero(r2))return DISOWNED(OWNED(_getFloatCopy(r1),owner),owner);
+    if(floatIsUndefinedOrZero(r1))return DISOWNED(OWNED(_getFloatNeg(r2),owner),owner);
+    return DISOWNED(OWNED(_getFloat(floatdifference(r1,r2)),owner),owner);
 }
 // for the computation of the product of two reals (which is very simple)
 long double ldproduct(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld2==M_LD_NAN?M_LD_NAN:ld1*ld2);} // either undefined, product undefined
 long double floatproduct(Mfloat* r1,Mfloat* r2){return(r1&&r2?ldproduct(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
-Mfloat* _floatproduct(Mfloat* r1,Mfloat* r2){return(r1||r2?_getFloat(floatproduct(r1,r2)):NULL);} // either undefined, product undefined
+Mfloat* _floatproduct(Mfloat* r1,Mfloat* r2){Mallocationowner owner=getOwner(__LINE__);
+    return(r1||r2?DISOWNED(OWNED(_getFloat(floatproduct(r1,r2)),owner),owner):NULL);
+} // either undefined, product undefined
 // for the computation of the quotient of two reals
 // NOTE if the second quotient is zero, we'd get infinity, so one should avoid this from happening, because then the quotient would be infinity!!!
 long double ldquotient(long double ld1,long double ld2){return(ld1==M_LD_NAN||ld2==M_LD_NAN?M_LD_NAN:ld1/ld2);} // either undefined, quotient undefined
 long double floatquotient(Mfloat* r1,Mfloat* r2){return(r1&&r2?ldquotient(r1->ld,r2->ld):M_LD_NAN);} // either undefined, product undefined
-Mfloat* _floatquotient(Mfloat* r1,Mfloat* r2){return(r1||r2?_getFloat(floatquotient(r1,r2)):NULL);} // either undefined, product undefined
+Mfloat* _floatquotient(Mfloat* r1,Mfloat* r2){Mallocationowner owner=getOwner(__LINE__);
+    return(r1||r2?DISOWNED(OWNED(_getFloat(floatquotient(r1,r2)),owner),owner):NULL);
+} // either undefined, product undefined
 
-mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
+mp_err _qadd(Mrational * const c,Mrational const * const a,Mrational const * const b){if(!c||c->num||c->den||c->delta)return MP_ERR;Mallocationowner owner=getOwner(__LINE__);
+    // MDH@24MAY2020 TODO is someone adding the delta's??????
     Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
     ///////Mfloat* _delta=NULL;
-    mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need both rationals
+    mp_err status=(a&&b?MP_OKAY:MP_ERR); // we need both rationals
     if(status==MP_OKAY){
-        status=_bimul(a->den,b->den,&_den); // multiply denominators to become the result denominator
+        status=_bimul(a->den,b->den,&_den);OWNED(_den,owner); // multiply denominators to become the result denominator
         if(status!=MP_OKAY)
             output("%sFailed to multiply the denominators of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
         else
-        if(amVerbose())
+        if(amVerboseDebugging())
             outputInfo("Denominators of two rationals multiplied");
     }
     if(status==MP_OKAY){
@@ -286,47 +293,47 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
     }
     ////// OOPS the deltas are handled by _getRationalSum!!!! if(status==MP_OKAY){_delta=_floatsum(a->delta,b->delta);if(!_delta)if(a->delta||b->delta)status=MP_ERR;} // if we failed in adding the delta's error as well
     if(status==MP_OKAY){
-        status=_bimul(a->num,b->den,&_num1);
+        status=_bimul(a->num,b->den,&_num1);OWNED(_num1,owner);
         if(status!=MP_OKAY)
             output("%sFailed to multiply the numerator and denominator of two rationals (error code: %d).\n",M_ERROR_PREFIX,status);
         else
-        if(amVerbose())
+        if(amVerboseDebugging())
             outputInfo("Numerator and denominator of two rationals multiplied.");
     }
     if(status==MP_OKAY){
-        status=_bimul(a->den,b->num,&_num2);
+        status=_bimul(a->den,b->num,&_num2);OWNED(_num2,owner);
         if(status!=MP_OKAY)
             output("%sFailed to multiply the denominator and numerator of two rationals (error code: %d).\n",M_ERROR_PREFIX,status); // multiply denominator of a with numerator of b for the min term of the result numerator
         else
-        if(amVerbose())
+        if(amVerboseDebugging())
             outputInfo("Denominator and numerator of two rationals multiplied.");
     }
     if(status==MP_OKAY){
-        status=_biadd(_num1,_num2,&_num);
+        status=_biadd(_num1,_num2,&_num);OWNED(_num,owner);
         if(status!=MP_OKAY)
             output("%sFailed to add two rational numerators (error code: %d).",M_ERROR_PREFIX,status); // add the numerator parts
         else
-        if(amVerbose())
+        if(amVerboseDebugging())
             outputInfo("Numerators of two rationals added.");
     }
     // loose the numerator parts (are not stored in the result rational anyway)
     ////outputInfo("Rational numerator parts to free.");
-    if(_num1)free_biginteger(_num1);
-    if(_num2)free_biginteger(_num2);
+    if(_num1)free_biginteger(_num1,owner);
+    if(_num2)free_biginteger(_num2,owner);
     ////outputInfo("Rational numerator parts freed.");
     if(status!=MP_OKAY){ // numerator and denominator not computed both
         outputInfo("Freeing new numerator and denominator when failing to compute the sum of two rationals");
-        if(_num)free_biginteger(_num);
-        if(_den)free_biginteger(_den);
+        if(_num)free_biginteger(_num,owner);
+        if(_den)free_biginteger(_den,owner);
         //////if(_delta)free_float(_delta);
         ////outputInfo("New numerator, denominator and delta freed!");
     }else{ // numerator and denominator computed
         ////outputBiginteger("Storing numerator '",_num,"'");outputBiginteger(" and denominator '",_den,"'.\n");
         // too bad we have to clear the current numerator and denominator pointers (if any)
-        if(c&&c->num){if(amVerbose()&&amDebugging())outputInfo("Freeing previous numerator.");free_biginteger(c->num);}
-        if(c&&c->den){if(amVerbose()&&amDebugging())outputInfo("Freeing previous denominator.");free_biginteger(c->den);}
+        if(c&&c->num){if(amVerboseDebugging())outputInfo("Freeing previous numerator.");free_biginteger(c->num,owner);}
+        if(c&&c->den){if(amVerboseDebugging())outputInfo("Freeing previous denominator.");free_biginteger(c->den,owner);}
         /////outputInfo("Previous numerator and denominator released.");
-        c->num=_num;c->den=_den;
+        c->num=DISOWNED(_num,owner);c->den=DISOWNED(_den,owner);
         /////outputInfo("Numerator and denominator stored.");
         // normalize the rational
         /////outputInfo("Normalizing the sum rational.");
@@ -341,25 +348,25 @@ mp_err _qadd(Mrational* c,Mrational const * const a,Mrational const * const b){
 /**
  * \brief copies \p a into \p b
  */
-mp_err _qcopy(Mrational * const b,Mrational const * const a){
-    mp_err status=(a&&b?MP_OKAY:MP_ERR);
+mp_err _qcopy(Mrational * const b,Mrational const * const a){if(!b||b->num||b->den||b->delta)return MP_ERR;Mallocationowner owner=getOwner(__LINE__);
+    mp_err status=(a?MP_OKAY:MP_ERR);
     if(status==MP_OKAY){
         // get copies of numerator, denominator and delta of the source
-        Mbiginteger *_num=(a->num?_getBigintegerCopy(a->num):NULL),*_den=(a->den?_getBigintegerCopy(a->den):NULL);
-        Mfloat* _delta=(a->delta?_getFloat(a->delta->ld):NULL);
+        Mbiginteger *_num=(a->num?OWNED(_getBigintegerCopy(a->num),owner):NULL),*_den=(a->den?OWNED(_getBigintegerCopy(a->den),owner):NULL);
+        Mfloat* _delta=(a->delta?OWNED(_getFloat(a->delta->ld),owner):NULL);
         // if copying failed mark as error
         if(a->num&&!_num)status=MP_ERR;else if(a->den&&!_den)status=MP_ERR;else if(a->delta&&!_delta)status=MP_ERR;
         if(status==MP_OKAY){ // copies made successfully
             // move copies freeing all originals in the process
-            if(b->num)free_biginteger(b->num);b->num=_num;
-            if(b->den)free_biginteger(b->den);b->den=_den;
-            if(b->delta)free_float(b->delta);b->delta=_delta;
+            b->num=DISOWNED(_num,owner);
+            b->den=DISOWNED(_den,owner);
+            b->delta=DISOWNED(_delta,owner);
             b->normalized=a->normalized;
         }else{
             // free all copies if made
-            if(_num)free_biginteger(_num);
-            if(_den)free_biginteger(_den);
-            if(_delta)free_float(_delta);
+            if(_num)free_biginteger(_num,owner);
+            if(_den)free_biginteger(_den,owner);
+            if(_delta)free_float(_delta,owner);
         }
     }
     return status;
@@ -367,17 +374,15 @@ mp_err _qcopy(Mrational * const b,Mrational const * const a){
 /**
  * \brief copies \p a into \p b
  */
-mp_err _qcopy_bi(Mrational* const b,Mbiginteger const * const a){
-    mp_err status=(a&&b?MP_OKAY:MP_ERR);
+mp_err _qcopy_bi(Mrational * const b,Mbiginteger const * const a){if(!b||b->num||b->den||b->delta)return MP_ERR;Mallocationowner owner=getOwner(__LINE__);
+    mp_err status=(a?MP_OKAY:MP_ERR);
     if(status==MP_OKAY){
         // get copies of numerator, denominator and delta of the source
-        Mbiginteger *_num=_getBigintegerCopy(a);
+        Mbiginteger *_num=OWNED(_getBigintegerCopy(a),owner);
         // if copying failed mark as error
         if(_num){            
             // move copies freeing all originals in the process
-            if(b->num)free_biginteger(b->num);b->num=_num;
-            if(b->den)free_biginteger(b->den);b->den=NULL;
-            if(b->delta)free_float(b->delta);b->delta=NULL;
+            b->num=DISOWNED(_num,owner);
             b->normalized=true;
         }else
             status=MP_ERR;
@@ -401,14 +406,14 @@ bool _qeq(Mrational* q1,Mrational* q2,mp_err *status){
     return(!q1&&!q2); // if both are NULL return true, false otherwise
 }
 
-Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * const q2){
+Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * const q2){Mallocationowner owner=getOwner(__LINE__);
     Mrational* _pureRationalSum=NULL;
     if(q1&&q2){ // rationals defined
         if(floatIsUndefinedOrZero(q1->delta)&&floatIsUndefinedOrZero(q2->delta)){ // both are pure
-            _pureRationalSum=__rational();
+            _pureRationalSum=OWNED(__rational(),owner);
             if(_pureRationalSum){
                 if(_qadd(_pureRationalSum,q1,q2)!=MP_OKAY){
-                    free_rational(_pureRationalSum);_pureRationalSum=NULL;
+                    free_rational(_pureRationalSum,owner);_pureRationalSum=NULL;
                     // if(amVerbose())
                     outputError("Failed to compute the sum of two pure rationals");
                 }
@@ -419,7 +424,7 @@ Mrational* _getPureRationalSum(Mrational const * const q1,Mrational const * cons
         // if(amVerbose())
         outputError("Both rationals should be pure, and are not");
     }
-    return _pureRationalSum;
+    return DISOWNED(_pureRationalSum,owner);
 }/* VALIDATED */
 
 // the following methods take rationals with deltas into account whereas the _qmul, _qdiv, _qadd and _qsub do not
@@ -863,14 +868,17 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){
 	return rational;
 }/* VALIDATED */
 
-void free_rational(Mrational* _rational){
+// MDH@24MAY2020: we're going to need clear_rational if a rational is to be used as output of an operation
+Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner){
     if(_rational){
-        if(_rational->num)free_biginteger(_rational->num);
-        if(_rational->den)free_biginteger(_rational->den);
-        if(_rational->delta)free_float(_rational->delta);
-        FREE(_rational,'R');
-    }else
-    if(amDebugging())outputInfo("No rational to free!");
+        if(_rational->num){free_biginteger(_rational->num,owner);_rational->num=NULL;}
+        if(_rational->den){free_biginteger(_rational->den,owner);_rational->den=NULL;}
+        if(_rational->delta){free_float(_rational->delta,owner);_rational->delta=NULL;}
+    }
+    return _rational;
+}/*VALIDATED*/
+void free_rational(Mrational* _rational,Mallocationowner owner){
+    FREE(cleared_rational(_rational,owner),'R',owner); // MDH@24MAY2020: now easily solved by freeing the cleared_rational
 }/* VALIDATED */
 
 // TODO should we free the given big integers when they are NOT bound to the rational that is being returned????
@@ -907,7 +915,7 @@ void normalizeRational(Mrational* rational){
 
 // MDH@07JUN2019: _getRational does NOT free the numerator and denominator supplied!!!
 //                as it does not know whether _numerator or _denominator should be released on failure
-Mrational* __rational(){
+Mrational* __rational(){Mallocationowner owner=getOwner(__LINE__);
     Mrational* _rational=(Mrational*)CALLOC(sizeof(Mrational),'R');
     if(!_rational)outputMemoryError("Failed to create a rational");
     if(_rational->num||_rational->den||_rational->delta)outputBug("New rational numerator, denominator and delta not all considered undefined");

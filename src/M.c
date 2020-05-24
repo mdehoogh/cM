@@ -675,7 +675,7 @@ void setLastTokenAutocompletionText(Mchars* _text){//Mallocationowner owner=getO
 		if(lastTokenAutocompletionText->_text)
 			freeChars(lastTokenAutocompletionText->_text,owner_tokenAutoCompletionTexts);
 		deleteAutocompletionText();
-		lastTokenAutocompletionText->_text=SUBOWNED(OWNED(_text,owner_tokenAutoCompletionTexts)); // replacing: _getChars(_text,foid); // _text now bound!! // MDH@23APR2020 NO not bound, as _text replaced by _getChars(_text)
+		lastTokenAutocompletionText->_text=SUBOWNED(OWNED(_text,owner_tokenAutoCompletionTexts),1); // replacing: _getChars(_text,foid); // _text now bound!! // MDH@23APR2020 NO not bound, as _text replaced by _getChars(_text)
 	}else{ // not present yet, so add (i.e. prepend!!)
 		if(strlen(_text->chars)>0){
 			if(amVerboseDebugging())
@@ -683,7 +683,7 @@ void setLastTokenAutocompletionText(Mchars* _text){//Mallocationowner owner=getO
 			Mtokenautocompletiontext* _tokenautocompletiontext=CALLOC(sizeof(Mtokenautocompletiontext),'7',owner_tokenAutoCompletionTexts);
 			if(_tokenautocompletiontext){
 				deleteAutocompletionText(); // I guess this is a bit confusing
-				_tokenautocompletiontext->_text=SUBOWNED(OWNED(_text,owner_tokenAutoCompletionTexts)); // MDH@23APR2020: not bound because _getChars() copies the text as well
+				_tokenautocompletiontext->_text=SUBOWNED(OWNED(_text,owner_tokenAutoCompletionTexts),1); // MDH@23APR2020: not bound because _getChars() copies the text as well
 				_tokenautocompletiontext->token=_userInputCommand->_lastToken;
 				// how about skipping all anonymous feed forward texts????
 				// if the first one is anonymous mark that one as last anonymous feed forward text
@@ -1244,17 +1244,19 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 // keep track of all commands so far
 #define COMMAND_BLOCKSIZE 8
 Mcommand** commands=NULL; // array for storing the pointers to the first token of all commands entered
-Mallocationowner owner_commands={__LINE__,0,0};
+Mallocationowner owner_commands={0,0,__LINE__};
+Mallocationowner owner_currentFunctionBodyInput={0,0,__LINE__};
 uint32_t commandBlocks=0;
+// MDH@24MAY2020 NOTE: registerCommand is ONLY called once with _userInputCommand as argument but 
 bool registerCommand(Mcommand* command){Mallocationowner owner=getOwner(__LINE__);
 	if(!command)return false;
 	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
-			Mcommand** createUserInputCommands=REALLOC(commands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mtoken*),'C',owner);
+			Mcommand** createUserInputCommands=REALLOC(commands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mtoken*),'C',owner_commands);
 			if(createUserInputCommands==NULL)return false;
 			commandBlocks++;
-			commands=OWNED(createUserInputCommands,owner_commands);
+			commands=createUserInputCommands;
 		}
 		commands[commandCount++]=command;
 		return true;
@@ -1422,10 +1424,12 @@ bool continuesOperator(Mtoken* _userInputCommand->_lastToken,char inputChar){
 	}
 }
 */
-bool isBinaryOperatorTokenType(uint8_t tokenType){return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;}
+bool isBinaryOperatorTokenType(uint8_t tokenType){
+	return(TOKENTYPE_IDS[tokenType]>>4)==0b0110;
+}
 
 // removeLastToken() removes the last user input command token, delegating the actual removal to removeLastCommandToken now defined in Mshell.h/c
-bool removeLastUserInputCommandToken(){int32_t foid=getOwnerId(55);
+bool removeLastUserInputCommandToken(){
 	if(!_userInputCommand||!_userInputCommand->_lastToken)return false;
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
 	deleteTokenAutocompletionText(_userInputCommand->_lastToken);
@@ -1434,7 +1438,7 @@ bool removeLastUserInputCommandToken(){int32_t foid=getOwnerId(55);
 }
 
 // MDH@04NOV2019: moved from line 1800 or so over here as it calls removeLastUserInputCommandToken() and we do not like to have to use prototypes TODO remove all prototype() definitions
-void updateUserInputCommandIdentifierContinuation(){int32_t foid=getOwnerId(56);
+void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@30OCT2019: simplified updating the identifier continuation a bit so wee do not need to be afraid that it won't work AND we no longer need the userInputCommandIdentifierContinuationNeedsUpdating flag!!!!
 	//                BUT right after a delete we should be allowed to set the flag so the continuation will be deleted and nothing more
 	//                OK, to make delete work, I have to check the NeedsUpdating flag which should be set to true when the token is set
@@ -1444,7 +1448,7 @@ void updateUserInputCommandIdentifierContinuation(){int32_t foid=getOwnerId(56);
 	if(canHaveAnIdentifierContinuation){ // theoretically we could have identifier continuation
 		if(userInputCommandIdentifierContinuationNeedsUpdating){ // not blocked
 			// MDH@04NOV2019: if inside a reference, skip the reference 'operator' at the start of the reference when requesting completion text
-			Mstring* _completionText=(_userInputCommand->_lastToken->type!=TT_REFERENCE?_getCompletion(string(_userInputCommand->_lastToken->text),true):_getCompletion(string_remainder(_userInputCommand->_lastToken->text,1),false));
+			Mstring* _completionText=OWNED(_userInputCommand->_lastToken->type!=TT_REFERENCE?_getCompletion(string(_userInputCommand->_lastToken->text),true):_getCompletion(string_remainder(_userInputCommand->_lastToken->text,1),false),owner);
 			// need at least two characters (the type and something text behind it)
 			// OOPS if there's only one character in the text (just the type) which is quite possible we will need to free _completionText even then!!!
 			if(_completionText){
@@ -1488,7 +1492,7 @@ void updateUserInputCommandIdentifierContinuation(){int32_t foid=getOwnerId(56);
 											inputError("The supposed reference can never become an existing variable reference.");
 										// if we failed to create the error token, we have to append the removed character again (should be no problem because Mstring does not reduce the memory when deleting characters from the end)
 										if(_errorToken!=_userInputCommand->_lastToken){
-											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength)){inputError("%sCouldn't undo the adjustments made to an erroneous reference.",M_BUG_PREFIX);}
+											if(!string_setlength(_userInputCommand->_lastToken->text,lastTokenLength,owner_userInputCommand)){inputError("%sCouldn't undo the adjustments made to an erroneous reference.",M_BUG_PREFIX);}
 										}
 									}else
 										inputError("Failed to retrieve the last (erroneous) character in a variable reference.");
@@ -1501,7 +1505,7 @@ void updateUserInputCommandIdentifierContinuation(){int32_t foid=getOwnerId(56);
 							inputError("There is no existing variable that can be referenced anymore.");
 					}
 				}
-				free_string(_completionText);
+				free_string(_completionText,owner);
 			}else 
 			if(amVerbose())inputInfo("No identifier continuation.");
 		}
@@ -2034,9 +2038,9 @@ void backToPrompt(){
 	}
 	*/
 }
-
+Mallocationowner owner_userInputCommand={0,0,__LINE__};
 void setUserInputCommand(Mcommand* command){
-	_userInputCommand=command;
+	_userInputCommand=command; // MDH@24MAY2020: take over ownership!!!!
 	// replacing: _userInputCommand->_lastToken=_userInputCommand->_firstToken=pCommand;
 	writeCommand(_userInputCommand);
 	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=(_userInputCommand?inIdentifierToken(_userInputCommand->_lastToken):false); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
@@ -2167,10 +2171,10 @@ void createUserInputCommand(){
 
 // TODO copyUserInputCommand() should set ->expr correctly
 // MDH@29OCT2019: TODO caller should check whether or not _userInputCommand is NULL if it is copying failed!!!!
-void copyUserInputCommand(){
+void copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	//        it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
-	Mcommand* _newUserInputCommand=_getNewCommand(false); // get a new command without tokens (should NEVER fail unless memory shortage)
+	Mcommand* _newUserInputCommand=OWNED(_getNewCommand(false),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
 	if(_newUserInputCommand){
 		// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
 		if(amDebugging())inputInfo("Preparing the user input command for editing.");
@@ -2222,7 +2226,7 @@ void copyUserInputCommand(){
 			// get the next token to copy...
 			_tokenToCopy=_tokenToCopy->next;
 		}
-		if(!_newUserInputCommand->_lastToken){free_command(_newUserInputCommand);_newUserInputCommand=NULL;}
+		if(!_newUserInputCommand->_lastToken){free_command(_newUserInputCommand,owner);_newUserInputCommand=NULL;}
 	}else
 		inputError("Failed to prepare the command for editing");
 	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
@@ -3956,14 +3960,14 @@ int main(int argc, char **argv){int32_t foid=getOwnerId(0); // using 0 is kind o
 						if(allocationMarkAdded())allocationMarksAdded++;else outputError("Failed to mark the allocations after evaluating the command.");
 					}
 					// TODO the next part should be improved, as it is getting a bit messy
-					Mstring* _userInputCommandText=_getCommandText(false); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
+					Mstring* _userInputCommandText=OWNED(_getCommandText(false),owner); // MDH@14NOV2019: used in the next part and in registerCommandEvaluation as well, free ASAP do NOT get out unless doing so
 					if(!commandEvaluated){
 						if(string_length(_userInputCommandText)==0){
 							clearCommand();
 							outputInfo("Nothing to evaluate!");
 						}else // MDH@16MAY2019: no need to tell the user that evaluation failed, because an error message would have been shown to indicate what went wrong (see evaluateCommand())
 							outputInfo("Please complete, correct or cancel the command.");
-						free_string(_userInputCommandText); // freed!
+						free_string(_userInputCommandText,owner); // freed!
 						continue;
 					}
 					resetOutputColor();

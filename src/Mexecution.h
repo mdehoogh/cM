@@ -114,13 +114,13 @@ Mstring* _getUndefinedValueText();
 
 Minteger* _getInteger(long long ll);
 
-void free_text(Mtext* _text);
+void free_text(Mtext* _text,Mallocationowner owner);
 Mtext* _getText(char* _c);
 Mtext* _getCharText(char _char);
 
 ////////Menvironment* getExecutionEnvironment();
 void free_integer(Minteger* _integer);
-void free_float(Mfloat* _float);
+void free_float(Mfloat* _float,Mallocationowner owner);
 
 bool strIsZero(char* str);
 Mstring* appendll(Mstring* const ms,long long ll);

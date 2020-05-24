@@ -6,7 +6,7 @@
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint32_t const MODULE_ID=17;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 Mvalue* NULL_value=NULL;
 // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
@@ -1298,10 +1298,10 @@ Mvalue* Mevalfunction(Mvalue* value){
 // end very special M functions
 
 // MCommand stuff
-void free_command(Mcommand* _command){
+void free_command(Mcommand* _command,Mallocationowner owner){
 	if(!_command)return;
-	if(_command->_firstToken)free_token(_command->_firstToken); // will free ALL connected tokens!!!
-	FREE(_command,'K');
+	if(_command->_firstToken)free_token(_command->_firstToken,owner); // will free ALL connected tokens!!!
+	FREE(_command,'K',owner);
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
@@ -1319,8 +1319,8 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 }
 // MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
 //                this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
-Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
-	Mtoken* pNewToken=__token();
+Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner owner=getOwner(__LINE__);
+	Mtoken* pNewToken=OWNED(__token(),owner);
 	if(pNewToken){
 		/////if(amDebugging())inputInfo("E1");
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
@@ -1484,37 +1484,48 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){
 		pNewToken->next=NULL;
 		*/
 	}
-	if(!pNewToken){if(inputErrorFunction)(*inputErrorFunction)("Failed to create a new token.");}else pNewToken->type=newTokenType;
-	return pNewToken;
+	if(!pNewToken){
+		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a new token.");
+		return NULL;
+	}
+	pNewToken->type=newTokenType;
+	return DISOWNED(pNewToken,owner);
 }
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
-Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/){
+Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//                but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=_getToken(lastCommandToken,tokenType);
-	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
-	return _newCommandToken;
+	Mtoken* _newCommandToken=OWNED(_getToken(lastCommandToken,tokenType),owner);
+	if(_newCommandToken)
+		setTokenType(_newCommandToken,tokenType);
+	else
+	if(amVerboseDebugging())
+		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
+	return DISOWNED(_newCommandToken,owner);
 }
-Mcommand* _getNewCommand(bool withFirstToken){
-	Mcommand* _command=CALLOC(sizeof(Mcommand),'K',getOwnerId(1));
+Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__LINE__);
+	Mcommand* _command=CALLOC(sizeof(Mcommand),'K',owner);
 	if(_command){
 		if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
-			_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/);
+			_command->_firstToken=SUBOWNED(OWNED(_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/),owner),1); // MDH@24MAY2020: obtain ownership immediately
 			if(_command->_firstToken){ // we've got a first token allocated
-				if(amDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
+				if(amVerboseDebugging())
+					if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
-				FREE(_command,'K',getOwnerId(1));_command=NULL;
-				if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
+				FREE(_command,'K',owner);_command=NULL;
+				if(amVerboseDebugging())
+					if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
 			}
 		}
 	}else
-	if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create the command.");
-	return _command;
+	if(amVerboseDebugging())
+		if(inputErrorFunction)(*inputErrorFunction)("Failed to create the command.");
+	return DISOWNED(_command,owner);
 }
 
 // and finally
@@ -1525,42 +1536,43 @@ Mcommand* _getNewCommand(bool withFirstToken){
 /////const char* M_QNUM_PI100="394372834342725903069943709807632345074473102456264";
 /////const char* M_QDEN_PI100="125532772013612015195543173729505082616186012726141";
 
-Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
+// MDH@24MAY2020: because _Iadd is currently only called with freeonfailure equal to false we removed that argument otherwise we would have needed to provide the two owners!!!
+Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT do NOT call with either a or b NULL
-	Mbiginteger* sum=NULL;
+	Mbiginteger* _sum=NULL;
 	if(a&&b){
 		if(!isBigintegerZero(a)&&!isBigintegerZero(b)){
-			sum=__biginteger();
-			if(mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(sum))!=MP_OKAY){free_biginteger(sum);sum=NULL;} // if the addition fails return 0
+			_sum=OWNED(__biginteger(),owner);
+			if(mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_sum))!=MP_OKAY){free_biginteger(_sum,owner);_sum=NULL;} // if the addition fails return 0
 		}else
-			sum=_getBigintegerCopy(isBigintegerZero(a)?b:a);
+			_sum=OWNED(_getBigintegerCopy(isBigintegerZero(a)?b:a),owner);
 	}
 	///////outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
-	if(!sum)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
-	return sum;
+	// if(!sum)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
+	return _sum;
 } // adding two big integers, if either is NULL return NULL
-Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
-	Mbiginteger* product=NULL;
+Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
+	Mbiginteger* _product=NULL;
 	if(a&&b){
 		if(!isBigintegerOne(a)&&!isBigintegerOne(b)){
-			product=__biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
-			if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(product))!=MP_OKAY){free_biginteger(product);product=NULL;}
+			_product=OWNED(__biginteger(),owner); // defaults to zero, which would be the result as well if either big integer is zero!!!
+			if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){free_biginteger(_product,owner);_product=NULL;}
 		}else
-			product=_getBigintegerCopy(isBigintegerOne(a)?b:a);
+			_product=OWNED(_getBigintegerCopy(isBigintegerOne(a)?b:a),owner);
 	}
 	//////////outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
-	if(!product)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
-	return product;
+	// if(!product)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
+	return DISOWNED(_product,owner);
 } // multiplying two big integers, if either is NULL return NULL
 
 // _Imul is special big integer multiplier that assumes a NULL big integer equals 1
-Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
+Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){Mallocationowner owner=getOwner(__LINE__);
 	if(!a&&!b)return NULL;
-	if(!a)return _getBigintegerCopy(b);
-	if(!b)return _getBigintegerCopy(a);
-	Mbiginteger* product=__biginteger();
-	if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(product))!=MP_OKAY){free_biginteger(product);product=NULL;}
-	return product;
+	if(!a)return DISOWNED(OWNED(_getBigintegerCopy(b),owner),owner);
+	if(!b)return DISOWNED(OWNED(_getBigintegerCopy(a),owner),owner);
+	Mbiginteger* _product=OWNED(__biginteger(),owner);
+	if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){free_biginteger(_product,owner);_product=NULL;}
+	return DISOWNED(_product,owner);
 }
 
 // RATIONAL STUFF
@@ -1738,7 +1750,7 @@ Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 }
 */
 
-Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){
+Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=getOwner(__LINE__);
 	// _value should be a positive integer defining the required precision
 	if(amVerbose())output("Computing pi using decimals.\n");
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
@@ -1754,7 +1766,7 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
 	// CORRECTION by default should NOT compute the sine table (to speed up computing pi)
-	return _getDecimalValue(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),true);
+	return DISOWNED(OWNED(_getDecimalValue(OWNED(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),true),owner),owner),owner);
 }
 
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
@@ -1785,29 +1797,29 @@ print("Pi = PI(353,5022,5020)")
  */
 // but the primary formula is pretty simple: 4*sum((-1)k/(2k+1)): this is the very slow Gregory-Leibniz series approximation
 // this is a very slow algorithm
-Mvalue* pi_ql(Mvalue* value){
+Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value&&value->type==VT_INTEGER){
 		long long maxiter=value->value._integer->ll;
 		if(maxiter>=0){
 			if(amVerbose())output("Approximating pi/4 by a sum of %llu rational fractions.\n",maxiter);
 			// the first approximation (when iter=0) equals 4
-			Mrational* _rational=_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true);
+			Mrational* _rational=OWNED(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),owner);
 			if(_rational){
 				// obviously we can add 2 to the big integer storing the numerator
 				if(maxiter>0){
-					Mbiginteger* _addendumDenominator=_getBiginteger(3);
-					Mbiginteger* _denominatorIncrement=_getBiginteger(2);
+					Mbiginteger* _addendumDenominator=OWNED(_getBiginteger(3),owner);
+					Mbiginteger* _denominatorIncrement=OWNED(_getBiginteger(2),owner);
 					if(_addendumDenominator&&_denominatorIncrement){
 						for(int iter=1;iter<=maxiter;iter++){
 							// compute the numerator and (new) denominator of the addendum rational
-							Mbiginteger* _addendumNumerator=_getBiginteger(iter%2?-1:1); // the numerator is either 1 or -1
+							Mbiginteger* _addendumNumerator=OWNED(_getBiginteger(iter%2?-1:1),owner); // the numerator is either 1 or -1
 							if(!_addendumNumerator){
-								free_biginteger(_addendumDenominator);
+								free_biginteger(_addendumDenominator,owner);
 								output("%sFailed to set the addendum numerator at iteration %u.\n",M_ERROR_PREFIX,iter);
 								break;
 							}
 							// both _addendumNumerator and _addendumDenominator are now available to be bound in the rational
-							Mrational* _addendumRational=_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false,true);
+							Mrational* _addendumRational=OWNED(_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false,true),owner);
 							if(!_addendumRational){ // failed to bind in the rational
 								output("%sFailed to compute the rational to add to the approximation of pi in step %u.",M_ERROR_PREFIX,iter);
 								break;
@@ -1817,48 +1829,54 @@ Mvalue* pi_ql(Mvalue* value){
 								outputRational("Sum so far: ",_rational,NULL);
 								outputRational(", addendum: ",_addendumRational,".\n");
 							}
-							Mrational* _newRational=_getRationalSum(_rational,_addendumRational); // _qsum replaced by _getRationalSum in Mrational.h/c
+							Mrational* _newRational=OWNED(_getRationalSum(_rational,_addendumRational),owner); // _qsum replaced by _getRationalSum in Mrational.h/c
 							if(!_newRational){
 								// we have to free the addendum numerator and denominator
 								output("%sFailed to add this addendum at step %u in approximating pi.\n",M_ERROR_PREFIX,iter);
-								free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
+								free_rational(_addendumRational,owner); // to free the addendum numerator and denominator bound to _addendumRational
 								break;
 							}
 							// increment the denominator BEFORE we loose the addendum denominator we have now (as part of _rational)
-							if(amVerbose())outputBiginteger("Incrementing the addendum denominator by ",_denominatorIncrement,".\n");		
-							Mbiginteger* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement,false);
+							if(amVerbose())
+								outputBiginteger("Incrementing the addendum denominator by ",_denominatorIncrement,".\n");		
+							Mbiginteger* _newAddendumDenominator=OWNED(_Iadd(_addendumDenominator,_denominatorIncrement),owner);
 							if(!_newAddendumDenominator){
-								free_biginteger(_addendumDenominator); // won't be using this in the addendum rational
+								free_biginteger(_addendumDenominator,owner); // won't be using this in the addendum rational
 								outputError("Failed to increment the addendum denominator");
 								break;
 							}
-							if(amVerbose())outputBiginteger("New addendum denominator: ",_newAddendumDenominator,".\n");
-							if(amVerbose())outputRational("New approximation to pi/4: ",_newRational,".\n");
-							free_rational(_addendumRational); // to free the addendum numerator and denominator bound to _addendumRational
+							if(amVerbose())
+								outputBiginteger("New addendum denominator: ",_newAddendumDenominator,".\n");
+							if(amVerbose())
+								outputRational("New approximation to pi/4: ",_newRational,".\n");
+							free_rational(_addendumRational,owner); // to free the addendum numerator and denominator bound to _addendumRational
 							// replace _rational by _newRational
-							free_rational(_rational);
+							free_rational(_rational,owner);
 							_rational=_newRational;
 							//if(amVerbose())
-							if(amVerbose())outputRational("Sum approximation of pi/4 so far: ",_rational,".\n");
+							if(amVerbose())
+								outputRational("Sum approximation of pi/4 so far: ",_rational,".\n");
 							// no need to normalize as the addendum is always normalized by itself
 							// replace the addendum denominator with the new one)
 							_addendumDenominator=_newAddendumDenominator;
-							if(amVerbose())outputBiginteger("New addendum denominator: ",_addendumDenominator,".\n");
+							if(amVerbose())
+								outputBiginteger("New addendum denominator: ",_addendumDenominator,".\n");
 						}
 					}else{
 						outputError("Failed to initialize the addendum numerator and its increment value (2)");
-						free_biginteger(_addendumDenominator);
+						free_biginteger(_addendumDenominator,owner);
 					}
 				}
 				// MDH@09APR2020: ok, this might be problematic if _rational_num is NULL so -> FIXED
 				if(!_rational->num||(mp_mul_2d(MP_INT_POINTER(_rational->num),2,MP_INT_POINTER(_rational->num))!=MP_OKAY)){
 					if(amVerbose()){output("%s",M_ERROR_PREFIX);outputRational("Failed to multiply the approximation of pi/4 (",_rational," by 4.\n");}
-					free_rational(_rational);
+					free_rational(_rational,owner);
 					return NULL;
 				} // multiply the numerator by 4 i.e. 2**2
 				normalizeRational(_rational);
-				if(amVerbose())outputRational("Normalized approximation of pi: ",_rational,".\n");
-				return _getRationalValue(_rational,true);
+				if(amVerbose())
+					outputRational("Normalized approximation of pi: ",_rational,".\n");
+				return OWNED(_getRationalValue(_rational,true),owner);
 			}
 		}
 	}
@@ -1866,63 +1884,71 @@ Mvalue* pi_ql(Mvalue* value){
 }
 
 // and the following is an implementation that can approximate pi using this formula
-Mvalue* pi_q(Mvalue* value){
+Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value&&value->type==VT_INTEGER){
 		long long iter=value->value._integer->ll;
 		if(iter>=0){
-			if(amVerbose())output("Computing %llu continued fractions of pi.\n",iter);
-			Mrational* _rational=_getRational(_getBiginteger(3),NULL,M_LD_NAN,false,true);
+			if(amVerbose())
+				output("Computing %llu continued fractions of pi.\n",iter);
+			Mrational* _rational=OWNED(_getRational(_getBiginteger(3),NULL,M_LD_NAN,false,true),owner);
 			if(_rational){
 				if(iter>0){
 					// working backwards starting with the last denominator quotient seems to be best
 					// in every step you have to compute i**2/6 the second term of the denominator
-					Mrational* _denominatorRational=_getRational(_getBiginteger(6),NULL,M_LD_NAN,false,true); // the final denominator equals 6
+					Mrational* _denominatorRational=OWNED(_getRational(_getBiginteger(6),NULL,M_LD_NAN,false,true),owner); // the final denominator equals 6
 					if(_denominatorRational){
-						if(amVerbose())output("First denominator rational computed.\n");
+						if(amVerbose())
+							output("First denominator rational computed.\n");
 						long long square;
-						Mbiginteger* _bi6=_getBiginteger(6); // the one we want to reuse in the computation (that we need to free when done)
-						if(!_bi6){free_rational(_denominatorRational);return NULL;} // what a nuisance
+						Mbiginteger* _bi6=OWNED(_getBiginteger(6),owner); // the one we want to reuse in the computation (that we need to free when done)
+						if(!_bi6){free_rational(_denominatorRational,owner);return NULL;} // what a nuisance
 						while(--iter>0){
 							square=4*(iter+1)*iter+1;
 							////////////if(amVerbose())output("Square numerator: %llu.",square);
-							Mbiginteger* _bigintegerSquare=_getBiginteger(square);
-							if(!_bigintegerSquare){output("%sFailed to compute the big integer of square %llu.\n",M_ERROR_PREFIX,square);break;}
-							if(amVerbose())output("%llu fractions yet to compute using numerator square '%llu'.\n",iter,square);
+							Mbiginteger* _bigintegerSquare=OWNED(_getBiginteger(square),owner);
+							if(!_bigintegerSquare){
+								output("%sFailed to compute the big integer of square %llu.\n",M_ERROR_PREFIX,square);
+								break;
+							}
+							if(amVerbose())
+								output("%llu fractions yet to compute using numerator square '%llu'.\n",iter,square);
 							// the new denominator becomes 6+square/prev denominator=
-							Mbiginteger* _mult=_Imultiply(_denominatorRational->num,_bi6,false);
-							Mbiginteger* _add=(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare,false):_bigintegerSquare);
-							Mbiginteger* _denominatorNumerator=(_mult?_Iadd(_mult,_add,false):NULL);
+							Mbiginteger* _mult=OWNED(_Imultiply(_denominatorRational->num,_bi6),owner);
+							Mbiginteger* _add=OWNED(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare,owner);
+							Mbiginteger* _denominatorNumerator=OWNED(_mult?_Iadd(_mult,_add):NULL,owner);
 							// free all intermediate big integers
-							free_biginteger(_mult);free_biginteger(_bigintegerSquare);if(_denominatorRational->den)free_biginteger(_add);
+							free_biginteger(_mult,owner);free_biginteger(_bigintegerSquare,owner);if(_denominatorRational->den)free_biginteger(_add,owner);
 							// update the denominator rational, free the numerator if we fail to bind it to _denominatorRational
 							// what's dangerous in the following is that _denominatorRational->num is not freed!!!!
-							Mbiginteger* _previousDenominatorNumerator=_getBigintegerCopy(_denominatorRational->num);
-							free_rational(_denominatorRational); // get the 'previous' numerator and denominator released!!!!!!
-							_denominatorRational=_getRational(_denominatorNumerator,_previousDenominatorNumerator,M_LD_NAN,false,true);
+							Mbiginteger* _previousDenominatorNumerator=OWNED(_getBigintegerCopy(_denominatorRational->num),owner);
+							free_rational(_denominatorRational,owner); // get the 'previous' numerator and denominator released!!!!!!
+							_denominatorRational=OWNED(_getRational(_denominatorNumerator,_previousDenominatorNumerator,M_LD_NAN,false,true),owner);
 							if(!_denominatorRational)break; // let's keep it normalized???? TODO is that necessary
-							if(amVerbose())outputRational("Denominator (unnormalized): ",_rational,".\n");
+							if(amVerbose())
+								outputRational("Denominator (unnormalized): ",_rational,".\n");
 						}
-						free_biginteger(_bi6);
+						free_biginteger(_bi6,owner);
 					}
 					if(!_denominatorRational){outputError("Final denominator could not be computed");return NULL;}
 					// NOTE: do NOT use the originals in inverting the denominator because those will be freed below so we need to pass in copies
-					Mrational* _inverseDenominatorRational=_getInverseRational(_denominatorRational);
+					Mrational* _inverseDenominatorRational=OWNED(_getInverseRational(_denominatorRational),owner);
 					Mrational* _result=NULL;
 					if(!_inverseDenominatorRational){
 						output("%s",M_ERROR_PREFIX);outputRational("Failed to compute the fractional part of pi (by inverting denominator rational ",_denominatorRational,").\n");
-						free_rational(_rational);_rational=NULL;
+						free_rational(_rational,owner);_rational=NULL;
 					}else
 						_result=_getRationalSum(_rational,_inverseDenominatorRational); // _qsum() replaced by _getRationalSum in Mrational.h/c
-					free_rational(_denominatorRational);
+					free_rational(_denominatorRational,owner);
 					if(_result){
 						_rational=_result;
-						if(amVerbose())outputRational("Approximation of pi: ",_rational,".\n");
+						if(amVerbose())
+							outputRational("Approximation of pi: ",_rational,".\n");
 					}else{
-						free_rational(_rational);
+						free_rational(_rational,owner);
 						_rational=NULL;
 					}
 				}
-				return _getRationalValue(_rational,true);
+				return DISOWNED(_getRationalValue(_rational,true),owner);
 			}
 		}
 	}
@@ -1970,57 +1996,57 @@ Mvalue* getResult(Mvalue* indexValue){
 ////////Mvalue* ml(Menvironment* _executionEnvironment){return _getListValue(VT_LIST);} // a list that may only contain list elements is acceptable as map list!!
 
 // list to map
-Mvalue* l2m(Mvalue* value){
+Mvalue* l2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _mapValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_mapValue=_getMapValue(value->type,false); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		_mapValue=OWNED(_getMapValue(value->type,false),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!listAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
-	return _mapValue;
+	return DISOWNED(_mapValue,owner);
 }
 // list to map list
-Mvalue* l2ml(Mvalue* value){
+Mvalue* l2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_maplistValue=_getListValue(VT_LIST,false,"l2ml"); // a map list ALWAYS requires element of type VT_LIST
+		_maplistValue=OWNED(_getListValue(VT_LIST,false,"l2ml"),owner); // a map list ALWAYS requires element of type VT_LIST
 		if(!listAppendedToMaplist(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
-	return _maplistValue;
+	return DISOWNED(_maplistValue,owner);
 }
 // map list to list conversion
-Mvalue* ml2l(Mvalue* value){
+Mvalue* ml2l(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_maplistValue=_getListValue(value->type,false,"ml2l"); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		_maplistValue=OWNED(_getListValue(value->type,false,"ml2l"),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!maplistAppendedToList(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
-	return _maplistValue;
+	return DISOWNED(_maplistValue,owner);
 }
-Mvalue* ml2m(Mvalue* value){
+Mvalue* ml2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _mapValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_mapValue=_getMapValue(value->type,false); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+		_mapValue=OWNED(_getMapValue(value->type,false),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!maplistAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
-	return _mapValue;
+	return DISOWNED(_mapValue,owner);
 }
 
 // map to map list conversion i.e. each list element is a attribute name - value pair
-Mvalue* m2ml(Mvalue* value){
+Mvalue* m2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_MAP){
-		_maplistValue=_getListValue(VT_LIST,false,"m2ml"); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
+		_maplistValue=OWNED(_getListValue(VT_LIST,false,"m2ml"),owner); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
 		if(!mapAppendedToMaplist(_maplistValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
-	return _maplistValue;
+	return DISOWNED(_maplistValue,owner);
 }
-Mvalue* m2l(Mvalue* value){
+Mvalue* m2l(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _listValue=NULL;
 	if(value&&value->type==VT_MAP){
-		_listValue=_getListValue(value->type,false,"m2l");
+		_listValue=OWNED(_getListValue(value->type,false,"m2l"),owner);
 		if(!mapAppendedToList(_listValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
 	}
-	return _listValue;
+	return DISOWNED(_listValue,owner);
 }
 // conversion functions
  // the value wrapper for not a real and not an integer...
@@ -2044,117 +2070,119 @@ typedef union {
 	uint8_t octets[sizeof(long double)];
 } longdoubleunion;
 // return the value decimals in little endian order
-Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){
-	Mlist* _dlist=_getListOfType(VT_INTEGER);
+Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
+	Mlist* _dlist=OWNED(_getListOfType(VT_INTEGER),owner);
 	if(!_dlist)return NULL;
 	longlongunion llu;
 	llu.ll=ll;
 	int l=sizeof(long long);
 	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
-	return _getValueOfList(_dlist,true);
+	return DISOWNED(_getValueOfList(_dlist,true),owner);
 }
 const char* const REAL_OCTET_INDEX_IDS[]={"1","2","3","4","5","6","7","8","9","10"};
-Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){
-	Mmap* _dmap=_getMapOfType(VT_UNDEFINED); // not just for storing integers!!!
+Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
+	Mmap* _dmap=OWNED(_getMapOfType(VT_UNDEFINED),owner); // not just for storing integers!!!
 	if(!_dmap)return NULL;
 	longdoubleunion lld;
 	lld.ld=ld;
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
 	// if we make a map with m0 through m7 for the mantisse, and e0 and e1 for the exponent
 	if(littleEndianOrder^isLittleEndian()){ // user wants to see them in little endian order i.e. m0 first
-		while(--l>=0)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[l],_getIntegerValue(lld.octets[l])))break;
+		while(--l>=0)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[l],DISOWNED(OWNED(_getIntegerValue(lld.octets[l]),owner),owner)))break;
 	}else{
-		for(int i=0;i<l;i++)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[i],_getIntegerValue(lld.octets[i])))break;
+		for(int i=0;i<l;i++)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[i],DISOWNED(OWNED(_getIntegerValue(lld.octets[i]),owner),owner)))break;
 	}
 	// how about extracting the mantisse and the exponent as well
 	uint64_t mantisse;uint16_t exponent;extractMantisseAndExponent(ld,&mantisse,&exponent);
 	// let's return the binary representation of exponent and mantisse with single quotes around it!!
-	Mstring* _mantisseText=_getUint64BinaryText(mantisse,'\'');if(_mantisseText){appendedToMap(_dmap,"m",_getTextValue(string(_mantisseText),false));free_string(_mantisseText);}
-	Mstring* _exponentText=_getUint16BinaryText(exponent,'\'');if(_exponentText){appendedToMap(_dmap,"e",_getTextValue(string(_exponentText),false));free_string(_exponentText);}
+	Mstring* _mantisseText=OWNED(_getUint64BinaryText(mantisse,'\''),owner);
+	if(_mantisseText){appendedToMap(_dmap,"m",_getTextValue(string(_mantisseText),false));free_string(_mantisseText,owner);}
+	Mstring* _exponentText=OWNED(_getUint16BinaryText(exponent,'\''),owner);
+	if(_exponentText){appendedToMap(_dmap,"e",_getTextValue(string(_exponentText),false));free_string(_exponentText,owner);}
 	/* replacing:
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
 	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
 	*/
-	return _getValueOfMap(_dmap,true);
+	return DISOWNED(_getValueOfMap(_dmap,true),owner);
 }
-char* _getIntegerCharacters(long long ll){
-	char str[20];sprintf(str,"%lld",ll);return _strdup(str);
+char* _getIntegerCharacters(long long ll){Mallocationowner owner=getOwner(__LINE__);
+	char str[20];sprintf(str,"%lld",ll);return DISOWNED(OWNED(_strdup(str),owner),owner);
 }
-Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){
+Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner owner=getOwner(__LINE__);
 	if(!text)return NULL;
-	Mmap* _dmap=_getMapOfType(VT_INTEGER);
+	Mmap* _dmap=OWNED(_getMapOfType(VT_INTEGER),owner);
 	if(!_dmap)return NULL;
 	char* characters=text->_c;
 	long long index=0;
 	char* _indexCharacters;
 	if(ascendingindex){
-		appendedToMap(_dmap,"0",_getIntegerValue(text->presuffix)); // the quote character
+		appendedToMap(_dmap,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 		while(*characters){
-			_indexCharacters=_getIntegerCharacters(++index);
-			appendedToMap(_dmap,_indexCharacters,_getIntegerValue(*characters));
-			free(_indexCharacters);
+			_indexCharacters=OWNED(_getIntegerCharacters(++index),owner);
+			appendedToMap(_dmap,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owner),owner));
+			FREE(_indexCharacters,'\'',owner);
 			characters++; // OOPS pretty essential
 		}
 	}else{
 		// go to the end
 		while(*characters){index++;characters++;}
 		while(index){
-			_indexCharacters=_getIntegerCharacters(index--);
+			_indexCharacters=OWNED(_getIntegerCharacters(index--),owner);
 			characters--;
-			appendedToMap(_dmap,_indexCharacters,_getIntegerValue(*characters));
-			free(_indexCharacters);
+			appendedToMap(_dmap,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owned),owned));
+			FREE(_indexCharacters,'\'',owner);
 		}
-		appendedToMap(_dmap,"0",_getIntegerValue(text->presuffix)); // the quote character
+		appendedToMap(_dmap,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 	}
-	return _getValueOfMap(_dmap,true);
+	return DISOWNED(_getValueOfMap(_dmap,true),owner);
 }
-Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){
-	Mlist* _dlist=_getListOfType(VT_INTEGER);
+Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
+	Mlist* _dlist=OWNED(_getListOfType(VT_INTEGER),owner);
 	if(!_dlist)return NULL;
 	longdoubleunion lld;
 	lld.ld=ld;
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
 	// how about adding a two-element list with the first equal to the field name?????
-	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
-	return _getValueOfList(_dlist,true);
+	while(--l>=0&&appendedToList(_dlist,DISOWNED(OWNED(_getIntegerValue(lld.octets[l]),owner),owner),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
+	return DISOWNED(_getValueOfList(_dlist,true),owner);
 }
 
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
 // TODO we should delegate to (_)getValueDecimal
-Mvalue* d(Mvalue* value){
+Mvalue* d(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value){
 		switch(value->type){
 			// TODO all other types_
-			case VT_INTEGER:return _getDecimalValue(__decimal(NULL,value->value._integer->ll,0),true); // TODO assuming long long and int64_t are the same type!!!!!
-			case VT_BIGINTEGER:return _getDecimalValue(_getBigintegerDecimal(value->value._biginteger),true);
-			case VT_RATIONAL:return _getDecimalValue(_getRationalDecimal(value->value._rational),true);
+			case VT_INTEGER:return DISOWNED(OWNED(_getDecimalValue(__decimal(NULL,value->value._integer->ll,0),true),owner),owner); // TODO assuming long long and int64_t are the same type!!!!!
+			case VT_BIGINTEGER:return DISOWNED(OWNED(_getDecimalValue(_getBigintegerDecimal(value->value._biginteger),true),owner),owner);
+			case VT_RATIONAL:return DISOWNED(OWNED(_getDecimalValue(_getRationalDecimal(value->value._rational),true),owner),owner);
 			case VT_DECIMAL:return value;
 			case VT_FLOAT: // TODO check whether somewhere I am converting a long double without using text
-			default:return _getDecimalValue(_getValueTextDecimal(value),true);
+			default:return DISOWNED(OWNED(_getDecimalValue(_getValueTextDecimal(value),true),owner),owner);
 		}
 	}
 	return NULL;
 }
 
 // MDH@18NOV2019: b/B renamed to o/O (for octets), and we're gonna create a b function for transforming to big integer
-Mvalue* o(Mvalue* value){ // little-endian representation list to return
+Mvalue* o(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // little-endian representation list to return
 	if(value){
 		switch(value->type){
-			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
-			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,true);
-			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
+			case VT_INTEGER:return DISOWNED(OWNED(getIntegerDecimalListValue(value->value._integer->ll,true),owner),owner);
+			case VT_FLOAT:return DISOWNED(OWNED(getLongDoubleDecimalMapValue(value->value._float->ld,true),owner),owner);
+			case VT_TEXT:return DISOWNED(OWNED(getTextDecimalMapValue(value->value._text,true),owner),owner);
 			default:break;
 		}
 	}
 	return NULL;
 } 
 
-Mvalue* O(Mvalue* value){ // big endian decimal representation list to return
+Mvalue* O(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endian decimal representation list to return
 	if(value){
 		switch(value->type){
-			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
-			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,false);
-			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
+			case VT_INTEGER:return DISOWNED(OWNED(getIntegerDecimalListValue(value->value._integer->ll,false),owner),owner);
+			case VT_FLOAT:return DISOWNED(OWNED(getLongDoubleDecimalMapValue(value->value._float->ld,false),owner),owner);
+			case VT_TEXT:return DISOWNED(OWNED(getTextDecimalMapValue(value->value._text,false),owner),owner);
 			default:break;
 		}
 	}
@@ -2162,18 +2190,19 @@ Mvalue* O(Mvalue* value){ // big endian decimal representation list to return
 }
 // TODO to add h/H and b/B functions
 
-Mvalue* i(Mvalue* value){
-	if(amVerbose())outputValue("Converting '",value,"' to an integer.\n");
+Mvalue* i(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(amVerbose())
+		outputValue("Converting '",value,"' to an integer.\n");
 	long long ll=getValueInteger(value);
-	return(ll!=M_LL_INVALID?_getIntegerValue(ll):NULL);
+	return(ll!=M_LL_INVALID?DISOWNED(OWNED(_getIntegerValue(ll),owner),owner):NULL);
 }
 
 // convert to a big integer
-Mvalue* b(Mvalue* value){
+Mvalue* b(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value){
 		if(value->type==VT_BIGINTEGER)return value; // already a big integer
-		Mbiginteger* _bigInteger=_getValueBiginteger(value);
-		if(_bigInteger)return _getBigintegerValue(_bigInteger,true);
+		Mbiginteger* _bigInteger=OWNED(_getValueBiginteger(value),owner);
+		if(_bigInteger)return DISOWNED(OWNED(_getBigintegerValue(_bigInteger,true),owner),owner);
 	}
 	return NULL;
 }
@@ -2272,27 +2301,28 @@ public Rational limitDenominator(long maximumDenominator) {
     }
 }
 */
-Mrational* _getRationalCopy(Mrational* _rational){
+Mrational* _getRationalCopy(Mrational* _rational){Mallocationowner owner=getOwner(__LINE__);
 	if(!_rational)return NULL;
-	Mbiginteger *_numeratorBiginteger=_getBigintegerCopy(_rational->num),*_denominatorBiginteger=(_rational->den?_getBigintegerCopy(_rational->den):NULL);
-	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){free_biginteger(_numeratorBiginteger);free_biginteger(_denominatorBiginteger);return NULL;} // some error
+	Mbiginteger *_numeratorBiginteger=OWNED(_getBigintegerCopy(_rational->num),owner),*_denominatorBiginteger=OWNED((_rational->den?_getBigintegerCopy(_rational->den):NULL),owner);
+	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){free_biginteger(_numeratorBiginteger,owner);free_biginteger(_denominatorBiginteger,owner);return NULL;} // some error
 	// MDH@13JUN2019: if we can't get a rational, free the numerator and denominator
-	Mrational* _copyRational=_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false,true);
+	Mrational* _copyRational=OWNED(_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false,true),owner);
 	if(_copyRational)_copyRational->normalized=_rational->normalized; // copy the rational flag
-	return _copyRational;
+	return DISOWNED(_copyRational,owner);
 }
 // _getValueRational() returns a (new) rational from the value stored in _value
-Mrational* _getValueRational(Mvalue* _value){
+Mrational* _getValueRational(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	Mrational* _rational=NULL;
 	if(_value){
-		if(amVerbose())outputValue("Extracting the rational from '",_value,"'.\n");
+		if(amVerbose())
+			outputValue("Extracting the rational from '",_value,"'.\n");
 		switch(_value->type){
 			case VT_INTEGER:
 			case VT_BIGINTEGER:
-				_rational=_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false,false); // not to free what's wrapped in _value
+				_rational=OWNED(_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false,false),owner); // not to free what's wrapped in _value
 				break;
 			case VT_DECIMAL:
-				_rational=_getDecimalRational(_value->value._decimal);
+				_rational=OWNED(_getDecimalRational(_value->value._decimal),owner);
 				/* replacing (and augmenting in case of a repeating fractional part):
 				{ // until we find a way to get the associated rational using the internal representation we stick to extracting the rational from the text representation of the decimal (which should be exact)
 					char* _decimalText=mpd_to_sci(_value->value._decimal->mpd,0);
@@ -2301,78 +2331,79 @@ Mrational* _getValueRational(Mvalue* _value){
 				*/
 				break;
 			case VT_TEXT:
-				_rational=_getDecimalTextRational(_value->value._text->_c);
+				_rational=OWNED(_getDecimalTextRational(_value->value._text->_c),owner);
 				break;
 			case VT_RATIONAL:
-				_rational=_getRationalCopy(_value->value._rational); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
+				_rational=OWNED(_getRationalCopy(_value->value._rational),owner); // NOTE return a copy NOT the original rational, only Mvalue things are immutable and the reference count is kept (and you should not use its contents elsewhere!!!)
 				break;
 			case VT_FLOAT:
-				_rational=_getLongDoubleRational(_value->value._float->ld,250); // TODO how many iterations at most???
+				_rational=OWNED(_getLongDoubleRational(_value->value._float->ld,250),owner); // TODO how many iterations at most???
 				break;
 			case VT_LIST:
 				if(_value->value._list->numberOfElements>1)
-					_rational=_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),
-											(_value->value._list->numberOfElements>2?getValueLongDouble(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true,false);
+					_rational=OWNED(_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),
+											(_value->value._list->numberOfElements>2?getValueLongDouble(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true,false),owner);
 				break;
 			default:break;
 		}
 	}
-	return _rational;
+	return DISOWNED(_rational,owner);
 }
 // MDH@11AUG2019: why wasn't this here before???
-Mrational* getValueRational(Mvalue* _value){
+Mrational* getValueRational(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(_value&&_value->type==VT_RATIONAL)return _value->value._rational;
-	return _getValueRational(_value);
+	return DISOWNED(OWNED(_getValueRational(_value),owner),owner);
 }
 
 // MDH@09OCT2019: unpure rationals can be purified using _getPurifiedRational
 long double getReal(Mfloat* _real){return(_real?_real->ld:M_LD_NAN);}
-Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){
+Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallocationowner owner=getOwner(__LINE__);
 	Mrational* _purifiedRational=NULL;
 	if(pureRational){
 		// convert delta into a rational
-		Mrational* _deltaRational=_getLongDoubleRational(delta,0);
+		Mrational* _deltaRational=OWNED(_getLongDoubleRational(delta,0),owner);
 		if(_deltaRational){
-			_purifiedRational=_getPureRationalSum(pureRational,_deltaRational);
-			free_rational(_deltaRational);
+			_purifiedRational=OWNED(_getPureRationalSum(pureRational,_deltaRational),owner);
+			free_rational(_deltaRational,owner);
 			if(!_purifiedRational)outputError("Failed to sum two pure rationals");
 		}else
 			outputError("Failed to rationalize a real");
 	}else
 		outputError("No base pure rational to use in purification");
-	return _purifiedRational;
+	return DISOWNED(_purifiedRational,owner);
 }
 
 // TODO how many iterations would we accept at most?????
-Mvalue* Q(Mvalue* _value){
+Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
-	if(_value->type==VT_FLOAT)return _getValueOfList(_getLongDoubleRationalList(_value->value._float->ld,250),true); // the intermediate results are stored in a list, and the last element will be the final result!!!
-	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value),true); // make a rational from it and wrap it again
-	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
-	return _rationalValue;
+	if(_value->type==VT_FLOAT)return DISOWNED(OWNED(_getValueOfList(DISOWNED(OWNED(_getLongDoubleRationalList(_value->value._float->ld,250),owner),owner),true),owner),owner); // the intermediate results are stored in a list, and the last element will be the final result!!!
+	Mvalue* _rationalValue=OWNED(_getRationalValue(DISOWNED(OWNED(_getValueRational(_value),true),owner),owner),owner); // make a rational from it and wrap it again
+	if(amVerbose())
+		outputValue("Converted to rational '",_rationalValue,"'.");
+	return DISOWNED(_rationalValue,owner);
 }
 // MDH@09OCT2019: TODO=DONE how about turning a unpure rational into a pure rational???? yes, that's a good idea
-Mvalue* q(Mvalue* _value){
+Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL){
 		Mrational* rational=_value->value._rational;
 		if(floatIsUndefinedOrZero(rational->delta))return _value;
 		long double rationaldelta=getReal(rational->delta);
 		Mrational* _purifiedRational=NULL;
-		Mrational* _pureRational=_getRational(_getBigintegerCopy(rational->num),_getBigintegerCopy(rational->den),M_LD_NAN,true,true);
+		Mrational* _pureRational=OWNED(_getRational(_getBigintegerCopy(rational->num),_getBigintegerCopy(rational->den),M_LD_NAN,true,true),owner);
 		if(_pureRational){
-			_purifiedRational=_getPurifiedRational(_pureRational,rationaldelta);
-			free_rational(_pureRational);
+			_purifiedRational=OWNED(_getPurifiedRational(_pureRational,rationaldelta),owner);
+			free_rational(_pureRational,owner);
 			if(!_purifiedRational)outputError("Failed to purify a rational");
 		}else
 			outputError("Failed to create a pure rational");
-		return _getRationalValue(_purifiedRational,true);
+		return DISOWNED(OWNED(_getRationalValue(_purifiedRational,true),owner),owner);
 	}
-	if(_value->type==VT_FLOAT)return _getRationalValue(_getLongDoubleRational(_value->value._float->ld,250),true); // forcefully free the _getLongDoubleRational if we failed to wrap it
-	Mvalue* _rationalValue=_getRationalValue(_getValueRational(_value),true); // make a rational from it and wrap it again
+	if(_value->type==VT_FLOAT)return DISOWNED(OWNED(_getRationalValue(OWNED(_getLongDoubleRational(_value->value._float->ld,250),owner),true),owner),owner); // forcefully free the _getLongDoubleRational if we failed to wrap it
+	Mvalue* _rationalValue=OWNED(OWNED(_getRationalValue(OWNED(_getValueRational(_value),true),owner),owner),owner); // make a rational from it and wrap it again
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
-	return _rationalValue;
+	return DISOWNED(_rationalValue,owner);
 }
 
 // convert to a real

@@ -20,10 +20,10 @@ typedef struct{
     long long blocks; // the number of allocated blocks of BLOCK_SIZE bytes of memory for _chars
 }Mstring;
 
+Mstring* __string();
 Mstring* free_string(Mstring* str,Mallocationowner owner); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
 
 // functions that create new string instances (and therefore start with _)
-Mstring* __string();
 Mstring* _getString(char const * const s); // convenient constructor
 // copying
 Mstring* _stringCopy(Mstring* const src,size_t length);

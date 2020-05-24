@@ -15,8 +15,9 @@
 
 #include "Mexecution.h"
 
-static int32_t const MODULE_ID=(9<<4);
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static int32_t const MODULE_ID=9;
+static uint32_t const MODULE_OWNER_ID=(MODULE_ID<<16);
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,MODULE_OWNER_ID+id};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
@@ -149,11 +150,12 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){Mallocatio
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
+static Mallocationowner owner_module={0,0,MODULE_OWNER_ID};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
-const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=_getBiginteger(0);return bi0;}/* VALIDATED */
-const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=_getBiginteger(1);return bi1;}/* VALIDATED */
-const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=_getBiginteger(2);return bi2;}/* VALIDATED */
-const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=_getBiginteger(3);return bi3;}/* VALIDATED */
+const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=OWNED(_getBiginteger(0),owner_module);return bi0;}/* VALIDATED */
+const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=OWNED(_getBiginteger(1),owner_module);return bi1;}/* VALIDATED */
+const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=OWNED(_getBiginteger(2),owner_module);return bi2;}/* VALIDATED */
+const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=OWNED(_getBiginteger(3),owner_module);return bi3;}/* VALIDATED */
 
 long long isBigintegerOne(Mbiginteger* biginteger){
     return(biginteger?(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerOne()))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID);
@@ -237,7 +239,7 @@ Mrational* _getLongDoubleRational(long double ld){
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
-void free_text(Mtext* _text){
+void free_text(Mtext* _text,Mallocationowner owner){
     // MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
     // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
     //                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
@@ -245,34 +247,39 @@ void free_text(Mtext* _text){
         // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
         //                _text->_c is an array and yes strlen() can be applied to any char*
         //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
-        REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"');
+        REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
         // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
     }else
-    if(amDebugging())
+    if(amVerboseDebugging())
         outputInfo("No text to free!");
 }/* VALIDATED */
-void free_integer(Minteger* _integer){
+void free_integer(Minteger* _integer,Mallocationowner owner){
     if(_integer){
-        if(amVerbose()&&amDebugging())output("Freeing integer %llu.\n",_integer->ll);
-        FREE(_integer,'I');
+        if(amVerboseDebugging())
+            output("Freeing integer %llu.\n",_integer->ll);
+        FREE(_integer,'I',owner);
     }else
-    if(amDebugging())outputInfo("No integer to free!");
+    if(amVerboseDebugging())
+        outputInfo("No integer to free!");
 }/* VALIDATED */
-void free_float(Mfloat* _float){
+void free_float(Mfloat* _float,Mallocationowner owner){
     if(_float){
-        if(amVerbose()&&amDebugging())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
-        FREE(_float,'F');
+        if(amVerboseDebugging())
+            output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
+        FREE(_float,'F',owner);
     }else
-    if(amDebugging())outputInfo("No real to free!");
+    if(amVerboseDebugging())
+        outputInfo("No real to free!");
 }/* VALIDATED */
 
 // ALLOCATORS (private)
 // value wrappers
 // typically an Mvalue is immutable (we might change that for variables that are strong typed e.g. when created with integer(),real(),string(),list() or map() function)
-Minteger* _getInteger(long long ll){
-    Minteger* _integer=MALLOC(sizeof(Minteger),'I');
-    if(_integer)_integer->ll=ll;
-    return _integer;
+Minteger* _getInteger(long long ll){Mallocationowner owner=getOwner(__LINE__);
+    Minteger* _integer=MALLOC(sizeof(Minteger),'I',owner);
+    if(!_integer)return NULL;
+    _integer->ll=ll;
+    return DISOWNED(_integer,owner);
 }/* VALIDATED */
 /*
 Mbiginteger*__biginteger(z_t zt){
@@ -285,10 +292,11 @@ Mbiginteger*__biginteger(z_t zt){
 */
 long double getFloatLongDouble(Mfloat const * const _float){return(_float?_float->ld:M_LD_NAN);}
 
-Mfloat* _getFloat(long double ld){
-    Mfloat* _float=MALLOC(sizeof(Mfloat),'F'); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
-    if(_float)_float->ld=ld;
-    return _float;
+Mfloat* _getFloat(long double ld){Mallocationowner owner=getOwner(__LINE__);
+    Mfloat* _float=MALLOC(sizeof(Mfloat),'F',owner); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
+    if(!_float)return NULL;
+    _float->ld=ld;
+    return DISOWNED(_float,owner);
 }/* VALIDATED */
 
 // special integer values to consider
@@ -422,26 +430,31 @@ long long areFloatsEqual(Mfloat* afloat1,Mfloat* afloat2){
 bool floatIsUndefined(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld));}
 bool floatIsUndefinedOrZero(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld)||isFloatZero(afloat)==M_TRUE);}
 
-Mfloat* _getFloatCopy(Mfloat* afloat){return(!floatIsUndefined(afloat)?_getFloat(afloat->ld):NULL);}/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
-Mfloat* _getFloatNeg(Mfloat* afloat){return(!floatIsUndefined(afloat)?_getFloat(-afloat->ld):NULL);}/* VALIDATED */ // just switching the sign of what _getRealCopy returns
+Mfloat* _getFloatCopy(Mfloat* afloat){Mallocationowner owner=getOwner(__LINE__);
+    return(floatIsUndefined(afloat)?NULL:DISOWNED(OWNED(_getFloat(afloat->ld),owner),owner));
+}/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
+Mfloat* _getFloatNeg(Mfloat* afloat){Mallocationowner owner=getOwner(__LINE__);
+    return(floatIsUndefined(afloat)?NULL:DISOWNED(OWNED(_getFloat(-afloat->ld),owner),owner));
+}/* VALIDATED */ // just switching the sign of what _getRealCopy returns
 
-long long isBigintegerUndefined(Mbiginteger* biginteger){return(biginteger?M_FALSE:M_TRUE);}
+long long isBigintegerUndefined(Mbiginteger* biginteger){return(biginteger&&biginteger->_bi?M_FALSE:M_TRUE);}
 long long isTextUndefined(Mtext* text){return(text?M_FALSE:M_TRUE);}
 long long isTokenUndefined(Mtoken* token){return(token?M_FALSE:M_TRUE);}
 
 // Mtext is an immutable version of Mstring* in that it cannot be changed
-Mtext* _getText(char* _text){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
-    return (Mtext*)_strdup(_text);
+Mtext* _getText(char* text){Mallocationowner owner=getOwner(__LINE__);
+    return(text?DISOWNED(OWNED(_strdup(text),owner),owner):NULL);
+    // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
 }/* VALIDATED */
 
-Mtext* _getCharText(char c){ // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
+Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
     Mtext* _charText=NULL;
-    Mstring* _charString=_getString("\"");
+    Mstring* _charString=OWNED(_getString("\""),owner);
     if(_charString){
-        if(string_append_char(_charString,c))_charText=_getText(string(_charString));
-        free_string(_charString);
+        if(string_append_char(_charString,c))_charText=OWNED(_getText(string(_charString)),owner);
+        free_string(_charString,owner);
     }
-    return _charText;
+    return DISOWNED(_charText,owner);
 }/* VALIDATED */
 /*
 void free_list(Mlist* _list);
@@ -574,16 +587,15 @@ Mstring* appendld(Mstring* const ms,long double ld){return string_append_ld(ms,l
 
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
-Mstring* _getIntegerText(Minteger* _integer){
-	Mstring* _s=__string();
-    if(_s){
-        Mstring* _p=_s;
-        if(amDebugging())_p=string_append_char(_p,'i');
-	    if(_p&&_integer)_p=appendll(_p,_integer->ll);
-        if(!_p){free_string(_s);_s=NULL;}
-    }
+Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _s=OWNED(__string(),owner);
+    if(!_s)return NULL;
+    Mstring* p=_s;
+    if(amVerboseDebugging())p=string_append_char(p,'i');
+    if(p&&_integer)p=appendll(p,_integer->ll);
+    if(!p){free_string(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
-	return _s;
+	return DISOWNED(_s,owner);
 }/* VALIDATED */
 /* replaced by getValueInteger()
 long long getInteger(Mvalue* _value){
@@ -604,8 +616,8 @@ long long getInteger(Mvalue* _value){
 
 // BigInteger stuff
 // MDH@09APR2020: certain functions only know the mp_int* and not the big integer
-static Mstring* _getMpintText(mp_int const * const _mpint){
-    Mstring* _mpintText=__string();
+static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _mpintText=OWNED(__string(),owner);
     ////outputChar('A');
     if(_mpintText){
         /// output("Initial big integer text length: %zu.\n",_bigintegerText->length);
@@ -681,34 +693,33 @@ static Mstring* _getMpintText(mp_int const * const _mpint){
     }else
         output("%sFailed to create a text for storing the representation of a big integer.\n",M_ERROR_PREFIX);
     ///outputChar('H');
-    return _mpintText;
+    return DISOWNED(_mpintText,owner);
 }
-Mstring* _getBigintegerText(const Mbiginteger* _biginteger){
-    if(!_biginteger)return __string();
-    return _getMpintText(MP_INT_POINTER(_biginteger));
+Mstring* _getBigintegerText(const Mbiginteger* _biginteger){Mallocationowner owner=getOwner(__LINE__);
+    return(_biginteger?DISOWNED(OWNED(_getMpintText(MP_INT_POINTER(_biginteger)),owner),owner):DISOWNED(OWNED(__string(),owner),owner));
 }
 
 Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
 
-Mbiginteger* getBigintegerLLMin(){
+Mbiginteger* getBigintegerLLMin(){Mallocationowner owner=getOwner(__LINE__);
     if(!_biLLMin){
         if(amVerboseDebugging())
             outputInfo("Determining the big integer equivalent of the smallest small integer.");
-        _biLLMin=_getBiginteger(M_LL_MIN);
+        _biLLMin=OWNED(_getBiginteger(M_LL_MIN),owner_module);
         if(amVerboseDebugging())
             outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
     }
-    return _biLLMin;
+    return DISOWNED(_biLLMin,owner_module);
 }/* VALIDATED */
 Mbiginteger* getBigintegerLLMax(){
     if(!_biLLMax){
         if(amVerboseDebugging())
             outputInfo("Determining the big integer equivalent of the largest small integer.");
-        _biLLMax=_getBiginteger(M_LL_MAX);
+        _biLLMax=OWNED(_getBiginteger(M_LL_MAX),owner_module);
         if(amVerboseDebugging())
             outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
     }
-    return _biLLMax;
+    return DISOWNED(_biLLMax,owner_module);
 }/* VALIDATED */
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 
@@ -867,7 +878,7 @@ double mp_get_double(const Mbiginteger *a)
 }
 */
 long double M_LD_DIGIT_MULTIPLIER=0.0; // NAN is the builtin NaN value defined in math.h
-long double mp_get_long_double(const Mbiginteger* const a){
+long double mp_get_long_double(Mbiginteger const * const a){
     mp_int* mpi_a=MP_INT_POINTER(a); // MDH@09APR2020: get the mp_int pointer from the big integer
     if(!mpi_a)return M_LD_NAN; // if a undefined, return NaN
     int i=mpi_a->used;
@@ -879,16 +890,21 @@ long double mp_get_long_double(const Mbiginteger* const a){
         while(--j>=0)M_LD_DIGIT_MULTIPLIER*=2.0;
     }
     long double d=(long double)mpi_a->dp[i]; // initialize d to the most significant big integer digit
-    if(amVerbose())output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",MP_INT_POINTER(a)->dp[i],LDBL_DIG,d,i);
+    if(amVerboseDebugging())
+        output("Long double of big integer digit %lld initialized to '%.*Lf' yet to shift by %u big integer digits.\n",MP_INT_POINTER(a)->dp[i],LDBL_DIG,d,i);
     while(--i>=0){
-        if(amVerbose())output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
+        if(amVerboseDebugging())
+            output("Multiplying '%.*Lf' by %Lf.\n",d,M_LD_DIGIT_MULTIPLIER);
         d*=M_LD_DIGIT_MULTIPLIER;
-        if(amVerbose())output("Result of multiplying by '%Lf': '%.*Lf'.\n",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
+        if(amVerboseDebugging())
+            output("Result of multiplying by '%Lf': '%.*Lf'.\n",M_LD_DIGIT_MULTIPLIER,LDBL_DIG,d);
         d+=(long double)mpi_a->dp[i];
-        if(amVerbose())output("Result of adding '%lld': '%.*Lf'.\n",mpi_a->dp[i],LDBL_DIG,d);
+        if(amVerboseDebugging())
+            output("Result of adding '%lld': '%.*Lf'.\n",mpi_a->dp[i],LDBL_DIG,d);
     }
-    if(mpi_a->sign==MP_NEG&&!ldIsNaN(d))return -d;
-    if(amVerbose())output("Conversion of big integer to long double '%.*Lf' done!\n",LDBL_DIG,d);
+    if(mpi_a->sign==MP_NEG&&!ldIsNaN(d))d=-d;
+    if(amVerboseDebugging())
+        output("Conversion of big integer to long double '%.*Lf' done!\n",LDBL_DIG,d);
     return d;
     // replacing: return(a->sign==MP_NEG&&!ldIsNaN(d)?-d:d);
 }/* VALIDATED */
@@ -926,21 +942,23 @@ long long double2long(long double ld){
 }/* VALIDATED */
 
 // STRINGIFY FUNCTIONS
-Mstring* _getFloatText(Mfloat* _float){
-	Mstring* _floatText=(_float?__string():NULL);
+Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__);
+    if(!_float)return NULL;
+	Mstring* _floatText=OWNED(__string(),owner);
     if(_floatText){
-        Mstring* _p=_floatText;
-        if(amDebugging())_p=string_append_char(_p,'r');
-        if(_p){
+        Mstring* p=_floatText;
+        if(amVerboseDebugging())
+            p=string_append_char(p,'r');
+        if(p){
             switch(fpclassify(_float->ld)){
-                case FP_NAN:_p=string_append(_p,M_NAN);break;
-                case FP_INFINITE:_p=string_append(_p,M_INF);break;
-                default:_p=appendld(_p,_float->ld);break;
+                case FP_NAN:p=string_append(p,M_NAN);break;
+                case FP_INFINITE:p=string_append(p,M_INF);break;
+                default:p=appendld(p,_float->ld);break;
             }
         }
-        if(!_p){free_string(_floatText);_floatText=NULL;}
+        if(!p){free_string(_floatText,owner);return NULL;}
     }
-	return _floatText;
+	return DISOWNED(_floatText,owner);
 }/* VALIDATED */
 
 char hexdigit(char c){
@@ -949,12 +967,13 @@ char hexdigit(char c){
     if(c>=48&&c<=57)return c-48;
     return '\0';
 }
-Mstring* _getStringText(Mtext* _text,bool dequoted){
-	Mstring* _stringText=(_text?__string():NULL);
+Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _stringText=OWNED(__string(),owner);
     if(_stringText){
-        Mstring* _p=_stringText;
-        if(amDebugging())_p=string_append_char(_p,'s');
-        if(_p){
+        Mstring* p=_stringText;
+        if(amVerboseDebugging())
+            p=string_append_char(p,'s');
+        if(p){
             // MDH@02OCT2019: are we going to resolve escape sequence characters? yes if we're supposed to dequote (e.g. when using the Mout function)
             if(dequoted){
                 char c;
@@ -966,18 +985,18 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){
                         if(index<lastindex&&c=='\\'){
                             c=_text->_c[++index];
                             switch(c){
-                                case 'a':_p=string_append_char(_p,0x07);break;
-                                case 'b':_p=string_append_char(_p,0x08);break;
-                                case 'e':_p=string_append_char(_p,0x1B);break;
-                                case 'f':_p=string_append_char(_p,0x0C);break;
-                                case 'n':_p=string_append_char(_p,0x0A);break;
-                                case 'r':_p=string_append_char(_p,0x0D);break;
-                                case 't':_p=string_append_char(_p,0x09);break;
-                                case 'v':_p=string_append_char(_p,0x0B);break;
-                                case '\\':_p=string_append_char(_p,0x5C);break;
-                                case '\'':_p=string_append_char(_p,0x27);break;
-                                case '"':_p=string_append_char(_p,0x22);break;
-                                case '?':_p=string_append_char(_p,0x3F);break;
+                                case 'a':p=string_append_char(p,0x07);break;
+                                case 'b':p=string_append_char(p,0x08);break;
+                                case 'e':p=string_append_char(p,0x1B);break;
+                                case 'f':p=string_append_char(p,0x0C);break;
+                                case 'n':p=string_append_char(p,0x0A);break;
+                                case 'r':p=string_append_char(p,0x0D);break;
+                                case 't':p=string_append_char(p,0x09);break;
+                                case 'v':p=string_append_char(p,0x0B);break;
+                                case '\\':p=string_append_char(p,0x5C);break;
+                                case '\'':p=string_append_char(p,0x27);break;
+                                case '"':p=string_append_char(p,0x22);break;
+                                case '?':p=string_append_char(p,0x3F);break;
                                 case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7': // octal
                                     { // octal representations can't have 8 or 9 in it
                                         char oct=(c-48);
@@ -988,52 +1007,52 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){
                                             oct=(oct<<3)+(c-48); // update oct by multiplying oct by 8 and adding c-48!!
                                             index++;
                                         }
-                                        _p=string_append_char(_p,oct);
+                                        p=string_append_char(p,oct);
                                         // replacing: _p=string_append_char(_p,8*(8*(c-48)+(_text->_c[++index]-48))+(_text->_c[++index]-48));
                                     }
                                     break; // assume octal
                                 case 8:case 9:break; // this would be invalid
                                 case 'x':case 'X':
                                     {
-                                        if(index+2<=lastindex){_p=string_append_char(_p,(hexdigit(_text->_c[index+1])<<4)+hexdigit(_text->_c[index+2]));}
+                                        if(index+2<=lastindex){p=string_append_char(p,(hexdigit(_text->_c[index+1])<<4)+hexdigit(_text->_c[index+2]));}
                                         index+=2;
                                     }
                                     break; // TODO for now skip, so still left to do
                             }
                         }else
-                            _p=string_append_char(_p,c);
+                            p=string_append_char(p,c);
                     }
                 }
             }else{
-                _p=string_append_char(_p,_text->presuffix);
-                _p=string_append(_p,_text->_c);
-                _p=string_append_char(_p,_text->presuffix);
+                p=string_append_char(p,_text->presuffix);
+                p=string_append(p,_text->_c);
+                p=string_append_char(p,_text->presuffix);
             }
         }
-        if(!_p){free_string(_stringText);_stringText=NULL;}
+        if(!p){free_string(_stringText,owner);return NULL;}
     }
-	return _stringText;
+	return OWNED(_stringText,owner);
 }/* VALIDATED */
 
 /////////////Mstring* _UNDEFINED_VALUETEXT=NULL;
 // the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
 // we can solve that by returning a new undefined value text instance every time
-Mstring* _getUndefinedValueText(){
-    return _getString(M_UNDEFINED_VALUE_TEXT); // just wrapping UNDEFINED_VALUETEXT again...
+Mstring* _getUndefinedValueText(){Mallocationowner owner=getOwner(__LINE__);
+    return DISOWNED(OWNED(_getString(M_UNDEFINED_VALUE_TEXT),owner),owner); // just wrapping UNDEFINED_VALUETEXT again...
     /* replacing:
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
     return string_copy(_UNDEFINED_VALUETEXT);
     */
 }/* VALIDATED */
 
-size_t outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix){
+size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _biginteger,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(_biginteger){
-        Mstring* _bigintegerText=_getBigintegerText(_biginteger);
+        Mstring* _bigintegerText=OWNED(_getBigintegerText(_biginteger),owner);
         if(_bigintegerText){
             written+=output("%s",string(_bigintegerText));
-            free_string(_bigintegerText);
+            free_string(_bigintegerText,owner);
         }else
             written+=output("no big integer text representation");
     }else
@@ -1041,14 +1060,14 @@ size_t outputBiginteger(const char* const prefix,const Mbiginteger* const _bigin
     if(postfix)written+=output("%s",postfix);
     return written;
 }/* VALIDATED */
-size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix){
+size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(_decimal){
-        Mstring* _decimalText=_getDecimalText(_decimal,false);
+        Mstring* _decimalText=OWNED(_getDecimalText(_decimal,false),owner);
         if(_decimalText){
             written+=output("%s",string(_decimalText));
-            free_string(_decimalText);
+            free_string(_decimalText,owner);
         }else
             written+=output("no decimal text representation");
     }else
@@ -1081,4 +1100,3 @@ bool isDecimalZero(Mdecimal* _decimal){
     return result;
 }// VALIDATED 
 */
-
