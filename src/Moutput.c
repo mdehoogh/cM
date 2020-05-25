@@ -11,7 +11,6 @@
 #include "Moutput.h"
 
 static uint32_t const MODULE_ID=1;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
 
 static FILE* outputFile=NULL;
 

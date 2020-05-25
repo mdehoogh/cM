@@ -154,7 +154,9 @@ Mvalue* Mbc(Mvalue* _value){
     if(ll==M_LL_INVALID)return NULL;
     char s[16];if(ll>=0)sprintf(s,"'\\033[48;5;%lldm",ll%256);else sprintf(s,"'\\033[48;5;%sm",getBackgroundColor());
     ////////////output("ANSI background color code: '%s'.\n",s);
-    return _getTextValue(_strdup(s),true);
+	char* _s=strdup(s);if(!_s)return NULL;
+	Mvalue* _textValue=_getTextValue(_s);free(_s);
+	return _textValue;
     /* replacing:
     Mstring* _valueText=_getValueText(_value,true);
     size_t result=string_length(_valueText);
@@ -169,7 +171,9 @@ Mvalue* Mtc(Mvalue* _value){
     if(ll==M_LL_INVALID)return NULL;
     char s[16];if(ll>=0)sprintf(s,"'\\033[38;5;%lldm",ll%256);else sprintf(s,"'\\033[38;5;%sm",getInfoColor());
     ////////output("ANSI foreground color code: '%s'.\n",s);
-    return _getTextValue(_strdup(s),true);
+	char* _s=strdup(s);if(!_s)return NULL;
+	Mvalue* _textValue=_getTextValue(_s);free(_s);
+	return _textValue;
     /*
     Mstring* _valueText=_getValueText(_value,true);
     size_t result=string_length(_valueText);

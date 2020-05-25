@@ -8,7 +8,7 @@
 #include "Malloc.h"
 
 static uint32_t const MODULE_ID=3;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 extern char const * const M_ERROR_PREFIX;
 extern char const * const M_WARNING_PREFIX;
@@ -722,6 +722,8 @@ void* Msubowned(void* ptr,uint8_t level){
         bug("Failed to subown a memory allocation: it is not registered.");
     return ptr;
 }
+// MDH@25MAY2020 careful here Msubowner result is supposed to be a local variable (on the program stack) so it will be disposed off 'automagically'
+Mallocationowner Msubowner(Mallocationowner owner,uint8_t level){return (Mallocationowner){owner.disowned,owner.level+level,owner.id};}
 void* Mownedby(void* ptr,Mallocationowner owner){
     if(!ptr)return NULL;
     if(ptr&&owner.id>0&&owner.disowned==0){

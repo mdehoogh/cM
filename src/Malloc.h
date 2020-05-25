@@ -46,9 +46,15 @@ typedef struct{
     */
 }Mallocationtype;
 
+typedef struct{
+    uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
+    uint8_t level:7; // the subpointer level
+    uint32_t id:24; // the owner id (typically a function or a module itself)
+}Mallocationowner;
+
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
-long long addAllocation(char allocationType,int32_t ownerId); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
+long long addAllocation(char allocationType,Mallocationowner owner); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
 // long long registerAllocation(char allocationType,size_t size,long long count);
 
 bool allocationRecordingInitialized();
@@ -76,13 +82,12 @@ bool oldestAllocationMarkDropped();
 // i.e. replacing __ADEBUG__ by __PRODUCTION__ and changing the sign
 
 // MDH@18MAY2020: for passing along (pointer) ownership DISOWNED and OWNED are introduced
+
+Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
+
 #ifndef __PRODUCTION__
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
-typedef struct{
-    uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
-    uint8_t level:7; // the subpointer level
-    uint32_t id:24; // the owner id (typically a function or a module itself)
-}Mallocationowner;
+
 //Mallocationowner getOwner(uint16_t module,uint32_t functionId);
 void* Mmalloc(size_t size,char type,Mallocationowner owner);
 void* Mcalloc(size_t size,char type,Mallocationowner owner);

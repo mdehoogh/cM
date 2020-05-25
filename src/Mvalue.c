@@ -380,7 +380,8 @@ Mvalue* _getFloatValue(long double ld){
         outputInfo("No float to wrap.");
     return _floatValue;
 }/* VALIDATED */
-Mvalue* _getTextValue(char* _s/*bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
+// MDH@25MAY2020: s is a constant character array that does not need change ownership (because it is supposed to be owned elsewhere or not owned)
+Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
     if(!_s)return NULL; // when no input, no go
     Mvalue* _textValue=NULL; // the result, when NULL check freeonfailure
     Mtext* _text=OWNED(_getText(_s),owner); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
@@ -494,7 +495,7 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
         Mstring* _attributeName=OWNED(_getString("'"),owner);
         if(!_attributeName){outputError("Failed to duplicate a map attribute name");break;}
         string_append(_attributeName,mapelement->_variable->_name->chars); // MDH@17APR2020: char* _name replaced by Mchars* _name // append the attribute name
-        Mvalue* attributeValue=OWNED(_getTextValue(string(_attributeName),false),owner);
+        Mvalue* attributeValue=OWNED(_getTextValue(string(_attributeName)),owner);
         free_string(_attributeName,owner);
         if(!attributeValue){outputError("Failed to store a map attribute name");break;}
         if(appendedToList(_list,attributeValue,M_LL_INVALID)==0){
@@ -1073,28 +1074,31 @@ Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
 
 // MAP STUFF
 // MDH@24MAY2019: if already in the map should replace the current value
-long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue const * const _attributeValue){
+long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue){Mallocationowner owner=getOwner(__LINE__);
     long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
     if(result!=M_LL_INVALID){
         if(!_map->immutable){ // the map is mutable
             // MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
             if(!_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
-                if(amVerbose()&&amDebugging())
+                if(amVerboseDebugging())
                 {output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
                 Mmapelement* _mapelement=_map->_first;
                 while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
                 if(!_mapelement){ // not found
-                    _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m'); // NOTE no need to set _next because it is now NULL
+                    _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
                         // MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
-                        _mapelement->_variable=_getVariable(attributeName,VT_UNDEFINED,false); // TODO why would this 'variable' be mutable, and allowing all values????
-                        if(_mapelement->_variable){ // the variable was created so attach in map
+                        // MDH@25MAY2020: we're disowning _variable because we 
+                        Mvariable* _variable=OWNED(_getVariable(attributeName,VT_UNDEFINED,false),owner); // TODO why would this 'variable' be mutable, and allowing all values????
+                        if(_variable){ // the variable was created so attach in map
+                            SUBOWNED(OWNED(DISOWNED(_mapelement,owner),owner_map),1); // pass ownership of _mapelement to _map at the first sublevel
+                            _mapelement->_variable=SUBOWNED(OWNED(_variable,owner_map),2); // pass ownership of _variable to the mapelement at the second sublevel in the map
                             if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
                             _map->_last=_mapelement;
                             _map->numberOfElements++;
                             // result=M_TRUE; // success
                         }else{ // we have a map element BUT no variable, so no go
-                            free_mapelement(_mapelement,false);_mapelement=NULL;
+                            free_mapelement(_mapelement,false,owner);_mapelement=NULL;
                             outputError("Failed to create a new attribute");
                         }
                     }else
@@ -1114,6 +1118,23 @@ long long appendedToMap(Mmap* const _map,char const * const attributeName,Mvalue
             outputError("Unable to change the map: it is immutable");
     }else
         outputError("No map or atribute name specified");
+    return result;
+}/* VALIDATED */
+long long removedFromMap(Mmap* map,Mallocationowner owner_map,char const * const attributeName){
+    long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
+    if(result!=M_LL_INVALID){
+        if(!_map->immutable){ // the map is mutable
+            Mmapelement *mapelement=_map->_first,*previousmapelement=NULL;
+            while(mapelement&&mapelement->_variable&&strcmp(mapelement->_variable->_name->chars,attributeName)){previousmapelement=mapelement;mapelement=previousmapelement->_next;}
+            if(mapelement){ // found
+                if(previousmapelement)previousmapelement->_next=mapelement->_next;else map->_first=mapelement->_next; // disconnect the map element
+                if(mapelement->_next==NULL)map->_last=previousmapelement;else mapelement->_next=NULL;
+                map->numberOfElements--; // one less element in the map now
+                free_mapelement(mapelement,_map->weak,owner_map); // free (all parts of) the map element
+            }
+            result=M_TRUE;
+        }
+    }
     return result;
 }/* VALIDATED */
 
@@ -1664,7 +1685,7 @@ bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map){
                         p=string_append_char(p,'\'');
                         p=string_append(p,_mapelement->_variable->_name->chars);
                         if(p){
-                            Mvalue* _attributeNameValue=_getTextValue(string(_attributeName),false);
+                            Mvalue* _attributeNameValue=_getTextValue(string(_attributeName));
                             if(_attributeNameValue&&appendedToList(_maplistelement,_attributeNameValue,M_LL_INVALID)){
                                 if(!appendedToList(_maplistelement,_mapelement->_variable->_value,M_LL_INVALID)||!appendedToList(_maplist,_maplistelementValue,M_LL_INVALID)){
                                     result=false;
@@ -2272,19 +2293,19 @@ void free_userfunction(Muserfunction* _userfunction){
 // END RELEASERS
 
 // Menvironment stuff
-Menvironment* __environment(int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(100));
-    Menvironment* _environment=CALLOC(sizeof(Menvironment),'E',foid);
+Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
+    Menvironment* _environment=CALLOC(sizeof(Menvironment),'E',owner);
     if(!_environment){outputError("Failed to create an environment");return NULL;}
-    _environment->_variableMap=CALLOC(sizeof(Mmap),'M',abs(foid)); // ascertain that the environment contains a variable map
+    _environment->_variableMap=CALLOC(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
     if(!_environment->_variableMap){free_environment(_environment,foid);_environment=NULL;outputError("Failed to create the new environment variable map");}
     return _environment;
 }/* VALIDATED */
-void free_environment(Menvironment* _environment,int32_t oid){int32_t foid=(oid>0?oid:-getOwnerId(100));
+void free_environment(Menvironment* _environment,Mallocationowner owner_environment){
     if(_environment){
-        if(_environment->_name){freeChars(_environment->_name);_environment->_name=NULL;}
+        if(_environment->_name){freeChars(_environment->_name,owner_environment);_environment->_name=NULL;}
         assignValue(&_environment->_parent,NULL); // MDH@03FEB2020 replacing:
         assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
-        free_map(_environment->_variableMap);
+        free_map(_environment->_variableMap,owner_environment);
         // free_map(_environment->_functionMap); // MDH@04MAR2020: TODO do we need this??????
         /* MDH@10JUL2019: only Menvironment has a function map!!   
            MDH@20JUL2019: NO user functions may also contain a function map, which is referenced in a user function execution environment
@@ -2292,14 +2313,14 @@ void free_environment(Menvironment* _environment,int32_t oid){int32_t foid=(oid>
                           freeing the execution environment)
         if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
         */
-        FREE(_environment,'E');
+        FREE(_environment,'E',owner_environment);
     }
 }/* VALIDATED */
 Menvironment* getEnvironmentParent(Menvironment* _environment){
     return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
 }/* VALIDATED */
-Mstring* _getEnvironmentName(Menvironment* _environment){int32_t foid=getOwnerId(101);
-    Mstring* _environmentName=__string(foid);
+Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _environmentName=OWNED(__string(),owner);
     if(_environmentName){
         Mstring* p=_environmentName;
         while(p&&_environment){
@@ -2308,9 +2329,9 @@ Mstring* _getEnvironmentName(Menvironment* _environment){int32_t foid=getOwnerId
             p=string_prepend(p,_environment->_name->chars);
             _environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
         }
-        if(!p){free_string(_environmentName,foid);_environmentName=NULL;}
+        if(!p){free_string(_environmentName,owner);_environmentName=NULL;}
     }
-    return _environmentName;
+    return DISOWNED(_environmentName,owner);
 }
 
 // additional function for wrapping environments and functions

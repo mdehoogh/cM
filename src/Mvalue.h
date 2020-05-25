@@ -126,26 +126,26 @@ long long isMapUndefined(Mmap* map);
 // data wrappers
 Mvalue* _getUndefinedValue(); // it's also possible to ask for an undefined value!!!
 // and allow asking for a reference value wrapper
-Mvalue* _getIntegerValue(long long ll,Mallocationowner owner);
-Mvalue* _getCharTextValue(char _c,Mallocationowner owner);
+Mvalue* _getIntegerValue(long long ll);
+Mvalue* _getCharTextValue(char _c);
 
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
-Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner); // MDH@31MAY2019: we cannot use a big integer long here
-Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner);
-Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner);
+Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_biginteger); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner_rational);
+Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner_decimal);
 Mvalue* _getFloatValue(long double ld);
-Mvalue* _getTextValue(char* text,Mallocationowner owner);
+Mvalue* _getTextValue(char const * const text);
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty map with all values to be of type mapValuetype
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
-Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner);
-Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner);
-Mvalue* _getValueOfReal(Mfloat* _real,Mallocationowner owner);
-Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner);
-Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner);
+Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list);
+Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer);
+Mvalue* _getValueOfReal(Mfloat* _real,Mallocationowner owner_real);
+Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map);
+Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token);
 
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mmap* _getMapOfType(Mvaluetype valuetype);
@@ -160,7 +160,7 @@ bool incrementReferenceCount(Mvalue* _value);
 void free_value(Mvalue* _value,Mallocationowner owner);
 //////////Mstring* appendld(Mstring* mstr,long double ld);
 
-/*unsigned */long long appendedToList(Mlist* const _list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+/*unsigned */long long appendedToList(Mlist* const _list,Mallocationowner owner_list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 
 Mlist* __list(char* source);
 void free_list(Mlist* _list,Mallocationowner owner);
@@ -174,7 +174,8 @@ Mvalue* getFirstScalarValue(Mvalue* value);
 
 long long isListUndefined(Mlist* list);
 
-long long appendedToMap(Mmap* const _map,const char* const attributeName,const Mvalue* const _attributeValue);
+long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,const char* const attributeName,const Mvalue* const _attributeValue);
+long long removedFromMap(Mmap* const _map,Mallocationowner owner_map,const char* const attributeName);
 
 long double getValueLongDouble(Mvalue const * const _value);
 Mbiginteger* _getValueBiginteger(Mvalue const * const _value); // converts a value to a big integer (if possible)
@@ -330,12 +331,12 @@ typedef struct Menvironment{
     Mvalue* execution; // MDH@03FEB2020 replacing: struct Menvironment* _execution; // the environment that was executing before this one was popped!!
 }Menvironment;
 
-Menvironment* __environment(int32_t oid); // creates a new (empty) environment
+Menvironment* __environment(); // creates a new (empty) environment
 Mstring* _getEnvironmentName(Menvironment* _environment); // for use in prompting
-void free_environment(Menvironment* _environment,Mallocationowner owner);
+void free_environment(Menvironment* _environment,Mallocationowner owner_environment);
 Menvironment* getEnvironmentParent(Menvironment* _environment);
 
-bool free_function(Mfunction* _function,Mallocationowner owner);
+bool free_function(Mfunction* _function,Mallocationowner owner_function);
 
 Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 

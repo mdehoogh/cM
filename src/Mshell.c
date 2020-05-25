@@ -222,13 +222,14 @@ bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap*
 \p functionName the name of the function to execute
 obviously when defining the function body there will be no commands to execute
  */
-Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){
+Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-	if(amVerbose()&&amDebugging())outputMap("Function execution argument map: ",_argumentMap,".\n");
-	Menvironment* _functionExecutionEnvironment=__environment(); // free asap
+	if(amVerboseDebugging())
+		outputMap("Function execution argument map: ",_argumentMap,".\n");
+	Menvironment* _functionExecutionEnvironment=OWNED(__environment(),owner); // free asap
 	if(_functionExecutionEnvironment){
 		if(amVerbose())outputInfo("Registering the name of the function execution environment");
-		_functionExecutionEnvironment->_name=_getChars(functionName); // store the name of the function as environment name!!!
+		_functionExecutionEnvironment->_name=SUBOWNED(OWNED(_getChars(functionName),owner),1); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
 		//                we do not need to distinguish between the originals and the references (so we never loose the referenced functions
@@ -253,9 +254,9 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 			}
 		}else
 			outputError("Failed to initialize the function execution environment.");
-		if(!functionExecutionEnvironmentInitialized){free_environment(_functionExecutionEnvironment);_functionExecutionEnvironment=NULL;}
+		if(!functionExecutionEnvironmentInitialized){free_environment(_functionExecutionEnvironment,owner);_functionExecutionEnvironment=NULL;}
 	}
-	return _functionExecutionEnvironment;
+	return DISOWNED(_functionExecutionEnvironment,owner);
 }
 
 /* moved back to M.c
@@ -539,16 +540,16 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 // MDH@05AUG2019: the do function allows for executing a single command in its own environment, so all variables created are local
 //                the problem is that we want to allow the user to enter a list of token things i.e. an infinite list of arguments instead of having to wrap the single argument in a list itself
 //                this is solvable if we convert the list of arguments to a single Mvalue wrapping the entire list of arguments before calling Mdofunction
-Mvalue* Mdofunction(Mvalue* _doTokenValue){
+Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	if(_doTokenValue&&_doTokenValue->type==VT_LIST){
 		Mlist* doList=_doTokenValue->value._list;
 		if(doList&&doList->_first){ // something to do
-			Menvironment* _doEnvironment=__environment();
+			Menvironment* _doEnvironment=OWNED(__environment(),owner);
 			if(_doEnvironment){
-				_doEnvironment->_name=_getChars("do");
+				_doEnvironment->_name=SUBOWNED(OWNED(_getChars("do"),owner),1);
 				// let's add variable $ as result variable and ! as exit flag variable
-				bool doEnvironmentInitialized=addVariable(_doEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_doEnvironment,"!",VT_INTEGER,false)&&setValue(_doEnvironment,"!",_getIntegerValue(0));
+				bool doEnvironmentInitialized=addVariable(_doEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_doEnvironment,"!",VT_INTEGER,false)&&setValue(_doEnvironment,"!",_getIntegerValue(0,owner));
 				if(doEnvironmentInitialized){
 					if(pushExecutionEnvironment(_doEnvironment)){
 						Mlistelement* tokenValueListelement=doList->_first;
@@ -571,15 +572,15 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){
 					}
 				}else{
 					outputError("Failed to create the do environment");
-					free_environment(_doEnvironment);
+					free_environment(_doEnvironment,owner);
 				}
 			}
 		}
 	}
-	return _result;
+	return DISOWNED(_result,owner);
 }
 // MDH@11MAR2020: the value of the result token is assigned to $ so that will become the result of the application of the Mforfunction
-Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){
+Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenValue,Mvalue* _incrementTokenValue,Mvalue* _bodyTokenValue,Mvalue* _resultTokenValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	if( (!_initializationTokenValue||_initializationTokenValue->type==VT_TOKEN)&&
 		(_conditionTokenValue&&_conditionTokenValue->type==VT_TOKEN)&&
@@ -595,12 +596,12 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			outputValue(" Result=",_resultTokenValue,NULL);
 			newline();
 		}
-		Menvironment* _forEnvironment=__environment();
+		Menvironment* _forEnvironment=OWNED(__environment(),owner);
 		if(_forEnvironment){
-			_forEnvironment->_name=_getChars("for loop");
+			_forEnvironment->_name=SUBOWNED(OWNED(_getChars("for loop"),owner),1);
 			// better wait with pushing until _forEnvironment is initialized appropriately
 			// MDH@11MAR2020: $ is NOT needed when there's an explicit result token value!!
-			bool forEnvironmentInitialized=(_resultTokenValue?true:addVariable(_forEnvironment,"$",VT_UNDEFINED,false))&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0));
+			bool forEnvironmentInitialized=(_resultTokenValue?true:addVariable(_forEnvironment,"$",VT_UNDEFINED,false))&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0,owner));
 			if(forEnvironmentInitialized){
 				if(pushExecutionEnvironment(_forEnvironment)){
 					// evaluate the initialization inside the for environment once
@@ -641,8 +642,8 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							// a for loop should continue unless the condition value is zero or undefined
 							if(isValueZero(_conditionValue)!=M_FALSE)break; // condition evaluates to zero or is undefined
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
-							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
-							if(amVerbose()&&amDebugging()){
+							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1,owner));
+							if(amVerboseDebugging()){
 								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
 								outputValue(" evaluates to '",_conditionValue,"'.\n");
 							}
@@ -655,7 +656,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								newline();resetOutputColor();
 								*/
 								_forBodyValue=getValueOfExpression("for loop",'l',(TokenType[]){},0);
-								if(amVerbose()&&amDebugging()){
+								if(amVerboseDebugging()){
 									outputValue("For loop body in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forBodyValue,"'.\n");
 								}
@@ -670,7 +671,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 								newline();resetOutputColor();
 								*/
 								_forIncrementValue=getValueOfExpression("for increment",'i',(TokenType[]){},0);
-								if(amVerbose()&&amDebugging()){
+								if(amVerboseDebugging()){
 									outputValue("For loop increment in iteration #",getValue(_forEnvironment,"_"),NULL);
 									outputValue(" evaluates to '",_forIncrementValue,"'.\n");
 								}
@@ -689,13 +690,16 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							_result=getValue(_forEnvironment,"$"); // get the result
 							if(!_result){
 								_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
-								if(amVerbose()&&amDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
+								if(amVerboseDebugging())
+									outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
 							}else
-							if(amVerbose()&&amDebugging())outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
+							if(amVerboseDebugging())
+								outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
 						}
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
-					if(amVerbose()&&amDebugging())outputInfo("For loop environment popped.");
+					if(amVerboseDebugging())
+						outputInfo("For loop environment popped.");
 				}else{
 					outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
@@ -703,8 +707,9 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			}else
 				output("%sFailed to add or initialize the for loop result and counter local variables $ and _.\n",M_ERROR_PREFIX);
 			if(!forEnvironmentInitialized){
-				free_environment(_forEnvironment); // have to free the environment myself
-				if(amVerbose())outputInfo("Uninitialized for loop environment discarded!");
+				free_environment(_forEnvironment,owner); // have to free the environment myself
+				if(amVerbose())
+					outputInfo("Uninitialized for loop environment discarded!");
 			}
 		}else
 			outputError("Failed to create the for loop execution environment");
@@ -1248,12 +1253,12 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 }
 
 // this is a fun method, allowing us to parse and evaluate any command (which we're gonna need when running M starting with commands to execute from a file)
-Mvalue* Mevalfunction(Mvalue* value){
+Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _evalValue=NULL;
-	Mstring* _evalValueText=_getValueText(value,true);
+	Mstring* _evalValueText=OWNED(_getValueText(value,true),owner);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
-		Mcommand* _evalCommand=_getNewCommand(true);
+		Mcommand* _evalCommand=OWNED(_getNewCommand(true),owner);
 		if(_evalCommand){
 			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
 			/* already set: 
@@ -1275,13 +1280,13 @@ Mvalue* Mevalfunction(Mvalue* value){
 			if(amVerbose())outputInfo("'.");
 			if(_evalCommand->_lastToken){
 				// just like with do() we have to evaluate the command in a subenvironment
-				Menvironment* _evalEnvironment=__environment();
+				Menvironment* _evalEnvironment=OWNED(__environment(),owner);
 				if(_evalEnvironment){
-					_evalEnvironment->_name=_getChars("eval");
+					_evalEnvironment->_name=SUBOWNED(OWNED(_getChars("eval"),owner),1);
 					if(pushExecutionEnvironment(_evalEnvironment)){
 						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
 						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
-						_evalValue=getCommandValue(_evalCommand,'e');
+						_evalValue=OWNED(getCommandValue(_evalCommand,'e'),owner);
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
@@ -1289,11 +1294,11 @@ Mvalue* Mevalfunction(Mvalue* value){
 					output("%sUnable to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}else
 				output("%sUnable to evaluate the invalid command '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
-			free_token(_evalCommandToken); // clean up the command
+			free_token(_evalCommandToken,owner); // clean up the command
 		}
-		free_string(_evalValueText);
+		free_string(_evalValueText,owner);
 	}
-	return _evalValue;
+	return DISOWNED(_evalValue,owner);
 }
 // end very special M functions
 
@@ -1876,7 +1881,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				normalizeRational(_rational);
 				if(amVerbose())
 					outputRational("Normalized approximation of pi: ",_rational,".\n");
-				return OWNED(_getRationalValue(_rational,true),owner);
+				return DISOWNED(_getRationalValue(_rational,owner),owner);
 			}
 		}
 	}
@@ -1948,7 +1953,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						_rational=NULL;
 					}
 				}
-				return DISOWNED(_getRationalValue(_rational,true),owner);
+				return DISOWNED(_getRationalValue(_rational),owner);
 			}
 		}
 	}
@@ -2076,8 +2081,8 @@ Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){Mallocat
 	longlongunion llu;
 	llu.ll=ll;
 	int l=sizeof(long long);
-	while(--l>=0&&appendedToList(_dlist,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
-	return DISOWNED(_getValueOfList(_dlist,true),owner);
+	while(--l>=0&&appendedToList(_dlist,owner,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
+	return DISOWNED(_getValueOfList(_dlist,owner),owner);
 }
 const char* const REAL_OCTET_INDEX_IDS[]={"1","2","3","4","5","6","7","8","9","10"};
 Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
@@ -2088,22 +2093,22 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
 	// if we make a map with m0 through m7 for the mantisse, and e0 and e1 for the exponent
 	if(littleEndianOrder^isLittleEndian()){ // user wants to see them in little endian order i.e. m0 first
-		while(--l>=0)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[l],DISOWNED(OWNED(_getIntegerValue(lld.octets[l]),owner),owner)))break;
+		while(--l>=0)if(!appendedToMap(_dmap,owner,REAL_OCTET_INDEX_IDS[l],DISOWNED(OWNED(_getIntegerValue(lld.octets[l]),owner),owner)))break;
 	}else{
-		for(int i=0;i<l;i++)if(!appendedToMap(_dmap,REAL_OCTET_INDEX_IDS[i],DISOWNED(OWNED(_getIntegerValue(lld.octets[i]),owner),owner)))break;
+		for(int i=0;i<l;i++)if(!appendedToMap(_dmap,owner,REAL_OCTET_INDEX_IDS[i],DISOWNED(OWNED(_getIntegerValue(lld.octets[i]),owner),owner)))break;
 	}
 	// how about extracting the mantisse and the exponent as well
 	uint64_t mantisse;uint16_t exponent;extractMantisseAndExponent(ld,&mantisse,&exponent);
 	// let's return the binary representation of exponent and mantisse with single quotes around it!!
 	Mstring* _mantisseText=OWNED(_getUint64BinaryText(mantisse,'\''),owner);
-	if(_mantisseText){appendedToMap(_dmap,"m",_getTextValue(string(_mantisseText),false));free_string(_mantisseText,owner);}
+	if(_mantisseText){appendedToMap(_dmap,owner,"m",_getTextValue(string(_mantisseText));free_string(_mantisseText,owner);}
 	Mstring* _exponentText=OWNED(_getUint16BinaryText(exponent,'\''),owner);
-	if(_exponentText){appendedToMap(_dmap,"e",_getTextValue(string(_exponentText),false));free_string(_exponentText,owner);}
+	if(_exponentText){appendedToMap(_dmap,owner,"e",_getTextValue(string(_exponentText));free_string(_exponentText,owner);}
 	/* replacing:
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
 	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
 	*/
-	return DISOWNED(_getValueOfMap(_dmap,true),owner);
+	return DISOWNED(_getValueOfMap(_dmap,owner),owner);
 }
 char* _getIntegerCharacters(long long ll){Mallocationowner owner=getOwner(__LINE__);
 	char str[20];sprintf(str,"%lld",ll);return DISOWNED(OWNED(_strdup(str),owner),owner);
@@ -2119,7 +2124,7 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 		appendedToMap(_dmap,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 		while(*characters){
 			_indexCharacters=OWNED(_getIntegerCharacters(++index),owner);
-			appendedToMap(_dmap,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owner),owner));
+			appendedToMap(_dmap,owner,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owner),owner));
 			FREE(_indexCharacters,'\'',owner);
 			characters++; // OOPS pretty essential
 		}
@@ -2129,12 +2134,12 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 		while(index){
 			_indexCharacters=OWNED(_getIntegerCharacters(index--),owner);
 			characters--;
-			appendedToMap(_dmap,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owned),owned));
+			appendedToMap(_dmap,owner,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owned),owned));
 			FREE(_indexCharacters,'\'',owner);
 		}
-		appendedToMap(_dmap,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
+		appendedToMap(_dmap,owner,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 	}
-	return DISOWNED(_getValueOfMap(_dmap,true),owner);
+	return DISOWNED(_getValueOfMap(_dmap,owner),owner);
 }
 Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _dlist=OWNED(_getListOfType(VT_INTEGER),owner);
@@ -2143,8 +2148,9 @@ Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mal
 	lld.ld=ld;
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
 	// how about adding a two-element list with the first equal to the field name?????
-	while(--l>=0&&appendedToList(_dlist,DISOWNED(OWNED(_getIntegerValue(lld.octets[l]),owner),owner),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
-	return DISOWNED(_getValueOfList(_dlist,true),owner);
+	while(--l>=0&&appendedToList(_dlist,owner,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID)==M_TRUE)
+	;
+	return DISOWNED(_getValueOfList(_dlist,owner),owner);
 }
 
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
@@ -2153,12 +2159,12 @@ Mvalue* d(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value){
 		switch(value->type){
 			// TODO all other types_
-			case VT_INTEGER:return DISOWNED(OWNED(_getDecimalValue(__decimal(NULL,value->value._integer->ll,0),true),owner),owner); // TODO assuming long long and int64_t are the same type!!!!!
-			case VT_BIGINTEGER:return DISOWNED(OWNED(_getDecimalValue(_getBigintegerDecimal(value->value._biginteger),true),owner),owner);
-			case VT_RATIONAL:return DISOWNED(OWNED(_getDecimalValue(_getRationalDecimal(value->value._rational),true),owner),owner);
+			case VT_INTEGER:return _getDecimalValue(OWNED(__decimal(NULL,value->value._integer->ll,0),owner),owner); // TODO assuming long long and int64_t are the same type!!!!!
+			case VT_BIGINTEGER:return _getDecimalValue(OWNED(_getBigintegerDecimal(value->value._biginteger),owner),owner);
+			case VT_RATIONAL:return _getDecimalValue(OWNED(_getRationalDecimal(value->value._rational),owner),owner);
 			case VT_DECIMAL:return value;
 			case VT_FLOAT: // TODO check whether somewhere I am converting a long double without using text
-			default:return DISOWNED(OWNED(_getDecimalValue(_getValueTextDecimal(value),true),owner),owner);
+			default:return _getDecimalValue(OWNED(_getValueTextDecimal(value),owner),owner);
 		}
 	}
 	return NULL;
@@ -2168,9 +2174,9 @@ Mvalue* d(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 Mvalue* o(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // little-endian representation list to return
 	if(value){
 		switch(value->type){
-			case VT_INTEGER:return DISOWNED(OWNED(getIntegerDecimalListValue(value->value._integer->ll,true),owner),owner);
-			case VT_FLOAT:return DISOWNED(OWNED(getLongDoubleDecimalMapValue(value->value._float->ld,true),owner),owner);
-			case VT_TEXT:return DISOWNED(OWNED(getTextDecimalMapValue(value->value._text,true),owner),owner);
+			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
+			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,true);
+			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
 			default:break;
 		}
 	}
@@ -2180,9 +2186,9 @@ Mvalue* o(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // little-en
 Mvalue* O(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endian decimal representation list to return
 	if(value){
 		switch(value->type){
-			case VT_INTEGER:return DISOWNED(OWNED(getIntegerDecimalListValue(value->value._integer->ll,false),owner),owner);
-			case VT_FLOAT:return DISOWNED(OWNED(getLongDoubleDecimalMapValue(value->value._float->ld,false),owner),owner);
-			case VT_TEXT:return DISOWNED(OWNED(getTextDecimalMapValue(value->value._text,false),owner),owner);
+			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
+			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,false);
+			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
 			default:break;
 		}
 	}

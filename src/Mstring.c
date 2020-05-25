@@ -40,7 +40,7 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
     return DISOWNED(ans,owner);
 }
 
-Mstring* _getString(const char* const s){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE__);
     if(!s)return NULL;
     Mstring* ans=CALLOC(sizeof(Mstring),'S',owner);
     if(ans){
@@ -49,7 +49,7 @@ Mstring* _getString(const char* const s){Mallocationowner owner=getOwner(__LINE_
         // MDH@17APR2020: Mchars* replacing char*
         size_t blocks=1+(l/M_BLOCK_CHARACTERS);
         // NOTE __chars will return a disowned pointer which can then be owned by ans unless we create a subowned macro that will simply increment the level of ownership
-        ans->_chars=SUBOWNED(OWNED(__chars(M_BLOCK_SIZE,blocks,'s'),owner));
+        ans->_chars=SUBOWNED(OWNED(__chars(M_BLOCK_SIZE,blocks,'s'),owner),1);
         if(ans->_chars){
             ans->length=l;
             ans->blocks=blocks;
@@ -88,7 +88,7 @@ Mstring* _stringCopy(Mstring* const src,size_t length){Mallocationowner owner=ge
     // MDH@17APR2020: replacing src->chars by src->_chars->chars
     src->_chars->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
     Mstring* _result=OWNED(_getString(src->_chars->chars),owner);
-    if(length>0)if(_result)string_setlength(_result,length);
+    if(length>0)if(_result)string_setlength(_result,length,owner);
     return _result;
     /* replacing:
     Mstring* dst=__string();
@@ -115,15 +115,15 @@ Mstring* _stringCopy(Mstring* const src,size_t length){Mallocationowner owner=ge
  */
 // MDH@18MAY2020: you can see what a nuisance it is to free a string for somebody else because the caller needs to DISOWN it first, then I have to obtain ownership otherwise I can't free it
 //                then there's str->_chars that we need to take ownership off as well
-Mstring* free_string(Mstring* str,Mallocationowner owner){   
+Mstring* free_string(Mstring* str,Mallocationowner owner_str){   
     // in order to be able to free_chars but perhaps we do not need to disown str->_chars before calling free_chars????????
     if(str){
         // MDH@17APR2020: replacing src->chars by src->_chars->chars
         // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
         // MDH@22MAY2020: subpointers can be disowned by passing in the superpointer owner i.e. it is NOT necessary to pass in it's own owner id (which indicates it is a subpointer)
-        free_chars(DISOWNED(str->_chars,owner),M_BLOCK_SIZE,str->blocks,'s');
+        free_chars(str->_chars,owner_str,M_BLOCK_SIZE,str->blocks,'s');
         // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
-        FREE(str,'S',owner);
+        FREE(str,'S',owner_str);
         return NULL;
     }
     return str;
@@ -135,7 +135,7 @@ size_t string_length(Mstring const * const str){return(str?str->length:0);}
 bool string_empty(Mstring const * const str){return(str?str->length==0:true);} // MDH@17APR2020: removing 
 
  // MDH@26FEB2018: we might want to set the length (to a smaller one)
-Mstring* string_setlength(Mstring* const str,size_t length,Mallocationowner owner){
+Mstring* string_setlength(Mstring* const str,size_t length,Mallocationowner owner_str){
     // MDH@22MAY2020: here we have a bit of an issue, because str->chars might change, although str won't change in which case we really need the oid from the caller
     //                unless we could extract ownership from str->chars itself????
     //                unless we decide that subpointers do not need to be owned?????
@@ -149,10 +149,10 @@ Mstring* string_setlength(Mstring* const str,size_t length,Mallocationowner owne
         if(blocks>str->blocks){
             /////////printf("Realloc string_setlength().\n");
             // MDH@17APR2020: replacing char* by Mchars* (chars by _chars)
-            Mchars* new_chars=OWNED(_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s'),owner); // MDH@22MAY2020: by using -foid we disown it immediately
+            Mchars* new_chars=_resized(str->_chars,owner_str,M_BLOCK_SIZE,str->blocks,blocks,'s'); // MDH@22MAY2020: by using -foid we disown it immediately
             if(!new_chars)return NULL; // failure
             str->blocks=blocks;
-            str->_chars=SUBOWNED(new_chars); // as soon as new_chars is stored in str->_chars which is a subpointer, we move the ownership to 0 i.e. it is safe if the containing pointer is
+            str->_chars=SUBOWNED(new_chars,1); // as soon as new_chars is stored in str->_chars which is a subpointer, we move the ownership to 0 i.e. it is safe if the containing pointer is
             /* replacing:
             char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
             if (!new_str)return NULL; // failure!!
@@ -245,7 +245,7 @@ size_t string_removed(Mstring * const str,size_t pos,size_t length){ // MDH@03OC
  * insert char c at position pos in the given string 
  * NOTE: returns NULL on failure, @str otherwise 
  */
-Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
+Mstring* string_insert_char(Mstring* const str,Mallocationowner owner_str,size_t pos,char c){
     if(str!=NULL){
         size_t l=str->length+1; // the 'length' of the text plus 1
         // pos should never be larger than l
@@ -257,10 +257,10 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
                     /////////printf("Realloc string_insert_char().\n");
                     // MDH@17APR2020: reallocating _chars (instead of str->chars)
                     // size_t sizeOfChars=getSizeOfChars(str);
-                    Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
+                    Mchars* new_chars=_resized(str->_chars,owner_str,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
                     if(!new_chars)return NULL;
                     ++(str->blocks);
-                    str->_chars=new_chars;
+                    str->_chars=SUBOWNED(new_chars,1);
                     /* replacing:
                     char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                     if (new_str==NULL)return NULL;
@@ -277,7 +277,7 @@ Mstring* string_insert_char(Mstring* const str,size_t pos,char c){
                 ///printf("->%s",str->chars);
                 ++(str->length);
             }else // at end, we have to call string_append_char because str->last_char will change
-            if(!string_append_char(str,c))return NULL;
+            if(!string_append_char(str,owner_str,c))return NULL;
         }
     }
     return str;
@@ -297,7 +297,7 @@ Mstring* string_setchars(Mstring * const str,size_t pos,char const * const pc){
  * Add a character to the end of the String 
  * NOTE: returns NULL on failure
  */
-Mstring* string_append_char(Mstring* const str,char c){
+Mstring* string_append_char(Mstring* const str,Mallocationowner owner_str,char c){
     if(str!=NULL){
         if(c){ // MDH@15NOV2019: appending '\0' makes no sense does it??????
             size_t l=str->length+1;
@@ -305,7 +305,7 @@ Mstring* string_append_char(Mstring* const str,char c){
             if(l==getNumberOfChars(str)){
                 //////////////printf("Realloc string_append_char().\n");
                 // size_t sizeOfChars=getSizeOfChars(str);
-                Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
+                Mchars* new_chars=_resized(str->_chars,owner_str,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
                 if(!new_chars)return NULL;
                 ++(str->blocks);
                 str->_chars=new_chars;
@@ -346,31 +346,31 @@ char* _stringstart(const Mstring* const str,size_t length){
 
 // MDH@24SEP2019: same as string_append but stopping when count characters were appended!!!
 //                changed it as little as possible by breaking out of the while as soon as the number of appended characters (index) exceeds count!!!!
-Mstring* string_append_chars(Mstring* const str,const char* pc,size_t count){
+Mstring* string_append_chars(Mstring* const str,Mallocationowner owner_str,const char* pc,size_t count){
     if(str!=NULL&&pc!=NULL){ // something to append
         char c;
         size_t index=0;
-        while((c=pc[index++])){if(index>count)break;if(string_append_char(str,c)==NULL)return NULL;}
+        while((c=pc[index++])){if(index>count)break;if(string_append_char(str,owner_str,c)==NULL)return NULL;}
         /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
     }
     return str;
 }
 
 // MDH@26FEB2019: assuming cs is a zero-terminated character array
-Mstring* string_append(Mstring * const str,char const * const pc){
+Mstring* string_append(Mstring * const str,Mallocationowner owner_str,char const * const pc){
     if(str&&pc){ // something to append (to)
         char c;
         size_t index=0;
-        while((c=pc[index++])){if(!string_append_char(str,c))return NULL;/*output("***** %c appended! ******\n",c);*/}
+        while((c=pc[index++])){if(!string_append_char(str,owner_str,c))return NULL;/*output("***** %c appended! ******\n",c);*/}
         /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
     }
     return str;
 }
-Mstring* string_prepend(Mstring* const str,char const * const pc){
+Mstring* string_prepend(Mstring* const str,Mallocationowner owner_str,char const * const pc){
     if(str&&pc){ // something to prepend (to)
         char c;
         size_t index=0;
-        while((c=pc[index])){if(!string_insert_char(str,index,c))return NULL;index++;} // increment index at the end is better than at the beginning TODO can we do even better?
+        while((c=pc[index])){if(!string_insert_char(str,owner_str,index,c))return NULL;index++;} // increment index at the end is better than at the beginning TODO can we do even better?
         /////????? while(*pc!='\0'){string_append_char(str,*pc);(*pc)++;}
     }
     return str;
@@ -467,16 +467,16 @@ bool string_equal(Mstring* str1,Mstring* str2){
 }
 
 // MDH@13MAR2020: helper functions now implemented here (instead of in Mexecution.h/c)
-Mstring* string_append_ull(Mstring* const ms,unsigned long long ll){
+Mstring* string_append_ull(Mstring* const str,unsigned long long ll){
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
-	return string_append(ms,llText);
+	return string_append(str,llText);
 }/* VALIDATED */
 // helper function
-Mstring* string_append_ll(Mstring* const ms,long long ll){
+Mstring* string_append_ll(Mstring* const str,long long ll){
 	char llText[80];
 	snprintf(llText,80,"%lld",ll); // TODO will this fit?
-	return string_append(ms,llText);
+	return string_append(str,owner_str,llText);
 }/* VALIDATED */
 Mstring* string_append_ld(Mstring* const ms,long double ld){
 	char ldText[80];

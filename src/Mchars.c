@@ -21,17 +21,17 @@ Mchars* __chars(size_t size,long long count,char type){Mallocationowner owner=ge
 }
 // if you want to expand an Mchars by the number of characters should we return the new _chars or simply true or false??????
 // ok, we're plugging in an Mchars pointer (which is the address of an Mchars structure)
-Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,long long to_count,char type){Mallocationowner owner=getOwner(__LINE__);
+Mchars* _resized(Mchars const * const _chars,Mallocationowner owner_chars,size_t size,long long from_count,long long to_count,char type){
     // MDH@19MAY2020: NOTE that _chars needs to be DISOWNED by the owner in order for REALLOC to allow changing ownership
     if(!_chars)return NULL;
     // obtain ownership, pass onto REALLOC to reallocate using foid as owner id, and return disowned
-    return(DISOWNED(REALLOC(OWNED(_chars,owner),from_count,to_count,size,type,owner),owner));
+    return REALLOC(_chars,from_count,to_count,size,type,owner_chars);
 }
-Mchars* free_chars(Mchars const * const _chars,size_t size,long long count,char type,Mallocationowner owner){
+Mchars* free_chars(Mchars const * const _chars,Mallocationowner owner_chars,size_t size,long long count,char type){
     // typically the caller would need to tell us the current number of characters stored in _chars
     // ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
     if(!_chars){printf("%sNo Mchars to free.\n",M_WARNING_PREFIX);return NULL;}
-    return REALLOC(_chars,count,0,size,type,owner); // obtain ownership and free
+    return REALLOC(_chars,count,0,size,type,owner_chars); // obtain ownership and free
 }
 
 // if you want to host a known list of characters ('\0' delimited) call _getChars()
@@ -54,7 +54,7 @@ Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LI
     return NULL;
 }
 // utility function to free an Mchars* created using _getChars
-void freeChars(Mchars const * const _chars,Mallocationowner owner){
+void freeChars(Mchars const * const _chars,Mallocationowner owner_chars){
     // if oid is not positive, assuming I was the owner to start with and use that as owner id
-    free_chars(_chars,owner),1,strlen(_chars->chars)+1,'\'');
+    free_chars(_chars,owner_chars,1,strlen(_chars->chars)+1,'\'');
 }
