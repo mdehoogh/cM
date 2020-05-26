@@ -3,6 +3,10 @@
 
 #include "Mmessage.h"
 
+// MDH@26MAY2020: all variable-size allocation types should be negative, all fixed-size allocation types should be positive
+//                to start with this should be used for the Mmalloc, Mcalloc, Mfree functions therefore the type is declared as signed char
+//                but the type itself is always stored as unsigned char i.e. abs(type)
+
 // MDH@14APR2020
 // typedef unsigned t_count long long;
 
@@ -32,7 +36,7 @@ typedef struct{
 }Mallocationmark;
 
 typedef struct{
-    char type;
+    signed char type;
     /*
     unsigned long long mark_occupied; // marked number of bytes occupied
     unsigned long long mark_freed; // marked number of bytes freed
@@ -54,7 +58,7 @@ typedef struct{
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
 // typically all unmark calls should unmark the most recent mark (otherwise an unmark is missing)
-long long addAllocation(char allocationType,Mallocationowner owner); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
+long long addAllocation(signed char allocationType,Mallocationowner owner); // MDH@09APR2020: perhaps nitems should always be 1 somehow?????????
 // long long registerAllocation(char allocationType,size_t size,long long count);
 
 bool allocationRecordingInitialized();
@@ -72,8 +76,8 @@ Mallocationtype* _getAllocationTypes();
 
 bool resetAllocationTypes();
 
-long long getAllocationTypeOccupied(char allocationType,unsigned long long history);
-long long getAllocationTypeFreed(char allocationType,unsigned long long history);
+long long getAllocationTypeOccupied(signed char allocationType,unsigned long long history);
+long long getAllocationTypeFreed(signed char allocationType,unsigned long long history);
 // MDH@11MAY2020: allow adding an allocation mark and dropping the oldest one
 bool allocationMarkAdded();
 bool oldestAllocationMarkDropped();
@@ -89,14 +93,14 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
 
 //Mallocationowner getOwner(uint16_t module,uint32_t functionId);
-void* Mmalloc(size_t size,char type,Mallocationowner owner);
-void* Mcalloc(size_t size,char type,Mallocationowner owner);
-void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,char type,Mallocationowner owner);
-void Mfree(void* ptr,char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
+void* Mmalloc(size_t size,signed char type,Mallocationowner owner);
+void* Mcalloc(size_t size,signed char type,Mallocationowner owner);
+void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char type/*,Mallocationowner owner*/); // MDH@26MAY2020 from now on only to be used to reallocate variable-size types (with negative type)
+void Mfree(void* ptr,signed char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
 // use the substitutes
 #define MALLOC(size,type,owner) Mmalloc((size),(type),(owner))
 #define CALLOC(size,type,owner) Mcalloc((size),(type),(owner))
-#define REALLOC(ptr,from_count,to_count,size,type,owner) Mrealloc((ptr),(from_count),(to_count),(size),(type),(owner))
+#define REALLOC(ptr,from_count,to_count,size,type) Mrealloc((ptr),(from_count),(to_count),(size),(type))
 #define FREE(ptr,type,owner) Mfree((ptr),(type),(owner))
 #define DISOWNED(ptr,owner) Mdisowned((ptr),(owner))
 #define OWNED(ptr,owner) Mowned((ptr),(owner))
@@ -107,7 +111,7 @@ void Mfree(void* ptr,char type,Mallocationowner owner); // releasing a single it
 #define MALLOC(size,type,owner) malloc((nitems)*(size))
 #define CALLOC(size,type,owner) calloc(1,(size))
 #define FREE(ptr,type,owner) free(ptr)
-#define REALLOC(ptr,from_nitems,to_nitems,size,type,owner) realloc((ptr),(to_nitems)*(size))
+#define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc((ptr),(to_nitems)*(size))
 #define DISOWNED(ptr,owner) (ptr)
 #define OWNED(ptr,owner) (ptr)
 #define OWNED_BY(ptr,owner) (ptr)
