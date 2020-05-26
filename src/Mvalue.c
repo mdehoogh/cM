@@ -25,7 +25,7 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner){
     if(_variable->_name)freeChars(_variable->_name,owner); // dynamically allocated (indicated by _) so we should free it...
     if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
-    FREE(_variable,'V',owner);
+    FREE_1(_variable,'V',owner);
 }/* VALIDATED */
 Mvariable* _getVariable(char const * name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
     // MDH@14NOV2019: maps might have attributes with no name (i.e. the empty string)
@@ -33,7 +33,7 @@ Mvariable* _getVariable(char const * name,Mvaluetype valuetype,bool immutable){M
         outputError("No variable name defined");
         return NULL;
     }
-    Mvariable* _variable=(Mvariable*)CALLOC(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
+    Mvariable* _variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
     if(!_variable){
         outputErrorAndText("Failed to allocate memory to store variable ",name);
         return NULL;
@@ -76,13 +76,13 @@ bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owne
     if(_listelement){
         if(_listelement->_next){free_listelement(_listelement->_next,weak,owner);_listelement->_next=NULL;}
         if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
-        FREE(_listelement,'l',owner);
+        FREE_1(_listelement,'l',owner);
         return true;
     }
     return false;
 }/* VALIDATED */
 Mlist* __list(char* source){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=CALLOC(sizeof(Mlist),'L',owner);
+    Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner);
     if(source){
         _list->_creator=SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
         if(!_list->_creator)
@@ -97,11 +97,11 @@ void free_list(Mlist* _list,Mallocationowner owner){
     {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
     if(_list->_first){
         // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters
-        if(_list->_creator)freeChars(_list->_creator,owner);// MDH@17APR2020 replacing: FREE(_list->_creator,'"');
+        if(_list->_creator)freeChars(_list->_creator,owner);// MDH@17APR2020 replacing: FREE_1(_list->_creator,'"');
         free_listelement(_list->_first,_list->weak,owner);
         _list->_first=NULL;
     }
-    FREE(_list,'L',owner);
+    FREE_1(_list,'L',owner);
 }/* VALIDATED */
 
 bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
@@ -119,14 +119,14 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
         _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
     }else
         outputWarning("No map attribute to free!");
-    FREE(_mapelement,'m',owner);
+    FREE_1(_mapelement,'m',owner);
     if(amVerboseDebugging())outputInfo("\tMap element freed!");
     return true;
 }/* VALIDATED */
 void free_map(Mmap* _map,Mallocationowner owner){
     if(amVerboseDebugging())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
     if(_map->_first){free_mapelement(_map->_first,_map->weak,owner);_map->_first=NULL;}else outputInfo("No map attributes to free!");
-    FREE(_map,'M',owner);
+    FREE_1(_map,'M',owner);
 }/* VALIDATED */
 
 // MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
@@ -136,7 +136,7 @@ void free_valuereference(Mvaluereference* _valuereference,Mallocationowner owner
     if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
     */
     if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
-    FREE(_valuereference,'5',owner); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
+    FREE_1(_valuereference,'5',owner); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
 }/* VALIDATED */
 
 // manage a list of created values
@@ -149,11 +149,11 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
         _valueList=OWNED(__list("global value list"),owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
         if(!_valueList){outputBug("Failed to create the global value list.");return NULL;}
         _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
-        if(!appendedToList(_valueList,CALLOC(sizeof(Mvalue),'U',owner),M_LL_INVALID)>0){outputBug("Failed to store the global undefined value.");return NULL;}
+        if(!appendedToList(_valueList,CALLOC_1(sizeof(Mvalue),'U',owner),M_LL_INVALID)>0){outputBug("Failed to store the global undefined value.");return NULL;}
     }
-    Mlistelement* _valueListelement=(Mlistelement*)CALLOC(sizeof(Mlistelement),'l',owner); // both pointers NULL
+    Mlistelement* _valueListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner); // both pointers NULL
     if(_valueListelement){
-        _value=(Mvalue*)CALLOC(sizeof(Mvalue),'X',owner); // MDH@07APR2020: should be 'X' not 'Y' // MDH@18MAY2020: immediately disown the Mvalue, because we return it 
+        _value=(Mvalue*)CALLOC_1(sizeof(Mvalue),'X',owner); // MDH@07APR2020: should be 'X' not 'Y' // MDH@18MAY2020: immediately disown the Mvalue, because we return it 
         if(_value){
             // shouldn't pose a problem now...
             _valueListelement->_value=SUBOWNED(_value,1);
@@ -164,7 +164,7 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
             _valueListelement->index=_valueList->numberOfElements;
             if(descriptor)if(amVerbose()&&amDebugging())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
         }else // couldn't get a new value, so free the value list element immediately
-            FREE(_valueListelement,'l',owner);
+            FREE_1(_valueListelement,'l',owner);
     }
     if(!_value)outputError("Failed to create value!"); // serious enough to report
     return DISOWNED(_value,owner);
@@ -190,7 +190,7 @@ void free_value(Mvalue* _value,Mallocationowner owner){
             case VT_ENVIRONMENT:if(_value->value._environment){free_environment(_value->value._environment,owner);_value->value._environment=NULL;}break;
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
-        FREE(_value,'X',owner);
+        FREE_1(_value,'X',owner);
         if(amVerboseDebugging())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
     }else
         outputBug("No value to free!");
@@ -291,7 +291,7 @@ bool incrementReferenceCount(Mvalue* _value){
 // MDH@23MAY2020: why not return a global representing an undefined value (might be the first value in _valuelist)
 Mvalue* _getUndefinedValue(){
     return (_valueList?DISOWNED(_valueList->_first->_value,owner_valueList):NULL);
-    // MDH@23MAY2020 replacing: return (Mvalue*)CALLOC(sizeof(Mvalue),'U',-getOwner(__LINE__));
+    // MDH@23MAY2020 replacing: return (Mvalue*)CALLOC_1(sizeof(Mvalue),'U',-getOwner(__LINE__));
 }/* VALIDATED */
 /*
 Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
@@ -304,7 +304,7 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 // MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
 Mreference* _getReference(Mvariable* variable){Mallocationowner owner=getOwner(__LINE__);
     // MDH@11MAR2020: variable can now be NULL
-    Mreference* _reference=CALLOC(sizeof(Mreference),'Q',owner);
+    Mreference* _reference=CALLOC_1(sizeof(Mreference),'Q',owner);
     if(_reference){_reference->variable=SUBOWNED(variable,1);if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
     return DISOWNED(_reference,owner);
 }
@@ -316,31 +316,29 @@ void free_reference(Mreference* reference,Mallocationowner owner){
         else
             reference->variable->referencecount--;
     }
-    FREE(reference,'Q',owner);
+    FREE_1(reference,'Q',owner);
 }
-Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* _getReferenceValue(Mreference* _reference){Mallocationowner owner=getOwner(__LINE__);
     // MDH@19MAY2020: should we check whether _reference is ownable???????
     if(!_reference){outputWarning("No reference to wrap.");return NULL;}
-    Mvalue* _referenceValue=OWNED(__value("reference"),owner);
+    Mvalue* _referenceValue=(_reference?OWNED(__value("reference"),owner):NULL);
     if(_referenceValue){
         _referenceValue->type=VT_REFERENCE;
         // I suppose the value should become the owner of the reference!!
-        _referenceValue->value._reference=SUBOWNED(_reference,owner);
+        _referenceValue->value._reference=SUBOWNED(_reference,1);
     }
-    if(!_referenceValue||!_referenceValue->value._reference)if(owner_reference.id>0)free_reference(_reference,owner_reference);
+    if(!_referenceValue||!_referenceValue->value._reference)free_value(_reference,owner_reference);
     return DISOWNED(_referenceValue,owner);
 }
-
-Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner_decimal){Mallocationowner owner=getOwner(__LINE__);
-    if(!_decimal){outputInfo("No decimal to wrap.");return NULL;}
-    Mvalue* _decimalValue=OWNED(__value("decimal"),owner);
+// MDH@26MAY2020: new contract, if NULL is returned _decimal is NOT bound and should be freed if desirable...
+Mvalue* _getDecimalValue(Mdecimal* _decimal){Mallocationowner owner=getOwner(__LINE__);
+    Mvalue* _decimalValue=(_decimal?OWNED(__value("decimal"),owner):NULL);
+    if(!_decimalValue)return NULL;
     //////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
-    if(_decimalValue){
-        _decimalValue->type=VT_DECIMAL;
-        _decimalValue->value._decimal=SUBOWNED(_decimal,owner);
-    }
-    if(!_decimalValue||!_decimalValue->value._decimal)if(owner_decimal.disowned)free_decimal(_decimal,owner_decimal);
-    return(oid>0?_decimalValue:DISOWNED(_decimalValue,sizeof(Mvalue),foid));
+    _decimalValue->type=VT_DECIMAL;
+    _decimalValue->value._decimal=SUBOWNED(_decimal,1);
+    // if(!_decimalValue||!_decimalValue->value._decimal)if(owner_decimal.disowned)free_decimal(_decimal,owner_decimal);
+    return DISOWNED(_decimalValue,owner);
 }/* VALIDATED */
 
 Mvalue* _getIntegerValue(long long ll){Mallocationowner owner=getOwner(__LINE__);
@@ -357,57 +355,55 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_bigi
     Mvalue* _bigintegerValue=(_biginteger?OWNED(__value("biginteger"),owner):NULL);
     if(_bigintegerValue){
         _bigintegerValue->type=VT_BIGINTEGER;
-        _bigintegerValue->value._biginteger=SUBOWNED(OWNED(_biginteger,owner),1);
+        _bigintegerValue->value._biginteger=SUBOWNED(_biginteger,1);
     }
-    if(!_bigintegerValue||!_bigintegerValue->value._biginteger){
-        free_biginteger(_biginteger,owner_biginteger);
-        if(amVerboseDebugging())
-            {output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to wrap big integer '",_biginteger,"'.\n");}
-    }else
-    if(amVerboseDebugging())
-        outputInfo("No big integer to wrap.");
-    return(oid>0?_bigintegerValue:DISOWNED(_bigintegerValue,sizeof(Mvalue),foid));
+    return DISOWNED(_bigintegerValue,owner);
 }/* VALIDATED */
 
-Mvalue* _getFloatValue(long double ld){
+Mvalue* _getFloatValue(long double ld){Mallocationowner owner=getOwner(__LINE__);
     if(amVerbose())output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
-    Mvalue* _floatValue=__value("long double");
+    Mvalue* _floatValue=OWNED(__value("long double"),owner);
     if(_floatValue){
-        _floatValue->value._float=_getFloat(ld);
-        if(!_floatValue->value._float){free_value(_floatValue);_floatValue=NULL;}else _floatValue->type=VT_FLOAT;
-    }else
-    if(amVerboseDebugging())
-        outputInfo("No float to wrap.");
-    return _floatValue;
+        _floatValue->value._float=SUBOWNED(OWNED(_getFloat(ld),owner),1);
+        if(!_floatValue->value._float){free_value(_floatValue,owner);_floatValue=NULL;}else _floatValue->type=VT_FLOAT;
+    }
+    return DISOWNED(_floatValue,owner);
 }/* VALIDATED */
+
 // MDH@25MAY2020: s is a constant character array that does not need change ownership (because it is supposed to be owned elsewhere or not owned)
 Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
-    if(!_s)return NULL; // when no input, no go
-    Mvalue* _textValue=NULL; // the result, when NULL check freeonfailure
-    Mtext* _text=OWNED(_getText(_s),owner); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
-    if(_text){
-        _textValue=OWNED(__value("text"),owner);
-        if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=SUBOWNED(_text,1);}else free_text(_text,owner); // always free the Mtext if it is not bound!!!
+    if(!s)return NULL; // when no input, no go
+    Mvalue* _textValue=OWNED(__value("text"),owner); // the result, when NULL check freeonfailure
+    if(_textValue){
+        _textValue->value._text=SUBOWNED(OWNED(_getText(s),owner),1);
+        if(!_textValue->value._text){free_value(_textValue,owner);_textValue=NULL;}else _textValue->type=VT_TEXT;
     }
-    // if(!_textValue)if(freeonfailure)free(_s);
     return DISOWNED(_textValue,owner);
 }/* VALIDATED */
 Mvalue* _getCharTextValue(char _c){Mallocationowner owner=getOwner(__LINE__);
-    Mtext* _text=(_c?OWNED(_getCharText(_c),owner):NULL); // for Mstring* sources pass string(Mstring*) into getStringValue() (which points to Mstring->chars which always start with the quote char used in declaring the literal)
-    Mvalue* _textValue=(_text?OWNED(__value("char"),owner):NULL);
-    if(_textValue){_textValue->type=VT_TEXT;_textValue->value._text=SUBOWNED(_text,1);}else if(_text)free_text(_text,owner); // ah do NOT forget to free _text if we haven't been able to create a value!!
+    Mvalue* _textValue=OWNED(__value("char"),owner);
+    if(_textValue){
+        _textValue->value._text=SUBOWNED(OWNED(_getCharText(_c),owner),1);
+        if(!_textValue->value._text){free_value(_textValue,owner);_textValue=NULL;}else _textValue->type=VT_TEXT;
+    }
     return DISOWNED(_textValue,owner);
 }/* VALIDATED */
 // we can force all listelements to have the same type????
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=OWNED(__list((source?source:"_getListValue")),owner);
-    if(!_list)return NULL;
-    _list->weak=weak;
-    _list->valuetype=listValuetype; // register what type of elements this list should have
-    Mvalue* _listvalue=OWNED(__value(weak?"weak list":"strong list"),owner);
-    if(_listvalue){_listvalue->type=VT_LIST;_listvalue->value._list=SUBOWNED(_list,1);}else free_list(_list,owner);
-    return DISOWNED(_listvalue,owner);
+    Mvalue* _listValue=OWNED(__value(weak?"weak list":"strong list"),owner);
+    if(_listValue){
+        Mlist* _list=OWNED(__list((source?source:"_getListValue")),owner);
+        _listValue->value._list=SUBOWNED(_list,1);
+        if(_listValue->value._list){
+            _listValue->type=VT_LIST;
+            _list->weak=weak;
+            _list->valuetype=listValuetype; // register what type of elements this list should have
+        }else
+        if(_list)free_list(_list,owner);
+    }
+    return DISOWNED(_listValue,owner);
 }/* VALIDATED */
+
 Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _list=OWNED(_getListOfType(VT_INTEGER),owner);
     if(!_list)return NULL;
@@ -508,7 +504,7 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
 }
 // MDH@23MAY2020: although a value is (weakly but permanently) stored in _valuelist we can set its owner to the function that created it
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M',owner);
+    Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
     if(!_map)return NULL;
     _map->weak=weak;
     _map->valuetype=mapValuetype;
@@ -581,9 +577,9 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
     if(name&&_floatValue){
         Mvariable* _realVariable=OWNED(_getVariable(name,VT_FLOAT,true),owner);
         if(_realVariable){
-            Mmapelement* _mapelement=CALLOC(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement){
-                Mmap* _map=CALLOC(sizeof(Mmap),'M',owner);
+                Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
                     assignValue(&_realVariable->_value,_floatValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
                     _mapelement->_variable=SUBOWNED(_realVariable,1);
@@ -607,9 +603,9 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
 Mmap* _getMap(char* name){Mallocationowner owner=getOwner(__LINE__);
     Mvariable* _variable=OWNED(_getVariable(name,VT_UNDEFINED,true),owner);
     if(_variable){
-        Mmapelement* _mapelement=CALLOC(sizeof(Mmapelement),'m',owner);
+        Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner);
         if(_mapelement){
-            Mmap* _map=CALLOC(sizeof(Mmap),'M',owner);
+            Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
             if(_map){
                 _map->numberOfElements=1;
                 _mapelement->_variable=SUBOWNED(_variable,1);
@@ -617,7 +613,7 @@ Mmap* _getMap(char* name){Mallocationowner owner=getOwner(__LINE__);
                 _map->_last=_mapelement;
                 return DISOWNED(_map,owner);
             }
-            FREE(_mapelement,'m',owner); // MDH@11NOV2019: no need to call free_mapelement() 
+            FREE_1(_mapelement,'m',owner); // MDH@11NOV2019: no need to call free_mapelement() 
         }
         free_variable(_variable,false,owner);
     }
@@ -633,7 +629,7 @@ Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE
             while(mapelement){
                 mapelementVariable=mapelement->_variable;
                 if(mapelementVariable){
-                    _mapelement=CALLOC(sizeof(Mmapelement),'m',owner); // new map element to hold a copy
+                    _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner); // new map element to hold a copy
                     if(_mapelement){
                         // create a variable with the same name and value as the variable in mapelement
                         // MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
@@ -660,7 +656,7 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
         if(_list){
             Mlistelement *listelement=list->_first,*_listelement=NULL;
             while(listelement){
-                _listelement=CALLOC(sizeof(Mlistelement),'l',owner);
+                _listelement=CALLOC_1(sizeof(Mlistelement),'l',owner);
                 if(_listelement){
                     // 'copy' the value over, here we have the same problem as with copying any other value: if the value to copy is composite (a list or a map) we should copy by value i.e. point to a new map or list and not to the original
                     // technically we could let assignValue() take care of that 
@@ -686,9 +682,9 @@ static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowne
     if(name&&strlen(name)>0){
         Mvariable* _variable=OWNED(_getVariable(name,valuetype,true),owner);
         if(_variable){
-            Mmapelement* _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement){
-                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M',owner);
+                Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
                     _mapelement->_variable=SUBOWNED(_variable,2);
                     _map->numberOfElements=1;
@@ -732,10 +728,10 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
 static Mmap* getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement1&&_mapelement2){
-                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M',owner);
+                Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
                     _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,valuetype1,true),owner),2);
                     _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_INTEGER,true),owner),2);
@@ -780,11 +776,11 @@ Mmap* _getTokenTokenMap(char* name1,char* name2){Mallocationowner owner=getOwner
 Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement1&&_mapelement2&&_mapelement3){
-                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M',owner);
+                Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
                     _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,VT_TEXT,true),owner),2);
                     _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_MAP,true),owner),2);
@@ -825,12 +821,12 @@ Mmap* getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvaluet
     if(name1&&name2&&name3&&name4){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
             strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name3,name4)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4){
-                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M',owner);
+                Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
                     _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,valuetype1,true),owner),2);
                     _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_TOKEN,true),owner),2);
@@ -868,13 +864,13 @@ Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *
             strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name2,name5)&&
             strcmp(name3,name4)&&strcmp(name3,name5)&&
             strcmp(name4,name5)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement4=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement5=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement5=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4&&_mapelement5){
-                Mmap* _map=(Mmap*)CALLOC(sizeof(Mmap),'M',owner);
+                Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
                     _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,VT_TOKEN,true),owner),2);
                     _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_TOKEN,true),owner),2);
@@ -919,7 +915,7 @@ Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list){Mallocationown
         free_value(_value,owner);
     }
     if(owner_list.id)free_list(_list,owner_list);
-    returnNULL;
+    return NULL;
 }/* VALIDATED */
 void checkList(Mlist* _list){
     if(_list){
@@ -960,7 +956,7 @@ void checkList(Mlist* _list){
 //                NOTE: index==0 means prepend, index==M_LL_INVALID means append, index<0 means insert from the back (i.e. relative to the maximum index)
 //                TODO: determine the situations where we want to return either M_LL_INVALID or 0 or a negative value to indicate failure
 //                DOING: I suppose returning M_LL_INVALID when there's something wrong with the input, 0 when unable to comply somehow (e.g. when the list is immutable)
-/*unsigned*/ long long appendedToList(Mlist * const _list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
+/*unsigned*/ long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index){Mallocationowner owner=getOwner(__LINE__);
     if(!_list){outputError("No list to append to");return M_LL_INVALID;} // MDH@18OCT2019: let's allow NULLing list elements (i.e. accepting _value to be NULL)
     if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
     // MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
@@ -993,7 +989,7 @@ void checkList(Mlist* _list){
         _prevListelement=_list->_last;
     // if we do not have a list element ascertain to have one
     if(!_listelement){ // not yet present in list, so we have to create a new element
-        _listelement=(Mlistelement*)CALLOC(sizeof(Mlistelement),'l',owner);
+        _listelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner);
         if(!_listelement){outputError("Failed to create a list element to insert");return 0;} // failure
     }
     // MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
@@ -1001,6 +997,7 @@ void checkList(Mlist* _list){
     // if replacing i.e. the index of _listelement matches index, we're done
     // if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
     if(_listelement->index!=index){ // insert or append
+        SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
         _listelement->index=index;
         // linking
         if(_prevListelement)_prevListelement->_next=_listelement;else _list->_first=_listelement;
@@ -1008,6 +1005,7 @@ void checkList(Mlist* _list){
         (_list->numberOfElements)++; // an additional element
     }else
     if(index==0){ // prepending
+        SUBOWNED(OWNED(DISOWNED(_listelement,owner),owner_list),1); // MDH@15MAY2020: make _listelement owned by the given list
         // linking into the list
         _listelement->_next=_list->_first;
         _list->_first=_listelement;
@@ -1085,7 +1083,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                 Mmapelement* _mapelement=_map->_first;
                 while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
                 if(!_mapelement){ // not found
-                    _mapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
+                    _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
                         // MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
                         // MDH@25MAY2020: we're disowning _variable because we 
@@ -1168,10 +1166,11 @@ Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName){
 
 // END MAP STUFF
 
-Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){
+Mvalue* _getRationalValue(Mrational* _rational/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
     if(!_rational)return NULL;
-    Mvalue* _value=__value("rational");
+    Mvalue* _value=OWNED(__value("rational"),owner);
     if(_value){
+        /*
         // MDH@03APR2020: if a rational has a denominator that equals 1 we can safely return a big integer instead but only when freeonfailure is true
         if(freeonfailure){
             if(!_rational->den){
@@ -1183,10 +1182,10 @@ Mvalue* _getRationalValue(Mrational* _rational,bool freeonfailure){
                 }
             }
         }
+        */
         _value->type=VT_RATIONAL;_value->value._rational=_rational;
-    }else
-    if(freeonfailure)free_rational(_rational);
-    return _value;
+    }//else if(freeonfailure)free_rational(_rational);
+    return DISOWNED(_value,owner);
 }/* VALIDATED */
 
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
@@ -1564,21 +1563,30 @@ bool listAppendedToMap(Mmap* const _map,const Mlist* const _list){ // appends a 
     }
     return result;
 }/* VALIDATED */
-bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list){
+bool listAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,Mlist const * const _list){Mallocationowner owner=getOwner(__LINE__);
     bool result=(_maplist&&_maplist->valuetype==VT_LIST); // the destination list should only allow for list elements
     if(result){
         if(_list){
             Mlistelement* _listelement=_list->_first;
             while(result&&_listelement){
                 // index and value of the list element are stored in a new list!!
-                Mvalue* _maplistelementValue=_getListValue(VT_UNDEFINED,false,"listAppendedToMapList"); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
+                Mvalue* _maplistelementValue=OWNED(_getListValue(VT_UNDEFINED,false,"listAppendedToMapList"),owner); // this will be a new value that (being managed) will be freed automatically when not bound, including the list contained by it!!
                 if(!_maplistelementValue){outputError("Failed to create an empty list");result=false;break;}
                 Mlist* _maplistelement=_maplistelementValue->value._list;
-                // if we fail to construct the maplist element or to add it
-                if(!_maplistelement||!appendedToList(_maplistelement,_getIntegerValue(_listelement->index),M_LL_INVALID)||!appendedToList(_maplistelement,_listelement->_value,M_LL_INVALID)||!appendedToList(_maplist,_maplistelementValue,M_LL_INVALID)){
+                if(!_maplistelement)result=false;else
+                if(appendedToList(_maplistelement,owner,_getIntegerValue(_listelement->index),M_LL_INVALID)<=0)result=false;else
+                if(appendedToList(_maplistelement,owner,_listelement->_value,M_LL_INVALID)<=0)result=false;else
+                if(appendedToList(_maplist,owner_maplist,_maplistelementValue,M_LL_INVALID)<=0)result=false;
+                if(!result){
+                    // no need to clean up because all created values will be garbage collected including their contents
+                    break;
+                }
+                /* MDH@26MAY2020 replacing: if we fail to construct the maplist element or to add it
+                if(!_maplistelement||appendedToList(_maplistelement,owner_maplist,_getIntegerValue(_listelement->index),M_LL_INVALID)<=0||!appendedToList(_maplistelement,_listelement->_value,M_LL_INVALID)||!appendedToList(_maplist,_maplistelementValue,M_LL_INVALID)){
                     outputError("Failed to create or populate map list element");
                     result=false;
                 }else
+                */
                     _listelement=_listelement->_next;
             }
         }
@@ -1786,16 +1794,17 @@ Mdecimal* getValueDecimal(Mvalue* value){
 // MDH@03FEB2020: extract specific data elements wrapped in values
 Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_ENVIRONMENT?value->value._environment:NULL);}
 
-Mlist* _getListOfType(Mvaluetype valuetype){
+Mlist* _getListOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
     // output("Allocating list (size: %zd).\n",sizeof(Mlist));
     Mlist* _list=__list("getListOfType");
     _list->valuetype=valuetype;
     return _list;
 }/* VALIDATED */
 Mmap* _getMapOfType(Mvaluetype valuetype){
-    Mmap* _map=CALLOC(sizeof(Mmap),'M');
+    Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
+    if(!_map)return NULL;
     _map->valuetype=valuetype;
-    return _map;
+    return DISOWNED(_map,owner);
 }/* VALIDATED */
 
 Mlist* listMadeWeak(Mlist* list){if(list)list->weak=true;return list;}
@@ -1929,9 +1938,9 @@ long long isValueUndefined(Mvalue* value){
 }/* VALIDATED */
 
 // MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
-Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
+Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationowner owner=getOwner(__LINE__);
     // if iterations, you're supposed to return all iteration results
-    Mlist* _iterationsList=_getListOfType(VT_UNDEFINED);
+    Mlist* _iterationsList=OWNED(_getListOfType(VT_UNDEFINED),owner);
     if(_iterationsList){ // should be freed when NOT returned!!
         Mrational* _rational=NULL; // the last (computed) rational
         if(isLongDoubleUndefined(ld)!=M_TRUE){ // not a NaN (might still be Infinity though), but Infinity has a sign too   
@@ -1952,15 +1961,20 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                     ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
                     delta=(ld*q)-p;
                     ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
-                    _rational=_getRational(_getBiginteger(neg?-p:p),_getBiginteger(q),delta,false,true); // construct the intermediate result without normalizing
-                    if(!_rational){output("%sFailed to construct the rational approximation %lld/%lld",M_ERROR_PREFIX,p,q);break;}
+                    Mbiginteger *_numerator=_getBiginteger(neg?-p:p),*_denominator=_getBiginteger(q);
+                    _rational=_getRational(_numerator,_denominator,delta,false/*,true*/); // construct the intermediate result without normalizing
+                    if(!_rational){
+                        free_biginteger(_numerator,owner);free_biginteger(_denominator,owner);
+                        output("%sFailed to construct the rational approximation %lld/%lld.\n",M_ERROR_PREFIX,p,q);
+                        break;
+                    }
                     // NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
-                    Mvalue* _rationalValue=_getRationalValue(_rational,true);
+                    Mvalue* _rationalValue=OWNED(_getRationalValue(_rational,true),owner);
                     if(!_rationalValue){outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
                     // NOTE probably best to break if we can't append approximations!!
                     // NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
-                    if(!appendedToList(_iterationsList,_rationalValue,i)){/*free_rational(_rational);*/outputError("Failed to register a rational approximation");break;}
+                    if(appendedToList(_iterationsList,owner,_rationalValue,i)<=0){/*free_rational(_rational);*/outputError("Failed to register a rational approximation");break;}
                     // if we get here success in updating the iterations list!!!!
                     // if delta is now zero, we're done!!!
                     if(isLongDoubleZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
@@ -1979,8 +1993,11 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){
                 }
                 */
             }else{ // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
-                Mvalue* _rationalValue=_getRationalValue(_getRational(__biginteger(),NULL,M_LD_NAN,false,true),true); // OK free __biginteger() if failing to get that _rational
-                if(_rationalValue&&!appendedToList(_iterationsList,_rationalValue,0))outputError("Failed to append rational approximation to the result list");
+                Mbiginteger* _numerator=OWNED(__biginteger(),owner);
+                Mrational* _rational=OWNED(_getRational(_numerator,NULL,M_LD_NAN,false),owner);
+                free_biginteger(_numerator,owner);
+                Mvalue* _rationalValue=_getRationalValue(_rational); // OK free __biginteger() if failing to get that _rational
+                if(!_rationalValue)free_rational(_rational,owner);else if(appendedToList(_iterationsList,owner,_rationalValue,0)<=0)outputError("Failed to append rational approximation to the result list");
             }
         }
         /* 
@@ -2294,10 +2311,10 @@ void free_userfunction(Muserfunction* _userfunction){
 
 // Menvironment stuff
 Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
-    Menvironment* _environment=CALLOC(sizeof(Menvironment),'E',owner);
+    Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
     if(!_environment){outputError("Failed to create an environment");return NULL;}
-    _environment->_variableMap=CALLOC(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
-    if(!_environment->_variableMap){free_environment(_environment,foid);_environment=NULL;outputError("Failed to create the new environment variable map");}
+    _environment->_variableMap=CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
+    if(!_environment->_variableMap){free_environment(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
     return _environment;
 }/* VALIDATED */
 void free_environment(Menvironment* _environment,Mallocationowner owner_environment){
@@ -2313,7 +2330,7 @@ void free_environment(Menvironment* _environment,Mallocationowner owner_environm
                           freeing the execution environment)
         if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
         */
-        FREE(_environment,'E',owner_environment);
+        FREE_1(_environment,'E',owner_environment);
     }
 }/* VALIDATED */
 Menvironment* getEnvironmentParent(Menvironment* _environment){

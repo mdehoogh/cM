@@ -119,9 +119,9 @@ void Mfree(void* ptr,long long count,signed char type,Mallocationowner owner); /
 #endif
 
 // some shortcuts
-#define MALLOC_1(size,type,owner) MALLOC((size),1,(type),(counter))
-#define CALLOC_1(size,type,owner) CALLOC((size),1,(type),(counter))
-#define FREE_1(ptr,type,owner) FREE((ptr),(type),(owner))
+#define MALLOC_1(size,type,owner) MALLOC(size,1,type,owner)
+#define CALLOC_1(size,type,owner) CALLOC(size,1,type,owner)
+#define FREE_1(ptr,type,owner) FREE(ptr,1,type,owner)
 
 // MDH@04MAY2020: asking for the allocation type sizes
 // MDH@07MAY2020: we could pass back all the allocation values of all the marks

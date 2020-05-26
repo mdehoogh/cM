@@ -2312,7 +2312,8 @@ Mrational* _getRationalCopy(Mrational* _rational){Mallocationowner owner=getOwne
 	Mbiginteger *_numeratorBiginteger=OWNED(_getBigintegerCopy(_rational->num),owner),*_denominatorBiginteger=OWNED((_rational->den?_getBigintegerCopy(_rational->den):NULL),owner);
 	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){free_biginteger(_numeratorBiginteger,owner);free_biginteger(_denominatorBiginteger,owner);return NULL;} // some error
 	// MDH@13JUN2019: if we can't get a rational, free the numerator and denominator
-	Mrational* _copyRational=OWNED(_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false,true),owner);
+	Mrational* _copyRational=OWNED(_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false),owner);
+	free_biginteger(_numeratorBiginteger,owner);free_biginteger(_denominatorBiginteger,owner);
 	if(_copyRational)_copyRational->normalized=_rational->normalized; // copy the rational flag
 	return DISOWNED(_copyRational,owner);
 }
@@ -2325,7 +2326,7 @@ Mrational* _getValueRational(Mvalue* _value){Mallocationowner owner=getOwner(__L
 		switch(_value->type){
 			case VT_INTEGER:
 			case VT_BIGINTEGER:
-				_rational=OWNED(_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false,false),owner); // not to free what's wrapped in _value
+				_rational=OWNED(_getRational(_getValueBiginteger(_value),NULL,M_LD_NAN,false),owner); // not to free what's wrapped in _value
 				break;
 			case VT_DECIMAL:
 				_rational=OWNED(_getDecimalRational(_value->value._decimal),owner);
@@ -2348,7 +2349,7 @@ Mrational* _getValueRational(Mvalue* _value){Mallocationowner owner=getOwner(__L
 			case VT_LIST:
 				if(_value->value._list->numberOfElements>1)
 					_rational=OWNED(_getRational(_getValueBiginteger(_value->value._list->_first->_value),_getValueBiginteger(_value->value._list->_first->_next->_value),
-											(_value->value._list->numberOfElements>2?getValueLongDouble(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true,false),owner);
+											(_value->value._list->numberOfElements>2?getValueLongDouble(_value->value._list->_first->_next->_next->_value):M_LD_NAN),true),owner);
 				break;
 			default:break;
 		}
@@ -2399,7 +2400,7 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		Mrational* _purifiedRational=NULL;
 		// create a copy of the numerator and denominator of the provided rational
 		Mbiginteger* _num=OWNED(_getBigintegerCopy(rational->num),owner),*_den=OWNED(_getBigintegerCopy(rational->den),owner);
-		Mrational* _pureRational=(_num?OWNED(_getRational(_num,_den,M_LD_NAN,true,false),owner):NULL);
+		Mrational* _pureRational=(_num?OWNED(_getRational(_num,_den,M_LD_NAN,true),owner):NULL);
 		if(_pureRational){
 			_purifiedRational=OWNED(_getPurifiedRational(_pureRational,rationaldelta),owner);
 			free_rational(_pureRational,owner);
@@ -3045,9 +3046,9 @@ FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInpu
 // MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
-	int32_t foid=getOwnerId(3);
+	int32_t owner=getOwnerId(3);
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(sizeof(FunctionBodyInput),'8',foid); // free if not bound
+	_currentFunctionBodyInput=CALLOC(sizeof(FunctionBodyInput),'8',owner); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
 	if(function&&function->type==FT_USER){
@@ -3070,7 +3071,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
-	FREE(_currentFunctionBodyInput,'H',foid);
+	FREE(_currentFunctionBodyInput,'H',owner);
 	return false;
 }
 bool startFunctionBodyInput(){
@@ -3422,7 +3423,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-						FREE(_valueholders,'_',foid);
+						FREE(_valueholders,'_',owner);
 					}
 				}
 				/* replacing:
@@ -3505,7 +3506,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
-	int32_t foid=getOwnerId(6);
+	int32_t owner=getOwnerId(6);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
 		if(amVerboseDebugging()){
@@ -3833,7 +3834,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 					}
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-					FREE(_valueholders,'_',foid);
+					FREE(_valueholders,'_',owner);
 				}
 				/*
 				}else
@@ -3941,9 +3942,7 @@ void outputLastTokenChar(Mtoken* _token){
 */
 // MDH@17NOV2019: applying unary operator on an indexed value not working as it should, so has to be fixed
 
-Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
-	
-	int32_t foid=getOwnerId(7);
+Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){Mallocationowner owner=getOwner(__LINE__);
 
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
 
@@ -3969,7 +3968,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 	if(expressionToken){
 		if(amVerboseDebugging())
 			output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-		_valueReference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5',foid);
+		_valueReference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',owner);
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
 		if(expressionToken->type==VT_INTEGER){
@@ -4283,7 +4282,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 			case TT_LIST: // a list literal
 				canbeindexedtheoretically=true;
-				_valueReference=OWNED(_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false)),foid);
+				_valueReference=OWNED(_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false)),owner);
 				break;
 			case TT_MAP: // a map literal
 				{
@@ -4292,7 +4291,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					if(amVerboseDebugging())
 						outputValue("Map extracted: '",_mapValue,"'.\n");
-					_valueReference=OWNED(_getValuereference(_mapValue),foid);
+					_valueReference=OWNED(_getValuereference(_mapValue),owner);
 				}
 				break;
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
@@ -4305,9 +4304,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
 					if(_expressionListValue->value._list->numberOfElements==1){
-						_valueReference=OWNED(_getValuereference(_expressionListValue->value._list->_first->_value),foid);
+						_valueReference=OWNED(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
 					}else
-						_valueReference=OWNED(_getValuereference(_expressionListValue),foid);
+						_valueReference=OWNED(_getValuereference(_expressionListValue),owner);
 					if(amVerboseDebugging())
 						outputInfo("Extracted list wrapped!");
 				}
@@ -4436,7 +4435,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			outputInfo("No value result!");
 	}
 	
-	return DISOWNED(_valueReference,foid);
+	return DISOWNED(_valueReference,owner);
 
 	/*
 		// it could be an assignment in which case we remove the assignee and assigned value
@@ -5755,9 +5754,10 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 }
 
 // MDH@07JUN2019: when two integers are presented to divide instead of actually computing the division we can store the division as a rational (so we kind of have a slow evaluation of the division, and we maintain accuracy as long as possible)
-Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
+Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO shouldn't we return infinity?????
 	// MDH@26OCT2019: dealing with any integer conform as we did in the other binary operators
@@ -5765,12 +5765,13 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){
 	// NOT replacing:
 	// integer divisions are not computed but stored in rational format (without a delta to not suggest that the division is decimal)
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
-		Mbiginteger* _numerator=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
-		Mbiginteger* _denominator=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
+		Mbiginteger* _numerator=OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _denominator=OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		// if the denominator is negative, both the numerator and denominator should be negated (should this be part of the normalization procedure?), theoretically storing the sign separate from the big integers in a rational could also be the way to go
 		// so when the sign of the two big integers is different, the rational is negative, otherwise it is positive and _getRational would store the absolute values of the big integer
 		// if _getRational would take care of negating the numerator and denominator it would have to free the passed in big integers (if so requested)
-		Mrational* _rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind
+		Mrational* _rational=_getRational(_numerator,_denominator,M_LD_NAN,true); // free num/den when failing to bind
+		free_biginteger(_numerator,owner);free_biginteger(_denominator,owner);
 		return _getRationalValue(_rational,true); // when failing to bind _rational to a value, free it as well
 	}
 	// if one of them is a rational do a rational division
@@ -6914,9 +6915,7 @@ char* getSignificantTokenText(Mtoken* token){
  * typically this assignee can be composite referencing indices or attributes in maps, obviously we can put this variable in some sort of structure
  * it composes a list of value references to which operators are to be applied
  */
-Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount){
-
-	int32_t foid=getOwnerId(8);
+Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount){Mallocationowner owner=getOwner(__LINE__);
 
 	Mvalue* _expressionValue=NULL;
 
@@ -6939,7 +6938,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		///////////output("Number of allocated formula elements before: %zd.\n",getAllocationTypeCount('4'));
 
 		Mvaluereference* _valuereference;
-		Mformulaelement* formula=OWNED(__formulaelement("root"),foid); // replacing: CALLOC(sizeof(Mformulaelement),'4');
+		Mformulaelement* formula=OWNED(__formulaelement("root"),owner); // replacing: CALLOC(sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
 		size_t formulaElementCount=(_formulaelement?1:0);
 
