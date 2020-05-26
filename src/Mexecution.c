@@ -247,7 +247,7 @@ void free_text(Mtext* _text,Mallocationowner owner){
         // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
         //                _text->_c is an array and yes strlen() can be applied to any char*
         //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
-        REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
+        FREE(_text,strlen(_text->_c)+sizeof(Mtext),-'"',owner); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
         // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
     }else
     if(amVerboseDebugging())
@@ -257,7 +257,7 @@ void free_integer(Minteger* _integer,Mallocationowner owner){
     if(_integer){
         if(amVerboseDebugging())
             output("Freeing integer %llu.\n",_integer->ll);
-        FREE(_integer,'I',owner);
+        FREEONE(_integer,'I',owner);
     }else
     if(amVerboseDebugging())
         outputInfo("No integer to free!");
@@ -266,7 +266,7 @@ void free_float(Mfloat* _float,Mallocationowner owner){
     if(_float){
         if(amVerboseDebugging())
             output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
-        FREE(_float,'F',owner);
+        FREEONE(_float,'F',owner);
     }else
     if(amVerboseDebugging())
         outputInfo("No real to free!");

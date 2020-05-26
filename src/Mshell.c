@@ -3167,8 +3167,7 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 }
 // two essential methods for getting and setting referenced values
 // MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
-Mvalue* getReferencedValue(Mvaluereference* _valuereference){
-	int32_t foid=getOwnerId(5);
+Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner owner=getOwner(__LINE__);
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
 	///////if(amVerbose())outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
@@ -3185,7 +3184,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					// MDH@11MAR2020: let's distinguish between an unnamed ref (with no variable name defined), and a named ref (where the variable SHOULD exist)
 					Mvariable* variable=getVariable(getExecutionEnvironment(),&_valuereference->_name->chars[1],false);
 					if(variable||strlen(_valuereference->_name->chars)==1){
-						referencedValue=_getReferenceValue(_getReference(variable),true);
+						referencedValue=_getReferenceValue(_getReference(variable),owner);
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
 						//                so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
 					}else
@@ -3218,7 +3217,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 					//                this works for lists not for maps
 					// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-					Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',foid); // set immediately so MALLOC suffices
+					Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
 					if(_valueholders){
 						size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 						bool result=true;
@@ -3250,7 +3249,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 										if(amDebugging())
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
-										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_',foid):_valueholders);
+										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_newValueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3505,7 +3504,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
-bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
+bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
 	int32_t foid=getOwnerId(6);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
@@ -3536,7 +3535,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 				//                this works for lists not for maps
 				// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-				Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',foid); // set immediately so MALLOC suffices
+				Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
 				if(_valueholders){
 					size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 					_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
@@ -3567,7 +3566,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){
 									if(amVerboseDebugging())
 										outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 									// which we now did
-									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_',foid):_valueholders);
+									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders

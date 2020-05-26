@@ -12,28 +12,28 @@ extern char const * const M_ERROR_PREFIX;
 /**
  * _strdup() adds writing a error message to strdup()
  */
-char* _strdup(char const * const _c){
+char* _strdup(char const * const _c){Mallocationowner owner=getOwner(__LINE__);
+    char* _hc=NULL;
     if(_c){
-        // MDH@07QAPR2020: strdup worked fine BUT I want to register the allocation of character arrays
-        ///* something wrong with this replacement code:
-        size_t l=strlen(_c)+1;
-        // MDH@09APR2020: in order to be able to keep track of memory we should NOT use MALLOC here anymore because what we allocate 
-        //                is of varying size which means that we should from now on use REALLOC to do so
-        char* _hc=NULL;
-        // MDH@14APR2020: here we have a problem in that allocationIndex is stored in the first t_count occypying bytes
-        //                so we can't use REALLOC here to do the allocation which is a nuisance
-        _hc=REALLOC(_hc,0,l,sizeof(char),'"');
-        // replacing: char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
-        if(_hc)memcpy(_hc,_c,sizeof(char)*l);else output("%sFailed to allocate memory to store '%s'.\n",M_ERROR_PREFIX,_c);
+        _hc=MALLOC(sizeof(char),-'"',owner); // a single character
+        if(_hc){
+            // MDH@07QAPR2020: strdup worked fine BUT I want to register the allocation of character arrays
+            ///* something wrong with this replacement code:
+            size_t l=strlen(_c)+1;
+            // MDH@09APR2020: in order to be able to keep track of memory we should NOT use MALLOC here anymore because what we allocate 
+            //                is of varying size which means that we should from now on use REALLOC to do so
+            _hc=REALLOC(_hc,1,l,sizeof(char),-'"');
+            // replacing: char* _hc=MALLOC(l,1,'"'); // if MALLOC calls malloc it's size argument will be the product of l and sizeof(char)!!!!
+            if(_hc)memcpy(_hc,_c,sizeof(char)*l);else output("%sFailed to allocate memory to store '%s'.\n",M_ERROR_PREFIX,_c);
+        }
         //*/
         /* replacing:
         char* _hc=strdup(_c);
         */
-        if(_hc)return _hc;
-        output("%sFailed to make a dynamic copy of '%s'.\n",M_ERROR_PREFIX,_c);
+        if(!_hc)output("%sFailed to make a dynamic copy of '%s'.\n",M_ERROR_PREFIX,_c);
     }else
         output("No text to copy!\n");
-    return NULL;
+    return DISOWNED(_hc,owner);
 }
 
 // typically invalid should represent NaN (i.e. strtold("nan",NULL))

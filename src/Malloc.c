@@ -456,18 +456,18 @@ static long long registerAllocation(signed char type,Mallocationowner owner,size
     }
     return allocationIndex;
 }
-static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool fixedsize){
+static bool unregisterAllocation(long long allocationTypeIndex,long long count,bool fixedsize){
     // NOTE the given size is actually the count i.e. the number of units allocated
     bool result=false;
     if(allocationTypeIndex>=0&&allocationTypeIndex<numberOfAllocationTypes){
-        if(size>0){
+        if(count>0){
             if(!fixedsize){
                 Mallocationtype allocationType=_allocationTypes[allocationTypeIndex];
                 // lookup the size as size in the histogram (should be there)
                 Mallocationsize* histogram=(allocationType.count<0?allocationType/*.allocationsizeunion*/._allocationsizes:NULL);
                 if(histogram){
                     long long category=-allocationType.count;
-                    while(--category>=0&&histogram[category].class!=size)
+                    while(--category>=0&&histogram[category].class!=count)
                     // printf(" %lld*%zd",histogram[category].count,histogram[category].class);
                     ;
                     // printf("\n");
@@ -476,20 +476,20 @@ static bool unregisterAllocation(long long allocationTypeIndex,size_t size,bool 
                             histogram[category].count--; // one down
                             result=true;
                         }else
-                            bug("Unable to unregister the allocation of size %zd of type '%c': no registered allocation count.\n",size,allocationType.type);
+                            bug("Unable to unregister the allocation of size %zd of type '%c': no registered allocation count.\n",count,allocationType.type);
                     }else
-                        bug("Unable to unregister the allocation of size %zd of type '%c': allocation type category unknown.\n",size,allocationType.type);
+                        bug("Unable to unregister the allocation of size %zd of type '%c': allocation type category unknown.\n",count,allocationType.type);
                 }
             }else{
-                if(_allocationTypes[allocationTypeIndex].count>=size){
-                    _allocationTypes[allocationTypeIndex].count-=size;
+                if(_allocationTypes[allocationTypeIndex].count>=count){
+                    _allocationTypes[allocationTypeIndex].count-=count;
                     result=true;
                 }else
-                    bug("Failed to unregister %zd fixed-size allocation%s of type '%c'.\n",size,(size>1?"s":""),_allocationTypes[allocationTypeIndex].type);
+                    bug("Failed to unregister %zd fixed-size allocation%s of type '%c'.\n",count,(count>1?"s":""),_allocationTypes[allocationTypeIndex].type);
             }
             // MDH@04MAY2020: increment freed with size times the fixed size of this allocation type
             // MDH@06MAY2020 BUG FIX: do NOT use allocationType here as that would be a copy not the original!!!!!
-            if(result)incrementAllocationTypeFreed(allocationTypeIndex,_allocationTypes[allocationTypeIndex].size*size); 
+            if(result)incrementAllocationTypeFreed(allocationTypeIndex,_allocationTypes[allocationTypeIndex].size*count); 
             // replacing: _allocationTypes[allocationTypeIndex].freed+=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size*size; 
         }
     }
@@ -667,12 +667,12 @@ void syncallocations(){
 
 #ifndef __PRODUCTION__
 // MDH@21APR2020: general function to store allocation info with the dynamically allocated memory
-static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner owner,size_t size){
+static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner owner,size_t size,long long count){
     // ASSERT all arguments supposedly valid i.e. ptr!=NULL, size>0
     // MDH@13APR2020: all Mmalloc calls represent fixed size allocations
-    if(type==0)return false;
+    if(ptr==NULL||type==0||size==0||count<=0)return false;
     // MDH@26MAY2020: now we should also accomodate for variable size allocations in which case we call registerReallocation with -1 for the allocationIndex (as this is a new allocation), see Mvalloc for a rewrite of Mrealloc with from_count=0 and to_count=1 with the required functionality)
-    long long allocationIndex=registerAllocation(type,owner,size,1); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
+    long long allocationIndex=registerAllocation(type,owner,size,count); // NOTE we do now how many items that are being allocated, so we assume size items of a single byte!!
     if(allocationIndex<0)return false;
     Malloc* _alloc=(Malloc*)ptr/*((char*)ptr+size)*/;
     _alloc->allocationType=type; // register the type
@@ -710,16 +710,16 @@ static void* Mvalloc(size_t size,unsigned char allocationType,Mallocationowner o
 */
 // MDH@08APR2020: if ptr starts with an allocation_index size_t field we can store the result of addallocation into it
 //                so we have to ascertain that in the non-production version every structure that we allocate this way starts with
-void* Mmalloc(size_t size,signed char type,Mallocationowner owner){
+void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner){
     void* ptr=NULL;
-    if(size>0&&type!=0){
+    if(size>0&&count>0&&type!=0){
 // MDH@09APR2020: addallocation() is now addallocationtype()
 #ifndef __PRODUCTION__
         info("\n*************************** Allocating %zd bytes of dynamic memory of type '%c' ***************************\n",size,type);
-        ptr=malloc(size+sizeof(Malloc));
+        ptr=malloc((size*count)+sizeof(Malloc));
         if(ptr)
-            if(!attachAllocationInfo(ptr,type,owner,size))
-                bug("Failed to register a %s-sized allocation of type '%c'.\n",(type>0?"fixed":"variable"),abs(type));
+            if(!attachAllocationInfo(ptr,type,owner,size,count))
+                bug("Failed to register %lld %s-sized allocation%s of type '%c'.\n",count,(type>0?"fixed":"variable"),abs(type),(count>1?"s":""));
 #else
         ptr=malloc(size);
 #endif
@@ -727,15 +727,15 @@ void* Mmalloc(size_t size,signed char type,Mallocationowner owner){
     return ((char*)ptr)+sizeof(Malloc);
 }
 
-void* Mcalloc(size_t size,signed char type,Mallocationowner owner){
+void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner){
     void* ptr=NULL;
-    if(size>0){
+    if(size>0&&count>0&&type!=0){
 #ifndef __PRODUCTION__
         info("\n*************************** Allocating %zd initialized bytes of dynamic memory of type '%c' ***************************\n",size,type);
-        ptr=calloc(1,size+sizeof(Malloc)); // MDH@20APR2020: calloc doesn't care about the items!!!!!
+        ptr=calloc(1,(size*count)+sizeof(Malloc)); // MDH@20APR2020: calloc doesn't care about the items!!!!!
         if(ptr)
-            if(!attachAllocationInfo(ptr,type,owner,size))
-                bug("Failed to register a %s-size allocation of type '%c'.\n",(type>0?"fixed":"variable"),abs(type));
+            if(!attachAllocationInfo(ptr,type,owner,size,count))
+                bug("Failed to register %lld %s-size allocation%s of type '%c'.\n",count,(type>0?"fixed":"variable"),abs(type),(count>1?"s":""));
 #else
         ptr=calloc(1,size);
 #endif
@@ -828,8 +828,8 @@ void Mvfree(){
 */
 // MDH@20APR2020: unfortunately we need to know the size of what was allocated which is easy for fixed size allocation but problematic for variable size records
 //                unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
-void Mfree(void* ptr,signed char allocationType,Mallocationowner owner){
-    if(!ptr||allocationType==0)return;
+void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner owner){
+    if(!ptr||allocationType==0||count<=0)return;
     ptr=((char*)ptr)-sizeof(Malloc); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
     info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",allocationType);
     /////info("Freeing type '%c' data",type);
@@ -841,8 +841,8 @@ void Mfree(void* ptr,signed char allocationType,Mallocationowner owner){
         // assume a size 1 thing if it's not there yet????? (typically only for testing though!!!)
         if(allocationTypeIndex>=0){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
             size=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; // extract the (fixed) size
-            if(!unregisterAllocation(allocationTypeIndex,1,allocationType>0))
-                bug("Failed to free the dynamic memory of an allocation of type '%c' (size: %zd).\n",allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
+            if(!unregisterAllocation(allocationTypeIndex,count,allocationType>0))
+                bug("Failed to free the dynamic memory of %llu allocation%s of type '%c' (size: %zd).\n",count,(count>1?"s":""),allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
             /* replacing what would no longer work:
             _allocationTypes[allocationTypeIndex].count--;
             // assuming this is a fixed size allocation type
@@ -864,7 +864,7 @@ void Mfree(void* ptr,signed char allocationType,Mallocationowner owner){
     Malloc* _alloc=(Malloc*)ptr;/* MDH@20MAY2020: (((char*)ptr)+size)*/;
     if(_alloc->allocationType!=allocationType){
         bug("Allocation type of dynamic memory '%c' (%u) freed of size %zd does not match provided allocation type '%c'.\n",_alloc->allocationType,_alloc->allocationType,size,allocationType);
-        dump(ptr,size,size);
+        dump(ptr,count*size,size);
         free(ptr);
         return;
     }
@@ -876,11 +876,11 @@ void Mfree(void* ptr,signed char allocationType,Mallocationowner owner){
     if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
         if(allocations._owners[_alloc->allocationIndex].type!=allocationType){
             bug("Allocation type of dynamic memory '%c' (=%u) (at index %llu) does not match provided allocation type '%c'.\n",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType);
-            dump(ptr,size,size);
+            dump(ptr,size*count,size);
         }else
         if(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id){
             bug("Allocation owner id of dynamic memory '%i' (=%u) (at index %llu) does not match provided allocation type '%c'.\n",allocations._owners[_alloc->allocationIndex].owner.id,allocations._owners[_alloc->allocationIndex].owner.id,_alloc->allocationIndex,owner.id);
-            dump(ptr,size,size);
+            dump(ptr,size*count,size);
         }else{
             // what we do here is the same as what Mdisown does!!!!
             allocations._owners[_alloc->allocationIndex].type=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
@@ -888,7 +888,7 @@ void Mfree(void* ptr,signed char allocationType,Mallocationowner owner){
         }
     }else{
         bug("Retrieved allocation position %llu out of range [0,%llu).",_alloc->allocationIndex,allocations.l);
-        dump(ptr,size,size);
+        dump(ptr,size*count,size);
     }
 #else
     long long pos=allocations.l-1;

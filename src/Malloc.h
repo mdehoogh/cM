@@ -93,15 +93,15 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
 
 //Mallocationowner getOwner(uint16_t module,uint32_t functionId);
-void* Mmalloc(size_t size,signed char type,Mallocationowner owner);
-void* Mcalloc(size_t size,signed char type,Mallocationowner owner);
+void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner);
+void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char type/*,Mallocationowner owner*/); // MDH@26MAY2020 from now on only to be used to reallocate variable-size types (with negative type)
-void Mfree(void* ptr,signed char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
+void Mfree(void* ptr,long long count,signed char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
 // use the substitutes
-#define MALLOC(size,type,owner) Mmalloc((size),(type),(owner))
-#define CALLOC(size,type,owner) Mcalloc((size),(type),(owner))
+#define MALLOC(size,count,type,owner) Mmalloc((size),(count),(type),(owner))
+#define CALLOC(size,count,type,owner) Mcalloc((size),(count),(type),(owner))
+#define FREE(ptr,count,type,owner) Mfree((ptr),(count),(type),(owner))
 #define REALLOC(ptr,from_count,to_count,size,type) Mrealloc((ptr),(from_count),(to_count),(size),(type))
-#define FREE(ptr,type,owner) Mfree((ptr),(type),(owner))
 #define DISOWNED(ptr,owner) Mdisowned((ptr),(owner))
 #define OWNED(ptr,owner) Mowned((ptr),(owner))
 #define OWNED_BY(subptr,ptr) Mownedby((subptr),(ptr))
@@ -117,6 +117,11 @@ void Mfree(void* ptr,signed char type,Mallocationowner owner); // releasing a si
 #define OWNED_BY(ptr,owner) (ptr)
 #define SUBOWNED(ptr,level) (ptr)
 #endif
+
+// some shortcuts
+#define MALLOC_1(size,type,owner) MALLOC((size),1,(type),(counter))
+#define CALLOC_1(size,type,owner) CALLOC((size),1,(type),(counter))
+#define FREE_1(ptr,type,owner) FREE((ptr),(type),(owner))
 
 // MDH@04MAY2020: asking for the allocation type sizes
 // MDH@07MAY2020: we could pass back all the allocation values of all the marks
