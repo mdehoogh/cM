@@ -14,17 +14,17 @@ Mrational* __rational();
 Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner);
 void free_rational(Mrational* _rational,Mallocationowner owner);
 
-void normalizeRational(Mrational* _rational);
-Mrational* _getRational(Mbiginteger* _numerator,Mbiginteger* _denominator,long double delta,bool normalize,bool freeonfailure);
+void normalizeRational(Mrational * const _rational,Mallocationowner owner_rational);
+Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const * const _denominator,long double delta,bool normalize/*,bool freeonfailure*/);
 Mrational* _getInverseRational(Mrational const * const _rational);
 Mstring* _getRationalText(Mrational const * const _rational);
 Mbiginteger* _rational2biginteger(Mrational* _rational); // computes the integer part of the rational
 void outputRational(char const * const prefix,Mrational const * const _rational,char const * const postfix);
 
-mp_err _qadd(Mrational * const c,Mrational const * const a,Mrational const * const b);
-mp_err _qsub(Mrational * const c,Mrational const * const a,Mrational const * const b);
-mp_err _qmul(Mrational * const c,Mrational const * const a,Mrational const * const b);
-mp_err _qdiv(Mrational * const c,Mrational const * const a,Mrational const * const b);
+mp_err _qadd(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b);
+mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b);
+mp_err _qmul(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b);
+mp_err _qdiv(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b);
 
 // MDH@23OCT2019: use getRationalSign() now replacing: long long qcmp(Mrational const * const a,Mrational const * const b); // MDH@16OCT2019: what to return if a or b is not defined????? I suppose NULL is smaller than any value???????
 

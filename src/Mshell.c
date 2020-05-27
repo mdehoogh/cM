@@ -453,23 +453,23 @@ long long getDP(){
 	return dp;
 }
 // MDH@18OCT2019: if someone wants to know about the decimal context
-Mvalue* getdc(Mvalue* value){
+Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value&&value->type==VT_DECIMAL){
 		Mdecimalcontext* decimalcontext=_getDecimalcontext(value->value._decimal->prec);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
-			Mmap* _contextMap=_getMapOfType(VT_INTEGER);
+			Mmap* _contextMap=(Mmap*)OWNED(_getMapOfType(VT_INTEGER),owner);
 			if(_contextMap){
-				appendedToMap(_contextMap,"status",_getIntegerValue(mpd_context->status));
-				appendedToMap(_contextMap,"precision",_getIntegerValue(mpd_context->prec));
-				appendedToMap(_contextMap,"round",_getIntegerValue(mpd_context->round));
-				appendedToMap(_contextMap,"exponentminimum",_getIntegerValue(mpd_context->emin));
-				appendedToMap(_contextMap,"exponentmaximum",_getIntegerValue(mpd_context->emax));
-				appendedToMap(_contextMap,"allcr",_getIntegerValue(mpd_context->allcr));
-				appendedToMap(_contextMap,"clamp",_getIntegerValue(mpd_context->clamp));
-				appendedToMap(_contextMap,"newtrap",_getIntegerValue(mpd_context->newtrap));
-				appendedToMap(_contextMap,"traps",_getIntegerValue(mpd_context->traps));
-				return _getValueOfMap(_contextMap,true);
+				appendedToMap(_contextMap,owner,"status",_getIntegerValue(mpd_context->status));
+				appendedToMap(_contextMap,owner,"precision",_getIntegerValue(mpd_context->prec));
+				appendedToMap(_contextMap,owner,"round",_getIntegerValue(mpd_context->round));
+				appendedToMap(_contextMap,owner,"exponentminimum",_getIntegerValue(mpd_context->emin));
+				appendedToMap(_contextMap,owner,"exponentmaximum",_getIntegerValue(mpd_context->emax));
+				appendedToMap(_contextMap,owner,"allcr",_getIntegerValue(mpd_context->allcr));
+				appendedToMap(_contextMap,owner,"clamp",_getIntegerValue(mpd_context->clamp));
+				appendedToMap(_contextMap,owner,"newtrap",_getIntegerValue(mpd_context->newtrap));
+				appendedToMap(_contextMap,owner,"traps",_getIntegerValue(mpd_context->traps));
+				return(Mvalue*)DISOWNED(OWNED(_getValueOfMap(_contextMap),owner),owner);
 			}
 		}
 	}
@@ -549,7 +549,7 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 			if(_doEnvironment){
 				_doEnvironment->_name=SUBOWNED(OWNED(_getChars("do"),owner),1);
 				// let's add variable $ as result variable and ! as exit flag variable
-				bool doEnvironmentInitialized=addVariable(_doEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_doEnvironment,"!",VT_INTEGER,false)&&setValue(_doEnvironment,"!",_getIntegerValue(0,owner));
+				bool doEnvironmentInitialized=addVariable(_doEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_doEnvironment,"!",VT_INTEGER,false)&&setValue(_doEnvironment,"!",_getIntegerValue(0));
 				if(doEnvironmentInitialized){
 					if(pushExecutionEnvironment(_doEnvironment)){
 						Mlistelement* tokenValueListelement=doList->_first;
@@ -596,12 +596,15 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			outputValue(" Result=",_resultTokenValue,NULL);
 			newline();
 		}
-		Menvironment* _forEnvironment=OWNED(__environment(),owner);
+		Menvironment* _forEnvironment=(Menvironment*)OWNED(__environment(),owner);
 		if(_forEnvironment){
 			_forEnvironment->_name=SUBOWNED(OWNED(_getChars("for loop"),owner),1);
 			// better wait with pushing until _forEnvironment is initialized appropriately
 			// MDH@11MAR2020: $ is NOT needed when there's an explicit result token value!!
-			bool forEnvironmentInitialized=(_resultTokenValue?true:addVariable(_forEnvironment,"$",VT_UNDEFINED,false))&&addVariable(_forEnvironment,"_",VT_INTEGER,false)&&setValue(_forEnvironment,"_",_getIntegerValue(0,owner));
+			bool forEnvironmentInitialized=(_resultTokenValue?true:false);
+			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,"$",VT_UNDEFINED,false))forEnvironmentInitialized=false;
+			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,"_",VT_INTEGER,false))forEnvironmentInitialized=false;
+			if(forEnvironmentInitialized&&!setValue(_forEnvironment,"_",_getIntegerValue(0)))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized){
 				if(pushExecutionEnvironment(_forEnvironment)){
 					// evaluate the initialization inside the for environment once
@@ -1255,10 +1258,10 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 // this is a fun method, allowing us to parse and evaluate any command (which we're gonna need when running M starting with commands to execute from a file)
 Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _evalValue=NULL;
-	Mstring* _evalValueText=OWNED(_getValueText(value,true),owner);
+	Mstring* _evalValueText=(Mstring*)OWNED(_getValueText(value,true),owner);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
-		Mcommand* _evalCommand=OWNED(_getNewCommand(true),owner);
+		Mcommand* _evalCommand=(Mcommand*)OWNED(_getNewCommand(true),owner);
 		if(_evalCommand){
 			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
 			/* already set: 
@@ -1280,13 +1283,13 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			if(amVerbose())outputInfo("'.");
 			if(_evalCommand->_lastToken){
 				// just like with do() we have to evaluate the command in a subenvironment
-				Menvironment* _evalEnvironment=OWNED(__environment(),owner);
+				Menvironment* _evalEnvironment=(Menvironment*)OWNED(__environment(),owner);
 				if(_evalEnvironment){
-					_evalEnvironment->_name=SUBOWNED(OWNED(_getChars("eval"),owner),1);
+					_evalEnvironment->_name=(Mchars*)SUBOWNED(OWNED(_getChars("eval"),owner),1);
 					if(pushExecutionEnvironment(_evalEnvironment)){
 						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
 						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
-						_evalValue=OWNED(getCommandValue(_evalCommand,'e'),owner);
+						_evalValue=(Mvalue*)OWNED(getCommandValue(_evalCommand,'e'),owner);
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
@@ -1306,7 +1309,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 void free_command(Mcommand* _command,Mallocationowner owner){
 	if(!_command)return;
 	if(_command->_firstToken)free_token(_command->_firstToken,owner); // will free ALL connected tokens!!!
-	FREE(_command,'K',owner);
+	FREE_1(_command,'K',owner);
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
@@ -1325,7 +1328,7 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 // MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
 //                this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner owner=getOwner(__LINE__);
-	Mtoken* pNewToken=OWNED(__token(),owner);
+	Mtoken* pNewToken=(Mtoken*)OWNED(__token(),owner);
 	if(pNewToken){
 		/////if(amDebugging())inputInfo("E1");
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
@@ -1502,7 +1505,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//                but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=OWNED(_getToken(lastCommandToken,tokenType),owner);
+	Mtoken* _newCommandToken=(Mtoken*)OWNED(_getToken(lastCommandToken,tokenType),owner);
 	if(_newCommandToken)
 		setTokenType(_newCommandToken,tokenType);
 	else
@@ -1511,7 +1514,7 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	return DISOWNED(_newCommandToken,owner);
 }
 Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__LINE__);
-	Mcommand* _command=CALLOC(sizeof(Mcommand),'K',owner);
+	Mcommand* _command=(Mcommand*)CALLOC_1(sizeof(Mcommand),'K',owner);
 	if(_command){
 		if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
@@ -1522,7 +1525,7 @@ Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
-				FREE(_command,'K',owner);_command=NULL;
+				FREE_1(_command,'K',owner);_command=NULL;
 				if(amVerboseDebugging())
 					if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
 			}
@@ -1530,7 +1533,7 @@ Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__
 	}else
 	if(amVerboseDebugging())
 		if(inputErrorFunction)(*inputErrorFunction)("Failed to create the command.");
-	return DISOWNED(_command,owner);
+	return(Mcommand*)DISOWNED(_command,owner);
 }
 
 // and finally
@@ -1547,37 +1550,37 @@ Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Malloca
 	Mbiginteger* _sum=NULL;
 	if(a&&b){
 		if(!isBigintegerZero(a)&&!isBigintegerZero(b)){
-			_sum=OWNED(__biginteger(),owner);
+			_sum=(Mbiginteger*)OWNED(__biginteger(),owner);
 			if(mp_add(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_sum))!=MP_OKAY){free_biginteger(_sum,owner);_sum=NULL;} // if the addition fails return 0
 		}else
-			_sum=OWNED(_getBigintegerCopy(isBigintegerZero(a)?b:a),owner);
+			_sum=(Mbiginteger*)OWNED(_getBigintegerCopy(isBigintegerZero(a)?b:a),owner);
 	}
 	///////outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
 	// if(!sum)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
-	return _sum;
+	return(Mbiginteger*)DISOWNED(_sum,owner);
 } // adding two big integers, if either is NULL return NULL
 Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
 	Mbiginteger* _product=NULL;
 	if(a&&b){
 		if(!isBigintegerOne(a)&&!isBigintegerOne(b)){
-			_product=OWNED(__biginteger(),owner); // defaults to zero, which would be the result as well if either big integer is zero!!!
+			_product=(Mbiginteger*)OWNED(__biginteger(),owner); // defaults to zero, which would be the result as well if either big integer is zero!!!
 			if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){free_biginteger(_product,owner);_product=NULL;}
 		}else
-			_product=OWNED(_getBigintegerCopy(isBigintegerOne(a)?b:a),owner);
+			_product=(Mbiginteger*)OWNED(_getBigintegerCopy(isBigintegerOne(a)?b:a),owner);
 	}
 	//////////outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
 	// if(!product)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
-	return DISOWNED(_product,owner);
+	return(Mbiginteger*)DISOWNED(_product,owner);
 } // multiplying two big integers, if either is NULL return NULL
 
 // _Imul is special big integer multiplier that assumes a NULL big integer equals 1
 Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){Mallocationowner owner=getOwner(__LINE__);
 	if(!a&&!b)return NULL;
-	if(!a)return DISOWNED(OWNED(_getBigintegerCopy(b),owner),owner);
-	if(!b)return DISOWNED(OWNED(_getBigintegerCopy(a),owner),owner);
-	Mbiginteger* _product=OWNED(__biginteger(),owner);
+	if(!a)return(Mbiginteger*)DISOWNED(OWNED(_getBigintegerCopy(b),owner),owner);
+	if(!b)return(Mbiginteger*)DISOWNED(OWNED(_getBigintegerCopy(a),owner),owner);
+	Mbiginteger* _product=(Mbiginteger*)OWNED(__biginteger(),owner);
 	if(mp_mul(MP_INT_POINTER(a),MP_INT_POINTER(b),MP_INT_POINTER(_product))!=MP_OKAY){free_biginteger(_product,owner);_product=NULL;}
-	return DISOWNED(_product,owner);
+	return(Mbiginteger*)DISOWNED(_product,owner);
 }
 
 // RATIONAL STUFF
@@ -1771,7 +1774,7 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
 	// CORRECTION by default should NOT compute the sine table (to speed up computing pi)
-	return DISOWNED(OWNED(_getDecimalValue(OWNED(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),true),owner),owner),owner);
+	return DISOWNED(OWNED(_getDecimalValue(OWNED(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),owner)),owner),owner);
 }
 
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
@@ -1803,12 +1806,13 @@ print("Pi = PI(353,5022,5020)")
 // but the primary formula is pretty simple: 4*sum((-1)k/(2k+1)): this is the very slow Gregory-Leibniz series approximation
 // this is a very slow algorithm
 Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	Mrational* _rational=NULL;
 	if(value&&value->type==VT_INTEGER){
 		long long maxiter=value->value._integer->ll;
 		if(maxiter>=0){
 			if(amVerbose())output("Approximating pi/4 by a sum of %llu rational fractions.\n",maxiter);
 			// the first approximation (when iter=0) equals 4
-			Mrational* _rational=OWNED(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false,true),owner);
+			Mbiginteger* _bi1=OWNED(_getBiginteger(1),owner);Mrational* _rational=(_bi1?OWNED(_getRational(_bi1,NULL,M_LD_NAN,false),owner):NULL);free_biginteger(_bi1,owner);
 			if(_rational){
 				// obviously we can add 2 to the big integer storing the numerator
 				if(maxiter>0){
@@ -1824,7 +1828,8 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								break;
 							}
 							// both _addendumNumerator and _addendumDenominator are now available to be bound in the rational
-							Mrational* _addendumRational=OWNED(_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false,true),owner);
+							Mrational* _addendumRational=OWNED(_getRational(_addendumNumerator,_addendumDenominator,M_LD_NAN,false),owner);
+							free_biginteger(_addendumNumerator,owner);
 							if(!_addendumRational){ // failed to bind in the rational
 								output("%sFailed to compute the rational to add to the approximation of pi in step %u.",M_ERROR_PREFIX,iter);
 								break;
@@ -1846,7 +1851,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								outputBiginteger("Incrementing the addendum denominator by ",_denominatorIncrement,".\n");		
 							Mbiginteger* _newAddendumDenominator=OWNED(_Iadd(_addendumDenominator,_denominatorIncrement),owner);
 							if(!_newAddendumDenominator){
-								free_biginteger(_addendumDenominator,owner); // won't be using this in the addendum rational
+								// MDH@27MAY2020: free_biginteger(_addendumDenominator,owner); // won't be using this in the addendum rational
 								outputError("Failed to increment the addendum denominator");
 								break;
 							}
@@ -1863,14 +1868,17 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								outputRational("Sum approximation of pi/4 so far: ",_rational,".\n");
 							// no need to normalize as the addendum is always normalized by itself
 							// replace the addendum denominator with the new one)
+							free_biginteger(_addendumDenominator,owner); // MDH@27MAY2020: release the current _addendumDenominator (as we're only freeing the final value below!!!)
 							_addendumDenominator=_newAddendumDenominator;
 							if(amVerbose())
 								outputBiginteger("New addendum denominator: ",_addendumDenominator,".\n");
 						}
 					}else{
 						outputError("Failed to initialize the addendum numerator and its increment value (2)");
-						free_biginteger(_addendumDenominator,owner);
 					}
+					// MDH@27MAY2020: free helper big integers
+					free_biginteger(_addendumDenominator,owner);
+					free_biginteger(_denominatorIncrement,owner);
 				}
 				// MDH@09APR2020: ok, this might be problematic if _rational_num is NULL so -> FIXED
 				if(!_rational->num||(mp_mul_2d(MP_INT_POINTER(_rational->num),2,MP_INT_POINTER(_rational->num))!=MP_OKAY)){
@@ -1881,7 +1889,8 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				normalizeRational(_rational);
 				if(amVerbose())
 					outputRational("Normalized approximation of pi: ",_rational,".\n");
-				return DISOWNED(_getRationalValue(_rational,owner),owner);
+				// if we get here _rational is the result to return
+				return DISOWNED(OWNED(_getRationalValue(_rational),owner),owner);
 			}
 		}
 	}
@@ -1895,18 +1904,21 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		if(iter>=0){
 			if(amVerbose())
 				output("Computing %llu continued fractions of pi.\n",iter);
-			Mrational* _rational=OWNED(_getRational(_getBiginteger(3),NULL,M_LD_NAN,false,true),owner);
+			Mbiginteger* _bi3=OWNED(_getBiginteger(3),owner);
+			if(!_bi3){outputError("Failed to create big integer 3.");return NULL;}
+			Mrational* _rational=OWNED(_getRational(_bi3,NULL,M_LD_NAN,false),owner);
+			free_biginteger(_bi3,owner);
 			if(_rational){
 				if(iter>0){
 					// working backwards starting with the last denominator quotient seems to be best
 					// in every step you have to compute i**2/6 the second term of the denominator
-					Mrational* _denominatorRational=OWNED(_getRational(_getBiginteger(6),NULL,M_LD_NAN,false,true),owner); // the final denominator equals 6
+					Mbiginteger* _bi6=OWNED(_getBiginteger(6),owner);
+					if(!_bi6){outputError("Failed to create big integer of 6.");return NULL;}
+					Mrational* _denominatorRational=(_bi6?OWNED(_getRational(_bi6,NULL,M_LD_NAN,false),owner):NULL); // the final denominator equals 6
 					if(_denominatorRational){
 						if(amVerbose())
 							output("First denominator rational computed.\n");
 						long long square;
-						Mbiginteger* _bi6=OWNED(_getBiginteger(6),owner); // the one we want to reuse in the computation (that we need to free when done)
-						if(!_bi6){free_rational(_denominatorRational,owner);return NULL;} // what a nuisance
 						while(--iter>0){
 							square=4*(iter+1)*iter+1;
 							////////////if(amVerbose())output("Square numerator: %llu.",square);
@@ -1919,22 +1931,25 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								output("%llu fractions yet to compute using numerator square '%llu'.\n",iter,square);
 							// the new denominator becomes 6+square/prev denominator=
 							Mbiginteger* _mult=OWNED(_Imultiply(_denominatorRational->num,_bi6),owner);
-							Mbiginteger* _add=OWNED(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare):_bigintegerSquare,owner);
-							Mbiginteger* _denominatorNumerator=OWNED(_mult?_Iadd(_mult,_add):NULL,owner);
+							Mbiginteger* _add=(_denominatorRational->den?OWNED(_Imultiply(_denominatorRational->den,_bigintegerSquare),owner):_bigintegerSquare);
+							Mbiginteger* _denominatorNumerator=(_mult?OWNED(_Iadd(_mult,_add),owner):NULL);
 							// free all intermediate big integers
-							free_biginteger(_mult,owner);free_biginteger(_bigintegerSquare,owner);if(_denominatorRational->den)free_biginteger(_add,owner);
+							free_biginteger(_mult,owner);
+							free_biginteger(_bigintegerSquare,owner);
+							if(_denominatorRational->den)free_biginteger(_add,owner);
 							// update the denominator rational, free the numerator if we fail to bind it to _denominatorRational
 							// what's dangerous in the following is that _denominatorRational->num is not freed!!!!
 							Mbiginteger* _previousDenominatorNumerator=OWNED(_getBigintegerCopy(_denominatorRational->num),owner);
 							free_rational(_denominatorRational,owner); // get the 'previous' numerator and denominator released!!!!!!
-							_denominatorRational=OWNED(_getRational(_denominatorNumerator,_previousDenominatorNumerator,M_LD_NAN,false,true),owner);
+							_denominatorRational=OWNED(_getRational(_denominatorNumerator,_previousDenominatorNumerator,M_LD_NAN,false),owner);
+							free_biginteger(_previousDenominatorNumerator,owner);free_biginteger(_denominatorNumerator,owner); // MDH@27MAY2020 getRational() does not bind the passed in big integers anymore, so need to be always freed
 							if(!_denominatorRational)break; // let's keep it normalized???? TODO is that necessary
 							if(amVerbose())
 								outputRational("Denominator (unnormalized): ",_rational,".\n");
 						}
-						free_biginteger(_bi6,owner);
 					}
-					if(!_denominatorRational){outputError("Final denominator could not be computed");return NULL;}
+					free_biginteger(_bi6,owner);
+					// MDH@27MAY2020: if(!_denominatorRational){outputError("Final denominator could not be computed");return NULL;}
 					// NOTE: do NOT use the originals in inverting the denominator because those will be freed below so we need to pass in copies
 					Mrational* _inverseDenominatorRational=OWNED(_getInverseRational(_denominatorRational),owner);
 					Mrational* _result=NULL;
@@ -1944,6 +1959,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					}else
 						_result=_getRationalSum(_rational,_inverseDenominatorRational); // _qsum() replaced by _getRationalSum in Mrational.h/c
 					free_rational(_denominatorRational,owner);
+					free_rational(_inverseDenominatorRational,owner); // MDH@27MAY2020
 					if(_result){
 						_rational=_result;
 						if(amVerbose())
@@ -2007,51 +2023,57 @@ Mvalue* l2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		_mapValue=OWNED(_getMapValue(value->type,false),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 		if(!listAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
-	return DISOWNED(_mapValue,owner);
+	return _mapValue;
 }
 // list to map list
 Mvalue* l2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
 		_maplistValue=OWNED(_getListValue(VT_LIST,false,"l2ml"),owner); // a map list ALWAYS requires element of type VT_LIST
-		if(!listAppendedToMaplist(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+		if(!listAppendedToMaplist(_maplistValue->value._list,owner,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
 	}
-	return DISOWNED(_maplistValue,owner);
+	return _maplistValue;
 }
 // map list to list conversion
 Mvalue* ml2l(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* _maplistValue=NULL;
-	if(value&&value->type==VT_LIST){
-		_maplistValue=OWNED(_getListValue(value->type,false,"ml2l"),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
-		if(!maplistAppendedToList(_maplistValue->value._list,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
-	}
-	return DISOWNED(_maplistValue,owner);
+	Mlist* _list=(value&&value->type==VT_LIST?(Mlist*)CALLOC_1(sizeof(Mlist),'L',owner):NULL);
+	if(!_list)return NULL;
+	_list->valuetype=value->type;
+		// replacing: _maplistValue=OWNED(_getListValue(value->type,false,"ml2l"),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+	maplistAppendedToList(_list,owner,value->value._list); // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+	Mvalue* _listValue=_getValueOfList(_list);
+	if(!_listValue)free_list(_list,owner);
+	return _listValue;
 }
 Mvalue* ml2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* _mapValue=NULL;
-	if(value&&value->type==VT_LIST){
-		_mapValue=OWNED(_getMapValue(value->type,false),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
-		if(!maplistAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
-	}
-	return DISOWNED(_mapValue,owner);
+	Mmap* _map=(value&&value->type==VT_LIST?(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner):NULL);
+	if(!_map)return NULL;
+	_map->valuetype=value->type;
+	// replacing: _mapValue=OWNED(_getMapValue(value->type,false),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
+	maplistAppendedToMap(_map,owner,value->value._list);
+	Mvalue* _mapValue=_getValueOfMap(_map);
+	if(!_mapValue)free_map(_map,owner);
+	return _mapValue;
 }
-
 // map to map list conversion i.e. each list element is a attribute name - value pair
 Mvalue* m2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* _maplistValue=NULL;
-	if(value&&value->type==VT_MAP){
-		_maplistValue=OWNED(_getListValue(VT_LIST,false,"m2ml"),owner); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
-		if(!mapAppendedToMaplist(_maplistValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
-	}
-	return DISOWNED(_maplistValue,owner);
+	Mlist* _list=(value&&value->type==VT_MAP?(Mlist*)CALLOC_1(sizeof(Mlist),'L',owner):NULL);
+	if(!_list)return NULL;
+	_list->valuetype=value->type; // TODO is this right?
+	// replacing: _maplistValue=OWNED(_getListValue(VT_LIST,false,"m2ml"),owner); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
+	mapAppendedToMaplist(_list,owner,value->value._map); // TODO should we release the list that was created somehow????
+	Mvalue* _maplistValue=_getValueOfList(_list);
+	if(!_maplistValue)free_list(_list,owner);
+	return _maplistValue;
 }
 Mvalue* m2l(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* _listValue=NULL;
-	if(value&&value->type==VT_MAP){
-		_listValue=OWNED(_getListValue(value->type,false,"m2l"),owner);
-		if(!mapAppendedToList(_listValue->value._list,value->value._map))return NULL; // TODO should we release the list that was created somehow????
-	}
-	return DISOWNED(_listValue,owner);
+	Mlist* _list=(value&&value->type==VT_MAP?CALLOC_1(sizeof(Mlist),'L',owner):NULL);
+	if(!_list)return NULL;
+	_list->valuetype=value->type;
+	mapAppendedToList(_list,owner,value->value._map); // TODO should we release the list that was created somehow????
+	Mvalue* _listValue=_getValueOfList(_list);
+	if(!_listValue)free_list(_list,owner);
+	return _listValue;
 }
 // conversion functions
  // the value wrapper for not a real and not an integer...
@@ -2082,7 +2104,9 @@ Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){Mallocat
 	llu.ll=ll;
 	int l=sizeof(long long);
 	while(--l>=0&&appendedToList(_dlist,owner,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
-	return DISOWNED(_getValueOfList(_dlist,owner),owner);
+	Mvalue* integerDecimalListValue=_getValueOfList(_dlist);
+	if(!integerDecimalListValue)free_list(integerDecimalListValue,owner);
+	return integerDecimalListValue;
 }
 const char* const REAL_OCTET_INDEX_IDS[]={"1","2","3","4","5","6","7","8","9","10"};
 Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
@@ -2101,14 +2125,14 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 	uint64_t mantisse;uint16_t exponent;extractMantisseAndExponent(ld,&mantisse,&exponent);
 	// let's return the binary representation of exponent and mantisse with single quotes around it!!
 	Mstring* _mantisseText=OWNED(_getUint64BinaryText(mantisse,'\''),owner);
-	if(_mantisseText){appendedToMap(_dmap,owner,"m",_getTextValue(string(_mantisseText));free_string(_mantisseText,owner);}
+	if(_mantisseText){appendedToMap(_dmap,owner,"m",_getTextValue(string(_mantisseText)));free_string(_mantisseText,owner);}
 	Mstring* _exponentText=OWNED(_getUint16BinaryText(exponent,'\''),owner);
-	if(_exponentText){appendedToMap(_dmap,owner,"e",_getTextValue(string(_exponentText));free_string(_exponentText,owner);}
+	if(_exponentText){appendedToMap(_dmap,owner,"e",_getTextValue(string(_exponentText)));free_string(_exponentText,owner);}
 	/* replacing:
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
 	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
 	*/
-	return DISOWNED(_getValueOfMap(_dmap,owner),owner);
+	return _getValueOfMap(_dmap);
 }
 char* _getIntegerCharacters(long long ll){Mallocationowner owner=getOwner(__LINE__);
 	char str[20];sprintf(str,"%lld",ll);return DISOWNED(OWNED(_strdup(str),owner),owner);
@@ -2121,11 +2145,11 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 	long long index=0;
 	char* _indexCharacters;
 	if(ascendingindex){
-		appendedToMap(_dmap,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
+		appendedToMap(_dmap,owner,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 		while(*characters){
 			_indexCharacters=OWNED(_getIntegerCharacters(++index),owner);
 			appendedToMap(_dmap,owner,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owner),owner));
-			FREE(_indexCharacters,'\'',owner);
+			FREE_1(_indexCharacters,'\'',owner);
 			characters++; // OOPS pretty essential
 		}
 	}else{
@@ -2134,12 +2158,14 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 		while(index){
 			_indexCharacters=OWNED(_getIntegerCharacters(index--),owner);
 			characters--;
-			appendedToMap(_dmap,owner,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owned),owned));
-			FREE(_indexCharacters,'\'',owner);
+			appendedToMap(_dmap,owner,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owner),owner));
+			FREE_1(_indexCharacters,'\'',owner);
 		}
 		appendedToMap(_dmap,owner,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 	}
-	return DISOWNED(_getValueOfMap(_dmap,owner),owner);
+	Mvalue* _valueOfMap=_getValueOfMap(_dmap);
+	if(!_valueOfMap)free_map(_dmap,owner);
+	return _valueOfMap;
 }
 Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _dlist=OWNED(_getListOfType(VT_INTEGER),owner);
@@ -2148,30 +2174,36 @@ Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mal
 	lld.ld=ld;
 	int l=sizeof(long double);if(l>10)l=10; // assume 10-byte extended precision if sizeof(long double) exceeds 10 (like 12 or 16)
 	// how about adding a two-element list with the first equal to the field name?????
-	while(--l>=0&&appendedToList(_dlist,owner,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID)==M_TRUE)
+	while(--l>=0&&appendedToList(_dlist,owner,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0)
 	;
-	return DISOWNED(_getValueOfList(_dlist,owner),owner);
+	Mvalue* _valueOfList=_getValueOfList(_dlist);
+	if(!_valueOfList)free_list(_dlist,owner);
+	return _valueOfList;
 }
 
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
 // TODO we should delegate to (_)getValueDecimal
 Mvalue* d(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	if(value){
+	Mvalue* dValue=value;
+	if(value&&value->type!=VT_DECIMAL){
+		Mdecimal* _decimal=NULL;
 		switch(value->type){
 			// TODO all other types_
-			case VT_INTEGER:return _getDecimalValue(OWNED(__decimal(NULL,value->value._integer->ll,0),owner),owner); // TODO assuming long long and int64_t are the same type!!!!!
-			case VT_BIGINTEGER:return _getDecimalValue(OWNED(_getBigintegerDecimal(value->value._biginteger),owner),owner);
-			case VT_RATIONAL:return _getDecimalValue(OWNED(_getRationalDecimal(value->value._rational),owner),owner);
-			case VT_DECIMAL:return value;
+			case VT_INTEGER:_decimal=(Mdecimal*)OWNED(__decimal(NULL,value->value._integer->ll,0),owner);break;
+			case VT_BIGINTEGER:_decimal=(Mdecimal*)OWNED(_getBigintegerDecimal(value->value._biginteger),owner);break;
+			case VT_RATIONAL:_decimal=(Mdecimal*)OWNED(_getRationalDecimal(value->value._rational),owner);break;
 			case VT_FLOAT: // TODO check whether somewhere I am converting a long double without using text
-			default:return _getDecimalValue(OWNED(_getValueTextDecimal(value),owner),owner);
+			default:_decimal=OWNED(_getValueTextDecimal(value),owner);break;
 		}
+		if(!_decimal)return NULL;
+		dValue=_getDecimalValue(_decimal);
+		if(!dValue)free_decimal(_decimal,owner);
 	}
-	return NULL;
+	return dValue;
 }
 
 // MDH@18NOV2019: b/B renamed to o/O (for octets), and we're gonna create a b function for transforming to big integer
-Mvalue* o(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // little-endian representation list to return
+Mvalue* o(Mvalue* value){ // little-endian representation list to return
 	if(value){
 		switch(value->type){
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
@@ -2200,17 +2232,19 @@ Mvalue* i(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(amVerbose())
 		outputValue("Converting '",value,"' to an integer.\n");
 	long long ll=getValueInteger(value);
-	return(ll!=M_LL_INVALID?DISOWNED(OWNED(_getIntegerValue(ll),owner),owner):NULL);
+	return(ll!=M_LL_INVALID?_getIntegerValue(ll):NULL);
 }
 
 // convert to a big integer
 Mvalue* b(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
-	if(value){
-		if(value->type==VT_BIGINTEGER)return value; // already a big integer
-		Mbiginteger* _bigInteger=OWNED(_getValueBiginteger(value),owner);
-		if(_bigInteger)return DISOWNED(OWNED(_getBigintegerValue(_bigInteger,true),owner),owner);
+	Mvalue* bValue=value;
+	if(value&&value->type!=VT_BIGINTEGER){
+		Mbiginteger* _biginteger=(Mbiginteger*)OWNED(_getValueBiginteger(value),owner);
+		if(!_biginteger)return NULL;
+		bValue=_getBigintegerValue(_biginteger);
+		if(!bValue)free_biginteger(_biginteger,owner);
 	}
-	return NULL;
+	return bValue;
 }
 
 
@@ -2384,11 +2418,20 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
-	if(_value->type==VT_FLOAT)return DISOWNED(OWNED(_getValueOfList(DISOWNED(OWNED(_getLongDoubleRationalList(_value->value._float->ld,250),owner),owner),true),owner),owner); // the intermediate results are stored in a list, and the last element will be the final result!!!
-	Mvalue* _rationalValue=OWNED(_getRationalValue(DISOWNED(OWNED(_getValueRational(_value),true),owner),owner),owner); // make a rational from it and wrap it again
+	Mvalue* _rationalValue=NULL;
+	if(_value->type==VT_FLOAT){
+		Mlist* _rationalList=OWNED(_getLongDoubleRationalList(_value->value._float->ld,250),owner);
+		_rationalValue=_getValueOfList(_rationalList); // the intermediate results are stored in a list, and the last element will be the final result!!!
+		if(!_rationalValue)free_list(_rationalList,owner);
+	}else{
+		Mrational* _valueRational=(Mrational*)OWNED(_getValueRational(_value),owner);
+		_rationalValue=_getRationalValue(_valueRational); // make a rational from it and wrap it again
+		if(!_rationalValue)free_rational(_valueRational,owner);
+	}
 	if(amVerbose())
-		outputValue("Converted to rational '",_rationalValue,"'.");
-	return DISOWNED(_rationalValue,owner);
+		if(_rationalValue)
+			outputValue("Converted to rational '",_rationalValue,"'.");
+	return _rationalValue;
 }
 // MDH@09OCT2019: TODO=DONE how about turning a unpure rational into a pure rational???? yes, that's a good idea
 Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
@@ -2411,36 +2454,43 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 			outputError("Failed to purify a rational");
 			return NULL;
 		}
-		return DISOWNED(OWNED(_getRationalValue(_purifiedRational,true),owner),owner);
+		Mvalue* _rationalValue=_getRationalValue(_purifiedRational);
+		if(!_rationalValue)free_rational(_purifiedRational,owner);
+		return _rationalValue;
 	}
-	if(_value->type==VT_FLOAT)return DISOWNED(OWNED(_getRationalValue(OWNED(_getLongDoubleRational(_value->value._float->ld,250),owner),true),owner),owner); // forcefully free the _getLongDoubleRational if we failed to wrap it
-	Mvalue* _rationalValue=OWNED(_getRationalValue(OWNED(_getValueRational(_value),true),owner),owner); // make a rational from it and wrap it again
+	if(_value->type==VT_FLOAT){
+		Mrational* _rational=OWNED(_getLongDoubleRational(_value->value._float->ld,250),owner);
+		Mvalue* _rationalValue=_getRationalValue(_rational);
+		if(!_rationalValue)free_rational(_rational,owner);
+		return _rationalValue; // forcefully free the _getLongDoubleRational if we failed to wrap it
+	}
+	Mrational* _rational=OWNED(_getValueRational(_value),owner);
+	Mvalue* _rationalValue=_getRationalValue(_rational); // make a rational from it and wrap it again
+	if(!_rationalValue)free_rational(_rational,owner);
 	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
-	return DISOWNED(_rationalValue,owner);
+	return _rationalValue;
 }
 
 // convert to a real
 
 // TODO complete with conversion from big integer and rational
-Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* _floatValue=NULL;
+Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
+	long double ld=M_LD_NAN;
 	if(amVerboseDebugging()){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 	switch(_value->type){
-		case VT_INTEGER:_floatValue=OWNED(_getFloatValue((long double)_value->value._integer->ll),owner);break;
-		case VT_BIGINTEGER:if(_value->value._biginteger)_floatValue=OWNED(_getFloatValue(mp_get_long_double(_value->value._biginteger)),owner);break;
-		case VT_DECIMAL:_floatValue=OWNED(_getFloatValue(OWNED(getDecimalLongDouble(_value->value._decimal),owner)),owner);break;
-		case VT_RATIONAL:_floatValue=OWNED(_getFloatValue(OWNED(getRationalLongDouble(_value->value._rational),owner)),owner);break;
-		case VT_FLOAT:_floatValue=_value;break; // TODO should we make a copy here? NO, Mvalue* instances don't need to be duplicated because they are immutable
-		case VT_TEXT:_floatValue=OWNED(_getFloatValue(_strtold(_value->value._text->_c,getNAR())),owner);break;
+		case VT_INTEGER:ld=(long double)_value->value._integer->ll);break;
+		case VT_BIGINTEGER:if(_value->value._biginteger)ld=mp_get_long_double(_value->value._biginteger);break;
+		case VT_DECIMAL:ld=getDecimalLongDouble(_value->value._decimal);break;
+		case VT_RATIONAL:ld=getRationalLongDouble(_value->value._rational);break;
+		case VT_TEXT:ld=_strtold(_value->value._text->_c,getNAR());break;
 		default:return NAF_value; // if NAF_value is returned, we do NOT disown it as we would with _floatValue being created here!!!
 	}
-	if(amVerbose())outputValue("Converted to '",_floatValue,"'.\n");
-	return DISOWNED(_floatValue,owner);
+	return(isLongDoubleUndefined(ld)?_getFloatValue(ld):NULL);
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
 Mvalue* t(Mvalue* value,Mvalue* format){if(!format||!format->type==VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* result=NULL;
-	Mstring* _valueText=OWNED(_getValueText(value,true),owner); // typically dequoted
+	Mstring* _valueText=(Mstring*)OWNED(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
 		if(amVerbose()){outputValue("Text representation of '",value,"' before formatting: ");output("'%s'.\n",string(_valueText));}
 		if(format){
@@ -2463,7 +2513,7 @@ Mvalue* t(Mvalue* value,Mvalue* format){if(!format||!format->type==VT_INTEGER)re
 			outputError("Failed to prepend a quote character to a text representation");
 		free_string(_valueText,owner);
 	}
-	return DISOWNED(result,owner);
+	return result;
 }
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
@@ -2488,34 +2538,45 @@ Mvalue* Msum(Mvalue* _value){
 }
 
 // MDH@10OCT2019: applying unary operator (=function) to all elements in a list
-Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function){
+Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(function&&_list){ // we need both a function and a list
-		_result=_getListOfType(_list->valuetype); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
+		_result=OWNED(_getListOfType(_list->valuetype),owner); // this could pose a problem as the function may not return the same value type as the elements in the list (i.e. if it doesn't we're in trouble!!!!)
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,function(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+		while(_listelement&&appendedToList(_result,owner,function(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
 	}
-	return(_result?_getValueOfList(_result,true):NULL);
+	if(!_result)return NULL;
+	Mvalue* _valueOfList=_getValueOfList(_result);
+	if(!_valueOfList)free_list(_result,owner);
+	return _valueOfList;
 }
 // MDH@10OCT2019: a special function to compute a reciprocal value
-Mvalue* Mreciprocal(Mvalue* value){
+Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _reciprocalValue=NULL;
 	if(value)
 	switch(value->type){
-		case VT_LIST:return _functionAppliedToList(value->value._list,Mreciprocal);
-		case VT_FLOAT:return _getFloatValue(1/value->value._float->ld); // TODO check what happens when the real equals 0
-		case VT_RATIONAL:return _getRationalValue(_getInverseRational(value->value._rational),true);
-		case VT_INTEGER:return _getRationalValue(_getRational(NULL,_getBiginteger(value->value._integer->ll),M_LD_NAN,true,true),true);
-		case VT_BIGINTEGER:return _getRationalValue(_getRational(NULL,value->value._biginteger,M_LD_NAN,true,false),true); // same as with VT_INTEGER but without freeing the to remain bound big integer
-		case VT_DECIMAL:return _getDecimalValue(_getInverseDecimal(value->value._decimal),true);
-		default:break; // TODO maps!!!!
+		case VT_LIST:_reciprocalValue=OWNED(_functionAppliedToList(value->value._list,Mreciprocal),owner);break;
+		case VT_FLOAT:_reciprocalValue=OWNED(_getFloatValue(1/value->value._float->ld),owner);break; // TODO check what happens when the real equals 0
+		case VT_RATIONAL:_reciprocalValue=OWNED(_getRationalValue(_getInverseRational(value->value._rational)),owner);break;
+		case VT_INTEGER:
+			{
+				Mbiginteger* _denominator=OWNED(_getBiginteger(value->value._integer->ll),owner);
+				_reciprocalValue=OWNED(_getRationalValue(_getRational(NULL,_denominator,M_LD_NAN,true)),owner);
+				free_biginteger(_denominator,owner);
+			}
+			break;
+		case VT_BIGINTEGER:_reciprocalValue=OWNED(_getRationalValue(_getRational(NULL,value->value._biginteger,M_LD_NAN,true)),owner);break; // same as with VT_INTEGER but without freeing the to remain bound big integer
+		case VT_DECIMAL:_reciprocalValue=OWNED(_getDecimalValue(OWNED(_getInverseDecimal(value->value._decimal),owner)),owner);break;
+		case VT_MAP:_reciprocalValue=OWNED(_functionAppliedToMap(value->value._map,Mreciprocal),owner);break;
+		default:break;
 	}
-	return NULL;
+	return DISOWNED(_reciprocalValue,owner);
 }
 // MDH@29OCT2019: concatenate textual, typically used for lists
-Mstring* _getConcatenated(Mlist* list,char* separator){
-	Mstring* _concatenated=__string();
+static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner owner=getOwner(__LINE__);
+	Mstring* _concatenated=OWNED(__string(),owner);
 	if(_concatenated){
 		Mlistelement* listelement=list->_first;
 		Mvalue* listelementValue=NULL;
@@ -2531,51 +2592,51 @@ Mstring* _getConcatenated(Mlist* list,char* separator){
 			if(_listelementText){
 				if(separator)if(string_length(_concatenated)>0)string_append(_concatenated,separator);
 				string_append(_concatenated,string(_listelementText));
-				free_string(_listelementText);
+				free_string(_listelementText,owner);
 			}
 			listelement=listelement->_next;
 		}
 	}else 
 		outputError("Failed to initialize the concatenation result text");
-	return _concatenated;
+	return DISOWNED(_concatenated,owner);
 }
-Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){
+Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _concatValue=NULL;
 	// the first value would be the list of things to concatenate, the second value the separator text (if any)
 	if(value1){
-		Mstring* _separator=(value2?_getValueText(value2,true):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
-		Mstring* _result;
+		Mstring* _separator=(value2?OWNED(_getValueText(value2,true),owner):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
+		Mstring* _concat;
 		if(value1->type==VT_LIST)
-			_result=_getConcatenated(value1->value._list,(_separator?string(_separator):NULL));
+			_concat=OWNED(_getConcatenated(value1->value._list,(_separator?string(_separator):NULL)),owner);
 		else
-			_result=_getValueText(value1,true);
-		Mvalue* _resultValue=NULL;
-		if(_result){
+			_concat=OWNED(_getValueText(value1,true),owner);
+		if(_concat){
 			// _result itself won't contain quotes, so in order to make it usable we need to prepend either a single quote or a double quote
-			if(string_insert_char(_result,0,'\''))_resultValue=_getTextValue(string(_result),false);else outputError("Failed to construct the concatenation text");
-			free_string(_result);
+			if(string_insert_char(_concat,0,'\''))_concatValue=_getTextValue(string(_concat));else outputError("Failed to construct the concatenation text");
+			free_string(_concat,owner);
 		}
-		if(_separator)free_string(_separator);
-		return _resultValue;
+		if(_separator)free_string(_separator,owner);
 	}
-	return NULL;
+	return DISOWNED(_concatValue,owner);
 }
-Mvalue* Mfibonacci(Mvalue* value){
+Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	// are we allowing big integers?
 	if(!value||value->type==VT_MAP)return NULL;
 	if(value->type==VT_LIST)return _functionAppliedToList(value->value._list,Mfibonacci);
+	Mvalue* _fibonnacciValue=NULL;
 	// ASSERT assuming scalars
-	Mbiginteger* _biginteger=_getValueBiginteger(value);
+	Mbiginteger* _biginteger=OWNED(_getValueBiginteger(value),owner);
 	if(_biginteger){
 		mp_err status=MP_OKAY; // keep track of the result status
 		Mbiginteger* _fibonacciBiginteger=NULL;
 		if(isBigintegerUndefined(_biginteger)==M_FALSE){ // not an undefined big integer
 			if(isBigintegerNegative(_biginteger)!=M_TRUE){ // not a negative big integer
-				Mbiginteger *_counterBiginteger=_getBigintegerCopy(_biginteger); // the number of times we will have to do an addition
-				_fibonacciBiginteger=__biginteger(); // where the result should be stored
+				Mbiginteger *_counterBiginteger=OWNED(_getBigintegerCopy(_biginteger),owner); // the number of times we will have to do an addition
+				_fibonacciBiginteger=OWNED(__biginteger(),owner); // where the result should be stored
 				if(_fibonacciBiginteger&&_counterBiginteger)status=mp_decr(MP_INT_POINTER(_counterBiginteger));else status=MP_ERR;
 				if(status==MP_OKAY){
 					if(isBigintegerPositive(_counterBiginteger)==M_TRUE){ // at least one addition to do
-						Mbiginteger *_firstBiginteger=_getBiginteger(0),*_secondBiginteger=_getBiginteger(1);
+						Mbiginteger *_firstBiginteger=OWNED(_getBiginteger(0),owner),*_secondBiginteger=OWNED(_getBiginteger(1),owner);
 						if(_firstBiginteger&&_secondBiginteger){
 							// NOTE _counterBiginteger defines the number of times we need to add the first and second big integer
 							while(isBigintegerZero(_counterBiginteger)!=M_TRUE){ // the counter is not zero yet
@@ -2587,20 +2648,19 @@ Mvalue* Mfibonacci(Mvalue* value){
 							}
 						}else 
 							outputError("Failed to initialize the Fibonacci sequence");
-						free_biginteger(_firstBiginteger);free_biginteger(_secondBiginteger);
+						free_biginteger(_firstBiginteger,owner);free_biginteger(_secondBiginteger,owner);
 					}else // no additions
 						status=mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_fibonacciBiginteger));
 				}else
 					outputError("Failed to initialize the Fibonacci sum");
-				free_biginteger(_counterBiginteger);
+				free_biginteger(_counterBiginteger,owner);
 			}
 		}
-		if(value->type!=VT_BIGINTEGER)free_biginteger(_biginteger);
-		if(status==MP_OKAY)return _getBigintegerValue(_fibonacciBiginteger,true);
-		// ASSERT something went wrong in the computations
-		if(_fibonacciBiginteger)free_biginteger(_fibonacciBiginteger); // not bound, so free here
+		if(value->type!=VT_BIGINTEGER)free_biginteger(_biginteger,owner);
+		if(status==MP_OKAY)_fibonnacciValue=OWNED(_getBigintegerValue(_fibonacciBiginteger),owner);
+		if(!_fibonnacciValue)free_biginteger(_fibonacciBiginteger,owner);
 	}
-	return NULL;
+	return DISOWNED(_fibonnacciValue,owner);
 }
 
 // HERE THE EVALUATION OF EXPRESSIONS TAKE PLACE
@@ -2737,8 +2797,8 @@ Mtoken* expressionToken=NULL; // the current evaluation token
 /*
  * \brief makes a copy useful for evaluation (not for editing)
  */
-Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
-	Mtoken* _tokenCopy=(_token?__token():NULL);
+Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner(__LINE__);
+	Mtoken* _tokenCopy=(_token?OWNED(__token(),owner):NULL);
 	if(_tokenCopy){
 		if(amVerbose()){
 			output("Copying token '%s' of type '%s'.\n",string(_token->text),TOKENTYPE_STRING[_token->type]);
@@ -2746,24 +2806,28 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
 		}
 		_tokenCopy->type=_token->type;
 		_tokenCopy->significantCharacterCount=_token->significantCharacterCount;
-		if(_token->text)_tokenCopy->text=_stringCopy(_token->text,0);
+		if(_token->text)_tokenCopy->text=SUBOWNED(OWNED(_stringCopy(_token->text,0),owner),1);
 		_tokenCopy->expr=_token->expr; // TODO do I need to do this??? this is also an issue because if we start comparing expr (on evaluation)
 		_tokenCopy->argument=_token->argument; // MDH@11AUG2019: we need the argument as well bro' TODO how about the envid?????
 		// we're NOT copying _next, _prev, _offset
 		//////_tokenCopy->prev=NULL;_tokenCopy->next=NULL;_tokenCopy->offset=0;
 	}
-	return _tokenCopy;
+	return DISOWNED(_tokenCopy,owner);
 }
 
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
-Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){
+Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
 	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
+	Mlist* _list=OWNED(__list("getValueOfList"),owner);
+	if(!_list){output("Failed to create a list to return.\n");return NULL;}
+	_list->weak=weak;
+	/* MDH@27MAY2020 replacing:
 	Mvalue* _listValue=_getListValue(VT_UNDEFINED,weak,"getValueOfList"); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
-	if(!_list){output("Failed to create a list to return.\n");return NULL;}
+	*/
 	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.\n");return NULL;}
 	if(amVerbose())output("Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
@@ -2782,7 +2846,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
 			// however this would require passing the bool argument along to every function getValueOfExpression calls
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
-			Mtoken* _firstUnevaluatedToken=_getEvaluatableTokenCopy(expressionToken);
+			Mtoken* _firstUnevaluatedToken=OWNED(_getEvaluatableTokenCopy(expressionToken),owner);
 			if(_firstUnevaluatedToken){
 				if(amVerbose())
 				output("Evaluating special function call argument tokens:");
@@ -2797,8 +2861,9 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 					unevaluatedToken=unevaluatedToken->next;
 				}
 				if(amVerbose())
-				outputChar('\n');
-				_listElementValue=_getValueOfToken(_firstUnevaluatedToken,true);
+					outputChar('\n');
+				_listElementValue=_getValueOfToken(_firstUnevaluatedToken);
+				if(!_listElementValue)free_token(_firstUnevaluatedToken,owner); // TODO what else?????
 			}
 		}else{ // evaluate
 			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
@@ -2813,7 +2878,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
 			if(amVerbose())output("Appending list element #%llu.\n",listElementIndex);
-			unsigned long long newListElementIndex=appendedToList(_list,_listElementValue,listElementIndex);
+			unsigned long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex==0){
 				output("%s",M_ERROR_PREFIX);
@@ -2826,14 +2891,19 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		if(!expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
-	if(amVerbose())outputValue("List '",_listValue,"' extracted!\n");
+	Mvalue* _listValue=_getValueOfList(_list);
+	if(!_listValue){free_list(_list,owner);return NULL;} // MDH@27MAY2020 wrapping the list here instead of the other way round so we can free the list if creating the value fails
+	if(amVerboseDebugging())outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
 
-Mvalue* getValueOfMap(){
+Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // MDH@17JUL2019: one of five functions that use and advance the current expression token
+	Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
+	/* MDH@27MAY2020 replacing:
 	Mvalue* _mapValue=_getMapValue(VT_UNDEFINED,false); // MDH@21MAY2019 for the same reason as above: replacing: getValueOfExpressionOfType(VT_MAP);
 	Mmap* _map=_mapValue->value._map; // grab the map to fill
+	*/
 	//enum TOKENTYPE_ENUM mapAttributeNameEndTokenTypes[]={TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT};
 	//enum TOKENTYPE_ENUM mapAttributeValueEndTokenTypes[]={TT_END_OF_MAP,TT_LISTELEMENT};
 	// NOTE a map can be empty in which case _firstToken will immediately be of type TT_END_OF_MAP
@@ -2845,7 +2915,7 @@ Mvalue* getValueOfMap(){
 		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'s',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
 		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		// MDH@22JUL2019: it's better to dequote the name here because otherwise the name of the attribute would be in quotes (and it is clear to be text)
-		Mstring* _attributeName=_getValueText(_attributeNameValue,true); // parse the attribute name value (could be undefined though)
+		Mstring* _attributeName=(Mstring*)OWNED(_getValueText(_attributeNameValue,true),owner); // parse the attribute name value (could be undefined though)
 		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
 		/////////////////////if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
@@ -2858,26 +2928,30 @@ Mvalue* getValueOfMap(){
 		if(!_attributeName)continue; // unable to parse the attribute name expression value into a string
 		// MDH@22JUL2019: let's allow empty attribute name as well (why not!)
 		////////if(string_length(_attributeName)>0)
-		if(!appendedToMap(_map,string(_attributeName),_attributeValueValue)){
+		if(!appendedToMap(_map,owner,string(_attributeName),_attributeValueValue)){
 			output("%s",M_ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
 		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
-		free_string(_attributeName); // ALWAYS free the name text
+		free_string(_attributeName,owner); // ALWAYS free the name text
 		if(!expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
-		if(amVerbose())output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerbose())
+			output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
+	Mvalue* _mapValue=_getValueOfMap(_map);
+	if(!_mapValue){free_map(_map,owner);return NULL;} // MDH@27MAY2020: afterwards encapsulating instead of before
+	if(amVerboseDebugging())outputValue("Map '",_mapValue,"' extracted!\n");
 	return _mapValue;
 }
 
 // a function call needs a function and a map of arguments (defining the values to use for the formal parameters of the function)
-Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _argumentMap){
+Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
 	////////Mvalue* _resultValue=NULL;
 	switch(_function->type){
 		case FT_USER:
 			{
 				// TODO replace following by calling getFunctionExecutionEnvironment
 				// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-				Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(_function,functionName,_argumentMap);
+				Menvironment* _functionExecutionEnvironment=(Menvironment*)OWNED(_getFunctionExecutionEnvironment(_function,functionName,_argumentMap),owner);
 				if(_functionExecutionEnvironment){
 					if(pushExecutionEnvironment(_functionExecutionEnvironment)){
 						// execute ALL the commands in _bodyCommandList
@@ -2907,7 +2981,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 						return (functionResultValue?functionResultValue:functionEvaluationValue);
 					}else{
 						output("%sFailed to create the function execution environment of function '%s'.\n",M_ERROR_PREFIX,functionName);
-						free_environment(_functionExecutionEnvironment);
+						free_environment(_functionExecutionEnvironment,owner);
 					}
 				}else
 					output("%sFailed to create the environment to execute function '%s'.\n",M_ERROR_PREFIX,functionName);
@@ -2998,26 +3072,26 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 // MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
 // requests can come out of a single command containing multiple function definitions
 // _firstFunctionBodyRequest represents the first one to execute
-FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){
+FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
 	FunctionBodyRequest* _functionBodyRequest=NULL;
 	if(functionName){
-		_functionBodyRequest=CALLOC(sizeof(FunctionBodyRequest),'9',getOwnerId(2));
+		_functionBodyRequest=CALLOC_1(sizeof(FunctionBodyRequest),'9',owner);
 		if(_functionBodyRequest){
-			_functionBodyRequest->_functionName=_strdup(functionName);
+			_functionBodyRequest->_functionName=_getChars(functionName);
 			if(!_functionBodyRequest->_functionName){
-				free(_functionBodyRequest);_functionBodyRequest=NULL;
+				FREE_1(_functionBodyRequest,'9',owner);_functionBodyRequest=NULL;
 			}
 		}
 	}
-	return _functionBodyRequest;
+	return DISOWNED(_functionBodyRequest,owner);
 }
-void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest){
+void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocationowner owner_functionBodyRequest){
 	if(!_functionBodyRequest)return;
-	free(_functionBodyRequest->_functionName);
-	free(_functionBodyRequest);
+	freeChars(_functionBodyRequest->_functionName,owner_functionBodyRequest);
+	FREE_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
-static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest={0,0,__LINE__};
 static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
 	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
 	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName))functionBodyRequest=functionBodyRequest->_next;
@@ -3030,7 +3104,7 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 	// ASSERT a 'valid' function name
 	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",M_ERROR_PREFIX,functionName);return NULL;} // already have it
 	// technically it should not have been requested already (or exist)
-	FunctionBodyRequest* _functionBodyRequest=new_functionbodyrequest(functionName); // guarantees that functionName is defined
+	FunctionBodyRequest* _functionBodyRequest=OWNED(new_functionbodyrequest(functionName),owner_functionBodyRequest); // guarantees that functionName is defined
 	if(_functionBodyRequest){		
 		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
 		_lastFunctionBodyRequest=_functionBodyRequest;
@@ -3044,11 +3118,10 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
 FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
 // MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
-bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){
+bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
-	int32_t owner=getOwnerId(3);
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC(sizeof(FunctionBodyInput),'8',owner); // free if not bound
+	_currentFunctionBodyInput=CALLOC_1(sizeof(FunctionBodyInput),'8',owner); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
 	if(function&&function->type==FT_USER){
@@ -3071,7 +3144,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
-	FREE(_currentFunctionBodyInput,'H',owner);
+	FREE_1(_currentFunctionBodyInput,'H',owner);
 	return false;
 }
 bool startFunctionBodyInput(){
@@ -3138,7 +3211,7 @@ bool endFunctionBodyInput(){
  */
 Mvaluereference* _getValuereference(Mvalue* _value){
 	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
-	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC(sizeof(Mvaluereference),'5',getOwnerId(4));
+	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',getOwnerId(4));
 	if(_valuereference){
 		_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
 		if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
@@ -3218,7 +3291,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 					//                this works for lists not for maps
 					// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-					Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
+					Mvalue*** _valueholders=MALLOC_1(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
 					if(_valueholders){
 						size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 						bool result=true;
@@ -3250,7 +3323,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										if(amDebugging())
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
-										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_newValueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC_1(_newValueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3326,7 +3399,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																						else
 																							newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																					}/*else{
-																						//FREE(valueholders,'_');
+																						//FREE_1(valueholders,'_');
 																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																					}*/
 																					free_string(_attributenameText);
@@ -3423,7 +3496,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-						FREE(_valueholders,'_',owner);
+						FREE_1(_valueholders,'_',owner);
 					}
 				}
 				/* replacing:
@@ -3536,7 +3609,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 				//                this works for lists not for maps
 				// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-				Mvalue*** _valueholders=MALLOC(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
+				Mvalue*** _valueholders=MALLOC_1(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
 				if(_valueholders){
 					size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
 					_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
@@ -3567,7 +3640,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 									if(amVerboseDebugging())
 										outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 									// which we now did
-									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC_1(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3653,15 +3726,15 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																			if(_attributenameText){
 																				newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																				if(!newValueholder){
-																					if(appendedToMap(valueholderMap,string(_attributenameText),NULL)!=1)
+																					if(appendedToMap(valueholderMap,owner_valueholderMap,string(_attributenameText),NULL)!=1)
 																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
 																					else
 																						newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																				}/*else{
-																					//FREE(valueholders,'_');
+																					//FREE_1(valueholders,'_');
 																					_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																				}*/
-																				free_string(_attributenameText);
+																				free_string(_attributenameText,owner);
 																			}else
 																				newValueholder=NULL;
 																		}
@@ -3752,7 +3825,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 							Mlist* _flattenedIndexList=_getFlattenedList(indexorattributenameListelementValue,true);
 							size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 							if(numberOfNewValueholders>0){
-								Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+								Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC_1(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 								if(_newValueholders){
 									_valueholders=_newValueholders;
 									Mlistelement* flattenedIndexListelement=_flattenedIndexList->_first;
@@ -3834,7 +3907,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 					}
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-					FREE(_valueholders,'_',owner);
+					FREE_1(_valueholders,'_',owner);
 				}
 				/*
 				}else
@@ -6854,7 +6927,7 @@ typedef struct Mformulaelement{
 }Mformulaelement;
 Mformulaelement* __formulaelement(char* source){
 	// output("BEFORE FORMULA ELEMENT ALLOCATION MARKS:\n");outputAllocationTypeMarks();
-	Mformulaelement* _formulaelement=CALLOC(sizeof(Mformulaelement),'4');
+	Mformulaelement* _formulaelement=CALLOC_1(sizeof(Mformulaelement),'4');
 	/*
 	if(_formulaelement){
 		output("FORMULA ELEMENT %s ALLOCATED: %zd:%zd.\n",source,getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
@@ -6870,7 +6943,7 @@ size_t free_formulaelement(Mformulaelement* _formulaelement){
 		if(_formulaelement->_next)result+=free_formulaelement(_formulaelement->_next);
 		if(_formulaelement->_operator)free_string(_formulaelement->_operator);
 		if(_formulaelement->_operand)free_valuereference(_formulaelement->_operand);
-		FREE(_formulaelement,'4');
+		FREE_1(_formulaelement,'4');
 		result+=1; // another one
 		// output("FORMULA ELEMENT FREED: %zd:%zd.\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 		// outputChar('.');
@@ -6938,7 +7011,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 		///////////output("Number of allocated formula elements before: %zd.\n",getAllocationTypeCount('4'));
 
 		Mvaluereference* _valuereference;
-		Mformulaelement* formula=OWNED(__formulaelement("root"),owner); // replacing: CALLOC(sizeof(Mformulaelement),'4');
+		Mformulaelement* formula=OWNED(__formulaelement("root"),owner); // replacing: CALLOC_1(sizeof(Mformulaelement),'4');
 		Mformulaelement* _formulaelement=formula;
 		size_t formulaElementCount=(_formulaelement?1:0);
 
@@ -7128,7 +7201,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					free_valuereference(nextformulaelement->_operand);// free the consumed operand
 					nextformulaelement->_operand=NULL; // MDH@14MAY2020: it's prudent to NULL the pointer, so no-one will try to free the value reference again
 					if(nextformulaelement){
-						FREE(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+						FREE_1(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
 						formulaElementCount--; // one less to free!!!
 					}else
 						outputInfo("No formula element to free!");
@@ -7240,7 +7313,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				free_string(_formulaelement->_operator);
 				free_valuereference(_formulaelement->_operand);
 				_nextformulaelement=_formulaelement->_next;
-				FREE(_formulaelement,'4'); // OOPS have to call FREE here not free()
+				FREE_1(_formulaelement,'4'); // OOPS have to call FREE here not free()
 				outputChar('.');
 				_formulaelement=_nextformulaelement;
 			}
@@ -7349,7 +7422,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 		_Menvironment->_name=_getChars("M"); // TODO why make a dynamic copy???
 		if(amVerbose())output("M environment named.\n");
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
-		Mfunctionmap* environmentFunctionMap=CALLOC(sizeof(Mfunctionmap),'W');
+		Mfunctionmap* environmentFunctionMap=CALLOC_1(sizeof(Mfunctionmap),'W');
 		if(environmentFunctionMap){
 
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????

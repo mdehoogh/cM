@@ -26,12 +26,12 @@ Mstring* free_string(Mstring* str,Mallocationowner owner); // changed from strin
 // functions that create new string instances (and therefore start with _)
 Mstring* _getString(char const * const s); // convenient constructor
 // copying
-Mstring* _stringCopy(Mstring* const src,size_t length);
+Mstring* _stringCopy(Mstring * const src,size_t length);
 
 bool string_empty(Mstring const * const str);
 
 size_t string_length(Mstring const * const str);
-Mstring* string_setlength(Mstring * const str, size_t length,Mallocationowner owner); // MDH@26FEB2018: we might want to set the length (to a smaller one)
+Mstring* string_setlength(Mstring * const str, size_t length); // MDH@26FEB2018: we might want to set the length (to a smaller one)
 
 Mstring* string_synclength(Mstring * const str); // MDH@02JUN2019: check the length (if a \0 is in front of the current length)
 

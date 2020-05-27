@@ -14,8 +14,9 @@ typedef struct {
 }Mchars;
 
 Mchars* __chars(size_t size,long long count,char type);
-Mchars* _resized(Mchars const * const _chars,Mallocationowner owner_chars,size_t size,long long from_count,long long to_count,char type);
-Mchars* free_chars(Mchars const * const _chars,Mallocationowner owner_chars,size_t size,long long count,char type);
+Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,long long to_count,char type);
+
+void free_chars(Mchars const * const _chars,Mallocationowner owner_chars,size_t size,long long count,char type);
 
 // get Mchars* that contains exactly the characters in chars (nothing more), and the size is 1 (for single characters)
 Mchars* _getChars(char const * const chars);

@@ -130,10 +130,10 @@ Mvalue* _getIntegerValue(long long ll);
 Mvalue* _getCharTextValue(char _c);
 
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
-Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_biginteger); // MDH@31MAY2019: we cannot use a big integer long here
-Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner_rational);
-Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner_decimal);
+Mvalue* _getReferenceValue(Mreference* _reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getRationalValue(Mrational* _rational);
+Mvalue* _getDecimalValue(Mdecimal* _decimal);
 Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char const * const text);
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
@@ -141,11 +141,11 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty m
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
-Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list);
-Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer);
-Mvalue* _getValueOfReal(Mfloat* _real,Mallocationowner owner_real);
-Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map);
-Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token);
+Mvalue* _getValueOfList(Mlist* _list);
+Mvalue* _getValueOfInteger(Minteger* _integer);
+Mvalue* _getValueOfReal(Mfloat* _real);
+Mvalue* _getValueOfMap(Mmap* _map);
+Mvalue* _getValueOfToken(Mtoken* _token);
 
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mmap* _getMapOfType(Mvaluetype valuetype);
@@ -188,7 +188,7 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 Mvalue** getValueHolderAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
 Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName);
 
-Mstring* _getListText(Mlist* _list,int32_t oid);
+Mstring* _getListText(Mlist* _list);
 Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings);
 
 void outputList(char const * const prefix,Mlist* list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
@@ -212,13 +212,13 @@ Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getIntegerBooleanMap(char* name1,char* name2);
 
 // list to map (list) conversions
-bool listAppendedToMap(Mmap* const _map,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
-bool listAppendedToMaplist(Mlist* const _maplist,const Mlist* const _list); // append a list to a (possibly empty) map using the indices as attribute name
-bool maplistAppendedToList(Mlist* const _list,const Mlist* const _maplist);
-bool maplistAppendedToMap(Mmap* const _map,const Mlist* const _maplist);
+bool listAppendedToMap(Mmap * const _map,Mlist const * const _list); // append a list to a (possibly empty) map using the indices as attribute name
+bool listAppendedToMaplist(Mlist * const _maplist,Mallocationowner owner_maplist,Mlist const * const _list); // append a list to a (possibly empty) map using the indices as attribute name
+bool maplistAppendedToList(Mlist * const _list,Mallocationowner owner_list,const Mlist const * const _maplist);
+bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist const * const _maplist);
 // map to (map) list conversions
-bool mapAppendedToList(Mlist* const _list,const Mmap* const _map);
-bool mapAppendedToMaplist(Mlist* const _maplist,const Mmap* const _map);
+bool mapAppendedToList(Mlist * const _list,Mallocationowner owner_list,Mmap const * const _map);
+bool mapAppendedToMaplist(Mlist * const _maplist,Mallocationowner owner_maplist,Mmap const * const _map);
 
 // all is... methods should now return a long long equal to M_TRUE, M_FALSE or M_LL_INVALID
 long long isValueZero(Mvalue* value);
