@@ -7,7 +7,7 @@ extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 extern long double M_LD_NAN;
 extern char const * const M_ERROR_PREFIX;
 
-Mvalue* Mempty(Mvalue* value){int32_t foid=getOwnerId(1);
+Mvalue* Mempty(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value)
     switch(value->type){
@@ -17,14 +17,16 @@ Mvalue* Mempty(Mvalue* value){int32_t foid=getOwnerId(1);
     }
     return _getIntegerValue(result);
 }
-Mvalue* Mkeys(Mvalue* value){int32_t foid=getOwnerId(2);
-    if(value)
-    switch(value->type){
-        case VT_MAP:return _getValueOfList(_getMapAttributes(value->value._map),true);
-        case VT_LIST:return _getValueOfList(_getListIndices(value->value._list),true);
-        default:break;
+Mvalue* Mkeys(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+    Mlist* _keysList=NULL;
+    if(value){
+        if(value->type==VT_MAP)_keysList=OWNED(_getMapAttributes(value->value._map),owner);else
+        if(value->type==VT_LIST)_keysList=OWNED(_getListIndices(value->value._list),owner);
     }
-    return NULL;
+    if(!_keysList)return NULL;
+    Mvalue* _keysValue=_getValueOfList(_keysList);
+    if(!_keysValue)free_list(_keysList,owner);
+    return _keysValue;
 }
 
 // TODO check whether the list is immutable????
@@ -32,12 +34,12 @@ Mvalue* Mkeys(Mvalue* value){int32_t foid=getOwnerId(2);
 // how about returning true on success and false on failure
 Mvalue* Mpush(Mvalue* listValue,Mvalue* value){ // append a value to the list
     long long result=M_LL_INVALID;
-    if(listValue&&listValue->type==VT_LIST)result=appendedToList(listValue->value._list,value,M_LL_INVALID); // now returning the result of appendedList() instead of M_TRUE and M_FALSE (nevertheless positive values indicate success)
+    if(listValue&&listValue->type==VT_LIST)result=appendedToList(listValue->value._list,Msubowner(getValueOwner(),1),value,M_LL_INVALID); // now returning the result of appendedList() instead of M_TRUE and M_FALSE (nevertheless positive values indicate success)
     return _getIntegerValue(result);
 }
 Mvalue* Mshove(Mvalue* listValue,Mvalue* value){ // prepend a value to the list
     long long result=M_LL_INVALID;
-    if(listValue&&listValue->type==VT_LIST)result=appendedToList(listValue->value._list,value,0);
+    if(listValue&&listValue->type==VT_LIST)result=appendedToList(listValue->value._list,Msubowner(getValueOwner(),1),value,0);
     return _getIntegerValue(result);
 }
 
@@ -56,7 +58,7 @@ Mvalue* Mpop(Mvalue* listValue){ // remove and return the last value i.e. opposi
                     // now we have to unlink the last element i.e. free it
                     if(beforelast)beforelast->_next=NULL;else list->_first=NULL; // if we have a beforelast we're NOT removing the first element, else we are (and list->_first should become NULL)
                     list->_last=beforelast;list->numberOfElements--; // unlink, update last
-                    last->_next=NULL;/* prevents releasing all following!*/free_listelement(last,list->weak); // free the list element we unlinked
+                    last->_next=NULL;/* prevents releasing all following!*/free_listelement(last,list->weak,Msubowner(getValueOwner(),2)); // free the list element we unlinked
                     /////// replacing: assignValue(&last->_value,NULL);FREE(last,"l'); // by assigning NULL last->_value will have one less reference count
                     return lastValue;
                 }
@@ -80,7 +82,7 @@ Mvalue* Mpull(Mvalue* listValue){ // remove and return the first value
                     list->_first=first->_next; // make the list start with the successor of the original first
                     if(!list->_first)list->_last=NULL; // if no list first now, also no list last anymore
                     list->numberOfElements--; // obviously one less element
-                    first->_next=NULL;/* prevents releasing all following!*/free_listelement(first,list->weak); // replacing: FREE(first,"l'); // free the list element we unlinked
+                    first->_next=NULL;/* prevents releasing all following!*/free_listelement(first,list->weak,Msubowner(getValueOwner(),2)); // replacing: FREE(first,"l'); // free the list element we unlinked
                     return firstValue;
                 }
                 outputError("It is not allowed to pull elements from an immutable list");
@@ -91,7 +93,7 @@ Mvalue* Mpull(Mvalue* listValue){ // remove and return the first value
     }
     return NULL;
 }
-Mvalue* removedFromList(Mlist* list,long long listIndex){
+Mvalue* removedFromList(Mlist* list,Mallocationowner owner_list,long long listIndex){
     Mvalue* removedValue=NULL;
     if(list){
         if(listIndex>0){
@@ -105,7 +107,7 @@ Mvalue* removedFromList(Mlist* list,long long listIndex){
                         if(previouslistelement)previouslistelement->_next=listelement->_next;else list->_first=listelement->_next;
                         list->numberOfElements--; // one less element in the list
                         removedValue=listelement->_value; // BEFORE freeing the element (and dereferencing the value well if this is not a weak list which it most likely will not be)
-                        listelement->_next=NULL;/* prevents releasing all following!*/free_listelement(listelement,list->weak); // takes care of dereferencing the value
+                        listelement->_next=NULL;/* prevents releasing all following!*/free_listelement(listelement,list->weak,Msubowner(owner_list,1)); // takes care of dereferencing the value
                         break;
                     }
                     previouslistelement=listelement; // remember the previous list element (in case we find a match)
@@ -123,7 +125,7 @@ Mvalue* removedFromList(Mlist* list,long long listIndex){
  * \brief removes any element with the given listIndex, if no such element is present M_LL_INVALID is returned
  * \returns the removed element
  */
-Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){
+Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* removedValue=NULL;
     if(listValue&&listValue->type==VT_LIST){
         Mlist* list=listValue->value._list;
@@ -133,25 +135,25 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){
                     if(listIndexValue->type==VT_LIST){ // multiple
                         Mlist* indexList=listIndexValue->value._list;
                         if(indexList){
-                            Mlist* _removedElementsList=_getListOfType(list->valuetype); // get a list of the same type as the list from which elements are removed!!!
+                            Mlist* _removedElementsList=(Mlist*)OWNED(_getListOfType(list->valuetype),owner); // get a list of the same type as the list from which elements are removed!!!
                             if(_removedElementsList){
                                 Mlistelement* indexListelement=indexList->_first;
                                 Mvalue* removedFromListValue;
                                 while(indexListelement){
-                                    removedFromListValue=removedFromList(list,getValueInteger(indexListelement->_value));
-                                    if(removedFromListValue&&!appendedToList(_removedElementsList,removedFromListValue,M_LL_INVALID))outputError("Failed to remember a removed list element");
+                                    removedFromListValue=removedFromList(list,Msubowner(getValueOwner(),1),getValueInteger(indexListelement->_value));
+                                    if(removedFromListValue&&!appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID))outputError("Failed to remember a removed list element");
                                     indexListelement=indexListelement->_next;
                                 }
-                                return _getValueOfList(_removedElementsList,true);
+                                removedValue=_getValueOfList(_removedElementsList);
+                                if(!removedValue)free_list(_removedElementsList,owner);
                             }else 
                                 outputError("Failed to create a list for storing the removed list elements");
                         }else 
                             outputBug("Missing index list");
                     }else // something else
-                        removedValue=removedFromList(list,getValueInteger(listIndexValue));
+                        removedValue=removedFromList(list,Msubowner(getValueOwner(),1),getValueInteger(listIndexValue));
                 }else 
                     outputError("No or invalid list index/indices second argument to the removed() function");
-
             }else 
                 outputError("Will not remove elements from a list that is immutable");
         }else 
@@ -164,29 +166,31 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){
 /**
  * \brief returns the indices of the elements in \p listValue equal to \p listElementValue but at most \p maximumNumberOfElementsValue
  */
-Mvalue* Mfind(Mvalue* listValue,Mvalue* listElementValue,Mvalue* maximumNumberOfElementsToFindValue){
+Mvalue* Mfind(Mvalue* listValue,Mvalue* listElementValue,Mvalue* maximumNumberOfElementsToFindValue){Mallocationowner owner=getOwner(__LINE__);
+    Mvalue* _findValue=NULL;
     if(listValue&&listValue->type==VT_LIST){
         Mlist* list=listValue->value._list;
         if(list){
             long long maximumNumberOfElementsToFind=getValueInteger(maximumNumberOfElementsToFindValue);
-            Mlist* _foundElementsIndicesList=_getListOfType(VT_INTEGER); // get a list of the same type as the list from which elements are removed!!!
+            Mlist* _foundElementsIndicesList=(Mlist*)OWNED(_getListOfType(VT_INTEGER),owner); // get a list of the same type as the list from which elements are removed!!!
             if(_foundElementsIndicesList){
                 Mlistelement* listelement=list->_first;
                 while(listelement){
                     if(areValuesEqual(listelement->_value,listElementValue)){
-                        if(appendedToList(_foundElementsIndicesList,_getIntegerValue(listelement->index),M_LL_INVALID)<=0)outputError("Failed to store the index of a list element found");else
+                        if(appendedToList(_foundElementsIndicesList,owner,_getIntegerValue(listelement->index),M_LL_INVALID)<=0)outputError("Failed to store the index of a list element found");else
                         if(maximumNumberOfElementsToFind>0&&_foundElementsIndicesList->numberOfElements>=maximumNumberOfElementsToFind)break;
                     }
                     listelement=listelement->_next;
                 }
-                return _getValueOfList(_foundElementsIndicesList,true);
+                _findValue=_getValueOfList(_foundElementsIndicesList);
+                if(!_findValue)free_list(_foundElementsIndicesList,owner);
             }else
                 outputError("Failed to create the list to store the indices of the element to find");
         }else
             outputBug("Missing list");
     }else 
         outputError("No list to search for a particular value.");
-    return NULL;
+    return _findValue;
 }
 
 Mvalue* Mfirst(Mvalue* listValue){ // return the first value
@@ -200,8 +204,8 @@ Mvalue* Mlast(Mvalue* listValue){ // return the last value
 // what statistics do we want to compute of a given sample of numbers? count, sum, sumofsquares, mode, minimum, maximum, missing
 // count and missing are integers, sum, sumofsquares, mode, minimum and maximum are in the same unit as the input values
 // if we use sum and sumofsquares to compute the mean and variance we can store these in a rational for integer input values
-Mmap* _getIntegerSampleStatisticsMap(Mlist* list){
-    Mmap* _statisticsMap=_getMapOfType(VT_UNDEFINED);
+Mmap* _getIntegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _statisticsMap=OWNED(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing integer sample statistics.\n");
         long long missings=0,errors=0;
@@ -233,60 +237,69 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){
                 }else missings++;
             }
             // ready to compose the map elements
-            appendedToMap(_statisticsMap,"count",_getIntegerValue(count));
-            appendedToMap(_statisticsMap,"sum",_getIntegerValue(sum));
-            appendedToMap(_statisticsMap,"squaressum",_getIntegerValue(squaressum));
-            appendedToMap(_statisticsMap,"minimum",_getIntegerValue(minimum));
-            appendedToMap(_statisticsMap,"maximum",_getIntegerValue(maximum));
-            appendedToMap(_statisticsMap,"minimumindex",_getIntegerValue(minimumindex));
-            appendedToMap(_statisticsMap,"maximumindex",_getIntegerValue(maximumindex));
+            appendedToMap(_statisticsMap,owner,"count",_getIntegerValue(count));
+            appendedToMap(_statisticsMap,owner,"sum",_getIntegerValue(sum));
+            appendedToMap(_statisticsMap,owner,"squaressum",_getIntegerValue(squaressum));
+            appendedToMap(_statisticsMap,owner,"minimum",_getIntegerValue(minimum));
+            appendedToMap(_statisticsMap,owner,"maximum",_getIntegerValue(maximum));
+            appendedToMap(_statisticsMap,owner,"minimumindex",_getIntegerValue(minimumindex));
+            appendedToMap(_statisticsMap,owner,"maximumindex",_getIntegerValue(maximumindex));
             // with these values we are able to compute the mean and the variance and the standard deviation
             if(count>0){
                 // we need big integers of all the relevant values
-                Mbiginteger *_count=_getBiginteger(count),*_sum=_getBiginteger(sum),*_squaressum=_getBiginteger(squaressum);
+                Mbiginteger *_count=OWNED(_getBiginteger(count),owner),*_sum=OWNED(_getBiginteger(sum),owner),*_squaressum=OWNED(_getBiginteger(squaressum),owner);
                 if(_count&&_sum&&_squaressum){
-                    Mrational* _mean=_getRational(_getBigintegerCopy(_sum),_getBigintegerCopy(_count),M_LD_NAN,true,true);
-                    if(_mean)appendedToMap(_statisticsMap,"mean",_getRationalValue(_mean,true));
+                    Mvalue* _meanValue=_getRationalValue(OWNED(_getRational(_sum,_count,M_LD_NAN,true),owner),owner);
+                    if(!_meanValue||appendedToMap(_statisticsMap,owner,"mean",_meanValue)<=0)outputError("Failed to store the sample mean in the statistics map");
                     // the sum of squared deviations (of sum of squares) is defined as squaressum-(sum*sum)/count
-                    Mrational* _squaressumRational=_getRational(_getBigintegerCopy(_squaressum),NULL,M_LD_NAN,false,true);
+                    Mrational* _squaressumRational=OWNED(_getRational(_squaressum,NULL,M_LD_NAN,false),owner);
                     if(_squaressumRational){
                         // I need to subtract another rational
-                        Mbiginteger* _squaredsum=__biginteger();
+                        Mbiginteger* _squaredsum=(Mbiginteger*)OWNED(__biginteger(),owner);
                         if(_squaredsum){
                             if(mp_sqr(MP_INT_POINTER(_sum),MP_INT_POINTER(_squaredsum))==MP_OKAY){
-                                Mrational* _tosubtract=_getRational(_getBigintegerCopy(_squaredsum),_getBigintegerCopy(_count),M_LD_NAN,false,true);
+                                Mrational* _tosubtract=OWNED(_getRational(_squaredsum,_count,M_LD_NAN,false),owner);
                                 if(_tosubtract){
-                                    Mrational* _sumofsquaresRational=_getRationalDifference(_squaressumRational,_tosubtract);
-                                    appendedToMap(_statisticsMap,"sumofsquares",_getRationalValue(_sumofsquaresRational,true));
-                                    // next to divide by the count minus 1 to give us the variance
-                                    Mbiginteger* _countminus1=_getBigintegerCopy(_count);
-                                    if(_countminus1&&mp_decr(MP_INT_POINTER(_countminus1))==MP_OKAY){
-                                        Mrational* _varianceRational=_getRationalBigintegerQuotient(_sumofsquaresRational,_countminus1);
-                                        if(_varianceRational){
-                                            appendedToMap(_statisticsMap,"variance",_getRationalValue(_varianceRational,true));
-                                            // and finally the standard deviation
+                                    Mrational* _sumofsquaresRational=OWNED(_getRationalDifference(_squaressumRational,_tosubtract),owner);
+                                    if(_sumofsquaresRational){
+                                        Mvalue* _sumofsquaresRationalValue=_getRationalValue(_sumofsquaresRational,owner);
+                                        if(_sumofsquaresRationalValue){ // _sumofsquaresRational now bound to the value
+                                            if(appendedToMap(_statisticsMap,owner,"sumofsquares",_sumofsquaresRationalValue)<=0)outputError("Failed to store the sample sum of squares in the statistics map");
+                                            // next to divide by the count minus 1 to give us the variance
+                                            Mbiginteger* _countminus1=(Mbiginteger*)OWNED(_getBigintegerCopy(_count),owner);
+                                            if(_countminus1){
+                                                if(mp_decr(MP_INT_POINTER(_countminus1))==MP_OKAY){
+                                                    Mrational* _varianceRational=OWNED(_getRationalBigintegerQuotient(_sumofsquaresRational,_countminus1),owner);
+                                                    if(_varianceRational){
+                                                        Mvalue* _varianceRationalValue=__getRationalValue(_varianceRational,owner);
+                                                        if(!_varianceRationalValue||appendedToMap(_statisticsMap,owner,"variance",_varianceRationalValue)<=0)outputError("Failed to store the sample variance in the statistics map");
+                                                        // TODO and finally the standard deviation
+                                                    }
+                                                }
+                                                free_biginteger(_countminus1,owner);
+                                            }
                                         }
                                     }
                                 }                       
                             }
-                            free_biginteger(_squaredsum);
+                            free_biginteger(_squaredsum,owner);
                         }
                     }else 
                         outputError("Failed to initialize the sum of squares");
                 }else 
                     outputMemoryError("Failed to store the sample size and/or sum in a big integer");
-                free_biginteger(_sum);free_biginteger(_count);free_biginteger(_squaressum);
+                free_biginteger(_sum,owner);free_biginteger(_count,owner);free_biginteger(_squaressum,owner);
             }
         }
-        appendedToMap(_statisticsMap,"missings",_getIntegerValue(missings));
-        appendedToMap(_statisticsMap,"errors",_getIntegerValue(errors));
+        appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
+        appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
         return _statisticsMap;
     }
     outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
 }
-Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){
-    Mmap* _statisticsMap=_getMapOfType(VT_UNDEFINED);
+Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _statisticsMap=OWNED(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing big integer sample statistics.\n");
         Mbiginteger* biginteger=NULL;
@@ -304,7 +317,8 @@ Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){
         }
         if(biginteger){ // at least one valid integer in the list
             long long count=1,minimumindex=listelement->index,maximumindex=listelement->index; // counting the missings and the number of sample values (that are NOT missing)
-            Mbiginteger *sumofsquares=__biginteger(),*sum=_getBigintegerCopy(biginteger),*minimum=_getBigintegerCopy(biginteger),*maximum=_getBigintegerCopy(biginteger);
+            Mbiginteger *sumofsquares=(Mbiginteger*)OWNED(__biginteger(),owner),*sum=(Mbiginteger*)OWNED(_getBigintegerCopy(biginteger),owner)
+                       ,*minimum=(Mbiginteger*)OWNED(_getBigintegerCopy(biginteger),owner),*maximum=(Mbiginteger*)OWNED(_getBigintegerCopy(biginteger),owner);
             if(sum&&minimum&&maximum&&sumofsquares&&mp_mul(MP_INT_POINTER(biginteger),MP_INT_POINTER(biginteger),MP_INT_POINTER(sumofsquares))==MP_OKAY){
                 // every time we get a big integer to use to update the cumulative sample statistics we're going to update the helpers first
                 Mbiginteger *_newsum=__biginteger(),*_newssq=__biginteger(),*_newminimum=__biginteger(),*_newmaximum=__biginteger(),*_square=__biginteger();
@@ -336,31 +350,34 @@ Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){
                         if(someerror)break;
                     }
                     if(!someerror){
-                        appendedToMap(_statisticsMap,"count",_getIntegerValue(count));
-                        appendedToMap(_statisticsMap,"sum",_getBigintegerValue(sum,true));
-                        appendedToMap(_statisticsMap,"sumofsquares",_getBigintegerValue(sumofsquares,true));
-                        appendedToMap(_statisticsMap,"minimum",_getBigintegerValue(minimum,true));
-                        appendedToMap(_statisticsMap,"maximum",_getBigintegerValue(maximum,true));
+                        appendedToMap(_statisticsMap,owner,"count",_getIntegerValue(count));
+                        appendedToMap(_statisticsMap,owner,"sum",_getBigintegerValue(sum));
+                        appendedToMap(_statisticsMap,owner,"sumofsquares",_getBigintegerValue(sumofsquares));
+                        appendedToMap(_statisticsMap,owner,"minimum",_getBigintegerValue(minimum));
+                        appendedToMap(_statisticsMap,owner,"maximum",_getBigintegerValue(maximum));
                     }else{
-                        Mstring* _error=__string();
+                        Mstring* _error=OWNED(__string(),owner);
                         if(_error){
-                            if(listelement){string_append(_error,"Some error occurred while updating the sample statistics with the list element at index ");appendll(_error,listelement->index);string_append(_error,".");}
-                            else string_append(_error,"Failed to compute the big integer sample statistics.");
-                            appendedToMap(_statisticsMap,"error",_getTextValue(strdup(string(_error)),false));
-                            free_string(_error);
-                        }else
-                            appendedToMap(_statisticsMap,"error",_getTextValue(strdup("Some error occurred computing the big integer sample statistics."),false));
+                            if(listelement){
+                                string_append(_error,"Some error occurred while updating the sample statistics with the list element at index ");
+                                appendll(_error,listelement->index);string_append(_error,".");
+                            }else
+                                string_append(_error,"Failed to compute the big integer sample statistics.");
+                            appendedToMap(_statisticsMap,owner,"error",_getTextValue(string(_error)));
+                            free_string(_error,owner);
+                        }else // NOTE _getTextValue will _strdup the text given, so we do not need to do that here!!!
+                            appendedToMap(_statisticsMap,owner,"error",_getTextValue("Some error occurred computing the big integer sample statistics."));
                     }
-                }else 
+                }else
                     outputError("Failed to create all big integer helpers in computing big integer sample statistics");
-                free_biginteger(_newsum);free_biginteger(_newssq);free_biginteger(_newminimum);free_biginteger(_newmaximum);free_biginteger(_square);
+                free_biginteger(_newsum,owner);free_biginteger(_newssq,owner);free_biginteger(_newminimum,owner);free_biginteger(_newmaximum,owner);free_biginteger(_square,owner);
                 // ready to compose the map elements
             }else 
                 outputError("Failed to initialize the big integer sample statistics");
         }
-        appendedToMap(_statisticsMap,"missings",_getIntegerValue(missings));
-        appendedToMap(_statisticsMap,"errors",_getIntegerValue(errors));
-        return _statisticsMap;
+        appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
+        appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
+        return DISOWNED(_statisticsMap,owner);
     }
     outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
@@ -383,8 +400,8 @@ Mmap* _getRationalSampleStatisticsMap(Mlist* list){
     outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
 }
-Mmap* _getFloatSampleStatisticsMap(Mlist* list){
-    Mmap* _statisticsMap=_getMapOfType(VT_UNDEFINED);
+Mmap* _getFloatSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _statisticsMap=OWNED(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing float sample statistics.\n");
         long long missings=0,errors=0;
@@ -415,37 +432,41 @@ Mmap* _getFloatSampleStatisticsMap(Mlist* list){
                     missings++;
             }
             // ready to compose the map elements
-            appendedToMap(_statisticsMap,"count",_getIntegerValue(count));
-            appendedToMap(_statisticsMap,"sum",_getFloatValue(sum));
-            appendedToMap(_statisticsMap,"sumofsquares",_getFloatValue(sumofsquares));
-            appendedToMap(_statisticsMap,"minimum",_getFloatValue(minimum));
-            appendedToMap(_statisticsMap,"maximum",_getFloatValue(minimum));
-            appendedToMap(_statisticsMap,"minimumindex",_getIntegerValue(minimumindex));
-            appendedToMap(_statisticsMap,"maximumindex",_getIntegerValue(maximumindex));
+            appendedToMap(_statisticsMap,owner,"count",_getIntegerValue(count));
+            appendedToMap(_statisticsMap,owner,"sum",_getFloatValue(sum));
+            appendedToMap(_statisticsMap,owner,"sumofsquares",_getFloatValue(sumofsquares));
+            appendedToMap(_statisticsMap,owner,"minimum",_getFloatValue(minimum));
+            appendedToMap(_statisticsMap,owner,"maximum",_getFloatValue(minimum));
+            appendedToMap(_statisticsMap,owner,"minimumindex",_getIntegerValue(minimumindex));
+            appendedToMap(_statisticsMap,owner,"maximumindex",_getIntegerValue(maximumindex));
         }
-        appendedToMap(_statisticsMap,"missings",_getIntegerValue(missings));
-        appendedToMap(_statisticsMap,"errors",_getIntegerValue(errors));
-        return _statisticsMap;
+        appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
+        appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
+        return DISOWNED(_statisticsMap,owner);
     }
     outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
 }
-Mvalue* Mstats(Mvalue* listValue){
+Mvalue* Mstats(Mvalue* listValue){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _statsMap=NULL;
     if(listValue){
         Mlist* list=listValue->value._list;
         if(list){
             if(list->valuetype!=VT_MAP&&list->valuetype!=VT_REFERENCE&&list->valuetype!=VT_LIST&&list->valuetype!=VT_UNDEFINED){
                 // the values in the list need to be scalars of the same type
-                if(list->valuetype==VT_INTEGER)return _getValueOfMap(_getIntegerSampleStatisticsMap(list),true);
-                if(list->valuetype==VT_BIGINTEGER)return _getValueOfMap(_getBigintegerSampleStatisticsMap(list),true);
-                if(list->valuetype==VT_RATIONAL)return _getValueOfMap(_getRationalSampleStatisticsMap(list),true);
-                if(list->valuetype==VT_DECIMAL)return _getValueOfMap(_getDecimalSampleStatisticsMap(list),true);
-                if(list->valuetype==VT_FLOAT)return _getValueOfMap(_getFloatSampleStatisticsMap(list),true);
+                if(list->valuetype==VT_INTEGER)_statsMap=(Mmap*)OWNED(_getIntegerSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_BIGINTEGER)_statsMap=(Mmap*)OWNED(_getBigintegerSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_RATIONAL)_statsMap=(Mmap*)OWNED(_getRationalSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_DECIMAL)_statsMap=(Mmap*)OWNED(_getDecimalSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_FLOAT)_statsMap=(Mmap*)OWNED(_getFloatSampleStatisticsMap(list),owner);
             }else
-                output("All values in the list should be of the same numeric type (integer, float, rational or decimal).\n");
+                output("All values in the list should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
         }else 
             outputBug("List vanished!");
     }else
         outputError("No sample list to compute statistics of");
-    return NULL;
+    if(!_statsMap)return NULL;
+    Mvalue* _statsValue=_getValueOfMap(_statsMap);
+    if(!_statsValue)free_map(_statsMap,owner);
+    return _statsValue;
 }

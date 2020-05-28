@@ -54,7 +54,7 @@ size_t outputToken(Mtoken* _token);
 */
 void outputLastTokenChar(Mtoken* token);
 // does not need to be exposed as it's only used internally: Mtoken* freeToken(Mtoken* _token);
-Mtoken* removedLastCommandToken(Mcommand* command); // needs to be here, as it is used by isAValidCommand() to cut off comments and errors
+Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command); // needs to be here, as it is used by isAValidCommand() to cut off comments and errors
 // for appending input characters to the end of a given command (as used by Mevalfunction) and commandCharacterAccepted() in M.c
 
 int8_t containsVariable(Menvironment const * const _environment,char /*const*/ * const name, int8_t report); // MDH@12MAR2020: used in changeFunctionTokenToAVariable() (moved from Menvironment.h/c)
@@ -63,7 +63,7 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput);
 bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId);
 Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput);
 
-int8_t isAValidCommandIndicator(Mcommand* command,bool report); // returns negative values for invalid commands, 0 for invalid input, positive value for valid commands
+int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report); // returns negative values for invalid commands, 0 for invalid input, positive value for valid commands
 
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount);
 

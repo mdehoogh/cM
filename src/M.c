@@ -1266,7 +1266,7 @@ bool registerCommand(Mcommand* command){Mallocationowner owner=getOwner(__LINE__
 	}else{ // should be added to the function body
 		// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
 		// MDH@25MAY2020 TODO should we pass {1} to _getValueOfToken()?????????
-		Mvalue* _commandToEvaluateTokenValue=(Mvalue*)OWNED(_getValueOfToken(command->_firstToken),owner);
+		Mvalue* _commandToEvaluateTokenValue=(Mvalue*)OWNED(_getValueOfToken(command->_firstToken,(Mallocationowner){1}),owner);
 		if(_commandToEvaluateTokenValue){
 			// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
 			if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
@@ -1437,7 +1437,7 @@ bool removeLastUserInputCommandToken(){
 	if(!_userInputCommand||!_userInputCommand->_lastToken)return false;
 	// MDH@20SEP2019: if a token is removed, we also need to remove any associated feed forward text associated with the token
 	deleteTokenAutocompletionText(_userInputCommand->_lastToken);
-	removedLastCommandToken(_userInputCommand); // NOT using the result (which would be the new last command token)
+	removedLastCommandToken(_userInputCommand,owner_userInputCommand); // NOT using the result (which would be the new last command token)
 	return true;
 }
 
@@ -1729,7 +1729,7 @@ long long allocationMarksAdded=0;
 bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LINE__);
 	
 	/// NOT HERE!! outputChar('\n'); // indicating that the command is being evaluated!!!
-	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,true);
+	int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,owner_userInputCommand,true);
 	if(aValidCommandIndicator<=0){
 		// MDH@20FEB2020: this is what we did in isAValidCommand() before, but removed from it: if the command ends with an error, we remove the error token, unfinish the (new) last token, so we can re-use it
 		if(_userInputCommand&&_userInputCommand->_lastToken&&_userInputCommand->_lastToken->type==TT_ERROR){
@@ -2614,7 +2614,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(_userInputCommand,inputChar,inputCharacterType,endOfInput);
 	if(!newLastCommandToEvaluateToken)return false;
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
-		_userInputCommand->_lastToken=newLastCommandToEvaluateToken;
+		_userInputCommand->_lastToken=SUBOWNED(OWNED(newLastCommandToEvaluateToken,owner_userInputCommand),1); // MDH@28MAY2020: take over ownership of the new last command token
 		outputUserInputCommandTokenColor();
 	}else{
 		// MDH@31OCT2019: show whitespace in the standard info color!!
@@ -2826,7 +2826,7 @@ Mvalue* Mvariables(){Mallocationowner owner=getOwner(__LINE__);
 		outputInfo("Getting the variables!");
 	// returning the names of the local variables (including the hidden ones)
 	// NOTE _getVariableNamesMap() always requires a non NULL environment to start with
-	return(Mvalue*)DISOWNED(OWNED(_getValueOfMap(OWNED(_getVariableNamesMap(getExecutionEnvironment()),owner)),owner),owner);
+	return _getValueOfMap(OWNED(_getVariableNamesMap(getExecutionEnvironment()),owner),owner);
 }
 // MDH@15NOV2019: returning value counts (per value type), passing in a list of variable names
 // MDH@25NOV2019: what about returning a table??? which is a list
@@ -2835,7 +2835,7 @@ Mvalue* Mvalues(Mvalue* variableNamesValue){Mallocationowner owner=getOwner(__LI
 		outputInfo("Getting the values!");
 	// MDH@25NOV2019: requesting the table allows for better reproduction
 	//                TODO instead of the table return the text representation of the table (which is easier to inspect!!!)
-	return(Mvalue*)DISOWNED(OWNED(_getValueOfList(OWNED(_getValuesTable(variableNamesValue),owner)),owner),owner);
+	return _getValueOfList(OWNED(_getValuesTable(variableNamesValue),owner),owner);
 	// replacing: return _getValueOfMap(_getValuesTable(variableNamesValue),true);
 }
 // method for reading a text from standard out which means reading characters until Enter-key is encountered!!
@@ -2926,7 +2926,7 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner
 				  }
 			}
 			pclose(fp);
-			_commandOutputValue=(Mvalue*)OWNED(_getValueOfList(_commandOutputList),owner);
+			_commandOutputValue=_getValueOfList(_commandOutputList,owner);
 		}else
 			output("%sFailed to execute OS command '%s'.\n",M_ERROR_PREFIX,string(_commandText));
 	}
@@ -3403,7 +3403,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							char c;inputCharRead(&c);
 							*/
 						}
-						int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,false);
+						int8_t aValidCommandIndicator=isAValidCommandIndicator(_userInputCommand,owner_userInputCommand,false);
 						inputInfo("Valid command indicator: %d.",aValidCommandIndicator);
 						// not using \ for newline continuation forces me to actually check whether the command is valid!!
 						if(aValidCommandIndicator<=0){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!

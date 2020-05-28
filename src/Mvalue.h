@@ -130,10 +130,12 @@ Mvalue* _getIntegerValue(long long ll);
 Mvalue* _getCharTextValue(char _c);
 
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
-Mvalue* _getReferenceValue(Mreference* _reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
-Mvalue* _getRationalValue(Mrational* _rational);
-Mvalue* _getDecimalValue(Mdecimal* _decimal);
+// MDH@28MAY2020 TODO shouldn't we rename these to _getValueOfReference etc.
+Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_biginteger); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner_rational);
+Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner_decimal);
+
 Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char const * const text);
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
@@ -141,11 +143,11 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty m
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
-Mvalue* _getValueOfList(Mlist* _list);
-Mvalue* _getValueOfInteger(Minteger* _integer);
-Mvalue* _getValueOfReal(Mfloat* _real);
-Mvalue* _getValueOfMap(Mmap* _map);
-Mvalue* _getValueOfToken(Mtoken* _token);
+Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list);
+Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer);
+Mvalue* _getValueOfReal(Mfloat* _real,Mallocationowner owner_real);
+Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map);
+Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token);
 
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mmap* _getMapOfType(Mvaluetype valuetype);
@@ -157,7 +159,10 @@ Mmap* mapMadeWeak(Mmap* map);
 bool decrementReferenceCount(Mvalue* _value);
 bool incrementReferenceCount(Mvalue* _value);
 
-void free_value(Mvalue* _value,Mallocationowner owner);
+// MDH@28MAY2020: because every value is owned by the same owner i.e. 'the value owner' which is one level down _valueList there's no need to call free_value with an owner
+//                technically this means that a value once created does (and should) never change ownership as opposed to locally created stuff not bound to a global variable
+Mallocationowner getValueOwner();
+// MDH@28MAY2020 better not to let the outside free values ever (except this module's garbage collector of course): void free_value(Mvalue* _value/*,Mallocationowner owner*/);
 //////////Mstring* appendld(Mstring* mstr,long double ld);
 
 /*unsigned */long long appendedToList(Mlist* const _list,Mallocationowner owner_list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
@@ -212,9 +217,9 @@ Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getIntegerBooleanMap(char* name1,char* name2);
 
 // list to map (list) conversions
-bool listAppendedToMap(Mmap * const _map,Mlist const * const _list); // append a list to a (possibly empty) map using the indices as attribute name
+bool listAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist const * const _list); // append a list to a (possibly empty) map using the indices as attribute name
 bool listAppendedToMaplist(Mlist * const _maplist,Mallocationowner owner_maplist,Mlist const * const _list); // append a list to a (possibly empty) map using the indices as attribute name
-bool maplistAppendedToList(Mlist * const _list,Mallocationowner owner_list,const Mlist const * const _maplist);
+bool maplistAppendedToList(Mlist * const _list,Mallocationowner owner_list,Mlist const * const _maplist);
 bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist const * const _maplist);
 // map to (map) list conversions
 bool mapAppendedToList(Mlist * const _list,Mallocationowner owner_list,Mmap const * const _map);
@@ -280,7 +285,7 @@ typedef struct Muserfunction{
     struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
     struct Mlist* _bodyCommandList; // a list of body commands
 }Muserfunction;
-void free_userfunction(Muserfunction* _userfunction);
+void free_userfunction(Muserfunction* _userfunction,Mallocationowner owner_userfunction);
 
 typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS,FT_INTERNAL_FIVE_ARGUMENTS}Mfunctiontype;
 

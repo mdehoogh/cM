@@ -318,32 +318,32 @@ static OutputCommandInfoFunction* outputCommandInfoFunction=outputCommandInfo;
  * freeToken() frees the memory @_userInputCommand->_lastToken points to and returns true on successfully removing the entire chain of tokens it points to
  * @returns the previous token (as we need that )  
  */
-Mtoken* freeToken(Mtoken* _token){
+static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
 	// MDH@30APR2019: let's delegate to free_token()
-	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token);}return _prevToken;
+	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token,owner_token);}return _prevToken;
 }
 // keep track of the state of entering a command
 // MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
 // MDH@28FEB2020: we NO longer NULL Mcommand* (we can't because that would require Mcommand**) BUT that would only be required 
 //                I suppose this also means that we do not need to return true or false anymore, any caller can check for a last token itself (i.e. an empty command!!!!)
 //                now returning the new last command token
-Mtoken* removedLastCommandToken(Mcommand* command){
+Mtoken* removedLastCommandToken(Mcommand* command,Mallocationowner owner_command){
 	// NOTE we can still remove the pointer although you cannot use it anymore (except for testing) because free_token would have released the associated memory!!!
 	if(command&&command->_lastToken){
-		command->_lastToken=freeToken(command->_lastToken); // MDH@28FEB2020: used to be removeLastUserInputCommandToken
+		command->_lastToken=freeToken(command->_lastToken,Msubowner(owner_command,1)); // MDH@28FEB2020: used to be removeLastUserInputCommandToken
 		if(command->_lastToken)command->_lastToken->next=NULL;
 		else command->_firstToken=NULL; // MDH@20FEB2020 ADDITION: it makes sense to NULL _firstToken if _lastToken is NULL
 	}
 	return(command?command->_lastToken:NULL);
 }
 
-int8_t isAValidCommandIndicator(Mcommand* command,bool report){
+int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report){
 
 	// 1. if no command nothing evaluated TODO don't call when this is the case though
 	if(!command||!command->_firstToken){if(report)outputError("Undefined or empty command");return 0;}
 
 	Mtoken* lastCommandToken=command->_lastToken;
-	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command);
+	if(lastCommandToken&&lastCommandToken->type==TT_COMMENT)lastCommandToken=removedLastCommandToken(command,owner_command);
 
 	if(!lastCommandToken){if(report)outputError("Empty command");return 0;}
 	
@@ -428,9 +428,9 @@ int8_t isAValidCommandIndicator(Mcommand* command,bool report){
 
 }
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
-Mvalue* getCommandValue(Mcommand* command,char commandType){
+Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char commandType){
 	if(amVerbose())if(outputCommandInfoFunction)outputCommandInfoFunction(command); // MDH@04MAR2020: using the given output command info function
-	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,amVerbose());
+	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,owner_command,amVerbose());
 	if(aValidCommandIndicator<=0)return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
 	if(amVerbose())outputInfo("Evaluating...");
@@ -469,7 +469,7 @@ Mvalue* getdc(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				appendedToMap(_contextMap,owner,"clamp",_getIntegerValue(mpd_context->clamp));
 				appendedToMap(_contextMap,owner,"newtrap",_getIntegerValue(mpd_context->newtrap));
 				appendedToMap(_contextMap,owner,"traps",_getIntegerValue(mpd_context->traps));
-				return(Mvalue*)DISOWNED(OWNED(_getValueOfMap(_contextMap),owner),owner);
+				return _getValueOfMap(_contextMap,owner);
 			}
 		}
 	}
@@ -645,7 +645,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							// a for loop should continue unless the condition value is zero or undefined
 							if(isValueZero(_conditionValue)!=M_FALSE)break; // condition evaluates to zero or is undefined
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
-							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1,owner));
+							setValue(_forEnvironment,"_",_getIntegerValue(getValue(_forEnvironment,"_")->value._integer->ll+1));
 							if(amVerboseDebugging()){
 								outputValue("For loop condition in iteration #",getValue(_forEnvironment,"_"),NULL);
 								outputValue(" evaluates to '",_conditionValue,"'.\n");
@@ -1277,7 +1277,8 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				if(amVerbose())outputChar(evalInputChar);
 				evalInputCharType=INPUTCHARACTERTYPES[evalInputChar];
 				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,evalInputChar,&evalInputCharType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
-				if(newLastEvalCommandToken!=_evalCommand->_lastToken)_evalCommand->_lastToken=newLastEvalCommandToken; // update our eval command's last token TODO do we need to test here????
+				// MDH@28MAY2020: take over ownership of the new token returned
+				if(newLastEvalCommandToken!=_evalCommand->_lastToken)_evalCommand->_lastToken=SUBOWNED(OWNED(newLastEvalCommandToken,owner),1); // update our eval command's last token TODO do we need to test here????
 				if(!_evalCommand->_lastToken)break;
 			}
 			if(amVerbose())outputInfo("'.");
@@ -1289,7 +1290,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					if(pushExecutionEnvironment(_evalEnvironment)){
 						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
 						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
-						_evalValue=(Mvalue*)OWNED(getCommandValue(_evalCommand,'e'),owner);
+						_evalValue=(Mvalue*)OWNED(getCommandValue(_evalCommand,owner,'e'),owner); // NOTE only place where getCommandValue() is called in Mshell.c
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
@@ -1306,10 +1307,10 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 // end very special M functions
 
 // MCommand stuff
-void free_command(Mcommand* _command,Mallocationowner owner){
+void free_command(Mcommand* _command,Mallocationowner owner_command){
 	if(!_command)return;
-	if(_command->_firstToken)free_token(_command->_firstToken,owner); // will free ALL connected tokens!!!
-	FREE_1(_command,'K',owner);
+	if(_command->_firstToken)free_token(_command->_firstToken,Msubowner(owner_command,1)); // will free ALL connected tokens!!!
+	FREE_1(_command,'K',owner_command);
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
@@ -1774,7 +1775,7 @@ Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=
 	}
 	// NOTE if the second argument (computesinetableValue is NOT specified and isValueZero() returns M_LL_INVALID, compute as well)
 	// CORRECTION by default should NOT compute the sine table (to speed up computing pi)
-	return DISOWNED(OWNED(_getDecimalValue(OWNED(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),owner)),owner),owner);
+	return _getDecimalValue(OWNED(pi_decimal(_getDecimalcontext(numberOfRequestedDecimals),isValueZero(computesinetableValue)==M_FALSE),owner),owner);
 }
 
 // wolfram reports 13 different approximations to pi at http://functions.wolfram.com/Constants/Pi/10/
@@ -1886,11 +1887,11 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					free_rational(_rational,owner);
 					return NULL;
 				} // multiply the numerator by 4 i.e. 2**2
-				normalizeRational(_rational);
+				normalizeRational(_rational,owner);
 				if(amVerbose())
 					outputRational("Normalized approximation of pi: ",_rational,".\n");
 				// if we get here _rational is the result to return
-				return DISOWNED(OWNED(_getRationalValue(_rational),owner),owner);
+				return _getRationalValue(_rational,owner);
 			}
 		}
 	}
@@ -1969,7 +1970,7 @@ Mvalue* pi_q(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						_rational=NULL;
 					}
 				}
-				return DISOWNED(_getRationalValue(_rational),owner);
+				return _getRationalValue(_rational,owner);
 			}
 		}
 	}
@@ -2020,8 +2021,12 @@ Mvalue* getResult(Mvalue* indexValue){
 Mvalue* l2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _mapValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_mapValue=OWNED(_getMapValue(value->type,false),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
-		if(!listAppendedToMap(_mapValue->value._map,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+		Mmap* _map=(Mmap*)OWNED(_getMapOfType(value->type),owner); // a strong map
+		if(!_map)return NULL;
+		if(!listAppendedToMap(_map,owner,value->value._list))
+			outputError("Failed to append a list to a map")
+		; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+		_mapValue=_getValueOfMap(_map,owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 	}
 	return _mapValue;
 }
@@ -2029,8 +2034,13 @@ Mvalue* l2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 Mvalue* l2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _maplistValue=NULL;
 	if(value&&value->type==VT_LIST){
-		_maplistValue=OWNED(_getListValue(VT_LIST,false,"l2ml"),owner); // a map list ALWAYS requires element of type VT_LIST
-		if(!listAppendedToMaplist(_maplistValue->value._list,owner,value->value._list))return NULL; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+		Mlist* _maplist=(Mlist*)OWNED(_getListOfType(VT_LIST),owner); // this will give me a strong list
+		if(!_maplist)return NULL;
+		// TODO check if we're passing the right 
+		if(!listAppendedToMaplist(_maplist,owner,value->value._list))
+			outputError("Failed to append a list to a map list")
+		; // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
+		_maplistValue=_getValueOfList(_maplist,owner);
 	}
 	return _maplistValue;
 }
@@ -2041,9 +2051,7 @@ Mvalue* ml2l(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	_list->valuetype=value->type;
 		// replacing: _maplistValue=OWNED(_getListValue(value->type,false,"ml2l"),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 	maplistAppendedToList(_list,owner,value->value._list); // TODO should we 'release' the map that was created somehow???? I guess the map not getting assigned will be released somehow automatically...
-	Mvalue* _listValue=_getValueOfList(_list);
-	if(!_listValue)free_list(_list,owner);
-	return _listValue;
+	return _getValueOfList(_list,owner);
 }
 Mvalue* ml2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mmap* _map=(value&&value->type==VT_LIST?(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner):NULL);
@@ -2051,9 +2059,7 @@ Mvalue* ml2m(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	_map->valuetype=value->type;
 	// replacing: _mapValue=OWNED(_getMapValue(value->type,false),owner); // create a map that is of the same type as the list is (typically VT_UNDEFINED)
 	maplistAppendedToMap(_map,owner,value->value._list);
-	Mvalue* _mapValue=_getValueOfMap(_map);
-	if(!_mapValue)free_map(_map,owner);
-	return _mapValue;
+	return _getValueOfMap(_map,owner);
 }
 // map to map list conversion i.e. each list element is a attribute name - value pair
 Mvalue* m2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
@@ -2062,18 +2068,14 @@ Mvalue* m2ml(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	_list->valuetype=value->type; // TODO is this right?
 	// replacing: _maplistValue=OWNED(_getListValue(VT_LIST,false,"m2ml"),owner); // a map list should always have element of type VT_LIST (this is the only additional requirement for a list to be accepted as map lists)
 	mapAppendedToMaplist(_list,owner,value->value._map); // TODO should we release the list that was created somehow????
-	Mvalue* _maplistValue=_getValueOfList(_list);
-	if(!_maplistValue)free_list(_list,owner);
-	return _maplistValue;
+	return _getValueOfList(_list,owner);
 }
 Mvalue* m2l(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _list=(value&&value->type==VT_MAP?CALLOC_1(sizeof(Mlist),'L',owner):NULL);
 	if(!_list)return NULL;
 	_list->valuetype=value->type;
 	mapAppendedToList(_list,owner,value->value._map); // TODO should we release the list that was created somehow????
-	Mvalue* _listValue=_getValueOfList(_list);
-	if(!_listValue)free_list(_list,owner);
-	return _listValue;
+	return _getValueOfList(_list,owner);
 }
 // conversion functions
  // the value wrapper for not a real and not an integer...
@@ -2104,9 +2106,7 @@ Mvalue* getIntegerDecimalListValue(long long ll,bool littleEndianOrder){Mallocat
 	llu.ll=ll;
 	int l=sizeof(long long);
 	while(--l>=0&&appendedToList(_dlist,owner,_getIntegerValue(llu.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0);
-	Mvalue* integerDecimalListValue=_getValueOfList(_dlist);
-	if(!integerDecimalListValue)free_list(integerDecimalListValue,owner);
-	return integerDecimalListValue;
+	return _getValueOfList(_dlist,owner);
 }
 const char* const REAL_OCTET_INDEX_IDS[]={"1","2","3","4","5","6","7","8","9","10"};
 Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
@@ -2132,7 +2132,7 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
 	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
 	*/
-	return _getValueOfMap(_dmap);
+	return _getValueOfMap(_dmap,owner);
 }
 char* _getIntegerCharacters(long long ll){Mallocationowner owner=getOwner(__LINE__);
 	char str[20];sprintf(str,"%lld",ll);return DISOWNED(OWNED(_strdup(str),owner),owner);
@@ -2163,12 +2163,10 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 		}
 		appendedToMap(_dmap,owner,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 	}
-	Mvalue* _valueOfMap=_getValueOfMap(_dmap);
-	if(!_valueOfMap)free_map(_dmap,owner);
-	return _valueOfMap;
+	return _getValueOfMap(_dmap,owner);
 }
 Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mallocationowner owner=getOwner(__LINE__);
-	Mlist* _dlist=OWNED(_getListOfType(VT_INTEGER),owner);
+	Mlist* _dlist=(Mlist*)OWNED(_getListOfType(VT_INTEGER),owner);
 	if(!_dlist)return NULL;
 	longdoubleunion lld;
 	lld.ld=ld;
@@ -2176,9 +2174,7 @@ Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mal
 	// how about adding a two-element list with the first equal to the field name?????
 	while(--l>=0&&appendedToList(_dlist,owner,_getIntegerValue(lld.octets[l]),(isLittleEndian()&&littleEndianOrder?l+1:M_LL_INVALID))>0)
 	;
-	Mvalue* _valueOfList=_getValueOfList(_dlist);
-	if(!_valueOfList)free_list(_dlist,owner);
-	return _valueOfList;
+	return _getValueOfList(_dlist,owner);
 }
 
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
@@ -2195,9 +2191,7 @@ Mvalue* d(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			case VT_FLOAT: // TODO check whether somewhere I am converting a long double without using text
 			default:_decimal=OWNED(_getValueTextDecimal(value),owner);break;
 		}
-		if(!_decimal)return NULL;
-		dValue=_getDecimalValue(_decimal);
-		if(!dValue)free_decimal(_decimal,owner);
+		if(_decimal)dValue=_getDecimalValue(_decimal,owner);
 	}
 	return dValue;
 }
@@ -2238,12 +2232,7 @@ Mvalue* i(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 // convert to a big integer
 Mvalue* b(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* bValue=value;
-	if(value&&value->type!=VT_BIGINTEGER){
-		Mbiginteger* _biginteger=(Mbiginteger*)OWNED(_getValueBiginteger(value),owner);
-		if(!_biginteger)return NULL;
-		bValue=_getBigintegerValue(_biginteger);
-		if(!bValue)free_biginteger(_biginteger,owner);
-	}
+	if(value&&value->type!=VT_BIGINTEGER)bValue=_getBigintegerValue((Mbiginteger*)OWNED(_getValueBiginteger(value),owner),owner);
 	return bValue;
 }
 
@@ -2419,15 +2408,10 @@ Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
 	Mvalue* _rationalValue=NULL;
-	if(_value->type==VT_FLOAT){
-		Mlist* _rationalList=OWNED(_getLongDoubleRationalList(_value->value._float->ld,250),owner);
-		_rationalValue=_getValueOfList(_rationalList); // the intermediate results are stored in a list, and the last element will be the final result!!!
-		if(!_rationalValue)free_list(_rationalList,owner);
-	}else{
-		Mrational* _valueRational=(Mrational*)OWNED(_getValueRational(_value),owner);
-		_rationalValue=_getRationalValue(_valueRational); // make a rational from it and wrap it again
-		if(!_rationalValue)free_rational(_valueRational,owner);
-	}
+	if(_value->type==VT_FLOAT)
+		_rationalValue=_getValueOfList((Mlist*)OWNED(_getLongDoubleRationalList(_value->value._float->ld,250),owner),owner);
+	else
+		_rationalValue=_getRationalValue((Mrational*)OWNED(_getValueRational(_value),owner),owner);
 	if(amVerbose())
 		if(_rationalValue)
 			outputValue("Converted to rational '",_rationalValue,"'.");
@@ -2454,31 +2438,19 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 			outputError("Failed to purify a rational");
 			return NULL;
 		}
-		Mvalue* _rationalValue=_getRationalValue(_purifiedRational);
-		if(!_rationalValue)free_rational(_purifiedRational,owner);
-		return _rationalValue;
+		return _getRationalValue(_purifiedRational,owner);
 	}
-	if(_value->type==VT_FLOAT){
-		Mrational* _rational=OWNED(_getLongDoubleRational(_value->value._float->ld,250),owner);
-		Mvalue* _rationalValue=_getRationalValue(_rational);
-		if(!_rationalValue)free_rational(_rational,owner);
-		return _rationalValue; // forcefully free the _getLongDoubleRational if we failed to wrap it
-	}
-	Mrational* _rational=OWNED(_getValueRational(_value),owner);
-	Mvalue* _rationalValue=_getRationalValue(_rational); // make a rational from it and wrap it again
-	if(!_rationalValue)free_rational(_rational,owner);
-	if(amVerbose())outputValue("Converted to rational '",_rationalValue,"'.");
-	return _rationalValue;
+	if(_value->type==VT_FLOAT)return _getRationalValue((Mrational*)OWNED(_getLongDoubleRational(_value->value._float->ld,250),owner),owner);
+	// all remaining value types
+	return _getRationalValue((Mrational*)OWNED(_getValueRational(_value),owner),owner);
 }
-
-// convert to a real
 
 // TODO complete with conversion from big integer and rational
 Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
 	long double ld=M_LD_NAN;
 	if(amVerboseDebugging()){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 	switch(_value->type){
-		case VT_INTEGER:ld=(long double)_value->value._integer->ll);break;
+		case VT_INTEGER:ld=(long double)_value->value._integer->ll;break;
 		case VT_BIGINTEGER:if(_value->value._biginteger)ld=mp_get_long_double(_value->value._biginteger);break;
 		case VT_DECIMAL:ld=getDecimalLongDouble(_value->value._decimal);break;
 		case VT_RATIONAL:ld=getRationalLongDouble(_value->value._rational);break;
@@ -2547,32 +2519,31 @@ Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function){Malloc
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement&&appendedToList(_result,owner,function(_listelement->_value),_listelement->index))_listelement=_listelement->_next;
 	}
-	if(!_result)return NULL;
-	Mvalue* _valueOfList=_getValueOfList(_result);
-	if(!_valueOfList)free_list(_result,owner);
-	return _valueOfList;
+	return (_result?_getValueOfList(_result,owner):NULL);
 }
 // MDH@10OCT2019: a special function to compute a reciprocal value
 Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _reciprocalValue=NULL;
 	if(value)
 	switch(value->type){
-		case VT_LIST:_reciprocalValue=OWNED(_functionAppliedToList(value->value._list,Mreciprocal),owner);break;
-		case VT_FLOAT:_reciprocalValue=OWNED(_getFloatValue(1/value->value._float->ld),owner);break; // TODO check what happens when the real equals 0
-		case VT_RATIONAL:_reciprocalValue=OWNED(_getRationalValue(_getInverseRational(value->value._rational)),owner);break;
+		// composite types
+		case VT_LIST:_reciprocalValue=_functionAppliedToList(value->value._list,Mreciprocal);break;
+		case VT_MAP:_reciprocalValue=_functionAppliedToMap(value->value._map,Mreciprocal);break;
+		// scalar types
+		case VT_FLOAT:_reciprocalValue=_getFloatValue(1/value->value._float->ld);break; // TODO check what happens when the real equals 0
+		case VT_RATIONAL:_reciprocalValue=_getRationalValue(OWNED(_getInverseRational(value->value._rational),owner),owner);break;
 		case VT_INTEGER:
 			{
-				Mbiginteger* _denominator=OWNED(_getBiginteger(value->value._integer->ll),owner);
-				_reciprocalValue=OWNED(_getRationalValue(_getRational(NULL,_denominator,M_LD_NAN,true)),owner);
-				free_biginteger(_denominator,owner);
+				Mbiginteger* _denominator=OWNED(_getBiginteger(value->value._integer->ll),owner); // create the big integer denominator
+				_reciprocalValue=_getRationalValue((Mrational*)OWNED(_getRational(NULL,_denominator,M_LD_NAN,true),owner),owner);
+				free_biginteger(_denominator,owner); // free the created big integer used to create the rational
 			}
 			break;
-		case VT_BIGINTEGER:_reciprocalValue=OWNED(_getRationalValue(_getRational(NULL,value->value._biginteger,M_LD_NAN,true)),owner);break; // same as with VT_INTEGER but without freeing the to remain bound big integer
-		case VT_DECIMAL:_reciprocalValue=OWNED(_getDecimalValue(OWNED(_getInverseDecimal(value->value._decimal),owner)),owner);break;
-		case VT_MAP:_reciprocalValue=OWNED(_functionAppliedToMap(value->value._map,Mreciprocal),owner);break;
+		case VT_BIGINTEGER:_reciprocalValue=_getRationalValue((Mrational*)OWNED(_getRational(NULL,value->value._biginteger,M_LD_NAN,true),owner),owner);break; // same as with VT_INTEGER but without freeing the to remain bound big integer
+		case VT_DECIMAL:_reciprocalValue=_getDecimalValue((Mdecimal*)OWNED(_getInverseDecimal(value->value._decimal),owner),owner);break;
 		default:break;
 	}
-	return DISOWNED(_reciprocalValue,owner);
+	return _reciprocalValue;
 }
 // MDH@29OCT2019: concatenate textual, typically used for lists
 static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner owner=getOwner(__LINE__);
@@ -3316,7 +3287,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 									// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 									//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
-									Mlist* _flattenedIndexList=_getFlattenedList(indexorattributenameListelementValue,0,true); // pass in a non-NULL value will only return NULL when an error occurs
+									Mlist* _flattenedIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
 									size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
@@ -3349,10 +3320,10 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 													// if the index is a list we will be duplicating
 													if(_flattenedIndexList->valuetype==VT_INTEGER){ // all integers in the index list
 														assignValue(valueholder,_getListValue(VT_UNDEFINED,false,"value holder list creator"));
-														if(amDebugging())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
+														if(amVerboseDebugging())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 													}else{ // not all integers in the index list
 														assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
-														if(amDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
+														if(amVerboseDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 													}
 													if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
 												}
@@ -3379,14 +3350,14 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																	//                we could flatten the value here????? so if it is a list we get the list of indices here
 																	Mmap* valueholderMap=(*valueholder)->value._map;
 																	Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
-																	if(amDebugging())
+																	if(amVerboseDebugging())
 																		outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																	if(valueIndexListelement){
 																		Mvalue** newValueholder;
 																		while(valueholderMap){
-																			if(amDebugging())
+																			if(amVerboseDebugging())
 																				outputMap("Value holder map: ",valueholderMap,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																			if(indexorattributenameListelementValue){
@@ -3394,7 +3365,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																				if(_attributenameText){
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																					if(!newValueholder){
-																						if(appendedToMap(valueholderMap,string(_attributenameText),NULL)!=1)
+																						if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)!=1)
 																							output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
 																						else
 																							newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
@@ -3402,7 +3373,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																						//FREE_1(valueholders,'_');
 																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																					}*/
-																					free_string(_attributenameText);
+																					free_string(_attributenameText,owner);
 																				}else
 																					newValueholder=NULL;
 																			}
@@ -3421,7 +3392,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 															if((*valueholder)->type==VT_LIST){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
 																	Mlist* valueholderList=(*valueholder)->value._list;
-																	Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false);
+																	Mlist* _valueIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
 																	// outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
@@ -3437,7 +3408,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																				if(listIndex!=M_LL_INVALID){
 																					newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																					if(!newValueholder){
-																						listIndex=appendedToList(valueholderList,NULL,listIndex);
+																						listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
 																						if(listIndex!=M_LL_INVALID){
 																							newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																							if(amDebugging())
@@ -3455,7 +3426,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																		}
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																	}
-																	if(_valueIndexList)free_list(_valueIndexList);
+																	if(_valueIndexList)free_list(_valueIndexList,owner);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
@@ -3473,7 +3444,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											outputError("Failed to reallocate the indexed value references");
 										}
 									}
-									if(_flattenedIndexList)free_list(_flattenedIndexList);
+									if(_flattenedIndexList)free_list(_flattenedIndexList,owner);
 								}
 								// if all the valueholders are NULL we break????
 								int valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
@@ -3485,14 +3456,14 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 							if(amVerboseDebugging())
 								output("Storing the values of %d elements.\n",numberOfValueholders);
 							// convert the values to a list
-							Mlist* _resultList=_getListOfType(VT_UNDEFINED);
+							Mlist* _resultList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner);
 							int valueholderIndex=numberOfValueholders;
 							while(--valueholderIndex>=0){
 								if(amVerboseDebugging())
 									{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
-								if(appendedToList(_resultList,*_valueholders[valueholderIndex],0)<=0){free_list(_resultList);_resultList=NULL;output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));break;}
+								if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){free_list(_resultList,owner);_resultList=NULL;output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));break;}
 							}
-							referencedValue=_getValueOfList(_resultList,true); // the result
+							referencedValue=_getValueOfList(_resultList,owner); // the result
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
@@ -3579,7 +3550,6 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
-	int32_t owner=getOwnerId(6);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
 		if(amVerboseDebugging()){
@@ -3712,7 +3682,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																//                which means that we can only retrieve successive elements from maps
 																//                we could flatten the value here????? so if it is a list we get the list of indices here
 																Mmap* valueholderMap=(*valueholder)->value._map;
-																Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
+																Mlist* _valueIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
 																outputList("Value index list: ",_valueIndexList,".\n");
 																// 'iterating' over all list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
@@ -3726,7 +3696,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																			if(_attributenameText){
 																				newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																				if(!newValueholder){
-																					if(appendedToMap(valueholderMap,owner_valueholderMap,string(_attributenameText),NULL)!=1)
+																					if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)!=1)
 																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
 																					else
 																						newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
@@ -3805,7 +3775,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 										outputError("Failed to reallocate the indexed value references");
 									}
 								}
-								if(_flattenedIndexList)free_list(_flattenedIndexList);
+								if(_flattenedIndexList)free_list(_flattenedIndexList,owner);
 							}
 							// if all the valueholders are NULL we break????
 							int valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
@@ -4188,9 +4158,9 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(amVerboseDebugging())
 					output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
-					Mstring* _environmentName=_getExecutionEnvironmentName();
+					Mstring* _environmentName=(Mstring*)OWNED(_getExecutionEnvironmentName(),owner);
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
-					free_string(_environmentName);
+					free_string(_environmentName,owner);
 					break; // NO retrieves the undefined value subsequently!!
 				}
 				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
@@ -4301,14 +4271,14 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						if(getDP()<l)outputWarning("More decimals present in literal than expected. Rounding may occur.");
 						if(amVerboseDebugging())
 							outputInfo("Decimal precision checked!");
-						Mdecimal* _decimal=__decimal(get_default_mpd_context(),0,0);
+						Mdecimal* _decimal=OWNED(__decimal(get_default_mpd_context(),0,0),owner);
 						if(amVerboseDebugging())
 							outputInfo("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
 							if(amDebugging())outputInfo("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
-								assignValue(&_valueReference->_value,_getDecimalValue(_decimal,true));
+								assignValue(&_valueReference->_value,_getDecimalValue(_decimal,owner));
 							else
 								outputErrorAndText("The decimal value of %s is undefined",string(pRealText));
 						}else
@@ -4320,24 +4290,24 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
 						if(amVerboseDebugging())
 							outputInfo("Releasing decimal text.");
-						free_string(_realText);
+						free_string(_realText,owner);
 						if(amVerboseDebugging())
 							outputInfo("Decimal text released.");
 					}else
 						outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
-					Mbiginteger* _biginteger=__biginteger();
+					Mbiginteger* _biginteger=OWNED(__biginteger(),owner);
 					if(mp_read_radix(MP_INT_POINTER(_biginteger),_significantTokenText,10)==MP_OKAY){
 						if(mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
 							_valueReference->_value=_getIntegerValue(mp_get_i64(MP_INT_POINTER(_biginteger)));
               				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
-							free_biginteger(_biginteger);
+							free_biginteger(_biginteger,owner);
 						}else
-							_valueReference->_value=_getBigintegerValue(_biginteger,true);
+							_valueReference->_value=_getBigintegerValue(_biginteger,owner);
 							// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
 					}else{
-						free_biginteger(_biginteger);
+						free_biginteger(_biginteger,owner);
 						outputErrorAndText("Failed to create the big integer to store integer ",_significantTokenText);
 					}
 				}
@@ -4349,7 +4319,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				break;
 			case TT_DQSTRING:
 			case TT_SQSTRING: // a string literal
-				_valueReference->_value=_getTextValue(_significantTokenText,false);
+				_valueReference->_value=_getTextValue(_significantTokenText);
 				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getTextValue(_significantTokenText,false));
 				////////////////incrementReferenceCount(_valueReference->_value); // TODO combine this with getValue to something called storeValue
 				break;
@@ -4410,7 +4380,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			Mlist* itemIdsList=NULL;
 			while(expressionToken&&expressionToken->next&&(expressionToken->next->type==TT_LIST||expressionToken->next->type==TT_PROPERTY)){
 				if(!itemIdsList){
-					itemIdsList=_getListOfType(VT_UNDEFINED); // we know we're going to need to list
+					itemIdsList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner); // we know we're going to need to list
 					if(!itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",M_ERROR_PREFIX,_valueReference->_name);break;}
 				}
 				expressionToken=nextEnvironmentExpressionToken();
@@ -4423,7 +4393,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						Mlist* newItemIdsList=indexListValue->value._list;
 						Mlistelement* newItemIdListElement=newItemIdsList->_first;
 						while(newItemIdListElement){
-							if(!appendedToList(itemIdsList,newItemIdListElement->_value,M_LL_INVALID)){
+							if(!appendedToList(itemIdsList,owner,newItemIdListElement->_value,M_LL_INVALID)){
 								outputError("Failed to append augmented item id.");
 								// TODO can't break here?????
 							}
@@ -4434,16 +4404,16 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 					// indexListValue will be removed by the garbage collector
 				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
 					// we have to wrap the property name inside a value as text
-					Mstring* _propertyName=_stringCopy(expressionToken->text,expressionToken->significantCharacterCount);
+					Mstring* _propertyName=(Mstring*)OWNED(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),owner);
 					if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
-						Mvalue* propertyNameValue=_getTextValue(string(_propertyName),false); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
-						if(!propertyNameValue||!appendedToList(itemIdsList,propertyNameValue,M_LL_INVALID)){
+						Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
+						if(!propertyNameValue||!appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)){
 							output("%sFailed to add property name '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
 							// TODO can't break here
 						}
 					}
 					// NOTE have to release _propertyName here
-					if(_propertyName)free_string(_propertyName);
+					if(_propertyName)free_string(_propertyName,owner);
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				// if(amDebugging())

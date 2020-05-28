@@ -36,74 +36,85 @@ void outputDecimalStatus(uint32_t status){int32_t foid=getOwnerId(1);
 returns the largest integer equal to or smaller than \p _value
 \parameter _value the value to floor
 */
-Mvalue* Mfloor(Mvalue* _value){
+// MDH@28MAY2020: we can either return a new value but preferably we should return the same value NOTE we can do that because values are immutable but can be reused
+Mvalue* Mfloor(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
+        if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
+        /* replacing:
+        if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
+        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
+        */
+        // composite types
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mfloor));
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mfloor));
+        // scalar values
         if(_value->type==VT_FLOAT)return _getFloatValue(floorl(_value->value._float->ld));
-        if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
-        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
-        if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,true,false),true);
-        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getDecimalInteger(_value->value._decimal,true,false),true);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mfloor),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mfloor),true);
+        if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRationalInteger(_value->value._rational,true,false),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getDecimalInteger(_value->value._decimal,true,false),owner),owner);
     }
     return NULL;
 }
-Mvalue* Mtrunc(Mvalue* _value){
+Mvalue* Mtrunc(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
+        if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
+        /* replacing:
+        if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
+        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
+        */
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtrunc));
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtrunc));
         if(_value->type==VT_FLOAT)return _getFloatValue(truncl(_value->value._float->ld));
-        if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
-        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
-        if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,true,true),true);
-        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getDecimalInteger(_value->value._decimal,true,true),true);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtrunc),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtrunc),true);
-    }
-    return NULL;
-}
-/*
- * returns nearest integer value
- */
-Mvalue* Mround(Mvalue* _value){
-    if(_value){
-        if(_value->type==VT_FLOAT)return _getFloatValue(roundl(_value->value._float->ld));
-        if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
-        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
-        if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRoundedRationalInteger(_value->value._rational),true);
-        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getRoundedDecimal(_value->value._decimal),true);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil),true);
+        if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRationalInteger(_value->value._rational,true,true),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getDecimalInteger(_value->value._decimal,true,true),owner),owner);
     }
     return NULL;
 }
 /*
  * returns integer equal to or larger than
  */
-Mvalue* Mceil(Mvalue* _value){
+Mvalue* Mceil(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
-        if(_value->type==VT_FLOAT)return _getFloatValue(ceill(_value->value._float->ld));
+        /* replacing:
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
-        if(_value->type==VT_RATIONAL)return _getBigintegerValue(_getRationalInteger(_value->value._rational,false,false),true);
-        if(_value->type==VT_DECIMAL)return _getDecimalValue(_getDecimalInteger(_value->value._decimal,false,false),true);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil),true);
+        */
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil));
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil));
+        if(_value->type==VT_FLOAT)return _getFloatValue(ceill(_value->value._float->ld));
+        if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRationalInteger(_value->value._rational,false,false),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getDecimalInteger(_value->value._decimal,false,false),owner),owner);
     }
     return NULL;
 }
 
-Mvalue* Msin(Mvalue* _value){
+/*
+ * returns nearest integer value
+ */
+Mvalue* Mround(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+    if(_value){
+        if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
+        /* replacing:
+        if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
+        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
+        */
+        if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Mround),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mround),owner),owner);
+        if(_value->type==VT_FLOAT)return _getFloatValue(roundl(_value->value._float->ld));
+        if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRoundedRationalInteger(_value->value._rational),owner),owner);
+        if(_value->type==VT_DECIMAL){return _getBigintegerValue((Mbiginteger*)OWNED(_getRoundedDecimalInteger(_value->value._decimal),owner),owner);
+    }
+    return NULL;
+}
+
+Mvalue* Msin(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(amVerbose()){outputValue("Applying sin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
         if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msin),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msin),true);
-        if(_value->type==VT_RATIONAL){
-            Mrational* _sineRational=_qsinorcos(_value->value._rational,true);
-            return _getRationalValue(_sineRational,true);
-        }
-        if(_value->type==VT_DECIMAL){
-            Mdecimal* _sineDecimal=_dsine(NULL,_value->value._decimal); // match the precision as used by the argument
+        if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Msin),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Msin),owner),owner);
+        if(_value->type==VT_RATIONAL)return _getRationalValue((Mrational*)OWNED(_qsinorcos(_value->value._rational,true),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue((Mdecimal*)OWNED(_dsine(NULL,_value->value._decimal),owner),owner); // match the precision as used by the argument
             /* replacing what was way to slow:
             uint32_t status=0;
             Mdecimal* _sineDecimal=__decimal(_decimalContext,0,0);
@@ -187,62 +198,48 @@ Mvalue* Msin(Mvalue* _value){
             free_decimal(_twoDecimal);
             free_decimal(_qDecimal);
             */
-            if(_sineDecimal)return _getDecimalValue(_sineDecimal,true);
-        }
     }
     return NULL;
 }/* NOT VALIDATED */
-Mvalue* Mcordicsin(Mvalue* _value){
+Mvalue* Mcordicsin(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(amVerbose()){outputValue("Applying cordicsin() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
         /* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
         if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
         */
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin),true);
-        if(_value->type==VT_DECIMAL){
-            Mdecimal* _cordicsineDecimal=_dcordicsine(NULL,_value->value._decimal); // match the precision as used by the argument
-            if(_cordicsineDecimal)return _getDecimalValue(_cordicsineDecimal,true);
-        }
+        if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Mcordicsin),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mcordicsin),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue((Mdecimal*)OWNED(_dcordicsine(NULL,_value->value._decimal),owner),owner);
     }
     return NULL;
 }/* NOT VALIDATED */
-Mvalue* Mcordiccos(Mvalue* _value){
+Mvalue* Mcordiccos(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(amVerbose()){outputValue("Applying cordiccos() to '",_value,"' of type ");output("%s(%u).\n",""/*VALUETYPENAMES[_value->type]*/,_value->type);}
         /* TODO we can call _dcordicsine although a real or integer does not have a decimal context, but then the default decimal context is used
         if(_value->type==VT_FLOAT)return _getFloatValue(sinl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(sin(_value->value._integer->ll));
         */
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcordicsin),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcordicsin),true);
-        if(_value->type==VT_DECIMAL){
-            Mdecimal* _cordiccosineDecimal=_dcordiccosine(NULL,_value->value._decimal); // match the precision as used by the argument
-            if(_cordiccosineDecimal)return _getDecimalValue(_cordiccosineDecimal,true);
-        }
+        if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Mcordicsin),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mcordicsin),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue((Mdecimal*)OWNED(_dcordiccosine(NULL,_value->value._decimal),owner),owner);
     }
     return NULL;
 }/* NOT VALIDATED */
 
-Mvalue* Mcos(Mvalue*  _value){
+Mvalue* Mcos(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(cosl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(cos(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcos),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcos),true);
-        if(_value->type==VT_RATIONAL){
-            Mrational* _cosineRational=_qsinorcos(_value->value._rational,false);
-            return _getRationalValue(_cosineRational,true);
-        }
-        if(_value->type==VT_DECIMAL){
-            Mdecimal* _cosineDecimal=_dcosine(NULL,_value->value._decimal); // match the precision as used by the argument
-            if(_cosineDecimal)return _getDecimalValue(_cosineDecimal,true);
-        }
+        if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Mcos),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mcos),owner),owner);
+        if(_value->type==VT_RATIONAL)return _getRationalValue((Mrational*)OWNED(_qsinorcos(_value->value._rational,false),owner),owner);
+        if(_value->type==VT_DECIMAL){return _getDecimalValue((Mdecimal*)OWNED(_dcosine(NULL,_value->value._decimal),owner),owner);
     }
     return NULL;
 }/* VALIDATED */
-Mvalue* Mtan(Mvalue*  _value){
+Mvalue* Mtan(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         // composite application
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtan),true);
@@ -262,7 +259,7 @@ Mvalue* Mtan(Mvalue*  _value){
     }
     return NULL;
 }/* VALIDATED */
-Mvalue* Mcosh(Mvalue*  _value){
+Mvalue* Mcosh(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(coshl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(cosh(_value->value._integer->ll));
@@ -271,7 +268,7 @@ Mvalue* Mcosh(Mvalue*  _value){
     }
     return NULL;
 }/* VALIDATED */
-Mvalue* Msinh(Mvalue*  _value){
+Mvalue* Msinh(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(sinhl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(sinh(_value->value._integer->ll));
@@ -280,7 +277,7 @@ Mvalue* Msinh(Mvalue*  _value){
     }
     return NULL;
 }/* VALIDATED */
-Mvalue* Mtanh(Mvalue*  _value){
+Mvalue* Mtanh(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(tanhl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(tanh(_value->value._integer->ll));
@@ -289,7 +286,7 @@ Mvalue* Mtanh(Mvalue*  _value){
     }
     return NULL;
 }/* VALIDATED */
-Mvalue* Mexp(Mvalue* _value){
+Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
@@ -315,7 +312,7 @@ Mvalue* Mexp(Mvalue* _value){
     return NULL;
 }
 // internal approximation by series expansion
-Mvalue* Mdexp(Mvalue* _value){
+Mvalue* Mdexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
@@ -331,7 +328,7 @@ Mvalue* Mdexp(Mvalue* _value){
     }
     return NULL;
 }
-Mvalue* Mlog(Mvalue* _value){
+Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(logl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(log(_value->value._integer->ll));
@@ -355,7 +352,7 @@ Mvalue* Mlog(Mvalue* _value){
     }
     return NULL;
 }
-Mvalue* Mlog10(Mvalue* _value){
+Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(log10l(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(log10(_value->value._integer->ll));
@@ -380,7 +377,7 @@ Mvalue* Mlog10(Mvalue* _value){
     return NULL;
 }
 
-Mvalue* Msqrt(Mvalue* _value){
+Mvalue* Msqrt(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(sqrtl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(sqrt(_value->value._integer->ll));
@@ -409,7 +406,7 @@ Mvalue* Msqrt(Mvalue* _value){
 }
 // two-argument power function (complicates things considerably)
 // TODO check different types convert to long double and use powl to compute the power!!
-Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){
+Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){Mallocationowner owner=getOwner(__LINE__);
     if(_value&&_exponentValue){
         if(_value->type==VT_FLOAT&&_exponentValue->type==VT_FLOAT)return _getFloatValue(powl(_value->value._float->ld,_exponentValue->value._float->ld));
         if(_value->type==VT_INTEGER&&_exponentValue->type==VT_INTEGER)return _getFloatValue(pow(_value->value._integer->ll,_exponentValue->value._integer->ll));
@@ -418,7 +415,7 @@ Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue){
 }
 // end math functions
 
-Mvalue* Mneg(Mvalue* _value){ // negate a value
+Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negate a value
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
         if(_value->type==VT_FLOAT)return _getFloatValue(-_value->value._float->ld);
@@ -464,32 +461,45 @@ Mvalue* Mneg(Mvalue* _value){ // negate a value
     return NULL;
 }/* VALIDATED */
 
-Mvalue* Mnot(Mvalue* _value){ // not a value
+Mvalue* Mnot(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // not a value
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(!_value->value._integer->ll);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mnot),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mnot),true);
+        if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Mnot),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mnot),owner),owner);
     }
     return NULL;
 }/* VALIDATED */
 // TODO can we not a string??????
-Mvalue* Mbnot(Mvalue* _value){ // not a value
-    if(_value){
-        if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mbnot),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mbnot),true);
-    }
+Mvalue* Mbnot(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // not a value
+    if(!_value)return NULL;
+    if(_value->type==VT_INTEGER)return _getIntegerValue(~_value->value._integer->ll);
+    if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Mbnot),owner),owner);
+    if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mbnot),owner),owner);
     return NULL;
 }/* VALIDATED */
 
-Mvalue* Mnull(Mvalue* _value){return _getIntegerValue(isValueNull(_value)?M_TRUE:M_FALSE);}/* VALIDATED */
-Mvalue* Mundefined(Mvalue* _value){return _getIntegerValue(isValueUndefined(_value)?M_TRUE:M_FALSE);}/* VALIDATED */ // MDH@18JUL2019: isUndefined() now comes in handy
-Mvalue* Msign(Mvalue* value){return(_getIntegerValue(getValueSign(value)));} /* VALIDATED */
+Mvalue* Mnull(Mvalue* _value){
+    return _getIntegerValue(isValueNull(_value)?M_TRUE:M_FALSE);
+}/* VALIDATED */
+Mvalue* Mundefined(Mvalue* _value){
+    return _getIntegerValue(isValueUndefined(_value)?M_TRUE:M_FALSE);
+}/* VALIDATED */ // MDH@18JUL2019: isUndefined() now comes in handy
+Mvalue* Msign(Mvalue* value){
+    return(_getIntegerValue(getValueSign(value)));
+} /* VALIDATED */
 // TODO use the sign in Mzero, Mpositive and Mnegative
-Mvalue* Mzero(Mvalue* _value){return(_getIntegerValue(_value?(isValueZero(_value)==M_TRUE?M_TRUE:M_FALSE):M_LL_INVALID));}/* VALIDATED */
-Mvalue* Mpositive(Mvalue* _value){return(_value?_getIntegerValue(isValuePositive(_value)?1:0):NULL);}/* VALIDATED */
-Mvalue* Mnegative(Mvalue* _value){return(_value?_getIntegerValue(isValueNegative(_value)?1:0):NULL);}/* VALIDATED */
-Mvalue* Mscalar(Mvalue* _value){return(_value?_getIntegerValue(isValueScalar(_value)?1:0):NULL);}/* VALIDATED */
+Mvalue* Mzero(Mvalue* _value){
+    return(_getIntegerValue(_value?(isValueZero(_value)==M_TRUE?M_TRUE:M_FALSE):M_LL_INVALID));
+}/* VALIDATED */
+Mvalue* Mpositive(Mvalue* _value){
+    return(_value?_getIntegerValue(isValuePositive(_value)?1:0):NULL);
+}/* VALIDATED */
+Mvalue* Mnegative(Mvalue* _value){
+    return(_value?_getIntegerValue(isValueNegative(_value)?1:0):NULL);
+}/* VALIDATED */
+Mvalue* Mscalar(Mvalue* _value){
+    return(_value?_getIntegerValue(isValueScalar(_value)?1:0):NULL);
+}/* VALIDATED */
 
 // TODO the length of a text is the number of characters in a text????
 // MDH@17OCT2019: the length of a list should now return the index of the last element (instead of the number of non-null values)

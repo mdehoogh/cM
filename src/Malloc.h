@@ -51,8 +51,8 @@ typedef struct{
 }Mallocationtype;
 
 typedef struct{
+    uint8_t level:7; // the subpointer level (by putting this first we can quickly create a dummy allocation owner at some nonzero level so the pointer won't be freed when we do not want to)
     uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
-    uint8_t level:7; // the subpointer level
     uint32_t id:24; // the owner id (typically a function or a module itself)
 }Mallocationowner;
 
