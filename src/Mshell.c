@@ -2628,8 +2628,7 @@ Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			}
 		}
 		if(value->type!=VT_BIGINTEGER)free_biginteger(_biginteger,owner);
-		if(status==MP_OKAY)_fibonnacciValue=OWNED(_getBigintegerValue(_fibonacciBiginteger),owner);
-		if(!_fibonnacciValue)free_biginteger(_fibonacciBiginteger,owner);
+		if(status==MP_OKAY)_fibonnacciValue=_getBigintegerValue(_fibonacciBiginteger,owner);
 	}
 	return DISOWNED(_fibonnacciValue,owner);
 }
@@ -2833,8 +2832,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 				}
 				if(amVerbose())
 					outputChar('\n');
-				_listElementValue=_getValueOfToken(_firstUnevaluatedToken);
-				if(!_listElementValue)free_token(_firstUnevaluatedToken,owner); // TODO what else?????
+				_listElementValue=_getValueOfToken(_firstUnevaluatedToken,owner);
 			}
 		}else{ // evaluate
 			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
@@ -2862,9 +2860,9 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		if(!expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
-	Mvalue* _listValue=_getValueOfList(_list);
-	if(!_listValue){free_list(_list,owner);return NULL;} // MDH@27MAY2020 wrapping the list here instead of the other way round so we can free the list if creating the value fails
-	if(amVerboseDebugging())outputValue("List '",_listValue,"' extracted!\n");
+	Mvalue* _listValue=_getValueOfList(_list,owner);
+	if(amVerboseDebugging())
+		outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
 
@@ -2908,8 +2906,7 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 		if(amVerbose())
 			output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
-	Mvalue* _mapValue=_getValueOfMap(_map);
-	if(!_mapValue){free_map(_map,owner);return NULL;} // MDH@27MAY2020: afterwards encapsulating instead of before
+	Mvalue* _mapValue=_getValueOfMap(_map,owner);
 	if(amVerboseDebugging())outputValue("Map '",_mapValue,"' extracted!\n");
 	return _mapValue;
 }
@@ -3105,12 +3102,12 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
 		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
 		// MDH@03MAR2020 TODO can we pass function->_parameterMap like this or should we pass _getFunctionArgumentMap(function,NULL)????????
-		Menvironment* _functionExecutionEnvironment=_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName,function->_parameterMap);
+		Menvironment* _functionExecutionEnvironment=(Menvironment*)OWNED(_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName,function->_parameterMap),owner);
 		if(_functionExecutionEnvironment){
 			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
 			outputError("Failed to register the function execution environment.");
-			free_environment(_functionExecutionEnvironment);
+			free_environment(_functionExecutionEnvironment,owner);
 		}else
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
@@ -3180,15 +3177,17 @@ bool endFunctionBodyInput(){
  * \brief wraps \p _value
  * \param _value the Mvalue to wrap
  */
-Mvaluereference* _getValuereference(Mvalue* _value){
-	if(amVerbose())outputValue("Wrapping value '",_value,"'.\n");
-	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',getOwnerId(4));
+Mvaluereference* _getValuereference(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__)
+	if(amVerboseDebugging())
+		outputValue("Wrapping value '",_value,"'.\n");
+	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',owner);
 	if(_valuereference){
 		_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
-		if(amVerbose())outputValue("Value '",_value,"' wrapped in value reference.\n");
+		if(amVerboseDebugging())
+			outputValue("Value '",_value,"' wrapped in value reference.\n");
 	}
 	// MDH@18MAY2020: whatever you return should be disowned before passing along (and BOUND by the receiver)
-	return DISOWNED(_valuereference,getOwnerId(4));
+	return DISOWNED(_valuereference,owner);
 }
 /* MDH@26OCT2019: moved over to Mvalue.h/c as we need it there so we can have value references as well!!!!!
 void free_valuereference(Mvaluereference* _valuereference){
@@ -3384,7 +3383,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																		}
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																	}
-																	if(_valueIndexList)free_list(_valueIndexList);
+																	if(_valueIndexList)free_list(_valueIndexList,owner);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
@@ -3603,7 +3602,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 								//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 								// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 								//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
-								Mlist* _flattenedIndexList=_getFlattenedList(indexorattributenameListelementValue,0,true); // pass in a non-NULL value will only return NULL when an error occurs
+								Mlist* _flattenedIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
 								size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 								if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 									// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
@@ -3715,7 +3714,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																	}
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																}
-																if(_valueIndexList)free_list(_valueIndexList);
+																if(_valueIndexList)free_list(_valueIndexList,owner);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
@@ -3739,7 +3738,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																			if(listIndex!=M_LL_INVALID){
 																				newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																				if(!newValueholder){
-																					listIndex=appendedToList(valueholderList,NULL,listIndex);
+																					listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
 																					if(listIndex!=M_LL_INVALID){
 																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																						if(amDebugging())
@@ -3757,7 +3756,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																	}
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																}
-																if(_valueIndexList)free_list(_valueIndexList);
+																if(_valueIndexList)free_list(_valueIndexList,owner);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
@@ -4076,10 +4075,10 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
 								// MDH@02NOV2019: making the list weak
-								functionCallArgumentList=listMadeWeak(_getListOfType(VT_UNDEFINED)); // creating a list
-								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,_functionArgumentsValue,M_LL_INVALID)<=0){
+								functionCallArgumentList=(Mlist*)OWNED(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
+								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
 									outputError("Failed to create the to do expression list");
-									free_list(functionCallArgumentList);
+									free_list(functionCallArgumentList,owner);
 									functionCallArgumentList=NULL; // so nothing will get done!!
 								}
 								// TODO what should we do with functionCallArgumentList (which we created) once we're done with it??????
@@ -4088,12 +4087,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 								functionCallArgumentList=_functionArgumentsValue->value._list; // use the wrapped list
 							// 2. get the arguments map
 							// MDH@02NOV2019 NOTE: this map will be weak as returned by _getFunctionArgumentMap!!
-							Mmap* _functionCallArgumentMap=_getFunctionArgumentMap(function,functionCallArgumentList); // assuming to have a list returned by getListExpressionValue()
+							Mmap* _functionCallArgumentMap=(Mmap*)OWNED(_getFunctionArgumentMap(function,functionCallArgumentList),owner); // assuming to have a list returned by getListExpressionValue()
 							/* MDH@11NOV2019 OOPS: can't wrap the function call argument map here, free it, and have it freed later on again by the garbage collector!!!!
 							outputValue("Function argument map: ",_getValueOfMap(_functionCallArgumentMap,false),".\n");
 							*/
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
-							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))free_list(functionCallArgumentList);
+							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))free_list(functionCallArgumentList,owner);
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
 							/*
 							if(amVerbose())output("Decrementing the reference count of the function arguments value!");
@@ -4137,7 +4136,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 							if(amVerboseDebugging())
 								{outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
-							free_map(_functionCallArgumentMap); // MDH@21MAY2019: no need for the function argument map anymore!!!
+							free_map(_functionCallArgumentMap,owner); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerboseDebugging())
 								outputInfo("Function argument map freed!");
 						}else
@@ -4422,7 +4421,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 			}
 			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
 			if(itemIdsList){
-				assignValue(&_valueReference->_itemid,_getValueOfList(itemIdsList,true));
+				assignValue(&_valueReference->_itemid,_getValueOfList(itemIdsList,owner));
 				if(amVerboseDebugging())
 					outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
 			}
@@ -4447,7 +4446,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 				// MDH@17NOV2019: applying a unary operator is dangerous because we may set the value BUT that's NOT enough
 				//                because if the name and/or item id remains it will be used again later on
-				if(_valueReference->_name){freeChars(_valueReference->_name);_valueReference->_name=NULL;}
+				if(_valueReference->_name){freeChars(_valueReference->_name,Msubowner(getValueOwner(),1));_valueReference->_name=NULL;}
 				if(_valueReference->_itemid){ // this is is a value wrapping a list of indices
 					// conform what would happen in free_valuereference!!! 
 					// TODO consider alternative creating a new value reference
@@ -4520,12 +4519,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 // BINARY OPERATOR + functions
 
-Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator){
+Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
 	if(!_list1)return _list2;if(!_list2)return _list1;
 	// MDH@30OCT2019: ALWAYS apply the binary operator i.e. do NOT just return the value!!! (which makes perfect sense for equality / unequality)
 	//                TODO if the result equals NULL, should we then NOT add the given element?????
 	// ASSERT neither are NULL
-	Mlist* _result=_getListOfType(_list1->valuetype==_list2->valuetype?_list1->valuetype:VT_UNDEFINED); // TODO if the types are the same use that?
+	Mlist* _result=OWNED(_getListOfType(_list1->valuetype==_list2->valuetype?_list1->valuetype:VT_UNDEFINED),owner); // TODO if the types are the same use that?
 	// elements with the same index are to be added and stored under that index
 	Mlistelement* _listelement1=_list1->_first;
 	Mlistelement* _listelement2=_list2->_first;
@@ -4535,18 +4534,18 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 		consumed2=false;
 		if(_listelement1&&_listelement2){
 			if(_listelement1->index==_listelement2->index){
-				if(appendedToList(_result,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index))consumed1=consumed2=true;
+				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index))consumed1=consumed2=true;
 			}else
 			if(_listelement1->index<_listelement2->index){
-				if(appendedToList(_result,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
+				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
 			}else{
-				if(appendedToList(_result,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
+				if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
 			}
 		}else
 		if(_listelement1){
-			if(appendedToList(_result,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
+			if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
 		}else
-			if(appendedToList(_result,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
+			if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
 		// done?????
 		if(!consumed1&&!consumed2)break; // if neither consumed done
 		if(consumed1)_listelement1=_listelement1->_next;
@@ -4555,29 +4554,30 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 	return _result;
 }
 // we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
-Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator){
+Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=_getListOfType(_list->valuetype);
+		_result=(Mlist*)OWNED(_getListOfType(_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,binaryoperator(_listelement->_value,_value),_listelement->index))_listelement=_listelement->_next;
+		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index))
+			_listelement=_listelement->_next;
 	}else
 		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
-	return _getValueOfList(_result,true);
+	return _getValueOfList(_result,owner);
 }
-Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator){
+Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=_getListOfType(_list->valuetype);
+		_result=(Mlist*)OWNED(_getListOfType(_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,binaryoperator(_value,_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index))_listelement=_listelement->_next;
 	}else
 		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
-	return _getValueOfList(_result,true);
+	return _getValueOfList(_result,owner);
 }
 
 // two-argument arithmetic
@@ -4723,7 +4723,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 	return NULL;
 }
 
-Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
+Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(amVerboseDebugging())
 		{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
@@ -4759,14 +4759,14 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerboseDebugging())
 				{outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
-			_differenceBiginteger=__biginteger();
+			_differenceBiginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
 			if(_differenceBiginteger&&mp_sub(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_differenceBiginteger))!=MP_OKAY){free_biginteger(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				{outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert an integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1);
-		if(smallinteger2)free_biginteger(_biginteger2);
+		if(smallinteger1)free_biginteger(_biginteger1,owner);
+		if(smallinteger2)free_biginteger(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)

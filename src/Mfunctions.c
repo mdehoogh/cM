@@ -531,7 +531,7 @@ Mvalue* Mfacd(Mvalue* _value){
 }/* VALIDATED */
 
 // TODO remember intermediate values in some list, that we can use as starting point
-Mvalue* Mfac(Mvalue* _value){
+Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(!_value){
         if(amVerboseDebugging())
             outputInfo("No argument to factorial() function!");
@@ -539,17 +539,18 @@ Mvalue* Mfac(Mvalue* _value){
     }
     if(amVerboseDebugging())
         outputValue("Argument of factorial() function: '",_value,"'.\n");
-    if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER){outputValue("\nERROR: Non-integer argument '",_value,"' to factorial() function!");return NULL;}
+    if(_value->type!=VT_INTEGER&&_value->type!=VT_BIGINTEGER)
+    {outputValue("\nERROR: Non-integer argument '",_value,"' to factorial() function!");return NULL;}
     // some special cases (i.e. the input number is smaller than 2)
     Mbiginteger* _finalmultiplier=NULL;
     if(_value->type==VT_INTEGER){
         if(_value->value._integer->ll<0){outputError("Invalid (negative) integer argument to factorial() function");return NULL;}
         if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
-        _finalmultiplier=_getBiginteger(_value->value._integer->ll);
+        _finalmultiplier=(Mbiginteger*)OWNED(_getBiginteger(_value->value._integer->ll),owner);
     }else{
         if(mp_isneg(MP_INT_POINTER(_value->value._biginteger))){outputError("Invalid (negative) big integer argument to factorial() function");return NULL;}
         if(mp_cmp(MP_INT_POINTER(_value->value._biginteger),MP_INT_POINTER(getBigintegerThree()))==MP_LT)
-            return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
+            return _getBigintegerValue((Mbiginteger*)OWNED(_getBigintegerCopy(_value->value._biginteger),owner),owner);
         _finalmultiplier=_getBigintegerCopy(_value->value._biginteger);
     }
     if(!_finalmultiplier){
@@ -558,12 +559,12 @@ Mvalue* Mfac(Mvalue* _value){
     }
     if(amVerboseDebugging())
         outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
-    Mbiginteger* _result=_getBiginteger(6); // the smallest value to return
+    Mbiginteger* _result=(Mbiginteger*)OWNED(_getBiginteger(6),owner); // the smallest value to return
     if(_result){
         clock_t then=(amVerbose()?clock():0);
         // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
         // we could start at some intermediate value????
-        Mbiginteger *_multiplier=_getBiginteger(3);
+        Mbiginteger *_multiplier=(Mbiginteger*)OWNED(_getBiginteger(3),owner);
         if(_multiplier){
             while(mp_cmp(MP_INT_POINTER(_multiplier),MP_INT_POINTER(_finalmultiplier))==MP_LT){
                 if(mp_incr(MP_INT_POINTER(_multiplier))!=MP_OKAY){outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
@@ -571,17 +572,17 @@ Mvalue* Mfac(Mvalue* _value){
                 //////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
             }
             // get rid of intermediate big integers
-            free_biginteger(_multiplier);
+            free_biginteger(_multiplier,owner);
         }else        
             outputError("Failed to create big integer 3");
         if(amVerboseDebugging())
             {outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/1000);}
     }else
         outputError("Failed to create big integer 6");
-    free_biginteger(_finalmultiplier);
+    free_biginteger(_finalmultiplier,owner);
     if(amVerboseDebugging())
         outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
-    return (_result?_getBigintegerValue(_result,true):NULL);
+    return (_result?_getBigintegerValue(_result,owner):NULL);
     /* replacing:
     // 39 is about the maximum that we can store in a long long
     if(n<40){
@@ -595,11 +596,11 @@ Mvalue* Mfac(Mvalue* _value){
 }/* VALIDATED */
 
 // method for writing a value to standard out
-Mvalue* Mout(Mvalue* _value){
-    Mstring* _valueText=_getValueText(_value,true);
+Mvalue* Mout(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _valueText=(Mstring*)OWNED(_getValueText(_value),owner);
     size_t result=string_length(_valueText);
     if(result>0)output("%s",string(_valueText));
-    free_string(_valueText);
+    free_string(_valueText,owner);
     return _getIntegerValue(result);
 }
 
@@ -610,7 +611,7 @@ Mvalue* Mbrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
     if(ll1==M_LL_INVALID||ll2==M_LL_INVALID||ll3==M_LL_INVALID)return NULL;
     char s[24];sprintf(s,"'\\033[48;2;%lld;%lld;%lldm",ll1%256,ll2%256,ll3%256);
     ////////output("ANSI foreground color code: '%s'.\n",s);
-    return _getTextValue(_strdup(s),true);
+    return _getTextValue(s);
 }
 Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
     long long ll1=getValueInteger(_value1),ll2=getValueInteger(_value2),ll3=getValueInteger(_value3);
@@ -618,5 +619,5 @@ Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
     if(ll1==M_LL_INVALID||ll2==M_LL_INVALID||ll3==M_LL_INVALID)return NULL;
     char s[24];sprintf(s,"'\\033[38;2;%lld;%lld;%lldm",ll1%256,ll2%256,ll3%256);
     ////////output("ANSI foreground color code: '%s'.\n",s);
-    return _getTextValue(_strdup(s),true);
+    return _getTextValue(s);
 }

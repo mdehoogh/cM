@@ -38,16 +38,17 @@ Menvironment* getExecutionEnvironment(){int32_t foid=getOwnerId(1);
 Mstring* _getExecutionEnvironmentName(){
     return _getEnvironmentName(getExecutionEnvironment());
 }
-void outputExecutionEnvironmentName(char* prefix,char* suffix){int32_t foid=getOwnerId(2);
+void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner owner=getOwner(__LINE__);
     if(prefix)output("%s",prefix);
-    Mstring* _environmentName=_getExecutionEnvironmentName();
+    Mstring* _environmentName=(Mstring*)OWNED(_getExecutionEnvironmentName(),owner);
     output("%s",string(_environmentName));
     if(suffix)output("%s",suffix);
-    free_string(_environmentName);
+    free_string(_environmentName,owner);
 }
-bool pushExecutionEnvironment(Menvironment* _environment){int32_t foid=getOwnerId(3);
+bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
+    // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
-    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment(_environment,false):NULL);
+    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment((Menvironment*)OWNED(_environment,owner),owner):NULL);
     if(!_environmentValue)return false;
     // MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
     if(!_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one
@@ -98,15 +99,15 @@ uint32_t getNumberOfVariables(Menvironment const * const _environment){
 Mstring* _getVariableNames(Menvironment const * const _environment,const char* const sep){
     Mstring* _variableNames=NULL;
     if(_environment&&sep){
-        _variableNames=__string();
+        _variableNames=(Mstring*)OWNED(__string(),owner);
         if(_variableNames){
             Mstring* p=_variableNames;
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                Mstring* _parentVariableNames=_getVariableNames(getValueEnvironment(_environment->_parent),sep); // free asap
+                Mstring* _parentVariableNames=(Mstring*)OWNED(_getVariableNames(getValueEnvironment(_environment->_parent),sep),owner); // free asap
                 if(_parentVariableNames){
                     p=string_append(p,string(_parentVariableNames));
-                    free_string(_parentVariableNames); // we can do this because string_append copies the characters
+                    free_string(_parentVariableNames,owner); // we can do this because string_append copies the characters
                 }
             }
             // we'll be appending the names of the variables in the environment itself
@@ -120,29 +121,29 @@ Mstring* _getVariableNames(Menvironment const * const _environment,const char* c
                     _variableMapelement=_variableMapelement->_next;
                 }
             }
-            if(!p){free_string(_variableNames);_variableNames=NULL;}
+            if(!p){free_string(_variableNames,owner);_variableNames=NULL;}
         }
     }
-    return _variableNames;
+    return DISOWNED(_variableNames,owner);
 }/* VALIDATED */
 
 // MDH@14NOV2019: what if someone asks for a list of variable names???
 //                how about prefixing the name of the variable with the name of the environment it is part of???
-Mlist* _getVariableNamesList(Menvironment* environment){
+Mlist* _getVariableNamesList(Menvironment* environment){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _variableNamesList=NULL;
     if(environment){
-        _variableNamesList=_getListOfType(VT_TEXT);
+        _variableNamesList=(Mlist*)OWNED(_getListOfType(VT_TEXT),owner);
         if(_variableNamesList){
             if(environment->_variableMap){
                 if(amVerbose())output("Creating the list of variable names of '%s'.\n",environment->_name);
                 Mmapelement* variableMapelement=environment->_variableMap->_first;
                 while(variableMapelement){
                     if(variableMapelement->_variable){
-                        Mstring* variableNameText=_getString("'");
+                        Mstring* variableNameText=(Mstring*)OWNED(_getString("'"),owner);
                         if(variableNameText){
                             if(string_append(variableNameText,variableMapelement->_variable->_name->chars))
-                                appendedToList(_variableNamesList,_getTextValue(string(variableNameText),false),M_LL_INVALID);
-                            free_string(variableNameText);
+                                appendedToList(_variableNamesList,owner,_getTextValue(string(variableNameText)),M_LL_INVALID);
+                            free_string(variableNameText,owner);
                         }
                     }
                     variableMapelement=variableMapelement->_next;
@@ -150,16 +151,16 @@ Mlist* _getVariableNamesList(Menvironment* environment){
             }
         }
     }
-    return _variableNamesList;
+    return DISOWNED(_variableNamesList,owner);
 }
-Mmap* _getVariableNamesMap(Menvironment const * const environment){
+Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationowner owner=getOwner(__LINE__);
     // how about returning for each environment that is active an attribute in a map?
     // first get the map of the parent
-    Mmap* _variableNamesMap=(environment?_getMapOfType(VT_UNDEFINED):NULL);
+    Mmap* _variableNamesMap=(environment?(Mmap*)OWNED(_getMapOfType(VT_UNDEFINED),owner):NULL);
     if(_variableNamesMap){
         // storing the local variables in a list that we're going to store in an attribute with name ''
         Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment),true);
-        if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,"",_localVariableNamesListValue)){
+        if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,owner,"",_localVariableNamesListValue)){
             /// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
             output("%sFailed to register the local variable names of '%s'.\n",M_ERROR_PREFIX,environment->_name);
         }
@@ -167,7 +168,7 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){
             // determine the variable names map of the parent environment and wrap it
             Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(getValueEnvironment(environment->_parent)),true);
             // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
-            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
+            if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,owner,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
                 /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
                 output("%sFailed to register the variable names of the parent of '%s'.\n",M_ERROR_PREFIX,environment->_name);
             }
@@ -178,22 +179,22 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){
 // MDH@25NOV2019: if we ask for the table, we receive a list with first element containing the column names
 Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,bool freeonfailure){
     if(columnNamesList){
-        Mlist* _table=_getListOfType(VT_LIST);
+        Mlist* _table=(Mlist*)OWNED(_getListOfType(VT_LIST),owner);
         if(_table){
             _table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
             // wrap the column names list in a value
             // oops this is going to be a nuisance as the list would be copied wouldn't it????????
             //      NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
             //      
-            Mvalue* columnNamesListValue=_getValueOfList(columnNamesList,false);
+            Mvalue* columnNamesListValue=_getValueOfList(columnNamesList,owner);
             if(columnNamesListValue){
                 outputValue("Column names values table: '",columnNamesListValue,"'.\n");
-                if(appendedToList(_table,columnNamesListValue,M_LL_INVALID)){
+                if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)){
                     while(numberOfRows>0){
                         numberOfRows--;
-                        Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED),true);
+                        Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED),owner);
                         if(!_rowValue)break;
-                        if(!appendedToList(_table,_rowValue,M_LL_INVALID))break;
+                        if(!appendedToList(_table,owner,_rowValue,M_LL_INVALID))break;
                     }
                     return _table;
                 }
@@ -201,7 +202,7 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,bool freeonfailure){
         }
         // in essence the values in the list have their counts incremented when being added to it
         // and only by decrementing their counts in free_list() do the elements go free
-        if(freeonfailure)free_list(columnNamesList);
+        if(freeonfailure)free_list(columnNamesList,owner);
     }
     return NULL;
 }
@@ -281,19 +282,19 @@ const char* HEXCHARS[]={
     "60","61","62","63","64","65","66","67","68","69","6A","6B","6C","6D","6E","6F",
     "70","71","72","73","74","75","76","77","78","79","7A","7B","7C","7D","7E","7F"
     };
-Mlist* _getValuesTable(Mvalue* variableNamesMapValue){
+Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwner(__LINE__);
     // MDH@25NOV2019: we should get the allocation types and counts asap (otherwise they will change), unless they are passed in
     Mallocationtype* _allocationTypes=_getAllocationTypes();
     // MDH@14APR2020 now present in the allocation types: t_count* _allocationcounts=_getAllocationCounts();
     Mlist* _valuesTable=NULL;
     // let's create the list containing the column names
-    Mlist* _valuesColumnNames=_getListOfType(VT_TEXT);
+    Mlist* _valuesColumnNames=(Mlist*)OWNED(_getListOfType(VT_TEXT),owner);
     if(_valuesColumnNames
-        &&appendedToList(_valuesColumnNames,_getTextValue("'Values: ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'TYPE        ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'SIZE        ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'ALLOCATED   ",false),M_LL_INVALID)>0
-        &&appendedToList(_valuesColumnNames,_getTextValue("'FREED       ",false),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,owner,_getTextValue("'Values: "),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,owner,_getTextValue("'TYPE        "),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,owner,_getTextValue("'SIZE        "),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,owner,_getTextValue("'ALLOCATED   "),M_LL_INVALID)>0
+        &&appendedToList(_valuesColumnNames,owner,_getTextValue("'FREED       "),M_LL_INVALID)>0
         // &&appendedToList(_valuesColumnNames,_getTextValue("'M.ALLOCATED ",false),M_LL_INVALID)>0
         // &&appendedToList(_valuesColumnNames,_getTextValue("'M.FREED     ",false),M_LL_INVALID)>0
         ){
