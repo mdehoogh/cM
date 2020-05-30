@@ -466,7 +466,5 @@ Mvalue* Mstats(Mvalue* listValue){Mallocationowner owner=getOwner(__LINE__);
     }else
         outputError("No sample list to compute statistics of");
     if(!_statsMap)return NULL;
-    Mvalue* _statsValue=_getValueOfMap(_statsMap);
-    if(!_statsValue)free_map(_statsMap,owner);
-    return _statsValue;
+    return _getValueOfMap(_statsMap,owner);
 }

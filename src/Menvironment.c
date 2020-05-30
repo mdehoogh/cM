@@ -48,7 +48,7 @@ void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner 
 bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
     // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
-    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment((Menvironment*)OWNED(_environment,owner),owner):NULL);
+    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment((Menvironment*)OWNED(_environment,owner)):NULL);
     if(!_environmentValue)return false;
     // MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
     if(!_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one
@@ -96,7 +96,7 @@ uint32_t getNumberOfVariables(Menvironment const * const _environment){
 }/* VALIDATED */
 
 // the names of the variables may be requested
-Mstring* _getVariableNames(Menvironment const * const _environment,const char* const sep){
+Mstring* _getVariableNames(Menvironment const * const _environment,const char* const sep){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _variableNames=NULL;
     if(_environment&&sep){
         _variableNames=(Mstring*)OWNED(__string(),owner);
@@ -159,14 +159,14 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
     Mmap* _variableNamesMap=(environment?(Mmap*)OWNED(_getMapOfType(VT_UNDEFINED),owner):NULL);
     if(_variableNamesMap){
         // storing the local variables in a list that we're going to store in an attribute with name ''
-        Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment),true);
+        Mvalue* _localVariableNamesListValue=_getValueOfList((Mlist*)OWNED(_getVariableNamesList(environment),owner),owner);
         if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,owner,"",_localVariableNamesListValue)){
             /// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
             output("%sFailed to register the local variable names of '%s'.\n",M_ERROR_PREFIX,environment->_name);
         }
         if(environment->_parent){
             // determine the variable names map of the parent environment and wrap it
-            Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(getValueEnvironment(environment->_parent)),true);
+            Mvalue* _parentVariableNamesMapValue=_getValueOfMap((Mmap*)OWNED(_getVariableNamesMap(getValueEnvironment(environment->_parent)),owner),owner);
             // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
             if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,owner,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
                 /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
@@ -177,7 +177,7 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
     return _variableNamesMap;
 }
 // MDH@25NOV2019: if we ask for the table, we receive a list with first element containing the column names
-Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,bool freeonfailure){
+Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner owner_columnNamesList){Mallocationowner owner=getOwner(__LINE__);
     if(columnNamesList){
         Mlist* _table=(Mlist*)OWNED(_getListOfType(VT_LIST),owner);
         if(_table){
@@ -186,7 +186,7 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,bool freeonfailure){
             // oops this is going to be a nuisance as the list would be copied wouldn't it????????
             //      NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
             //      
-            Mvalue* columnNamesListValue=_getValueOfList(columnNamesList,owner);
+            Mvalue* columnNamesListValue=_getValueOfList(columnNamesList,owner_columnNamesList);
             if(columnNamesListValue){
                 outputValue("Column names values table: '",columnNamesListValue,"'.\n");
                 if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)){
@@ -202,12 +202,12 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,bool freeonfailure){
         }
         // in essence the values in the list have their counts incremented when being added to it
         // and only by decrementing their counts in free_list() do the elements go free
-        if(freeonfailure)free_list(columnNamesList,owner);
+        if(owner_columnNamesList.level==0)free_list(columnNamesList,owner_columnNamesList);
     }
     return NULL;
 }
 // MDH@25NOV2019: the first example of a list which is constructed as a table is the the values() table
-void outputTable(Mlist* table){
+void outputTable(Mlist* table){Mallocationowner owner=getOwner(__LINE__);
     if(table){
          if(table->numberOfElements>0&&table->_first){
             // the first list element is supposed to be contain the column names
@@ -226,10 +226,10 @@ void outputTable(Mlist* table){
                             newline(); // start a new line before outputting the table!!!
                             while(headerrowListelement){
                                 if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table header loop!");break;}
-                                Mstring* _columnNameText=_getValueText(headerrowListelement->_value,true);
+                                Mstring* _columnNameText=(Mstring*)OWNED(_getValueText(headerrowListelement->_value,true),owner);
                                 if(_columnNameText){
                                     columnLengths[columnIndex]=output("%s",string(_columnNameText));
-                                    free_string(_columnNameText);
+                                    free_string(_columnNameText,owner);
                                 }
                                 columnIndex++;
                                 headerrowListelement=headerrowListelement->_next;
@@ -247,10 +247,10 @@ void outputTable(Mlist* table){
                                         Mlistelement* rowListelement=tablerowValueList->_first;
                                         while(rowListelement){
                                             if(columnIndex==tablerowValueList->numberOfElements){outputBug("Had to break out of table data row loop!");break;}
-                                            Mstring* _cellText=_getValueText(rowListelement->_value,true);
+                                            Mstring* _cellText=(Mstring*)OWNED(_getValueText(rowListelement->_value,true),owner);
                                             cellLength=(_cellText?output("%s",string(_cellText)):0);
                                             while(++cellLength<=columnLengths[columnIndex])outputChar(' ');
-                                            free_string(_cellText);
+                                            free_string(_cellText,owner);
                                             rowListelement=rowListelement->_next;
                                             columnIndex++;
                                         }
@@ -301,13 +301,13 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
         long long numberOfAllocationTypes=getNumberOfAllocationTypes();
         // get a table with the given values column names and number of rows (which are initialized to empty lists)
         // NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
-        _valuesTable=_getTable(_valuesColumnNames,numberOfAllocationTypes,true);
+        _valuesTable=OWNED(_getTable(_valuesColumnNames,numberOfAllocationTypes,owner),owner);
         if(_valuesTable){
             if(numberOfAllocationTypes){
                 // we start with a general overview (the counts per type)
                 // NOTE dividing by sizeof(char) is far fetched
                 for(long long i=0;i<numberOfAllocationTypes;i++){
-                    Mstring* _allocationTypeText=_getString("'");
+                    Mstring* _allocationTypeText=OWNED(_getString("'"),owner);
                     if(_allocationTypeText
                             &&string_append_char(_allocationTypeText,_allocationTypes[i].type)
                             &&string_append(_allocationTypeText,"=0x")
@@ -315,22 +315,22 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
                     {
                         Mlist* _valuecountsList=_getListOfType(VT_UNDEFINED); // we're going to store the value counts in a map
                         if(_valuecountsList){
-                            Mvalue* _zeroTextValue=_getTextValue("'",false); // will be garbage collected automatically when the reference count is not incremented (as in weak lists)
+                            Mvalue* _zeroTextValue=_getTextValue("'"); // will be garbage collected automatically when the reference count is not incremented (as in weak lists)
                             _valuecountsList->weak=true; // TODO should we do this???
                             // start with the table row index below the name of the table!!!
-                            if(appendedToList(_valuecountsList,_getIntegerValue(i+1),M_LL_INVALID)>0
-                                &&appendedToList(_valuecountsList,_getTextValue(string(_allocationTypeText),false),M_LL_INVALID)>0){
+                            if(appendedToList(_valuecountsList,owner,_getIntegerValue(i+1),M_LL_INVALID)>0
+                                &&appendedToList(_valuecountsList,owner,_getTextValue(string(_allocationTypeText)),M_LL_INVALID)>0){
                                 // now the 5 counts
                                 // TODO how about the count???????
-                                appendedToList(_valuecountsList,_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,0)),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)),M_LL_INVALID);
-                                appendedToList(_valuecountsList,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,1)),M_LL_INVALID);
-                                if(appendedToList(_valuesTable,_getValueOfList(_valuecountsList,true),M_LL_INVALID)<=0)
+                                appendedToList(_valuecountsList,owner,_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size),M_LL_INVALID);
+                                appendedToList(_valuecountsList,owner,_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,0)),M_LL_INVALID);
+                                appendedToList(_valuecountsList,owner,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)),M_LL_INVALID);
+                                appendedToList(_valuecountsList,owner,_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)),M_LL_INVALID);
+                                appendedToList(_valuecountsList,owner,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,1)),M_LL_INVALID);
+                                if(appendedToList(_valuesTable,owner,_getValueOfList(_valuecountsList,owner),M_LL_INVALID)<=0)
                                     outputError("Failed to remember a values table row.");
                             }else{
-                                free_list(_valuecountsList); // have to explicitly free the list of the row that we failed to register
+                                free_list(_valuecountsList,owner); // have to explicitly free the list of the row that we failed to register
                                 outputError("Failed to initialize a values table row.");
                             }
                             /*
@@ -341,7 +341,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
                         }else
                             outputError("Failed to create a values table row.");
                     }
-                    free_string(_allocationTypeText);
+                    free_string(_allocationTypeText,owner);
                 }
             }else
                 outputError("No allocation types/counts registered");

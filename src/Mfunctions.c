@@ -45,8 +45,8 @@ Mvalue* Mfloor(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         */
         // composite types
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mfloor));
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mfloor));
+        if(_value->type==VT_LIST)return _getValueOfList(OWNED(appliedToList(_value->value._list,Mfloor),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(OWNED(appliedToMap(_value->value._map,Mfloor),owner),owner);
         // scalar values
         if(_value->type==VT_FLOAT)return _getFloatValue(floorl(_value->value._float->ld));
         if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRationalInteger(_value->value._rational,true,false),owner),owner);
@@ -61,8 +61,8 @@ Mvalue* Mtrunc(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         */
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtrunc));
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtrunc));
+        if(_value->type==VT_LIST)return _getValueOfList(OWNED(appliedToList(_value->value._list,Mtrunc),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(OWNED(appliedToMap(_value->value._map,Mtrunc),owner),owner);
         if(_value->type==VT_FLOAT)return _getFloatValue(truncl(_value->value._float->ld));
         if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRationalInteger(_value->value._rational,true,true),owner),owner);
         if(_value->type==VT_DECIMAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getDecimalInteger(_value->value._decimal,true,true),owner),owner);
@@ -78,8 +78,8 @@ Mvalue* Mceil(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_INTEGER)return _getIntegerValue(_value->value._integer->ll);
         if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getBigintegerCopy(_value->value._biginteger),true);
         */
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mceil));
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mceil));
+        if(_value->type==VT_LIST)return _getValueOfList(OWNED(appliedToList(_value->value._list,Mceil),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(OWNED(appliedToMap(_value->value._map,Mceil),owner),owner);
         if(_value->type==VT_FLOAT)return _getFloatValue(ceill(_value->value._float->ld));
         if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRationalInteger(_value->value._rational,false,false),owner),owner);
         if(_value->type==VT_DECIMAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getDecimalInteger(_value->value._decimal,false,false),owner),owner);
@@ -242,19 +242,19 @@ Mvalue* Mcos(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
 Mvalue* Mtan(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         // composite application
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtan),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtan),true);
+        if(_value->type==VT_LIST)return _getValueOfList(OWNED(appliedToList(_value->value._list,Mtan),owner),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(OWNED(appliedToMap(_value->value._map,Mtan),owner),owner);
         // scalar arguments
         if(_value->type==VT_FLOAT)return _getFloatValue(tanl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(tan(_value->value._integer->ll));
         if(_value->type==VT_DECIMAL)return _getDecimalValue(_dtangent(NULL,_value->value._decimal),true);
         if(_value->type==VT_RATIONAL){
-            Mrational* _sineRational=_qsinorcos(_value->value._rational,true);
-            Mrational* _cosineRational=_qsinorcos(_value->value._rational,false);
-            Mrational* _tanRational=_getRationalQuotient(_sineRational,_cosineRational);
-            free_rational(_sineRational);
-            free_rational(_cosineRational);
-            return _getRationalValue(_tanRational,true);
+            Mrational* _sineRational=(Mrational*)OWNED(_qsinorcos(_value->value._rational,owner),owner);
+            Mrational* _cosineRational=(Mrational*)OWNED(_qsinorcos(_value->value._rational,owner),owner);
+            Mrational* _tanRational=(Mrational*)OWNED(_getRationalQuotient(_sineRational,_cosineRational),owner);
+            free_rational(_sineRational,owner);
+            free_rational(_cosineRational,owner);
+            return _getRationalValue(_tanRational,owner);
         }
     }
     return NULL;
@@ -293,9 +293,9 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),true);
         // use decimal conversion
-        Mdecimal* _decimal=getValueDecimal(_value);
+        Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
-            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
+            Mdecimal* _result=(Mdecimal*)OWNED(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
             if(_result){
                 uint32_t status=0;
                 mpd_qexp(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
@@ -305,8 +305,8 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
                     outputDecimalStatus(status);
                 }
             }
-            if(_value->type!=VT_DECIMAL)free_decimal(_decimal);
-            return _getDecimalValue(_result,true);
+            if(_value->type!=VT_DECIMAL)free_decimal(_decimal,owner);
+            return _getDecimalValue(_result,owner);
         }
     }
     return NULL;
@@ -319,11 +319,11 @@ Mvalue* Mdexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),true);
         // use decimal conversion
-        Mdecimal* _decimal=getValueDecimal(_value);
+        Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
             Mdecimal* _result=_dexp(NULL,_decimal);
-            if(_value->type!=VT_DECIMAL)free_decimal(_decimal);
-            return _getDecimalValue(_result,true);
+            if(_value->type!=VT_DECIMAL)free_decimal(_decimal,owner);
+            return _getDecimalValue(_result,owner);
         }
     }
     return NULL;
@@ -334,20 +334,20 @@ Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_INTEGER)return _getFloatValue(log(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog),true);
-        Mdecimal* _decimal=getValueDecimal(_value);
+        Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
-            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
+            Mdecimal* _result=(Mdecimal*)OWNED(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
             if(_result){
                 uint32_t status=0;
                 mpd_qln(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
-                    free_decimal(_result);_result=NULL;
+                    free_decimal(_result,owner);_result=NULL;
                     outputError("Failed to compute the natural logarithm of a decimal");
                     outputDecimalStatus(status);
                 }
             }
-            if(_value->type!=VT_DECIMAL)free_decimal(_decimal);
-            return _getDecimalValue(_result,true);
+            if(_value->type!=VT_DECIMAL)free_decimal(_decimal,owner);
+            return _getDecimalValue(_result,owner);
         }
     }
     return NULL;
@@ -358,19 +358,19 @@ Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_INTEGER)return _getFloatValue(log10(_value->value._integer->ll));
         if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10),true);
         if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10),true);
-        Mdecimal* _decimal=getValueDecimal(_value);
+        Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
-            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
+            Mdecimal* _result=(Mdecimal*)OWNED(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
             if(_result){
                 uint32_t status=0;
                 mpd_qlog10(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
-                    free_decimal(_result);_result=NULL;
+                    free_decimal(_result,owner);_result=NULL;
                     outputError("Failed to compute the base 10 logarithm of a decimal");
                     outputDecimalStatus(status);
                 }
             }
-            if(_value->type!=VT_DECIMAL)free_decimal(_decimal);
+            if(_value->type!=VT_DECIMAL)free_decimal(_decimal,owner);
             return _getDecimalValue(_result,true);
         }
     }
