@@ -3108,6 +3108,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
 	Mstring* _settingsCharacterText=OWNED(__string(),owner);
+	output("Settings characters text: '%s'.\n",string(_settingsCharacterText));
 	if(argc>1){
 		printf("%s\n","Arguments");
 		char settingCharacter;
