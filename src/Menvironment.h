@@ -11,6 +11,7 @@
 bool pushExecutionEnvironment(Menvironment* _environment);
 void popExecutionEnvironment(); // should never go wrong (a bug is reported if there's no environment to pop though)
 Menvironment* getExecutionEnvironment(); // the current environment
+Mallocationowner getOwnerExecutionEnvironment(); // MDH@31MAY2020
 Mstring* _getExecutionEnvironmentName();
 void outputExecutionEnvironmentName(char* prefix,char* suffix);
 
@@ -73,7 +74,7 @@ void outputTable(Mlist* table); // MDH@25NOV2019: certain lists are now construc
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue);
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue); // MDH@25NOV2019: storing the memory allocations in a table makes it more displayable
 
-bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype valuetype,bool immutable);
+bool addVariable(Menvironment * const _environment,Mallocationowner owner_environment,char * const name,Mvaluetype valuetype,bool immutable);
 /*
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mfloat* _real);
@@ -83,7 +84,7 @@ bool setValueOfStringVariable(Mvariable* _variable,Mtext* _string);
 
 // functions
 Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep);
-bool registerInternalFunctions(Menvironment* const _environment);
+bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment);
 
 // helper function to return the function
 Mfunction* getFunction(Menvironment const * const _environment,const char* const functionName);
@@ -92,7 +93,7 @@ Muserfunction* getUserfunction(Menvironment const * const _environment,const cha
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
 Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList);
 
-Mfunction* _getFunction(Menvironment* const _environment,char const * const name); // creates the function if it does not exist yet
+Mfunction* _getFunction(Menvironment* const _environment,Mallocationowner owner_environment,char const * const name); // creates the function if it does not exist yet
 
 bool completedFunction(Mfunction* const _function,const char* const functionName,NoArgumentFunction noArgumentFunction);
 bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction);

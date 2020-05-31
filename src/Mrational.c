@@ -117,7 +117,7 @@ mp_err _qmul(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
 mp_err _qmul_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mbiginteger const * const b){Mallocationowner owner=getOwner(__LINE__);
     Mbiginteger *_num=NULL,*_den=NULL;
     mp_err status=(a&&b&&c?MP_OKAY:MP_ERR); // we need all input pointers
-    if(status==MP_OKAY){status=_bimul(a->den,NULL,&_den);owned(_den,owner);} // multiply denominators
+    if(status==MP_OKAY){status=_bimul(a->den,NULL,&_den);OWNED(_den,owner);} // multiply denominators
     if(status==MP_OKAY)if(!_den||mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
     if(status==MP_OKAY){status=_bimul(a->num,b,&_num);OWNED(_num,owner);} // multiply numerators
     if(status!=MP_OKAY){ // numerator and denominator not computed both

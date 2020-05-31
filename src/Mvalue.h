@@ -345,5 +345,5 @@ bool free_function(Mfunction* _function,Mallocationowner owner_function);
 
 Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 
-Mvalue* _getValueOfFunction(Mfunction* _function);
-Mvalue* _getValueOfEnvironment(Menvironment* _environment);
+Mvalue* _getValueOfFunction(Mfunction* _function,Mallocationowner owner_function);
+Mvalue* _getValueOfEnvironment(Menvironment* _environment,Mallocationowner owner_environment);

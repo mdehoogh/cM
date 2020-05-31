@@ -7,8 +7,8 @@
 
 #include "Menvironment.h"
 
-static int32_t const MODULE_ID=(16<<4);
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static int32_t const MODULE_ID=16;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE;
@@ -32,9 +32,12 @@ extern const char * const VALUETYPENAMES[];
 // keep track of the current execution environment
 // MDH@03FEB2020: now wrapped inside a value
 static Mvalue* _executionEnvironmentValue=NULL;
-Menvironment* getExecutionEnvironment(){int32_t foid=getOwnerId(1);
+Menvironment* getExecutionEnvironment(){
     return getValueEnvironment(_executionEnvironmentValue);
 } // convenience method for obtaining the current execution environment from its wrapper
+// MDH@31MAY2020: the execution environment hangs inside a value
+Mallocationowner getOwnerExecutionEnvironment(){return Msubowner(getValueOwner(),1);}
+
 Mstring* _getExecutionEnvironmentName(){
     return _getEnvironmentName(getExecutionEnvironment());
 }
@@ -48,7 +51,7 @@ void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner 
 bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
     // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
-    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment((Menvironment*)OWNED(_environment,owner)):NULL);
+    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment((Menvironment*)OWNED(_environment,owner),owner):NULL);
     if(!_environmentValue)return false;
     // MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
     if(!_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one
@@ -59,7 +62,7 @@ bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner
     if(amVerbose())outputExecutionEnvironmentName("New execution environment '","'.\n");
     return true;
 }/* NOT VALIDATED */
-void popExecutionEnvironment(){int32_t foid=getOwnerId(4);
+void popExecutionEnvironment(){
     Menvironment* _executionEnvironment=getExecutionEnvironment();
     if(!_executionEnvironment){outputBug("No environment left to pop!");return;} // nothing to pop
     // NOTE only execution environments that have a parent can be popped!!!
@@ -301,19 +304,19 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
         long long numberOfAllocationTypes=getNumberOfAllocationTypes();
         // get a table with the given values column names and number of rows (which are initialized to empty lists)
         // NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
-        _valuesTable=OWNED(_getTable(_valuesColumnNames,numberOfAllocationTypes,owner),owner);
+        _valuesTable=(Mlist*)OWNED(_getTable(_valuesColumnNames,numberOfAllocationTypes,owner),owner);
         if(_valuesTable){
             if(numberOfAllocationTypes){
                 // we start with a general overview (the counts per type)
                 // NOTE dividing by sizeof(char) is far fetched
                 for(long long i=0;i<numberOfAllocationTypes;i++){
-                    Mstring* _allocationTypeText=OWNED(_getString("'"),owner);
+                    Mstring* _allocationTypeText=(Mstring*)OWNED(_getString("'"),owner);
                     if(_allocationTypeText
                             &&string_append_char(_allocationTypeText,_allocationTypes[i].type)
                             &&string_append(_allocationTypeText,"=0x")
                             &&string_append(_allocationTypeText,HEXCHARS[_allocationTypes[i].type]))
                     {
-                        Mlist* _valuecountsList=_getListOfType(VT_UNDEFINED); // we're going to store the value counts in a map
+                        Mlist* _valuecountsList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner); // we're going to store the value counts in a map
                         if(_valuecountsList){
                             Mvalue* _zeroTextValue=_getTextValue("'"); // will be garbage collected automatically when the reference count is not incremented (as in weak lists)
                             _valuecountsList->weak=true; // TODO should we do this???
@@ -349,32 +352,33 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
     }else
         outputError("Failed to create the values table header.");
     free(_allocationTypes);
-    return _valuesTable;
+    return DISOWNED(_valuesTable,owner);
 }
-Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
-    Mmap* _valuesMap=_getMapOfType(VT_UNDEFINED);
+Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _valuesMap=(Mmap*)OWNED(_getMapOfType(VT_UNDEFINED),owner);
     if(_valuesMap){
         size_t numberOfAllocationTypes=getNumberOfAllocationTypes();
-        appendedToMap(_valuesMap,"typecount",_getIntegerValue(numberOfAllocationTypes));
+        appendedToMap(_valuesMap,owner,"typecount",_getIntegerValue(numberOfAllocationTypes));
         if(numberOfAllocationTypes){
             // we start with a general overview (the counts per type)
-	        Mallocationtype* _allocationTypes=_getAllocationTypes();
+	        Mallocationtype* _allocationTypes=_getAllocationTypes(); // TODO put under memory management control?
             // MDH@14APR2020 replacing: size_t* _allocationcounts=_getAllocationCounts();
-            Mstring *_allocationTypeText=__string(),*_allocationTypeCharactersText=_getString("'"); // free ASAP
+            Mstring *_allocationTypeText=(Mstring*)OWNED(__string(),owner)
+                   ,*_allocationTypeCharactersText=(Mstring*)OWNED(_getString("'"),owner); // free ASAP
             if(_allocationTypeText&&_allocationTypeCharactersText){
-                Mmap* _valuecountsMap=_getMapOfType(VT_MAP); // we're going to store the value counts in a map
+                Mmap* _valuecountsMap=(Mmap*)OWNED(_getMapOfType(VT_MAP),owner); // we're going to store the value counts in a map
                 // NOTE dividing by sizeof(char) is far fetched
                 for(size_t i=0;i<numberOfAllocationTypes;i++){
                     if(string_append_char(_allocationTypeCharactersText,_allocationTypes[i].type)&&string_append_char(_allocationTypeText,_allocationTypes[i].type)){
                         if(_valuecountsMap){
-                            Mmap* _valuecountMap=_getMapOfType(VT_INTEGER);
+                            Mmap* _valuecountMap=(Mmap*)OWNED(_getMapOfType(VT_INTEGER),owner);
                             if(_valuecountMap){
-                                appendedToMap(_valuecountMap,(i==0?"count sum":"count"),_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size));
-                                appendedToMap(_valuecountMap,(i==0?"bytes allocated":"allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,0)/*_allocationTypes[i].occupied*/));
-                                appendedToMap(_valuecountMap,(i==0?"bytes freed":"freed"),_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)/*_allocationTypes[i].freed*/));
-                                appendedToMap(_valuecountMap,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_occupied*/));
-                                appendedToMap(_valuecountMap,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_freed*/));
-                                if(!appendedToMap(_valuecountsMap,string(_allocationTypeText),_getValueOfMap(_valuecountMap,true)))
+                                appendedToMap(_valuecountMap,owner,(i==0?"count sum":"count"),_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size));
+                                appendedToMap(_valuecountMap,owner,(i==0?"bytes allocated":"allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,0)/*_allocationTypes[i].occupied*/));
+                                appendedToMap(_valuecountMap,owner,(i==0?"bytes freed":"freed"),_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)/*_allocationTypes[i].freed*/));
+                                appendedToMap(_valuecountMap,owner,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_occupied*/));
+                                appendedToMap(_valuecountMap,owner,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_freed*/));
+                                if(appendedToMap(_valuecountsMap,owner,string(_allocationTypeText),_getValueOfMap(_valuecountMap,owner)<=0))
                                     output("%sFailed to store the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
                             }else
                                 output("%sFailed to create the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
@@ -382,11 +386,17 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
                         string_setlength(_allocationTypeText,0);
                     }
                 }
-                if(!appendedToMap(_valuesMap,"types",_getTextValue(string(_allocationTypeCharactersText),false)))outputError("Failed to store the data type characters.");
-                if(_valuecountsMap&&!appendedToMap(_valuesMap,"counts",_getValueOfMap(_valuecountsMap,true)))outputError("Failed to store the data type counts.");
+                if(appendedToMap(_valuesMap,owner,"types",_getTextValue(string(_allocationTypeCharactersText)))<=0)
+                    outputError("Failed to store the data type characters.");
+                if(_valuecountsMap){
+                    if(appendedToMap(_valuesMap,owner,"counts",_getValueOfMap(_valuecountsMap,owner))<=0){
+                        outputError("Failed to store the data type counts.");
+                        free_map(_valuecountsMap,owner);
+                    }
+                }
             }
-            free_string(_allocationTypeCharactersText);
-            free_string(_allocationTypeText); // freed
+            free_string(_allocationTypeCharactersText,owner);
+            free_string(_allocationTypeText,owner); // freed
             // MDH@25NOV2019: essential!!!
             free(_allocationTypes);
             // MDH@14APR2020: free(_allocationcounts);
@@ -398,7 +408,7 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){
         }
     }else
         outputError("Failed to create the values map");
-    return _valuesMap;
+    return DISOWNED(_valuesMap,owner);
 }
 
 // MDH@08AUG2019: when _environment is NULL, we only check the current execution environment (this makes sense because with no environment presented, we only have the current execution environment to check)
@@ -515,10 +525,10 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
     return (environment&&environment->_parent?getConstantWithValue(getValueEnvironment(environment->_parent),name,value):NULL);
 }
-Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenvariablevalues){
+Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenvariablevalues){Mallocationowner owner=getOwner(__LINE__);
     Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
     Mmap* map=(environment?environment->_variableMap:NULL);
-	Mstring* result=(map?__string():NULL);
+	Mstring* result=(map?(Mstring*)OWNED(__string(),owner):NULL);
     if(result){
 	    Mstring* p=result;
         if(amDebugging())p=string_append_char(p,'m');
@@ -550,12 +560,12 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
                         char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name->chars,_mapVariable->_value);
                         if(!constantWithValue){ // not a 'symbolic' value
                             /////output("%s",string(p));
-                            Mstring* _mapelementValueText=_getValueText(_mapVariable->_value,false); // free asap
+                            Mstring* _mapelementValueText=(Mstring*)OWNED(_getValueText(_mapVariable->_value,false),owner); // free asap
                             /////output("Map element: %s",string(p));
                             // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
                             if(_mapelementValueText){
                                 p=string_append(p,string(_mapelementValueText)); // append 
-                                free_string(_mapelementValueText); // release AFTER copying over
+                                free_string(_mapelementValueText,owner); // release AFTER copying over
                             }
                         }else // a 'symbolic' value
                             p=string_append(p,constantWithValue);
@@ -570,9 +580,9 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 		if(showcurlybraces)p=string_append_char(p,'}');
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){free_string(result);result=NULL;}
+		if(!p){free_string(result,owner);result=NULL;}
 	}
-	return result;
+	return DISOWNED(result,owner);
 }/* VALIDATED */
 // MDH@24OCT2019 END
 
@@ -723,7 +733,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 // addVariable returns the value map element that was created (if successful)
 // MDH@09AUG2019: we allow checking the current environment only when _environment is NULL
 // MDH@12MAR2020: we have to also now take care of adding properties for name containing 'dots' i.e. property references
-bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype valuetype,bool immutable){
+bool addVariable(Menvironment * const _environment,Mallocationowner owner_environment,char * const name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
     Mvariable* _variable=NULL;
     if(name&&strlen(name)>0){ // input valid
         // MDH@19MAR2020: if a property reference was accepted (even though the hosting variable does not exist or it's value is currently NULL) we can still create it, the map and the property in the map!!!!
@@ -744,16 +754,21 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
             Mmap* map=(environment?environment->_variableMap:NULL); // the map to add the variable
             if(map){
                 if(amVerbose())output("Will attempt to add variable '%s' to environment '%s'.\n",name,environment->_name);
-                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'m');
+                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC_1(sizeof(Mmapelement),'m',owner);
                 if(_variableMapelement){
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
-                    _variable=_getVariable(name,(propertySeparator?VT_UNDEFINED:valuetype),immutable); // creates the variable, free when not bound BUT that will NOT happen
+                    _variable=(Mvariable*)OWNED(_getVariable(name,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
                     // store the references
                     _variableMapelement->_next=NULL;
+                    SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_environment),3); // TODO is this the best way to do that?
                     _variableMapelement->_variable=_variable;
                     Mmapelement* _lastVariableMapelement=map->_last;
-                    if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else map->_first=_variableMapelement;
+                    SUBOWNED(OWNED(DISOWNED(_variableMapelement,owner),owner_environment),2);
+                    if(_lastVariableMapelement!=NULL)
+                        _lastVariableMapelement->_next=_variableMapelement;
+                    else 
+                        map->_first=_variableMapelement;
                     map->_last=_variableMapelement;
                     map->numberOfElements++;
                     if(amVerbose())output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
@@ -777,17 +792,20 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
             propertySeparator=strchr(property,M_PROPERTY_SEPARATOR_CHARACTER);
             if(propertySeparator)property[propertySeparator-property]='\0';
             // add the given property to the map BUT it might already be defined in the map!!!!!
-            Mmapelement* mapelement=map->_first;while(mapelement&&(!mapelement->_variable||strcmp(property,mapelement->_variable->_name->chars)))mapelement=mapelement->_next;
+            Mmapelement* mapelement=map->_first;
+            while(mapelement&&(!mapelement->_variable||strcmp(property,mapelement->_variable->_name->chars)))
+                mapelement=mapelement->_next;
             if(!mapelement){ // property does not yet exist
-                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC(sizeof(Mmapelement),'m');
+                Mmapelement* _variableMapelement=(Mmapelement*)MALLOC_1(sizeof(Mmapelement),'m',owner);
                 if(_variableMapelement){
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
-                    _variable=_getVariable(property,(propertySeparator?VT_UNDEFINED:valuetype),immutable); // creates the variable, free when not bound BUT that will NOT happen
+                    _variable=(Mvariable*)OWNED(_getVariable(property,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
                     // store the references
                     _variableMapelement->_next=NULL;
-                    _variableMapelement->_variable=_variable;
+                    _variableMapelement->_variable=(Mvariable*)SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_environment),3);
                     Mmapelement* _lastVariableMapelement=map->_last;
+                    SUBOWNED(OWNED(DISOWNED(_variableMapelement,owner),owner_environment),2); // TODO
                     if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else map->_first=_variableMapelement;
                     map->_last=_variableMapelement;
                     map->numberOfElements++;
@@ -854,10 +872,10 @@ bool addVariable(Menvironment * const _environment,char * const name,Mvaluetype 
     return(_variable!=NULL);
 }/* VALIDATED */
 
-bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){
+bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("Cannot set the value: no variable name");return false;}
-    Mvariable* variable=getVariable(_environment,name,amVerbose());
+    Mvariable* variable=getVariable(_environment,name,amVerboseDebugging());
     if(variable){
         if(!variable->_value||!variable->immutable){
             if(amVerbose())output("Variable '%s' to set.\n",variable->_name);
@@ -867,10 +885,10 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
                 if(amVerbose()){
-                    Mstring* _valueText=_getValueText(variable->_value,false);
+                    Mstring* _valueText=(Mstring*)OWNED(_getValueText(variable->_value,false),owner);
                     if(_valueText){
                         output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
-                        free_string(_valueText);
+                        free_string(_valueText,owner);
                     }else
                         outputInfo("No value text!");
                 }
@@ -890,7 +908,7 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 }/* VALIDATED */
 
 // MDH@14NOV2019: sometimes we need a setValue that does not use assignValue() because we do not want to copy the (composite) value passed in
-bool setVariable(Menvironment * const _environment,char /*const*/ * const name,Mvalue const * const _value){
+bool setVariable(Menvironment * const _environment,char /*const*/ * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("No variable specified to set the value of");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
@@ -904,10 +922,10 @@ bool setVariable(Menvironment * const _environment,char /*const*/ * const name,M
                 variable->_value=_value;
                 if(variable->_value)incrementReferenceCount(variable->_value);
                 if(amVerbose()){
-                    Mstring* _valueText=_getValueText(variable->_value,false);
+                    Mstring* _valueText=(Mstring*)OWNED(_getValueText(variable->_value,false),owner);
                     if(_valueText){
                         output("Value '%s' (reference count: %zd) assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
-                        free_string(_valueText);
+                        free_string(_valueText,owner);
                     }else
                     if(variable->_value)
                         outputError("No value text!");
@@ -935,7 +953,7 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
         if(variableValue&&variableValue->type==VT_LIST){ // yes a list we can append to
             // we should prevent circular references
             if(variableValue!=_value){
-                unsigned long long index=appendedToList(variableValue->value._list,_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
+                unsigned long long index=appendedToList(variableValue->value._list,Msubowner(getValueOwner(),1),_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
                 if(index>0)return index;
                 output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",M_ERROR_PREFIX,name,(_value?_value->type:-1));
             }else
@@ -964,18 +982,18 @@ Mvalue** getValueHolder(Menvironment const * const _environment,char /*const*/ *
 
 // FUNCTION STUFF
 // the names of the variables may be requested
-Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep){
+Mstring* _getFunctionNames(Menvironment const * const _environment,const char* const sep){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _functionNames=NULL;
     if(_environment&&sep){
-        _functionNames=__string();
+        _functionNames=(Mstring*)OWNED(__string(),owner);
         if(_functionNames){
             Mstring* p=_functionNames;
             // first append the names of the variables in the parent
             if(_environment->_parent){
-                Mstring* _parentFunctionNames=_getFunctionNames(getValueEnvironment(_environment->_parent),sep);
+                Mstring* _parentFunctionNames=(Mstring*)OWNED(_getFunctionNames(getValueEnvironment(_environment->_parent),sep),owner);
                 if(_parentFunctionNames){
                     p=string_append(p,string(_parentFunctionNames));
-                    free_string(_parentFunctionNames); // we can do this because string_append copies the characters that string() points to!!
+                    free_string(_parentFunctionNames,owner); // we can do this because string_append copies the characters that string() points to!!
                 }
             }
             // we'll be appending the names of the variables in the environment itself
@@ -989,10 +1007,10 @@ Mstring* _getFunctionNames(Menvironment const * const _environment,const char* c
                     functionmapelement=functionmapelement->_next;
                 }
             }
-            if(!p){free_string(_functionNames);_functionNames=NULL;}
+            if(!p){free_string(_functionNames,owner);_functionNames=NULL;}
         }
     }
-    return _functionNames;
+    return DISOWNED(_functionNames,owner);
 }/* VALIDATED */
 
 // MDH@04MAR2020: getFunction() is used to determine if some identifier name represents a function, which can now also be a variable which value is a(n anonymous) function
@@ -1038,11 +1056,11 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 }// VALIDATED
 */
 // MDH@05NOV2019: if there are missing elements in _argumentList (what we allow now), there should be an associated map element with value NULL
-Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList){
+Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList){Mallocationowner owner=getOwner(__LINE__);
     Mmap* _functionArgumentMap=NULL;
     // MDH@03MAR2020: _argumentList should also be allowed to be NULL (because then defaults would be used)
     if(_function/*&&_argumentList*/){
-        _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC(sizeof(Mmap),'M')); // MDH@02NOV2019: force the map to be weak
+        _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC_1(sizeof(Mmap),'M',owner)); // MDH@02NOV2019: force the map to be weak
         Mmap* functionParameterMap=_function->_parameterMap;
         if(_functionArgumentMap&&functionParameterMap){
             if(amVerbose())outputInfo("Matching the function parameters!");
@@ -1053,15 +1071,15 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 argumentindex++; // the index of the argument we need
                 // if the current list element has an index below the one we need, get the next argument list element until we have found one with an index at least equal to argument index
                 while(argumentListelement&&argumentListelement->index<argumentindex)argumentListelement=argumentListelement->_next;
-                Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC(sizeof(Mmapelement),'m');
+                Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
                 if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
-                _argumentmapelement->_variable=(Mvariable*)CALLOC(sizeof(Mvariable),'V');
-                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true);break;}
+                _argumentmapelement->_variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner);
+                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true,owner);break;}
                 // probably can't simply assign??? let's use _strdup then 
                 // MDH@17APR2020: _strdup() replaced by _getChars() as on so many other places today
                 _argumentmapelement->_variable->_name=_getChars(functionParameterMapelement->_variable->_name->chars);
-                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true);break;}
+                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true,owner);break;}
                 // associate the argument list element value (if available)
                 // MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)
                 //                we get a problem with functions like push() and shove() that try to adjust their argument
@@ -1089,29 +1107,30 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
 // _getFunction() will create the function
 // MDH@03FEB2020: now wrapping the environment in the parameter list in a value
 //                a new function is always created on the currently executing environment
-Mfunction* _getFunction(Menvironment * const _environment,const char* const name){
+Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner_environment,const char* const name){Mallocationowner owner=getOwner(__LINE__);
     Mfunction* _function=NULL;
     if(_environment&&name&&strlen(name)){
         _function=getFunction(_environment,name); // check for a function with the given name in the given environment
         if(!_function){ // doesn't exist yet
-            _function=(Mfunction*)CALLOC(sizeof(Mfunction),'=');
+            _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
             if(_function){
                 ///////////_function->type=functionType;
                 /* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
                 // MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
                 assignValue(&_function->_definitionEnvironmentValue,_environmentValue?_environmentValue:_executionEnvironmentValue); // MDH@03FEB2020 replacing: _function->_definitionEnvironment=_environment; // TODO why would we need this?????
                 */
-                Mstring* _functionName=__string();
+                Mstring* _functionName=(Mstring*)OWNED(__string(),owner);
                 if(_functionName){
                     Mstring* p=_functionName;
                     p=string_append(p,name);
                     if(p){
                         Mfunctionmap* _functionmap=_environment->_functionMap;
                         if(_functionmap){
-                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC(sizeof(Mfunctionmapelement),'+');
+                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
                             if(_functionmapelement){
-                                _functionmapelement->_name=_functionName; // MDH@10JUL2019: moved over to the function map element
-                                _functionmapelement->_function=_function; // no worries here
+                                _functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
+                                _functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
+                                SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
                                 Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
                                 if(_lastFunctionmapelement){
                                     _lastFunctionmapelement->_next=_functionmapelement;
@@ -1121,18 +1140,19 @@ Mfunction* _getFunction(Menvironment * const _environment,const char* const name
                                 _functionmap->_last=_functionmapelement;
                                 _functionmap->numberOfFunctions++;
                                 ///////_function->_name=_functionName; // success!!!!!
-                                if(amVerbose())output("Function '%s' registered as function #%d.\n",name,_functionmap->numberOfFunctions);
+                                if(amVerbose())
+                                    output("Function '%s' registered as function #%d.\n",name,_functionmap->numberOfFunctions);
                             }else // failure
                                 p=NULL;
                         }else
                             p=NULL;
                     }
-                    if(!p){free_string(_functionName);_functionName=NULL;} // p==NULL indicates _functionName not bound in _function->_name
+                    if(!p){free_string(_functionName,owner);_functionName=NULL;} // p==NULL indicates _functionName not bound in _function->_name
                     // try to append it to the functionMap, if we succeed store _functioName in ->_name
                 }else
                     output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
                 // if we fail to register the name and/or the function with the environment free the function!!
-                if(!_functionName){free_function(_function);_function=NULL;}   
+                if(!_functionName){free_function(_function,owner);_function=NULL;}   
             }
             if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
         }else
@@ -1213,7 +1233,7 @@ Mvalue* Mtype(Mvalue* value){
 		/////case VT_USERFUNCTION:return _getTextValue("'f",false);
 	}
 	*/
-	return _getTextValue(result,false);
+	return _getTextValue(result);
 }
 
 bool allListElementsAreOfType(Mlist* list,Mvaluetype valuetype){
@@ -1639,15 +1659,16 @@ unsigned long long getNumberOfFunctionCommands(const char* const functionName){
     if(!function||function->type!=FT_USER){if(!function)output("%sFunction '%s' not found.\n",M_ERROR_PREFIX,functionName);return -1;}
     return (function->functionunion._userfunction->_bodyCommandList?function->functionunion._userfunction->_bodyCommandList->numberOfElements:0);
 }
-bool registerFunctionCommand(const char* const functionName,Mtoken* command){
+bool registerFunctionCommand(const char* const functionName,Mtoken* command){Mallocationowner owner=getOwner(__LINE__);
     if(!functionName||!command)return false;
     Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
     if(function&&function->type==FT_USER){
-        Mvalue* _commandValue=_getValueOfToken(command,false);
+        Mvalue* _commandValue=_getValueOfToken(command,(Mallocationowner){1}); // TODO I don't think command should be released if we fail
         if(_commandValue){
             if(!function->functionunion._userfunction->_bodyCommandList)
                 function->functionunion._userfunction->_bodyCommandList=__list("function body command list");
-            if(appendedToList(function->functionunion._userfunction->_bodyCommandList,_commandValue,M_LL_INVALID))return true;
+            if(appendedToList(function->functionunion._userfunction->_bodyCommandList,Msubowner(getOwnerExecutionEnvironment(),4),_commandValue,M_LL_INVALID)>0)
+                return true;
             output("%sFailed to add command to list of body of '%s'.\n",M_ERROR_PREFIX,functionName);
         }else
             output("%sFailed to wrap a command of function '%s'.\n",M_ERROR_PREFIX,functionName);
@@ -1658,27 +1679,28 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){
 
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
 //                so these are actually anonymous functions
-Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
+Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* _functionValue=NULL;
     if((!_parameterMapValue||_parameterMapValue->type==VT_MAP)&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-        Muserfunction* _userfunction=(Muserfunction*)CALLOC(sizeof(Muserfunction),'-');
+        Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
         if(_userfunction){
             if(amVerbose())if(_parameterMapValue)outputValue("Defining an anonymous function with parameters ",_parameterMapValue,".\n");
             // user function expects a list of commands, so we have to wrap the single token (if any)
             if(_bodyTokenValue){
                 _userfunction->_bodyCommandList=_getListOfType(VT_TOKEN);
-                if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,_bodyTokenValue,M_LL_INVALID))
+                if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
                     outputError("Failed to store the inline command as body of an anonymous function.");
                 // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
             }
-            Mfunction* _function=(Mfunction*)CALLOC(sizeof(Mfunction),'=');
+            Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
             if(_function){
                 // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                 //                so we have to make a copy of the parameter map
-                if(_parameterMapValue)_function->_parameterMap=_getMapCopy(_parameterMapValue->value._map); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+                if(_parameterMapValue)
+                    _function->_parameterMap=SUBOWNED(OWNED(_getMapCopy(_parameterMapValue->value._map),owner),1); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
                 _function->functionunion._userfunction=_userfunction;
                 // return the result of applying the function to the default parameter map
-                _functionValue=_getValueOfFunction(_function,true);
+                _functionValue=_getValueOfFunction(_function,owner);
             }else
                 outputError("Failed to create an anonymous function.");
         }
@@ -1688,31 +1710,32 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
     return _functionValue;
 }
 // might make the following obsolete (defun)
-Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){
+Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
     // the user specifies the body as a text (to prevent evaluation during defining the function)
     // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
     // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
     if(_nameValue&&_parameterMapValue){
         if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-            Muserfunction* _userfunction=(Muserfunction*)CALLOC(sizeof(Muserfunction),'-');
+            Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
             if(_userfunction){
                 if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
                 Mtext* functionName=_nameValue->value._text;
                 // user function expects a list of commands, so we have to wrap the single token (if any)
                 if(_bodyTokenValue){
-                    _userfunction->_bodyCommandList=_getListOfType(VT_TOKEN);
-                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,_bodyTokenValue,M_LL_INVALID))
+                    _userfunction->_bodyCommandList=SUBOWNED(OWNED(_getListOfType(VT_TOKEN),owner),1);
+                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID))
                         output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
                     // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
                 }
                 //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
                 ///////if(_userfunctionValue){
                     // MDH@17JUL2019: the map needs to be stored with the Mfunction
-                Mfunction* _function=_getFunction(getExecutionEnvironment(),functionName->_c);
+                Mallocationowner owner_environment=getOwnerExecutionEnvironment();
+                Mfunction* _function=_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c);
                 if(_function){
                     // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                     //                so we have to make a copy of the parameter map
-                    _function->_parameterMap=_getMapCopy(_parameterMapValue->value._map); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+                    _function->_parameterMap=SUBOWNED(OWNED(_getMapCopy(_parameterMapValue->value._map),owner_environment),3); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
                     _function->functionunion._userfunction=_userfunction;
                     // return the result of applying the function to the default parameter map
 
@@ -1750,39 +1773,39 @@ Mvalue* Mreturn(Mvalue* _value){
 }/*VALIDATED */
 
 // these internal functions do NOT have a body as M defined functions have...
-bool registerInternalFunctions(Menvironment* const _environment){
+bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment){
     // variable functions
     // math functions
-    if(!completedFloatFunction(_getFunction(_environment,"cos"),"cos",Mcos))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"cordiccos"),"cordiccos",Mcordiccos))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"sin"),"sin",Msin))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"cordicsin"),"cordicsin",Mcordicsin))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"tan"),"tan",Mtan))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"cosh"),"cosh",Mcosh))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"sinh"),"sinh",Msinh))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"tanh"),"tanh",Mtanh))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"sqrt"),"sqrt",Msqrt))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"log"),"log",Mlog))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"log10"),"log10",Mlog10))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"floor"),"floor",Mfloor))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"trunc"),"trunc",Mtrunc))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"round"),"round",Mround))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"ceil"),"ceil",Mceil))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"exp"),"exp",Mexp))return false;
-    if(!completedFloatFunction(_getFunction(_environment,"dexp"),"dexp",Mdexp))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cos"),"cos",Mcos))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cordiccos"),"cordiccos",Mcordiccos))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"sin"),"sin",Msin))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cordicsin"),"cordicsin",Mcordicsin))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"tan"),"tan",Mtan))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cosh"),"cosh",Mcosh))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"sinh"),"sinh",Msinh))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"tanh"),"tanh",Mtanh))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"sqrt"),"sqrt",Msqrt))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"log"),"log",Mlog))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"log10"),"log10",Mlog10))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"floor"),"floor",Mfloor))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"trunc"),"trunc",Mtrunc))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"round"),"round",Mround))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"ceil"),"ceil",Mceil))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"exp"),"exp",Mexp))return false;
+    if(!completedFloatFunction(_getFunction(_environment,owner_environment,"dexp"),"dexp",Mdexp))return false;
     // MDH@04NOV2019: settype now has 3 arguments the last one being the immutable flag
-    if(!completedValueFunction(_getFunction(_environment,"type"),"type",Mtype))return false;
-    if(!completedValueTextValueFunction(_getFunction(_environment,"settype"),"settype",Msettype))return false;
-    if(!completedFloatFloatFunction(_getFunction(_environment,"pow"),"pow",Mpow))return false;
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"type"),"type",Mtype))return false;
+    if(!completedValueTextValueFunction(_getFunction(_environment,owner_environment,"settype"),"settype",Msettype))return false;
+    if(!completedFloatFloatFunction(_getFunction(_environment,owner_environment,"pow"),"pow",Mpow))return false;
 
-    if(!completedStringMapTokenFunction(_getFunction(_environment,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
-    if(!completedMapTokenFunction(_getFunction(_environment,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
+    if(!completedStringMapTokenFunction(_getFunction(_environment,owner_environment,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
+    if(!completedMapTokenFunction(_getFunction(_environment,owner_environment,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
 
-    if(!completedValueFunction(_getFunction(_environment,"return"),"return",Mreturn))return false;
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"return"),"return",Mreturn))return false;
 
-    if(!completedValueFunction(_getFunction(_environment,"out"),"out",Mout))return false;
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"out"),"out",Mout))return false;
 
-    if(!completedThreeIntegersFunction(_getFunction(_environment,"brgb"),"brgb",Mbrgb))return false;
-    if(!completedThreeIntegersFunction(_getFunction(_environment,"trgb"),"trgb",Mtrgb))return false;
+    if(!completedThreeIntegersFunction(_getFunction(_environment,owner_environment,"brgb"),"brgb",Mbrgb))return false;
+    if(!completedThreeIntegersFunction(_getFunction(_environment,owner_environment,"trgb"),"trgb",Mtrgb))return false;
     return true;
 }/* VALIDATED */

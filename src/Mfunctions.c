@@ -12,7 +12,7 @@ extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_NE
 extern const long double M_LD_NAN,M_LD_PI;
 extern const Mdecimalcontext* M_DECIMALCONTEXT; // M.c takes care of creating the application-wide decimal context
 
-void outputDecimalStatus(uint32_t status){int32_t foid=getOwnerId(1);
+void outputDecimalStatus(uint32_t status){
 	if(status>0){
 		outputInfo("Decimal computations error report.");
 		if(status&MPD_IEEE_Invalid_operation)outputInfo("\tIEEE Invalid operation error.");
@@ -90,6 +90,30 @@ Mvalue* Mceil(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 /*
  * returns nearest integer value
  */
+static Mbiginteger* _getRoundedDecimalInteger(Mdecimal* _decimal){Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* _roundedDecimalInteger=NULL;
+    if(_decimal){
+        Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
+        mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
+        if(mpd_context){
+            Mdecimal* _roundDecimal=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner);
+            if(_roundDecimal){
+                uint32_t status=0;
+                mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
+                if((status&0xEFBF)==0){
+                    long long dll=decimal2long(_roundDecimal);
+                    _roundedDecimalInteger=(Mbiginteger*)OWNED(_getBiginteger(dll),owner);
+                }else{
+                    output("%s",M_ERROR_PREFIX);outputDecimal("Failed to round decimal '",_decimal,"'");
+                    output(" (status: %.8x).\n",status);
+                }
+                free_decimal(_roundDecimal,owner);
+            }
+        }else
+            outputError("No context available for rounding a decimal");
+    }
+    return DISOWNED(_roundedDecimalInteger,owner); 
+}
 Mvalue* Mround(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_INTEGER||_value->type==VT_BIGINTEGER)return _value;
@@ -101,7 +125,7 @@ Mvalue* Mround(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mround),owner),owner);
         if(_value->type==VT_FLOAT)return _getFloatValue(roundl(_value->value._float->ld));
         if(_value->type==VT_RATIONAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRoundedRationalInteger(_value->value._rational),owner),owner);
-        if(_value->type==VT_DECIMAL){return _getBigintegerValue((Mbiginteger*)OWNED(_getRoundedDecimalInteger(_value->value._decimal),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getBigintegerValue((Mbiginteger*)OWNED(_getRoundedDecimalInteger(_value->value._decimal),owner),owner);
     }
     return NULL;
 }
@@ -235,7 +259,7 @@ Mvalue* Mcos(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
         if(_value->type==VT_LIST)return _getValueOfList((Mlist*)OWNED(appliedToList(_value->value._list,Mcos),owner),owner);
         if(_value->type==VT_MAP)return _getValueOfMap((Mmap*)OWNED(appliedToMap(_value->value._map,Mcos),owner),owner);
         if(_value->type==VT_RATIONAL)return _getRationalValue((Mrational*)OWNED(_qsinorcos(_value->value._rational,false),owner),owner);
-        if(_value->type==VT_DECIMAL){return _getDecimalValue((Mdecimal*)OWNED(_dcosine(NULL,_value->value._decimal),owner),owner);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue((Mdecimal*)OWNED(_dcosine(NULL,_value->value._decimal),owner),owner);
     }
     return NULL;
 }/* VALIDATED */
@@ -247,10 +271,10 @@ Mvalue* Mtan(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
         // scalar arguments
         if(_value->type==VT_FLOAT)return _getFloatValue(tanl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(tan(_value->value._integer->ll));
-        if(_value->type==VT_DECIMAL)return _getDecimalValue(_dtangent(NULL,_value->value._decimal),true);
+        if(_value->type==VT_DECIMAL)return _getDecimalValue(_dtangent(NULL,_value->value._decimal),owner);
         if(_value->type==VT_RATIONAL){
-            Mrational* _sineRational=(Mrational*)OWNED(_qsinorcos(_value->value._rational,owner),owner);
-            Mrational* _cosineRational=(Mrational*)OWNED(_qsinorcos(_value->value._rational,owner),owner);
+            Mrational* _sineRational=(Mrational*)OWNED(_qsinorcos(_value->value._rational,true),owner);
+            Mrational* _cosineRational=(Mrational*)OWNED(_qsinorcos(_value->value._rational,false),owner);
             Mrational* _tanRational=(Mrational*)OWNED(_getRationalQuotient(_sineRational,_cosineRational),owner);
             free_rational(_sineRational,owner);
             free_rational(_cosineRational,owner);
@@ -263,8 +287,8 @@ Mvalue* Mcosh(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(coshl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(cosh(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcosh),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcosh),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mcosh),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mcosh),owner);
     }
     return NULL;
 }/* VALIDATED */
@@ -272,8 +296,8 @@ Mvalue* Msinh(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(sinhl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(sinh(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msinh),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msinh),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msinh),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msinh),owner);
     }
     return NULL;
 }/* VALIDATED */
@@ -281,8 +305,8 @@ Mvalue* Mtanh(Mvalue*  _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(tanhl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(tanh(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtanh),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtanh),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mtanh),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mtanh),owner);
     }
     return NULL;
 }/* VALIDATED */
@@ -290,8 +314,8 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),owner);
         // use decimal conversion
         Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
@@ -300,7 +324,7 @@ Mvalue* Mexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
                 uint32_t status=0;
                 mpd_qexp(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
-                    free_decimal(_result);_result=NULL;
+                    free_decimal(_result,owner);_result=NULL;
                     outputError("Failed to apply the exp function to a decimal");
                     outputDecimalStatus(status);
                 }
@@ -316,8 +340,8 @@ Mvalue* Mdexp(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(expl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(exp(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mexp),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mexp),owner);
         // use decimal conversion
         Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
@@ -332,8 +356,8 @@ Mvalue* Mlog(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(logl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(log(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog),owner);
         Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
             Mdecimal* _result=(Mdecimal*)OWNED(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
@@ -356,8 +380,8 @@ Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(log10l(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(log10(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mlog10),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mlog10),owner);
         Mdecimal* _decimal=getValueDecimal(_value);if(_value->type!=VT_DECIMAL)OWNED(_decimal,owner);
         if(_decimal){
             Mdecimal* _result=(Mdecimal*)OWNED(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
@@ -371,7 +395,7 @@ Mvalue* Mlog10(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
                 }
             }
             if(_value->type!=VT_DECIMAL)free_decimal(_decimal,owner);
-            return _getDecimalValue(_result,true);
+            return _getDecimalValue(_result,owner);
         }
     }
     return NULL;
@@ -381,25 +405,25 @@ Mvalue* Msqrt(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->type==VT_FLOAT)return _getFloatValue(sqrtl(_value->value._float->ld));
         if(_value->type==VT_INTEGER)return _getFloatValue(sqrt(_value->value._integer->ll));
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msqrt),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msqrt),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Msqrt),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Msqrt),owner);
         // the square root of big integer, decimal and rational values has to be computed by conversion to decimals first
         // TODO although for rationals we could divide the square root of the numerator by the square root of the denominator
         // we've got a function in Mdecimal.h/c to explicitly convert a value (if possible) to a decimal (if the value wraps a decimal that is returned (instead of a new copy of this wrapped decimal) and that decimal should NOT be freed (see below))
         Mdecimal* _decimal=getValueDecimal(_value);
         if(_decimal){
-            Mdecimal* _result=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
+            Mdecimal* _result=(Mdecimal*)OWNED(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
             if(_result){
                 uint32_t status=0;
                 mpd_qsqrt(_result->mpd,_decimal->mpd,M_DECIMALCONTEXT->mpd_context,&status);
                 if(status&0xEFBF){
-                    free_decimal(_result);_result=NULL;
+                    free_decimal(_result,owner);_result=NULL;
                     outputError("Failed to compute the square root of a decimal");
                     outputDecimalStatus(status);
                 }
             }
-            if(_value->type!=VT_DECIMAL)free_decimal(_decimal);
-            return _getDecimalValue(_result,true);
+            if(_value->type!=VT_DECIMAL)free_decimal(_decimal,owner);
+            return _getDecimalValue(_result,owner);
         }
     }
     return NULL;
@@ -419,23 +443,24 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
     if(_value){
         if(_value->type==VT_INTEGER)return _getIntegerValue(-_value->value._integer->ll);
         if(_value->type==VT_FLOAT)return _getFloatValue(-_value->value._float->ld);
-        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg),true);
-        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg),true);
-        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getNegatedBiginteger(_value->value._biginteger),true);
+        if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mneg),owner);
+        if(_value->type==VT_MAP)return _getValueOfMap(appliedToMap(_value->value._map,Mneg),owner);
+        if(_value->type==VT_BIGINTEGER)return _getBigintegerValue(_getNegatedBiginteger(_value->value._biginteger),owner);
         if(_value->type==VT_RATIONAL){
             // this is done by negating the numerator but if the numerator equals NULL we should use -1
             Mrational* rational=_value->value._rational;
             if(rational){
                 /////////outputValue("Negating rational '",_value,"'.\n");
-                Mbiginteger* _biNumerator=(rational->num?_getNegatedBiginteger(rational->num):_getBiginteger(-1));
+                Mbiginteger* _biNumerator=(Mbiginteger*)OWNED(rational->num?_getNegatedBiginteger(rational->num):_getBiginteger(-1),owner);
                 if(_biNumerator){
                     ////////outputBiginteger("Negated numerator '",_biNumerator,"' computed!\n");
-                    Mbiginteger* _biDenominator=(rational->den?_getBigintegerCopy(rational->den):NULL);
+                    Mbiginteger* _biDenominator=(rational->den?(Mbiginteger*)OWNED(_getBigintegerCopy(rational->den),owner):NULL);
                     ////////outputBiginteger("Denominator '",_biDenominator,"' copied!\n");
-                    if(_biDenominator||!rational->den)return _getRationalValue(_getRational(_biNumerator,_biDenominator,(isFloatUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false,true),true);
+                    if(_biDenominator||!rational->den)
+                        return _getRationalValue((Mrational*)OWNED(_getRational(_biNumerator,_biDenominator,(isFloatUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false),owner),owner);
                     outputError("Failed to copy the numerator of the rational to negate");
-                    if(_biDenominator)free_biginteger(_biDenominator);
-                    free_biginteger(_biNumerator);
+                    if(_biDenominator)free_biginteger(_biDenominator,owner);
+                    free_biginteger(_biNumerator,owner);
                 }else
                     outputError("Failed to negate the numerator of a rational");
             }
@@ -443,17 +468,17 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
         if(_value->type==VT_DECIMAL){
             Mdecimal* decimal=_value->value._decimal;
             if(decimal){
-                Mdecimal* _negDecimal=__decimal(M_DECIMALCONTEXT->mpd_context,0,0);
+                Mdecimal* _negDecimal=(Mdecimal*)OWNED(__decimal(M_DECIMALCONTEXT->mpd_context,0,0),owner);
                 if(_negDecimal){
                     uint32_t status=0;
                     mpd_qcopy_negate(_negDecimal->mpd,decimal->mpd,&status);
                     if(status&0xEFBF){
-                        free_decimal(_negDecimal);_negDecimal=NULL;
+                        free_decimal(_negDecimal,owner);_negDecimal=NULL;
                         outputError("Failed to negate a decimal");
                         outputDecimalStatus(status);
                     }else // success, ascertain to copy the repeating field over as that remains the same on negating (assumedly)
                         _negDecimal->repeating=decimal->repeating;
-                    if(_negDecimal)return _getDecimalValue(_negDecimal,true);
+                    if(_negDecimal)return _getDecimalValue(_negDecimal,owner);
                 }
             }
         }
@@ -544,14 +569,17 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     // some special cases (i.e. the input number is smaller than 2)
     Mbiginteger* _finalmultiplier=NULL;
     if(_value->type==VT_INTEGER){
-        if(_value->value._integer->ll<0){outputError("Invalid (negative) integer argument to factorial() function");return NULL;}
-        if(_value->value._integer->ll<3)return _getIntegerValue(_value->value._integer->ll);
+        if(_value->value._integer->ll<0)
+        {outputError("Invalid (negative) integer argument to factorial() function");return NULL;}
+        if(_value->value._integer->ll<3)
+            return _getIntegerValue(_value->value._integer->ll);
         _finalmultiplier=(Mbiginteger*)OWNED(_getBiginteger(_value->value._integer->ll),owner);
     }else{
-        if(mp_isneg(MP_INT_POINTER(_value->value._biginteger))){outputError("Invalid (negative) big integer argument to factorial() function");return NULL;}
+        if(mp_isneg(MP_INT_POINTER(_value->value._biginteger)))
+        {outputError("Invalid (negative) big integer argument to factorial() function");return NULL;}
         if(mp_cmp(MP_INT_POINTER(_value->value._biginteger),MP_INT_POINTER(getBigintegerThree()))==MP_LT)
             return _getBigintegerValue((Mbiginteger*)OWNED(_getBigintegerCopy(_value->value._biginteger),owner),owner);
-        _finalmultiplier=_getBigintegerCopy(_value->value._biginteger);
+        _finalmultiplier=(Mbiginteger*)OWNED(_getBigintegerCopy(_value->value._biginteger),owner);
     }
     if(!_finalmultiplier){
         output("%s",M_ERROR_PREFIX);outputValue("Failed to convert '",_value,"' to a big integer!\n");
@@ -559,7 +587,7 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
     }
     if(amVerboseDebugging())
         outputBiginteger("\nFinal multiplier: '",_finalmultiplier,"'.");
-    Mbiginteger* _result=(Mbiginteger*)OWNED(_getBiginteger(6),owner); // the smallest value to return
+    Mbiginteger* _result=(Mbiginteger*)OWNED(_getBiginteger(6),owner);
     if(_result){
         clock_t then=(amVerbose()?clock():0);
         // we could store fac values in a special list with index equal to the argument, in which case we could look up the starting value
@@ -567,8 +595,10 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
         Mbiginteger *_multiplier=(Mbiginteger*)OWNED(_getBiginteger(3),owner);
         if(_multiplier){
             while(mp_cmp(MP_INT_POINTER(_multiplier),MP_INT_POINTER(_finalmultiplier))==MP_LT){
-                if(mp_incr(MP_INT_POINTER(_multiplier))!=MP_OKAY){outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
-                if(mp_mul(MP_INT_POINTER(_result),MP_INT_POINTER(_multiplier),MP_INT_POINTER(_result))!=MP_OKAY){outputError("Failed to multiply a big integer");_result=NULL;break;}
+                if(mp_incr(MP_INT_POINTER(_multiplier))!=MP_OKAY)
+                {outputError("Failed to increment a big integer");_result=NULL;break;} // if we fail to increment break
+                if(mp_mul(MP_INT_POINTER(_result),MP_INT_POINTER(_multiplier),MP_INT_POINTER(_result))!=MP_OKAY)
+                {outputError("Failed to multiply a big integer");_result=NULL;break;}
                 //////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
             }
             // get rid of intermediate big integers
@@ -597,7 +627,7 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 
 // method for writing a value to standard out
 Mvalue* Mout(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _valueText=(Mstring*)OWNED(_getValueText(_value),owner);
+    Mstring* _valueText=(Mstring*)OWNED(_getValueText(_value,true),owner);
     size_t result=string_length(_valueText);
     if(result>0)output("%s",string(_valueText));
     free_string(_valueText,owner);

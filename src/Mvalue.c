@@ -482,7 +482,7 @@ Mvalue* getFirstScalarValue(Mvalue* value){
 }
 
 Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=OWNED(_getListOfType(VT_TEXT),owner);
+    Mlist* _list=(Mlist*)OWNED(_getListOfType(VT_TEXT),owner);
     if(!_list)return NULL;
     Mmapelement* mapelement=map->_first;
     while(mapelement){
@@ -507,12 +507,12 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
 Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=getOwner(__LINE__);
     Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
     if(!_map)return NULL;
-    Mvalue* _value=__value(weak?"weak map":"strong map");
-    if(_value){
+    Mvalue* _mapValue=__value(weak?"weak map":"strong map");
+    if(_mapValue){
         _map->weak=weak;
         _map->valuetype=mapValuetype;
-        _value->type=VT_MAP;
-        _value->value._map=(Mmap*)SUBOWNED(OWNED(_map,owner_valueList),3);
+        _mapValue->type=VT_MAP;
+        _mapValue->value._map=(Mmap*)SUBOWNED(OWNED(_map,owner_valueList),3);
     }else
         free_map(_map,owner);
     return _mapValue;
@@ -545,7 +545,7 @@ Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map){
 Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token){
     if(!_token)return NULL;
     Mvalue* _value=__value("token");
-    if!_value){_value->value._token=(Mtoken*)OWNED(DISOWNED(_token,owner_token),owner_value_data);_value->type=VT_TOKEN;}else if(owner_token.level==0)free_token(_token,owner_token);
+    if(_value){_value->value._token=(Mtoken*)OWNED(DISOWNED(_token,owner_token),owner_value_data);_value->type=VT_TOKEN;}else if(owner_token.level==0)free_token(_token,owner_token);
     return _value;
 }/* VALIDATED */
 
@@ -711,7 +711,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
     return NULL;
 }/* VALIDATED */
 
-static Mmap* getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);
+static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
             Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
@@ -756,7 +756,7 @@ Mmap* _getMapTokenMap(char* name1,char* name2){Mallocationowner owner=getOwner(_
     return DISOWNED(OWNED(_getTwoArgumentMap(name1,name2,VT_MAP,VT_TOKEN),owner),owner);
 }/* VALIDATED */
 Mmap* _getTokenTokenMap(char* name1,char* name2){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(getTwoArgumentMap(name1,name2,VT_TOKEN,VT_TOKEN),owner),owner);
+    return DISOWNED(OWNED(_getTwoArgumentMap(name1,name2,VT_TOKEN,VT_TOKEN),owner),owner);
 }/* VALIDATED */
 
 Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3){Mallocationowner owner=getOwner(__LINE__);
@@ -803,7 +803,7 @@ Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){Mallocationow
     return DISOWNED(OWNED(_getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_UNDEFINED,VT_INTEGER),owner),owner);
 }/* VALIDATED */
 
-Mmap* getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3,Mvaluetype valuetype4){Mallocationowner owner=getOwner(__LINE__);
+Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3,Mvaluetype valuetype4){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3&&name4){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
             strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name3,name4)){
@@ -892,10 +892,13 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
 // end helper functions 
 
 // LIST STUFF
-Mvalue* _getValueOfList(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list){Mallocationowner owner=getOwner(__LINE__);
     if(!_list)return NULL;
     Mvalue* _value=OWNED(__value(_list->weak?"weak list":"strong list"),owner);
-    if(!_value)return NULL;
+    if(!_value){
+        if(owner_list.level==0)free_list(_list,owner_list);
+        return NULL;
+    }
     _value->value._list=_list;
     _value->type=VT_LIST;
     return DISOWNED(_value,owner);
@@ -1153,8 +1156,8 @@ Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner_rational){
     if(!_rational)return NULL;
     Mvalue* _rationalValue=__value("rational");
     if(_rationalValue){
-        _value->type=VT_RATIONAL;
-        _value->value._rational=_rational;
+        _rationalValue->type=VT_RATIONAL;
+        _rationalValue->value._rational=_rational;
     }else
     if(owner_rational.level==0)free_rational(_rational,owner_rational);
     return _rationalValue;
@@ -1920,7 +1923,7 @@ long long isValueUndefined(Mvalue* value){
 // MDH@04JUN2019: based on https://stackoverflow.com/questions/4637967/algorithm-challenge-generate-continued-fractions-for-a-float/56444882#56444882
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationowner owner=getOwner(__LINE__);
     // if iterations, you're supposed to return all iteration results
-    Mlist* _iterationsList=OWNED(_getListOfType(VT_UNDEFINED),owner);
+    Mlist* _iterationsList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner);
     if(_iterationsList){ // should be freed when NOT returned!!
         Mrational* _rational=NULL; // the last (computed) rational
         if(isLongDoubleUndefined(ld)!=M_TRUE){ // not a NaN (might still be Infinity though), but Infinity has a sign too   
@@ -1941,7 +1944,8 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
                     delta=(ld*q)-p;
                     ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
-                    Mbiginteger *_numerator=OWNED(_getBiginteger(neg?-p:p),owner),*_denominator=OWNED(_getBiginteger(q),owner);
+                    Mbiginteger *_numerator=(Mbiginteger*)OWNED(_getBiginteger(neg?-p:p),owner)
+                               ,*_denominator=(Mbiginteger*)OWNED(_getBiginteger(q),owner);
                     _rational=_getRational(_numerator,_denominator,delta,false/*,true*/); // construct the intermediate result without normalizing
                     free_biginteger(_numerator,owner);free_biginteger(_denominator,owner); // MDH@26MAY2020 now always!!!
                     if(!_rational){
@@ -1950,7 +1954,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     }
                     // NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
-                    Mvalue* _rationalValue=OWNED(_getRationalValue(_rational),owner);
+                    Mvalue* _rationalValue=_getRationalValue(_rational,owner);
                     if(!_rationalValue){free_rational(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
                     // NOTE probably best to break if we can't append approximations!!
                     // NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
@@ -1973,10 +1977,10 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                 }
                 */
             }else{ // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
-                Mbiginteger* _numerator=OWNED(__biginteger(),owner);
-                Mrational* _rational=OWNED(_getRational(_numerator,NULL,M_LD_NAN,false),owner);
+                Mbiginteger* _numerator=(Mbiginteger*)OWNED(__biginteger(),owner);
+                Mrational* _rational=(Mrational*)OWNED(_getRational(_numerator,NULL,M_LD_NAN,false),owner);
                 free_biginteger(_numerator,owner); // ALWAYS!!
-                Mvalue* _rationalValue=_getRationalValue(_rational); // OK free __biginteger() if failing to get that _rational
+                Mvalue* _rationalValue=_getRationalValue(_rational,owner); // OK free __biginteger() if failing to get that _rational
                 if(!_rationalValue)free_rational(_rational,owner);else 
                 if(appendedToList(_iterationsList,owner,_rationalValue,0)<=0)outputError("Failed to append rational approximation to the result list"); // no need to free _rational because it's value wrapper will be garbage collected!!
             }
@@ -2012,15 +2016,15 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){Mallocationowner 
         //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
         if(_value->type==VT_MAP){
             // if(amVerbose()&&amDebugging())outputValue("Copying map ",_value,".\n");
-            Mmap* _mapCopy=OWNED(_getMapCopy(_value->value._map),owner);
-            _value=_getValueOfMap(_mapCopy);
-            if(!_value)free_map(_mapCopy,owner);
+            Mmap* _mapCopy=(Mmap*)OWNED(_getMapCopy(_value->value._map),owner);
+            _value=_getValueOfMap(_mapCopy,owner);
+            // if(!_value)free_map(_mapCopy,owner);
         }else
         if(_value->type==VT_LIST){
-            Mlist* _listCopy=OWNED(_getListCopy(_value->value._list),owner);
+            Mlist* _listCopy=(Mlist*)OWNED(_getListCopy(_value->value._list),owner);
             // if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
-            _value=_getValueOfList(_listCopy);
-            if(!_value)free_list(_listCopy,owner);
+            _value=_getValueOfList(_listCopy,owner);
+            // if(!_value)free_list(_listCopy,owner);
         }
     }
     *_valueholder=_value; // replace what's being pointed to
@@ -2279,7 +2283,7 @@ bool free_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocatio
 void free_functionmap(Mfunctionmap* _functionmap,Mallocationowner owner_functionmap){
     if(_functionmap){
         free_functionmapelement(_functionmap->_first,Msubowner(owner_functionmap,1));
-        FREE(_functionmap,'F',owner_functionmap);
+        FREE_1(_functionmap,'F',owner_functionmap);
     }
 }// VALIDATED
 // MDH@20JUL2019: might never get called, wel perhaps on internal functions when it goes out of scope???????
@@ -2337,19 +2341,25 @@ Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=
 }
 
 // additional function for wrapping environments and functions
-Mvalue* _getValueOfFunction(Mfunction* _function){
+Mvalue* _getValueOfFunction(Mfunction* _function,Mallocationowner owner_function){
     if(!_function)return NULL;
     Mvalue* _value=__value("function");
-    if(!_value)return NULL;
+    if(!_value){
+        if(owner_function.level==0)free_function(_function,owner_function);
+        return NULL;
+    }
     _value->type=VT_FUNCTION;
-    _value->value._function=SUBOWNED(OWNED(_function,owner_valueList),3);
+    _value->value._function=SUBOWNED(OWNED(DISOWNED(_function,owner_function),owner_valueList),3);
     return _value;
 }/* VALIDATED */
-Mvalue* _getValueOfEnvironment(Menvironment* _environment){
+Mvalue* _getValueOfEnvironment(Menvironment* _environment,Mallocationowner owner_environment){
     if(!_environment)return NULL;
     Mvalue* _value=__value("environment");
-    if(!_value)return NULL;
+    if(!_value){
+        if(owner_environment.level==0)free_environment(_environment,owner_environment);
+        return NULL;
+    }
     _value->type=VT_ENVIRONMENT;
-    _value->value._environment=SUBOWNED(OWNED(_environment,owner_valueList),3);
+    _value->value._environment=SUBOWNED(OWNED(DISOWNED(_environment,owner_environment),owner_valueList),3);
     return _value;
 }/* VALIDATED */

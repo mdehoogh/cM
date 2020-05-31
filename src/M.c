@@ -552,7 +552,7 @@ void deleteAutocompletionText(){
 	if(amVerboseDebugging())inputInfo("No auto completion text to delete.");
 }
 void updateAutoCompletionText(){
-	deleteAutoCompletionText();
+	deleteAutocompletionText();
 	_autoCompletionText=OWNED(_getAutoCompletionText('\0'),owner_autoCompletionText); // get the new characters
 	// merge with identifier continuation text
 	if(_autoCompletionText&&_identifierContinuationCharacters){
@@ -2935,12 +2935,13 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner
 }
 
 // in an interactive session we'll have additional variables to set up
-uint16_t prepareShellEnvironmentForInteractiveSession(){
+uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=getOwner(__LINE__);
 	
 	uint16_t errorflags=0;
 
 	// Menvironment* _Menvironment=getValueEnviroment(_MenvironmentValue); // MDH@03FEB2020: extracting the environment from its wrapper
 	// if(!pushExecutionEnvironment(_Menvironment))return false;
+	Mallocationowner owner_executionenvironment=getOwnerExecutionEnvironment();
 
 	// we're gonna need a list to store lists of command and result pairs
 	M_value=OWNED(_getListValue(VT_MAP,false,"M command list"),owner_M_value);
@@ -2948,7 +2949,8 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 	// MDH@14NOV2019: typically M is created as an immutable variable BUT of course I can change the assigned M_value myself directly but the user can't!!
 	//                NOTE if we would have used setValue to set M to M_value it would copy the list that M_value holds instead of using M_value itself, setVariable won't do that
 	if(M_value){
-		if(!addVariable(_Menvironment,M_VARIABLE_NAME,VT_LIST,true)||!setVariable(_Menvironment,M_VARIABLE_NAME,M_value)){
+		if(!addVariable(_Menvironment,owner_executionenvironment,M_VARIABLE_NAME,VT_LIST,true)
+				||!setVariable(_Menvironment,M_VARIABLE_NAME,M_value)){
 			outputWarning("Failed to create, add or initialize M.");
 			errorflags|=1;
 		}
@@ -2961,7 +2963,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 	
 	// MDH@14NOV2019: the M function allows access to the results of previously executed commands (before reset() clears them all!!!)
 	if(M_value){
-		if(!completedValueFunction(_getFunction(_Menvironment,MFUNCTION_NAME),MFUNCTION_NAME,MM)){
+		if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,MFUNCTION_NAME),MFUNCTION_NAME,MM)){
 			errorflags|=8;
 			output("%sFailed to register function %s.",M_ERROR_PREFIX,MFUNCTION_NAME);
 		}else
@@ -2969,31 +2971,31 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 			output("Function %s registered.\n",MFUNCTION_NAME);
 	}
 
-	if(!completedFunction(_getFunction(_Menvironment,"variables"),"variables",Mvariables)){
+	if(!completedFunction(_getFunction(_Menvironment,owner_executionenvironment,"variables"),"variables",Mvariables)){
 		errorflags|=16;
 		outputWarning("Failed to register the variables() function");
 	}
-	if(!completedValueFunction(_getFunction(_Menvironment,"values"),"values",Mvalues)){
+	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"values"),"values",Mvalues)){
 		errorflags|=32;
 		outputWarning("Failed to register the values() function");
 	}
 
 	// MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
-	if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min)){
+	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"in"),"in",Min)){
 		errorflags|=64;
 		outputWarning("Failed to register the in function"); // moved out of registerInternalFunctions!!!!
 	}
-	if(!completedValueFunction(_getFunction(_Menvironment,"os"),"os",MexecuteOSCommand)){
+	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"os"),"os",MexecuteOSCommand)){
 		errorflags|=128;
 		outputWarning("Failed to register the os function"); // moved out of registerInternalFunctions!!!!
 	}
 
 	// color functions
-	if(!completedValueFunction(_getFunction(_Menvironment,"bc"),"bc",Mbc)){
+	if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"bc"),"bc",Mbc)){
 		errorflags|=256;
 		outputWarning("Failed to register the bc function"); // moved out of registerInternalFunctions!!!!
 	}
-    if(!completedValueFunction(_getFunction(_Menvironment,"tc"),"tc",Mtc)){
+    if(!completedValueFunction(_getFunction(_Menvironment,owner_executionenvironment,"tc"),"tc",Mtc)){
 		errorflags|=512;
 		outputWarning("Failed to register the tc function"); // moved out of registerInternalFunctions!!!!
 	}
@@ -3004,7 +3006,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){
 // additional functions are available in an interactive session to be added to the shell environment
 // as well as specific functions for displaying input info and input error messages
 bool interactiveSessionInitialized(){
-	uint16_t errorflags=prepareShellEnvironmentForInteractiveSession();
+	uint16_t errorflags=prepareShellEnvironmentForInteractiveSession(getOwnerExecutionEnvironment());
 	if(errorflags){
 		output("Errors preparing for running an interactive session (with code %x). Do you want to continue? ",errorflags);
 		char answer;
@@ -3061,7 +3063,8 @@ static Mstring* _separator=NULL;Mallocationowner owner_separator={0,0,__LINE__};
 void showSeparatorLine(){
 	int columns=getCurrentNumberOfWindowTextColumns();
 	if(columns<=0){outputWarning("No number of columns");return;}
-	if(!_separator){_separator=_OWNED(_string(),owner_separator);if(!_separator){outputError("No separator!");return;}}
+	if(!_separator){_separator=(Mstring*)OWNED(__string(),owner_separator);
+	if(!_separator){outputError("No separator!");return;}}
 	// output("Number of columns: %d.\n",columns);
 	size_t separatorlength=string_length(_separator);
 	if(separatorlength<3*columns)if(!string_setlength(_separator,3*columns/*,owner_separator*/)){outputError("Failed to resize the separator.");return;}; // MDH@23APR2020: prudent to ascertain that the text is sufficient long enough to contain the separator characters
@@ -3144,7 +3147,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
 
 	// prepare an interactive session
-	if(!interactiveSessionInitialized()){
+	if(!interactiveSessionInitialized(getOwnerExecutionEnvironment())){
 		outputError("Failed to initialize the interactive session.");
 		resetOutputColor();
 		exit(2);

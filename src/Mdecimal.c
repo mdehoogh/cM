@@ -69,15 +69,17 @@ void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,M
 	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
 	FREE_1(_decimalcontextElement,'e',owner_decimalcontextElement);
 }
-static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;
+static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={0,0,__LINE__};
 // to get the unique decimal context with the requested precision
-static Mdecimalcontext* getDecimalcontext(mpd_ssize_t prec){
+static Mdecimalcontext* _getExistingDecimalcontext(mpd_ssize_t prec){
 	if(prec<6)return NULL; // prec needs to be at least 6
 	MdecimalcontextElement *decimalcontextElement=_firstDecimalcontextElement;
 	while(decimalcontextElement&&decimalcontextElement->_decimalcontext->mpd_context->prec!=prec)decimalcontextElement=decimalcontextElement->_next;
 	return(decimalcontextElement?decimalcontextElement->_decimalcontext:NULL);
 }
-Mdecimalcontext* _getNewDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getOwner(__LINE__); // NOTE a global so use module level id
+Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getOwner(__LINE__); // NOTE a global so use module level id
+	Mdecimalcontext* decimalcontext=_getExistingDecimalcontext(prec);
+	if(decimalcontext)return decimalcontext;
 	MdecimalcontextElement* decimalcontextElement=CALLOC_1(sizeof(MdecimalcontextElement),'e',owner);
 	if(decimalcontextElement){
 		decimalcontextElement->_decimalcontext=CALLOC_1(sizeof(Mdecimalcontext),'C',owner);
@@ -89,6 +91,7 @@ Mdecimalcontext* _getNewDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=
 				if(!_firstDecimalcontextElement)_firstDecimalcontextElement=_lastDecimalcontextElement;
 				return decimalcontextElement->_decimalcontext;
 			}
+			// not bound!!!
 			DISOWNED(decimalcontextElement->_decimalcontext,owner);
 		}
 		free_decimalcontextElement(decimalcontextElement,owner);
@@ -146,7 +149,8 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
  */
 Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){Mallocationowner owner=getOwner(__LINE__);
 	if(!_decimal)return NULL;
-	Mdecimalcontext* decimalcontext=getDecimalcontext(_decimal->prec);if(!decimalcontext)decimalcontext=_getNewDecimalContext(_decimal->prec);
+	Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
+	// MDH@31MAY2020 undone, so no need to do this: if(!decimalcontext)decimalcontext=_getNewDecimalContext(_decimal->prec);
     if(!decimalcontext)return NULL;
 	mpd_t* _mpd=OWNED(get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd),owner); // make a copy
 	if(!_mpd)return NULL;
@@ -448,7 +452,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 			free_biginteger(_digit,owner);free_biginteger(_remainder,owner);free_biginteger(_bi10,owner);
 		}
     }else
-        _decimalText=OWNED(getBigintegerText(numerator),owner);
+        _decimalText=OWNED(_getBigintegerText(numerator),owner);
     // parse _decimalText to a decimal
     Mdecimal* _decimal=NULL;
     if(_decimalText){
@@ -629,7 +633,7 @@ Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t rep
  */
 Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){Mallocationowner owner=getOwner(__LINE__);
     if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
-    Mdecimal* _decimal=OWNED(_adecimal(),owner); // always using the default decimal context
+    Mdecimal* _decimal=OWNED(__adecimal(),owner); // always using the default decimal context
     if(_decimal){
 		////////output("Wrapping decimal with precision %u.\n",prec);
 		_decimal->mpd=_mpd;_decimal->prec=prec;_decimal->repeating=repeating;

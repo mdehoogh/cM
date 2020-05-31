@@ -20,11 +20,11 @@ Mvalue* Mempty(Mvalue* value){
 Mvalue* Mkeys(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _keysList=NULL;
     if(value){
-        if(value->type==VT_MAP)_keysList=OWNED(_getMapAttributes(value->value._map),owner);else
-        if(value->type==VT_LIST)_keysList=OWNED(_getListIndices(value->value._list),owner);
+        if(value->type==VT_MAP)_keysList=(Mlist*)OWNED(_getMapAttributes(value->value._map),owner);else
+        if(value->type==VT_LIST)_keysList=(Mlist*)OWNED(_getListIndices(value->value._list),owner);
     }
     if(!_keysList)return NULL;
-    Mvalue* _keysValue=_getValueOfList(_keysList);
+    Mvalue* _keysValue=_getValueOfList(_keysList,owner);
     if(!_keysValue)free_list(_keysList,owner);
     return _keysValue;
 }
@@ -144,7 +144,7 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
                                     if(removedFromListValue&&!appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID))outputError("Failed to remember a removed list element");
                                     indexListelement=indexListelement->_next;
                                 }
-                                removedValue=_getValueOfList(_removedElementsList);
+                                removedValue=_getValueOfList(_removedElementsList,owner);
                                 if(!removedValue)free_list(_removedElementsList,owner);
                             }else 
                                 outputError("Failed to create a list for storing the removed list elements");
@@ -177,12 +177,15 @@ Mvalue* Mfind(Mvalue* listValue,Mvalue* listElementValue,Mvalue* maximumNumberOf
                 Mlistelement* listelement=list->_first;
                 while(listelement){
                     if(areValuesEqual(listelement->_value,listElementValue)){
-                        if(appendedToList(_foundElementsIndicesList,owner,_getIntegerValue(listelement->index),M_LL_INVALID)<=0)outputError("Failed to store the index of a list element found");else
-                        if(maximumNumberOfElementsToFind>0&&_foundElementsIndicesList->numberOfElements>=maximumNumberOfElementsToFind)break;
+                        if(appendedToList(_foundElementsIndicesList,owner,_getIntegerValue(listelement->index),M_LL_INVALID)<=0)
+                            outputError("Failed to store the index of a list element found");else
+                        if(maximumNumberOfElementsToFind>0
+                                &&_foundElementsIndicesList->numberOfElements>=maximumNumberOfElementsToFind)
+                            break;
                     }
                     listelement=listelement->_next;
                 }
-                _findValue=_getValueOfList(_foundElementsIndicesList);
+                _findValue=_getValueOfList(_foundElementsIndicesList,owner);
                 if(!_findValue)free_list(_foundElementsIndicesList,owner);
             }else
                 outputError("Failed to create the list to store the indices of the element to find");
@@ -271,7 +274,7 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwne
                                                 if(mp_decr(MP_INT_POINTER(_countminus1))==MP_OKAY){
                                                     Mrational* _varianceRational=OWNED(_getRationalBigintegerQuotient(_sumofsquaresRational,_countminus1),owner);
                                                     if(_varianceRational){
-                                                        Mvalue* _varianceRationalValue=__getRationalValue(_varianceRational,owner);
+                                                        Mvalue* _varianceRationalValue=_getRationalValue(_varianceRational,owner);
                                                         if(!_varianceRationalValue||appendedToMap(_statisticsMap,owner,"variance",_varianceRationalValue)<=0)outputError("Failed to store the sample variance in the statistics map");
                                                         // TODO and finally the standard deviation
                                                     }
@@ -299,7 +302,7 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwne
     return NULL;
 }
 Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _statisticsMap=OWNED(_getMapOfType(VT_UNDEFINED),owner);
+    Mmap* _statisticsMap=(Mmap*)OWNED(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing big integer sample statistics.\n");
         Mbiginteger* biginteger=NULL;
@@ -321,7 +324,11 @@ Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getO
                        ,*minimum=(Mbiginteger*)OWNED(_getBigintegerCopy(biginteger),owner),*maximum=(Mbiginteger*)OWNED(_getBigintegerCopy(biginteger),owner);
             if(sum&&minimum&&maximum&&sumofsquares&&mp_mul(MP_INT_POINTER(biginteger),MP_INT_POINTER(biginteger),MP_INT_POINTER(sumofsquares))==MP_OKAY){
                 // every time we get a big integer to use to update the cumulative sample statistics we're going to update the helpers first
-                Mbiginteger *_newsum=__biginteger(),*_newssq=__biginteger(),*_newminimum=__biginteger(),*_newmaximum=__biginteger(),*_square=__biginteger();
+                Mbiginteger *_newsum=(Mbiginteger*)OWNED(__biginteger(),owner)
+                           ,*_newssq=(Mbiginteger*)OWNED(__biginteger(),owner)
+                           ,*_newminimum=(Mbiginteger*)OWNED(__biginteger(),owner)
+                           ,*_newmaximum=(Mbiginteger*)OWNED(__biginteger(),owner)
+                           ,*_square=(Mbiginteger*)OWNED(__biginteger(),owner);
                 if(_newsum&&_newssq&&_newminimum&&_newmaximum){
                     bool someerror;
                     while(listelement->_next){
@@ -351,10 +358,10 @@ Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getO
                     }
                     if(!someerror){
                         appendedToMap(_statisticsMap,owner,"count",_getIntegerValue(count));
-                        appendedToMap(_statisticsMap,owner,"sum",_getBigintegerValue(sum));
-                        appendedToMap(_statisticsMap,owner,"sumofsquares",_getBigintegerValue(sumofsquares));
-                        appendedToMap(_statisticsMap,owner,"minimum",_getBigintegerValue(minimum));
-                        appendedToMap(_statisticsMap,owner,"maximum",_getBigintegerValue(maximum));
+                        appendedToMap(_statisticsMap,owner,"sum",_getBigintegerValue(sum,owner));
+                        appendedToMap(_statisticsMap,owner,"sumofsquares",_getBigintegerValue(sumofsquares,owner));
+                        appendedToMap(_statisticsMap,owner,"minimum",_getBigintegerValue(minimum,owner));
+                        appendedToMap(_statisticsMap,owner,"maximum",_getBigintegerValue(maximum,owner));
                     }else{
                         Mstring* _error=OWNED(__string(),owner);
                         if(_error){

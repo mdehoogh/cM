@@ -196,7 +196,7 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 
 const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,0b1000000,0b11111111};
 
-bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap* _variableMap){
+bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap){
 	bool executionEnvironmentInitialized=true;
 	if(amVerbose())outputMap("Execution environment variable map: ",_variableMap,".\n");
 	Mmapelement* variableMapelement=(_variableMap?_variableMap->_first:NULL);
@@ -205,7 +205,7 @@ bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mmap*
 		variableMapelementVariable=variableMapelement->_variable;
 		if(strlen(variableMapelementVariable->_name->chars)==0)continue; // no use to create a variable with no name
 		// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
-		if(!addVariable(_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->valuetype,false)){
+		if(!addVariable(_executionEnvironment,owner_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->valuetype,false)){
 			output("%sFailed to add variable '%s' as local variable.\n",M_ERROR_PREFIX,variableMapelementVariable->_name->chars);
 			executionEnvironmentInitialized=false;
 		}else
@@ -240,15 +240,15 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		assignValue(&_functionExecutionEnvironment->_parent,_function->_definitionEnvironmentValue); // MDH@03FEB2020 replacing: _functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
 		if(amVerbose())outputInfo("Parent of function execution environment set to the function definition environment");
 		// 3. create the argument map fields as variables in the function execution environment
-		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,_argumentMap);
+		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,owner,_argumentMap);
 		if(functionExecutionEnvironmentInitialized){
 			if(amVerbose())outputInfo("Function execution environment initialized.");
 			// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
-			if(!addVariable(_functionExecutionEnvironment,"$",VT_UNDEFINED,false)){
+			if(!addVariable(_functionExecutionEnvironment,owner,"$",VT_UNDEFINED,false)){
 				outputError("Failed to add the result variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}else // also add the function exit flag variable (with name ! which cannot be set in the code because it is an invalid name)
-			if(!addVariable(_functionExecutionEnvironment,"!",VT_UNDEFINED,false)){
+			if(!addVariable(_functionExecutionEnvironment,owner,"!",VT_UNDEFINED,false)){
 				outputError("Failed to add the exit flag variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
 			}
@@ -549,7 +549,9 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 			if(_doEnvironment){
 				_doEnvironment->_name=SUBOWNED(OWNED(_getChars("do"),owner),1);
 				// let's add variable $ as result variable and ! as exit flag variable
-				bool doEnvironmentInitialized=addVariable(_doEnvironment,"$",VT_UNDEFINED,false)&&addVariable(_doEnvironment,"!",VT_INTEGER,false)&&setValue(_doEnvironment,"!",_getIntegerValue(0));
+				bool doEnvironmentInitialized=addVariable(_doEnvironment,owner,"$",VT_UNDEFINED,false)
+												&&addVariable(_doEnvironment,owner,"!",VT_INTEGER,false)
+												&&setValue(_doEnvironment,"!",_getIntegerValue(0));
 				if(doEnvironmentInitialized){
 					if(pushExecutionEnvironment(_doEnvironment)){
 						Mlistelement* tokenValueListelement=doList->_first;
@@ -602,8 +604,8 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			// better wait with pushing until _forEnvironment is initialized appropriately
 			// MDH@11MAR2020: $ is NOT needed when there's an explicit result token value!!
 			bool forEnvironmentInitialized=(_resultTokenValue?true:false);
-			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,"$",VT_UNDEFINED,false))forEnvironmentInitialized=false;
-			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,"_",VT_INTEGER,false))forEnvironmentInitialized=false;
+			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"$",VT_UNDEFINED,false))forEnvironmentInitialized=false;
+			if(forEnvironmentInitialized&&!addVariable(_forEnvironment,owner,"_",VT_INTEGER,false))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized&&!setValue(_forEnvironment,"_",_getIntegerValue(0)))forEnvironmentInitialized=false;
 			if(forEnvironmentInitialized){
 				if(pushExecutionEnvironment(_forEnvironment)){
@@ -619,7 +621,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
 						// although perhaps we should exclude using $ and _ well especially _
 						// MDH@08NOV2019: a list is also allowed actually anything
-						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,initializationValue->value._map)){
+						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,getOwnerExecutionEnvironment(),initializationValue->value._map)){
 							outputError("Failed to initialize the for loop local variables");
 							forEnvironmentInitialized=false;
 						}
@@ -2528,7 +2530,7 @@ Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	switch(value->type){
 		// composite types
 		case VT_LIST:_reciprocalValue=_functionAppliedToList(value->value._list,Mreciprocal);break;
-		case VT_MAP:_reciprocalValue=_functionAppliedToMap(value->value._map,Mreciprocal);break;
+		case VT_MAP:/*_reciprocalValue=_functionAppliedToMap(value->value._map,Mreciprocal); TODO where is it?*/break;
 		// scalar types
 		case VT_FLOAT:_reciprocalValue=_getFloatValue(1/value->value._float->ld);break; // TODO check what happens when the real equals 0
 		case VT_RATIONAL:_reciprocalValue=_getRationalValue(OWNED(_getInverseRational(value->value._rational),owner),owner);break;
@@ -3293,7 +3295,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										if(amDebugging())
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
-										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC_1(_newValueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_newValueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3609,7 +3611,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 									if(amVerboseDebugging())
 										outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 									// which we now did
-									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC_1(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -4156,7 +4158,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				////////if(amVerbose())
 				if(amVerboseDebugging())
 					output("Will add%s variable '%s'.\n",(expressionToken->argument==1?" local":""),_significantTokenText);
-				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
+				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),getOwnerExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=(Mstring*)OWNED(_getExecutionEnvironmentName(),owner);
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
 					free_string(_environmentName,owner);
@@ -7529,18 +7531,18 @@ Menvironment* shellInitialized(char const * const settingCharacters,InputCharRea
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
 			// MDH@29MAY2019: we've got (symbol) NULL
 			// MDH@06NOV2019: the NULL constant will have value NULL forever
-			if(!addVariable(_Menvironment,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
+			if(!addVariable(_Menvironment,owner,M_NULL_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_NULL_VARIABLE_NAME,NULL_value)){
 				outputWarning("Failed to create, add or initialize constant NULL.");
 			}
 			// MDH@06NOV2019: whereas the UNDEFINED constant will be a non-NULL value of type VT_UNDEFINED (of which we do not need to set the value at all)
-			if(!addVariable(_Menvironment,M_UNDEFINED_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_UNDEFINED_VARIABLE_NAME,UNDEFINED_value)){
+			if(!addVariable(_Menvironment,owner,M_UNDEFINED_VARIABLE_NAME,VT_UNDEFINED,true)||!setValue(_Menvironment,M_UNDEFINED_VARIABLE_NAME,UNDEFINED_value)){
 				outputWarning("Failed to create, add or initialize constant UNDEFINED.");
 			}
-			if(!NAF_value||!addVariable(_Menvironment,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
+			if(!NAF_value||!addVariable(_Menvironment,owner,"NAF",VT_FLOAT,true)||!setValue(_Menvironment,"NAF",NAF_value)){
 				outputWarning("Failed to create, add or initialize Not-a-float constant NAF.");
 				////////return false;
 			}
-			if(!NAI_value||!addVariable(_Menvironment,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
+			if(!NAI_value||!addVariable(_Menvironment,owner,"NAI",VT_INTEGER,true)||!setValue(_Menvironment,"NAI",NAI_value)){
 				outputWarning("Failed to create, add or initialize Not-an-integer default NAI.");
 				////////return false;
 			}
@@ -7555,7 +7557,7 @@ Menvironment* shellInitialized(char const * const settingCharacters,InputCharRea
 				outputError("Failed to create PI");
 				return NULL;
 			}
-			if(!addVariable(_Menvironment,"PI",VT_FLOAT,true)){
+			if(!addVariable(_Menvironment,owner,"PI",VT_FLOAT,true)){
 				outputError("Failed to add PI");
 				///////free_value(PI_value);
 				return NULL;
@@ -7571,7 +7573,7 @@ Menvironment* shellInitialized(char const * const settingCharacters,InputCharRea
 				outputError("Failed to create E");
 				return NULL;
 			}
-			if(!addVariable(_Menvironment,"E",VT_FLOAT,true)){
+			if(!addVariable(_Menvironment,owner,"E",VT_FLOAT,true)){
 				outputError("Failed to add E");
 				return NULL;
 			}
@@ -7599,17 +7601,17 @@ Menvironment* shellInitialized(char const * const settingCharacters,InputCharRea
 			_Menvironment->_functionMap=SUBOWNED(OWNED(environmentFunctionMap,owner),1);
 
 			// register if, while and for special functions
-		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
-		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
-		    if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
+		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
+		    if(!completedTokenTokenFunction(_getFunction(_Menvironment,owner,WHILEFUNCTION_NAME),WHILEFUNCTION_NAME,Mwhilefunction))return false;
+		    if(!completedTokenTokenTokenTokenTokenFunction(_getFunction(_Menvironment,owner,FORFUNCTION_NAME),FORFUNCTION_NAME,Mforfunction))return false;
 			// MDH@05AUG2019: the do function has a single token to process
-		    if(!completedTokenListFunction(_getFunction(_Menvironment,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
-		    if(!completedValueFunction(_getFunction(_Menvironment,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
+		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
+		    if(!completedValueFunction(_getFunction(_Menvironment,owner,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 		    // if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!
 
-			if(!registerInternalFunctions(_Menvironment)){
+			if(!registerInternalFunctions(_Menvironment,owner)){
 				outputError("Failed to register all internal functions");
 				return NULL;
 			}
@@ -7626,26 +7628,33 @@ Menvironment* shellInitialized(char const * const settingCharacters,InputCharRea
 				return false;
 			}
 			*/
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"setdp"),"setdp",setdp)||!completedIntegerFunction(_getFunction(_Menvironment,"getdc"),"getdc",getdc)||!completedIntegerFunction(_getFunction(_Menvironment,"getdp"),"getdp",getdp)){
+			if(!completedIntegerFunction(_getFunction(_Menvironment,owner,"setdp"),"setdp",setdp)
+				||!completedIntegerFunction(_getFunction(_Menvironment,owner,"getdc"),"getdc",getdc)
+				||!completedIntegerFunction(_getFunction(_Menvironment,owner,"getdp"),"getdp",getdp)){
 				outputError("Failed to register the setdp, getdc and getdp functions");
 				return NULL;
 			}
 			// pi() functions (decimal and rational)
-			if(!completedIntegerFunction(_getFunction(_Menvironment,"pi$q"),"pi$q",pi_q)||!completedIntegerFunction(_getFunction(_Menvironment,"pi$ql"),"pi$ql",pi_ql)||!completedIntegerBooleanFunction(_getFunction(_Menvironment,"pi"),"pi",Mpi)){
+			if(!completedIntegerFunction(_getFunction(_Menvironment,owner,"pi$q"),"pi$q",pi_q)
+					||!completedIntegerFunction(_getFunction(_Menvironment,owner,"pi$ql"),"pi$ql",pi_ql)
+					||!completedIntegerBooleanFunction(_getFunction(_Menvironment,owner,"pi"),"pi",Mpi)){
 				outputError("Failed to register the pi, pi$q and pi$ql functions");
 				return NULL;
 			}
-			if(!completedValueValueFunction(_getFunction(_Menvironment,"range"),"range",Mrange)){
+			if(!completedValueValueFunction(_getFunction(_Menvironment,owner,"range"),"range",Mrange)){
 				outputError("Failed to register the range function");
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
-			if(!completedValueFunction(_getFunction(_Menvironment,"i"),"i",i)||!completedValueFunction(_getFunction(_Menvironment,"b"),"b",b)
-					||!completedValueValueFunction(_getFunction(_Menvironment,"t"),"t",t)
-					||!completedValueFunction(_getFunction(_Menvironment,"f"),"f",f)
-					||!completedValueFunction(_getFunction(_Menvironment,"q"),"q",q)||!completedValueFunction(_getFunction(_Menvironment,"Q"),"Q",Q)
-					||!completedValueFunction(_getFunction(_Menvironment,"d"),"d",d)
-					||!completedValueFunction(_getFunction(_Menvironment,"o"),"o",o)||!completedValueFunction(_getFunction(_Menvironment,"O"),"O",O)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"i"),"i",i)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"b"),"b",b)
+					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"t"),"t",t)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"f"),"f",f)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"q"),"q",q)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"Q"),"Q",Q)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"d"),"d",d)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"o"),"o",o)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"O"),"O",O)){
 				outputError("Failed to register value type conversion functions");
 				return NULL;
 			}
@@ -7655,74 +7664,95 @@ Menvironment* shellInitialized(char const * const settingCharacters,InputCharRea
 				return false;
 			}
 			*/
-			if(!completedValueFunction(_getFunction(_Menvironment,"keys"),"keys",Mkeys)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"keys"),"keys",Mkeys)){
 				outputError("Failed to register the keys function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"neg"),"neg",Mneg)||!completedValueFunction(_getFunction(_Menvironment,"bnot"),"bnot",Mbnot)||!completedValueFunction(_getFunction(_Menvironment,"not"),"not",Mnot)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"neg"),"neg",Mneg)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"bnot"),"bnot",Mbnot)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"not"),"not",Mnot)){
 				outputError("Failed to register all unary (neg, bnot, and not) functions");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"exists"),"exists",Mexists)||!completedValueFunction(_getFunction(_Menvironment,"scalar"),"scalar",Mscalar)||!completedValueFunction(_getFunction(_Menvironment,"null"),"null",Mnull)||!completedValueFunction(_getFunction(_Menvironment,"undefined"),"undefined",Mundefined)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"exists"),"exists",Mexists)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"scalar"),"scalar",Mscalar)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"null"),"null",Mnull)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"undefined"),"undefined",Mundefined)){
 				outputError("Failed to register the exists, scalar, null and undefined functions");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"sign"),"sign",Msign)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sign"),"sign",Msign)){
 				outputError("Failed to register the sign function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"zero"),"zero",Mzero)||!completedValueFunction(_getFunction(_Menvironment,"positive"),"positive",Mpositive)||!completedValueFunction(_getFunction(_Menvironment,"negative"),"negative",Mnegative)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"zero"),"zero",Mzero)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"positive"),"positive",Mpositive)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"negative"),"negative",Mnegative)){
 				outputError("Failed to register the zero, positive and negative functions");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"sum"),"sum",Msum)||!completedValueFunction(_getFunction(_Menvironment,"len"),"len",Mlen)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"sum"),"sum",Msum)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"len"),"len",Mlen)){
 				outputError("Failed to register the sum and len list functions");
 				return NULL;
 			}
 			// MDH@01NOV2019: I have some generic list functions implemented
-			if(!completedValueFunction(_getFunction(_Menvironment,"empty"),"empty",Mempty)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"empty"),"empty",Mempty)){
 				outputError("Failed to register the empty function");
 				return false;
 			}
-			if(!completedListFunction(_getFunction(_Menvironment,"statistics"),"statistics",Mstats)||!completedListFunction(_getFunction(_Menvironment,"first"),"first",Mfirst)||!completedListFunction(_getFunction(_Menvironment,"last"),"last",Mlast)){
+			if(!completedListFunction(_getFunction(_Menvironment,owner,"statistics"),"statistics",Mstats)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"first"),"first",Mfirst)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"last"),"last",Mlast)){
 				outputError("Failed to register the statistics, first and last list functions");
 				return NULL;
 			}
-			if(!completedListValueFunction(_getFunction(_Menvironment,"removed"),"removed",Mremoved)||!completedListValueFunction(_getFunction(_Menvironment,"push"),"push",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"drop"),"drop",Mpush)||!completedListValueFunction(_getFunction(_Menvironment,"shove"),"shove",Mshove)||!completedListFunction(_getFunction(_Menvironment,"pop"),"pop",Mpop)){
+			if(!completedListValueFunction(_getFunction(_Menvironment,owner,"removed"),"removed",Mremoved)
+					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
+					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)
+					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)){
 				outputError("Failed to register the removed, push(=drop), shove and pop functions");
 				return NULL;
 			}
-			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,"find"),"find",Mfind)){
+			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,owner,"find"),"find",Mfind)){
 				outputError("Failed to register the find function");
 				return NULL;
 			}
 
-			if(!completedValueFunction(_getFunction(_Menvironment,"tl"),"tl",Mtl)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"tl"),"tl",Mtl)){
 				outputError("Failed to register the tl text function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"fac"),"fac",Mfac)||!completedValueFunction(_getFunction(_Menvironment,"facd"),"facd",Mfacd)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"fac"),"fac",Mfac)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"facd"),"facd",Mfacd)){
 				outputError("Failed to register the fac and facd function");
 				return NULL;
 			}
-			if(!completedValueFunction(_getFunction(_Menvironment,"reciprocal"),"reciprocal",Mreciprocal)||!completedValueFunction(_getFunction(_Menvironment,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"reciprocal"),"reciprocal",Mreciprocal)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"fibonacci"),"fibonacci",Mfibonacci)){ // MDH@10OCT2019
 				outputError("Failed to register the reciprocal and fibonacci function");
 				return NULL;
 			}
-			if(!completedValueValueFunction(_getFunction(_Menvironment,"concat"),"concat",Mconcat)){
+			if(!completedValueValueFunction(_getFunction(_Menvironment,owner,"concat"),"concat",Mconcat)){
 				outputError("Failed to register the concat function");
 				return NULL;
 			}
 			// register list conversions
-			if(!completedListFunction(_getFunction(_Menvironment,"l2m"),"l2m",l2m)||!completedListFunction(_getFunction(_Menvironment,"l2ml"),"l2ml",l2ml)||!completedListFunction(_getFunction(_Menvironment,"ml2l"),"ml2l",ml2l)||!completedListFunction(_getFunction(_Menvironment,"ml2m"),"ml2m",ml2m)){
+			if(!completedListFunction(_getFunction(_Menvironment,owner,"l2m"),"l2m",l2m)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"l2ml"),"l2ml",l2ml)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"ml2l"),"ml2l",ml2l)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"ml2m"),"ml2m",ml2m)){
 				outputError("Failed to register list conversion functions");
 				return NULL;
 			}
 			// register map conversions
-			if(!completedListFunction(_getFunction(_Menvironment,"m2ml"),"m2ml",m2ml)||!completedListFunction(_getFunction(_Menvironment,"m2l"),"m2l",m2l)){
+			if(!completedListFunction(_getFunction(_Menvironment,owner,"m2ml"),"m2ml",m2ml)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"m2l"),"m2l",m2l)){
 				outputError("Failed to register map conversion functions");
 				return NULL;
 			}
+
 		}
 	}
 	if(pushExecutionEnvironment(DISOWNED(_Menvironment,owner)))return _Menvironment;
