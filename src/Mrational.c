@@ -124,8 +124,8 @@ mp_err _qmul_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
         if(_num)free_biginteger(_num,owner);
         if(_den)free_biginteger(_den,owner);
     }else{ // numerator and denominator computed
-        c->num=SUBOWNED(OWNED(DISOWNED(_num,owner),owner_c),1);
-        c->den=DISOWNED(OWNED(DISOWNED(_den,owner),owner_c),1);
+        c->num=(Mbiginteger*)SUBOWNED(OWNED(DISOWNED(_num,owner),owner_c),1);
+        c->den=(Mbiginteger*)SUBOWNED(OWNED(DISOWNED(_den,owner),owner_c),1);
         if(!c->normalized)normalizeRational(c,owner_c);
     }
     return status;

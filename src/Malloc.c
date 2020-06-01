@@ -17,7 +17,7 @@ extern char const * const M_BUG_PREFIX;
 static char const * const HMS_FORMAT_STRING="%H:%M:%S";
 
 static void info(char const * fmt,...){
-    // va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
+    va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
@@ -677,6 +677,8 @@ static bool attachAllocationInfo(void* ptr,signed char type,Mallocationowner own
     Malloc* _alloc=(Malloc*)ptr/*((char*)ptr+size)*/;
     _alloc->allocationType=type; // register the type
     _alloc->allocationIndex=allocationIndex;
+    _alloc->owner=owner;
+    _alloc->owner.disowned=1; // immediately disown the thing
     return true;
 }
 #endif
@@ -724,6 +726,7 @@ void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owne
         ptr=malloc(size);
 #endif
     }
+    info("Mmalloc: %p\n",ptr);
     return ((char*)ptr)+sizeof(Malloc);
 }
 
@@ -740,6 +743,7 @@ void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owne
         ptr=calloc(1,size);
 #endif
     }
+    info("Mcalloc: %p\n",ptr);
     return ((char*)ptr)+sizeof(Malloc);
 }
 
@@ -751,53 +755,75 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
     // you can only disown what you own!!
     if(owner.disowned==0&&owner.id>0){
         Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/*+size*/);
+        info("Disowned: %p\n",_alloc);
+        info("\tAllocation #%i=(%i,%i,%x).\n",_alloc->allocationIndex,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.id);
         if(_alloc->allocationIndex>0){
             // let's toggle the ownership if it matches
+            if(_alloc->owner.id==owner.id)
+                _alloc->owner.disowned=1;
+            else
+                bug("Unable to remove ownership by %x of a memory allocation: it is owned by %x.",owner.id,_alloc->owner.id);
+            /* replacing:
             if(allocations._owners[_alloc->allocationIndex].owner.id==owner.id)
                 allocations._owners[_alloc->allocationIndex].owner.disowned=1;
             else
-                bug("Unable to remove ownership %i of a memory allocation: it is owned by %i.",owner.id,allocations._owners[_alloc->allocationIndex].owner.id);
+                bug("Unable to remove ownership %i of a memory allocation: it is owned by %x.",owner.id,allocations._owners[_alloc->allocationIndex].owner.id);
+            */
         }else
             bug("Failed to disown a memory allocation: it is not registered.");
     }else
         bug("Can't release the ownership of an invalid owner.");
+    info("%p disowned.",ptr);
     return ptr;
 }
 void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
     if(!ptr)return NULL;
+    printf("S");
     // MDH@20MAY2020: you can only own something if disowned by the previous owner (in which case ownerId should be negative)
     if(owner.disowned==0&&owner.id>0){
         Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
+        info("Owned %p:\n",_alloc);
+        info("\tAllocation #%i=(%i,%i,%x).\n",_alloc->allocationIndex,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.id);
+        printf("%s","U");
         if(_alloc->allocationIndex>0){
             // pass ownership to owner if ptr is currently disowned
-            if(allocations._owners[_alloc->allocationIndex].owner.disowned!=0)
-                allocations._owners[_alloc->allocationIndex].owner=owner;
+            printf("%s","X");
+            if(_alloc->owner.disowned!=0)
+                _alloc->owner=owner;
             else
-            if(allocations._owners[_alloc->allocationIndex].owner.id==0)
-                bug("Owner %i cannot take over ownership of a memory allocation: it is not owned anymore.",owner.id);
+            if(_alloc->owner.id==0)
+                bug("Owner %x cannot take over ownership of a memory allocation: it is not owned anymore.",owner.id);
             else
-                bug("Owner %i cannot take over ownership of a memory allocation: it is still owned by %i.",owner.id,allocations._owners[_alloc->allocationIndex].owner.id);
+                bug("Owner %x cannot take over ownership of a memory allocation: it is still owned by %x.",owner.id,_alloc->owner.id/*allocations._owners[_alloc->allocationIndex].owner.id*/);
+            printf("%s","Y");
         }else
             bug("Failed to disown a memory allocation: it is not registered.");
     }else
         bug("Can't set the owner of a memory allocation to an invalid owner.");
+    info("Ownership taken of %p.",ptr);
     return ptr;
 }
 void* Msubowned(void* ptr,uint8_t level){
     if(!ptr)return NULL;
+    info("Incrementing subownership of %p by %i.",ptr,level);
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
+    info("Subowned %p:\n",_alloc);
+    info("\tAllocation #%i=(%i,%i,%x).\n",_alloc,_alloc->allocationIndex,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.id);
     if(_alloc->allocationIndex>0){
-        if(allocations._owners[_alloc->allocationIndex].owner.id>0&&allocations._owners[_alloc->allocationIndex].owner.disowned==0){
-            if(allocations._owners[_alloc->allocationIndex].owner.level==256-level)return NULL; // MDH@22MAY2020: shouldn't happen though!!!
-            allocations._owners[_alloc->allocationIndex].owner.level+=level; // simply increment the owner level
+        if(_alloc->owner.id>0&&_alloc->owner.disowned==0){
+            if(_alloc->owner.level==256-level)return NULL; // MDH@22MAY2020: shouldn't happen though!!!
+            _alloc->owner.level+=level; // simply increment the owner level
         }else
             bug("Can't subown a disowned or unowned memory allocation.");
     }else
         bug("Failed to subown a memory allocation: it is not registered.");
+    info("Subownership established of %p.",ptr);
     return ptr;
 }
 // MDH@25MAY2020 careful here Msubowner result is supposed to be a local variable (on the program stack) so it will be disposed off 'automagically'
-Mallocationowner Msubowner(Mallocationowner owner,uint8_t level){return (Mallocationowner){owner.disowned,owner.level+level,owner.id};}
+Mallocationowner Msubowner(Mallocationowner owner,uint8_t level){
+    return (Mallocationowner){owner.disowned,owner.level+level,owner.id};
+}
 void* Mownedby(void* ptr,Mallocationowner owner){
     if(!ptr)return NULL;
     if(ptr&&owner.id>0&&owner.disowned==0){

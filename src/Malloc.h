@@ -97,6 +97,12 @@ void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owne
 void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char type/*,Mallocationowner owner*/); // MDH@26MAY2020 from now on only to be used to reallocate variable-size types (with negative type)
 void Mfree(void* ptr,long long count,signed char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
+// I think we need these ones in here as well or otherwise pointer addresses are cut down to int values
+void* Mowned(void* ptr,Mallocationowner owner);
+void* Msubowned(void* ptr,uint8_t level);
+void* Mownedby(void* ptr,Mallocationowner owner);
+void* Mdisowned(void* ptr,Mallocationowner owner);
+
 // use the substitutes
 #define MALLOC(size,count,type,owner) Mmalloc((size),(count),(type),(owner))
 #define CALLOC(size,count,type,owner) Mcalloc((size),(count),(type),(owner))
@@ -104,7 +110,7 @@ void Mfree(void* ptr,long long count,signed char type,Mallocationowner owner); /
 #define REALLOC(ptr,from_count,to_count,size,type) Mrealloc((ptr),(from_count),(to_count),(size),(type))
 #define DISOWNED(ptr,owner) Mdisowned((ptr),(owner))
 #define OWNED(ptr,owner) Mowned((ptr),(owner))
-#define OWNED_BY(subptr,ptr) Mownedby((subptr),(ptr))
+#define OWNED_BY(subptr,owner) Mownedby((subptr),(owner))
 #define SUBOWNED(ptr,level) Msubowned((ptr),(level))
 #else
 // use the system methods

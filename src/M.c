@@ -2798,7 +2798,7 @@ bool registerCommandEvaluation(char const * const commandText,Mvalue* evaluation
 				//      so theoretically that value is weak, whereas the evaluation result is strong
 				// TODO find a way to fix this!!!
 				Mtext* _commandText=OWNED(_getText(commandText),owner); // MDH@25MAY2020: when we are wrapping the command text we need to get a copy!!!! NOTE string() is used on an Mstring to pass in the characters in the command text, so we can NOT use that itself as it is owned by the Mstring
-				Mvalue* _commandTextValue=OWNED(_getTextValue(_commandText),owner);
+				Mvalue* _commandTextValue=OWNED(_getTextValue(commandText),owner); // TODO _getTextValue expects a char * so why do we need _commandText?????
 				Mallocationowner owner_map=Msubowner(owner,1);
 				long long commandTextValueMapIndex=appendedToMap(commandresultValue->value._map,owner_map,"c",_commandTextValue);
 				if(commandTextValueMapIndex==M_TRUE){
@@ -3006,7 +3006,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 // additional functions are available in an interactive session to be added to the shell environment
 // as well as specific functions for displaying input info and input error messages
 bool interactiveSessionInitialized(){
-	uint16_t errorflags=prepareShellEnvironmentForInteractiveSession(getOwnerExecutionEnvironment());
+	uint16_t errorflags=prepareShellEnvironmentForInteractiveSession();
 	if(errorflags){
 		output("Errors preparing for running an interactive session (with code %x). Do you want to continue? ",errorflags);
 		char answer;
@@ -3148,7 +3148,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 	_Menvironment=getExecutionEnvironment(); // the currently executing environment will be referenced in _Menvironment
 
 	// prepare an interactive session
-	if(!interactiveSessionInitialized(getOwnerExecutionEnvironment())){
+	if(!interactiveSessionInitialized()){
 		outputError("Failed to initialize the interactive session.");
 		resetOutputColor();
 		exit(2);
