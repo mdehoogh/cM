@@ -6,7 +6,7 @@
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint32_t const MODULE_ID=17;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 Mvalue* NULL_value=NULL;
 // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
@@ -7475,7 +7475,7 @@ bool settingApplied(char settingCharacter){
 }
 
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
-Menvironment* shellInitialized(char const * const settingCharacters,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
+bool shellInitialized(char const * const settingCharacters,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
 
 	size_t numberOfSettingCharacters=(settingCharacters?strlen(settingCharacters):0);
 	while(numberOfSettingCharacters>0)settingApplied(settingCharacters[--numberOfSettingCharacters]);
@@ -7755,10 +7755,10 @@ Menvironment* shellInitialized(char const * const settingCharacters,InputCharRea
 
 		}
 	}
-	if(pushExecutionEnvironment(DISOWNED(_Menvironment,owner)))return _Menvironment;
 
-	outputError("Failed to create the M shell");
-	
-    return NULL;
+	// if we successfully push _Menvironment (to become the current execution environment we succeeded)
+
+	return(pushExecutionEnvironment(DISOWNED(_Menvironment,owner)));
+
 }
 

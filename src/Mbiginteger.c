@@ -1,7 +1,7 @@
 #include "Mbiginteger.h"
 
-static int32_t const MODULE_ID=(10<<4);
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static uint32_t const MODULE_ID=10;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 extern const long long M_LL_INVALID,M_ZERO,M_POSITIVE,M_NEGATIVE,M_TRUE,M_FALSE;
 

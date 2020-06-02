@@ -5,7 +5,7 @@
 #include "Mvalue.h"
 
 static uint32_t const MODULE_ID=13;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
@@ -39,7 +39,7 @@ Mvariable* _getVariable(char const * name,Mvaluetype valuetype,bool immutable){M
         return NULL;
     }
     _variable->immutable=immutable;
-    _variable->_name=OWNED(_getChars(name),owner); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
+    _variable->_name=SUBOWNED(OWNED(_getChars(name),owner),1); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
     if(!_variable->_name){
         free_variable(_variable,true,owner);
         output("%sFailed to allocate memory to store name '%s' of the new variable.\n",M_ERROR_PREFIX,name);
@@ -391,16 +391,22 @@ Mvalue* _getCharTextValue(char _c){
     return _textValue;
 }/* VALIDATED */
 // we can force all listelements to have the same type????
-Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){
-    Mvalue* _listValue=__value(weak?"weak list":"strong list");
-    if(_listValue)return NULL;
-    Mlist* _list=__list(source?source:"_getListValue");
-    if(_list){
-        _list->weak=weak;
-        _list->valuetype=listValuetype; // register what type of elements this list should have    
+Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
+    Mlist* _list=OWNED(__list(source?source:"_getListValue"),owner);
+    if(!_list){
+        // if(amVerboseDebugging())
+            outputError("Failed to create a list.\n");
+        return NULL;
     }
+    Mvalue* _listValue=__value(weak?"weak list":"strong list");
+    if(!_listValue){
+        free_list(_list,owner);
+        return NULL;
+    }
+    _list->weak=weak;
+    _list->valuetype=listValuetype; // register what type of elements this list should have    
     _listValue->type=VT_LIST;
-    _listValue->value._list=SUBOWNED(OWNED(_list,owner_valueList),3);
+    _listValue->value._list=SUBOWNED(OWNED(_list,getValueOwner()),1);
     return _listValue;
 }/* VALIDATED */
 
@@ -512,7 +518,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
         _map->weak=weak;
         _map->valuetype=mapValuetype;
         _mapValue->type=VT_MAP;
-        _mapValue->value._map=(Mmap*)SUBOWNED(OWNED(_map,owner_valueList),3);
+        _mapValue->value._map=(Mmap*)SUBOWNED(OWNED(_map,getValueOwner()),1);
     }else
         free_map(_map,owner);
     return _mapValue;
@@ -702,13 +708,19 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){Mallocationowner owner=ge
 }/* VALIDATED */
 Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__);
     if(!name||strlen(name)==0)return NULL;
-    Mmap* _listMap=OWNED(_getOneArgumentMap(name,VT_LIST),owner);
-    if(_listMap&&_listValue){
-        assignValue(_listMap->_first->_variable->_value,_listValue);
-        return DISOWNED(_listMap,owner);
+    if(!_listValue){
+        // if(amVerboseDebugging())
+            output("Unable to create list map: no list value to put in list.\n");
+        return NULL;
     }
-    if(_listMap)free_map(_listMap,owner);
-    return NULL;
+    Mmap* _listMap=OWNED(_getOneArgumentMap(name,VT_LIST),owner);
+    if(!_listMap){
+        // if(amVerboseDebugging())
+           output("%sFailed to create a one argument list map.\n",M_ERROR_PREFIX);
+        return NULL;
+    }
+    assignValue(_listMap->_first->_variable->_value,_listValue);
+    return DISOWNED(_listMap,owner);
 }/* VALIDATED */
 
 static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);

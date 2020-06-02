@@ -4,8 +4,8 @@
 
 #include "Mmemory.h"
 
-static int32_t const MODULE_ID=(8<<4);
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static int32_t const MODULE_ID=8;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 extern char const * const M_ERROR_PREFIX;
 

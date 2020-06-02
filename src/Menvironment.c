@@ -7,7 +7,7 @@
 
 #include "Menvironment.h"
 
-static int32_t const MODULE_ID=16;
+static uint32_t const MODULE_ID=16;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 // externally (in M.c) defined constants
@@ -1452,7 +1452,8 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
         _function->_parameterMap=_getListMap("l",_getListValue(VT_TOKEN,false,"completedTokenListFunction"));
         if(_function->_parameterMap){
-            if(amVerbose())output("Registered token list function '%s' completed.\n",functionName);
+            if(amVerbose())
+                output("Registered token list function '%s' completed.\n",functionName);
             return true;
         }
         output("%sFailed to register single token list argument function '%s'.\n",M_ERROR_PREFIX,functionName);

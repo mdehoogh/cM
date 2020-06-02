@@ -5,7 +5,7 @@
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //                TODO if blocks is zero failed to 
 static uint32_t MODULE_ID=5;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 /** MDH@25DEC2018:
  *  this code is from the Internet to implement a mutable string
@@ -31,7 +31,7 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
         if(!ans->_chars){FREE_1(ans,'S',owner);return NULL;}
         //OWNED(ans->_chars,owner);SUBOWNED(ans->_chars,1);
         ans->blocks=1;
-        printf("String contents allocated...");
+        printf("String contents allocated...\n");
         /* replacing:
         ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!

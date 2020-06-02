@@ -1,7 +1,7 @@
 #include "Mlist.h"
 
 static uint32_t const MODULE_ID=14;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){(MODULE_ID<<16)+id,0,0};}
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
 
 extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 extern long double M_LD_NAN;

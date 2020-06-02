@@ -89,7 +89,7 @@ bool settingApplied(char settingCharacter);
 
 // and finally obtaining a root environment
 // in general initializing the shell with the callbacks and the M setting characters
-Menvironment* shellInitialized(
+bool shellInitialized(
 				char const * const settingCharacters,
 				InputCharReadFunction _inputCharReadFunction,
 				InputResponseFunction _inputInfoFunction,
