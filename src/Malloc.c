@@ -336,7 +336,9 @@ static long long registerReallocation(signed char type/*,Mallocationowner owner*
                 // store in histogram
                 Mallocationsize* histogram=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes;
                 if(!histogram)_allocationTypes[allocationTypeIndex].count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
-                long long numberOfHistogramCategories=-_allocationTypes[allocationTypeIndex].count;
+                if(_allocationTypes[allocationTypeIndex].count>0)
+                    bug("Invalid histogram category count of type %c: %lld.",type,_allocationTypes[allocationTypeIndex].count);
+                long long numberOfHistogramCategories=llabs(_allocationTypes[allocationTypeIndex].count); // MDH@03JUN2020: TODO why won't - work????
                 long long category=numberOfHistogramCategories; // MDH@04MAY2020: negate because we're counting backwards for variable-size allocations now
                 while(--category>=0&&histogram[category].class!=count)
                 ;
@@ -404,7 +406,9 @@ static long long registerAllocation(signed char type,Mallocationowner owner,size
                         // store in histogram
                         Mallocationsize* histogram=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/._allocationsizes;
                         if(!histogram)_allocationTypes[allocationTypeIndex].count=0; // MDH@29APR2020: precaution in case histogram pointer is undefined
-                        long long numberOfHistogramCategories=-_allocationTypes[allocationTypeIndex].count;
+                        if(_allocationTypes[allocationTypeIndex].count>0)
+                            bug("Invalid count for type %c: %lld.",type,_allocationTypes[allocationTypeIndex].count);
+                        long long numberOfHistogramCategories=llabs(_allocationTypes[allocationTypeIndex].count); // MDH@03JUN2020: why doesn't - work????
                         long long category=numberOfHistogramCategories; // MDH@04MAY2020: negate because we're counting backwards for variable-size allocations now
                         while(--category>=0&&histogram[category].class!=count)
                         ;

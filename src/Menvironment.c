@@ -1108,57 +1108,58 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
 // MDH@03FEB2020: now wrapping the environment in the parameter list in a value
 //                a new function is always created on the currently executing environment
 Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner_environment,const char* const name){Mallocationowner owner=getOwner(__LINE__);
-    Mfunction* _function=NULL;
-    if(_environment&&name&&strlen(name)){
-        _function=getFunction(_environment,name); // check for a function with the given name in the given environment
-        if(!_function){ // doesn't exist yet
-            _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
-            if(_function){
-                ///////////_function->type=functionType;
-                /* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
-                // MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
-                assignValue(&_function->_definitionEnvironmentValue,_environmentValue?_environmentValue:_executionEnvironmentValue); // MDH@03FEB2020 replacing: _function->_definitionEnvironment=_environment; // TODO why would we need this?????
-                */
-                Mstring* _functionName=(Mstring*)OWNED(__string(),owner);
-                if(_functionName){
-                    Mstring* p=_functionName;
-                    p=string_append(p,name);
-                    if(p){
-                        Mfunctionmap* _functionmap=_environment->_functionMap;
-                        if(_functionmap){
-                            Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
-                            if(_functionmapelement){
-                                _functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
-                                _functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
-                                SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
-                                Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
-                                if(_lastFunctionmapelement){
-                                    _lastFunctionmapelement->_next=_functionmapelement;
-                                    _functionmap->_last=_functionmapelement;
-                                }else
-                                    _functionmap->_first=_functionmapelement;
+    if(!name||strlen(name)==0)return NULL;
+    if(_environment){
+        Mfunction* _function=getFunction(_environment,name); // check for a function with the given name in the given environment
+        if(_function)return _function; // MDH@03JUN2020: do NOT change ownership!!!!!
+        // doesn't exist yet
+        _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
+        if(_function){
+            ///////////_function->type=functionType;
+            /* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
+            // MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
+            assignValue(&_function->_definitionEnvironmentValue,_environmentValue?_environmentValue:_executionEnvironmentValue); // MDH@03FEB2020 replacing: _function->_definitionEnvironment=_environment; // TODO why would we need this?????
+            */
+            Mstring* _functionName=(Mstring*)OWNED(__string(),owner);
+            if(_functionName){
+                Mstring* p=_functionName;
+                p=string_append(p,name);
+                if(p){
+                    Mfunctionmap* _functionmap=_environment->_functionMap;
+                    if(_functionmap){
+                        Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
+                        if(_functionmapelement){
+                            _functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
+                            _functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
+                            SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
+                            Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
+                            if(_lastFunctionmapelement){
+                                _lastFunctionmapelement->_next=_functionmapelement;
                                 _functionmap->_last=_functionmapelement;
-                                _functionmap->numberOfFunctions++;
-                                ///////_function->_name=_functionName; // success!!!!!
-                                if(amVerbose())
-                                    output("Function '%s' registered as function #%d.\n",name,_functionmap->numberOfFunctions);
-                            }else // failure
-                                p=NULL;
-                        }else
+                            }else
+                                _functionmap->_first=_functionmapelement;
+                            _functionmap->_last=_functionmapelement;
+                            _functionmap->numberOfFunctions++;
+                            ///////_function->_name=_functionName; // success!!!!!
+                            if(amVerbose())
+                                output("Function '%s' registered as function #%d.\n",name,_functionmap->numberOfFunctions);
+                        }else // failure
                             p=NULL;
-                    }
-                    if(!p){free_string(_functionName,owner);_functionName=NULL;} // p==NULL indicates _functionName not bound in _function->_name
-                    // try to append it to the functionMap, if we succeed store _functioName in ->_name
-                }else
-                    output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
-                // if we fail to register the name and/or the function with the environment free the function!!
-                if(!_functionName){free_function(_function,owner);_function=NULL;}   
-            }
-            if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
-        }else
-            output("NOTE: Function '%s' already exists.\n",name);
-    }
-    return _function;
+                    }else
+                        p=NULL;
+                }
+                if(!p){free_string(_functionName,owner);_functionName=NULL;} // p==NULL indicates _functionName not bound in _function->_name
+                // try to append it to the functionMap, if we succeed store _functioName in ->_name
+            }else
+                output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
+            // if we fail to register the name and/or the function with the environment free the function!!
+            if(!_functionName){free_function(_function,owner);_function=NULL;}   
+        }
+        if(_function)return DISOWNED(_function,owner);
+        output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
+    }else
+        output("%sNo environment to search for function '%s'.",M_ERROR_PREFIX,name);
+    return NULL;
 }/* VALIDATED */
 
 // END FUNCTION STUFF
