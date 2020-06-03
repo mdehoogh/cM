@@ -817,7 +817,7 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
 void* Msubowned(void* ptr,uint8_t level){
     if(!ptr)return NULL;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
-    info("%p: Incrementing level of owner (%i,%i,%x) by %i.\n",_alloc,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.id,level);
+    info("%p: Incrementing level of owner (%i,%i,%i,%i) by %i.\n",_alloc,_alloc->owner.module,_alloc->owner.id,_alloc->owner.level,_alloc->owner.disowned,level);
     //replacing: info("Incrementing subownership of %p by %i.\n",_alloc,level);
     // info("Subowning %p:\n",ptr);
     if(_alloc->allocationIndex>0){
