@@ -51,9 +51,10 @@ typedef struct{
 }Mallocationtype;
 
 typedef struct{
+    uint16_t module:8; // the owner id (typically a function or a module itself)
+    uint16_t id:16;
     uint8_t level:7; // the subpointer level (by putting this first we can quickly create a dummy allocation owner at some nonzero level so the pointer won't be freed when we do not want to)
     uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
-    uint32_t id:24; // the owner id (typically a function or a module itself)
 }Mallocationowner;
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark
@@ -92,7 +93,6 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 #ifndef __PRODUCTION__
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
 
-//Mallocationowner getOwner(uint16_t module,uint32_t functionId);
 void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char type/*,Mallocationowner owner*/); // MDH@26MAY2020 from now on only to be used to reallocate variable-size types (with negative type)

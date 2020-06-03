@@ -5,8 +5,8 @@
 #include "Mshell.h"
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
-static uint32_t const MODULE_ID=17;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,(MODULE_ID<<16)+id};}
+static uint16_t const MODULE_ID=17;
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
 
 Mvalue* NULL_value=NULL;
 // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
@@ -2462,7 +2462,7 @@ Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
 	return(isLongDoubleUndefined(ld)?_getFloatValue(ld):NULL);
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
-Mvalue* t(Mvalue* value,Mvalue* format){if(!format||!format->type==VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
+Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* result=NULL;
 	Mstring* _valueText=(Mstring*)OWNED(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
@@ -3061,10 +3061,10 @@ void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocat
 	FREE_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
-static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest={0,0,__LINE__};
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest=(Mallocationowner){MODULE_ID,__LINE__};
 static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
 	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
-	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName))functionBodyRequest=functionBodyRequest->_next;
+	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName->chars))functionBodyRequest=functionBodyRequest->_next;
 	return functionBodyRequest;
 }
 FunctionBodyRequest* getFirstFunctionBodyRequest(){return _firstFunctionBodyRequest;}
@@ -3093,7 +3093,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 	///////////if(!_firstFunctionBodyRequest)return false;
 	_currentFunctionBodyInput=CALLOC_1(sizeof(FunctionBodyInput),'8',owner); // free if not bound
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
-	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName);
+	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName->chars);
 	if(function&&function->type==FT_USER){
 		// it's better to put the next request in, so after finishing with this request we can do the following if any
 		_currentFunctionBodyInput->_request=_functionBodyRequest->_next; // remember the request that initiated this body input
@@ -3104,7 +3104,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
 		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
 		// MDH@03MAR2020 TODO can we pass function->_parameterMap like this or should we pass _getFunctionArgumentMap(function,NULL)????????
-		Menvironment* _functionExecutionEnvironment=(Menvironment*)OWNED(_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName,function->_parameterMap),owner);
+		Menvironment* _functionExecutionEnvironment=(Menvironment*)OWNED(_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName->chars,function->_parameterMap),owner);
 		if(_functionExecutionEnvironment){
 			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;

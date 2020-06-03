@@ -15,9 +15,8 @@
 
 #include "Mexecution.h"
 
-static int32_t const MODULE_ID=9;
-static uint32_t const MODULE_OWNER_ID=(MODULE_ID<<16);
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,MODULE_OWNER_ID+id};}
+static uint16_t const MODULE_ID=9;
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_ZERO,M_POSITIVE,M_NEGATIVE;
@@ -150,7 +149,7 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){Mallocatio
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-static Mallocationowner owner_module={0,0,MODULE_OWNER_ID};
+static Mallocationowner owner_module=(Mallocationowner){MODULE_ID};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
 const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=(Mbiginteger*)OWNED(_getBiginteger(0),owner_module);return bi0;}/* VALIDATED */
 const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=(Mbiginteger*)OWNED(_getBiginteger(1),owner_module);return bi1;}/* VALIDATED */

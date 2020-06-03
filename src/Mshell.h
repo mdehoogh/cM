@@ -70,7 +70,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 // MDH@20FEB2020 only called inside Mshell.c so removed from this header file: Mvalue* getCommandValue(Mcommand* command,char commandType);
 
 typedef struct FunctionBodyRequest{
-	char* _functionName; // MDH@02MAR2020: allocated on the heap so starts with _ now (to indicate that it should be freed together with its wrapper)
+	Mchars* _functionName; // MDH@02MAR2020: allocated on the heap so starts with _ now (to indicate that it should be freed together with its wrapper)
 	struct FunctionBodyRequest *_next;
 }FunctionBodyRequest;
 FunctionBodyRequest* getFirstFunctionBodyRequest();

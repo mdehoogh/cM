@@ -1,8 +1,7 @@
 #include "Mrational.h"
 
-static uint32_t const MODULE_ID=11;
-static uint32_t const MODULE_OWNER_ID=(MODULE_ID<<16);
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,MODULE_OWNER_ID+id};}
+static uint16_t const MODULE_ID=11;
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
 
 // MDH@27FEB2020 replacing: #include "Msession.h"
 

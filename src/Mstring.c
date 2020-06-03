@@ -4,8 +4,8 @@
 
 // MDH@21JUN2019: there's no need to set the end-of-string marker until a string is returned!!!
 //                TODO if blocks is zero failed to 
-static uint32_t MODULE_ID=5;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,(MODULE_ID<<16)+id};}
+static uint16_t MODULE_ID=5;
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
 
 /** MDH@25DEC2018:
  *  this code is from the Internet to implement a mutable string

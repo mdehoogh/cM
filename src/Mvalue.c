@@ -4,8 +4,8 @@
 
 #include "Mvalue.h"
 
-static uint32_t const MODULE_ID=13;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){0,0,(MODULE_ID<<16)+id};}
+static uint16_t const MODULE_ID=13;
+static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
@@ -143,7 +143,7 @@ void free_valuereference(Mvaluereference* _valuereference,Mallocationowner owner
 // if we make a map out of it, we can annote the value with a name????
 static Mlist* _valueList=NULL;
 // MDH@28MAY2020: in one go we can set the owner of the value list, the owner of every element in the value list, the owner of each value in every element of the value list and finally that of any data bound to the value
-static Mallocationowner owner_valueList={0,0,__LINE__},owner_valueListelement={0,1,__LINE__},owner_value={0,2,__LINE__},owner_value_data={0,3,__LINE__};
+static Mallocationowner owner_valueList={MODULE_ID,__LINE__},owner_valueListelement={MODULE_ID,__LINE__,1},owner_value={MODULE_ID,__LINE__,2},owner_value_data={MODULE_ID,__LINE__,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
 Mallocationowner getValueOwner(){return owner_value;}
 Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(__LINE__);
@@ -700,7 +700,7 @@ Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){Mallocationowner owner=ge
     if(!name||strlen(name)==0)return NULL;
     Mmap* _integerMap=OWNED(_getOneArgumentMap(name,VT_INTEGER),owner);
     if(_integerMap&&_integerValue){
-        assignValue(_integerMap->_first->_variable->_value,_integerValue);
+        assignValue(&_integerMap->_first->_variable->_value,_integerValue);
         return DISOWNED(_integerMap,owner);
     }
     if(_integerMap)free_map(_integerMap,owner);
@@ -719,7 +719,7 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
            output("%sFailed to create a one argument list map.\n",M_ERROR_PREFIX);
         return NULL;
     }
-    assignValue(_listMap->_first->_variable->_value,_listValue);
+    assignValue(&_listMap->_first->_variable->_value,_listValue);
     return DISOWNED(_listMap,owner);
 }/* VALIDATED */
 

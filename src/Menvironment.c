@@ -7,8 +7,8 @@
 
 #include "Menvironment.h"
 
-static uint32_t const MODULE_ID=16;
-static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){0,0,(MODULE_ID<<16)+id};}
+static uint16_t const MODULE_ID=16;
+static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
 
 // externally (in M.c) defined constants
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE;
@@ -378,7 +378,7 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwn
                                 appendedToMap(_valuecountMap,owner,(i==0?"bytes freed":"freed"),_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)/*_allocationTypes[i].freed*/));
                                 appendedToMap(_valuecountMap,owner,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_occupied*/));
                                 appendedToMap(_valuecountMap,owner,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_freed*/));
-                                if(appendedToMap(_valuecountsMap,owner,string(_allocationTypeText),_getValueOfMap(_valuecountMap,owner)<=0))
+                                if(appendedToMap(_valuecountsMap,owner,string(_allocationTypeText),_getValueOfMap(_valuecountMap,owner))<=0)
                                     output("%sFailed to store the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
                             }else
                                 output("%sFailed to create the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
