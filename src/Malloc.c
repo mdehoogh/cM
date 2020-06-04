@@ -876,7 +876,7 @@ void Mvfree(){
 void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner owner){
     if(!ptr||allocationType==0||count<=0)return;
     ptr=((char*)ptr)-sizeof(Malloc); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
-    info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",allocationType);
+    info("\n*************************** Freeing dynamic memory of type %u ***************************\n",allocationType);
     /////info("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     // MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
@@ -908,7 +908,7 @@ void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner
 #ifndef __PRODUCTION__
     Malloc* _alloc=(Malloc*)ptr;/* MDH@20MAY2020: (((char*)ptr)+size)*/;
     if(_alloc->allocationType!=allocationType){
-        bug("Allocation type of dynamic memory '%c' (%u) freed of size %zd does not match provided allocation type '%c'.",_alloc->allocationType,_alloc->allocationType,size,allocationType);
+        bug("\tAllocation type of dynamic memory '%c' (=%u) freed of size %zd does not match provided allocation type '%c' (=%u).",_alloc->allocationType,_alloc->allocationType,size,allocationType,allocationType);
         dump(ptr,count*size,size);
         free(ptr);
         return;
@@ -920,11 +920,11 @@ void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner
 #ifndef __PRODUCTION__
     if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
         if(allocations._owners[_alloc->allocationIndex].type!=allocationType){
-            bug("Allocation type of dynamic memory '%c' (=%u) (at index %llu) does not match provided allocation type '%c'.",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType);
+            bug("\tAllocation type of dynamic memory '%c' (=%u) (at index %llu) does not match provided allocation type '%c' (=%u).",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType,allocationType);
             dump(ptr,size*count,size);
         }else
         if(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id||allocations._owners[_alloc->allocationIndex].owner.module!=owner.module){
-            bug("Allocation owner of dynamic memory (%i,%i) (at index %llu) does not match owner (%i,%i) trying to free the memory.",allocations._owners[_alloc->allocationIndex].owner.module,allocations._owners[_alloc->allocationIndex].owner.id,_alloc->allocationIndex,owner.module,owner.id,allocationType);
+            bug("Allocation owner of dynamic memory (%i,%i) (at index %llu) does not match owner (%i,%i) trying to free the memory of type '%c' (=%u).",allocations._owners[_alloc->allocationIndex].owner.module,allocations._owners[_alloc->allocationIndex].owner.id,_alloc->allocationIndex,owner.module,owner.id,allocationType,allocationType);
             dump(ptr,size*count,size);
         }else{
             // what we do here is the same as what Mdisown does!!!!
