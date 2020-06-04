@@ -3061,7 +3061,7 @@ void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocat
 	FREE_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
-static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest=(Mallocationowner){MODULE_ID,__LINE__};
+static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest=(Mallocationowner){MODULE_ID,__LINE__,1};
 static FunctionBodyRequest* getFunctionBodyRequest(char const * const functionName){
 	FunctionBodyRequest* functionBodyRequest=_firstFunctionBodyRequest;
 	while(functionBodyRequest&&strcmp(functionName,functionBodyRequest->_functionName->chars))functionBodyRequest=functionBodyRequest->_next;
@@ -3085,13 +3085,14 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 	return _functionBodyRequest;
 }
 
-static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL; // the stack of function bodies being constructed
+static FunctionBodyInput *_functionBodyInputStack=NULL,*_currentFunctionBodyInput=NULL;static Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MODULE_ID,__LINE__,1}; // the stack of function bodies being constructed
 FunctionBodyInput* getCurrentFunctionBodyInput(){return _currentFunctionBodyInput;}
+Mallocationowner getCurrentFunctionBodyInputOwner(){return owner_currentFunctionBodyInput;}
 // MDH@02MAR2020: as we're passing in the function body request I renamed argument _firstFunctionBodyRequest to _functionBodyRequest which makes more sense
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=CALLOC_1(sizeof(FunctionBodyInput),'8',owner); // free if not bound
+	_currentFunctionBodyInput=OWNED(CALLOC_1(sizeof(FunctionBodyInput),'8',owner),owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName->chars);
 	if(function&&function->type==FT_USER){
@@ -3114,7 +3115,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
-	FREE_1(_currentFunctionBodyInput,'H',owner);
+	FREE_1(_currentFunctionBodyInput,'H',owner_currentFunctionBodyInput);
 	return false;
 }
 bool startFunctionBodyInput(){

@@ -17,7 +17,7 @@ extern char const * const M_BUG_PREFIX;
 static char const * const HMS_FORMAT_STRING="%H:%M:%S";
 
 static void info(char const * fmt,...){
-    va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
+    // Nuva_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
@@ -140,7 +140,7 @@ static bool updateAllocationTypeMarks(){
 // MDH@18MAY2020: we are not just going to store the allocation type (a char) but also the id of the owner (i.e. every allocation will be owned)
 typedef struct{
     Mallocationowner owner;
-    unsigned char type;
+    signed char type;
 }Mallocationownertype;
 
 struct{
@@ -735,7 +735,7 @@ void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owne
     if(!attachAllocationInfo(ptr,type,owner,size,count))
         bug("Failed to register %lld %s-sized allocation%s of type '%c'.\n",count,(type>0?"fixed":"variable"),abs(type),(count>1?"s":""));
 #endif
-    info("%p created by Mmalloc() owned by (%i,%i,%i,%i).\n",ptr,owner.module,owner.id,owner.level,owner.disowned);
+    info("%p created by Mmalloc() owned by (%i,%i,%i,%i,%i).\n",ptr,owner.module,owner.id,owner.global,owner.level,owner.disowned);
     return ((char*)ptr)+sizeof(Malloc);
 }
 
@@ -754,7 +754,7 @@ void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owne
     if(!attachAllocationInfo(ptr,type,owner,size,count))
         bug("Failed to register %lld %s-size allocation%s of type '%c'.",count,(type>0?"fixed":"variable"),abs(type),(count>1?"s":""));
 #endif
-    info("%p created by Mcalloc() owned by (%i,%i,%i,%i).\n",ptr,owner.module,owner.id,owner.level,owner.disowned);
+    info("%p created by Mcalloc() owned by (%i,%i,%i,%i,%i).\n",ptr,owner.module,owner.id,owner.global,owner.level,owner.disowned);
     return ((char*)ptr)+sizeof(Malloc);
 }
 
@@ -765,10 +765,10 @@ void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owne
 void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
     if(!ptr)return NULL;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/*+size*/);
-    info("%p: Releasing owner (%i,%i,%i,%i) by (%i,%i,%i,%i).\n",_alloc,owner.module,owner.id,owner.level,owner.disowned,_alloc->owner.module,_alloc->owner.id,_alloc->owner.level,_alloc->owner.disowned);
+    info("%p: Releasing owner (%i,%i,%i,%i,%i) by (%i,%i,%i,%i,%i).\n",_alloc,owner.module,owner.id,owner.global,owner.level,owner.disowned,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
     if(_alloc->allocationIndex>0){
         // info("Disowned: %p\n",_alloc);
-        info("\tAllocation #%i=(%i,%i,%i,%i).\n",_alloc->allocationIndex,_alloc->owner.module,_alloc->owner.id,_alloc->owner.level,_alloc->owner.disowned);
+        info("\tAllocation #%i=(%i,%i,%i,%i,%i).\n",_alloc->allocationIndex,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
         // you can only disown what you own!!
         if(owner.disowned==0&&owner.id>0){
             // let's toggle the ownership if it matches
@@ -782,14 +782,14 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
             bug("\tCan't release the ownership of an invalid owner.");
     }else
         bug("\tFailed to disown a memory allocation: it is not registered.");
-    info("\tDisowned by (%i,%i,%i,%i).\n",owner.module,owner.id,owner.level,owner.disowned);
+    info("\tDisowned by (%i,%i,%i,%i,%i).\n",owner.module,owner.id,owner.global,owner.level,owner.disowned);
     return ptr;
 }
 void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
     if(!ptr)return NULL;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
     // info("\tPointer allocation=(%i,%i,%x).\n",_alloc->allocationIndex,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.id);
-    info("%p: (%i,%i,%i,%i) taking over allocation owned by (%i,%i,%i,%i).\n",_alloc,owner.module,owner.id,owner.level,owner.disowned,_alloc->owner.module,_alloc->owner.id,_alloc->owner.level,_alloc->owner.disowned);
+    info("%p: (%i,%i,%i,%i,%i) taking over allocation owned by (%i,%i,%i,%i,%i).\n",_alloc,owner.module,owner.id,owner.global,owner.level,owner.disowned,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
     // printf("S");
     // MDH@20MAY2020: you can only own something if disowned by the previous owner (in which case ownerId should be negative)
     // info("Owned %p:\n",_alloc);
@@ -804,7 +804,7 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
             if(_owner->disowned!=0){
                 *_owner=owner;
                 _alloc->owner=*_owner; // TODO we might have to comment this out in due course
-                info("\tOwnership taken by (%i,%i,%i,%i).\n",_alloc->owner.module,_alloc->owner.id,_alloc->owner.level,_alloc->owner.disowned);
+                info("\tOwnership taken by (%i,%i,%i,%i,%i).\n",_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
             }else
             if(_owner->id==0)
                 bug("\tOwner %x cannot take over ownership of a memory allocation: it is not owned anymore.",owner.id);
@@ -815,23 +815,23 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
             bug("\tCan't set the owner of a memory allocation to an invalid owner.");
     }else
         bug("\tFailed to disown a memory allocation: it is not registered.");
-    info("\tOwned by (%i,%i,%i,%i).\n",owner.module,owner.id,owner.level,owner.disowned);
+    info("\tOwned by (%i,%i,%i,%i,%i).\n",owner.module,owner.id,owner.global,owner.level,owner.disowned);
     return ptr;
 }
 void* Msubowned(void* ptr,uint8_t level){
     if(!ptr)return NULL;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
-    info("%p: Incrementing level of owner (%i,%i,%i,%i) by %i.\n",_alloc,_alloc->owner.module,_alloc->owner.id,_alloc->owner.level,_alloc->owner.disowned,level);
+    info("%p: Incrementing level of owner (%i,%i,%i,%i,%i) by %i.\n",_alloc,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,level);
     //replacing: info("Incrementing subownership of %p by %i.\n",_alloc,level);
     // info("Subowning %p:\n",ptr);
     if(_alloc->allocationIndex>0){
         Mallocationowner* _owner=&(allocations._owners[_alloc->allocationIndex].owner);
-        info("\tAllocation #%i=(%i,%i,%i,%i).\n",_alloc->allocationIndex,_owner->module,_owner->id,_owner->level,_owner->disowned);
+        info("\tAllocation #%i=(%i,%i,%i,%i,%i).\n",_alloc->allocationIndex,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned);
         if(_owner->id>0&&_owner->disowned==0){
             if(_owner->level==256-level)return NULL; // MDH@22MAY2020: shouldn't happen though!!!
             _owner->level+=level; // simply increment the owner level
             _alloc->owner.level=_owner->level; // TODO might be removed in due course
-            info("\tSubownership established by owner (%i,%i,%i,%i).\n",_owner->module,_owner->id,_owner->level,_owner->disowned);
+            info("\tSubownership established by owner (%i,%i,%i,%i,%i).\n",_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned);
         }else
             bug("\tCan't subown a disowned or unowned memory allocation.");
     }else
@@ -842,9 +842,10 @@ void* Msubowned(void* ptr,uint8_t level){
 Mallocationowner Msubowner(Mallocationowner owner,uint8_t level){
     return (Mallocationowner){owner.module,owner.id,owner.level+level,owner.disowned};
 }
+/*
 void* Mownedby(void* ptr,Mallocationowner owner){
     if(!ptr)return NULL;
-    Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
+    Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));
     if(_alloc->allocationIndex>0){
         if(owner.id>0&&owner.disowned==0){
             Mallocationowner* _owner=&(allocations._owners[_alloc->allocationIndex].owner);
@@ -857,6 +858,7 @@ void* Mownedby(void* ptr,Mallocationowner owner){
         bug("Failed to register a memory allocation a subowned: it is not registered.");
     return ptr;
 }
+*/
 // int32_t Mowner(void* ptr,size_t size){
 //     if(ptr&&size>0){
 //         Malloc* _alloc=(Malloc*)(((char*)ptr)+size);
@@ -873,10 +875,11 @@ void Mvfree(){
 */
 // MDH@20APR2020: unfortunately we need to know the size of what was allocated which is easy for fixed size allocation but problematic for variable size records
 //                unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
-void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner owner){
+void Mfree(void const * const ptr,long long count,signed char allocationType,Mallocationowner owner){
     if(!ptr||allocationType==0||count<=0)return;
-    ptr=((char*)ptr)-sizeof(Malloc); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
-    info("\n*************************** Freeing dynamic memory of type %u ***************************\n",allocationType);
+    Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
+    info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
+    info("%p: owned by (%i,%i,%i,%i,%i) being freed by (%i,%i,%i,%i,%i).\n",_alloc,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,owner.module,owner.id,owner.global,owner.level,owner.disowned);
     /////info("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     // MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
@@ -906,11 +909,10 @@ void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner
     }
     // MDH@14APR2020 NOTE: the following is about removing the allocation
 #ifndef __PRODUCTION__
-    Malloc* _alloc=(Malloc*)ptr;/* MDH@20MAY2020: (((char*)ptr)+size)*/;
     if(_alloc->allocationType!=allocationType){
-        bug("\tAllocation type of dynamic memory '%c' (=%u) freed of size %zd does not match provided allocation type '%c' (=%u).",_alloc->allocationType,_alloc->allocationType,size,allocationType,allocationType);
+        bug("\tAllocation type of dynamic memory '%c' (=%i) freed of size %zd does not match provided allocation type '%c' (=%i).",_alloc->allocationType,_alloc->allocationType,size,allocationType,allocationType);
         dump(ptr,count*size,size);
-        free(ptr);
+        free(_alloc);
         return;
     }
     // if(_alloc->allocationIndex<=0)bug("No allocation index registered for allocation of type '%c'.\n",allocationType);
@@ -918,13 +920,14 @@ void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner
     if(!allocations._owners)error("Allocation owners not recorded!\n");
     if(allocations.l==0)warning("Nothing allocated to free.\n");
 #ifndef __PRODUCTION__
+    // MDH@04JUN2020: we can check ownership here BUT when a subowned allocation is freed by the superowner, which might have changed ownership the subowned allocation can still be freed as long as the levels match
     if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
         if(allocations._owners[_alloc->allocationIndex].type!=allocationType){
-            bug("\tAllocation type of dynamic memory '%c' (=%u) (at index %llu) does not match provided allocation type '%c' (=%u).",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType,allocationType);
+            bug("\tAllocation type of dynamic memory '%c' (=%i) (at index %i) does not match provided allocation type '%c' (=%i).",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType,allocationType);
             dump(ptr,size*count,size);
         }else
-        if(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id||allocations._owners[_alloc->allocationIndex].owner.module!=owner.module){
-            bug("Allocation owner of dynamic memory (%i,%i) (at index %llu) does not match owner (%i,%i) trying to free the memory of type '%c' (=%u).",allocations._owners[_alloc->allocationIndex].owner.module,allocations._owners[_alloc->allocationIndex].owner.id,_alloc->allocationIndex,owner.module,owner.id,allocationType,allocationType);
+        if(allocations._owners[_alloc->allocationIndex].owner.level!=owner.level+1&&(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id||allocations._owners[_alloc->allocationIndex].owner.module!=owner.module)){
+            bug("\tAllocation owner of dynamic memory (%i,%i) (at index %i) does not match owner (%i,%i) trying to free the memory of type '%c' (=%u).",allocations._owners[_alloc->allocationIndex].owner.module,allocations._owners[_alloc->allocationIndex].owner.id,_alloc->allocationIndex,owner.module,owner.id,allocationType,allocationType);
             dump(ptr,size*count,size);
         }else{
             // what we do here is the same as what Mdisown does!!!!
@@ -943,7 +946,7 @@ void Mfree(void* ptr,long long count,signed char allocationType,Mallocationowner
         pos--;
     }
 #endif
-    free(ptr);
+    free(_alloc);
     //////info("!");
     // undo the allocation of the given type
     /* MDH@14APR2020 removing:
@@ -1030,7 +1033,7 @@ void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,sig
                         // printf("New allocation type %c (%c) - allocation index %llu (%llu).\n",_newalloc->allocationType,_alloc->allocationType,_newalloc->allocationIndex,_alloc->allocationIndex);
                     }
                 }else
-                    bug("Failed to register the (re)allocation of a variable-size allocation of type '%c' from %lld to %lld.\n",allocationType,freed,occupied);
+                    bug("Failed to register the (re)allocation of a variable-size allocation of type '%c' (=%i) from %lld to %lld.\n",allocationType,allocationType,freed,occupied);
 #endif
                 //                well, it might be a replacement
                 newptr=((char*)newptr)+sizeof(Malloc);

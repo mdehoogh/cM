@@ -69,7 +69,7 @@ void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,M
 	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
 	FREE_1(_decimalcontextElement,'e',owner_decimalcontextElement);
 }
-static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={0,0,__LINE__};
+static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={MODULE_ID,__LINE__,1};
 // to get the unique decimal context with the requested precision
 static Mdecimalcontext* _getExistingDecimalcontext(mpd_ssize_t prec){
 	if(prec<6)return NULL; // prec needs to be at least 6

@@ -1681,11 +1681,12 @@ unsigned long long getNumberOfFunctionCommands(char const * const functionName){
     if(!function||function->type!=FT_USER){if(!function)output("%sFunction '%s' not found.\n",M_ERROR_PREFIX,functionName);return -1;}
     return (function->functionunion._userfunction->_bodyCommandList?function->functionunion._userfunction->_bodyCommandList->numberOfElements:0);
 }
-bool registerFunctionCommand(const char* const functionName,Mtoken* command){Mallocationowner owner=getOwner(__LINE__);
-    if(!functionName||!command)return false;
+/*
+bool registerFunctionCommand(const char* const functionName,Mtoken* _command,Mallocationowner owner_command){Mallocationowner owner=getOwner(__LINE__);
+    if(!functionName||!_command)return false;
     Mfunction* function=getFunction(getExecutionEnvironment(),functionName);
     if(function&&function->type==FT_USER){
-        Mvalue* _commandValue=_getValueOfToken(command,(Mallocationowner){1}); // TODO I don't think command should be released if we fail
+        Mvalue* _commandValue=_getValueOfToken(_command,owner_command); // DONE it's up to the caller TODO I don't think command should be released if we fail, that's why we indicate that it's a global
         if(_commandValue){
             if(!function->functionunion._userfunction->_bodyCommandList)
                 function->functionunion._userfunction->_bodyCommandList=__list("function body command list");
@@ -1698,7 +1699,7 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* command){Mal
         output("%s'%s' does not represent a user function.\n",M_ERROR_PREFIX,functionName);
     return false;
 }
-
+*/
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
 //                so these are actually anonymous functions
 Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);

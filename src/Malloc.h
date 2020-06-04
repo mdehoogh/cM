@@ -52,7 +52,8 @@ typedef struct{
 
 typedef struct{
     uint16_t module:8; // the owner id (typically a function or a module itself)
-    uint16_t id:16;
+    uint16_t id:15;
+    uint8_t global:1; // MDH@04JUN2020: can now be negative (to indicate module global owners that are allowed to persist)
     uint8_t level:7; // the subpointer level (by putting this first we can quickly create a dummy allocation owner at some nonzero level so the pointer won't be freed when we do not want to)
     uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
 }Mallocationowner;
@@ -96,7 +97,7 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char type/*,Mallocationowner owner*/); // MDH@26MAY2020 from now on only to be used to reallocate variable-size types (with negative type)
-void Mfree(void* ptr,long long count,signed char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
+void Mfree(void const * const ptr,long long count,signed char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
 // I think we need these ones in here as well or otherwise pointer addresses are cut down to int values
 void* Mowned(void* ptr,Mallocationowner owner);
 void* Msubowned(void* ptr,uint8_t level);
@@ -110,7 +111,6 @@ void* Mdisowned(void* ptr,Mallocationowner owner);
 #define REALLOC(ptr,from_count,to_count,size,type) Mrealloc((ptr),(from_count),(to_count),(size),(type))
 #define DISOWNED(ptr,owner) Mdisowned((ptr),(owner))
 #define OWNED(ptr,owner) Mowned((ptr),(owner))
-#define OWNED_BY(subptr,owner) Mownedby((subptr),(owner))
 #define SUBOWNED(ptr,level) Msubowned((ptr),(level))
 #else
 // use the system methods
@@ -120,7 +120,6 @@ void* Mdisowned(void* ptr,Mallocationowner owner);
 #define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc((ptr),(to_nitems)*(size))
 #define DISOWNED(ptr,owner) (ptr)
 #define OWNED(ptr,owner) (ptr)
-#define OWNED_BY(ptr,owner) (ptr)
 #define SUBOWNED(ptr,level) (ptr)
 #endif
 

@@ -5,7 +5,7 @@
 #include "Mvalue.h"
 
 static uint16_t const MODULE_ID=13;
-static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
+static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MODULE_ID,id};}
 
 extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
@@ -69,7 +69,8 @@ Mvariable* _getVariable(char const * name,Mvaluetype valuetype,bool immutable){M
     }else
         _variable->_value=NULL;
     */
-    return DISOWNED(_variable,owner);
+    // MDH@04JUN2020: given that _variable is already disowned (as returned by CALLOC_1), no need to disown it again
+    return _variable; // replacing: DISOWNED(_variable,owner);
 }/* VALIDATED */
 
 bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owner){
@@ -143,7 +144,7 @@ void free_valuereference(Mvaluereference* _valuereference,Mallocationowner owner
 // if we make a map out of it, we can annote the value with a name????
 static Mlist* _valueList=NULL;
 // MDH@28MAY2020: in one go we can set the owner of the value list, the owner of every element in the value list, the owner of each value in every element of the value list and finally that of any data bound to the value
-static Mallocationowner owner_valueList={MODULE_ID,__LINE__},owner_valueListelement={MODULE_ID,__LINE__,1},owner_value={MODULE_ID,__LINE__,2},owner_value_data={MODULE_ID,__LINE__,3};
+static Mallocationowner owner_valueList=(Mallocationowner){MODULE_ID,__LINE__,1},owner_valueListelement=(Mallocationowner){MODULE_ID,__LINE__,1,1},owner_value=(Mallocationowner){MODULE_ID,__LINE__,1,2},owner_value_data=(Mallocationowner){MODULE_ID,__LINE__,1,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
 Mallocationowner getValueOwner(){return owner_value;}
 Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(__LINE__);
@@ -154,7 +155,7 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
         _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
         // MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
         //                as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
-        if(appendedToList(_valueList,owner_valueList,(Mvalue*)CALLOC_1(sizeof(Mvalue),'U',(Mallocationowner){0}),M_LL_INVALID)<=0){outputBug("Failed to store the global undefined value.");return NULL;}
+        if(appendedToList(_valueList,owner_valueList,(Mvalue*)CALLOC_1(sizeof(Mvalue),'U',owner),M_LL_INVALID)<=0){outputBug("Failed to store the global undefined value.");return NULL;}
     }
     Mlistelement* _valueListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner_valueListelement); // both pointers NULL
     if(_valueListelement){
@@ -251,17 +252,18 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
                     /* MDH@11NOV2019: let's decide NOT to decrement numberOfElements meaning that we NOW use numberOfElements to always have a unique index for every value ever added to it!!!
                     if(_valueList->numberOfElements>0)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
                     */
-                    free(_valueListelement);
+                    FREE_1(_valueListelement,'l',owner_valueListelement);
                 }
                 // next to check!!!
                 _valueListelement=_nextValueListelement;
             }
+            if(showInfo)output("Actual number of values freed: %llu.\n",removed);
             // update the first and last in the list (could both be NULL!!!)
             _valueList->_first=_firstValueListelement;
             _valueList->_last=_lastValueListelement;
         }
     }
-    if(tofree){
+    if(tofree>0){
         if(tofree>removed)
             output("%sFailed to free %llu unused value list elements.\n",M_WARNING_PREFIX,(tofree-removed));
         else 
