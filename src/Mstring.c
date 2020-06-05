@@ -19,7 +19,7 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
     // MDH@09APR2020: because sizeof(Mstring) would not include what we need for the characters pointed to by chars, we need to allocated one BLOCK_SIZE of characters to start with
     Mstring* ans=CALLOC_1(sizeof(Mstring),'S',owner);
     if(ans){
-        printf("String allocated...\n");
+        // printf("String allocated...\n");
         // NOTE calloc() will make length and blocks 0: ans->length=0;ans->blocks=0;
         // the size of each allocation is BLOCKSIZE characters
         // MDH@09APR2020: everything that is of dynamic size needs to be allocated using REALLOC even when freeing, that way we can keep track
@@ -27,11 +27,11 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
         //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
         // MDH@16APR2020: using Mchars* instance
         // MDH@03MAY2020 OOPS the size should go first!!!
-        ans->_chars=(Mchars*)Msubowned(Mowned(__chars(M_BLOCK_SIZE,1,'s'),owner),1);
+        ans->_chars=(Mchars*)SUBOWNED(OWNED(__chars(M_BLOCK_SIZE,1,'s'),owner),1);
         if(!ans->_chars){FREE_1(ans,'S',owner);return NULL;}
         //OWNED(ans->_chars,owner);SUBOWNED(ans->_chars,1);
         ans->blocks=1;
-        printf("String contents allocated...\n");
+        // printf("String contents allocated...\n");
         /* replacing:
         ans->chars=REALLOC(ans->chars,0,1,sizeof(char)*BLOCK_SIZE,'s'); // changed type 's' to '"' to prevent the check for size...
         if(!ans->chars){FREE(ans,'S');ans=NULL;}else ans->blocks=1; // if the allocation failed we release ans immediately again, so ans->blocks will always be positive!!!
@@ -155,7 +155,7 @@ Mstring* string_setlength(Mstring* const str,size_t length){
             Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,blocks,'s'); // MDH@22MAY2020: by using -foid we disown it immediately
             if(!new_chars)return NULL; // failure
             str->blocks=blocks;
-            str->_chars=SUBOWNED(new_chars,1); // as soon as new_chars is stored in str->_chars which is a subpointer, we move the ownership to 0 i.e. it is safe if the containing pointer is
+            str->_chars=new_chars; // MDH@05JUN2020 NO it is already subowned!!!! as soon as new_chars is stored in str->_chars which is a subpointer, we move the ownership to 0 i.e. it is safe if the containing pointer is
             /* replacing:
             char* new_str=REALLOC(str->chars,str->blocks,blocks,BLOCK_SIZE*sizeof(char),'s');
             if (!new_str)return NULL; // failure!!
@@ -263,7 +263,7 @@ Mstring* string_insert_char(Mstring* const str/*,Mallocationowner owner_str*/,si
                     Mchars* new_chars=_resized(str->_chars,M_BLOCK_SIZE,str->blocks,str->blocks+1,'s');
                     if(!new_chars)return NULL;
                     ++(str->blocks);
-                    str->_chars=SUBOWNED(new_chars,1);
+                    str->_chars=new_chars;
                     /* replacing:
                     char *new_str=REALLOC(str->chars,str->blocks,str->blocks+1,sizeof(char)*BLOCK_SIZE,'s');
                     if (new_str==NULL)return NULL;

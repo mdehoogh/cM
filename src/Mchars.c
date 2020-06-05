@@ -17,7 +17,7 @@ extern char const * const M_WARNING_PREFIX;
 Mchars* __chars(size_t size,long long count,signed char type){Mallocationowner owner=getOwner(__LINE__);
     // MDH@19MAY2020: it's a bit weird to pass the negative value of the owner id to REALLOC but this prevents us from having to call DISOWNED on the pointer returned by REALLOC
     //                this way we get a pointer that we know who created it by disowns it immediately
-    return(Mchars*)MALLOC(size,count,-abs(type),owner); // MDH@03JUN2020: force type to be negative (variable-sized)
+    return(Mchars*)MALLOC(size,count,(type>0?-type:type),owner); // MDH@03JUN2020: force type to be negative (variable-sized)
 }
 // if you want to expand an Mchars by the number of characters should we return the new _chars or simply true or false??????
 // ok, we're plugging in an Mchars pointer (which is the address of an Mchars structure)
@@ -25,13 +25,13 @@ Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,lo
     // MDH@19MAY2020: NOTE that _chars needs to be DISOWNED by the owner in order for REALLOC to allow changing ownership
     if(!_chars)return NULL;
     // obtain ownership, pass onto REALLOC to reallocate using foid as owner id, and return disowned
-    return(Mchars*)REALLOC(_chars,from_count,to_count,size,-abs(type));
+    return(Mchars*)REALLOC(_chars,from_count,to_count,size,(type>0?-type:type));
 }
 void free_chars(Mchars const * const _chars,Mallocationowner owner_chars,size_t size,long long count,signed char type){
     // typically the caller would need to tell us the current number of characters stored in _chars
     // ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
     if(!_chars){output("%sNo Mchars to free.\n",M_WARNING_PREFIX);return;}
-    FREE(_chars,count,-abs(type),owner_chars); // obtain ownership and free
+    FREE(_chars,count,(type>0?-type:type),owner_chars); // obtain ownership and free
 }
 
 // if you want to host a known list of characters ('\0' delimited) call _getChars()
