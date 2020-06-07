@@ -769,7 +769,7 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
     info("%p: Releasing owner (%i,%i,%i,%i,%i) by (%i,%i,%i,%i,%i).\n",_alloc,owner.module,owner.id,owner.global,owner.level,owner.disowned,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
     if(_alloc->allocationIndex>0){
         // info("Disowned: %p\n",_alloc);
-        info("\tAllocation #%i=(%i,%i,%i,%i,%i).\n",_alloc->allocationIndex,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
+        info("\tAllocation #%i=(%i,%i,%i,%i,%i,%i).\n",_alloc->allocationIndex,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.freed);
         // you can only disown what you own!!
         if(owner.disowned==0&&owner.id>0){
             // let's toggle the ownership if it matches
@@ -778,26 +778,30 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
                 allocations._owners[_alloc->allocationIndex].owner.disowned=1; // replacing: _owner->disowned=1;
                 _alloc->owner.disowned=1; // TODO we might have to comment this out in due course
             }else
-                bug("\tUnable to remove ownership %x of a memory allocation: it is owned by %x.",owner.id,_owner->id);
+                bug("\tUnable to remove ownership (%u,%u,%u,%u,%u,%u) of a memory allocation: it is owned by (%u,%u,%u,%u,%u,%u)."
+                    ,owner.module,owner.id,owner.global,owner.level,owner.disowned,owner.freed
+                    ,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned,_owner->freed);
         }else
             bug("\tCan't release the ownership of an invalid owner.");
     }else
         bug("\tFailed to disown a memory allocation: it is not registered.");
-    info("\tDisowned by (%i,%i,%i,%i,%i).\n",owner.module,owner.id,owner.global,owner.level,owner.disowned);
+    info("\tDisowned by (%u,%u,%u,%u,%u,%u).\n",owner.module,owner.id,owner.global,owner.level,owner.disowned,owner.freed);
     return ptr;
 }
 void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
     if(!ptr)return NULL;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/* MDH@20MAY2020: +size*/);
     // info("\tPointer allocation=(%i,%i,%x).\n",_alloc->allocationIndex,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.id);
-    info("%p: (%i,%i,%i,%i,%i) taking over allocation owned by (%i,%i,%i,%i,%i).\n",_alloc,owner.module,owner.id,owner.global,owner.level,owner.disowned,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
+    info("%p: (%i,%i,%i,%i,%i) taking over allocation owned by (%i,%i,%i,%i,%i).\n",_alloc
+        ,owner.module,owner.id,owner.global,owner.level,owner.disowned,owner.freed
+        ,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.freed);
     // printf("S");
     // MDH@20MAY2020: you can only own something if disowned by the previous owner (in which case ownerId should be negative)
     // info("Owned %p:\n",_alloc);
     // printf("%s","U");
     if(_alloc->allocationIndex>0){
         Mallocationowner *_owner=&(allocations._owners[_alloc->allocationIndex].owner); // MDH@02JUN2020: pointing to where the owner of the allocation is registered
-        info("\tAllocation #%i=(%i,%i,%i,%i).\n",_alloc->allocationIndex,_owner->module,_owner->id,_owner->level,_owner->disowned);
+        info("\tAllocation #%i=(%u,%u,%u,%u,%u,%u).\n",_alloc->allocationIndex,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned,_owner->freed);
         if(owner.disowned==0&&owner.id>0){
             // pass ownership to owner if ptr is currently disowned
             // printf("%s","X");
@@ -808,9 +812,12 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
                 info("\tOwnership taken by (%i,%i,%i,%i,%i).\n",_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned);
             }else
             if(_owner->id==0)
-                bug("\tOwner %x cannot take over ownership of a memory allocation: it is not owned anymore.",owner.id);
+                bug("\tOwner (%u,%u,%u,%u,%u,%u) cannot take over ownership of a memory allocation: it is not owned anymore."
+                    ,owner.module,owner.id,owner.global,owner.level,owner.disowned,owner.freed);
             else
-                bug("\tOwner %x cannot take over ownership of a memory allocation: it is still owned by %x.",owner.id,_owner->id);
+                bug("\tOwner (%u,%u,%u,%u,%u,%u) cannot take over ownership of a memory allocation: it is still owned by (%u,%u,%u,%u,%u,%u)."
+                    ,owner.module,owner.id,owner.global,owner.level,owner.disowned,owner.freed
+                    ,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned,_owner->freed);
             // printf("%s","Y");
         }else
             bug("\tCan't set the owner of a memory allocation to an invalid owner.");
@@ -825,18 +832,22 @@ void* Msubowned(void* ptr,uint8_t level){
     info("%p: Incrementing level of owner (%i,%i,%i,%i,%i) by %i.\n",_alloc,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,level);
     //replacing: info("Incrementing subownership of %p by %i.\n",_alloc,level);
     // info("Subowning %p:\n",ptr);
-    if(_alloc->allocationIndex>0){
+    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
         Mallocationowner* _owner=&(allocations._owners[_alloc->allocationIndex].owner);
-        info("\tAllocation #%i=(%i,%i,%i,%i,%i).\n",_alloc->allocationIndex,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned);
+        info("\tAllocation #%i=(%u,%u,%u,%u,%u,%u).\n",_alloc->allocationIndex,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned,_owner->freed);
         if(_owner->id>0&&_owner->disowned==0){
             if(_owner->level==256-level)return NULL; // MDH@22MAY2020: shouldn't happen though!!!
             _owner->level+=level; // simply increment the owner level
             _alloc->owner.level=_owner->level; // TODO might be removed in due course
-            info("\tSubownership established by owner (%i,%i,%i,%i,%i).\n",_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned);
+            info("\tSubownership established by owner (%u,%u,%u,%u,%u,%u).\n"
+                ,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned,_owner->freed);
         }else
-            bug("\tCan't subown a disowned or unowned memory allocation.");
+            bug("\tCan't subown a disowned or unowned memory allocation (%u,%u,%u,%u,%u,%u)."
+                ,_owner->module,_owner->id,_owner->global,_owner->level,_owner->disowned,_owner->freed);
     }else
-        bug("\tFailed to subown a memory allocation: it is not registered (index: %llu).",_alloc->allocationIndex);
+        bug("\tFailed to subown memory allocation (%u,%u,%u,%u,%u,%u): it is not registered (index: %llu)."
+                ,_alloc->owner.module,_alloc->owner.id,_alloc->owner.global,_alloc->owner.level,_alloc->owner.disowned,_alloc->owner.freed
+                ,_alloc->allocationIndex);
     return ptr;
 }
 // MDH@25MAY2020 careful here Msubowner result is supposed to be a local variable (on the program stack) so it will be disposed off 'automagically'
@@ -923,6 +934,10 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,Mal
 #ifndef __PRODUCTION__
     // MDH@04JUN2020: we can check ownership here BUT when a subowned allocation is freed by the superowner, which might have changed ownership the subowned allocation can still be freed as long as the levels match
     if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
+        if(allocations._owners[_alloc->allocationIndex].owner.freed){
+            allocations._owners[_alloc->allocationIndex].owner.freed=0;
+            bug("\tAllocation of dynamic memory '%c' (=%i) of size %zd was already marked as free.");
+        }
         if(allocations._owners[_alloc->allocationIndex].type!=allocationType){
             bug("\tAllocation type of dynamic memory '%c' (=%i) (at index %i) does not match provided allocation type '%c' (=%i).",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType,allocationType);
             dump(ptr,size*count,size);
@@ -936,13 +951,16 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,Mal
             ,allocationType,allocationType);
             dump(ptr,size*count,size);
         }else{
+            // MDH@07JUN2020: it's going to suffice (see below) to set the freed flag once done (see the line below)
+            /* replacing:
             // what we do here is the same as what Mdisown does!!!!
             allocations._owners[_alloc->allocationIndex].type=' '; // MDH@13APR2020: can't use ' ' as that's used for a command
             allocations._owners[_alloc->allocationIndex].owner.id=0; // MDH@18MAY2020
             allocations._owners[_alloc->allocationIndex].owner.module=0; // MDH@03JUN2020: TODO we might not want to do this
+            */
         }
     }else{
-        bug("Retrieved allocation position %llu out of range [0,%llu).",_alloc->allocationIndex,allocations.l);
+        bug("\tRetrieved allocation position %llu out of range [0,%llu).",_alloc->allocationIndex,allocations.l);
         dump(ptr,size*count,size);
     }
 #else
@@ -953,6 +971,13 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,Mal
     }
 #endif
     free(_alloc);
+#ifndef __PRODUCTION__
+    // MDH@07JUN2020: if we get here we know free was sucessful and we should definitely mark the thing as freed
+    // we may safely assume that _alloc was freed but its good that to set the freed flag so we know that the pointer was freed actually but still know the type
+    // technically it might also be a good idea to have an additional flag that we can use to 
+    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l)
+        allocations._owners[_alloc->allocationIndex].owner.freed=1; // MDH@13APR2020: can't use ' ' as that's used for a command
+#endif
     //////info("!");
     // undo the allocation of the given type
     /* MDH@14APR2020 removing:

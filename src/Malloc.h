@@ -50,12 +50,16 @@ typedef struct{
     */
 }Mallocationtype;
 
+// MDH@07JUN2020: if we allow Mfree to (p)relinquish ownership we do not need to actually cancel the ownership
+//                additional advantage would be that we would still know who owned the pointer
+//                NOTE that unowning a disowned pointer is typically prohibited because ownership should always be passed when disowned
 typedef struct{
     uint16_t module:8; // the owner id (typically a function or a module itself)
-    uint16_t id:15;
+    uint16_t id:16;
     uint8_t global:1; // MDH@04JUN2020: can now be negative (to indicate module global owners that are allowed to persist)
-    uint8_t level:7; // the subpointer level (by putting this first we can quickly create a dummy allocation owner at some nonzero level so the pointer won't be freed when we do not want to)
+    uint8_t level:5; // the subpointer level (by putting this first we can quickly create a dummy allocation owner at some nonzero level so the pointer won't be freed when we do not want to)
     uint8_t disowned:1; // whether or not it's a disowned allocation (so it can get a new owner)
+    uint8_t freed:1; // MDH@07JUN2020: flag set by Mfree 
 }Mallocationowner;
 
 // a user can mark the allocation by calling Mmark() and using the returned position to unmark

@@ -1109,12 +1109,12 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
 //                a new function is always created on the currently executing environment
 Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner_environment,const char* const name){Mallocationowner owner=getOwner(__LINE__);
     if(!name||strlen(name)==0)return NULL;
+    Mfunction* _function=NULL;
     if(_environment){
-        Mfunction* _function=getFunction(_environment,name); // check for a function with the given name in the given environment
-        if(_function)return _function; // MDH@03JUN2020: do NOT change ownership!!!!!
-        // doesn't exist yet
-        _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
-        if(_function){
+        _function=getFunction(_environment,name); // check for a function with the given name in the given environment
+        if(!_function&&_environment->_functionMap){ // does not exist yet, and is registrable
+            if(amVerbose())
+                output("Registering function '%s'",name);
             ///////////_function->type=functionType;
             /* MDH@03FEB2020 CORRECTION: if we decide to make these methods environment stack unaware we can do the assignment outside this function possibly at the moment that the function is passed outside its scope
             // MDH@03FEB2020: by assigning the presented environment value to the definition environment value, the reference counter of _environmentValue will be incremented because it is now bound to an additional variable!!!
@@ -1122,16 +1122,22 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
             */
             Mstring* _functionName=(Mstring*)OWNED(__string(),owner);
             if(_functionName){
+                if(amVerbose())outputChar('.'); // 1
                 Mstring* p=_functionName;
                 p=string_append(p,name);
                 if(p){
-                    Mfunctionmap* _functionmap=_environment->_functionMap;
-                    if(_functionmap){
+                    if(amVerbose())outputChar('.'); // 2
+                    _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner); // create the function
+                    if(_function){
+                        if(amVerbose())outputChar('.'); // 3
                         Mfunctionmapelement* _functionmapelement=(Mfunctionmapelement*)CALLOC_1(sizeof(Mfunctionmapelement),'+',owner);
                         if(_functionmapelement){
+                            if(amVerbose())outputChar('.'); // 4
                             _functionmapelement->_name=(Mstring*)SUBOWNED(OWNED(DISOWNED(_functionName,owner),owner_environment),4); // MDH@10JUL2019: moved over to the function map element
                             _functionmapelement->_function=(Mfunction*)SUBOWNED(OWNED(DISOWNED(_function,owner),owner_environment),3); // no worries here
                             SUBOWNED(OWNED(DISOWNED(_functionmapelement,owner),owner_environment),2); // TODO
+                            if(amVerbose())outputChar('.'); // 5
+                            Mfunctionmap* _functionmap=_environment->_functionMap;
                             Mfunctionmapelement* _lastFunctionmapelement=_functionmap->_last;
                             if(_lastFunctionmapelement){
                                 _lastFunctionmapelement->_next=_functionmapelement;
@@ -1140,26 +1146,47 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
                                 _functionmap->_first=_functionmapelement;
                             _functionmap->_last=_functionmapelement;
                             _functionmap->numberOfFunctions++;
+                            if(amVerbose())outputChar('.'); // 6
                             ///////_function->_name=_functionName; // success!!!!!
-                            if(amVerbose())
-                                output("Function '%s' registered as function #%d.\n",name,_functionmap->numberOfFunctions);
-                        }else // failure
+                        }else{ // failure
                             p=NULL;
-                    }else
+                            output("%sFailed to create the function map element of '%s'.",M_ERROR_PREFIX,name);
+                        }
+                    }else{
                         p=NULL;
-                }
-                if(!p){free_string(_functionName,owner);_functionName=NULL;} // p==NULL indicates _functionName not bound in _function->_name
-                // try to append it to the functionMap, if we succeed store _functioName in ->_name
+                        output("%sFailed to create function '%s'.",M_ERROR_PREFIX,name);
+                    }
+                    if(!p){
+                        if(amVerbose())outputChar('!');
+                        free_string(_functionName,owner);
+                        _functionName=NULL;
+                        if(amVerbose())outputChar('!');
+                    }
+                    // try to append it to the functionMap, if we succeed store _functioName in ->_name
+                }else
+                    output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
+                // if we fail to register the name and/or the function with the environment free the function!!
+                if(!_functionName){
+                    if(_function){
+                        if(amVerbose())outputChar('!');
+                        free_function(_function,owner);_function=NULL;
+                        if(amVerbose())outputChar('!');
+                    }
+                }else
+                if(amVerbose())
+                    output("%s"," done"); // 7
             }else
-                output("%sFailed to store function name '%s'.\n",M_ERROR_PREFIX,name);
-            // if we fail to register the name and/or the function with the environment free the function!!
-            if(!_functionName){free_function(_function,owner);_function=NULL;}   
-        }
-        if(_function)return DISOWNED(_function,owner);
-        output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
+                output("%sFailed to create the function name to store '%s' in.",M_ERROR_PREFIX,name);
+            // if(!_function)output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,name);
+        }else
+        if(!_function)
+            output("%sNo function map in the environment to store '%s' in.",M_ERROR_PREFIX,name);
     }else
         output("%sNo environment to search for function '%s'.",M_ERROR_PREFIX,name);
-    return NULL;
+    if(_function)
+        if(amVerbose())
+            output("%s",".\n");
+    return _function;
 }/* VALIDATED */
 
 // END FUNCTION STUFF
