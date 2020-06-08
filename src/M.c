@@ -1258,25 +1258,31 @@ bool registerCommand(Mcommand* command){Mallocationowner owner=getOwner(__LINE__
 	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
-			Mcommand** createUserInputCommands=REALLOC(commands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mtoken*),'C');
+			Mcommand** createUserInputCommands=(commandBlocks==0?MALLOC(sizeof(Mtoken*),COMMAND_BLOCKSIZE,'C',owner_commands):REALLOC(commands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mtoken*),'C'));
 			if(createUserInputCommands==NULL)return false;
 			commandBlocks++;
 			commands=createUserInputCommands;
 		}
 		commands[commandCount++]=command;
+		if(amVerboseDebugging())
+			outputLine("Command registered!");
 		return true;
-	}else{ // should be added to the function body
-		// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
-		// MDH@25MAY2020 TODO should we pass {1} to _getValueOfToken()?????????
-		Mvalue* _commandToEvaluateTokenValue=(Mvalue*)OWNED(_getValueOfToken(command->_firstToken,(Mallocationowner){0,0,1}),owner);
-		if(_commandToEvaluateTokenValue){
-			// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
-			if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
-				getCurrentFunctionBodyInput()->_function->_bodyCommandList=SUBOWNED(OWNED(__list("body command list"),owner_currentFunctionBodyInput),2);
-			if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,owner_currentFunctionBodyInput,_commandToEvaluateTokenValue,M_LL_INVALID)==M_TRUE)return true;
-			outputError("Failed to add the command to the body of the function");
-		}
 	}
+	// should be added to the function body
+	// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
+	// MDH@25MAY2020 TODO should we pass {1} to _getValueOfToken()?????????
+	// MDH@08JUN2020 TODO still have to check the following... what would be the owner of the first command token??????? I suppose it will be subowned by the user input command
+	Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(command->_firstToken,Msubowner(owner_userInputCommand,1));
+	if(_commandToEvaluateTokenValue){ // the first command token is now bound 
+		// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
+		if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
+			getCurrentFunctionBodyInput()->_function->_bodyCommandList=SUBOWNED(OWNED(__list("body command list"),owner_currentFunctionBodyInput),2);
+		// MDH@08JUN2020: if we succeed in adding the command value to the function body we still return false as result which will result in command to be freed
+		//                BUT by NULLing command->_firstToken we prevent the tokens from being freed in the command as we should
+		if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,owner_currentFunctionBodyInput,_commandToEvaluateTokenValue,M_LL_INVALID)>0)
+			command->_firstToken=NULL;
+	}
+	outputError("Failed to add the command to the body of the function");
 	return false;
 }
 // MDH@21JUN2019: reset() takes care of removing all stored commands
@@ -4032,7 +4038,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					if(!registerCommand(_userInputCommand)){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
-						if(!commandIndex){ // a new command being registered!!!
+						if(commandIndex==0){ // a new command being registered!!!
 							free_command(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
 							outputError("Failed to register the command! Probable cause: out of memory");
 						}else

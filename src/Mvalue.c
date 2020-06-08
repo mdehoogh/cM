@@ -152,10 +152,10 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
     if(!_valueList){
         _valueList=OWNED(__list("global value list"),owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
         if(!_valueList){outputBug("Failed to create the global value list.");return NULL;}
-        _valueList->weak=true; // MDH@11NOV2019: don't think this actually matters, as I'm the only one that accesses it and the list will be around for the remainder of the session!!!
         // MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
         //                as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
         if(appendedToList(_valueList,owner_valueList,(Mvalue*)CALLOC_1(sizeof(Mvalue),'U',owner),M_LL_INVALID)<=0){outputBug("Failed to store the global undefined value.");return NULL;}
+        _valueList->weak=true; // MDH@11NOV2019: from now on a weak list i.e. elements are not added using assignValue but directly
     }
     Mlistelement* _valueListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner_valueListelement); // both pointers NULL
     if(_valueListelement){
