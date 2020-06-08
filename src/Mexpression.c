@@ -6,7 +6,7 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_I
 extern char const * const M_ERROR_PREFIX;
 
 Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
-    return CALLOC_1(sizeof(Mtoken),'O',owner);
+    return DISOWNED(CALLOC_1(sizeof(Mtoken),'O',owner),owner);
 }
 void free_token(Mtoken* _token,Mallocationowner owner){
     // MDH@19MAY2020: we can free it only when we own it

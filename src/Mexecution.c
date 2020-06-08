@@ -149,7 +149,7 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){Mallocatio
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-static Mallocationowner owner_module=(Mallocationowner){MODULE_ID};
+static Mallocationowner owner_module=(Mallocationowner){MODULE_ID,__LINE__,1};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
 const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=(Mbiginteger*)OWNED(_getBiginteger(0),owner_module);return bi0;}/* VALIDATED */
 const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=(Mbiginteger*)OWNED(_getBiginteger(1),owner_module);return bi1;}/* VALIDATED */
@@ -278,6 +278,7 @@ Minteger* _getInteger(long long ll){Mallocationowner owner=getOwner(__LINE__);
     Minteger* _integer=MALLOC_1(sizeof(Minteger),'I',owner);
     if(!_integer)return NULL;
     _integer->ll=ll;
+    // output("Integer: %lld.\n",_integer->ll); // DEBUG
     return(Minteger*)DISOWNED(_integer,owner);
 }/* VALIDATED */
 /*

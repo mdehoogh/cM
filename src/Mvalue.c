@@ -354,19 +354,12 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_bigi
     Mvalue* _bigintegerValue=__value("biginteger");
     if(_bigintegerValue){
         _bigintegerValue->type=VT_BIGINTEGER;
-        _bigintegerValue->value._biginteger=SUBOWNED(OWNED(_biginteger,owner_valueList),3);
+        _bigintegerValue->value._biginteger=SUBOWNED(OWNED(_biginteger,getValueOwner()),1);
     }else
     if(owner_biginteger.level==0)free_biginteger(_biginteger,owner_biginteger);
     return _bigintegerValue;
 }/* VALIDATED */
 
-Mvalue* _getIntegerValue(long long ll){
-    if(amVerboseDebugging())output("Wrapping integer '%lld'.\n",ll);
-    Mvalue* _integerValue=__value("integer");
-    if(!_integerValue)return NULL;
-    _integerValue->value._integer=SUBOWNED(OWNED(_getInteger(ll),owner_valueList),3);
-    return _integerValue;
-}/* VALIDATED */
 Mvalue* _getFloatValue(long double ld){
     if(amVerbose())
         output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
@@ -375,6 +368,14 @@ Mvalue* _getFloatValue(long double ld){
     _floatValue->type=VT_FLOAT;
     _floatValue->value._float=SUBOWNED(OWNED(_getFloat(ld),owner_valueList),3);
     return _floatValue;
+}/* VALIDATED */
+Mvalue* _getIntegerValue(long long ll){
+    if(amVerboseDebugging())output("Wrapping integer '%lld'.\n",ll);
+    Mvalue* _integerValue=__value("integer");
+    if(!_integerValue)return NULL;
+    _integerValue->type=VT_INTEGER;
+    _integerValue->value._integer=SUBOWNED(OWNED(_getInteger(ll),getValueOwner()),1);
+    return _integerValue;
 }/* VALIDATED */
 // MDH@25MAY2020: s is a constant character array that does not need change ownership (because it is supposed to be owned elsewhere or not owned)
 Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){

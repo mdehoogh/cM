@@ -3987,14 +3987,14 @@ void outputLastTokenChar(Mtoken* _token){
 */
 // MDH@17NOV2019: applying unary operator on an indexed value not working as it should, so has to be fixed
 
-Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){Mallocationowner owner=getOwner(__LINE__);
+Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t endTokenTypeCount){Mallocationowner owner=getOwner(__LINE__);
 
 	Mtoken* expressionToken=getEnvironmentExpressionToken();
 
 	Mvaluereference* _valueReference=NULL;
 
 	if(amVerboseDebugging())
-		output("getValueReference() extracting a(n) '%s' value that starts with token '%s' of type '%s'.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		output("_getValueReference() extracting a(n) '%s' value that starts with token '%s' of type '%s'.\n",info,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 
 	Mstring* unaryOperators=NULL; // a value starts with a number (zero or more) of unary operators
 		
@@ -4012,7 +4012,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 
 	if(expressionToken){
 		if(amVerboseDebugging())
-			output("getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+			output("_getValueReference() interpreting first value token '%s' of type %s.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		_valueReference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',owner);
 		// expecting either a function (call), (new) variable or (integer, real, string, list or map) literal
 		/* NO we can NOT change the tokens themselves (to keep them editable!!!)
@@ -4300,18 +4300,24 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
 					Mbiginteger* _biginteger=OWNED(__biginteger(),owner);
+					// output("Converting '%s' to a big integer.\n",_significantTokenText); // DEBUG
 					if(mp_read_radix(MP_INT_POINTER(_biginteger),_significantTokenText,10)==MP_OKAY){
+						// outputBiginteger("Big integer: '",_biginteger,"'.\n"); // DEBUG
 						if(mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMin()))!=MP_LT&&mp_cmp(MP_INT_POINTER(_biginteger),MP_INT_POINTER(getBigintegerLLMax()))!=MP_GT){
+							// outputBiginteger("Storing the small integer of '",_biginteger,"' as referenced value.\n"); // DEBUG
 							_valueReference->_value=_getIntegerValue(mp_get_i64(MP_INT_POINTER(_biginteger)));
               				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
 							free_biginteger(_biginteger,owner);
-						}else
+						}else{
+							outputBiginteger("Storing big integer '",_biginteger,"' as referenced value.\n"); // DEBUG
 							_valueReference->_value=_getBigintegerValue(_biginteger,owner);
 							// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
+						}
 					}else{
 						free_biginteger(_biginteger,owner);
 						outputErrorAndText("Failed to create the big integer to store integer ",_significantTokenText);
 					}
+					// outputValue("Value referenced: '",_valueReference->_value,"'.\n"); // DEBUG
 				}
 				break;
 			case TT_REAL: // unlikely without integer part in front of it though
@@ -4628,13 +4634,16 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		// ASSERT both integers are considered valid (i.e. not invalid)
 		Mbiginteger *_biginteger1=(smallinteger1?OWNED(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
 		Mbiginteger *_biginteger2=(smallinteger2?OWNED(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		// outputBiginteger("Adding '",_biginteger1,"' and '");outputBiginteger(NULL,_biginteger2,"'.\n"); // DEBUG
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
 			if(amVerboseDebugging())
 				{outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_sumBiginteger=OWNED(__biginteger(),owner);
-			if(_sumBiginteger&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY)
-			{free_biginteger(_sumBiginteger,owner);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_sumBiginteger&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){
+				free_biginteger(_sumBiginteger,owner);_sumBiginteger=NULL;
+				outputError("Failed to add two big integers");
+			} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
@@ -4648,7 +4657,10 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 			if(!_sumBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llsum=getBigintegerInteger(_sumBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llsum!=M_LL_INVALID){free_biginteger(_sumBiginteger,owner);return _getIntegerValue(llsum);}
+			if(llsum!=M_LL_INVALID){
+				free_biginteger(_sumBiginteger,owner);
+				return _getIntegerValue(llsum);
+			}
 			outputWarning("Small integer sum out of range, will continue using big integer sum.");
 		}
 		return _getBigintegerValue(_sumBiginteger,owner);
@@ -7136,7 +7148,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			
 			if(_formulaelement){
-				_formulaelement->_operand=getValueReference("operand",endTokenTypes,endTokenTypeCount);
+				_formulaelement->_operand=SUBOWNED(OWNED(_getValueReference("operand",endTokenTypes,endTokenTypeCount),owner),1); // MDH@08JUN2020: whatever we bind in the formula element needs to be subowned by it
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerboseDebugging())
 					outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.\n");
@@ -7155,7 +7167,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				//                TODO alternatively we could move this functionality to getValueReference()!!
 				//                TODO this also means that we can have an index on a value (not per se a variable)
 				//                TODO are we allowing indexing strings as well??????
-				/* MDH@17NOV2019: moved over to getValueReference() where it actually belongs
+				/* MDH@17NOV2019: moved over to _getValueReference() where it actually belongs
 				if(amVerbose()&&amDebugging())
 				{output("Possible augmented list item ids expression token");outputToken(expressionToken);outputChar('\n');}
 				while(expressionToken&&expressionToken->type==TT_LIST){
@@ -7205,7 +7217,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(amVerboseDebugging())
 					output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
-				_formulaelement->_operator=_stringCopy(expressionToken->text,expressionToken->significantCharacterCount); // replacing: _stringCopy(expressionToken->text);
+				_formulaelement->_operator=SUBOWNED(OWNED(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),owner),1); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
 				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
@@ -7219,7 +7231,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				}
 				if(amVerboseDebugging())
 					output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
-				_formulaelement->_next=__formulaelement("successor");
+				_formulaelement->_next=OWNED(__formulaelement("successor"),owner); // MDH@08JUN2020: similar to all other formula elements this one needs to be owned by me as well otherwise I won't be able to free it myself
 				_formulaelement=_formulaelement->_next;
 				if(!_formulaelement){
 					outputError("Failed to create a new formula element.");
