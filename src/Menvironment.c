@@ -1421,7 +1421,7 @@ bool completedFunction(Mfunction* const _function,const char* const functionName
 // MDH@03JUN2020: if we assume that _function (in all following methods) is disowned, we can simply take over ownership
 bool completedValueFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getMap("v"),owner),1);
@@ -1436,7 +1436,7 @@ bool completedValueFunction(Mfunction* const _function,const char* const functio
 }/* VALIDATED */
 bool completedFloatFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getFloatMap("x",_getFloatValue(M_LD_NAN)),owner),1); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
@@ -1450,7 +1450,7 @@ bool completedFloatFunction(Mfunction* const _function,const char* const functio
 }/* VALIDATED */
 bool completedIntegerFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
@@ -1465,7 +1465,7 @@ bool completedIntegerFunction(Mfunction* const _function,const char* const funct
 }/* VALIDATED */
 bool completedListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
@@ -1480,7 +1480,7 @@ bool completedListFunction(Mfunction* const _function,const char* const function
 }/* VALIDATED */
 bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
@@ -1496,7 +1496,7 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
 }/* VALIDATED */
 bool completedIntegerBooleanFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
@@ -1511,7 +1511,7 @@ bool completedIntegerBooleanFunction(Mfunction* const _function,const char* cons
 }/* NOT VALIDATED */
 bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getStringStringMap("variable","type"),owner),1);
@@ -1525,7 +1525,7 @@ bool completedStringStringFunction(Mfunction* const _function,const char* const 
 }/* VALIDATED */
 bool completedFloatFloatFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getFloatFloatMap("base","exponent"),owner),1);
@@ -1539,7 +1539,7 @@ bool completedFloatFloatFunction(Mfunction* const _function,const char* const fu
 }/* VALIDATED */
 bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getStringMapTokenMap("name","parameters","body"),owner),1);
@@ -1553,7 +1553,7 @@ bool completedStringMapTokenFunction(Mfunction* const _function,const char* cons
 }/* VALIDATED */
 bool completedMapTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getMapTokenMap("parameters","body"),owner),1);
@@ -1567,7 +1567,7 @@ bool completedMapTokenFunction(Mfunction* const _function,const char* const func
 }/* VALIDATED */
 bool completedValueTextValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getStringMapTokenMap("variable name, list or map","value type","immutable"),owner),1);
@@ -1581,7 +1581,7 @@ bool completedValueTextValueFunction(Mfunction* const _function,const char* cons
 }/* VALIDATED */
 bool completedTokenTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenMap("while condition","while body"),owner),1);
@@ -1595,7 +1595,7 @@ bool completedTokenTokenFunction(Mfunction* const _function,const char* const fu
 }/* VALIDATED */
 bool completedValueValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenMap("value to text","format specifier"),owner),1);
@@ -1609,7 +1609,7 @@ bool completedValueValueFunction(Mfunction* const _function,const char* const fu
 }/* VALIDATED */
 bool completedListValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenMap("list","value"),owner),1);
@@ -1623,7 +1623,7 @@ bool completedListValueFunction(Mfunction* const _function,const char* const fun
 }/* VALIDATED */
 bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getListValueIntegerMap("list to search","value to find","maximum number of elements"),owner),1);
@@ -1637,7 +1637,7 @@ bool completedListValueIntegerFunction(Mfunction* const _function,const char* co
 }/* VALIDATED */
 bool completedValueTokenTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getValueTokenTokenMap("if condition","then clause","else clause"),owner),1);
@@ -1651,7 +1651,7 @@ bool completedValueTokenTokenFunction(Mfunction* const _function,const char* con
 }/* VALIDATED */
 bool completedThreeIntegersFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getThreeIntegerMap("red","green","blue"),owner),1);
@@ -1665,7 +1665,7 @@ bool completedThreeIntegersFunction(Mfunction* const _function,const char* const
 }/* VALIDATED */
 bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FourArgumentFunction fourArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_FOUR_ARGUMENTS;
         _function->functionunion.fourArgumentFunction=fourArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body"),owner),1);
@@ -1679,7 +1679,7 @@ bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char
 }/* VALIDATED */
 bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const char* const functionName,FiveArgumentFunction fiveArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
-        OWNED(_function,owner);
+        // OWNED(_function,owner);
         _function->type=FT_INTERNAL_FIVE_ARGUMENTS;
         _function->functionunion.fiveArgumentFunction=fiveArgumentFunction;
         _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body","result"),owner),1);

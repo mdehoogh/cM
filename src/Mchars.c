@@ -17,7 +17,7 @@ extern char const * const M_WARNING_PREFIX;
 Mchars* __chars(size_t size,long long count,signed char type){Mallocationowner owner=getOwner(__LINE__);
     // MDH@19MAY2020: it's a bit weird to pass the negative value of the owner id to REALLOC but this prevents us from having to call DISOWNED on the pointer returned by REALLOC
     //                this way we get a pointer that we know who created it by disowns it immediately
-    return(Mchars*)MALLOC(size,count,(type>0?-type:type),owner); // MDH@03JUN2020: force type to be negative (variable-sized)
+    return(Mchars*)DISOWNED(MALLOC(size,count,(type>0?-type:type),owner),owner); // MDH@03JUN2020: force type to be negative (variable-sized)
 }
 // if you want to expand an Mchars by the number of characters should we return the new _chars or simply true or false??????
 // ok, we're plugging in an Mchars pointer (which is the address of an Mchars structure)

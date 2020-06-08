@@ -70,7 +70,7 @@ Mvariable* _getVariable(char const * name,Mvaluetype valuetype,bool immutable){M
         _variable->_value=NULL;
     */
     // MDH@04JUN2020: given that _variable is already disowned (as returned by CALLOC_1), no need to disown it again
-    return _variable; // replacing: DISOWNED(_variable,owner);
+    return DISOWNED(_variable,owner);
 }/* VALIDATED */
 
 bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owner){
@@ -408,7 +408,7 @@ Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const sour
     _list->weak=weak;
     _list->valuetype=listValuetype; // register what type of elements this list should have    
     _listValue->type=VT_LIST;
-    _listValue->value._list=SUBOWNED(OWNED(_list,getValueOwner()),1);
+    _listValue->value._list=SUBOWNED(OWNED(DISOWNED(_list,owner),getValueOwner()),1);
     return _listValue;
 }/* VALIDATED */
 
@@ -740,7 +740,7 @@ static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mv
                         _mapelement1->_next=_mapelement2;
                         _map->_last=SUBOWNED(_mapelement2,1);
                         _map->numberOfElements=2;
-                        return _map;
+                        return DISOWNED(_map,owner);
                     }
                     outputError("Failed to create both map element variables");
                     free_map(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
@@ -908,14 +908,14 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
 // LIST STUFF
 Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list){Mallocationowner owner=getOwner(__LINE__);
     if(!_list)return NULL;
-    Mvalue* _value=OWNED(__value(_list->weak?"weak list":"strong list"),owner);
+    Mvalue* _value=__value(_list->weak?"weak list":"strong list");
     if(!_value){
         if(owner_list.level==0)free_list(_list,owner_list);
         return NULL;
     }
-    _value->value._list=_list;
+    _value->value._list=SUBOWNED(OWNED(DISOWNED(_list,owner_list),getValueOwner()),1); // MDH@09JUN2020: _value is to take over ownership of _list
     _value->type=VT_LIST;
-    return DISOWNED(_value,owner);
+    return _value;
 }/* VALIDATED */
 void checkList(Mlist* _list){
     if(_list){
@@ -2318,7 +2318,7 @@ Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
     if(!_environment){outputError("Failed to create an environment");return NULL;}
     _environment->_variableMap=CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
     if(!_environment->_variableMap){free_environment(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
-    return _environment;
+    return DISOWNED(_environment,owner);
 }/* VALIDATED */
 void free_environment(Menvironment* _environment,Mallocationowner owner_environment){
     if(_environment){

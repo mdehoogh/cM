@@ -2946,7 +2946,7 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 	Mallocationowner owner_executionenvironment=getOwnerExecutionEnvironment();
 
 	// we're gonna need a list to store lists of command and result pairs
-	M_value=OWNED(_getListValue(VT_MAP,false,"M command list"),owner_M_value);
+	M_value=_getListValue(VT_MAP,false,"M command list"); // don't change the ownership of Mvalue instances
 
 	// MDH@14NOV2019: typically M is created as an immutable variable BUT of course I can change the assigned M_value myself directly but the user can't!!
 	//                NOTE if we would have used setValue to set M to M_value it would copy the list that M_value holds instead of using M_value itself, setVariable won't do that

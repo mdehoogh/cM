@@ -7599,7 +7599,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				return false;
 			}
 			*/
-			_Menvironment->_functionMap=SUBOWNED(OWNED(environmentFunctionMap,owner),1);
+			_Menvironment->_functionMap=SUBOWNED(environmentFunctionMap,1);
 
 			// register if, while and for special functions
 		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
