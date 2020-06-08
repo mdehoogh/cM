@@ -361,8 +361,7 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_bigi
 }/* VALIDATED */
 
 Mvalue* _getFloatValue(long double ld){
-    if(amVerbose())
-        output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
+    if(amVerboseDebugging())output("Wrapping long double (float) '%.*Lf'.\n",DBL_DIG,ld);
     Mvalue* _floatValue=__value("long double");
     if(!_floatValue)return NULL;
     _floatValue->type=VT_FLOAT;
