@@ -27,22 +27,24 @@ void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner){
     if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
     FREE_1(_variable,'V',owner);
 }/* VALIDATED */
-Mvariable* _getVariable(char const * name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
+// MDH@09JUN2020: if we want the name of the variable to be subowned by the caller, it's better to pass in a properly owned Mchars name, which we can subown
+//                it's a bit of a nuisance that we create it in such a way that the caller has to take care of the ownership of _name but that makes sense because we pass in Mchars (which is already managed)
+Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
     // MDH@14NOV2019: maps might have attributes with no name (i.e. the empty string)
-    if(!name){
+    if(!_name){
         outputError("No variable name defined");
         return NULL;
     }
     Mvariable* _variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
     if(!_variable){
-        outputErrorAndText("Failed to allocate memory to store variable ",name);
+        outputError("Failed to create a variable.");
         return NULL;
     }
     _variable->immutable=immutable;
-    _variable->_name=SUBOWNED(OWNED(_getChars(name),owner),1); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
+    _variable->_name=_name; // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
     if(!_variable->_name){
         free_variable(_variable,true,owner);
-        output("%sFailed to allocate memory to store name '%s' of the new variable.\n",M_ERROR_PREFIX,name);
+        output("%sFailed to allocate memory to store name '%s' of the new variable.\n",M_ERROR_PREFIX,_name->chars);
         return NULL;
     }
     _variable->valuetype=valuetype;
@@ -566,11 +568,27 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 	return _tokenValue;
 }*/
 
+// MDH@09JUN2020: interface between _getVariable (now requiring a Mchars name) and all that still use a char* thing
+static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){Mallocationowner owner=getOwner(__LINE__);
+    Mchars* _name=OWNED(_getChars(name),owner);
+    if(!_name){
+        output("%sFailed to create variable name '%s'.",M_ERROR_PREFIX,name);
+        return NULL;
+    }
+    Mvariable* _variable=OWNED(_getVariable(_name,valuetype,immutable),owner);
+    if(!_variable){
+        freeChars(_name,owner); // release the name
+        output("%sFailed to create variable '%s'.\n",M_ERROR_PREFIX,name);
+        return NULL;
+    }
+    SUBOWNED(OWNED(DISOWNED(_name,owner),owner_variable),1); // take over ownership of the variable name
+    return OWNED(DISOWNED(_variable,owner),owner_variable);
+}
 // helper function to create a parameter map with a single value
 // the following is a nuisance
 Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwner(__LINE__);
     if(name&&_floatValue){
-        Mvariable* _realVariable=OWNED(_getVariable(name,VT_FLOAT,true),owner);
+        Mvariable* _realVariable=_getVariableWithName(name,VT_FLOAT,true,owner);
         if(_realVariable){
             Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement){
@@ -578,6 +596,7 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
                 if(_map){
                     assignValue(&_realVariable->_value,_floatValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
                     _mapelement->_variable=SUBOWNED(_realVariable,1);
+                    SUBOWNED(_realVariable->_name,1); // another level down
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     _map->_last=_mapelement;
@@ -591,12 +610,12 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
                 outputError("Failed to create the float variable map element");
             free_variable(_realVariable,false,owner);
         }else
-            outputError("Failed to create the float variable");
+            outputError("Failed to create the float variable name");
     }
     return NULL;
 }/* VALIDATED */
-Mmap* _getMap(char* name){Mallocationowner owner=getOwner(__LINE__);
-    Mvariable* _variable=OWNED(_getVariable(name,VT_UNDEFINED,true),owner);
+Mmap* _getMap(char* name){if(!name)return NULL;Mallocationowner owner=getOwner(__LINE__);
+    Mvariable* _variable=_getVariableWithName(name,VT_UNDEFINED,true,owner);
     if(_variable){
         Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner);
         if(_mapelement){
@@ -604,6 +623,7 @@ Mmap* _getMap(char* name){Mallocationowner owner=getOwner(__LINE__);
             if(_map){
                 _map->numberOfElements=1;
                 _mapelement->_variable=SUBOWNED(_variable,1);
+                SUBOWNED(_variable->_name,1);
                 _map->_first=_mapelement;
                 _map->_last=_mapelement;
                 return DISOWNED(_map,owner);
@@ -611,7 +631,8 @@ Mmap* _getMap(char* name){Mallocationowner owner=getOwner(__LINE__);
             FREE_1(_mapelement,'m',owner); // MDH@11NOV2019: no need to call free_mapelement() 
         }
         free_variable(_variable,false,owner);
-    }
+    }else
+        output("%sFailed to create map '%s'.\n",M_ERROR_PREFIX,name);
     return NULL;
 }/* VALIDATED */
 
@@ -628,14 +649,17 @@ Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE
                     if(_mapelement){
                         // create a variable with the same name and value as the variable in mapelement
                         // MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
-                        _mapelement->_variable=SUBOWNED(OWNED(_getVariable(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/),owner),2);
-                        assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the value over
-                        if(_map->_last)_map->_last->_next=_mapelement; // make the current last point to the new last
-                        _map->_last=SUBOWNED(_mapelement,1); // replace current last by the new last
-                        if(!_map->_first)_map->_first=_map->_last; // initialize first if necessary
-                        _map->numberOfElements++; // count one more
+                        _mapelement->_variable=SUBOWNED(_getVariableWithName(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/,owner),2);
+                        if(_mapelement->_variable){
+                            assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the value over
+                            if(_map->_last)_map->_last->_next=_mapelement; // make the current last point to the new last
+                            _map->_last=SUBOWNED(_mapelement,1); // replace current last by the new last
+                            if(!_map->_first)_map->_first=_map->_last; // initialize first if necessary
+                            _map->numberOfElements++; // count one more
+                        }else
+                            output("%sFailed to copy the map attribute name '%s'.\n",M_ERROR_PREFIX,mapelementVariable->_name->chars);
                     }else
-                        output("%sFailed to copy map attribute '%s'.\n",M_ERROR_PREFIX,mapelementVariable->_name);
+                        output("%sFailed to copy map attribute '%s'.\n",M_ERROR_PREFIX,mapelementVariable->_name->chars);
                 }
                 mapelement=mapelement->_next;
             }
@@ -675,7 +699,7 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
 static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
     // NOTE wait with filling the single integer value map until we have all the ingredients
     if(name&&strlen(name)>0){
-        Mvariable* _variable=OWNED(_getVariable(name,valuetype,true),owner);
+        Mvariable* _variable=_getVariableWithName(name,valuetype,true,owner);
         if(_variable){
             Mmapelement* _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement){
@@ -734,8 +758,8 @@ static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mv
             if(_mapelement1&&_mapelement2){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,valuetype1,true),owner),2);
-                    _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_INTEGER,true),owner),2);
+                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,valuetype1,true,owner),2);
+                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_INTEGER,true,owner),2);
                     if(_mapelement1->_variable&&_mapelement2->_variable){
                         _map->_first=SUBOWNED(_mapelement1,1);
                         _mapelement1->_next=_mapelement2;
@@ -783,9 +807,9 @@ Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuet
             if(_mapelement1&&_mapelement2&&_mapelement3){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,VT_TEXT,true),owner),2);
-                    _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_MAP,true),owner),2);
-                    _mapelement3->_variable=SUBOWNED(OWNED(_getVariable(name3,VT_TOKEN,true),owner),2);
+                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,VT_TEXT,true,owner),2);
+                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_MAP,true,owner),2);
+                    _mapelement3->_variable=SUBOWNED(_getVariableWithName(name3,VT_TOKEN,true,owner),2);
                     if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable){
                         _map->_first=SUBOWNED(_mapelement1,1);
                         _mapelement1->_next=SUBOWNED(_mapelement2,1);
@@ -829,10 +853,10 @@ Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvalue
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,valuetype1,true),owner),2);
-                    _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_TOKEN,true),owner),2);
-                    _mapelement3->_variable=SUBOWNED(OWNED(_getVariable(name3,VT_TOKEN,true),owner),2);
-                    _mapelement4->_variable=SUBOWNED(OWNED(_getVariable(name4,VT_TOKEN,true),owner),2);
+                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,valuetype1,true,owner),2);
+                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_TOKEN,true,owner),2);
+                    _mapelement3->_variable=SUBOWNED(_getVariableWithName(name3,VT_TOKEN,true,owner),2);
+                    _mapelement4->_variable=SUBOWNED(_getVariableWithName(name4,VT_TOKEN,true,owner),2);
                     if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable){
                         _map->_first=SUBOWNED(_mapelement1,1);
                         _mapelement1->_next=SUBOWNED(_mapelement2,1);
@@ -873,11 +897,11 @@ Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4&&_mapelement5){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(OWNED(_getVariable(name1,VT_TOKEN,true),owner),2);
-                    _mapelement2->_variable=SUBOWNED(OWNED(_getVariable(name2,VT_TOKEN,true),owner),2);
-                    _mapelement3->_variable=SUBOWNED(OWNED(_getVariable(name3,VT_TOKEN,true),owner),2);
-                    _mapelement4->_variable=SUBOWNED(OWNED(_getVariable(name4,VT_TOKEN,true),owner),2);
-                    _mapelement5->_variable=SUBOWNED(OWNED(_getVariable(name5,VT_TOKEN,true),owner),2);
+                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,VT_TOKEN,true,owner),2);
+                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_TOKEN,true,owner),2);
+                    _mapelement3->_variable=SUBOWNED(_getVariableWithName(name3,VT_TOKEN,true,owner),2);
+                    _mapelement4->_variable=SUBOWNED(_getVariableWithName(name4,VT_TOKEN,true,owner),2);
+                    _mapelement5->_variable=SUBOWNED(_getVariableWithName(name5,VT_TOKEN,true,owner),2);
                     if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable&&_mapelement5->_variable){
                         _map->_first=SUBOWNED(_mapelement1,1);
                         _mapelement1->_next=SUBOWNED(_mapelement2,1);
@@ -995,7 +1019,7 @@ void checkList(Mlist* _list){
     }
     // MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
     if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
-    outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count);
+    // outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count); // DEBUG
     // if replacing i.e. the index of _listelement matches index, we're done
     // if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
     if(_listelement->index!=index){ // insert or append
@@ -1087,13 +1111,13 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                 if(!_mapelement){ // not found
                     _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
-                        // MDH@09JUN2020: owned by owner until we put it in the map
+                        // MDH@09JUN2020: we can immediately set the owner of _variable to be in the map because if we succeed in creating it that's where it will go
                         // MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
                         // MDH@25MAY2020: we're disowning _variable because we 
-                        Mvariable* _variable=OWNED(_getVariable(attributeName,VT_UNDEFINED,false),owner); // TODO why would this 'variable' be mutable, and allowing all values????
+                        Mvariable* _variable=_getVariableWithName(attributeName,VT_UNDEFINED,false,Msubowner(owner_map,2)); // TODO why would this 'variable' be mutable, and allowing all values????
                         if(_variable){ // the variable was created so attach in map
                              // pass ownership of _mapelement to _map at the first sublevel
-                            _mapelement->_variable=SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_map),2); // pass ownership of _variable to the mapelement at the second sublevel in the map
+                            _mapelement->_variable=_variable; // pass ownership of _variable to the mapelement at the second sublevel in the map
                             if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
                             _map->_last=SUBOWNED(OWNED(DISOWNED(_mapelement,owner),owner_map),1);
                             _map->numberOfElements++;

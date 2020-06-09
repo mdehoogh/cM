@@ -242,7 +242,7 @@ Mvalue* __value(char const * const descriptor); // TODO expose __value()????? ye
 size_t getNumberOfRemovedValues(bool showInfo);
 unsigned long long getNumberOfValues();
 
-Mvariable* _getVariable(const char* name,Mvaluetype valuetype,bool immutable);
+Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
 void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner);
 
 bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner);

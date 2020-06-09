@@ -758,7 +758,8 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
                 if(_variableMapelement){
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
-                    _variable=(Mvariable*)OWNED(_getVariable(name,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
+                    // MDH@08JUN2020: _getVariable() adjusted to accept an Mchars* properly owned to start with (and freed automatically on failure)
+                    _variable=(Mvariable*)OWNED(_getVariable(OWNED(_getChars(name),owner),(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
                     // store the references
                     _variableMapelement->_next=NULL;
                     SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_environment),3); // TODO is this the best way to do that?
@@ -780,6 +781,7 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
         if(!propertySeparator)return(_variable?true:false); // if not a property reference we're done anyway (and the result depends on whether or not _variable is NULL)
         // ASSERT some property reference, and we have to undo the '\0' character placement
         property[propertySeparator-property]=M_PROPERTY_SEPARATOR_CHARACTER;
+        Mallocationowner owner_variablemapelement=Msubowner(owner_environment,2),owner_variable=Msubowner(owner_environment,3),owner_variablename=Msubowner(owner_environment,4); // MDH@09JUN2020: the owner of the variable name
         while(_variable){
             // if the variable does not have a value
             if(!_variable->_value)assignValue(&_variable->_value,_getMapValue(VT_UNDEFINED,false));
@@ -799,17 +801,30 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
                 Mmapelement* _variableMapelement=(Mmapelement*)MALLOC_1(sizeof(Mmapelement),'m',owner);
                 if(_variableMapelement){
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
-                    // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
-                    _variable=(Mvariable*)OWNED(_getVariable(property,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
-                    // store the references
-                    _variableMapelement->_next=NULL;
-                    _variableMapelement->_variable=(Mvariable*)SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_environment),3);
-                    Mmapelement* _lastVariableMapelement=map->_last;
-                    SUBOWNED(OWNED(DISOWNED(_variableMapelement,owner),owner_environment),2); // TODO
-                    if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else map->_first=_variableMapelement;
-                    map->_last=_variableMapelement;
-                    map->numberOfElements++;
-                    if(amVerbose())output("Property '%s' added.\n",property);
+                    Mchars* _variablename=OWNED(_getChars(property),owner); // technically I am the one that has to disown it
+                    if(_variablename){
+                        // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
+                        _variable=(Mvariable*)OWNED(_getVariable(_variablename,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
+                        // store the references
+                        if(_variable){
+                            _variableMapelement->_next=NULL;
+                            _variableMapelement->_variable=(Mvariable*)OWNED(DISOWNED(_variable,owner),owner_variable);
+                            Mmapelement* _lastVariableMapelement=map->_last;
+                            if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else map->_first=_variableMapelement;
+                            map->_last=_variableMapelement;
+                            OWNED(DISOWNED(_variableMapelement,owner),owner_variablemapelement);
+                            OWNED(_variable->_name,owner_variablename); // MDH@09JUNE2020: assuming _variablename is now bound
+                            map->numberOfElements++;
+                            if(amVerbose())
+                                output("Property '%s' added.\n",property);
+                        }else{
+                            freeChars(_variablename,owner); // _variablename NOT bound, so has to be freed
+                            output("%sFailed to add property '%s'.\n",property);
+                        }
+                    }else{
+                        _variable=NULL;
+                        outputError("Failed to create the property variable name.");
+                    }
                 }else{ // failure
                     _variable=NULL;
                     output("%sFailed to create a new map element to store property '%s'.",M_ERROR_PREFIX,property);
