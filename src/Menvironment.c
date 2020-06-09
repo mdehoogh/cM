@@ -759,20 +759,29 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
                     // MDH@08JUN2020: _getVariable() adjusted to accept an Mchars* properly owned to start with (and freed automatically on failure)
-                    _variable=(Mvariable*)OWNED(_getVariable(OWNED(_getChars(name),owner),(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
-                    // store the references
-                    _variableMapelement->_next=NULL;
-                    SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_environment),3); // TODO is this the best way to do that?
-                    _variableMapelement->_variable=_variable;
-                    Mmapelement* _lastVariableMapelement=map->_last;
-                    SUBOWNED(OWNED(DISOWNED(_variableMapelement,owner),owner_environment),2);
-                    if(_lastVariableMapelement!=NULL)
-                        _lastVariableMapelement->_next=_variableMapelement;
-                    else 
-                        map->_first=_variableMapelement;
-                    map->_last=_variableMapelement;
-                    map->numberOfElements++;
-                    if(amVerbose())output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
+                    Mchars* _variableName=OWNED(_getChars(name),owner);
+                    if(_variableName){
+                        _variable=(Mvariable*)OWNED(_getVariable(_variableName,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
+                        if(_variable){
+                            // store the references
+                            _variableMapelement->_next=NULL;
+                            SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_environment),3); // TODO is this the best way to do that?
+                            SUBOWNED(OWNED(DISOWNED(_variable->_name,owner),owner_environment),4); // bound name one level below what we did to the variable
+                            _variableMapelement->_variable=_variable;
+                            Mmapelement* _lastVariableMapelement=map->_last;
+                            SUBOWNED(OWNED(DISOWNED(_variableMapelement,owner),owner_environment),2);
+                            if(_lastVariableMapelement!=NULL)
+                                _lastVariableMapelement->_next=_variableMapelement;
+                            else 
+                                map->_first=_variableMapelement;
+                            map->_last=_variableMapelement;
+                            map->numberOfElements++;
+                            if(amVerbose())output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
+                        }else{
+                            freeChars(_variableName,owner_environment);
+                        }
+                    }else
+                        output("%sFailed to create variable name '%s'.\n",M_ERROR_PREFIX,name);
                 }else
                     output("%sFailed to create a new map element for variable '%s'.",M_ERROR_PREFIX,name);
             }else
@@ -1093,7 +1102,7 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true,owner);break;}
                 // probably can't simply assign??? let's use _strdup then 
                 // MDH@17APR2020: _strdup() replaced by _getChars() as on so many other places today
-                _argumentmapelement->_variable->_name=_getChars(functionParameterMapelement->_variable->_name->chars);
+                _argumentmapelement->_variable->_name=SUBOWNED(OWNED(_getChars(functionParameterMapelement->_variable->_name->chars),owner),1); // MDH@09JUN2020: OOPS make the right owner
                 if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true,owner);break;}
                 // associate the argument list element value (if available)
                 // MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)
@@ -1115,7 +1124,7 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
         }
         if(amVerbose())outputInfo("Argument map created.");
     }
-    return _functionArgumentMap;
+    return DISOWNED(_functionArgumentMap,owner); // MDH@09JUN2020 OOPS forgot to disown prev.
 }/* VALIDATED */
 
 // newFunction renamed to _getFunction(), not to be confused with getFunction()

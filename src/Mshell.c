@@ -3047,7 +3047,7 @@ FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){Ma
 	if(functionName){
 		_functionBodyRequest=CALLOC_1(sizeof(FunctionBodyRequest),'9',owner);
 		if(_functionBodyRequest){
-			_functionBodyRequest->_functionName=_getChars(functionName);
+			_functionBodyRequest->_functionName=SUBOWNED(OWNED(_getChars(functionName),owner),1);
 			if(!_functionBodyRequest->_functionName){
 				FREE_1(_functionBodyRequest,'9',owner);_functionBodyRequest=NULL;
 			}
@@ -4239,7 +4239,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				//                so it's much similar to an unindexed variable at the moment
 				//                for now the only thing we're going to do is store the name of the reference (i.e. starting with @) (without value) so that whoever uses it will know how to resolve it!!!
 				// MDH@17APR2020: here we go again
-				_valueReference->_name=_getChars(_significantTokenText);
+				_valueReference->_name=SUBOWNED(OWNED(_getChars(_significantTokenText),owner),1); // MDH@09JUN2020: OOPS ownership again
 				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerboseDebugging())
 					output("Value reference referenced variable name: '%s'.\n",_valueReference->_name->chars);
