@@ -7308,7 +7308,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					// release the applied operator, and replace it by the successor operator
 					// MDH@14MAY2020: if we make a copy of the next operator we can free the disconnected formula element entirely
 					free_string(_formulaelement->_operator,owner); // TODO is owner correct?
-					_formulaelement->_operator=_getString(string(nextformulaelement->_operator));
+					_formulaelement->_operator=OWNED(_getString(string(nextformulaelement->_operator)),owner); // MDH@09JUN2020: do NOT forget to obtain ownership of the next operator
 					nextformulaelement->_next=NULL;free_formulaelement(nextformulaelement,owner); // NULL next of the nextformulaelement so it won't free all successive formula elements left to be applied
 					formulaElementCount--;
 					/* replacing:
