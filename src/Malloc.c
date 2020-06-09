@@ -793,7 +793,7 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
                 allocations._owners[_alloc->allocationIndex].owner.disowned=1; // replacing: _owner->disowned=1;
                 _alloc->owner.disowned=1; // TODO we might have to comment this out in due course
             }else
-                bug("\tUnable to remove ownership %s:%u(%s%u%s%s) of a memory allocation: it is owned by (%s:%u,%u,%u,%u,%u)."
+                bug("\tUnable to remove ownership %s:%u(%s%u%s%s) of a memory allocation: it is owned by %s:%u(%s%u%s%s)."
                     ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
                     ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
                     );

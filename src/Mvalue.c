@@ -113,7 +113,8 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
     }
     if(_mapelement->_variable){
         if(_mapelement->_variable->_name){
-            if(amVerboseDebugging())output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
+            if(amVerboseDebugging())
+                output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
         }else
             outputWarning("Unnamed map attribute!");
         free_variable(_mapelement->_variable,weak,owner);
@@ -126,7 +127,7 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
 }/* VALIDATED */
 void free_map(Mmap* _map,Mallocationowner owner){
     if(amVerboseDebugging())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
-    if(_map->_first){free_mapelement(_map->_first,_map->weak,owner);_map->_first=NULL;}else outputInfo("No map attributes to free!");
+    if(_map->_first){free_mapelement(_map->_first,_map->weak,Msubowner(owner,1));_map->_first=NULL;}else outputInfo("No map attributes to free!");
     FREE_1(_map,'M',owner);
 }/* VALIDATED */
 
@@ -520,7 +521,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
         _map->weak=weak;
         _map->valuetype=mapValuetype;
         _mapValue->type=VT_MAP;
-        _mapValue->value._map=(Mmap*)SUBOWNED(OWNED(_map,getValueOwner()),1);
+        _mapValue->value._map=(Mmap*)SUBOWNED(OWNED(DISOWNED(_map,owner),getValueOwner()),1);
     }else
         free_map(_map,owner);
     return _mapValue;
@@ -994,6 +995,7 @@ void checkList(Mlist* _list){
     }
     // MDH@02NOV2019: if the list is flagged as weak we do not (de)reference values (and copy lists and maps as assignValue() does)
     if(_list->weak)_listelement->_value=_value;else assignValue(&_listelement->_value,_value); // ALWAYS assign (even when replacing)
+    outputValue("Count of value '",_value,"' added to list:");output("%zd\n",_listelement->_value->count);
     // if replacing i.e. the index of _listelement matches index, we're done
     // if index equals 0 it WILL be equal to _listelement->index (which is initialized to 0 for sure)
     if(_listelement->index!=index){ // insert or append
@@ -1085,14 +1087,15 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                 if(!_mapelement){ // not found
                     _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
+                        // MDH@09JUN2020: owned by owner until we put it in the map
                         // MDH@12MAR2020: I suppose we would like to be able to change the map property value (now using dot notation as well), so the mutable flag should be true not false
                         // MDH@25MAY2020: we're disowning _variable because we 
                         Mvariable* _variable=OWNED(_getVariable(attributeName,VT_UNDEFINED,false),owner); // TODO why would this 'variable' be mutable, and allowing all values????
                         if(_variable){ // the variable was created so attach in map
-                            SUBOWNED(OWNED(DISOWNED(_mapelement,owner),owner_map),1); // pass ownership of _mapelement to _map at the first sublevel
-                            _mapelement->_variable=SUBOWNED(OWNED(_variable,owner_map),2); // pass ownership of _variable to the mapelement at the second sublevel in the map
+                             // pass ownership of _mapelement to _map at the first sublevel
+                            _mapelement->_variable=SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_map),2); // pass ownership of _variable to the mapelement at the second sublevel in the map
                             if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
-                            _map->_last=_mapelement;
+                            _map->_last=SUBOWNED(OWNED(DISOWNED(_mapelement,owner),owner_map),1);
                             _map->numberOfElements++;
                             // result=M_TRUE; // success
                         }else{ // we have a map element BUT no variable, so no go

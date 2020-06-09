@@ -2799,25 +2799,28 @@ bool registerCommandEvaluation(char const * const commandText,Mvalue* evaluation
 	if(M_value){
 		Mlist* M_list=(M_value->type==VT_LIST?M_value->value._list:NULL);
 		if(M_list){
-			Mallocationowner owner_M_list=Msubowner(owner_M_value,1); // MDH@25MAY2020: the owner of M_list
-			Mvalue* commandresultValue=OWNED(_getMapValue(VT_UNDEFINED,false),owner); // the map that is to contain the command text and its result value text
+			// we know M_list is a list stored in an Mvalue which has owner getValueOwner()
+			Mallocationowner owner_M_list=Msubowner(getValueOwner(),1); // MDH@25MAY2020: the owner of M_list
+			Mvalue* commandresultValue=_getMapValue(VT_UNDEFINED,false); // the map that is to contain the command text and its result value text
 			if(commandresultValue){
 				// NOTE we're wrapping the first token of the command into a value which is dangerous because when the list is freed, the token shouldn't!!
 				//      so theoretically that value is weak, whereas the evaluation result is strong
 				// TODO find a way to fix this!!!
-				Mtext* _commandText=OWNED(_getText(commandText),owner); // MDH@25MAY2020: when we are wrapping the command text we need to get a copy!!!! NOTE string() is used on an Mstring to pass in the characters in the command text, so we can NOT use that itself as it is owned by the Mstring
-				Mvalue* _commandTextValue=OWNED(_getTextValue(commandText),owner); // TODO _getTextValue expects a char * so why do we need _commandText?????
-				Mallocationowner owner_map=Msubowner(owner,1);
+				// Mtext* _commandText=OWNED(_getText(commandText),owner); // MDH@25MAY2020: when we are wrapping the command text we need to get a copy!!!! NOTE string() is used on an Mstring to pass in the characters in the command text, so we can NOT use that itself as it is owned by the Mstring
+				Mvalue* _commandTextValue=_getTextValue(commandText); // TODO _getTextValue expects a char * so why do we need _commandText?????
+				Mallocationowner owner_map=Msubowner(getValueOwner(),1); // MDH@09JUN2020: what we can safely assume
 				long long commandTextValueMapIndex=appendedToMap(commandresultValue->value._map,owner_map,"c",_commandTextValue);
 				if(commandTextValueMapIndex==M_TRUE){
-					if(appendedToMap(commandresultValue->value._map,owner_map,"v",evaluationresultValue)==M_TRUE){
-						if(appendedToList(M_list,owner_M_list,DISOWNED(commandresultValue,owner),commandIndex)==M_TRUE)
+					if(appendedToMap(commandresultValue->value._map,owner_map,"v",evaluationresultValue)>0){
+						if(appendedToList(M_list,owner_M_list,commandresultValue,M_LL_INVALID)>0)
 							return true;
-						if(removedFromMap(commandresultValue->value._map,owner_map,"v")!=M_TRUE)
+						outputError("Failed to append the command result to the result list.");
+						if(removedFromMap(commandresultValue->value._map,owner_map,"v")<=0)
 							outputBug("Failed to remove the result value text from the failed command result registration.");
-					}
+					}else
+						outputError("Failed to append the command result text and result to the result list.");
 					// DONE:TODO remove from the map again
-					if(removedFromMap(commandresultValue->value._map,owner_map,"c")!=M_TRUE)
+					if(removedFromMap(commandresultValue->value._map,owner_map,"c")<=0)
 						outputBug("Failed to remove the command text from the failed command result registration.");
 				}
 				// we may expect _commandTextValue to be repossed by the garbage collector as the text failed to be stored
