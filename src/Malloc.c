@@ -918,13 +918,22 @@ void Mvfree(){
 */
 // MDH@20APR2020: unfortunately we need to know the size of what was allocated which is easy for fixed size allocation but problematic for variable size records
 //                unless we assume that Mfree is always called on fixed size allocations which require that a single item is allocated each time, so we don't need nitems on Mmalloc and Mcalloc
-void Mfree(void const * const ptr,long long count,signed char allocationType,Mallocationowner owner){
+void Mfree(void const * const ptr,long long count,signed char allocationType/*,Mallocationowner owner*/){
     if(!ptr||allocationType==0||count<=0)return;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
     info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
-    info("%p: owned by %s:%u(%s%u%s%s) being freed by %s:%u(%s%u%s%s).\n",_alloc
+    info("%p: owned by %s:%u(%s%u%s%s) being freed.\n",_alloc // replacing: by %s:%u(%s%u%s%s).\n",_alloc
         ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
-        ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]);
+        // ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
+        );
+    // only disowned stuff can be freed!!!!!
+    if(_alloc->owner.disowned==0)
+        bug("\tStill disowned!");
+    if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
+        if(allocations._owners[_alloc->allocationIndex].owner.freed!=0)
+            bug("\tFreed before!");
+    }else
+        bug("Invalid allocation index %i.",_alloc->allocationIndex);
     /////info("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     // MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
@@ -974,7 +983,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,Mal
         if(allocations._owners[_alloc->allocationIndex].type!=allocationType){
             bug("\tAllocation type of dynamic memory '%c' (=%i) (at index %i) does not match provided allocation type '%c' (=%i).",allocations._owners[_alloc->allocationIndex].type,allocations._owners[_alloc->allocationIndex].type,_alloc->allocationIndex,allocationType,allocationType);
             dump(ptr,size*count,size);
-        }else
+        /*}else
         if(allocations._owners[_alloc->allocationIndex].owner.level!=owner.level+1&&(allocations._owners[_alloc->allocationIndex].owner.id!=owner.id||allocations._owners[_alloc->allocationIndex].owner.module!=owner.module)){
             Mallocationowner* _allocationowner=&(allocations._owners[_alloc->allocationIndex].owner);
             bug("\tAllocation owner of dynamic memory %s:%u(%s%u%s%s) (at index %i) does not match owner %s:%u(%s%u%s%s) trying to free the memory of type '%c' (=%i)."
@@ -983,6 +992,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType,Mal
             ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
             ,allocationType,allocationType);
             dump(ptr,size*count,size);
+        */
         }else{
             // MDH@07JUN2020: it's going to suffice (see below) to set the freed flag once done (see the line below)
             /* replacing:

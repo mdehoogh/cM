@@ -25,7 +25,7 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner){
     if(_variable->_name)freeChars(_variable->_name,owner); // dynamically allocated (indicated by _) so we should free it...
     if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
-    FREE_1(_variable,'V',owner);
+    FREE_DISOWNED_1(_variable,'V',owner);
 }/* VALIDATED */
 // MDH@09JUN2020: if we want the name of the variable to be subowned by the caller, it's better to pass in a properly owned Mchars name, which we can subown
 //                it's a bit of a nuisance that we create it in such a way that the caller has to take care of the ownership of _name but that makes sense because we pass in Mchars (which is already managed)
@@ -83,7 +83,7 @@ bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owne
     if(_listelement){
         if(_listelement->_next){free_listelement(_listelement->_next,weak,owner);_listelement->_next=NULL;}
         if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
-        FREE_1(_listelement,'l',owner);
+        FREE_DISOWNED_1(_listelement,'l',owner);
         return true;
     }
     return false;
@@ -105,11 +105,11 @@ void free_list(Mlist* _list,Mallocationowner owner){
     {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
     if(_list->_first){
         // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters
-        if(_list->_creator)freeChars(_list->_creator,owner);// MDH@17APR2020 replacing: FREE_1(_list->_creator,'"');
+        if(_list->_creator)freeChars(_list->_creator,owner);// MDH@17APR2020 replacing: FREE_DISOWNED_1(_list->_creator,'"');
         free_listelement(_list->_first,_list->weak,owner);
         _list->_first=NULL;
     }
-    FREE_1(_list,'L',owner);
+    FREE_DISOWNED_1(_list,'L',owner);
 }/* VALIDATED */
 
 bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
@@ -130,7 +130,7 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
         _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
     }else
         outputWarning("No map attribute to free!");
-    FREE_1(_mapelement,'m',owner);
+    FREE_DISOWNED_1(_mapelement,'m',owner);
     if(amVerboseDebugging())outputInfo("\tMap element freed!");
     return true;
 }/* VALIDATED */
@@ -143,7 +143,7 @@ void free_map(Mmap* _map,Mallocationowner owner){
     }else
     if(amVerboseDebugging()) 
         outputInfo("No map attributes to free!");
-    FREE_1(_map,'M',owner);
+    FREE_DISOWNED_1(_map,'M',owner);
 }/* VALIDATED */
 
 // MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
@@ -153,7 +153,7 @@ void free_valuereference(Mvaluereference* _valuereference,Mallocationowner owner
     if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
     */
     if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
-    FREE_1(_valuereference,'5',owner); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
+    FREE_DISOWNED_1(_valuereference,'5',owner); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
 }/* VALIDATED */
 
 // manage a list of created values
@@ -186,7 +186,7 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
             _valueListelement->index=_valueList->numberOfElements;
             if(descriptor)if(amVerbose()&&amDebugging())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
         }else // couldn't get a new value, so free the value list element immediately
-            FREE_1(_valueListelement,'l',owner);
+            FREE_DISOWNED_1(_valueListelement,'l',owner);
     }
     if(!_value)outputError("Failed to create value!"); // serious enough to report
     return _value;
@@ -214,7 +214,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
             case VT_ENVIRONMENT:if(_value->value._environment){free_environment(_value->value._environment,owner_value_data);_value->value._environment=NULL;}break;
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
-        FREE_1(_value,'X',owner_value);
+        FREE_DISOWNED_1(_value,'X',owner_value);
         if(amVerboseDebugging())output("\tValue of type '%s' freed.\n",VALUETYPENAMES[_value->type]);
     }else
         outputBug("No value to free!");
@@ -268,7 +268,7 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
                     /* MDH@11NOV2019: let's decide NOT to decrement numberOfElements meaning that we NOW use numberOfElements to always have a unique index for every value ever added to it!!!
                     if(_valueList->numberOfElements>0)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
                     */
-                    FREE_1(_valueListelement,'l',owner_valueListelement);
+                    FREE_DISOWNED_1(_valueListelement,'l',owner_valueListelement);
                 }
                 // next to check!!!
                 _valueListelement=_nextValueListelement;
@@ -341,7 +341,7 @@ void free_reference(Mreference* reference,Mallocationowner owner_reference){
         else
             reference->variable->referencecount--;
     }
-    FREE_1(reference,'Q',owner_reference);
+    FREE_DISOWNED_1(reference,'Q',owner_reference);
 }
 Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference){
     // MDH@19MAY2020: should we check whether _reference is ownable???????
@@ -632,7 +632,7 @@ Mmap* _getMap(char* name){if(!name)return NULL;Mallocationowner owner=getOwner(_
                 _map->_last=_mapelement;
                 return DISOWNED(_map,owner);
             }
-            FREE_1(_mapelement,'m',owner); // MDH@11NOV2019: no need to call free_mapelement() 
+            FREE_DISOWNED_1(_mapelement,'m',owner); // MDH@11NOV2019: no need to call free_mapelement() 
         }
         free_variable(_variable,false,owner);
     }else
@@ -2309,7 +2309,7 @@ bool free_function(Mfunction* _function,Mallocationowner owner_function){
         /////// MDH@10JUL2019: moved over to the map element containing the function! free_string(_function->_name);
         free_map(_function->_parameterMap,owner_function);
         if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction,owner_function);
-        FREE_1(_function,'F',owner_function);
+        FREE_DISOWNED_1(_function,'F',owner_function);
         return true;
     }
     return false;
@@ -2319,7 +2319,7 @@ bool free_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocatio
         if(free_functionmapelement(_functionmapelement->_next,owner_functionmapelement))_functionmapelement->_next=NULL;
         if(free_function(_functionmapelement->_function,owner_functionmapelement)){
             free_string(_functionmapelement->_name,owner_functionmapelement);
-            FREE_1(_functionmapelement,'f',owner_functionmapelement);
+            FREE_DISOWNED_1(_functionmapelement,'f',owner_functionmapelement);
             return true;
         }
     }
@@ -2328,7 +2328,7 @@ bool free_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocatio
 void free_functionmap(Mfunctionmap* _functionmap,Mallocationowner owner_functionmap){
     if(_functionmap){
         free_functionmapelement(_functionmap->_first,Msubowner(owner_functionmap,1));
-        FREE_1(_functionmap,'F',owner_functionmap);
+        FREE_DISOWNED_1(_functionmap,'F',owner_functionmap);
     }
 }// VALIDATED
 // MDH@20JUL2019: might never get called, wel perhaps on internal functions when it goes out of scope???????
@@ -2338,7 +2338,7 @@ void free_userfunction(Muserfunction* _userfunction,Mallocationowner owner_userf
         // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
         free_list(_userfunction->_bodyCommandList,owner_userfunction);
         // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
-        FREE_1(_userfunction,'U',owner_userfunction);
+        FREE_DISOWNED_1(_userfunction,'U',owner_userfunction);
     }
 }/* VALIDATED */
 // END RELEASERS
@@ -2364,7 +2364,7 @@ void free_environment(Menvironment* _environment,Mallocationowner owner_environm
                           freeing the execution environment)
         if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
         */
-        FREE_1(_environment,'E',owner_environment);
+        FREE_DISOWNED_1(_environment,'E',owner_environment);
     }
 }/* VALIDATED */
 Menvironment* getEnvironmentParent(Menvironment* _environment){

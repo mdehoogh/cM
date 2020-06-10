@@ -381,14 +381,14 @@ size_t free_userinputline(){
 	while(_userinputline){
 		numberOfUserInputLines++;
 		prevUserinputline=_userinputline->_prev;
-		FREE_1(_userinputline,'6',owner_userinputline);
+		FREE_DISOWNED_1(_userinputline,'6',owner_userinputline);
 		_userinputline=prevUserinputline;
 	}
 	return numberOfUserInputLines;
 }
 void removeUserinputline(){
 	Muserinputline* prevUserinputline=_userinputline->_prev;
-	FREE_1(_userinputline,'6',owner_userinputline);
+	FREE_DISOWNED_1(_userinputline,'6',owner_userinputline);
 	_userinputline=prevUserinputline;
 }
 // MDH@30OCT2019 END
@@ -633,7 +633,7 @@ void free_tokenautocompletiontext(Mtokenautocompletiontext* _autocompletiontext,
 	if(!_autocompletiontext)return;
 	if(_autocompletiontext->_next)free_tokenautocompletiontext(_autocompletiontext->_next,owner);
 	if(_autocompletiontext->_text)freeChars(_autocompletiontext->_text,owner); // MDH@02MAY2020: switching to freeChars() given that _getChars() was used to create it
-	FREE_1(_autocompletiontext,'7',owner); // MDH@07APR2020: _autocompletiontext is an Mstring* so release as 'S'
+	FREE_DISOWNED_1(_autocompletiontext,'7',owner); // MDH@07APR2020: _autocompletiontext is an Mstring* so release as 'S'
 }
 
 // MDH@04OCT2019: if we remember the immediate feed forward token we can determine whether or not we need to remove the associated feed forward text

@@ -101,7 +101,7 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char type/*,Mallocationowner owner*/); // MDH@26MAY2020 from now on only to be used to reallocate variable-size types (with negative type)
-void Mfree(void const * const ptr,long long count,signed char type,Mallocationowner owner); // releasing a single item of a fixed size allocation type
+void Mfree(void const * const ptr,long long count,signed char type/*,Mallocationowner owner*/); // releasing a single item of a fixed size allocation type
 // I think we need these ones in here as well or otherwise pointer addresses are cut down to int values
 void* Mowned(void* ptr,Mallocationowner owner);
 void* Msubowned(void* ptr,uint8_t level);
@@ -111,7 +111,7 @@ void* Mdisowned(void* ptr,Mallocationowner owner);
 // use the substitutes
 #define MALLOC(size,count,type,owner) Mmalloc((size),(count),(type),(owner))
 #define CALLOC(size,count,type,owner) Mcalloc((size),(count),(type),(owner))
-#define FREE(ptr,count,type,owner) Mfree((ptr),(count),(type),(owner))
+#define FREE(ptr,count,type) Mfree((ptr),(count),(type))
 #define REALLOC(ptr,from_count,to_count,size,type) Mrealloc((ptr),(from_count),(to_count),(size),(type))
 #define DISOWNED(ptr,owner) Mdisowned((ptr),(owner))
 #define OWNED(ptr,owner) Mowned((ptr),(owner))
@@ -120,7 +120,7 @@ void* Mdisowned(void* ptr,Mallocationowner owner);
 // use the system methods
 #define MALLOC(size,type,owner) malloc((nitems)*(size))
 #define CALLOC(size,type,owner) calloc(1,(size))
-#define FREE(ptr,type,owner) free(ptr)
+#define FREE(ptr,count,type) free(ptr)
 #define REALLOC(ptr,from_nitems,to_nitems,size,type) realloc((ptr),(to_nitems)*(size))
 #define DISOWNED(ptr,owner) (ptr)
 #define OWNED(ptr,owner) (ptr)
@@ -130,7 +130,8 @@ void* Mdisowned(void* ptr,Mallocationowner owner);
 // some shortcuts
 #define MALLOC_1(size,type,owner) MALLOC(size,1,type,owner)
 #define CALLOC_1(size,type,owner) CALLOC(size,1,type,owner)
-#define FREE_1(ptr,type,owner) FREE(ptr,1,type,owner)
+#define FREE_DISOWNED(ptr,count,type,owner) FREE((DISOWNED(ptr,owner)),count,type)
+#define FREE_DISOWNED_1(ptr,type,owner) FREE((DISOWNED(ptr,owner)),1,type)
 
 // MDH@04MAY2020: asking for the allocation type sizes
 // MDH@07MAY2020: we could pass back all the allocation values of all the marks

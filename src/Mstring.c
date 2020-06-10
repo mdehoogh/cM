@@ -28,7 +28,7 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
         // MDH@16APR2020: using Mchars* instance
         // MDH@03MAY2020 OOPS the size should go first!!!
         ans->_chars=(Mchars*)SUBOWNED(OWNED(__chars(M_BLOCK_SIZE,1,'s'),owner),1);
-        if(!ans->_chars){FREE_1(ans,'S',owner);return NULL;}
+        if(!ans->_chars){FREE_DISOWNED_1(ans,'S',owner);return NULL;}
         //OWNED(ans->_chars,owner);SUBOWNED(ans->_chars,1);
         ans->blocks=1;
         // printf("String contents allocated...\n");
@@ -59,7 +59,7 @@ Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE
             ans->blocks=blocks;
             memcpy(ans->_chars->chars,s,ans->length); // copy the actual characters over!!! // replacing: while(true){ans->chars[l]=s[l];if(l==0)break;l--;} // copying the characters over... TODO there's a faster way to do this of course
         }else{ // failure
-            FREE_1(ans,'S',owner);ans=NULL;
+            FREE_DISOWNED_1(ans,'S',owner);ans=NULL;
         }
         /* replacing:
         ans->blocks=(l/BLOCK_SIZE); // NOTE that s actually is strlen(s)+1 characters (including the '\0' at the end)
@@ -126,7 +126,7 @@ Mstring* free_string(Mstring* str,Mallocationowner owner_str){
         // MDH@22MAY2020: subpointers can be disowned by passing in the superpointer owner i.e. it is NOT necessary to pass in it's own owner id (which indicates it is a subpointer)
         free_chars(str->_chars,owner_str,M_BLOCK_SIZE,str->blocks,'s');
         // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
-        FREE_1(str,'S',owner_str);
+        FREE_DISOWNED_1(str,'S',owner_str);
         return NULL;
     }
     return str;

@@ -882,7 +882,7 @@ Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner){
     return _rational;
 }/*VALIDATED*/
 void free_rational(Mrational* _rational,Mallocationowner owner){
-    FREE_1(cleared_rational(_rational,owner),'R',owner); // MDH@24MAY2020: now easily solved by freeing the cleared_rational
+    FREE_DISOWNED_1(cleared_rational(_rational,owner),'R',owner); // MDH@24MAY2020: now easily solved by freeing the cleared_rational
 }/* VALIDATED */
 
 // TODO should we free the given big integers when they are NOT bound to the rational that is being returned????

@@ -16,5 +16,5 @@ void free_token(Mtoken* _token,Mallocationowner owner){
         if(amVerboseDebugging())output("Freeing token '%s'.\n",string(_token->text));
         free_string(_token->text,owner);_token->text=NULL;
     }
-    FREE_1(_token,'O',owner);
+    FREE_DISOWNED_1(_token,'O',owner);
 }

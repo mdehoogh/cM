@@ -101,11 +101,11 @@ void free_biginteger(Mbiginteger* biginteger,Mallocationowner owner_biginteger){
         if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
 #ifndef __PRODUCTION__
         mp_clear(biginteger->_bi);
-        FREE_1(biginteger->_bi,'b',owner_biginteger);
+        FREE_DISOWNED_1(biginteger->_bi,'b',owner_biginteger);
 #else
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
 #endif
-        FREE_1(biginteger,'B',owner_biginteger); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
+        FREE_DISOWNED_1(biginteger,'B',owner_biginteger); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
     }else
     if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
@@ -114,8 +114,8 @@ Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
     if(_biginteger){
 #ifndef __PRODUCTION__
         _biginteger->_bi=(mp_int*)SUBOWNED(CALLOC_1(sizeof(mp_int),'b',owner),1);
-        if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE_1(_biginteger->_bi,'b',owner);_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
-        if(!_biginteger->_bi){FREE_1(_biginteger,'B',owner);_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
+        if(_biginteger->_bi&&mp_init(_biginteger->_bi)!=MP_OKAY){FREE_DISOWNED_1(_biginteger->_bi,'b',owner);_biginteger->_bi=NULL;} // initialize the mp_int, when failing free the mp_int*
+        if(!_biginteger->_bi){FREE_DISOWNED_1(_biginteger,'B',owner);_biginteger=NULL;} // if we fail to allocate and/or initialize an mp_int dynamically, get rid of the biginteger too
 #else
         if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
 #endif
@@ -246,7 +246,7 @@ void free_text(Mtext* _text,Mallocationowner owner){
         // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
         //                _text->_c is an array and yes strlen() can be applied to any char*
         //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
-        FREE(_text,strlen(_text->_c)+sizeof(Mtext),-'"',owner); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
+        FREE_DISOWNED(_text,strlen(_text->_c)+sizeof(Mtext),-'"',owner); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
         // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
     }else
     if(amVerboseDebugging())
@@ -256,7 +256,7 @@ void free_integer(Minteger* _integer,Mallocationowner owner){
     if(_integer){
         if(amVerboseDebugging())
             output("Freeing integer %llu.\n",_integer->ll);
-        FREE_1(_integer,'I',owner);
+        FREE_DISOWNED_1(_integer,'I',owner);
     }else
     if(amVerboseDebugging())
         outputInfo("No integer to free!");
@@ -265,7 +265,7 @@ void free_float(Mfloat* _float,Mallocationowner owner){
     if(_float){
         if(amVerboseDebugging())
             output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
-        FREE_1(_float,'F',owner);
+        FREE_DISOWNED_1(_float,'F',owner);
     }else
     if(amVerboseDebugging())
         outputInfo("No real to free!");

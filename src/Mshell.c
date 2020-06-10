@@ -1312,7 +1312,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 void free_command(Mcommand* _command,Mallocationowner owner_command){
 	if(!_command)return;
 	if(_command->_firstToken)free_token(_command->_firstToken,Msubowner(owner_command,1)); // will free ALL connected tokens!!!
-	FREE_1(_command,'K',owner_command);
+	FREE_DISOWNED_1(_command,'K',owner_command);
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
@@ -1528,7 +1528,7 @@ Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
-				FREE_1(_command,'K',owner);_command=NULL;
+				FREE_DISOWNED_1(_command,'K',owner);_command=NULL;
 				if(amVerboseDebugging())
 					if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
 			}
@@ -2151,7 +2151,7 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 		while(*characters){
 			_indexCharacters=OWNED(_getIntegerCharacters(++index),owner);
 			appendedToMap(_dmap,owner,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owner),owner));
-			FREE_1(_indexCharacters,'\'',owner);
+			FREE_DISOWNED_1(_indexCharacters,'\'',owner);
 			characters++; // OOPS pretty essential
 		}
 	}else{
@@ -2161,7 +2161,7 @@ Mvalue* getTextDecimalMapValue(Mtext* text,bool ascendingindex){Mallocationowner
 			_indexCharacters=OWNED(_getIntegerCharacters(index--),owner);
 			characters--;
 			appendedToMap(_dmap,owner,_indexCharacters,DISOWNED(OWNED(_getIntegerValue(*characters),owner),owner));
-			FREE_1(_indexCharacters,'\'',owner);
+			FREE_DISOWNED_1(_indexCharacters,'\'',owner);
 		}
 		appendedToMap(_dmap,owner,"0",DISOWNED(OWNED(_getIntegerValue(text->presuffix),owner),owner)); // the quote character
 	}
@@ -3049,7 +3049,7 @@ FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){Ma
 		if(_functionBodyRequest){
 			_functionBodyRequest->_functionName=SUBOWNED(OWNED(_getChars(functionName),owner),1);
 			if(!_functionBodyRequest->_functionName){
-				FREE_1(_functionBodyRequest,'9',owner);_functionBodyRequest=NULL;
+				FREE_DISOWNED_1(_functionBodyRequest,'9',owner);_functionBodyRequest=NULL;
 			}
 		}
 	}
@@ -3058,7 +3058,7 @@ FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){Ma
 void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocationowner owner_functionBodyRequest){
 	if(!_functionBodyRequest)return;
 	freeChars(_functionBodyRequest->_functionName,owner_functionBodyRequest);
-	FREE_1(_functionBodyRequest,'9',owner_functionBodyRequest);
+	FREE_DISOWNED_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
 static FunctionBodyRequest *_firstFunctionBodyRequest=NULL,*_lastFunctionBodyRequest=NULL;Mallocationowner owner_functionBodyRequest=(Mallocationowner){MODULE_ID,__LINE__,1};
@@ -3115,7 +3115,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
-	FREE_1(_currentFunctionBodyInput,'H',owner_currentFunctionBodyInput);
+	FREE_DISOWNED_1(_currentFunctionBodyInput,'H',owner_currentFunctionBodyInput);
 	return false;
 }
 bool startFunctionBodyInput(){
@@ -3372,7 +3372,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																						else
 																							newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																					}/*else{
-																						//FREE_1(valueholders,'_');
+																						//FREE_DISOWNED_1(valueholders,'_');
 																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																					}*/
 																					free_string(_attributenameText,owner);
@@ -3469,7 +3469,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-						FREE_1(_valueholders,'_',owner);
+						FREE_DISOWNED_1(_valueholders,'_',owner);
 					}
 				}
 				/* replacing:
@@ -3703,7 +3703,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																					else
 																						newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
 																				}/*else{
-																					//FREE_1(valueholders,'_');
+																					//FREE_DISOWNED_1(valueholders,'_');
 																					_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																				}*/
 																				free_string(_attributenameText,owner);
@@ -3879,7 +3879,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 					}
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-					FREE_1(_valueholders,'_',owner);
+					FREE_DISOWNED_1(_valueholders,'_',owner);
 				}
 				/*
 				}else
@@ -7059,7 +7059,7 @@ size_t free_formulaelement(Mformulaelement* _formulaelement,Mallocationowner own
 		if(_formulaelement->_next)result+=free_formulaelement(_formulaelement->_next,owner_formulaelement);
 		if(_formulaelement->_operator)free_string(_formulaelement->_operator,owner_formulaelement);
 		if(_formulaelement->_operand)free_valuereference(_formulaelement->_operand,owner_formulaelement);
-		FREE_1(_formulaelement,'4',owner_formulaelement);
+		FREE_DISOWNED_1(_formulaelement,'4',owner_formulaelement);
 		result+=1; // another one
 		// output("FORMULA ELEMENT FREED: %zd:%zd.\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
 		// outputChar('.');
@@ -7317,7 +7317,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					free_valuereference(nextformulaelement->_operand);// free the consumed operand
 					nextformulaelement->_operand=NULL; // MDH@14MAY2020: it's prudent to NULL the pointer, so no-one will try to free the value reference again
 					if(nextformulaelement){
-						FREE_1(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
+						FREE_DISOWNED_1(nextformulaelement,'4'); // NOTE although it's operator is still pointing to something, it is still pointed to that Mstring (as we took that over), so it should NOT be released!!!!!!
 						formulaElementCount--; // one less to free!!!
 					}else
 						outputInfo("No formula element to free!");
@@ -7429,7 +7429,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				free_string(_formulaelement->_operator);
 				free_valuereference(_formulaelement->_operand);
 				_nextformulaelement=_formulaelement->_next;
-				FREE_1(_formulaelement,'4'); // OOPS have to call FREE here not free()
+				FREE_DISOWNED_1(_formulaelement,'4'); // OOPS have to call FREE here not free()
 				outputChar('.');
 				_formulaelement=_nextformulaelement;
 			}

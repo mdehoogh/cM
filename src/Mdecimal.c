@@ -25,7 +25,7 @@ void free_sincoselement(Msincoselement* _sincoselement,Mallocationowner owner_si
     if(_sincoselement){
 		if(_sincoselement->_next)free_sincoselement(_sincoselement->_next,owner_sincoselement); // unlikely though
         free_mpd(_sincoselement->_angle);free_mpd(_sincoselement->_sine);free_mpd(_sincoselement->_cosine); // MDH@20MAY2020: TODO whoever calls free_sincoselement needs to disown it first
-		FREE_1(_sincoselement,'#',owner_sincoselement);
+		FREE_DISOWNED_1(_sincoselement,'#',owner_sincoselement);
     }
 }
 
@@ -43,7 +43,7 @@ mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){Mallocationowner owne
 
 void free_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner_decimalcontext){
 	if(!_decimalcontext)return;
-	if(_decimalcontext->mpd_context)FREE_1(_decimalcontext->mpd_context,'c',owner_decimalcontext);
+	if(_decimalcontext->mpd_context)FREE_DISOWNED_1(_decimalcontext->mpd_context,'c',owner_decimalcontext);
 	if(_decimalcontext->pi)free_mpd(_decimalcontext->pi);
 	if(_decimalcontext->pimul2)free_mpd(_decimalcontext->pimul2);
 	if(_decimalcontext->pidiv2)free_mpd(_decimalcontext->pidiv2);
@@ -54,7 +54,7 @@ void free_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner
 	for(int index=256;index>=0;index--)if(_decimalcontext->predefinedsines[index])free_mpd(_decimalcontext->predefinedsines[index]);
 	if(_decimalcontext->_firstCordicelement)free_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
 	if(_decimalcontext->_firstSincoselement)free_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
-	FREE_1(_decimalcontext,'C',owner_decimalcontext);
+	FREE_DISOWNED_1(_decimalcontext,'C',owner_decimalcontext);
 }
 
 // if we want to keep a list of all decimal contexts, we need to be able to iterate over all decimal contexts to see if it is already there
@@ -67,7 +67,7 @@ void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,M
 	if(!_decimalcontextElement)return;
 	if(_decimalcontextElement->_next)free_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
 	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
-	FREE_1(_decimalcontextElement,'e',owner_decimalcontextElement);
+	FREE_DISOWNED_1(_decimalcontextElement,'e',owner_decimalcontextElement);
 }
 static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={MODULE_ID,__LINE__,1};
 // to get the unique decimal context with the requested precision
@@ -180,7 +180,7 @@ static void free_bigintegerListelement(MbigintegerListelement* _bile,Mallocation
     // ASSERT assume _bile to not be NULL
     if(_bile->_next)free_bigintegerListelement(_bile->_next,owner);
     if(_bile->_biginteger)free_biginteger(_bile->_biginteger,owner);
-	FREE_1(_bile,'x',owner);
+	FREE_DISOWNED_1(_bile,'x',owner);
 }/* VALIDATED */
 
 // MDH@17JUN2019: convert a decimal (back) to a rational
@@ -392,7 +392,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 						_remainderListelement->_biginteger=OWNED(_getBigintegerCopy(_remainder),owner); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
 						if(!_remainderListelement->_biginteger){
 							outputError("Failed to store the remainder");
-							FREE_1(_remainderListelement,'b',owner); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
+							FREE_DISOWNED_1(_remainderListelement,'b',owner); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
 							_p=NULL;
 							break;
 						}
@@ -589,7 +589,7 @@ void free_decimal(Mdecimal* decimal,Mallocationowner owner_decimal){
 	if(!decimal)return;
     if(amVerboseDebugging())output("Freeing decimal.\n");
     if(decimal->mpd)free_mpd(decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
-    FREE_1(decimal,'D',owner_decimal);
+    FREE_DISOWNED_1(decimal,'D',owner_decimal);
 }/* VALIDATED */
 
 /**
@@ -617,7 +617,7 @@ Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t rep
                 _decimal->repeating=repeating;
                 _decimal->prec=mpd_context->prec;
             }else{
-                FREE_1(_decimal,'D',owner);
+                FREE_DISOWNED_1(_decimal,'D',owner);
                 _decimal=NULL;
             }
         }else
@@ -1664,7 +1664,7 @@ typedef struct mpd_sincos_t{
 void free_mpd_sincos(mpd_sincos_t* _mpd_sincos,Mallocationowner owner_mpd_sincos){
 	free_mpd(_mpd_sincos->sin);
 	free_mpd(_mpd_sincos->cos);
-	FREE_1(_mpd_sincos,'T',owner_mpd_sincos);
+	FREE_DISOWNED_1(_mpd_sincos,'T',owner_mpd_sincos);
 }
 /**
  * \brief returns a pair of mpd_t* instances containing the sine and cosine of \p x respectively guaranteeing their sum of squares equals 1
@@ -1899,7 +1899,7 @@ typedef struct mpd_relative_angle{
 void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle,Mallocationowner owner_mpd_relative_angle){
 	free_sincoselement(_mpd_relative_angle->sincoselement,owner_mpd_relative_angle); // MDH@11SEP2019: now we do need to free the Msincoselement*
 	free_mpd(_mpd_relative_angle->_delta_angle);
-	FREE_1(_mpd_relative_angle,'$',owner_mpd_relative_angle);
+	FREE_DISOWNED_1(_mpd_relative_angle,'$',owner_mpd_relative_angle);
 }
 
 // MDH@11SEP2019: we can do much faster and better now we have the predefinedsines in Mdecimalcontext's
@@ -2007,7 +2007,7 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext const * const decimalcon
 						}
 						sincoselement=nextsincoselement;
 					}
-					if(!sincoselement){FREE_1(_relativeAngle,'A',owner);_relativeAngle=NULL;}else _relativeAngle->sincoselement=sincoselement;
+					if(!sincoselement){FREE_DISOWNED_1(_relativeAngle,'A',owner);_relativeAngle=NULL;}else _relativeAngle->sincoselement=sincoselement;
 				}else
 					outputError("No predefined angles");
 			}else

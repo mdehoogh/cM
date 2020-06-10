@@ -31,7 +31,7 @@ void free_chars(Mchars const * const _chars,Mallocationowner owner_chars,size_t 
     // typically the caller would need to tell us the current number of characters stored in _chars
     // ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
     if(!_chars){output("%sNo Mchars to free.\n",M_WARNING_PREFIX);return;}
-    FREE(_chars,count,(type>0?-type:type),owner_chars); // obtain ownership and free
+    FREE_DISOWNED(_chars,count,(type>0?-type:type),owner_chars); // obtain ownership and free
 }
 
 // if you want to host a known list of characters ('\0' delimited) call _getChars()
