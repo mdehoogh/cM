@@ -167,7 +167,7 @@ Mallocationowner getValueOwner();
 
 /*unsigned */long long appendedToList(Mlist* const _list,Mallocationowner owner_list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 
-Mlist* __list(char* source);
+Mlist* __list(char* source,Mallocationowner owner_list);
 void free_list(Mlist* _list,Mallocationowner owner);
 Mlist* _getListCopy(Mlist const * const _list);
 

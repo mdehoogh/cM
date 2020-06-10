@@ -931,7 +931,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	Mtoken* lastCommandToken=(command?command->_lastToken:NULL);
 	// TODO shouldn't be outputting to the console if the command is not the user input command
 	if(!lastCommandToken){(*inputErrorFunction)("%sNo last command token.",M_BUG_PREFIX);return NULL;}
-	if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
+	// if(amDebugging())(*inputInfoFunction)("Appending '%c'.",inputChar);
 	/* MDH@31OCT2019: for now not allowing special TT_WHITESPACE tokens BUT returning to the original idea of appending whitespace to the current token
 	// MDH@31OCT2019: by allowing dummy i.e. TT_WHITESPACE tokens in the command the type of the token to consider isn't that of lastCommandToken per se
 	//                so it's actually best if we create a new token that points to the last non-whitespace command token
@@ -2793,7 +2793,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
-	Mlist* _list=OWNED(__list("getValueOfList"),owner);
+	Mlist* _list=__list("getValueOfList",owner);
 	if(!_list){output("Failed to create a list to return.\n");return NULL;}
 	_list->weak=weak;
 	/* MDH@27MAY2020 replacing:
@@ -4090,7 +4090,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								functionCallArgumentList=_functionArgumentsValue->value._list; // use the wrapped list
 							// 2. get the arguments map
 							// MDH@02NOV2019 NOTE: this map will be weak as returned by _getFunctionArgumentMap!!
-							Mmap* _functionCallArgumentMap=(Mmap*)OWNED(_getFunctionArgumentMap(function,functionCallArgumentList),owner); // assuming to have a list returned by getListExpressionValue()
+							Mmap* _functionCallArgumentMap=_getFunctionArgumentMap(function,functionCallArgumentList,owner); // assuming to have a list returned by getListExpressionValue()
 							/* MDH@11NOV2019 OOPS: can't wrap the function call argument map here, free it, and have it freed later on again by the garbage collector!!!!
 							outputValue("Function argument map: ",_getValueOfMap(_functionCallArgumentMap,false),".\n");
 							*/

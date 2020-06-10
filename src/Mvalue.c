@@ -29,25 +29,29 @@ void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner){
 }/* VALIDATED */
 // MDH@09JUN2020: if we want the name of the variable to be subowned by the caller, it's better to pass in a properly owned Mchars name, which we can subown
 //                it's a bit of a nuisance that we create it in such a way that the caller has to take care of the ownership of _name but that makes sense because we pass in Mchars (which is already managed)
+// MDH@11JUN2020: by allowing _name to be disowned to start with we can free it when we fail to bind it
 Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
     // MDH@14NOV2019: maps might have attributes with no name (i.e. the empty string)
-    if(!_name){
-        outputError("No variable name defined");
-        return NULL;
-    }
-    Mvariable* _variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
-    if(!_variable){
+    if(_name){
+        Mvariable* _variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
+        if(_variable){
+            _variable->_name=_name; // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
+            _variable->immutable=immutable;
+            _variable->valuetype=valuetype;
+            return DISOWNED(_variable,owner);
+        }
         outputError("Failed to create a variable.");
-        return NULL;
-    }
-    _variable->immutable=immutable;
-    _variable->_name=_name; // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
-    if(!_variable->_name){
+    }else
+        outputError("No variable name defined");
+    /*
+     if(!_variable->_name){
+        freeChars(_name,owner);
         free_variable(_variable,true,owner);
         output("%sFailed to allocate memory to store name '%s' of the new variable.\n",M_ERROR_PREFIX,_name->chars);
         return NULL;
     }
     _variable->valuetype=valuetype;
+    */
     /* MDH@01MAY2019: we're NOT setting the value here!!!!
     // a ha, here we have an issue: we cannot just use the char pointer, if we want to free the name later on
     if(_variable->valuetype!=VT_UNDEFINED){
@@ -72,7 +76,7 @@ Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool imm
         _variable->_value=NULL;
     */
     // MDH@04JUN2020: given that _variable is already disowned (as returned by CALLOC_1), no need to disown it again
-    return DISOWNED(_variable,owner);
+    return NULL; // replacing: return DISOWNED(_variable,owner);
 }/* VALIDATED */
 
 bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owner){
@@ -84,16 +88,17 @@ bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owne
     }
     return false;
 }/* VALIDATED */
-Mlist* __list(char* source){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner);
+Mlist* __list(char* source,Mallocationowner owner_list){// Mallocationowner owner=getOwner(__LINE__);
+    Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner_list);
     if(source){
-        _list->_creator=SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
+        _list->_creator=SUBOWNED(OWNED(_getChars(source),owner_list),1); // replacing: keep disowned, so easy to reown... SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
         if(!_list->_creator)
             output("%sFailed to register list creator '%s'.\n",M_ERROR_PREFIX,source);
         else
-        if(amVerboseDebugging())output("List creator: '%s'.\n",_list->_creator->chars);
+        if(amVerboseDebugging())
+            output("List creator: '%s'.\n",_list->_creator->chars);
     }
-    return DISOWNED(_list,owner);
+    return DISOWNED(_list,owner_list);
 }
 void free_list(Mlist* _list,Mallocationowner owner){
     if(amVerboseDebugging())
@@ -108,9 +113,11 @@ void free_list(Mlist* _list,Mallocationowner owner){
 }/* VALIDATED */
 
 bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
-    if(amVerboseDebugging())output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
+    if(amVerboseDebugging())
+        output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
     if(_mapelement->_next){
-        if(!free_mapelement(_mapelement->_next,weak,owner))outputError("Failed to free a map element!");//////else outputInfo("Next map element freed!");
+        if(!free_mapelement(_mapelement->_next,weak,owner))
+            outputError("Failed to free a map element!");//////else outputInfo("Next map element freed!");
         _mapelement->_next=NULL;
     }
     if(_mapelement->_variable){
@@ -128,8 +135,14 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
     return true;
 }/* VALIDATED */
 void free_map(Mmap* _map,Mallocationowner owner){
-    if(amVerboseDebugging())output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
-    if(_map->_first){free_mapelement(_map->_first,_map->weak,Msubowner(owner,1));_map->_first=NULL;}else outputInfo("No map attributes to free!");
+    if(amVerboseDebugging())
+        output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
+    if(_map->_first){
+        free_mapelement(_map->_first,_map->weak,Msubowner(owner,1));
+        _map->_first=NULL;
+    }else
+    if(amVerboseDebugging()) 
+        outputInfo("No map attributes to free!");
     FREE_1(_map,'M',owner);
 }/* VALIDATED */
 
@@ -153,7 +166,7 @@ Mallocationowner getValueOwner(){return owner_value;}
 Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* _value=NULL;
     if(!_valueList){
-        _valueList=OWNED(__list("global value list"),owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
+        _valueList=__list("global value list",owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
         if(!_valueList){outputBug("Failed to create the global value list.");return NULL;}
         // MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
         //                as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
@@ -397,7 +410,7 @@ Mvalue* _getCharTextValue(char _c){
 }/* VALIDATED */
 // we can force all listelements to have the same type????
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=OWNED(__list(source?source:"_getListValue"),owner);
+    Mlist* _list=__list(source?source:"_getListValue",owner);
     if(!_list){
         // if(amVerboseDebugging())
             outputError("Failed to create a list.\n");
@@ -569,26 +582,17 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 }*/
 
 // MDH@09JUN2020: interface between _getVariable (now requiring a Mchars name) and all that still use a char* thing
-static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){Mallocationowner owner=getOwner(__LINE__);
-    Mchars* _name=OWNED(_getChars(name),owner);
-    if(!_name){
-        output("%sFailed to create variable name '%s'.",M_ERROR_PREFIX,name);
-        return NULL;
-    }
-    Mvariable* _variable=OWNED(_getVariable(_name,valuetype,immutable),owner);
-    if(!_variable){
-        freeChars(_name,owner); // release the name
-        output("%sFailed to create variable '%s'.\n",M_ERROR_PREFIX,name);
-        return NULL;
-    }
-    SUBOWNED(OWNED(DISOWNED(_name,owner),owner_variable),1); // take over ownership of the variable name
-    return OWNED(DISOWNED(_variable,owner),owner_variable);
+static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){if(!name||strlen(name)==0)return NULL;Mallocationowner owner=getOwner(__LINE__);
+    Mchars* _name=OWNED(_getChars(name),owner_variable);
+    Mvariable* _variable=OWNED(_getVariable(_name,valuetype,immutable),owner_variable);
+    if(_variable)SUBOWNED(_variable->_name,1);else freeChars(_name,owner_variable);
+    return _variable;
 }
 // helper function to create a parameter map with a single value
 // the following is a nuisance
 Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwner(__LINE__);
     if(name&&_floatValue){
-        Mvariable* _realVariable=_getVariableWithName(name,VT_FLOAT,true,owner);
+        Mvariable* _realVariable=_getVariableWithName(name,VT_FLOAT,true,owner); // MDH@11JUN2020: _getChars(name) returns a disowned pointer that we need in _getVariable()
         if(_realVariable){
             Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner);
             if(_mapelement){
@@ -1819,7 +1823,7 @@ Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_E
 
 Mlist* _getListOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
     // output("Allocating list (size: %zd).\n",sizeof(Mlist));
-    Mlist* _list=OWNED(__list("getListOfType"),owner);
+    Mlist* _list=__list("getListOfType",owner);
     if(!_list)return NULL;
     _list->valuetype=valuetype;
     return DISOWNED(_list,owner);

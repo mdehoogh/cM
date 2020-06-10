@@ -1080,11 +1080,12 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 }// VALIDATED
 */
 // MDH@05NOV2019: if there are missing elements in _argumentList (what we allow now), there should be an associated map element with value NULL
-Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList){Mallocationowner owner=getOwner(__LINE__);
+Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList,Mallocationowner owner_functionargumentmap){
+    // Mallocationowner owner=getOwner(__LINE__);
     Mmap* _functionArgumentMap=NULL;
     // MDH@03MAR2020: _argumentList should also be allowed to be NULL (because then defaults would be used)
     if(_function/*&&_argumentList*/){
-        _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC_1(sizeof(Mmap),'M',owner)); // MDH@02NOV2019: force the map to be weak
+        _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC_1(sizeof(Mmap),'M',owner_functionargumentmap)); // MDH@02NOV2019: force the map to be weak
         Mmap* functionParameterMap=_function->_parameterMap;
         if(_functionArgumentMap&&functionParameterMap){
             if(amVerbose())outputInfo("Matching the function parameters!");
@@ -1095,15 +1096,15 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 argumentindex++; // the index of the argument we need
                 // if the current list element has an index below the one we need, get the next argument list element until we have found one with an index at least equal to argument index
                 while(argumentListelement&&argumentListelement->index<argumentindex)argumentListelement=argumentListelement->_next;
-                Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+                Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_functionargumentmap);
                 if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
-                _argumentmapelement->_variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner);
-                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true,owner);break;}
+                _argumentmapelement->_variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner_functionargumentmap);
+                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true,owner_functionargumentmap);break;}
                 // probably can't simply assign??? let's use _strdup then 
                 // MDH@17APR2020: _strdup() replaced by _getChars() as on so many other places today
-                _argumentmapelement->_variable->_name=SUBOWNED(OWNED(_getChars(functionParameterMapelement->_variable->_name->chars),owner),1); // MDH@09JUN2020: OOPS make the right owner
-                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true,owner);break;}
+                _argumentmapelement->_variable->_name=SUBOWNED(OWNED(_getChars(functionParameterMapelement->_variable->_name->chars),owner_functionargumentmap),1); // MDH@09JUN2020: OOPS make the right owner
+                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true,owner_functionargumentmap);break;}
                 // associate the argument list element value (if available)
                 // MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)
                 //                we get a problem with functions like push() and shove() that try to adjust their argument
@@ -1122,9 +1123,10 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 functionParameterMapelement=functionParameterMapelement->_next;
             }
         }
-        if(amVerbose())outputInfo("Argument map created.");
+        if(amVerboseDebugging())
+            outputInfo("Argument map created.");
     }
-    return DISOWNED(_functionArgumentMap,owner); // MDH@09JUN2020 OOPS forgot to disown prev.
+    return _functionArgumentMap; // MDH@09JUN2020 OOPS forgot to disown prev.
 }/* VALIDATED */
 
 // newFunction renamed to _getFunction(), not to be confused with getFunction()

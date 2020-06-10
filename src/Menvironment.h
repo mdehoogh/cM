@@ -91,7 +91,7 @@ Mfunction* getFunction(Menvironment const * const _environment,const char* const
 Muserfunction* getUserfunction(Menvironment const * const _environment,const char* const userfunctionName);
 
 // MDH@21MAY2019: the _ indicates that the caller has to free the map itself
-Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList);
+Mmap* _getFunctionArgumentMap(const Mfunction* const _function,const Mlist* const _argumentList,Mallocationowner owner_functionargumentmap);
 
 Mfunction* _getFunction(Menvironment* const _environment,Mallocationowner owner_environment,char const * const name); // creates the function if it does not exist yet
 

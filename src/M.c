@@ -1276,7 +1276,8 @@ bool registerCommand(Mcommand* command){Mallocationowner owner=getOwner(__LINE__
 	if(_commandToEvaluateTokenValue){ // the first command token is now bound 
 		// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
 		if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
-			getCurrentFunctionBodyInput()->_function->_bodyCommandList=SUBOWNED(OWNED(__list("body command list"),owner_currentFunctionBodyInput),2);
+			getCurrentFunctionBodyInput()->_function->_bodyCommandList=
+				__list("body command list",Msubowner(owner_currentFunctionBodyInput,2));
 		// MDH@08JUN2020: if we succeed in adding the command value to the function body we still return false as result which will result in command to be freed
 		//                BUT by NULLing command->_firstToken we prevent the tokens from being freed in the command as we should
 		if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,owner_currentFunctionBodyInput,_commandToEvaluateTokenValue,M_LL_INVALID)>0)
