@@ -10,9 +10,13 @@ long double getRationalLongDouble(Mrational const * const _rational);
 Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/); 
 // used by (now moved over to Mdecimal.h/c): Mrational* _getDecimalRational(Mdecimal* _decimal);
 
+Mrational* disowned_rational(Mrational* _rational,Mallocationowner owner_rational);
+Mrational* owned_rational(Mrational* _rational,Mallocationowner owner_rational);
+
 Mrational* __rational();
 Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner);
-void free_rational(Mrational* _rational,Mallocationowner owner);
+void free_rational(Mrational* _rational/*,Mallocationowner owner*/);
+#define FREE_RATIONAL(_rational,owner_rational) free_rational(disowned_rational(_rational,owner_rational))
 
 void normalizeRational(Mrational * const _rational,Mallocationowner owner_rational);
 Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const * const _denominator,long double delta,bool normalize/*,bool freeonfailure*/);

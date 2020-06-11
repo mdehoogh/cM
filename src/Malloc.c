@@ -770,6 +770,9 @@ void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owne
     return ((char*)ptr)+sizeof(Malloc);
 }
 
+bool Misowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));return(!_alloc->owner.freed&&!_alloc->owner.disowned);}
+bool Misdisowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc));return(!_alloc->owner.freed&&_alloc->owner.disowned);}
+
 // MDH@18MAY2020: passing along ownership is done through macros DISOWNED and OWNED 
 //                unfortunately we need to know the size so we can find the allocation id
 // MDH@02JUN2020: yes, we do need to register current ownership 'globally' i.e. not just in the memory 'record' itself because we do not know where the pointer is

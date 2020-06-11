@@ -97,7 +97,8 @@ Mallocationowner Msubowner(Mallocationowner owner,uint8_t level);
 
 #ifndef __PRODUCTION__
 // MDH@22MAY2020: the structure used for indicating allocation ownership allowing for a total of 1022 modules (with 0 being the program module), and 2^20-1 function lines per module
-
+bool Misowned(void* ptr);
+bool Misdisowned(void* ptr);
 void* Mmalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mcalloc(size_t size,long long count,signed char type,Mallocationowner owner);
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char type/*,Mallocationowner owner*/); // MDH@26MAY2020 from now on only to be used to reallocate variable-size types (with negative type)

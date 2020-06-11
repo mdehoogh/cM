@@ -35,10 +35,14 @@ typedef struct Mdecimalcontext{
 // MDH@29AUG2019: create a decimal context with __decimalcontext passing in the required precision
 Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec); // to get the unique decimal context with the requested precision
 
-void free_decimal(Mdecimal* decimal,Mallocationowner owner_decimal);
+Mdecimal* disowned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal);
+Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal);
 
 Mdecimal* __adecimal(); // returning a completely blank decimal (e.g. to be used with mpd_copy_negate otherwise we'd have the old pointer hanging around with an allocated decimal that won't get freed anywhere ever)
 Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t repeating); // pass in NULL for mpd_context to use the application-wide decimal context!!
+void free_decimal(Mdecimal* decimal/*,Mallocationowner owner_decimal*/);
+#define FREE_DECIMAL(_decimal,owner_decimal) free_decimal(disowned_decimal(_decimal,owner_decimal))
+
 // TODO if we call _getDecimal with mpd we won't know the precision of the decimal (as that is not contained in an mpd_t instance), therefore we need to change _getDecimal somehow!!!
 // DONE I've added the prec parameter because mpd_t itself does not store the precision used to compute this decimal
 Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure);

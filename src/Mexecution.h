@@ -187,14 +187,16 @@ Mfloat* _getFloatNeg(Mfloat* afloat);
 
 // BIG INTEGER STUFF
 // TODO should be moved over to Mbiginteger.h/c
-Mbiginteger* __biginteger();
 Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger);
+Mbiginteger* owned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger);
+
+Mbiginteger* __biginteger();
 void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/);
 #define FREE_BIGINTEGER(_biginteger,owner_biginteger) free_biginteger(disowned_biginteger(_biginteger,owner_biginteger))
 
-Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger);
 Mbiginteger* _getBiginteger(int64_t l);
 
+Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger);
 Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger); // NOTE there's a replicate called getNegatedBiginteger in Mbiginteger.h/c but I need it here
 
 Mbiginteger* getBigintegerLLMin();

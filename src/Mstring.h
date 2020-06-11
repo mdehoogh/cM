@@ -20,10 +20,11 @@ typedef struct{
     long long blocks; // the number of allocated blocks of BLOCK_SIZE bytes of memory for _chars
 }Mstring;
 
-Mstring* __string();
 
 Mstring* disowned_string(Mstring* str,Mallocationowner owner_str);
+Mstring* owned_string(Mstring* str,Mallocationowner owner_str);
 
+Mstring* __string();
 Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
 
 // MDH@11JUN2020: a useful macro

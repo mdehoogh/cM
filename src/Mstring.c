@@ -117,6 +117,10 @@ Mstring* disowned_string(Mstring* str,Mallocationowner owner_str){
     disowned_chars(str->_chars,owner_str);
     return DISOWNED(str,owner_str);
 }
+Mstring* owned_string(Mstring* str,Mallocationowner owner_str){
+    owned_chars(str->_chars,Msubowner(owner_str,1));
+    return OWNED(str,owner_str);
+}
 /** 
  * Free the memory associated with a String
  */

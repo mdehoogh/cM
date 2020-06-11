@@ -135,7 +135,7 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
                 free(_decimalChars); // NOTE assuming mpd_format dynamically created _decimalChars transferring ownership to me
             }else
                 _p=NULL;
-            if(!_p){free_string(_decimalText,owner);_decimalText=NULL;}
+            if(!_p){FREE_STRING(_decimalText,owner);_decimalText=NULL;}
         }else
 			string_append_char(_decimalText,'?');
     }else outputChar('?');
@@ -300,7 +300,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                 }
             }else // we can go through the text????
                 _rational=OWNED(_getDecimalTextRational(decimalText),owner);
-            free_string(_decimalText,owner); // OOPS use free_string() not free()!
+            FREE_STRING(_decimalText,owner); // OOPS use FREE_STRING() not free()!
         }else
             outputError("Failed to convert the decimal to text");
     }
@@ -314,7 +314,7 @@ Mdecimal* _getBigintegerDecimal(Mbiginteger const * const biginteger){Mallocatio
 		Mstring* _bigintegerText=OWNED(_getBigintegerText(biginteger),owner);
 		if(_bigintegerText){
 			_bigintegerDecimal=OWNED(_getTextDecimal(string(_bigintegerText),0),owner);
-			free_string(_bigintegerText,owner);
+			FREE_STRING(_bigintegerText,owner);
 		}
 	}
 	return DISOWNED(_bigintegerDecimal,owner);
@@ -422,14 +422,14 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 
 						// append the dividend to the decimal text
 						// NOTE that _digitText is freed as soon as possible
-						_digitText=OWNED(_getBigintegerText(_digit),owner);
+						_digitText=owned_string(_getBigintegerText(_digit),owner);
 						if(!_digitText){
 							outputError("Failed to store the next decimal character");
 							_p=NULL;
 							break;
 						}
 						_p=string_append(_p,string(_digitText));
-						free_string(_digitText,owner);
+						FREE_STRING(_digitText,owner); // MDH@11JUN2020: disowns it and frees it
 
 						if(amVerboseDebugging())if(_p)output("Decimal text so far: '%s'.\n",string(_p));
 
@@ -440,12 +440,12 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 						}
 					}
 					if(_firstRemainderListelement)free_bigintegerListelement(_firstRemainderListelement,owner); // replacing: free_list(_remainderList);
-					if(!_p){free_string(_decimalText,owner);_decimalText=NULL;} // some failure occurred
+					if(!_p){FREE_STRING(_decimalText,owner);_decimalText=NULL;} // some failure occurred
 				}
 			}
 			// prepend the sign if the numerator is negative TODO what if this fails?????
 			if(mp_isneg(MP_INT_POINTER(numerator))){
-				if(_decimalText&&!string_insert_char(_decimalText,0,'-')){free_string(_decimalText,owner);_decimalText=NULL;}
+				if(_decimalText&&!string_insert_char(_decimalText,0,'-')){FREE_STRING(_decimalText,owner);_decimalText=NULL;}
 				FREE_BIGINTEGER(_nonnegativenumerator,owner);
 			}
 			// free all locally used pointers to dynamic memory
@@ -456,15 +456,15 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
     // parse _decimalText to a decimal
     Mdecimal* _decimal=NULL;
     if(_decimalText){
-        _decimal=OWNED(_getTextDecimal(string(_decimalText),repeating),owner);
+        _decimal=owned_decimal(_getTextDecimal(string(_decimalText),repeating),owner);
         if(!_decimal)
 			output("%sFailed to parse decimal text '%s' of the corresponding rational",M_ERROR_PREFIX,string(_decimalText));
 		else 
 		if(amVerboseDebugging())
 			outputDecimal("Decimal of rational: '",_decimal,"'.\n");
-        free_string(_decimalText,owner);
+        FREE_STRING(_decimalText,owner);
     }
-    return DISOWNED(_decimal,owner);
+    return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
 
 // decimalerrorstatus() filter out the rounding and inexact 'errors'

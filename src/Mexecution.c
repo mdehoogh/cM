@@ -93,6 +93,16 @@ bool initExecution(){
 */
 
 // BIG INTEGER STUFF
+Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
+    if(!_biginteger)return NULL;
+    if(_biginteger->_bi)DISOWNED(_biginteger->_bi,owner_biginteger);
+    return DISOWNED(_biginteger,owner_biginteger);
+}
+Mbiginteger* owned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
+    if(!_biginteger)return NULL;
+    if(_biginteger->_bi)OWNED(_biginteger->_bi,Msubowner(owner_biginteger,1));
+    return OWNED(_biginteger,owner_biginteger);
+}
 Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
     Mbiginteger* _biginteger=(Mbiginteger*)CALLOC_1(sizeof(Mbiginteger),'B',owner);
     if(_biginteger){
@@ -104,27 +114,22 @@ Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
         if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
 #endif
     }
-    return(Mbiginteger*)DISOWNED(_biginteger,owner);
+    return(Mbiginteger*)disowned_biginteger(_biginteger,owner);
 }/* VALIDATED */
 // end of block that uses __PRODUCTION__ flag
-Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
-    if(!_biginteger)return NULL;
-    if(_biginteger->_bi)DISOWNED(_biginteger->_bi,owner_biginteger);
-    return DISOWNED(_biginteger,owner_biginteger);
-}
 /** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
  *  \return a newly created big integer
  */
-void free_biginteger(Mbiginteger* biginteger/*,Mallocationowner owner_biginteger*/){
-    if(biginteger){
+void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/){
+    if(_biginteger){
         if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
 #ifndef __PRODUCTION__
-        mp_clear(biginteger->_bi);
-        FREE_1(biginteger->_bi,'b'/*,owner_biginteger*/);
+        mp_clear(_biginteger->_bi);
+        FREE_1(_biginteger->_bi,'b'/*,owner_biginteger*/);
 #else
         mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
 #endif
-        FREE_1(biginteger,'B'/*,owner_biginteger*/); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
+        FREE_1(_biginteger,'B'/*,owner_biginteger*/); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
     }else
     if(amVerbose())outputInfo("No big integer to free!");
 }/* VALIDATED */
@@ -139,27 +144,28 @@ Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__
 
 // replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
 Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* _bigintegerNeg=(Mbiginteger*)OWNED(_biginteger?__biginteger():NULL,owner); // the result we will be returning
-    if(_bigintegerNeg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){free_biginteger(_bigintegerNeg,owner);_bigintegerNeg=NULL;}
-    return(Mbiginteger*)DISOWNED(_bigintegerNeg,owner);
+    Mbiginteger* _bigintegerNeg=(_biginteger?owned_biginteger(__biginteger(),owner):NULL); // the result we will be returning
+    if(!_bigintegerNeg)return NULL;
+    if(mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerNeg,owner); return NULL;}
+    return disowned_biginteger(_bigintegerNeg,owner);
 }// VALIDATED
 
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
-Mbiginteger* _getBigintegerCopy(Mbiginteger const * const biginteger){Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* _bigintegerCopy=(biginteger?(Mbiginteger*)OWNED(__biginteger(),owner):NULL);
+Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger){Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* _bigintegerCopy=(_biginteger?(Mbiginteger*)owned_biginteger(__biginteger(),owner):NULL);
     if(!_bigintegerCopy)return NULL;
-    if(mp_copy(MP_INT_POINTER(biginteger),MP_INT_POINTER(_bigintegerCopy))!=MP_OKAY){free_biginteger(_bigintegerCopy,owner);_bigintegerCopy=NULL;}
-    return(Mbiginteger*)DISOWNED(_bigintegerCopy,owner);
+    if(mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerCopy))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerCopy,owner);return NULL;}
+    return disowned_biginteger(_bigintegerCopy,owner);
 }/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
 static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-static Mallocationowner owner_module=(Mallocationowner){MODULE_ID,__LINE__,1};
+static Mallocationowner owner_biginteger=(Mallocationowner){MODULE_ID,__LINE__,1};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
-const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=(Mbiginteger*)OWNED(_getBiginteger(0),owner_module);return bi0;}/* VALIDATED */
-const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=(Mbiginteger*)OWNED(_getBiginteger(1),owner_module);return bi1;}/* VALIDATED */
-const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=(Mbiginteger*)OWNED(_getBiginteger(2),owner_module);return bi2;}/* VALIDATED */
-const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=(Mbiginteger*)OWNED(_getBiginteger(3),owner_module);return bi3;}/* VALIDATED */
+const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=owned_biginteger(_getBiginteger(0),owner_biginteger);return bi0;}/* VALIDATED */
+const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=owned_biginteger(_getBiginteger(1),owner_biginteger);return bi1;}/* VALIDATED */
+const Mbiginteger* getBigintegerTwo(){if(!bi2)bi2=owned_biginteger(_getBiginteger(2),owner_biginteger);return bi2;}/* VALIDATED */
+const Mbiginteger* getBigintegerThree(){if(!bi3)bi3=owned_biginteger(_getBiginteger(3),owner_biginteger);return bi3;}/* VALIDATED */
 
 long long isBigintegerOne(Mbiginteger* biginteger){
     return(biginteger?(mp_cmp(MP_INT_POINTER(biginteger),MP_INT_POINTER(getBigintegerOne()))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID);
@@ -243,7 +249,7 @@ Mrational* _getLongDoubleRational(long double ld){
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
-void free_text(Mtext* _text,Mallocationowner owner){
+void free_text(Mtext* _text/*,Mallocationowner owner*/){
     // MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
     // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
     //                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
@@ -251,12 +257,13 @@ void free_text(Mtext* _text,Mallocationowner owner){
         // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
         //                _text->_c is an array and yes strlen() can be applied to any char*
         //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
-        FREE_DISOWNED(_text,strlen(_text->_c)+sizeof(Mtext),-'"',owner); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
+        FREE(_text,strlen(_text->_c)+sizeof(Mtext),-'"'/*,owner*/); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
         // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)FREE_STRING(_string->_m);_string->_m=NULL;free(_string);}
     }else
     if(amVerboseDebugging())
         outputInfo("No text to free!");
 }/* VALIDATED */
+
 void free_integer(Minteger* _integer,Mallocationowner owner){
     if(_integer){
         if(amVerboseDebugging())
@@ -705,26 +712,26 @@ Mstring* _getBigintegerText(const Mbiginteger* _biginteger){Mallocationowner own
 }
 
 Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
-
+// MDH@11JUN2020: if we return something that is owned instead of something that is disowned we prevent external freeing (i.e. unwarned that is)
 Mbiginteger* getBigintegerLLMin(){Mallocationowner owner=getOwner(__LINE__);
     if(!_biLLMin){
         if(amVerboseDebugging())
             outputInfo("Determining the big integer equivalent of the smallest small integer.");
-        _biLLMin=(Mbiginteger*)OWNED(_getBiginteger(M_LL_MIN),owner_module);
+        _biLLMin=owned_biginteger(_getBiginteger(M_LL_MIN),owner_biginteger);
         if(amVerboseDebugging())
             outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
     }
-    return(Mbiginteger*)DISOWNED(_biLLMin,owner_module);
+    return _biLLMin;
 }/* VALIDATED */
 Mbiginteger* getBigintegerLLMax(){
     if(!_biLLMax){
         if(amVerboseDebugging())
             outputInfo("Determining the big integer equivalent of the largest small integer.");
-        _biLLMax=(Mbiginteger*)OWNED(_getBiginteger(M_LL_MAX),owner_module);
+        _biLLMax=owned_biginteger(_getBiginteger(M_LL_MAX),owner_biginteger);
         if(amVerboseDebugging())
             outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
     }
-    return(Mbiginteger*)DISOWNED(_biLLMax,owner_module);
+    return _biLLMax;
 }/* VALIDATED */
 
 // MDH@01JUN2019: my own version of converting a (IEEE754 extended precision) long double to a big integer 

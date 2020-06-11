@@ -28,9 +28,8 @@ Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,lo
     return(Mchars*)REALLOC(_chars,from_count,to_count,size,(type>0?-type:type));
 }
 
-Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){
-    return DISOWNED(_chars,owner_chars);
-}
+Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return DISOWNED(_chars,owner_chars);}
+Mchars* owned_chars(Mchars const * const _chars,Mallocationowner owner_chars){return OWNED(_chars,owner_chars);}
 
 void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,size_t size,long long count,signed char type){
     // typically the caller would need to tell us the current number of characters stored in _chars
