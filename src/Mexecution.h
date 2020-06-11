@@ -122,8 +122,15 @@ Mtext* _getText(char* _c);
 Mtext* _getCharText(char _char);
 
 ////////Menvironment* getExecutionEnvironment();
-void free_integer(Minteger* _integer,Mallocationowner owner);
-void free_float(Mfloat* _float,Mallocationowner owner);
+Minteger* disowned_integer(Minteger* _integer,Mallocationowner owner_integer);
+Minteger* owned_integer(Minteger* _integer,Mallocationowner owner_integer);
+void free_integer(Minteger* _integer/*,Mallocationowner owner*/);
+#define FREE_INTEGER(_integer,owner_integer) free_integer(disowned_integer(_integer,owner_integer))
+
+Mfloat* disowned_float(Mfloat* _float,Mallocationowner owner_float);
+Mfloat* owned_float(Mfloat* _float,Mallocationowner owner_float);
+void free_float(Mfloat* _float/*,Mallocationowner owner*/);
+#define FREE_FLOAT(_float,owner_float) free_float(disowned_float(_float,owner_float))
 
 bool strIsZero(char* str);
 Mstring* appendll(Mstring* const ms,long long ll);

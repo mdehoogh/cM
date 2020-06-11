@@ -351,10 +351,13 @@ mp_err _qcopy(Mrational * const b,Mallocationowner owner_b,Mrational const * con
     mp_err status=(a?MP_OKAY:MP_ERR);
     if(status==MP_OKAY){
         // get copies of numerator, denominator and delta of the source
-        Mbiginteger *_num=(a->num?OWNED(_getBigintegerCopy(a->num),owner):NULL),*_den=(a->den?OWNED(_getBigintegerCopy(a->den),owner):NULL);
-        Mfloat* _delta=(a->delta?OWNED(_getFloat(a->delta->ld),owner):NULL);
+        Mbiginteger *_num=(a->num?owned_biginteger(_getBigintegerCopy(a->num),owner):NULL)
+                   ,*_den=(a->den?owned_biginteger(_getBigintegerCopy(a->den),owner):NULL);
+        Mfloat* _delta=(a->delta?owned_float(_getFloat(a->delta->ld),owner):NULL);
         // if copying failed mark as error
-        if(a->num&&!_num)status=MP_ERR;else if(a->den&&!_den)status=MP_ERR;else if(a->delta&&!_delta)status=MP_ERR;
+        if(a->num&&!_num)status=MP_ERR;else 
+        if(a->den&&!_den)status=MP_ERR;else
+        if(a->delta&&!_delta)status=MP_ERR;
         if(status==MP_OKAY){ // copies made successfully
             // move copies freeing all originals in the process
             b->num=SUBOWNED(OWNED(DISOWNED(_num,owner),owner_b),1);
@@ -365,7 +368,7 @@ mp_err _qcopy(Mrational * const b,Mallocationowner owner_b,Mrational const * con
             // free all copies if made
             if(_num)FREE_BIGINTEGER(_num,owner);
             if(_den)FREE_BIGINTEGER(_den,owner);
-            if(_delta)free_float(_delta,owner);
+            if(_delta)FREE_FLOAT(_delta,owner);
         }
     }
     return status;
@@ -377,7 +380,7 @@ mp_err _qcopy_bi(Mrational * const b,Mallocationowner owner_b,Mbiginteger const 
     mp_err status=(a?MP_OKAY:MP_ERR);
     if(status==MP_OKAY){
         // get copies of numerator, denominator and delta of the source
-        Mbiginteger *_num=OWNED(_getBigintegerCopy(a),owner);
+        Mbiginteger *_num=owned_biginteger(_getBigintegerCopy(a),owner);
         // if copying failed mark as error
         if(_num){            
             // move copies freeing all originals in the process
@@ -876,43 +879,62 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){Mal
 
 static Mrational* cleared_rational(Mrational* _rational/*,Mallocationowner owner*/){
     if(_rational){
-        if(_rational->num){FREE_BIGINTEGER(_rational->num,owner);_rational->num=NULL;}
-        if(_rational->den){FREE_BIGINTEGER(_rational->den,owner);_rational->den=NULL;}
-        if(_rational->delta){FREE_FLOAT(_rational->delta,owner);_rational->delta=NULL;}
     }
     return _rational;
 }/*VALIDATED*/
+Mrational* disowned_rational(Mrational* _rational,Mallocationowner owner_rational){
+    if(!_rational)return NULL;
+    disowned_biginteger(_rational->num,owner_rational);
+    disowned_biginteger(_rational->den,owner_rational);
+    disowned_float(_rational->delta,owner_rational);
+    return DISOWNED(_rational,owner_rational);
+}
+Mrational* owned_rational(Mrational* _rational,Mallocationowner owner_rational){
+    if(!_rational)return NULL;
+    owned_biginteger(_rational->num,Msubowner(owner_rational,1));
+    owned_biginteger(_rational->den,Msubowner(owner_rational,1));
+    owned_float(_rational->delta,Msubowner(owner_rational,1));
+    return OWNED(_rational,owner_rational);
+}
 void free_rational(Mrational* _rational/*,Mallocationowner owner*/){
-    FREE_1(cleared_rational(_rational/*,owner*/),'R'/*,owner*/); // MDH@24MAY2020: now easily solved by freeing the cleared_rational
+    if(_rational->num){free_biginteger(_rational->num);_rational->num=NULL;}
+    if(_rational->den){free_biginteger(_rational->den);_rational->den=NULL;}
+    if(_rational->delta){free_float(_rational->delta);_rational->delta=NULL;}
+    FREE_1(_rational,'R'); // MDH@24MAY2020: now easily solved by freeing the cleared_rational
 }/* VALIDATED */
 
 // TODO should we free the given big integers when they are NOT bound to the rational that is being returned????
-void normalizeRational(Mrational * const rational,Mallocationowner owner_rational){Mallocationowner owner=getOwner(__LINE__);
-    if(!rational)return;
+void normalizeRational(Mrational * const _rational,Mallocationowner owner_rational){Mallocationowner owner=getOwner(__LINE__);
+    if(!_rational)return;
     // checking on the validity of the flag (which would actually be a bug)
-    if(!rational->normalized&&!rational->den){outputWarning("Normalized flag of rational not set although the denominator equals 1; flag set");rational->normalized=true;}
-    if(rational->normalized)return; // apparently already normalized
+    if(!_rational->normalized&&!_rational->den){
+        outputWarning("Normalized flag of rational not set although the denominator equals 1; flag set");
+        _rational->normalized=true;
+    }
+    if(_rational->normalized)return; // apparently already normalized
     // normalization means dividing by the gcd unless the gcd is one
     Mbiginteger* _gcd=owned_biginteger(__biginteger(),owner); // to be freed in all cases!
     if(!_gcd){outputError("Can't normalize a rational: failed to create the big integer to store the GCD");return;}
     // ASSERT at the end of the following block always free _gcd
-    if(mp_gcd(MP_INT_POINTER(rational->num),MP_INT_POINTER(rational->den),MP_INT_POINTER(_gcd))==MP_OKAY){
+    if(mp_gcd(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_gcd))==MP_OKAY){
         if(mp_cmp(MP_INT_POINTER(_gcd),MP_INT_POINTER(getBigintegerOne()))!=MP_EQ){ // equal to 1 apparently no need to divide num and den by the gcd and then consider normalized
             // won't do an in-place division as we need both to succeed, if only one does we would be in trouble
-            Mbiginteger *_newnum=OWNED(__biginteger(),owner),*_newden=OWNED(__biginteger(),owner); // to be freed if failing to bind them!!!
-            if(_newnum&&_newden&&mp_div(MP_INT_POINTER(rational->num),MP_INT_POINTER(_gcd),MP_INT_POINTER(_newnum),NULL)==MP_OKAY
-                                &&mp_div(MP_INT_POINTER(rational->den),MP_INT_POINTER(_gcd),MP_INT_POINTER(_newden),NULL)==MP_OKAY){
-                FREE_BIGINTEGER(rational->num,owner_rational);rational->num=SUBOWNED(OWNED(_newnum,owner),1);
-                FREE_BIGINTEGER(rational->den,owner_rational);rational->den=NULL;
-                if(isBigintegerOne(_newden))FREE_BIGINTEGER(_newden,owner);else rational->den=SUBOWNED(OWNED(_newden,owner),1); // if _newden equals 1, get rid of it, otherwise assign
-                rational->normalized=true;
+            Mbiginteger *_newnum=owned_biginteger(__biginteger(),owner)
+                       ,*_newden=owned_biginteger(__biginteger(),owner); // to be freed if failing to bind them!!!
+            if(_newnum&&_newden&&mp_div(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_gcd),MP_INT_POINTER(_newnum),NULL)==MP_OKAY
+                                &&mp_div(MP_INT_POINTER(_rational->den),MP_INT_POINTER(_gcd),MP_INT_POINTER(_newden),NULL)==MP_OKAY){
+                FREE_BIGINTEGER(_rational->num,owner_rational);
+                _rational->num=SUBOWNED(OWNED(_newnum,owner),1);
+                FREE_BIGINTEGER(_rational->den,owner_rational);_rational->den=NULL;
+                if(isBigintegerOne(_newden))FREE_BIGINTEGER(_newden,owner);else _rational->den=SUBOWNED(OWNED(_newden,owner),1); // if _newden equals 1, get rid of it, otherwise assign
+                _rational->normalized=true;
             }else{ // if the normalization failed, newnum and newden are not bound to the rational!!
                 FREE_BIGINTEGER(_newnum,owner);
                 FREE_BIGINTEGER(_newden,owner);
                 outputError("Normalization of rational failed");
             }
         }else // the GCD equals 1 which means that the thing is normalized!!!
-            rational->normalized=true;
+            _rational->normalized=true;
     }else
         outputError("Can't normalize a rational: failed to compute the GCD");
     FREE_BIGINTEGER(_gcd,owner); // OOPS essential!!
@@ -943,7 +965,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
             if(!_rational->delta){FREE_RATIONAL(_rational,owner);_rational=NULL;outputError("Failed to create the rational delta");}
         }
         if(_rational){
-            Mbiginteger* _nonnullnumerator=OWNED(_numerator?_getBigintegerCopy(_numerator):_getBiginteger(1),owner); // MDH@25MAY2020: now making a copy, so _numerator itself will not end up 
+            Mbiginteger* _nonnullnumerator=owned_biginteger(_numerator?_getBigintegerCopy(_numerator):_getBiginteger(1),owner); // MDH@25MAY2020: now making a copy, so _numerator itself will not end up 
             if(_nonnullnumerator){
                 // MDH@15AUG2019: we prefer the numerator to be negative instead of the denominator
                 // MDH@10OCT2019: TODO wouldn't it be better to be able to toggle the signs???? YES but I can't find a function in tommath to do so!!!!
@@ -951,7 +973,8 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
                     if(amVerbose())outputInfo("Moving the sign from the denominator to the numerator of the rational.");
                     // we have to get negated versions of both the numerator and the denominator
                     // if we succeed in doing so we use those otherwise we stick to using the current ones
-                    Mbiginteger *_negatedNumerator=OWNED(_getBigintegerNeg(_nonnullnumerator),owner),*_negatedDenominator=OWNED(_getBigintegerNeg(_denominator),owner);
+                    Mbiginteger *_negatedNumerator=owned_biginteger(_getBigintegerNeg(_nonnullnumerator),owner)
+                               ,*_negatedDenominator=owned_biginteger(_getBigintegerNeg(_denominator),owner);
                     // actually we need both or neither
                     if(_negatedNumerator&&_negatedDenominator){ // succeeded in negating the numerator and denominator
                         if(amVerbose())outputInfo("Using the negated numerator and denominator.");
@@ -981,7 +1004,7 @@ Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const *
                     if(!_numerator)FREE_BIGINTEGER(_nonnullnumerator,owner);
                 }else{
                     _rational->num=_nonnullnumerator; // could be NULL now when it's the inverse of another rational
-                    if(_denominator)_rational->den=SUBOWNED(OWNED(_getBigintegerCopy(_denominator),owner),1); // MDH@26MAY2020: copying the denominator if it is not NULL
+                    if(_denominator)_rational->den=SUBOWNED(owned_biginteger(_getBigintegerCopy(_denominator),owner),1); // MDH@26MAY2020: copying the denominator if it is not NULL
                 }
                 if(_rational){ // if we still have one (could have failed when we had to toggle the signs)
                     // last step: normalize if so requested

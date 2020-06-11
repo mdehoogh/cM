@@ -264,24 +264,31 @@ void free_text(Mtext* _text/*,Mallocationowner owner*/){
         outputInfo("No text to free!");
 }/* VALIDATED */
 
-void free_integer(Minteger* _integer,Mallocationowner owner){
+Minteger* owned_integer(Minteger* _integer,Mallocationowner owner){return(Minteger*)OWNED(_integer,owner_integer);}
+Minteger* disowned_integer(Minteger* _integer,Mallocationowner owner_integer){return(Minteger*)DISOWNED(_integer,owner_integer);}
+void free_integer(Minteger* _integer/*,Mallocationowner owner*/){
     if(_integer){
         if(amVerboseDebugging())
             output("Freeing integer %llu.\n",_integer->ll);
-        FREE_DISOWNED_1(_integer,'I',owner);
+        FREE_1(_integer,'I'/*,owner*/);
     }else
     if(amVerboseDebugging())
         outputInfo("No integer to free!");
 }/* VALIDATED */
-void free_float(Mfloat* _float,Mallocationowner owner){
+#define FREE_INTEGER(_integer,owner_integer) free_integer(disowned_integer(_integer,owner_integer))
+
+Mfloat* owned_float(Mfloat* _float,Mallocationowner owner_float){return OWNED(_float,owner_float);}
+Mfloat* disowned_float(Mfloat* _float,Mallocationowner owner_float){return DISOWNED(_float,owner_float);}
+void free_float(Mfloat* _float/*,Mallocationowner owner*/){
     if(_float){
         if(amVerboseDebugging())
             output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
-        FREE_DISOWNED_1(_float,'F',owner);
+        FREE_1(_float,'F',owner);
     }else
     if(amVerboseDebugging())
         outputInfo("No real to free!");
 }/* VALIDATED */
+#define FREE_FLOAT(_float,owner_float) free_float(disowned_float(_float,owner_float))
 
 // ALLOCATORS (private)
 // value wrappers
