@@ -114,7 +114,10 @@ Mstring* _getUndefinedValueText();
 
 Minteger* _getInteger(long long ll);
 
-void free_text(Mtext* _text,Mallocationowner owner);
+Mtext* disowned_text(Mtext* _text,Mallocationowner owner_text);
+void free_text(Mtext* _text/*,Mallocationowner owner*/);
+#define FREE_TEXT(_text,owner_text) free_text(disowned_text(_text,owner_text))
+
 Mtext* _getText(char* _c);
 Mtext* _getCharText(char _char);
 
@@ -184,8 +187,11 @@ Mfloat* _getFloatNeg(Mfloat* afloat);
 
 // BIG INTEGER STUFF
 // TODO should be moved over to Mbiginteger.h/c
-void free_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger);
 Mbiginteger* __biginteger();
+Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger);
+void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/);
+#define FREE_BIGINTEGER(_biginteger,owner_biginteger) free_biginteger(disowned_biginteger(_biginteger,owner_biginteger))
+
 Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger);
 Mbiginteger* _getBiginteger(int64_t l);
 

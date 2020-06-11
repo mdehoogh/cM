@@ -130,8 +130,9 @@ void* Mdisowned(void* ptr,Mallocationowner owner);
 // some shortcuts
 #define MALLOC_1(size,type,owner) MALLOC(size,1,type,owner)
 #define CALLOC_1(size,type,owner) CALLOC(size,1,type,owner)
+#define FREE_1(ptr,type) FREE(ptr,1,type)
 #define FREE_DISOWNED(ptr,count,type,owner) FREE((DISOWNED(ptr,owner)),count,type)
-#define FREE_DISOWNED_1(ptr,type,owner) FREE((DISOWNED(ptr,owner)),1,type)
+#define FREE_DISOWNED_1(ptr,type,owner) FREE_1((DISOWNED(ptr,owner)),type)
 
 // MDH@04MAY2020: asking for the allocation type sizes
 // MDH@07MAY2020: we could pass back all the allocation values of all the marks

@@ -42,8 +42,9 @@ typedef struct Mvaluereference{
 	Mvalue* _value; // either the host value (if no variable name is defined), or the value of the host variable
 	Mvalue* _itemid; // the item referenced!!!
 }Mvaluereference;
-
-void free_valuereference(Mvaluereference* _valuereference,Mallocationowner owner);
+Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference);
+void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/);
+#define FREE_VALUEREFERENCE(_valuereference,owner_valuereference) free_valuereference(disowned_valuereference(_valuereference,owner_valuereference))
 
 // a variable is a named value of a certain value type
 typedef struct Mvariable{
@@ -109,7 +110,9 @@ typedef struct Mexpressionlist{
     Mexpressionlistelement* _next;
 }Mexpressionlist;
 
-void free_map(Mmap* _map,Mallocationowner owner);
+Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map);
+void free_map(Mmap* _map/*,Mallocationowner owner*/);
+#define FREE_MAP(_map,owner_map) free_map(disowned_map(_map,owner_map))
 
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
 
@@ -152,12 +155,12 @@ Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token);
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mmap* _getMapOfType(Mvaluetype valuetype);
 
-Mlist* listMadeWeak(Mlist* list);
-Mmap* mapMadeWeak(Mmap* map);
+Mlist* listMadeWeak(Mlist * const list);
+Mmap* mapMadeWeak(Mmap * const map);
 
 // MDH@02MAY2019: not allowed to call free_value from the outside
-bool decrementReferenceCount(Mvalue* _value);
-bool incrementReferenceCount(Mvalue* _value);
+bool decrementReferenceCount(Mvalue * const _value);
+bool incrementReferenceCount(Mvalue * const _value);
 
 // MDH@28MAY2020: because every value is owned by the same owner i.e. 'the value owner' which is one level down _valueList there's no need to call free_value with an owner
 //                technically this means that a value once created does (and should) never change ownership as opposed to locally created stuff not bound to a global variable
@@ -165,10 +168,14 @@ Mallocationowner getValueOwner();
 // MDH@28MAY2020 better not to let the outside free values ever (except this module's garbage collector of course): void free_value(Mvalue* _value/*,Mallocationowner owner*/);
 //////////Mstring* appendld(Mstring* mstr,long double ld);
 
-/*unsigned */long long appendedToList(Mlist* const _list,Mallocationowner owner_list,const Mvalue* const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+/*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,const Mvalue * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 
 Mlist* __list(char* source,Mallocationowner owner_list);
-void free_list(Mlist* _list,Mallocationowner owner);
+
+Mlist* disowned_list(Mlist* _list,Mallocationowner owner_list);
+void free_list(Mlist* _list/*,Mallocationowner owner*/);
+#define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
+
 Mlist* _getListCopy(Mlist const * const _list);
 
 Mlist* _getListIndices(Mlist const * const _list);
@@ -245,8 +252,13 @@ unsigned long long getNumberOfValues();
 Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
 void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner);
 
-bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner);
-bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owner);
+Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement);
+bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/);
+#define FREE_MAPELEMENT(_mapelement,weak,owner_mapelement) free_mapelement(disowned_mapelement(_mapelement,owner_mapelement))
+
+Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement);
+bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/);
+#define FREE_LISTELEMENT(_listelement,owner_listelement) free_listelement(disowned_listelement(_listelement,owner_listelement))
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
@@ -285,7 +297,9 @@ typedef struct Muserfunction{
     struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
     struct Mlist* _bodyCommandList; // a list of body commands
 }Muserfunction;
-void free_userfunction(Muserfunction* _userfunction,Mallocationowner owner_userfunction);
+void disowned_userfunction(Muserfunction* _userfunction,Mallocationowner owner_userfunction);
+void free_userfunction(Muserfunction* _userfunction/*,Mallocationowner owner_userfunction*/);
+#define FREE_USERFUNCTION(_userfunction,owner_userfunction) free_userfunction(disowned_userfunction(_userfunction,owner_userfunction))
 
 typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS,FT_INTERNAL_FIVE_ARGUMENTS}Mfunctiontype;
 
@@ -337,11 +351,16 @@ typedef struct Menvironment{
 }Menvironment;
 
 Menvironment* __environment(); // creates a new (empty) environment
+Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment);
+void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
+#define FREE_ENVIRONMENT(_environment,owner_environment) free_environment(disowned_environment(_environment,owner_environment))
+
 Mstring* _getEnvironmentName(Menvironment* _environment); // for use in prompting
-void free_environment(Menvironment* _environment,Mallocationowner owner_environment);
 Menvironment* getEnvironmentParent(Menvironment* _environment);
 
-bool free_function(Mfunction* _function,Mallocationowner owner_function);
+Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function);
+bool free_function(Mfunction* _function/*,Mallocationowner owner_function*/);
+#define FREE_FUNCTION(_function,owner_function) free_function(disowned_function(_function,owner_function))
 
 Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 

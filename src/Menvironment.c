@@ -46,7 +46,7 @@ void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner 
     Mstring* _environmentName=(Mstring*)OWNED(_getExecutionEnvironmentName(),owner);
     output("%s",string(_environmentName));
     if(suffix)output("%s",suffix);
-    free_string(_environmentName,owner);
+    FREE_STRING(_environmentName,owner);
 }
 bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
     // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
@@ -110,7 +110,7 @@ Mstring* _getVariableNames(Menvironment const * const _environment,const char* c
                 Mstring* _parentVariableNames=(Mstring*)OWNED(_getVariableNames(getValueEnvironment(_environment->_parent),sep),owner); // free asap
                 if(_parentVariableNames){
                     p=string_append(p,string(_parentVariableNames));
-                    free_string(_parentVariableNames,owner); // we can do this because string_append copies the characters
+                    FREE_STRING(_parentVariableNames,owner); // we can do this because string_append copies the characters
                 }
             }
             // we'll be appending the names of the variables in the environment itself
@@ -124,7 +124,7 @@ Mstring* _getVariableNames(Menvironment const * const _environment,const char* c
                     _variableMapelement=_variableMapelement->_next;
                 }
             }
-            if(!p){free_string(_variableNames,owner);_variableNames=NULL;}
+            if(!p){FREE_STRING(_variableNames,owner);_variableNames=NULL;}
         }
     }
     return DISOWNED(_variableNames,owner);
@@ -146,7 +146,7 @@ Mlist* _getVariableNamesList(Menvironment* environment){Mallocationowner owner=g
                         if(variableNameText){
                             if(string_append(variableNameText,variableMapelement->_variable->_name->chars))
                                 appendedToList(_variableNamesList,owner,_getTextValue(string(variableNameText)),M_LL_INVALID);
-                            free_string(variableNameText,owner);
+                            FREE_STRING(variableNameText,owner);
                         }
                     }
                     variableMapelement=variableMapelement->_next;
@@ -232,7 +232,7 @@ void outputTable(Mlist* table){Mallocationowner owner=getOwner(__LINE__);
                                 Mstring* _columnNameText=(Mstring*)OWNED(_getValueText(headerrowListelement->_value,true),owner);
                                 if(_columnNameText){
                                     columnLengths[columnIndex]=output("%s",string(_columnNameText));
-                                    free_string(_columnNameText,owner);
+                                    FREE_STRING(_columnNameText,owner);
                                 }
                                 columnIndex++;
                                 headerrowListelement=headerrowListelement->_next;
@@ -253,7 +253,7 @@ void outputTable(Mlist* table){Mallocationowner owner=getOwner(__LINE__);
                                             Mstring* _cellText=(Mstring*)OWNED(_getValueText(rowListelement->_value,true),owner);
                                             cellLength=(_cellText?output("%s",string(_cellText)):0);
                                             while(++cellLength<=columnLengths[columnIndex])outputChar(' ');
-                                            free_string(_cellText,owner);
+                                            FREE_STRING(_cellText,owner);
                                             rowListelement=rowListelement->_next;
                                             columnIndex++;
                                         }
@@ -344,7 +344,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
                         }else
                             outputError("Failed to create a values table row.");
                     }
-                    free_string(_allocationTypeText,owner);
+                    FREE_STRING(_allocationTypeText,owner);
                 }
             }else
                 outputError("No allocation types/counts registered");
@@ -391,12 +391,12 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwn
                 if(_valuecountsMap){
                     if(appendedToMap(_valuesMap,owner,"counts",_getValueOfMap(_valuecountsMap,owner))<=0){
                         outputError("Failed to store the data type counts.");
-                        free_map(_valuecountsMap,owner);
+                        FREE_MAP(_valuecountsMap,owner);
                     }
                 }
             }
-            free_string(_allocationTypeCharactersText,owner);
-            free_string(_allocationTypeText,owner); // freed
+            FREE_STRING(_allocationTypeCharactersText,owner);
+            FREE_STRING(_allocationTypeText,owner); // freed
             // MDH@25NOV2019: essential!!!
             free(_allocationTypes);
             // MDH@14APR2020: free(_allocationcounts);
@@ -565,7 +565,7 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
                             // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
                             if(_mapelementValueText){
                                 p=string_append(p,string(_mapelementValueText)); // append 
-                                free_string(_mapelementValueText,owner); // release AFTER copying over
+                                FREE_STRING(_mapelementValueText,owner); // release AFTER copying over
                             }
                         }else // a 'symbolic' value
                             p=string_append(p,constantWithValue);
@@ -580,7 +580,7 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 		if(showcurlybraces)p=string_append_char(p,'}');
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){free_string(result,owner);result=NULL;}
+		if(!p){FREE_STRING(result,owner);result=NULL;}
 	}
 	return DISOWNED(result,owner);
 }/* VALIDATED */
@@ -912,7 +912,7 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
                     Mstring* _valueText=(Mstring*)OWNED(_getValueText(variable->_value,false),owner);
                     if(_valueText){
                         output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
-                        free_string(_valueText,owner);
+                        FREE_STRING(_valueText,owner);
                     }else
                         outputInfo("No value text!");
                 }
@@ -949,7 +949,7 @@ bool setVariable(Menvironment * const _environment,char /*const*/ * const name,M
                     Mstring* _valueText=(Mstring*)OWNED(_getValueText(variable->_value,false),owner);
                     if(_valueText){
                         output("Value '%s' (reference count: %zd) assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
-                        free_string(_valueText,owner);
+                        FREE_STRING(_valueText,owner);
                     }else
                     if(variable->_value)
                         outputError("No value text!");
@@ -1017,7 +1017,7 @@ Mstring* _getFunctionNames(Menvironment const * const _environment,const char* c
                 Mstring* _parentFunctionNames=(Mstring*)OWNED(_getFunctionNames(getValueEnvironment(_environment->_parent),sep),owner);
                 if(_parentFunctionNames){
                     p=string_append(p,string(_parentFunctionNames));
-                    free_string(_parentFunctionNames,owner); // we can do this because string_append copies the characters that string() points to!!
+                    FREE_STRING(_parentFunctionNames,owner); // we can do this because string_append copies the characters that string() points to!!
                 }
             }
             // we'll be appending the names of the variables in the environment itself
@@ -1031,7 +1031,7 @@ Mstring* _getFunctionNames(Menvironment const * const _environment,const char* c
                     functionmapelement=functionmapelement->_next;
                 }
             }
-            if(!p){free_string(_functionNames,owner);_functionNames=NULL;}
+            if(!p){FREE_STRING(_functionNames,owner);_functionNames=NULL;}
         }
     }
     return DISOWNED(_functionNames,owner);
@@ -1184,7 +1184,7 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
                     }
                     if(!p){
                         if(amVerbose())outputChar('!');
-                        free_string(_functionName,owner);
+                        FREE_STRING(_functionName,owner);
                         _functionName=NULL;
                         if(amVerbose())outputChar('!');
                     }

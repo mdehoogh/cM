@@ -9,7 +9,7 @@ Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){Mallocationowner ow
     if(!_biginteger)return NULL;
     Mbiginteger* _bineg=OWNED(__biginteger(),owner);
     if(_bineg&&mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bineg))!=MP_OKAY)
-    {free_biginteger(_bineg,owner);_bineg=NULL;outputError("Failed to negate a big integer");}
+    {FREE_BIGINTEGER(_bineg,owner);_bineg=NULL;outputError("Failed to negate a big integer");}
     return DISOWNED(_bineg,owner);
 }
 

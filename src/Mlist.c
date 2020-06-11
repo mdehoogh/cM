@@ -279,19 +279,19 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwne
                                                         // TODO and finally the standard deviation
                                                     }
                                                 }
-                                                free_biginteger(_countminus1,owner);
+                                                FREE_BIGINTEGER(_countminus1,owner);
                                             }
                                         }
                                     }
                                 }                       
                             }
-                            free_biginteger(_squaredsum,owner);
+                            FREE_BIGINTEGER(_squaredsum,owner);
                         }
                     }else 
                         outputError("Failed to initialize the sum of squares");
                 }else 
                     outputMemoryError("Failed to store the sample size and/or sum in a big integer");
-                free_biginteger(_sum,owner);free_biginteger(_count,owner);free_biginteger(_squaressum,owner);
+                FREE_BIGINTEGER(_sum,owner);FREE_BIGINTEGER(_count,owner);FREE_BIGINTEGER(_squaressum,owner);
             }
         }
         appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
@@ -377,7 +377,7 @@ Mmap* _getBigintegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getO
                     }
                 }else
                     outputError("Failed to create all big integer helpers in computing big integer sample statistics");
-                free_biginteger(_newsum,owner);free_biginteger(_newssq,owner);free_biginteger(_newminimum,owner);free_biginteger(_newmaximum,owner);free_biginteger(_square,owner);
+                FREE_BIGINTEGER(_newsum,owner);FREE_BIGINTEGER(_newssq,owner);FREE_BIGINTEGER(_newminimum,owner);FREE_BIGINTEGER(_newmaximum,owner);FREE_BIGINTEGER(_square,owner);
                 // ready to compose the map elements
             }else 
                 outputError("Failed to initialize the big integer sample statistics");

@@ -113,20 +113,24 @@ Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=g
     */
 }
 
+Mstring* disowned_string(Mstring* str,Mallocationowner owner_str){
+    disowned_chars(str->_chars,owner_str);
+    return DISOWNED(str,owner_str);
+}
 /** 
  * Free the memory associated with a String
  */
 // MDH@18MAY2020: you can see what a nuisance it is to free a string for somebody else because the caller needs to DISOWN it first, then I have to obtain ownership otherwise I can't free it
 //                then there's str->_chars that we need to take ownership off as well
-Mstring* free_string(Mstring* str,Mallocationowner owner_str){   
+Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/){   
     // in order to be able to free_chars but perhaps we do not need to disown str->_chars before calling free_chars????????
     if(str){
         // MDH@17APR2020: replacing src->chars by src->_chars->chars
         // MDH@09APR2020: switching to using REALLOC instead of FREE for all variable length dynamic memory allocations
         // MDH@22MAY2020: subpointers can be disowned by passing in the superpointer owner i.e. it is NOT necessary to pass in it's own owner id (which indicates it is a subpointer)
-        free_chars(str->_chars,owner_str,M_BLOCK_SIZE,str->blocks,'s');
+        free_chars(str->_chars/*,owner_str*/,M_BLOCK_SIZE,str->blocks,'s');
         // replacing: if(str->chars)str->chars=REALLOC(str->chars,str->blocks,0,sizeof(char)*BLOCK_SIZE,'s'); // replacing: FREE(str->chars,'s');
-        FREE_DISOWNED_1(str,'S',owner_str);
+        FREE_1(str,'S'/*,owner_str*/);
         return NULL;
     }
     return str;
@@ -560,7 +564,7 @@ Mstring* _string_info(Mstring* str){Mallocationowner owner=getOwner(__LINE__);
                 p=string_append(p,"(undefined)");
         }else
             p=string_append(p,"(undefined)");
-        if(!p){free_string(str_info,owner);str_info=NULL;}
+        if(!p){FREE_STRING(str_info,owner);str_info=NULL;}
     }
     return str_info;
 }

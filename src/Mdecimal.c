@@ -179,7 +179,7 @@ typedef struct MbigintegerListelement{
 static void free_bigintegerListelement(MbigintegerListelement* _bile,Mallocationowner owner){
     // ASSERT assume _bile to not be NULL
     if(_bile->_next)free_bigintegerListelement(_bile->_next,owner);
-    if(_bile->_biginteger)free_biginteger(_bile->_biginteger,owner);
+    if(_bile->_biginteger)FREE_BIGINTEGER(_bile->_biginteger,owner);
 	FREE_DISOWNED_1(_bile,'x',owner);
 }/* VALIDATED */
 
@@ -212,7 +212,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                         if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
                         for(int i=decimal->repeating;i>1;i--)if(mp_mul(MP_INT_POINTER(_den2),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den2))!=MP_OKAY){
 							outputError("Failed to multiply the second rational denominator part by 10");
-							free_biginteger(_den2,owner);
+							FREE_BIGINTEGER(_den2,owner);
 							_den2=NULL;
 							break;
 						}
@@ -224,11 +224,11 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                             if(numberOfNonRepeatingDecimalDigits>0){
                                 while(_den1&&(--numberOfNonRepeatingDecimalDigits>=0))
 									if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
-									{outputError("Failed to multiply the first rational denominator part by 10");free_biginteger(_den1,owner);_den1=NULL;}
+									{outputError("Failed to multiply the first rational denominator part by 10");FREE_BIGINTEGER(_den1,owner);_den1=NULL;}
                                 if(_den1){
                                     _den=OWNED(__biginteger(),owner);
                                     if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY){
-										free_biginteger(_den,owner);
+										FREE_BIGINTEGER(_den,owner);
 										_den=NULL;
 									}else 
 									if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
@@ -246,11 +246,11 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                                 if(_num&&strlen(periodText)){ // something between the period and the repeating digits
                                     Mbiginteger* _num2=OWNED(__biginteger(),owner); // _num2 is freed below, so that's good
                                     if(mp_read_radix(MP_INT_POINTER(_num2),periodText,10)!=MP_OKAY||mp_mul(MP_INT_POINTER(_num2),MP_INT_POINTER(_den2),MP_INT_POINTER(_num2))!=MP_OKAY||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num2),MP_INT_POINTER(_num))!=MP_OKAY){
-										free_biginteger(_num,owner);
+										FREE_BIGINTEGER(_num,owner);
 										_num=NULL;
 									}else 
                                     if(amVerbose())outputBiginteger("Non-repeating digits numerator part: '",_num2,"'.\n");
-                                    free_biginteger(_num2,owner);
+                                    FREE_BIGINTEGER(_num2,owner);
                                 }
                                 if(_num){ // so far so good
                                     // _num to be bound or freed in this block!!!
@@ -261,41 +261,41 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                                         if(!isBigintegerZero(_num1)){
                                             if(mp_mul(MP_INT_POINTER(_num1),MP_INT_POINTER(_den),MP_INT_POINTER(_num1))!=MP_OKAY
 												||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num1),MP_INT_POINTER(_num))!=MP_OKAY){
-													free_biginteger(_num,owner);
+													FREE_BIGINTEGER(_num,owner);
 													_num=NULL;
 											}else
 											if(amVerbose())outputBiginteger("Integer numerator part: '",_num1,"'.\n");
                                         }
                                     }else{
-										free_biginteger(_num,owner);
+										FREE_BIGINTEGER(_num,owner);
 										_num=NULL;
 									}
-                                    free_biginteger(_num1,owner);    
+                                    FREE_BIGINTEGER(_num1,owner);    
                                 }
                                 // negate the numerator if the decimal is negative
-                                if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){free_biginteger(_num,owner);_num=NULL;}
+                                if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){FREE_BIGINTEGER(_num,owner);_num=NULL;}
                                 if(_num){
 									_rational=OWNED(_getRational(_num,_den,M_LD_NAN,true),owner);
-									free_biginteger(_num,owner);
+									FREE_BIGINTEGER(_num,owner);
 								}
                                 // if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
-								free_biginteger(_den,owner);
+								FREE_BIGINTEGER(_den,owner);
                             }
                         }else
                             outputError("Failed to compute the second denominator multiplier");
                     }else
                         outputError("Failed to construct the integer containing the repeating digits");
-                    free_biginteger(_num3,owner);
-                    free_biginteger(_bi10,owner);
-                    free_biginteger(_den2,owner);
-                    free_biginteger(_den1,owner);
+                    FREE_BIGINTEGER(_num3,owner);
+                    FREE_BIGINTEGER(_bi10,owner);
+                    FREE_BIGINTEGER(_den2,owner);
+                    FREE_BIGINTEGER(_den1,owner);
                 }else{
                     if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
                     Mbiginteger* _num=OWNED(__biginteger(),owner);
                     if(_num){
                         if(mp_read_radix(MP_INT_POINTER(_num),decimalText,10)==MP_OKAY)
 							_rational=OWNED(_getRational(_num,NULL,M_LD_NAN,false/*,false*/),owner);
-                        free_biginteger(_num,owner); // MDH@26MAY2020: always now
+                        FREE_BIGINTEGER(_num,owner); // MDH@26MAY2020: always now
                     }
                 }
             }else // we can go through the text????
@@ -446,10 +446,10 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 			// prepend the sign if the numerator is negative TODO what if this fails?????
 			if(mp_isneg(MP_INT_POINTER(numerator))){
 				if(_decimalText&&!string_insert_char(_decimalText,0,'-')){free_string(_decimalText,owner);_decimalText=NULL;}
-				free_biginteger(_nonnegativenumerator,owner);
+				FREE_BIGINTEGER(_nonnegativenumerator,owner);
 			}
 			// free all locally used pointers to dynamic memory
-			free_biginteger(_digit,owner);free_biginteger(_remainder,owner);free_biginteger(_bi10,owner);
+			FREE_BIGINTEGER(_digit,owner);FREE_BIGINTEGER(_remainder,owner);FREE_BIGINTEGER(_bi10,owner);
 		}
     }else
         _decimalText=OWNED(_getBigintegerText(numerator),owner);

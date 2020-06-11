@@ -459,8 +459,8 @@ Mvalue* Mneg(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__); // negat
                     if(_biDenominator||!rational->den)
                         return _getRationalValue((Mrational*)OWNED(_getRational(_biNumerator,_biDenominator,(isFloatUndefined(rational->delta)==M_TRUE?M_LD_NAN:-rational->delta->ld),false),owner),owner);
                     outputError("Failed to copy the numerator of the rational to negate");
-                    if(_biDenominator)free_biginteger(_biDenominator,owner);
-                    free_biginteger(_biNumerator,owner);
+                    if(_biDenominator)FREE_BIGINTEGER(_biDenominator,owner);
+                    FREE_BIGINTEGER(_biNumerator,owner);
                 }else
                     outputError("Failed to negate the numerator of a rational");
             }
@@ -602,14 +602,14 @@ Mvalue* Mfac(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
                 //////////if(amVerbose())outputBigInteger("Result so far: '",result,"'.");
             }
             // get rid of intermediate big integers
-            free_biginteger(_multiplier,owner);
+            FREE_BIGINTEGER(_multiplier,owner);
         }else        
             outputError("Failed to create big integer 3");
         if(amVerboseDebugging())
             {outputBiginteger("The computation of the factorial of ",_finalmultiplier," took ");output("%lld ms.\n",(clock()-then)/1000);}
     }else
         outputError("Failed to create big integer 6");
-    free_biginteger(_finalmultiplier,owner);
+    FREE_BIGINTEGER(_finalmultiplier,owner);
     if(amVerboseDebugging())
         outputBiginteger("Result of applying the factorial() function: '",_result,"'.\n");
     return (_result?_getBigintegerValue(_result,owner):NULL);

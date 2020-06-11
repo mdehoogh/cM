@@ -1527,12 +1527,12 @@ Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	if(a&&b){
 		if(!isBigintegerZero(a)&&!isBigintegerZero(b)){
 			sum=__biginteger();
-			if(mp_add(a,b,sum)!=MP_OKAY){free_biginteger(sum);sum=NULL;} // if the addition fails return 0
+			if(mp_add(a,b,sum)!=MP_OKAY){FREE_BIGINTEGER(sum);sum=NULL;} // if the addition fails return 0
 		}else
 			sum=_getBigintegerCopy(isBigintegerZero(a)?b:a);
 	}
 	///////outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
-	if(!sum)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
+	if(!sum)if(freeonfailure){FREE_BIGINTEGER(a);FREE_BIGINTEGER(b);}
 	return sum;
 } // adding two big integers, if either is NULL return NULL
 Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
@@ -1540,12 +1540,12 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b,bool freeonfailure){
 	if(a&&b){
 		if(!isBigintegerOne(a)&&!isBigintegerOne(b)){
 			product=__biginteger(); // defaults to zero, which would be the result as well if either big integer is zero!!!
-			if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
+			if(mp_mul(a,b,product)!=MP_OKAY){FREE_BIGINTEGER(product);product=NULL;}
 		}else
 			product=_getBigintegerCopy(isBigintegerOne(a)?b:a);
 	}
 	//////////outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
-	if(!product)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
+	if(!product)if(freeonfailure){FREE_BIGINTEGER(a);FREE_BIGINTEGER(b);}
 	return product;
 } // multiplying two big integers, if either is NULL return NULL
 
@@ -1555,7 +1555,7 @@ Mbiginteger* _Imul(Mbiginteger* a,Mbiginteger* b){
 	if(!a)return _getBigintegerCopy(b);
 	if(!b)return _getBigintegerCopy(a);
 	Mbiginteger* product=__biginteger();
-	if(mp_mul(a,b,product)!=MP_OKAY){free_biginteger(product);product=NULL;}
+	if(mp_mul(a,b,product)!=MP_OKAY){FREE_BIGINTEGER(product);product=NULL;}
 	return product;
 }
 
@@ -1607,9 +1607,9 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den,false):_getBigintegerCopy(rational1->num));
 			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den,false):_getBigintegerCopy(rational2->num));
 			if(!_numerator||!_denominator){ // failed to compute either, so somewhere it went wrong
-				free_biginteger(_numerator);free_biginteger(_denominator);
+				FREE_BIGINTEGER(_numerator);FREE_BIGINTEGER(_denominator);
 			}else{
-				if(isBigintegerOne(_denominator)){free_biginteger(_denominator);_denominator=NULL;} // prevent storing 1 explicitly...
+				if(isBigintegerOne(_denominator)){FREE_BIGINTEGER(_denominator);_denominator=NULL;} // prevent storing 1 explicitly...
 				_rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind them
 			}
 		}else{ // either one or both are unpure i.e. 'reals' approximated by rationals 
@@ -1639,7 +1639,7 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 		Mbiginteger *_num1=_Imul(_rational1->num,_rational2->den),*_num2=_Imul(_rational2->num,_rational1->den);
 		if(_num1&&_num2) // we got (and need) both
 			_rational=_getRational(_Iadd(_num1,_num2,false),_Imul(_rational1->den,_rational2->den),realsum(_rational1->delta,_rational2->delta),true,true); // free the numerator and denominator
-		if(_num1)free_biginteger(_num1);if(_num2)free_biginteger(_num2);
+		if(_num1)FREE_BIGINTEGER(_num1);if(_num2)FREE_BIGINTEGER(_num2);
 	}
 	return _rational;
 }
@@ -1798,7 +1798,7 @@ Mvalue* pi_ql(Mvalue* value){
 							// compute the numerator and (new) denominator of the addendum rational
 							Mbiginteger* _addendumNumerator=_getBiginteger(iter%2?-1:1); // the numerator is either 1 or -1
 							if(!_addendumNumerator){
-								free_biginteger(_addendumDenominator);
+								FREE_BIGINTEGER(_addendumDenominator);
 								output("%sFailed to set the addendum numerator at iteration %u.\n",M_ERROR_PREFIX,iter);
 								break;
 							}
@@ -1824,7 +1824,7 @@ Mvalue* pi_ql(Mvalue* value){
 							if(amVerbose())outputBiginteger("Incrementing the addendum denominator by ",_denominatorIncrement,".\n");		
 							Mbiginteger* _newAddendumDenominator=_Iadd(_addendumDenominator,_denominatorIncrement,false);
 							if(!_newAddendumDenominator){
-								free_biginteger(_addendumDenominator); // won't be using this in the addendum rational
+								FREE_BIGINTEGER(_addendumDenominator); // won't be using this in the addendum rational
 								outputError("Failed to increment the addendum denominator");
 								break;
 							}
@@ -1843,7 +1843,7 @@ Mvalue* pi_ql(Mvalue* value){
 						}
 					}else{
 						outputError("Failed to initialize the addendum numerator and its increment value (2)");
-						free_biginteger(_addendumDenominator);
+						FREE_BIGINTEGER(_addendumDenominator);
 					}
 				}
 				if(mp_mul_2d(_rational->num,2,_rational->num)!=MP_OKAY){
@@ -1888,7 +1888,7 @@ Mvalue* pi_q(Mvalue* value){
 							Mbiginteger* _add=(_denominatorRational->den?_Imultiply(_denominatorRational->den,_bigintegerSquare,false):_bigintegerSquare);
 							Mbiginteger* _denominatorNumerator=(_mult?_Iadd(_mult,_add,false):NULL);
 							// free all intermediate big integers
-							free_biginteger(_mult);free_biginteger(_bigintegerSquare);if(_denominatorRational->den)free_biginteger(_add);
+							FREE_BIGINTEGER(_mult);FREE_BIGINTEGER(_bigintegerSquare);if(_denominatorRational->den)FREE_BIGINTEGER(_add);
 							// update the denominator rational, free the numerator if we fail to bind it to _denominatorRational
 							// what's dangerous in the following is that _denominatorRational->num is not freed!!!!
 							Mbiginteger* _previousDenominatorNumerator=_getBigintegerCopy(_denominatorRational->num);
@@ -1897,7 +1897,7 @@ Mvalue* pi_q(Mvalue* value){
 							if(!_denominatorRational)break; // let's keep it normalized???? TODO is that necessary
 							if(amVerbose())outputRational("Denominator (unnormalized): ",_rational,".\n");
 						}
-						free_biginteger(_bi6);
+						FREE_BIGINTEGER(_bi6);
 					}
 					if(!_denominatorRational){outputError("Final denominator could not be computed");return NULL;}
 					// NOTE: do NOT use the originals in inverting the denominator because those will be freed below so we need to pass in copies
@@ -2270,7 +2270,7 @@ public Rational limitDenominator(long maximumDenominator) {
 Mrational* _getRationalCopy(Mrational* _rational){
 	if(!_rational)return NULL;
 	Mbiginteger *_numeratorBiginteger=_getBigintegerCopy(_rational->num),*_denominatorBiginteger=(_rational->den?_getBigintegerCopy(_rational->den):NULL);
-	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){free_biginteger(_numeratorBiginteger);free_biginteger(_denominatorBiginteger);return NULL;} // some error
+	if(!_numeratorBiginteger||(!_denominatorBiginteger&&_rational->den)){FREE_BIGINTEGER(_numeratorBiginteger);FREE_BIGINTEGER(_denominatorBiginteger);return NULL;} // some error
 	// MDH@13JUN2019: if we can't get a rational, free the numerator and denominator
 	Mrational* _copyRational=_getRational(_numeratorBiginteger,_denominatorBiginteger,(_rational->delta?_rational->delta->ld:M_LD_NAN),false,true);
 	if(_copyRational)_copyRational->normalized=_rational->normalized; // copy the rational flag
@@ -2540,18 +2540,18 @@ Mvalue* Mfibonacci(Mvalue* value){
 							}
 						}else 
 							outputError("Failed to initialize the Fibonacci sequence");
-						free_biginteger(_firstBiginteger);free_biginteger(_secondBiginteger);
+						FREE_BIGINTEGER(_firstBiginteger);FREE_BIGINTEGER(_secondBiginteger);
 					}else // no additions
 						status=mp_copy(_biginteger,_fibonacciBiginteger);
 				}else
 					outputError("Failed to initialize the Fibonacci sum");
-				free_biginteger(_counterBiginteger);
+				FREE_BIGINTEGER(_counterBiginteger);
 			}
 		}
-		if(value->type!=VT_BIGINTEGER)free_biginteger(_biginteger);
+		if(value->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger);
 		if(status==MP_OKAY)return _getBigintegerValue(_fibonacciBiginteger,true);
 		// ASSERT something went wrong in the computations
-		if(_fibonacciBiginteger)free_biginteger(_fibonacciBiginteger); // not bound, so free here
+		if(_fibonacciBiginteger)FREE_BIGINTEGER(_fibonacciBiginteger); // not bound, so free here
 	}
 	return NULL;
 }
@@ -3805,12 +3805,12 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 						if(mp_cmp(_biginteger,getBigintegerLLMin())!=MP_LT&&mp_cmp(_biginteger,getBigintegerLLMax())!=MP_GT){
 							_valueReference->_value=_getIntegerValue(mp_get_i64(_biginteger));
               				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
-							free_biginteger(_biginteger);
+							FREE_BIGINTEGER(_biginteger);
 						}else
 							_valueReference->_value=_getBigintegerValue(_biginteger,true);
 							// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
 					}else{
-						free_biginteger(_biginteger);
+						FREE_BIGINTEGER(_biginteger);
 						outputErrorAndText("Failed to create the big integer to store integer ",_significantTokenText);
 					}
 				}
@@ -4089,7 +4089,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 // NOTE the following takes a lot of precision because we should never return the originals always copies which should be freed if they are not used anymore
 /* see Mexecution.c
 Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
-	Mbiginteger* _bigintegerCopy=new_Mbiginteger();if(mp_copy(_biginteger,_bigintegerCopy)!=MP_OKAY){free_biginteger(_bigintegerCopy);return NULL;}return _bigintegerCopy;
+	Mbiginteger* _bigintegerCopy=new_Mbiginteger();if(mp_copy(_biginteger,_bigintegerCopy)!=MP_OKAY){FREE_BIGINTEGER(_bigintegerCopy);return NULL;}return _bigintegerCopy;
 }
 */
 // rational number addition
@@ -4134,13 +4134,13 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 			if(amVerboseDebugging())
 				{outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_sumBiginteger=__biginteger();
-			if(_sumBiginteger&&mp_add(_biginteger1,_biginteger2,_sumBiginteger)!=MP_OKAY){free_biginteger(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_sumBiginteger&&mp_add(_biginteger1,_biginteger2,_sumBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_sumBiginteger);_sumBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
 			outputError("Failed to convert an integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1);
-		if(smallinteger2)free_biginteger(_biginteger2);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -4148,7 +4148,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){
 			if(!_sumBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llsum=getBigintegerInteger(_sumBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llsum!=M_LL_INVALID){free_biginteger(_sumBiginteger);return _getIntegerValue(llsum);}
+			if(llsum!=M_LL_INVALID){FREE_BIGINTEGER(_sumBiginteger);return _getIntegerValue(llsum);}
 			outputWarning("Small integer sum out of range, will continue using big integer sum.");
 		}
 		return _getBigintegerValue(_sumBiginteger,true);
@@ -4259,12 +4259,12 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_differenceBiginteger=__biginteger();
-			if(_differenceBiginteger&&mp_sub(_biginteger1,_biginteger2,_differenceBiginteger)!=MP_OKAY){free_biginteger(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_differenceBiginteger&&mp_sub(_biginteger1,_biginteger2,_differenceBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_differenceBiginteger);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert an integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1);
-		if(smallinteger2)free_biginteger(_biginteger2);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -4272,7 +4272,7 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){
 			if(!_differenceBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llsum=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llsum!=M_LL_INVALID){free_biginteger(_differenceBiginteger);return _getIntegerValue(llsum);}
+			if(llsum!=M_LL_INVALID){FREE_BIGINTEGER(_differenceBiginteger);return _getIntegerValue(llsum);}
 			outputWarning("Small integer difference out of range, will continue using big integer difference.");
 		}
 		return _getBigintegerValue(_differenceBiginteger,true);
@@ -4338,12 +4338,12 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_productBiginteger=__biginteger();
-			if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){free_biginteger(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_productBiginteger&&mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1);
-		if(smallinteger2)free_biginteger(_biginteger2);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -4351,7 +4351,7 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 			if(!_productBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llproduct=getBigintegerInteger(_productBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llproduct!=M_LL_INVALID){free_biginteger(_productBiginteger);return _getIntegerValue(llproduct);}
+			if(llproduct!=M_LL_INVALID){FREE_BIGINTEGER(_productBiginteger);return _getIntegerValue(llproduct);}
 			outputWarning("Small integer product out of range, will continue using big integer product.");
 		}
 		return _getBigintegerValue(_productBiginteger,true);
@@ -4371,13 +4371,13 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){
 			_productBiginteger=__biginteger();
 			if(!_productBiginteger)outputError("Failed to create the product big integer");else
 			if(mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){
-				free_biginteger(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
+				FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
 			}else
 			if(amVerbose())outputBiginteger("Big integer product: '",_productBiginteger,"'.\n");
 			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		}else
 			outputError("Failed to create two helper big integers");
-		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_productBiginteger,true);
 	}
 	*/
@@ -4503,13 +4503,13 @@ Mbiginteger* _getBigintegerPowerWithPositiveBigintegerExponent(Mbiginteger* base
 						if(!mp_isodd(exponentBiginteger)||mp_mul(_doublehalfresultBiginteger,baseBiginteger,_doublehalfresultBiginteger)==MP_OKAY)
 							_resultBiginteger=_doublehalfresultBiginteger;
 						else
-							free_biginteger(_doublehalfresultBiginteger);
+							FREE_BIGINTEGER(_doublehalfresultBiginteger);
 					}else
-						free_biginteger(_doublehalfresultBiginteger);
-					free_biginteger(_halfresultBiginteger);
+						FREE_BIGINTEGER(_doublehalfresultBiginteger);
+					FREE_BIGINTEGER(_halfresultBiginteger);
 				}
 			}
-			free_biginteger(_halfexponentBiginteger);
+			FREE_BIGINTEGER(_halfexponentBiginteger);
 		}else
 			_resultBiginteger=_getBigintegerCopy(baseBiginteger);
 	}
@@ -4543,8 +4543,8 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 		Mbiginteger *_numerator=_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger);
 		Mbiginteger *_denominator=_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger);
 		_rationalPower=_getRational(_numerator,_denominator,M_LD_NAN,true,true);
-		if(!_rationalPower||!_rationalPower->num)free_biginteger(_numerator);
-		if(!_rationalPower||!_rationalPower->den)free_biginteger(_denominator);
+		if(!_rationalPower||!_rationalPower->num)FREE_BIGINTEGER(_numerator);
+		if(!_rationalPower||!_rationalPower->den)FREE_BIGINTEGER(_denominator);
 	}
 	return _rationalPower;
 }
@@ -4562,7 +4562,7 @@ Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteg
 				Mbiginteger* _baseBiginteger=_getBiginteger(baseValue->value._integer->ll);
 				if(_baseBiginteger){
 					_resultValue=_getBigintegerBigintegerPowerValue(_baseBiginteger,exponentBiginteger);
-					free_biginteger(_baseBiginteger);
+					FREE_BIGINTEGER(_baseBiginteger);
 				}
 				return _resultValue;
 			}
@@ -4630,7 +4630,7 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 					free_decimal(_halfresultDecimal);
 				}
 			}
-			free_biginteger(_halfexponentBiginteger);
+			FREE_BIGINTEGER(_halfexponentBiginteger);
 		}else
 			_resultDecimal=_getDecimalCopy(baseDecimal);
 	}
@@ -4655,7 +4655,7 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 					if(mp_isodd(_exponentBiginteger)==MP_YES)if((result=mp_mul(powerBiginteger,_multiplierBiginteger,powerBiginteger))!=MP_OKAY)break;
 				}
 			}
-			free_biginteger(_multiplierBiginteger);free_biginteger(_exponentBiginteger);
+			FREE_BIGINTEGER(_multiplierBiginteger);FREE_BIGINTEGER(_exponentBiginteger);
 		}else
 			result=mp_copy(baseBiginteger,powerBiginteger);
 	}
@@ -4698,7 +4698,7 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						if(result==MP_OKAY){
 							// try to initialize root degree times the denominator of the root argument (which could be NULL when it equals 1)
 							Mbiginteger* _np_a=_getBigintegerCopy(rootDegreeBiginteger);
-							if(_np_a&&q_a&&mp_mul(_np_a,q_a,_np_a)!=MP_OKAY){free_biginteger(_np_a);_np_a=NULL;}
+							if(_np_a&&q_a&&mp_mul(_np_a,q_a,_np_a)!=MP_OKAY){FREE_BIGINTEGER(_np_a);_np_a=NULL;}
 							if(_np_a){
 								// we need some additional helper big integers
 								Mbiginteger *_pktothepowern=__biginteger(),*_qktothepowern=_getBiginteger(1),*_delta1=__biginteger(),*_delta2=__biginteger(),*_distancenumerator=__biginteger(),*_pktothepowernminus1=__biginteger(),*_divremainder=__biginteger(),*_gcd=__biginteger();
@@ -4846,24 +4846,24 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(mp_copy(_nextqk,_qk)!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
 
 									}
-									free_biginteger(_pktothepowern);free_biginteger(_qktothepowern);free_biginteger(_delta1);free_biginteger(_delta2);free_biginteger(_distancenumerator);
-									free_biginteger(_pktothepowernminus1);free_biginteger(_divremainder);free_biginteger(_gcd);
-									free_biginteger(_num1);free_biginteger(_num);free_biginteger(_den);free_biginteger(_nextpk);free_biginteger(_nextqk);
-									free_biginteger(_distancedenominator);
-									free_biginteger(_pkctothepowern);
-									free_biginteger(_pkonthisside);free_biginteger(_pkontheotherside);free_biginteger(_deltapk);free_biginteger(_distanceonthisside);free_biginteger(_distanceontheotherside);
-									free_biginteger(_pkhalfway);free_biginteger(_distancehalfway);free_biginteger(_one);
+									FREE_BIGINTEGER(_pktothepowern);FREE_BIGINTEGER(_qktothepowern);FREE_BIGINTEGER(_delta1);FREE_BIGINTEGER(_delta2);FREE_BIGINTEGER(_distancenumerator);
+									FREE_BIGINTEGER(_pktothepowernminus1);FREE_BIGINTEGER(_divremainder);FREE_BIGINTEGER(_gcd);
+									FREE_BIGINTEGER(_num1);FREE_BIGINTEGER(_num);FREE_BIGINTEGER(_den);FREE_BIGINTEGER(_nextpk);FREE_BIGINTEGER(_nextqk);
+									FREE_BIGINTEGER(_distancedenominator);
+									FREE_BIGINTEGER(_pkctothepowern);
+									FREE_BIGINTEGER(_pkonthisside);FREE_BIGINTEGER(_pkontheotherside);FREE_BIGINTEGER(_deltapk);FREE_BIGINTEGER(_distanceonthisside);FREE_BIGINTEGER(_distanceontheotherside);
+									FREE_BIGINTEGER(_pkhalfway);FREE_BIGINTEGER(_distancehalfway);FREE_BIGINTEGER(_one);
 								}
-								free_biginteger(_np_a);
+								FREE_BIGINTEGER(_np_a);
 								_rationalBigintegerRootRational=_getRational(_pk,_qk,M_LD_NAN,true,false);
 							}
 						}else
 							outputError("Failed to initialize the rational root approximation");
 					}else
 						outputError("Failed to initialize the rational rational root approximation");
-					if(!rootArgumentRational->den)free_biginteger(q_a); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
+					if(!rootArgumentRational->den)FREE_BIGINTEGER(q_a); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
 					// take care of freeing the result numerator and denominator when we do not have a rational root rational
-					if(!_rationalBigintegerRootRational){free_biginteger(_pk);free_biginteger(_qk);}
+					if(!_rationalBigintegerRootRational){FREE_BIGINTEGER(_pk);FREE_BIGINTEGER(_qk);}
 				}else
 					outputError("The root degree is too large (which should never happen though, as it should have been prevented)");
 			}else
@@ -5000,7 +5000,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 											free_decimal(_productplusquotient);free_decimal(_power);
 										}else
 											outputError("Failed to compute a helper big integer in computing a root decimal");
-										free_biginteger(_rootDegreeMinus1Biginteger);
+										FREE_BIGINTEGER(_rootDegreeMinus1Biginteger);
 										outputInfo("Root computation helper big integer released...");
 									}else
 										outputError("Failed to copy the root degree in computing a root decimal");
@@ -5063,8 +5063,8 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 			if(amVerbose()){outputBiginteger("Power: '",_powerBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1);
-		if(smallinteger2)free_biginteger(_biginteger2);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2);
 		// MDH@24OCT2019: if the base is integer, we're going to try to return a small integer
 		if(smallinteger1){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			if(amVerbose())outputInfo("Will try to convert the big integer result back to a small integer.");
@@ -5073,7 +5073,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llpower!=M_LL_INVALID){
 				if(amVerbose())outputInfo("Will remove the big integer exponentiation result!");
-				free_biginteger(_powerBiginteger);
+				FREE_BIGINTEGER(_powerBiginteger);
 				if(amVerbose())outputInfo("Returning the small integer equivalent of the big integer exponentation result.");
 				return _getIntegerValue(llpower);
 			}
@@ -5092,7 +5092,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 		if(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||(_value2->type==VT_RATIONAL&&(!_value2->value._rational->den||isBigintegerOne(_value2->value._rational->den)))){
 			Mbiginteger* _exponentBiginteger=_getValueBiginteger(_value2);
 			_returnValue=_getBigintegerPowerValue(_value1,_exponentBiginteger);
-			if(_value2->type!=VT_BIGINTEGER)free_biginteger(_exponentBiginteger);
+			if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_exponentBiginteger);
 		}else{ // non-integer exponent, only decimals and rationals remaining
 			// if the exponent is inherently rational we should use 
 			Mrational* _exponentRational=NULL;
@@ -5161,7 +5161,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 								*/
 							}else
 								outputError("Failed to determine the integer and fractional part of a rational exponent");
-							free_biginteger(_integerdividend);free_biginteger(_remainder);
+							FREE_BIGINTEGER(_integerdividend);FREE_BIGINTEGER(_remainder);
 						}else // the numerator equals the denominator meaning that _value1 is the value to return
 							_rootValue=_value1;
 					}else // an integer rational, so no need to take the root at all!!!
@@ -5173,7 +5173,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){
 						_returnValue=multiply(_rootValue,_getFloatValue(getFloatValuePower(_value1,getReal(_exponentRational->delta))));
 					else
 						_returnValue=_rootValue;
-					if(neg){free_biginteger(_positiveExponentNumerator);if(_returnValue)_returnValue=Mreciprocal(_returnValue);}
+					if(neg){FREE_BIGINTEGER(_positiveExponentNumerator);if(_returnValue)_returnValue=Mreciprocal(_returnValue);}
 				}else
 					outputError("Failed to reverse the sign of the rational exponent");
 				if(_value2->type!=VT_RATIONAL)free_rational(_exponentRational);
@@ -5267,7 +5267,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 						else
 							outputError("Failed to multiply the denominator of the rational by an integer power of 10.");
 					}
-					free_biginteger(_biginteger10);
+					FREE_BIGINTEGER(_biginteger10);
 				}
 				return _getRationalValue(_rational,true);
 			}
@@ -5359,12 +5359,12 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_integerquotientBiginteger=__biginteger();
-			if(_integerquotientBiginteger&&mp_div(_biginteger1,_biginteger2,_integerquotientBiginteger,NULL)!=MP_OKAY){free_biginteger(_integerquotientBiginteger);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_integerquotientBiginteger&&mp_div(_biginteger1,_biginteger2,_integerquotientBiginteger,NULL)!=MP_OKAY){FREE_BIGINTEGER(_integerquotientBiginteger);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1);
-		if(smallinteger2)free_biginteger(_biginteger2);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -5372,7 +5372,7 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 			if(!_integerquotientBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llintegerquotient=getBigintegerInteger(_integerquotientBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llintegerquotient!=M_LL_INVALID){free_biginteger(_integerquotientBiginteger);return _getIntegerValue(llintegerquotient);}
+			if(llintegerquotient!=M_LL_INVALID){FREE_BIGINTEGER(_integerquotientBiginteger);return _getIntegerValue(llintegerquotient);}
 			outputWarning("Small integer integer quotient out of range, will continue using big integer integer quotient.");
 		}
 		return _getBigintegerValue(_integerquotientBiginteger,true);
@@ -5394,15 +5394,15 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){
 				if(_integerdivideBiginteger){
 					Mbiginteger* _integerremainderBiginteger=__biginteger();
 					if(_integerremainderBiginteger){
-						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerdivideBiginteger);_integerdivideBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-						free_biginteger(_integerremainderBiginteger);
+						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_integerdivideBiginteger);_integerdivideBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+						FREE_BIGINTEGER(_integerremainderBiginteger);
 					}
 				}else 
 					outputError("Failed to create the integer divide result big integer");
 			}
 		}else 
 			outputError("Failed to create two helper big integers");
-		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_integerdivideBiginteger,true);
 	}
 	*/
@@ -5470,12 +5470,12 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Moduloing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_moduloBiginteger=__biginteger();
-			if(_moduloBiginteger&&mp_div(_biginteger1,_biginteger2,NULL,_moduloBiginteger)!=MP_OKAY){free_biginteger(_moduloBiginteger);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			if(_moduloBiginteger&&mp_div(_biginteger1,_biginteger2,NULL,_moduloBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_moduloBiginteger);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer division remainder: '",_moduloBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1);
-		if(smallinteger2)free_biginteger(_biginteger2);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -5483,7 +5483,7 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 			if(!_moduloBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llmodulo=getBigintegerInteger(_moduloBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llmodulo!=M_LL_INVALID){free_biginteger(_moduloBiginteger);return _getIntegerValue(llmodulo);}
+			if(llmodulo!=M_LL_INVALID){FREE_BIGINTEGER(_moduloBiginteger);return _getIntegerValue(llmodulo);}
 			outputWarning("Small integer quotient remainder out of range, will continue using big integer quotient remainder.");
 		}
 		return _getBigintegerValue(_moduloBiginteger,true);
@@ -5504,13 +5504,13 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){
 				if(_integerremainderBiginteger){
 					Mbiginteger *_integerdivideBiginteger=__biginteger();
 					if(_integerdivideBiginteger){
-						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerremainderBiginteger);_integerremainderBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-						free_biginteger(_integerdivideBiginteger);
+						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_integerremainderBiginteger);_integerremainderBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+						FREE_BIGINTEGER(_integerdivideBiginteger);
 					}
 				}
 			}
 		}
-		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
 		return _getBigintegerValue(_integerremainderBiginteger,true);
 	}
 	*/
@@ -5570,8 +5570,8 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-			if(_biginteger1&&_biginteger2&&mp_xor(_biginteger1,_biginteger2,_xorbiginteger)!=MP_OKAY){free_biginteger(_xorbiginteger);_xorbiginteger=NULL;}
-			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+			if(_biginteger1&&_biginteger2&&mp_xor(_biginteger1,_biginteger2,_xorbiginteger)!=MP_OKAY){FREE_BIGINTEGER(_xorbiginteger);_xorbiginteger=NULL;}
+			FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 			return _getBigintegerValue(_xorbiginteger,true);
 		}else
 			outputError("Failed to create the xor result big integer");
@@ -5592,8 +5592,8 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-			if(_biginteger1&&_biginteger2&&mp_and(_biginteger1,_biginteger2,_bitwiseandbiginteger)!=MP_OKAY){free_biginteger(_bitwiseandbiginteger);_bitwiseandbiginteger=NULL;}
-			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+			if(_biginteger1&&_biginteger2&&mp_and(_biginteger1,_biginteger2,_bitwiseandbiginteger)!=MP_OKAY){FREE_BIGINTEGER(_bitwiseandbiginteger);_bitwiseandbiginteger=NULL;}
+			FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 			return _getBigintegerValue(_bitwiseandbiginteger,true);
 		}else
 			outputError("Failed to create the bitwise and result big integer");
@@ -5614,8 +5614,8 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){
 			// creating two intermediate big integers that need to be freed asap
 			Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 			Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
-			if(_biginteger1&&_biginteger2&&mp_or(_biginteger1,_biginteger2,_bitwiseorbiginteger)!=MP_OKAY){free_biginteger(_bitwiseorbiginteger);_bitwiseorbiginteger=NULL;}
-			free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+			if(_biginteger1&&_biginteger2&&mp_or(_biginteger1,_biginteger2,_bitwiseorbiginteger)!=MP_OKAY){FREE_BIGINTEGER(_bitwiseorbiginteger);_bitwiseorbiginteger=NULL;}
+			FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 			return _getBigintegerValue(_bitwiseorbiginteger,true);
 		}else
 			outputError("Failed to create the bitwise or result big integer");
@@ -5638,7 +5638,7 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		if(_biginteger1&&_biginteger2)_logicalandbiginteger=_getBiginteger(mp_iszero(_biginteger1)==MP_YES||mp_iszero(_biginteger2)==MP_YES?0:1); // if either is zero, the result is zero otherwise 1
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getBigintegerValue(_logicalandbiginteger,true);
 	}	
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -5657,7 +5657,7 @@ Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		if(_biginteger1&&_biginteger2)_logicalorbiginteger=_getBiginteger(mp_iszero(_biginteger1)==MP_NO||mp_iszero(_biginteger2)==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getBigintegerValue(_logicalorbiginteger,true);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
@@ -5690,7 +5690,7 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _shiftleftBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift left
 		if(_shiftleftBiginteger){
 			if((shiftleftinteger<0?mp_div_2d(_value1->value._biginteger,-shiftleftinteger,_shiftleftBiginteger,NULL):mp_mul_2d(_value1->value._biginteger,shiftleftinteger,_shiftleftBiginteger))!=MP_OKAY){
-				free_biginteger(_shiftleftBiginteger);_shiftleftBiginteger=NULL;
+				FREE_BIGINTEGER(_shiftleftBiginteger);_shiftleftBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
 			}else 
 				outputError("Failed to shift left a big integer");
@@ -5760,7 +5760,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _shiftrightBiginteger=_getBigintegerCopy(_value1->value._biginteger); // make a copy of the big integer to shift right
 		if(_shiftrightBiginteger){
 			if((shiftrightinteger>0?mp_div_2d(_value1->value._biginteger,shiftrightinteger,_shiftrightBiginteger,NULL):mp_mul_2d(_value1->value._biginteger,-shiftrightinteger,_shiftrightBiginteger))!=MP_OKAY){
-				free_biginteger(_shiftrightBiginteger);_shiftrightBiginteger=NULL;
+				FREE_BIGINTEGER(_shiftrightBiginteger);_shiftrightBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
 			}else 
 				outputError("Failed to shift right a big integer");
@@ -5777,7 +5777,7 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){
 					if(amVerbose()){outputBiginteger("Shifting big integer '",_biginteger1,"' left");output(" by %" PRIi64 ".\n",shr);}
 					if((shr>0?mp_div_2d(_biginteger1,shr,_biginteger1,NULL):mp_mul_2d(_biginteger1,-shr,_biginteger1))==MP_OKAY)return _getBigintegerValue(_biginteger1,true);
 					output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_biginteger1,"' to the right.\n");			
-					free_biginteger(_biginteger1);
+					FREE_BIGINTEGER(_biginteger1);
 				}
 			}
 		}else
@@ -5843,7 +5843,7 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getIntegerValue(llsmallerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
@@ -5892,7 +5892,7 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		long long lllargerthan=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getIntegerValue(lllargerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
@@ -5941,7 +5941,7 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		long long lllargerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getIntegerValue(lllargerthanorequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
@@ -5991,7 +5991,7 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		long long llunequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getIntegerValue(llunequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
@@ -6042,7 +6042,7 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		long long llequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getIntegerValue(llequalto);
 	}
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -6091,7 +6091,7 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 		Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 		Mbiginteger* _biginteger2=(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger));
 		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(_biginteger1,_biginteger2)==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1);free_biginteger(_biginteger2); // free the created copies
+		FREE_BIGINTEGER(_biginteger1);FREE_BIGINTEGER(_biginteger2); // free the created copies
 		return _getIntegerValue(llsmallerthanorequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)

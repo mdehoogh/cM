@@ -79,15 +79,21 @@ Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool imm
     return NULL; // replacing: return DISOWNED(_variable,owner);
 }/* VALIDATED */
 
-bool free_listelement(Mlistelement* _listelement,bool weak,Mallocationowner owner){
+Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
+    if(!_listelement)return NULL;
+    disowned_listelement(_listelement->_next,owner_listelement);
+    return DISOWNED(_listelement,owner_listelement);
+}
+bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/){
     if(_listelement){
         if(_listelement->_next){free_listelement(_listelement->_next,weak,owner);_listelement->_next=NULL;}
         if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
-        FREE_DISOWNED_1(_listelement,'l',owner);
+        FREE_1(_listelement,'l'/*,owner*/);
         return true;
     }
     return false;
 }/* VALIDATED */
+
 Mlist* __list(char* source,Mallocationowner owner_list){// Mallocationowner owner=getOwner(__LINE__);
     Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner_list);
     if(source){
@@ -100,23 +106,37 @@ Mlist* __list(char* source,Mallocationowner owner_list){// Mallocationowner owne
     }
     return DISOWNED(_list,owner_list);
 }
+
+Mlist* disowned_list(Mlist* _list,Mallocationowner owner_list){
+    if(!_list)return NULL;
+    disowned_chars(_list->_creator,owner_list);
+    disowned_listelement(_list->_first,owner_list);
+    return DISOWNED(_list,owner_list);
+}
+
 void free_list(Mlist* _list,Mallocationowner owner){
     if(amVerboseDebugging())
     {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
     if(_list->_first){
         // MDH@17APR2020: assuming we allocated exactly the number of characters for storing the characters
-        if(_list->_creator)freeChars(_list->_creator,owner);// MDH@17APR2020 replacing: FREE_DISOWNED_1(_list->_creator,'"');
-        free_listelement(_list->_first,_list->weak,owner);
+        if(_list->_creator)freeChars(_list->_creator/*,owner*/);// MDH@17APR2020 replacing: FREE_DISOWNED_1(_list->_creator,'"');
+        free_listelement(_list->_first,_list->weak/*,owner*/);
         _list->_first=NULL;
     }
-    FREE_DISOWNED_1(_list,'L',owner);
+    FREE_1(_list,'L'/*,owner*/);
 }/* VALIDATED */
 
-bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
+Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
+    disowned_mapelement(_mapelement->_next,owner_mapelement);
+    disowned_variable(_mapelement->_variable,owner_mapelement);
+    return DISOWNED(_mapelement,owner_mapelement);
+}
+
+bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
     if(amVerboseDebugging())
         output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
     if(_mapelement->_next){
-        if(!free_mapelement(_mapelement->_next,weak,owner))
+        if(!free_mapelement(_mapelement->_next,weak/*,owner*/))
             outputError("Failed to free a map element!");//////else outputInfo("Next map element freed!");
         _mapelement->_next=NULL;
     }
@@ -126,34 +146,46 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak,Mallocationowner owner){
                 output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
         }else
             outputWarning("Unnamed map attribute!");
-        free_variable(_mapelement->_variable,weak,owner);
+        free_variable(_mapelement->_variable,weak/*,owner*/);
         _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
     }else
         outputWarning("No map attribute to free!");
-    FREE_DISOWNED_1(_mapelement,'m',owner);
+    FREE_1(_mapelement,'m'/*,owner*/);
     if(amVerboseDebugging())outputInfo("\tMap element freed!");
     return true;
 }/* VALIDATED */
-void free_map(Mmap* _map,Mallocationowner owner){
+
+Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
+    disowned_mapelement(_map->_first,owner_map);
+    return DISOWNED(_map,owner_map);
+}
+
+void free_map(Mmap* _map/*,Mallocationowner owner*/){
     if(amVerboseDebugging())
         output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
     if(_map->_first){
-        free_mapelement(_map->_first,_map->weak,Msubowner(owner,1));
+        FREE_MAPELEMENT(_map->_first,_map->weak/*,Msubowner(owner,1)*/);
         _map->_first=NULL;
     }else
     if(amVerboseDebugging()) 
         outputInfo("No map attributes to free!");
-    FREE_DISOWNED_1(_map,'M',owner);
+    FREE_1(_map,'M'/*,owner*/);
 }/* VALIDATED */
 
 // MDH@26OCT2019: when freeing a value reference we NULL the fields just in case (TODO why?)
-void free_valuereference(Mvaluereference* _valuereference,Mallocationowner owner){
-    if(_valuereference->_name){freeChars(_valuereference->_name,owner);_valuereference->_name=NULL;}
+Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
+    if(!_valuereference)return NULL;
+    disowned_chars(_valuereference->_name,owner_valuereference);
+    return DISOWNED(_valuereference,owner_valuereference);
+}
+
+void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/){
+    if(_valuereference->_name){freeChars(_valuereference->_name/*,owner*/);_valuereference->_name=NULL;}
     /* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
     if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
     */
     if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
-    FREE_DISOWNED_1(_valuereference,'5',owner); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
+    FREE_1(_valuereference,'5'/*,owner*/); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
 }/* VALIDATED */
 
 // manage a list of created values
@@ -200,18 +232,18 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
     if(_value){
         switch(_value->type){
             case VT_UNDEFINED:break;
-            case VT_TOKEN:if(_value->value._token){free_token(_value->value._token,owner_value_data);_value->value._token=NULL;}break;
-            case VT_INTEGER:if(_value->value._integer){free_integer(_value->value._integer,owner_value_data);_value->value._integer=NULL;}break;
-            case VT_BIGINTEGER:if(_value->value._biginteger){free_biginteger(_value->value._biginteger,owner_value_data);_value->value._biginteger=NULL;}break;
-            case VT_DECIMAL:if(_value->value._decimal){free_decimal(_value->value._decimal,owner_value_data);_value->value._decimal=NULL;}break;
-            case VT_RATIONAL:if(_value->value._rational){free_rational(_value->value._rational,owner_value_data);_value->value._rational=NULL;}break;
-            case VT_FLOAT:if(_value->value._float){free_float(_value->value._float,owner_value_data);_value->value._float=NULL;}break;
-            case VT_TEXT:if(_value->value._text){free_text(_value->value._text,owner_value_data);_value->value._text=NULL;}break;
-            case VT_LIST:if(_value->value._list){free_list(_value->value._list,owner_value_data);_value->value._list=NULL;}break;
-            case VT_MAP:if(_value->value._map){free_map(_value->value._map,owner_value_data);_value->value._map=NULL;}break;
-            case VT_REFERENCE:if(_value->value._reference){free_reference(_value->value._reference,owner_value_data);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
-            case VT_FUNCTION:if(_value->value._function){free_function(_value->value._function,owner_value_data);_value->value._function=NULL;}break;
-            case VT_ENVIRONMENT:if(_value->value._environment){free_environment(_value->value._environment,owner_value_data);_value->value._environment=NULL;}break;
+            case VT_TOKEN:if(_value->value._token){FREE_TOKEN(_value->value._token,owner_value_data);_value->value._token=NULL;}break;
+            case VT_INTEGER:if(_value->value._integer){FREE_INTEGER(_value->value._integer,owner_value_data);_value->value._integer=NULL;}break;
+            case VT_BIGINTEGER:if(_value->value._biginteger){FREE_BIGINTEGER(_value->value._biginteger,owner_value_data);_value->value._biginteger=NULL;}break;
+            case VT_DECIMAL:if(_value->value._decimal){FREE_DECIMAL(_value->value._decimal,owner_value_data);_value->value._decimal=NULL;}break;
+            case VT_RATIONAL:if(_value->value._rational){FREE_RATIONAL(_value->value._rational,owner_value_data);_value->value._rational=NULL;}break;
+            case VT_FLOAT:if(_value->value._float){FREE_FLOAT(_value->value._float,owner_value_data);_value->value._float=NULL;}break;
+            case VT_TEXT:if(_value->value._text){FREE_TEXT(_value->value._text,owner_value_data);_value->value._text=NULL;}break;
+            case VT_LIST:if(_value->value._list){FREE_LIST(_value->value._list,owner_value_data);_value->value._list=NULL;}break;
+            case VT_MAP:if(_value->value._map){FREE_MAP(_value->value._map,owner_value_data);_value->value._map=NULL;}break;
+            case VT_REFERENCE:if(_value->value._reference){FREE_REFERENCE(_value->value._reference,owner_value_data);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
+            case VT_FUNCTION:if(_value->value._function){FREE_FUNCTION(_value->value._function,owner_value_data);_value->value._function=NULL;}break;
+            case VT_ENVIRONMENT:if(_value->value._environment){FREE_ENVIRONMENT(_value->value._environment,owner_value_data);_value->value._environment=NULL;}break;
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         FREE_DISOWNED_1(_value,'X',owner_value);
@@ -293,12 +325,12 @@ unsigned long long getNumberOfValues(){
     return (_valueList?_valueList->numberOfElements:0);
 }/* VALIDATED */
 
-bool decrementReferenceCount(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+bool decrementReferenceCount(Mvalue * const _value){Mallocationowner owner=getOwner(__LINE__);
     if(_value){
         if(_value->count>0){(_value->count)--;return true;}
         Mstring* _valueText=(Mstring*)OWNED(_getValueText(_value,false),owner);
         output("%sReference count of '%s' of type '%c' already zero.\n",M_BUG_PREFIX,string(_valueText),MUTABLEVALUETYPECHARS[_value->type]); // NOTE bugs should always be reported whether or not in amVerbose() mode or not!!!
-        free_string(_valueText,owner);
+        FREE_STRING(_valueText,owner);
     }else
     if(amVerbose())
         outputInfo("No value to decrement the reference count of.");
@@ -333,7 +365,10 @@ Mreference* _getReference(Mvariable* variable){Mallocationowner owner=getOwner(_
     if(_reference){_reference->variable=SUBOWNED(variable,1);if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
     return DISOWNED(_reference,owner);
 }
-void free_reference(Mreference* reference,Mallocationowner owner_reference){
+#ifndef __PRODUCTION__
+Mreference* disowned_reference(Mreference* _reference,Mallocationowner owner_reference){return DISOWNED(_reference,owner_reference);}
+#endif
+void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
     if(!reference)return;
     if(reference->variable){
         if(reference->variable->referencecount==0)
@@ -341,7 +376,7 @@ void free_reference(Mreference* reference,Mallocationowner owner_reference){
         else
             reference->variable->referencecount--;
     }
-    FREE_DISOWNED_1(reference,'Q',owner_reference);
+    FREE_1(reference,'Q'/*,owner_reference*/);
 }
 Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference){
     // MDH@19MAY2020: should we check whether _reference is ownable???????
@@ -351,7 +386,7 @@ Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_referen
         _referenceValue->type=VT_REFERENCE;
         _referenceValue->value._reference=SUBOWNED(OWNED(_reference,owner_valueList),3);
     }else
-    if(owner_reference.level==0)free_reference(_reference,owner_reference);
+    if(owner_reference.level==0)FREE_REFERENCE(_reference,owner_reference);
     return _referenceValue;
 }
 // MDH@26MAY2020: new contract, if NULL is returned _decimal is NOT bound and should be freed if desirable...
@@ -362,7 +397,7 @@ Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner_decimal){
         _decimalValue->type=VT_DECIMAL;
         _decimalValue->value._decimal=SUBOWNED(OWNED(_decimal,owner_valueList),3);
     }else
-    if(owner_decimal.level==0)free_decimal(_decimal,owner_decimal);
+    if(owner_decimal.level==0)FREE_DECIMAL(_decimal,owner_decimal);
     return _decimalValue;
 }/* VALIDATED */
 Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
@@ -372,7 +407,7 @@ Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_bigi
         _bigintegerValue->type=VT_BIGINTEGER;
         _bigintegerValue->value._biginteger=SUBOWNED(OWNED(_biginteger,getValueOwner()),1);
     }else
-    if(owner_biginteger.level==0)free_biginteger(_biginteger,owner_biginteger);
+    if(owner_biginteger.level==0)FREE_BIGINTEGER(_biginteger,owner_biginteger);
     return _bigintegerValue;
 }/* VALIDATED */
 
@@ -516,7 +551,7 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
         if(!_attributeName){outputError("Failed to duplicate a map attribute name");break;}
         string_append(_attributeName,mapelement->_variable->_name->chars); // MDH@17APR2020: char* _name replaced by Mchars* _name // append the attribute name
         Mvalue* attributeValue=OWNED(_getTextValue(string(_attributeName)),owner);
-        free_string(_attributeName,owner);
+        FREE_STRING(_attributeName,owner);
         if(!attributeValue){outputError("Failed to store a map attribute name");break;}
         if(appendedToList(_list,owner,attributeValue,M_LL_INVALID)<=0){
             // NO need to free indexValue because it is a Value!!!
@@ -551,7 +586,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
 Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer){
     if(!_integer)return NULL;
     Mvalue* _value=__value("integer"); // make the value create have the same owner as the integer
-    if(_value){_value->value._integer=OWNED(DISOWNED(_integer,owner_integer),owner_value_data);_value->type=VT_INTEGER;}else if(owner_integer.level==0)free_integer(_integer,owner_integer);
+    if(_value){_value->value._integer=OWNED(DISOWNED(_integer,owner_integer),owner_value_data);_value->type=VT_INTEGER;}else if(owner_integer.level==0)FREE_INTEGER(_integer,owner_integer);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfFloat(Mfloat* _float,Mallocationowner owner_float){
@@ -569,7 +604,7 @@ Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map){
 Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token){
     if(!_token)return NULL;
     Mvalue* _value=__value("token");
-    if(_value){_value->value._token=(Mtoken*)OWNED(DISOWNED(_token,owner_token),owner_value_data);_value->type=VT_TOKEN;}else if(owner_token.level==0)free_token(_token,owner_token);
+    if(_value){_value->value._token=(Mtoken*)OWNED(DISOWNED(_token,owner_token),owner_value_data);_value->type=VT_TOKEN;}else if(owner_token.level==0)FREE_TOKEN(_token,owner_token);
     return _value;
 }/* VALIDATED */
 
@@ -577,7 +612,7 @@ Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token){
 Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 	if(!_token)return NULL;
 	Mvalue* _tokenValue=__value();
-	if(_tokenValue){_tokenValue->type=VT_TOKEN;_tokenValue->value._token=_token;}else if(freeonfailure)free_token(_token);
+	if(_tokenValue){_tokenValue->type=VT_TOKEN;_tokenValue->value._token=_token;}else if(freeonfailure)FREE_TOKEN(_token);
 	return _tokenValue;
 }*/
 
@@ -1204,7 +1239,7 @@ Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner_rational){
         _rationalValue->type=VT_RATIONAL;
         _rationalValue->value._rational=_rational;
     }else
-    if(owner_rational.level==0)free_rational(_rational,owner_rational);
+    if(owner_rational.level==0)FREE_RATIONAL(_rational,owner_rational);
     return _rationalValue;
 }/* VALIDATED */
 
@@ -1232,7 +1267,7 @@ Mstring* _getListText(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 				Mstring* _listelementValueText=(Mstring*)OWNED(_getValueText(_listelementValue,false),owner); // to be freed asap
 				if(_listelementValueText){
 					p=string_append(p,string(_listelementValueText));
-					free_string(_listelementValueText,owner); // release AFTER copying over
+					FREE_STRING(_listelementValueText,owner); // release AFTER copying over
 				}
 			/////}
 			_listelement=_listelement->_next;
@@ -1240,7 +1275,7 @@ Mstring* _getListText(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 		p=string_append_char(p,']');
 		/////output("List=%s",string(p));
 		// if appending failed somewhere free s
-		if(!p){free_string(result,owner);result=NULL;}
+		if(!p){FREE_STRING(result,owner);result=NULL;}
 	}
 	return DISOWNED(result,owner);
 }/* VALIDATED */
@@ -1248,7 +1283,7 @@ Mstring* _getListText(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 void outputList(char const * const prefix,Mlist* list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _listText=OWNED(_getListText(list),owner);
     output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
-    free_string(_listText,owner);
+    FREE_STRING(_listText,owner);
 }/* VALIDATED */
 
 Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings){Mallocationowner owner=getOwner(__LINE__);
@@ -1278,7 +1313,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
                             // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
                             if(_mapelementValueText){
                                 p=string_append(p,string(_mapelementValueText)); // append 
-                                free_string(_mapelementValueText,owner); // release AFTER copying over
+                                FREE_STRING(_mapelementValueText,owner); // release AFTER copying over
                             }
                         }
                     }
@@ -1294,7 +1329,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
         }
 		//////output("%s",string(p));
 		// if we failed, we have to free s here!!!
-		if(!p){free_string(result,owner);result=NULL;}
+		if(!p){FREE_STRING(result,owner);result=NULL;}
 	}
 	return DISOWNED(result,owner);
 }/* VALIDATED */
@@ -1302,7 +1337,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
 void outputMap(char const * const prefix,Mmap* map,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _mapText=OWNED(_getMapText(map,true,true,true),owner);
     output("%s%s%s",(prefix?prefix:""),(_mapText?string(_mapText):""),(suffix?suffix:""));
-    free_string(_mapText,owner);
+    FREE_STRING(_mapText,owner);
 }/* VALIDATED */ 
 
 // MDH@24OCT2019: if you want the value representation or perhaps the name of a constant depends on whether name is defined
@@ -1337,7 +1372,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                             p=string_append(p,string(token->text));
                             token=token->next;
                         }
-                        if(!p){free_string(valueText,owner);valueText=NULL;}
+                        if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
                     }
                     // replacing: valueText=_stringCopy(_value->value._token->text,0);
                 }
@@ -1359,16 +1394,16 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                         if(_value->value._reference->_itemid){
                             p=string_append_char(p,'[');
                             Mstring* _valueText=_getValueText(_value->value._reference->_itemid,dequoted);
-                            if(_valueText){p=string_append(p,string(_valueText));free_string(_valueText);}
+                            if(_valueText){p=string_append(p,string(_valueText));FREE_STRING(_valueText);}
                             p=string_append_char(p,']');
                         }
                         if(_value->value._reference->_value){
                             p=string_append_char(p,'=');
                             Mstring* _valueText=_getValueText(_value->value._reference->_value,dequoted);
-                            if(_valueText){p=string_append(p,string(_valueText));free_string(_valueText);}
+                            if(_valueText){p=string_append(p,string(_valueText));FREE_STRING(_valueText);}
                         }
                         */
-                        if(!p){free_string(valueText,owner);valueText=NULL;}
+                        if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
                     }
                 }
                 break;
@@ -1388,7 +1423,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                                         p=string_append_char(p,':');
                                         Mstring* _parameterValueText=OWNED(_getValueText(_parameterMapelement->_variable->_value,false),owner);
                                         p=string_append(p,string(_parameterValueText));
-                                        free_string(_parameterValueText,owner);
+                                        FREE_STRING(_parameterValueText,owner);
                                     }
                                     _parameterMapelement=_parameterMapelement->_next;
                                     if(_parameterMapelement)p=string_append_char(p,',');
@@ -1397,7 +1432,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                             p=string_append_char(p,')');
                         }else
                             p=string_append_char(p,'?');
-                        if(!p){free_string(valueText,owner);valueText=NULL;}
+                        if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
                     }
                 }
                 break;
@@ -1412,12 +1447,12 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                             p=string_append_char(p,'\'');
                             Mstring* _environmentName=OWNED(_getEnvironmentName(environment),owner);
                             p=string_append(p,string(_environmentName));
-                            free_string(_environmentName,owner);
+                            FREE_STRING(_environmentName,owner);
                             p=string_append_char(p,'\'');
                             p=string_append_char(p,')');
                         }else
                             p=string_append_char(p,'?');
-                        if(!p){free_string(valueText,owner);valueText=NULL;}
+                        if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
                     }
                 }
                 break;
@@ -1441,7 +1476,7 @@ size_t outputValue(const char* const prefix,const Mvalue* const value,const char
     if(prefix)written=output("%s",prefix);
     if(value){
         Mstring* _valueText=OWNED(_getValueText(value,false),owner); // free asap
-        if(_valueText){written+=output("%s",string(_valueText));free_string(_valueText,owner);_valueText=NULL;}
+        if(_valueText){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
     }else
         written+=outputChar('-');
     if(suffix)written+=output("%s",suffix);
@@ -1479,7 +1514,7 @@ long long getValueInteger(const Mvalue* const _value){Mallocationowner owner=get
                     Mbiginteger* _biginteger=OWNED(_rational2biginteger(_value->value._rational),owner);
                     if(_biginteger){
                         long long ll=biginteger2long(_biginteger);
-                        free_biginteger(_biginteger,owner);
+                        FREE_BIGINTEGER(_biginteger,owner);
                         return ll;
                     }
                 }
@@ -1498,7 +1533,7 @@ long double getBigintegerLongDouble(Mbiginteger* biginteger){
     /* replacing:
     long double ldBiginteger=M_LD_NAN;
    	Mstring* _bigintegerText=(biginteger?_getBigintegerText(biginteger):NULL);
-    if(_bigintegerText){ldBiginteger=_strtold(string(_bigintegerText),ldBiginteger);free_string(_bigintegerText);}
+    if(_bigintegerText){ldBiginteger=_strtold(string(_bigintegerText),ldBiginteger);FREE_STRING(_bigintegerText);}
 	return ldBiginteger;
     */
 }
@@ -1535,7 +1570,7 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
                 // this is a bit of a nuisance when the double is out of the VT_INTEGER range
                 _resultBiginteger=OWNED(__biginteger(),owner);
                 if(_resultBiginteger&&mp_set_longdouble(_resultBiginteger,_value->value._float->ld)!=MP_OKAY)
-                {free_biginteger(_resultBiginteger,owner);_resultBiginteger=NULL;}
+                {FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
                 if(!_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
             }
             break;
@@ -1543,7 +1578,7 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
             {
                 _resultBiginteger=__biginteger();
                 if(_resultBiginteger&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),_value->value._text->_c,10)!=MP_OKAY)
-                {free_biginteger(_resultBiginteger,owner);_resultBiginteger=NULL;}
+                {FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
                 if(!_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
             }
             break;
@@ -1551,7 +1586,7 @@ Mbiginteger* _getValueBiginteger(Mvalue const * const _value){Mallocationowner o
             {
                 _resultBiginteger=OWNED(__biginteger(),owner);
                 if(_resultBiginteger&&mp_read_radix(MP_INT_POINTER(_resultBiginteger),string(_value->value._token->text),10)!=MP_OKAY)
-                {free_biginteger(_resultBiginteger,owner);_resultBiginteger=NULL;}
+                {FREE_BIGINTEGER(_resultBiginteger,owner);_resultBiginteger=NULL;}
                 if(!_resultBiginteger)outputValue("ERROR: Failed to convert `",_value,"` to a big integer.\n");
             }
         case VT_REFERENCE: // TODO this may be hard
@@ -1571,7 +1606,7 @@ bool listAppendedToMap(Mmap* const _map,Mallocationowner owner_map,const Mlist* 
                 Mstring* _indexValueText=OWNED(__string(),owner);
                 if(_indexValueText){ // free asap
                     if(!appendll(_indexValueText,_listelement->index)||appendedToMap(_map,owner_map,string(_indexValueText),_listelement->_value)<=0){outputError("Failed to append a list element to a map");result=false;}
-                    free_string(_indexValueText,owner); // freeing
+                    FREE_STRING(_indexValueText,owner); // freeing
                 }else{
                     result=false;
                     output("ERROR: Failed to convert list element index %llu to an attribute name.\n",_listelement->index);
@@ -1664,7 +1699,7 @@ bool maplistAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist con
                             outputError("Failed to append a list element to a map (using the index text as attribute name)");
                             result=false;
                         }
-                        free_string(_attributeNameValueText,owner);
+                        FREE_STRING(_attributeNameValueText,owner);
                         // TODO is this Ok?
                         // DONE yes, because appendedToMap will _strdup the char* (i.e. string(_attributeNameValueText) )
                     }
@@ -1728,7 +1763,7 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,c
                             result=false;
                             outputError("Failed to construct the attribute name text in constructing a map list element");
                         }
-                        free_string(_attributeName,owner); // freed!
+                        FREE_STRING(_attributeName,owner); // freed!
                     }else{
                         result=false;
                         outputError("Failed to create a text");
@@ -1753,7 +1788,7 @@ Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__
     	    Mstring* _valueText=OWNED(_getValueText(value,true),owner); // TODO will there be any brackets around a repeating part of a 
 	        if(_valueText){
                 _valueTextDecimal=OWNED(_getTextDecimal(string(_valueText),0),owner);
-                free_string(_valueText,owner);
+                FREE_STRING(_valueText,owner);
             }else
                 outputError("Failed to create the text trying to convert a value to a decimal");
         }else
@@ -1768,8 +1803,8 @@ Mdecimal* _getValueTextDecimal(Mvalue* value){Mallocationowner owner=getOwner(__
 		if(_valueText){
             uint32_t status=0;
             mpd_qset_string(_parsedValueDecimal->mpd,string(_valueText),get_default_mpd_context(),&status);
-            free_string(_valueText);
-            if((status&0xEFBF)!=0){free_decimal(_parsedValueDecimal);_parsedValueDecimal=NULL;outputError("Failed to parse the decimal text");}
+            FREE_STRING(_valueText);
+            if((status&0xEFBF)!=0){FREE_DECIMAL(_parsedValueDecimal);_parsedValueDecimal=NULL;outputError("Failed to parse the decimal text");}
         }
     }else
         outputError("Failed to create a decimal");
@@ -1788,17 +1823,17 @@ Mdecimal* _getValueDecimal(Mvalue* value){Mallocationowner owner=getOwner(__LINE
 				case VT_INTEGER:_decimal=OWNED(__decimal(NULL,value->value._integer->ll,0),owner);break; // MDH@29AUG2019: replacing a call to _getDecimal()
                 case VT_BIGINTEGER:
                     {
-                        // NOTE we need to make a copy of the big integer because otherwise free_rational() below would free the big integer wrapped inside the value, which would be a terrible mistake
+                        // NOTE we need to make a copy of the big integer because otherwise FREE_RATIONAL() below would free the big integer wrapped inside the value, which would be a terrible mistake
                         // MDH@26MAY2020 but now that _getRational does not use the given numerator and denominator anymore and makes a copy if necessary we can simply pass in value->value._biginteger as is
                         Mrational* _rational=_getRational(value->value._biginteger,NULL,M_LD_NAN,false); // much neater, isn't it?
                         /* replacing:
                         Mbiginteger* _numerator=OWNED(_getBigintegerCopy(value->value._biginteger),owner);
                         Mrational* _rational=_getRational(_numerator,NULL,M_LD_NAN,false);
-                        free_biginteger(_numerator,owner);
+                        FREE_BIGINTEGER(_numerator,owner);
                         */
                         if(_rational){
                             _decimal=OWNED(_getRationalDecimal(_rational),owner);
-                            free_rational(_rational,owner);
+                            FREE_RATIONAL(_rational,owner);
                         }
                     }
                     break;
@@ -1992,7 +2027,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     Mbiginteger *_numerator=(Mbiginteger*)OWNED(_getBiginteger(neg?-p:p),owner)
                                ,*_denominator=(Mbiginteger*)OWNED(_getBiginteger(q),owner);
                     _rational=_getRational(_numerator,_denominator,delta,false/*,true*/); // construct the intermediate result without normalizing
-                    free_biginteger(_numerator,owner);free_biginteger(_denominator,owner); // MDH@26MAY2020 now always!!!
+                    FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner); // MDH@26MAY2020 now always!!!
                     if(!_rational){
                         output("%sFailed to construct the rational approximation %lld/%lld.\n",M_ERROR_PREFIX,p,q);
                         break;
@@ -2000,10 +2035,10 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     // NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
                     Mvalue* _rationalValue=_getRationalValue(_rational,owner);
-                    if(!_rationalValue){free_rational(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
+                    if(!_rationalValue){FREE_RATIONAL(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
                     // NOTE probably best to break if we can't append approximations!!
                     // NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
-                    if(appendedToList(_iterationsList,owner,_rationalValue,i)<=0){/*free_rational(_rational);*/outputError("Failed to register a rational approximation");break;}
+                    if(appendedToList(_iterationsList,owner,_rationalValue,i)<=0){/*FREE_RATIONAL(_rational);*/outputError("Failed to register a rational approximation");break;}
                     // if we get here success in updating the iterations list!!!!
                     // if delta is now zero, we're done!!!
                     if(isLongDoubleZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
@@ -2018,15 +2053,15 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     // construct the last rational (i.e. the result) from p and q
                     Mbiginteger* _numerator=_getBiginteger(p),*_denominator=_getBiginteger(q); // have to be freed when not bound in _rational
                     if(_numerator&&_denominator)if(!neg||mp_neg(_numerator,_numerator)==MP_OKAY)_rational=_getRational(_numerator,_denominator,delta,true,false);
-                    if(!_rational){free_biginteger(_numerator);free_biginteger(_denominator);} // DIY freeing if failing to construct the rational
+                    if(!_rational){FREE_BIGINTEGER(_numerator);FREE_BIGINTEGER(_denominator);} // DIY freeing if failing to construct the rational
                 }
                 */
             }else{ // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
                 Mbiginteger* _numerator=(Mbiginteger*)OWNED(__biginteger(),owner);
                 Mrational* _rational=(Mrational*)OWNED(_getRational(_numerator,NULL,M_LD_NAN,false),owner);
-                free_biginteger(_numerator,owner); // ALWAYS!!
+                FREE_BIGINTEGER(_numerator,owner); // ALWAYS!!
                 Mvalue* _rationalValue=_getRationalValue(_rational,owner); // OK free __biginteger() if failing to get that _rational
-                if(!_rationalValue)free_rational(_rational,owner);else 
+                if(!_rationalValue)FREE_RATIONAL(_rational,owner);else 
                 if(appendedToList(_iterationsList,owner,_rationalValue,0)<=0)outputError("Failed to append rational approximation to the result list"); // no need to free _rational because it's value wrapper will be garbage collected!!
             }
         }
@@ -2127,24 +2162,24 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner o
                                         // increment _dividend if _remainder larger than denominator
                                         if(success&&mp_cmp(MP_INT_POINTER(_remainder),MP_INT_POINTER(_rational->den))==MP_GT&&mp_incr(MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
                                         if(success&&neg&&mp_neg(MP_INT_POINTER(_dividend),MP_INT_POINTER(_dividend))!=MP_OKAY)success=false;
-                                        if(!success){free_biginteger(_dividend,owner);_dividend=NULL;}
+                                        if(!success){FREE_BIGINTEGER(_dividend,owner);_dividend=NULL;}
                                     }else 
                                         outputError("Failed to create big integer dividend");
-                                    free_biginteger(_remainder,owner);
+                                    FREE_BIGINTEGER(_remainder,owner);
                                 }else 
                                     outputError("Failed to create big integer remainder");
                             }else
                                 outputError("Failed to double big integer denominator");
-                            free_biginteger(_twiceden,owner);
+                            FREE_BIGINTEGER(_twiceden,owner);
                         }
                     }else
                         outputError("Failed to double big integger numerator");
-                    free_biginteger(_twicenum,owner); // freed!
+                    FREE_BIGINTEGER(_twicenum,owner); // freed!
                 }else
                     outputError("Failed to create big integer");
             }else
                 outputError("Failed to compute the absolute of a big integer");
-            free_biginteger(_absnum,owner); // freed!
+            FREE_BIGINTEGER(_absnum,owner); // freed!
         }
         return DISOWNED(_dividend,owner);
     }
@@ -2164,7 +2199,7 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
         // get the absolute value of the numerator
         Mbiginteger* _absnum=OWNED(__biginteger(),owner); // to be freed asap
         if(mp_abs(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_absnum))!=MP_OKAY)
-        {free_biginteger(_absnum,owner);outputError("Failed to compute the absolute of a big integer");return NULL;}
+        {FREE_BIGINTEGER(_absnum,owner);outputError("Failed to compute the absolute of a big integer");return NULL;}
         Mbiginteger *_dividend=(Mbiginteger*)OWNED(__biginteger(),owner),*_remainder=(Mbiginteger*)OWNED(__biginteger(),owner);
         bool success=(mp_div(MP_INT_POINTER(_absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
         if(success&&mp_iszero(MP_INT_POINTER(_remainder))!=MP_YES){ // division succeeded with a non-zero remainder
@@ -2185,10 +2220,10 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
                     outputError("Failed to increment truncated positive big integer");
                 }
             }
-            if(!success){free_biginteger(_dividend,owner);_dividend=NULL;}
+            if(!success){FREE_BIGINTEGER(_dividend,owner);_dividend=NULL;}
         }
-        free_biginteger(_remainder,owner);
-        free_biginteger(_absnum,owner);
+        FREE_BIGINTEGER(_remainder,owner);
+        FREE_BIGINTEGER(_absnum,owner);
         return DISOWNED(_dividend,owner);
     }
     return NULL;
@@ -2211,7 +2246,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
                     mpd_qtrunc(_truncDecimal->mpd,_decimal->mpd,mpd_context,&status);
                     if((status&0xEFBF)==0)return(Mdecimal*)DISOWNED(_truncDecimal,owner);
                     output("%s",M_ERROR_PREFIX);outputDecimal("Failed to truncate decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
-                    free_decimal(_truncDecimal,owner);
+                    FREE_DECIMAL(_truncDecimal,owner);
                 }
             }else
             if(floor){
@@ -2221,7 +2256,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
                     mpd_qfloor(_floorDecimal->mpd,_decimal->mpd,mpd_context,&status);
                     if((status&0xEFBF)==0)return(Mdecimal*)DISOWNED(_floorDecimal,owner);
                     output("%s",M_ERROR_PREFIX);outputDecimal("Failed to floor decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
-                    free_decimal(_floorDecimal,owner);
+                    FREE_DECIMAL(_floorDecimal,owner);
                 }                    
             }else{
                 Mdecimal* _ceilDecimal=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner);
@@ -2230,7 +2265,7 @@ Mdecimal* _getDecimalInteger(Mdecimal* _decimal,bool floor,bool towardszero){Mal
                     mpd_qceil(_ceilDecimal->mpd,_decimal->mpd,mpd_context,&status);
                     if((status&0xEFBF)==0)return(Mdecimal*)DISOWNED(_ceilDecimal,owner);
                     output("%s",M_ERROR_PREFIX);outputDecimal("Failed to ceil decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
-                    free_decimal(_ceilDecimal,owner);
+                    FREE_DECIMAL(_ceilDecimal,owner);
                 }
             }
         }else
@@ -2250,7 +2285,7 @@ Mdecimal* _getRoundedDecimal(Mdecimal* _decimal){Mallocationowner owner=getOwner
                 mpd_qround_to_int(_roundDecimal->mpd,_decimal->mpd,mpd_context,&status);
                 if((status&0xEFBF)==0)return(Mdecimal*)DISOWNED(_roundDecimal,owner);
                 output("%s",M_ERROR_PREFIX);outputDecimal("Failed to round decimal '",_decimal,"'");output(" (status: %.8x).\n",status);
-                free_decimal(_roundDecimal,owner);
+                FREE_DECIMAL(_roundDecimal,owner);
             }
         }else
             outputError("No context available for rounding a decimal");
@@ -2306,7 +2341,7 @@ void free_expressionlist(Mexpressionlist* _expressionlist){
 // TODO if a function map is freed, we shouldn't free internal functions BUT those are only present in the main environment which is never released!!
 bool free_function(Mfunction* _function,Mallocationowner owner_function){
     if(_function){
-        /////// MDH@10JUL2019: moved over to the map element containing the function! free_string(_function->_name);
+        /////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
         free_map(_function->_parameterMap,owner_function);
         if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction,owner_function);
         FREE_DISOWNED_1(_function,'F',owner_function);
@@ -2318,7 +2353,7 @@ bool free_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocatio
     if(_functionmapelement){
         if(free_functionmapelement(_functionmapelement->_next,owner_functionmapelement))_functionmapelement->_next=NULL;
         if(free_function(_functionmapelement->_function,owner_functionmapelement)){
-            free_string(_functionmapelement->_name,owner_functionmapelement);
+            FREE_STRING(_functionmapelement->_name,owner_functionmapelement);
             FREE_DISOWNED_1(_functionmapelement,'f',owner_functionmapelement);
             return true;
         }
@@ -2351,12 +2386,19 @@ Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
     if(!_environment->_variableMap){free_environment(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
     return DISOWNED(_environment,owner);
 }/* VALIDATED */
-void free_environment(Menvironment* _environment,Mallocationowner owner_environment){
+Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment){
+    if(!_environment)return NULL;
+    disowned_chars(_environment->_name,owner_environment);
+    disowned_map(_environment->_variableMap,owner_environment);
+    // disowned_map(_environment->_functionMap);
+    return DISOWNED(_environment,owner_environment);
+}
+void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/){
     if(_environment){
-        if(_environment->_name){freeChars(_environment->_name,owner_environment);_environment->_name=NULL;}
+        if(_environment->_name){freeChars(_environment->_name/*,owner_environment*/);_environment->_name=NULL;}
         assignValue(&_environment->_parent,NULL); // MDH@03FEB2020 replacing:
         assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
-        free_map(_environment->_variableMap,owner_environment);
+        free_map(_environment->_variableMap/*,owner_environment*/);
         // free_map(_environment->_functionMap); // MDH@04MAR2020: TODO do we need this??????
         /* MDH@10JUL2019: only Menvironment has a function map!!   
            MDH@20JUL2019: NO user functions may also contain a function map, which is referenced in a user function execution environment
@@ -2364,9 +2406,10 @@ void free_environment(Menvironment* _environment,Mallocationowner owner_environm
                           freeing the execution environment)
         if(_environment->_functionMap)free_functionmap(_environment->_functionMap);
         */
-        FREE_DISOWNED_1(_environment,'E',owner_environment);
+        FREE_1(_environment,'E'/*,owner_environment*/);
     }
 }/* VALIDATED */
+
 Menvironment* getEnvironmentParent(Menvironment* _environment){
     return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
 }/* VALIDATED */
@@ -2380,7 +2423,7 @@ Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=
             p=string_prepend(p,_environment->_name->chars);
             _environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
         }
-        if(!p){free_string(_environmentName,owner);_environmentName=NULL;}
+        if(!p){FREE_STRING(_environmentName,owner);_environmentName=NULL;}
     }
     return DISOWNED(_environmentName,owner);
 }

@@ -319,8 +319,8 @@ static OutputCommandInfoFunction* outputCommandInfoFunction=outputCommandInfo;
  * @returns the previous token (as we need that )  
  */
 static Mtoken* freeToken(Mtoken* _token,Mallocationowner owner_token){
-	// MDH@30APR2019: let's delegate to free_token()
-	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;free_token(_token,owner_token);}return _prevToken;
+	// MDH@30APR2019: let's delegate to FREE_TOKEN()
+	Mtoken* _prevToken=NULL;if(_token){_prevToken=_token->prev;FREE_TOKEN(_token,owner_token);}return _prevToken;
 }
 // keep track of the state of entering a command
 // MDH@01OCT2019: result booled, but TODO can removeToken() fail??????
@@ -1300,9 +1300,9 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					output("%sUnable to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}else
 				output("%sUnable to evaluate the invalid command '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
-			free_token(_evalCommandToken,owner); // clean up the command
+			FREE_TOKEN(_evalCommandToken,owner); // clean up the command
 		}
-		free_string(_evalValueText,owner);
+		FREE_STRING(_evalValueText,owner);
 	}
 	return DISOWNED(_evalValue,owner);
 }
@@ -1311,7 +1311,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 // MCommand stuff
 void free_command(Mcommand* _command,Mallocationowner owner_command){
 	if(!_command)return;
-	if(_command->_firstToken)free_token(_command->_firstToken,Msubowner(owner_command,1)); // will free ALL connected tokens!!!
+	if(_command->_firstToken)FREE_TOKEN(_command->_firstToken,owner_command); //Msubowner(owner_command,1)); // will free ALL connected tokens!!!
 	FREE_DISOWNED_1(_command,'K',owner_command);
 }
 
@@ -2127,9 +2127,9 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 	uint64_t mantisse;uint16_t exponent;extractMantisseAndExponent(ld,&mantisse,&exponent);
 	// let's return the binary representation of exponent and mantisse with single quotes around it!!
 	Mstring* _mantisseText=OWNED(_getUint64BinaryText(mantisse,'\''),owner);
-	if(_mantisseText){appendedToMap(_dmap,owner,"m",_getTextValue(string(_mantisseText)));free_string(_mantisseText,owner);}
+	if(_mantisseText){appendedToMap(_dmap,owner,"m",_getTextValue(string(_mantisseText)));FREE_STRING(_mantisseText,owner);}
 	Mstring* _exponentText=OWNED(_getUint16BinaryText(exponent,'\''),owner);
-	if(_exponentText){appendedToMap(_dmap,owner,"e",_getTextValue(string(_exponentText)));free_string(_exponentText,owner);}
+	if(_exponentText){appendedToMap(_dmap,owner,"e",_getTextValue(string(_exponentText)));FREE_STRING(_exponentText,owner);}
 	/* replacing:
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
 	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
@@ -2485,7 +2485,7 @@ Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)ret
 			result=OWNED(_getTextValue(string(_valueText)),owner);
 		}else
 			outputError("Failed to prepend a quote character to a text representation");
-		free_string(_valueText,owner);
+		FREE_STRING(_valueText,owner);
 	}
 	return result;
 }
@@ -2565,7 +2565,7 @@ static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner o
 			if(_listelementText){
 				if(separator)if(string_length(_concatenated)>0)string_append(_concatenated,separator);
 				string_append(_concatenated,string(_listelementText));
-				free_string(_listelementText,owner);
+				FREE_STRING(_listelementText,owner);
 			}
 			listelement=listelement->_next;
 		}
@@ -2586,9 +2586,9 @@ Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(_
 		if(_concat){
 			// _result itself won't contain quotes, so in order to make it usable we need to prepend either a single quote or a double quote
 			if(string_insert_char(_concat,0,'\''))_concatValue=_getTextValue(string(_concat));else outputError("Failed to construct the concatenation text");
-			free_string(_concat,owner);
+			FREE_STRING(_concat,owner);
 		}
-		if(_separator)free_string(_separator,owner);
+		if(_separator)FREE_STRING(_separator,owner);
 	}
 	return DISOWNED(_concatValue,owner);
 }
@@ -2699,7 +2699,7 @@ void free_expressionvalue(Mexpressionvalue* _expressionvalue){
 		// MDH@03MAY2019: append the result value at the proper index (as indicated by the command index)
 		if(_resultListValue){if(appendedToList(_resultListValue->value._list,_expressionvalue->_valuereference->_variable->_value,commandCount+1))outputInfo("ERROR: Failed to save the result.");else if(amVerbose())outputInfo("Result saved.");}
 		// replacing: if(!appendToListVariable(_Menvironment,"M",_expressionvalue->_value))outputInfo("ERROR: Failed to append the result to the M list.");else if(amVerbose())outputInfo("Result appended to the M list.");
-		//// NEVER free what does not have an underscore at the start!!!! free_token(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
+		//// NEVER free what does not have an underscore at the start!!!! FREE_TOKEN(_expressionvalue->token); // probably NULLed already as this will not be new token, so I guess we could remove the _ to prevent freeing!!!
 		////////output("Freeing expression!");
 		decrementReferenceCount(_expressionvalue->_valuereference->_variable->_value); // as where freeing _expressionvalue!!!!
 		free(_expressionvalue);
@@ -2902,7 +2902,7 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 		if(!appendedToMap(_map,owner,string(_attributeName),_attributeValueValue)){
 			output("%s",M_ERROR_PREFIX);outputValue("Failed to append the value of attribute '",_attributeNameValue,"'.\n");
 		} // NOTE can't break until we actually bump into the TT_END_OF_MAP!!!
-		free_string(_attributeName,owner); // ALWAYS free the name text
+		FREE_STRING(_attributeName,owner); // ALWAYS free the name text
 		if(!expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
 		if(amVerbose())
@@ -3375,7 +3375,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																						//FREE_DISOWNED_1(valueholders,'_');
 																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																					}*/
-																					free_string(_attributenameText,owner);
+																					FREE_STRING(_attributenameText,owner);
 																				}else
 																					newValueholder=NULL;
 																			}
@@ -3386,7 +3386,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																		}
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																	}
-																	if(_valueIndexList)free_list(_valueIndexList,owner);
+																	if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
@@ -3428,7 +3428,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																		}
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																	}
-																	if(_valueIndexList)free_list(_valueIndexList,owner);
+																	if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
 																}else
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 																// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
@@ -3446,7 +3446,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											outputError("Failed to reallocate the indexed value references");
 										}
 									}
-									if(_flattenedIndexList)free_list(_flattenedIndexList,owner);
+									if(_flattenedIndexList)FREE_LIST(_flattenedIndexList,owner);
 								}
 								// if all the valueholders are NULL we break????
 								int valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
@@ -3463,7 +3463,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 							while(--valueholderIndex>=0){
 								if(amVerboseDebugging())
 									{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
-								if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){free_list(_resultList,owner);_resultList=NULL;output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));break;}
+								if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){FREE_LIST(_resultList,owner);_resultList=NULL;output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));break;}
 							}
 							referencedValue=_getValueOfList(_resultList,owner); // the result
 						}else
@@ -3492,7 +3492,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 							Mstring* attributenameText=_getValueText(indexorattributenameListelementValue,true); // TODO should we dequote??
 							if(attributenameText){
 								referencedValue=getValueOfAttribute(referencedValue->value._map,string(attributenameText));		
-								free_string(attributenameText);
+								FREE_STRING(attributenameText);
 								continue;	
 							}
 							output("%s",M_ERROR_PREFIX);
@@ -3706,7 +3706,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																					//FREE_DISOWNED_1(valueholders,'_');
 																					_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																				}*/
-																				free_string(_attributenameText,owner);
+																				FREE_STRING(_attributenameText,owner);
 																			}else
 																				newValueholder=NULL;
 																		}
@@ -3717,7 +3717,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																	}
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																}
-																if(_valueIndexList)free_list(_valueIndexList,owner);
+																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
@@ -3759,7 +3759,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																	}
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																}
-																if(_valueIndexList)free_list(_valueIndexList,owner);
+																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
 															}else
 																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
 															// if(!_valueholders[valueholderIndex+numberOfNewValueholders]){output("%s",M_ERROR_PREFIX);outputValue("Assumed index '",indexorattributenameListelementValue,"' not an integer.\n");}
@@ -3777,7 +3777,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 										outputError("Failed to reallocate the indexed value references");
 									}
 								}
-								if(_flattenedIndexList)free_list(_flattenedIndexList,owner);
+								if(_flattenedIndexList)FREE_LIST(_flattenedIndexList,owner);
 							}
 							// if all the valueholders are NULL we break????
 							int valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
@@ -3841,7 +3841,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 								}else
 									result=false;
 							}
-							if(_flattenedIndexList)free_list(_flattenedIndexList);
+							if(_flattenedIndexList)FREE_LIST(_flattenedIndexList);
 						}else
 							outputError("No index value.");
 					}
@@ -3854,7 +3854,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 							if((*_valueholders[valueholderIndex])->type==VT_MAP){
 								Mstring* _attributeName=_getValueText(indexorattributenameListelement->_value,true);
 								if(appendedToMap((*_valueholders[valueholderIndex])->value._map,string(_attributeName),_newValue)!=1)result=false;
-								free_string(_attributeName);
+								FREE_STRING(_attributeName);
 								// if(!result)return false;
 							}else
 							if((*_valueholders[valueholderIndex])->type==VT_LIST){
@@ -4081,7 +4081,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								functionCallArgumentList=(Mlist*)OWNED(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
 								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
 									outputError("Failed to create the to do expression list");
-									free_list(functionCallArgumentList,owner);
+									FREE_LIST(functionCallArgumentList,owner);
 									functionCallArgumentList=NULL; // so nothing will get done!!
 								}
 								// TODO what should we do with functionCallArgumentList (which we created) once we're done with it??????
@@ -4095,7 +4095,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							outputValue("Function argument map: ",_getValueOfMap(_functionCallArgumentMap,false),".\n");
 							*/
 							// if this is a do() function call, we need to get rid of the single element list we created to wrap all arguments
-							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))free_list(functionCallArgumentList,owner);
+							if(!strcmp(_significantTokenText,DOFUNCTION_NAME))FREE_LIST(functionCallArgumentList,owner);
 							/// we do not need to release the function arguments list value because it it never assigned by itself, it is simply a container for the argument list elements (which do have a reference count incremented when added to the list)
 							/*
 							if(amVerbose())output("Decrementing the reference count of the function arguments value!");
@@ -4139,7 +4139,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							if(amVerboseDebugging())
 								{outputValue("Function call result value: '",_valueReference->_value,"'.\n");outputInfo("Freeing the function argument map!");}
 							// MDH@02NOV2019: release the function call argument map to be treated as weak map (i.e. the values do not need to be dereferenced)
-							free_map(_functionCallArgumentMap,owner); // MDH@21MAY2019: no need for the function argument map anymore!!!
+							FREE_MAP(_functionCallArgumentMap,owner); // MDH@21MAY2019: no need for the function argument map anymore!!!
 							if(amVerboseDebugging())
 								outputInfo("Function argument map freed!");
 						}else
@@ -4162,7 +4162,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),getOwnerExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=(Mstring*)OWNED(_getExecutionEnvironmentName(),owner);
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
-					free_string(_environmentName,owner);
+					FREE_STRING(_environmentName,owner);
 					break; // NO retrieves the undefined value subsequently!!
 				}
 				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
@@ -4292,7 +4292,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
 						if(amVerboseDebugging())
 							outputInfo("Releasing decimal text.");
-						free_string(_realText,owner);
+						FREE_STRING(_realText,owner);
 						if(amVerboseDebugging())
 							outputInfo("Decimal text released.");
 					}else
@@ -4421,7 +4421,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						}
 					}
 					// NOTE have to release _propertyName here
-					if(_propertyName)free_string(_propertyName,owner);
+					if(_propertyName)FREE_STRING(_propertyName,owner);
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				// if(amDebugging())
@@ -4676,11 +4676,11 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		// MDH@28OCT2019: think twice this is only true when _value2 is also of type text
 		if(_value2->type!=VT_TEXT){
 			Mstring* _value2Text=OWNED(_getValueText(_value2,true),owner); // get the text representation of the second argument without quotes
-			if(_value2Text){p=string_append(p,string(_value2Text));free_string(_value2Text,owner);}
+			if(_value2Text){p=string_append(p,string(_value2Text));FREE_STRING(_value2Text,owner);}
 		}else // second argument also of type text
 			p=string_append(p,_value2->value._text->_c);
 		Mvalue* _value=(p?_getTextValue(string(_valueText)):NULL);
-		free_string(_valueText,owner);
+		FREE_STRING(_valueText,owner);
 		return _value;
 	}
 	// if either is a rational, compute the sum rational (NOTE or rationals disguised as decimals)
@@ -6834,7 +6834,7 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 							inrangeValue=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
 							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
 							if(inrangeValue->value._integer->ll==0)break; // not in range
-							if(appendedToList(_scalarRangeList,owner,integerrangeValue,M_LL_INVALID)<=0){free_list(_scalarRangeList,owner);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
+							if(appendedToList(_scalarRangeList,owner,integerrangeValue,M_LL_INVALID)<=0){FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
 							// determine the next value to insert into the integer range
 							if(*up)rangeInteger++;else rangeInteger--;
 							integerrangeValue=_getIntegerValue(rangeInteger);
@@ -6909,7 +6909,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 			Mvalue* deltaRangeValue=divide(subtract(endIntegerRangeValue,startIntegerRangeValue),rangeValue);
 			if(!deltaRangeValue)continue;
 			if(appendedToList(_multFactorList,owner,deltaRangeValue,M_LL_INVALID)<0){
-				free_list(_multFactorList,owner);
+				FREE_LIST(_multFactorList,owner);
 				_multFactorList=NULL;
 				break;
 			}
@@ -6932,9 +6932,9 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 					Mlistelement* _integerRangeListelement=_integerRangeList->_first;
 					while(_integerRangeListelement){
 						Mlist* _pointList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner);
-						if(!_pointList){free_list(_resultList,owner);_resultList=NULL;break;}
+						if(!_pointList){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						if(appendedToList(_pointList,owner,_integerRangeListelement->_value,M_LL_INVALID)<0)
-						{free_list(_resultList,owner);_resultList=NULL;break;}
+						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						// now to compute the points in all other dimensions which means we have to increment startIntegerRangeListelement and endIntegerRangeListelement
 						Mlistelement* multFactorListelement=_multFactorList->_first;
 						Mvalue* rangeValue;
@@ -6951,21 +6951,21 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 							// outputValue("First range value ",firstRangeValue,".\n");
 							rangeValue=add(startIntegerRangeValue,multiply(multFactorListelement->_value,firstRangeValue));
 							// outputValue("Range value: ",rangeValue,".\n");
-							if(appendedToList(_pointList,owner,rangeValue,M_LL_INVALID)<0){free_list(_resultList,owner);_resultList=NULL;break;}
+							if(appendedToList(_pointList,owner,rangeValue,M_LL_INVALID)<0){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 							multFactorListelement=multFactorListelement->_next;
 						}
 						if(!_resultList)break;
 						// append _pointList to the result list
 						if(appendedToList(_resultList,owner,_getValueOfList(_pointList,owner),M_LL_INVALID)<0)
-						{free_list(_resultList,owner);_resultList=NULL;break;}
+						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						_integerRangeListelement=_integerRangeListelement->_next;
 						firstRangeValue=add(firstRangeValue,incrementValue); // increment the first range value (which is the X offset so to speak from the first dimension)
 					}
 				}
-				free_list(_integerRangeList,owner);
+				FREE_LIST(_integerRangeList,owner);
 			}else
 				_resultList=_integerRangeList;
-			free_list(_multFactorList,owner);
+			FREE_LIST(_multFactorList,owner);
 		}
 		return _getValueOfList(_resultList,owner);
 		// replacing: return _appliedToList(_value1->value._list,_value2,Mrange);
@@ -7057,7 +7057,7 @@ size_t free_formulaelement(Mformulaelement* _formulaelement,Mallocationowner own
 	size_t result=0;
 	if(_formulaelement){
 		if(_formulaelement->_next)result+=free_formulaelement(_formulaelement->_next,owner_formulaelement);
-		if(_formulaelement->_operator)free_string(_formulaelement->_operator,owner_formulaelement);
+		if(_formulaelement->_operator)FREE_STRING(_formulaelement->_operator,owner_formulaelement);
 		if(_formulaelement->_operand)free_valuereference(_formulaelement->_operand,owner_formulaelement);
 		FREE_DISOWNED_1(_formulaelement,'4',owner_formulaelement);
 		result+=1; // another one
@@ -7268,7 +7268,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(!addVariable(expressionToken->argument==1?NULL:getExecutionEnvironment(),_significantTokenText,VT_UNDEFINED,false)){
 					Mstring* _environmentName=_getExecutionEnvironmentName();
 					output("%sFailed to add%s variable '%s' to environment '%s'.\n",M_ERROR_PREFIX,(expressionToken->argument!=1&&expressionToken->envid?" implicitly declared local":""),_significantTokenText,string(_environmentName));
-					free_string(_environmentName);
+					FREE_STRING(_environmentName);
 					break; // NO retrieves the undefined value subsequently!!
 				}
 				if(amVerbose())if(expressionToken->argument!=1&&expressionToken->envid)output("WARNING: Not explicitly declared local variable '%s' encountered.\n",_significantTokenText);
@@ -7307,7 +7307,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					_formulaelement->_next=nextformulaelement->_next;
 					// release the applied operator, and replace it by the successor operator
 					// MDH@14MAY2020: if we make a copy of the next operator we can free the disconnected formula element entirely
-					free_string(_formulaelement->_operator,owner); // TODO is owner correct?
+					FREE_STRING(_formulaelement->_operator,owner); // TODO is owner correct?
 					_formulaelement->_operator=OWNED(_getString(string(nextformulaelement->_operator)),owner); // MDH@09JUN2020: do NOT forget to obtain ownership of the next operator
 					nextformulaelement->_next=NULL;free_formulaelement(nextformulaelement,owner); // NULL next of the nextformulaelement so it won't free all successive formula elements left to be applied
 					formulaElementCount--;
@@ -7362,7 +7362,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					if(amVerboseDebugging()){
 						Mstring* _indexidText=(Mstring*)OWNED(_getValueText(_valuereference->_itemid,false),owner);
 						output("Assignment to %s%s using operator %s!\n",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
-						if(_indexidText)free_string(_indexidText,owner);
+						if(_indexidText)FREE_STRING(_indexidText,owner);
 					}
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
 					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
@@ -7426,7 +7426,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			Mformulaelement* _nextformulaelement;
 			_formulaelement=formula;
 			while(_formulaelement){
-				free_string(_formulaelement->_operator);
+				FREE_STRING(_formulaelement->_operator);
 				free_valuereference(_formulaelement->_operand);
 				_nextformulaelement=_formulaelement->_next;
 				FREE_DISOWNED_1(_formulaelement,'4'); // OOPS have to call FREE here not free()

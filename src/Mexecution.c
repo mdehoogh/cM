@@ -51,7 +51,7 @@ bool isLittleEndian(){
  * \param ul the 64-bit positive integer to represent in 0s and 1s
  * \param presuffix character to enquote the binary representation when displayed
  * \return the newly created Mstring containing the binary representation on success, NULL on failure
- * needs to be freed with free_string() after use (e.g. of its string representation) as indicated by the _ that starts the name
+ * needs to be freed with FREE_STRING() after use (e.g. of its string representation) as indicated by the _ that starts the name
  */
 Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _binaryText=(Mstring*)OWNED(__string(),owner);
@@ -60,7 +60,7 @@ Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner
         int l=64;
         while(--l>=0&&_p){_p=string_append_char(_p,ul&1?'1':'0');ul>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
         if(presuffix)_p=string_append_char(_p,presuffix);
-        if(!_p){free_string(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
+        if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
     }
     return(Mstring*)DISOWNED(_binaryText,owner);
 }/* VALIDATED */
@@ -69,7 +69,7 @@ Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner
  * \param us the 16-bit unsigned integer to represent in 0s and 1s
  * \param presuffix character to enquote the binary representation when displayed
  * \return the newly created Mstring containing the binary representation on success, NULL on failure
- * needs to be freed with free_string() after use (e.g. of its string representation) as indicated by the _ that starts the name
+ * needs to be freed with FREE_STRING() after use (e.g. of its string representation) as indicated by the _ that starts the name
  */
 Mstring* _getUint16BinaryText(uint16_t us,char presuffix){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _binaryText=(Mstring*)OWNED(__string(),owner);
@@ -78,7 +78,7 @@ Mstring* _getUint16BinaryText(uint16_t us,char presuffix){Mallocationowner owner
         int l=16;
         while(--l>=0&&_p){_p=string_append_char(_p,us&1?'1':'0');us>>=1;if(l)if((l%8)==0)_p=string_append_char(_p,' ');}
         if(presuffix)_p=string_append_char(_p,presuffix);
-        if(!_p){free_string(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
+        if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
     }
     return(Mstring*)DISOWNED(_binaryText,owner);
 }/* VALIDATED */
@@ -93,22 +93,6 @@ bool initExecution(){
 */
 
 // BIG INTEGER STUFF
-/** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
- *  \return a newly created big integer
- */
-void free_biginteger(Mbiginteger* biginteger,Mallocationowner owner_biginteger){
-    if(biginteger){
-        if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
-#ifndef __PRODUCTION__
-        mp_clear(biginteger->_bi);
-        FREE_DISOWNED_1(biginteger->_bi,'b',owner_biginteger);
-#else
-        mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
-#endif
-        FREE_DISOWNED_1(biginteger,'B',owner_biginteger); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
-    }else
-    if(amVerbose())outputInfo("No big integer to free!");
-}/* VALIDATED */
 Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
     Mbiginteger* _biginteger=(Mbiginteger*)CALLOC_1(sizeof(Mbiginteger),'B',owner);
     if(_biginteger){
@@ -123,6 +107,27 @@ Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
     return(Mbiginteger*)DISOWNED(_biginteger,owner);
 }/* VALIDATED */
 // end of block that uses __PRODUCTION__ flag
+Mbiginteger* disowned_biginteger(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
+    if(!_biginteger)return NULL;
+    if(_biginteger->_bi)DISOWNED(_biginteger->_bi,owner_biginteger);
+    return DISOWNED(_biginteger,owner_biginteger);
+}
+/** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
+ *  \return a newly created big integer
+ */
+void free_biginteger(Mbiginteger* biginteger/*,Mallocationowner owner_biginteger*/){
+    if(biginteger){
+        if(amVerboseDebugging())outputInfo("Freeing a big integer."); // TODO can we display the value?
+#ifndef __PRODUCTION__
+        mp_clear(biginteger->_bi);
+        FREE_1(biginteger->_bi,'b'/*,owner_biginteger*/);
+#else
+        mp_clear(biginteger); // directly call mp_clear on the Mbiginteger pointer!!!
+#endif
+        FREE_1(biginteger,'B'/*,owner_biginteger*/); // MDH@15NOV2019: this is a big gamble but if I understand the library correctly this should be Ok because the big integer is allocated on the heap!!!
+    }else
+    if(amVerbose())outputInfo("No big integer to free!");
+}/* VALIDATED */
 
 // MDH@09APR2020: for all methods that call mp_int methods now require calling MP_INT_POINTER() on Mbiginteger instances
 Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__);
@@ -221,8 +226,8 @@ Mrational* _getLongDoubleRational(long double ld){
             return NULL;
         }
         // we may assume that what got shifted out fits in an uint64_t
-        uint64_t shiftedout=mp_get_u64(_shiftedout);Mstring* _shiftedoutText=_getUint64BinaryText(shiftedout,'\0');output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_string(_shiftedoutText);
-        // replacing: Mstring* _shiftedoutText=_getBigintegerText(_shiftedout);output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));free_string(_shiftedoutText);
+        uint64_t shiftedout=mp_get_u64(_shiftedout);Mstring* _shiftedoutText=_getUint64BinaryText(shiftedout,'\0');output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));FREE_STRING(_shiftedoutText);
+        // replacing: Mstring* _shiftedoutText=_getBigintegerText(_shiftedout);output("Shifted (by %u positions) out: '%s'.",-exp,string(_shiftedoutText));FREE_STRING(_shiftedoutText);
         free_biginteger(_shiftedout);
     }
     // make the numerator negative if the long double is negative (this is when bit 15 of the exponent equals 1)
@@ -247,7 +252,7 @@ void free_text(Mtext* _text,Mallocationowner owner){
         //                _text->_c is an array and yes strlen() can be applied to any char*
         //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
         FREE_DISOWNED(_text,strlen(_text->_c)+sizeof(Mtext),-'"',owner); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
-        // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)free_string(_string->_m);_string->_m=NULL;free(_string);}
+        // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)FREE_STRING(_string->_m);_string->_m=NULL;free(_string);}
     }else
     if(amVerboseDebugging())
         outputInfo("No text to free!");
@@ -452,7 +457,7 @@ Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text 
     Mstring* _charString=(Mstring*)OWNED(_getString("\""),owner);
     if(_charString){
         if(string_append_char(_charString,c))_charText=(Mtext*)OWNED(_getText(string(_charString)),owner);
-        free_string(_charString,owner);
+        FREE_STRING(_charString,owner);
     }
     return(Mtext*)DISOWNED(_charText,owner);
 }/* VALIDATED */
@@ -593,7 +598,7 @@ Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__L
     Mstring* p=_s;
     if(amVerboseDebugging())p=string_append_char(p,'i');
     if(p&&_integer)p=appendll(p,_integer->ll);
-    if(!p){free_string(_s,owner);return NULL;}
+    if(!p){FREE_STRING(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
 	return(Mstring*)DISOWNED(_s,owner);
 }/* VALIDATED */
@@ -634,7 +639,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
             clock_t then=clock();
             ///////if(amVerbose())outputInfo("Determining a big integer text representation.");
             // output("Big integer text length: %zu.\n",_bigintegerText->length);
-            // output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));free_string(str_info);
+            // output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
             if(mp_radix_size(_mpint,10,&arepsize)==MP_OKAY){
 #ifdef M_MP_DEVELOP
                 // if(arepsize>0)output("Length of big integer text representation: %zu.\n",arepsize-1);
@@ -643,7 +648,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
                 // if(arepsize>0)output("Length of big integer text representation: %d.\n",arepsize-1);
                 if(arepsize<=INT_MAX){
 #endif
-                // output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));free_string(str_info);
+                // output("After calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
                 // outputChar('D');
                 // if(amVerbose()&&amDebugging())
                     // outputChar('E');
@@ -672,7 +677,7 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
                     }else
                         failure=1;
                     if(failure>0){
-                        free_string(_mpintText,owner);_mpintText=NULL;
+                        FREE_STRING(_mpintText,owner);_mpintText=NULL;
                         switch(failure){
                             case 1:output("%sFailed to initialize the length of the big integer text representation to %d.",M_ERROR_PREFIX,arepsize);break;
                             case 2:outputError("Failed to determine the big integer representation");break;
@@ -774,7 +779,7 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){Mallocat
         if(amVerbose()){
             Mstring* _mantisseBigIntegerText=(Mstring*)OWNED(_getMpintText(a),owner); // MDH@09APR2020: ask _getMpintText(), replacing _getBigintegerText()
             output("Value after setting the fraction: %s.\n",string(_mantisseBigIntegerText));
-            free_string(_mantisseBigIntegerText,owner);
+            FREE_STRING(_mantisseBigIntegerText,owner);
         }
         if(amVerbose())output("Long double exponent part: %d - mantisse: %llu.\n",exp,mantisse);
         if(exp==0x7FFF){if(amVerbose())output("NOTE: Cannot convert an invalid or infinite real value to a big integer.");return MP_VAL;} // +-inf, NaN
@@ -788,7 +793,7 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){Mallocat
         if(amVerbose()){
             Mstring* _bigIntegerText=(Mstring*)OWNED(_getMpintText(a),owner); // MDH@09APR2020
             output("Value after applying the exponent: %s.\n",string(_bigIntegerText));
-            free_string(_bigIntegerText,owner);
+            FREE_STRING(_bigIntegerText,owner);
         }
         if(exponent>>15){ // negative
             // take over the sign from the long double (bit 15 in the signandexponent part)
@@ -956,7 +961,7 @@ Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__)
                 default:p=appendld(p,_float->ld);break;
             }
         }
-        if(!p){free_string(_floatText,owner);return NULL;}
+        if(!p){FREE_STRING(_floatText,owner);return NULL;}
     }
 	return(Mstring*)DISOWNED(_floatText,owner);
 }/* VALIDATED */
@@ -1029,7 +1034,7 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Malloc
                 p=string_append_char(p,_text->presuffix);
             }
         }
-        if(!p){free_string(_stringText,owner);return NULL;}
+        if(!p){FREE_STRING(_stringText,owner);return NULL;}
     }
 	return(Mstring*)DISOWNED(_stringText,owner);
 }/* VALIDATED */
@@ -1052,7 +1057,7 @@ size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _big
         Mstring* _bigintegerText=(Mstring*)OWNED(_getBigintegerText(_biginteger),owner);
         if(_bigintegerText){
             written+=output("%s",string(_bigintegerText));
-            free_string(_bigintegerText,owner);
+            FREE_STRING(_bigintegerText,owner);
         }else
             written+=output("no big integer text representation");
     }else
@@ -1067,7 +1072,7 @@ size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,c
         Mstring* _decimalText=(Mstring*)OWNED(_getDecimalText(_decimal,false),owner);
         if(_decimalText){
             written+=output("%s",string(_decimalText));
-            free_string(_decimalText,owner);
+            FREE_STRING(_decimalText,owner);
         }else
             written+=output("no decimal text representation");
     }else
@@ -1094,7 +1099,7 @@ bool isDecimalZero(Mdecimal* _decimal){
     if(!_decimal)return false;
     Mstring* _decimalText=_getDecimalText(_decimal,true); // free asap
     ///////output("Is decimal '%s' zero?",string(_decimalText));
-    free_string(_decimalText); // freed
+    FREE_STRING(_decimalText); // freed
     bool result=(_decimal->mpd?mpd_iszero(_decimal->mpd)==MP_YES:false); // TODO apparently 0 means true, something else means false
     //////output(" %s.\n",(result?"YES":"NO"));
     return result;

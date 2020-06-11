@@ -21,7 +21,13 @@ typedef struct{
 }Mstring;
 
 Mstring* __string();
-Mstring* free_string(Mstring* str,Mallocationowner owner); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
+
+Mstring* disowned_string(Mstring* str,Mallocationowner owner_str);
+
+Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
+
+// MDH@11JUN2020: a useful macro
+#define FREE_STRING(str,owner_str) free_string(disowned_string(str,owner_str))
 
 // functions that create new string instances (and therefore start with _)
 Mstring* _getString(char const * const s); // convenient constructor

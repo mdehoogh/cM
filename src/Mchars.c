@@ -27,11 +27,16 @@ Mchars* _resized(Mchars const * const _chars,size_t size,long long from_count,lo
     // obtain ownership, pass onto REALLOC to reallocate using foid as owner id, and return disowned
     return(Mchars*)REALLOC(_chars,from_count,to_count,size,(type>0?-type:type));
 }
-void free_chars(Mchars const * const _chars,Mallocationowner owner_chars,size_t size,long long count,signed char type){
+
+Mchars* disowned_chars(Mchars const * const _chars,Mallocationowner owner_chars){
+    return DISOWNED(_chars,owner_chars);
+}
+
+void free_chars(Mchars const * const _chars/*,Mallocationowner owner_chars*/,size_t size,long long count,signed char type){
     // typically the caller would need to tell us the current number of characters stored in _chars
     // ok, if we're freeing _chars we can pass any owner id into REALLOC but technically this means that REALLOC might fail, I suppose it makes sense than to return NULL on success and the original pointer on failure
     if(!_chars){output("%sNo Mchars to free.\n",M_WARNING_PREFIX);return;}
-    FREE_DISOWNED(_chars,count,(type>0?-type:type),owner_chars); // obtain ownership and free
+    FREE(_chars,count,(type>0?-type:type)/*,owner_chars*/); // obtain ownership and free
 }
 
 // if you want to host a known list of characters ('\0' delimited) call _getChars()
@@ -54,7 +59,7 @@ Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LI
     return NULL;
 }
 // utility function to free an Mchars* created using _getChars
-void freeChars(Mchars const * const _chars,Mallocationowner owner_chars){
+void freeChars(Mchars const * const _chars/*,Mallocationowner owner_chars*/){
     // if oid is not positive, assuming I was the owner to start with and use that as owner id
-    free_chars(_chars,owner_chars,1,strlen(_chars->chars)+1,'\'');
+    free_chars(_chars/*,owner_chars*/,1,strlen(_chars->chars)+1,'\'');
 }
