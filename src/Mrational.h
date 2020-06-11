@@ -14,7 +14,7 @@ Mrational* disowned_rational(Mrational* _rational,Mallocationowner owner_rationa
 Mrational* owned_rational(Mrational* _rational,Mallocationowner owner_rational);
 
 Mrational* __rational();
-Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner);
+//Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner);
 void free_rational(Mrational* _rational/*,Mallocationowner owner*/);
 #define FREE_RATIONAL(_rational,owner_rational) free_rational(disowned_rational(_rational,owner_rational))
 

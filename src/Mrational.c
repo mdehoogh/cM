@@ -873,7 +873,8 @@ Mrational* _getDecimalTextRational(char* decimalText/*,bool freeonfailure*/){Mal
 }/* VALIDATED?? */
 
 // MDH@24MAY2020: we're going to need clear_rational if a rational is to be used as output of an operation
-static Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner){
+
+static Mrational* cleared_rational(Mrational* _rational/*,Mallocationowner owner*/){
     if(_rational){
         if(_rational->num){FREE_BIGINTEGER(_rational->num,owner);_rational->num=NULL;}
         if(_rational->den){FREE_BIGINTEGER(_rational->den,owner);_rational->den=NULL;}
@@ -882,7 +883,7 @@ static Mrational* cleared_rational(Mrational* _rational,Mallocationowner owner){
     return _rational;
 }/*VALIDATED*/
 void free_rational(Mrational* _rational/*,Mallocationowner owner*/){
-    FREE_1(cleared_rational(_rational,owner),'R'/*,owner*/); // MDH@24MAY2020: now easily solved by freeing the cleared_rational
+    FREE_1(cleared_rational(_rational/*,owner*/),'R'/*,owner*/); // MDH@24MAY2020: now easily solved by freeing the cleared_rational
 }/* VALIDATED */
 
 // TODO should we free the given big integers when they are NOT bound to the rational that is being returned????

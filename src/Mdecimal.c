@@ -582,14 +582,17 @@ void free_mpd(mpd_t* _mpd){
 	if(_mpd)mpd_del(_mpd);
 }/* VALIDATED */
 
+Mdecimal* disowned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){return(Mdecimal*)DISOWNED(_decimal,owner_decimal);}
+Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){return(Mdecimal*)OWNED(_decimal,owner_decimal);}
+
 /**
  * \brief frees \p decimal, delegating to free_mpd() for freeing the contained mpdecimal instance
  */
-void free_decimal(Mdecimal* decimal,Mallocationowner owner_decimal){
-	if(!decimal)return;
+void free_decimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
+	if(!_decimal)return;
     if(amVerboseDebugging())output("Freeing decimal.\n");
-    if(decimal->mpd)free_mpd(decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
-    FREE_DISOWNED_1(decimal,'D',owner_decimal);
+    if(_decimal->mpd)free_mpd(_decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
+    FREE_1(_decimal,'D'/*,owner_decimal*/);
 }/* VALIDATED */
 
 /**
@@ -597,7 +600,7 @@ void free_decimal(Mdecimal* decimal,Mallocationowner owner_decimal){
  */
 Mdecimal* __adecimal(){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _adecimal=(Mdecimal*)CALLOC_1(sizeof(Mdecimal),'D',owner);
-	return DISOWNED(_adecimal,owner);
+	return disowned_decimal(_adecimal,owner);
 } /* VALIDATED */
 
 /**
@@ -624,7 +627,7 @@ Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t rep
             outputError("Failed to create a decimal"); // TODO make an out of memory error out of this
     }else
         outputError("No context to create decimal in");
-    return DISOWNED(_decimal,owner);
+    return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
 
 // MDH@29AUG2019: as mpd_t does not itself store the precision with which the decimal was created AND an Mdecimal* does store the precision I've added the prec parameter
@@ -633,14 +636,14 @@ Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t rep
  */
 Mdecimal* _getDecimal(mpd_t const * const _mpd,mpd_ssize_t prec,uint64_t repeating,bool freeonfailure){Mallocationowner owner=getOwner(__LINE__);
     if(!_mpd)return NULL; // can do this as won't have to free mpd anyway
-    Mdecimal* _decimal=OWNED(__adecimal(),owner); // always using the default decimal context
+    Mdecimal* _decimal=owned_decimal(__adecimal(),owner); // always using the default decimal context
     if(_decimal){
 		////////output("Wrapping decimal with precision %u.\n",prec);
 		_decimal->mpd=_mpd;_decimal->prec=prec;_decimal->repeating=repeating;
 		////////output("Decimal with precision %u wrapped.\n",prec);
 	}else
 	if(freeonfailure)free_mpd(_mpd);
-    return DISOWNED(_decimal,owner);
+    return disowned_decimal(_decimal,owner);
 }/* VALIDATED */
 
 /**
@@ -660,7 +663,7 @@ Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 			if(!_decimal)return NULL;
 			uint32_t status=0;mpd_qadd(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){free_decimal(_decimal,owner);_decimal=NULL;outputError("Failed to compute the sum of two decimals");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_decimal,owner);_decimal=NULL;outputError("Failed to compute the sum of two decimals");}
 		}
 	}
 	return DISOWNED(_decimal,owner);
@@ -677,17 +680,17 @@ Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){Ma
 				Mrational* _r=OWNED(_getRationalSum(_r1,_r2),owner); // compute the sum of two rationals
 				if(_r){
 					_decimal=OWNED(_getRationalDecimal(_r),owner);
-					free_rational(_r,owner);
+					FREE_RATIONAL(_r,owner);
 				}else
 					outputError("Failed to compute the sum of two rational decimals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
-			free_rational(_r1,owner);
-			free_rational(_r2,owner);
+			FREE_RATIONAL(_r1,owner);
+			FREE_RATIONAL(_r2,owner);
 		}else // pure decimals
-			_decimal=OWNED(_dadd(d1,d2),owner); // just add
+			_decimal=owned_decimal(_dadd(d1,d2),owner); // just add
 	}
-	return DISOWNED(_decimal,owner);
+	return disowned_decimal(_decimal,owner);
 }
 
 /**
@@ -707,10 +710,10 @@ Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 			if(!_decimal)return NULL;
 			uint32_t status=0;mpd_qsub(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
-			if((status&0xEFBF)!=0){free_decimal(_decimal,owner);_decimal=NULL;outputError("Failed to compute the difference of two decimals");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_decimal,owner);outputError("Failed to compute the difference of two decimals");return NULL;}
 		}
 	}
-	return DISOWNED(_decimal,owner);
+	return disowned_decimal(_decimal,owner);
 }
 //MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
 //               which will make it a little harder to compute the decimal sum
@@ -721,15 +724,15 @@ Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
 			Mrational *_r1=OWNED(_getDecimalRational(d1),owner),*_r2=OWNED(_getDecimalRational(d2),owner);
 			if(_r1&&_r2){
-				Mrational* _r=OWNED(_getRationalDifference(_r1,_r2),owner); // compute the product of two rationals
+				Mrational* _r=owned_rational(_getRationalDifference(_r1,_r2),owner); // compute the product of two rationals
 				if(_r){
-					_decimal=OWNED(_getRationalDecimal(_r),owner);
-					free_rational(_r,owner);
+					_decimal=owned_decimal(_getRationalDecimal(_r),owner);
+					FREE_RATIONAL(_r,owner);
 				}else
 					outputError("Failed to compute the difference of two rationalized decimals");
 			}else
 				outputError("Failed to convert a decimal to a rational");
-			free_rational(_r1,owner);
+			FREE_RATIONAL(_r1,owner);
 			free_rational(_r2,owner);
 		}else // pure decimals
 			_decimal=OWNED(_dsub(d1,d2),owner); // just subtract
