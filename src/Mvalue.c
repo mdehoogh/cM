@@ -22,11 +22,20 @@ extern const long double LD_PI; // for Mfacd()
 extern Mdecimalcontext * const M_DECIMALCONTEXT; // the application-wide (default) decimal context
 extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 
-void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner){
-    if(_variable->_name)freeChars(_variable->_name,owner); // dynamically allocated (indicated by _) so we should free it...
+Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable){
+    if(_variable->_name)disowned_chars(_variable->_name,owner_variable); // dynamically allocated (indicated by _) so we should free it...
+    return DISOWNED(_variable,owner_variable);
+}
+Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable){
+    if(_variable->_name)owned_chars(_variable->_name,owner_variable); // dynamically allocated (indicated by _) so we should free it...
+    return OWNED(_variable,owner_variable);
+}
+void free_variable(Mvariable* _variable,bool weak){
+    if(_variable->_name)freeChars(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
     if(!weak)if(_variable->_value)decrementReferenceCount(_variable->_value); //// replacing: free_value(_variable->_value);
-    FREE_DISOWNED_1(_variable,'V',owner);
+    FREE_1(_variable,'V');
 }/* VALIDATED */
+
 // MDH@09JUN2020: if we want the name of the variable to be subowned by the caller, it's better to pass in a properly owned Mchars name, which we can subown
 //                it's a bit of a nuisance that we create it in such a way that the caller has to take care of the ownership of _name but that makes sense because we pass in Mchars (which is already managed)
 // MDH@11JUN2020: by allowing _name to be disowned to start with we can free it when we fail to bind it
@@ -86,7 +95,7 @@ Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner o
 }
 bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/){
     if(_listelement){
-        if(_listelement->_next){free_listelement(_listelement->_next,weak,owner);_listelement->_next=NULL;}
+        if(_listelement->_next){free_listelement(_listelement->_next,weak);_listelement->_next=NULL;}
         if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
         FREE_1(_listelement,'l'/*,owner*/);
         return true;
@@ -97,7 +106,7 @@ bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner ow
 Mlist* __list(char* source,Mallocationowner owner_list){// Mallocationowner owner=getOwner(__LINE__);
     Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner_list);
     if(source){
-        _list->_creator=SUBOWNED(OWNED(_getChars(source),owner_list),1); // replacing: keep disowned, so easy to reown... SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
+        _list->_creator=SUBOWNED(owned_chars(_getChars(source),owner_list),1); // replacing: keep disowned, so easy to reown... SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
         if(!_list->_creator)
             output("%sFailed to register list creator '%s'.\n",M_ERROR_PREFIX,source);
         else
@@ -107,14 +116,19 @@ Mlist* __list(char* source,Mallocationowner owner_list){// Mallocationowner owne
     return DISOWNED(_list,owner_list);
 }
 
+Mlist* owned_list(Mlist* _list,Mallocationowner owner_list){
+    if(!_list)return NULL;
+    owned_chars(_list->_creator,Msubowner(owner_list,1));
+    owned_listelement(_list->_first,owner_list);
+    return OWNED(_list,owner_list);
+}
 Mlist* disowned_list(Mlist* _list,Mallocationowner owner_list){
     if(!_list)return NULL;
     disowned_chars(_list->_creator,owner_list);
     disowned_listelement(_list->_first,owner_list);
     return DISOWNED(_list,owner_list);
 }
-
-void free_list(Mlist* _list,Mallocationowner owner){
+void free_list(Mlist* _list){
     if(amVerboseDebugging())
     {output("Freeing a %s list",_list->weak?"weak":"strong");if(_list->_creator)output(" created by '%s'",_list->_creator->chars);outputChar('.');outputChar('\n');}
     if(_list->_first){
@@ -131,7 +145,6 @@ Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner
     disowned_variable(_mapelement->_variable,owner_mapelement);
     return DISOWNED(_mapelement,owner_mapelement);
 }
-
 bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
     if(amVerboseDebugging())
         output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
@@ -146,7 +159,7 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner
                 output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
         }else
             outputWarning("Unnamed map attribute!");
-        free_variable(_mapelement->_variable,weak/*,owner*/);
+        free_variable(_mapelement->_variable,weak);
         _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
     }else
         outputWarning("No map attribute to free!");
@@ -159,12 +172,11 @@ Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
     disowned_mapelement(_map->_first,owner_map);
     return DISOWNED(_map,owner_map);
 }
-
 void free_map(Mmap* _map/*,Mallocationowner owner*/){
     if(amVerboseDebugging())
         output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
     if(_map->_first){
-        FREE_MAPELEMENT(_map->_first,_map->weak/*,Msubowner(owner,1)*/);
+        free_mapelement(_map->_first,_map->weak);
         _map->_first=NULL;
     }else
     if(amVerboseDebugging()) 
@@ -178,7 +190,11 @@ Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Malloc
     disowned_chars(_valuereference->_name,owner_valuereference);
     return DISOWNED(_valuereference,owner_valuereference);
 }
-
+Mvaluereference* owned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference){
+    if(!_valuereference)return NULL;
+    owned_chars(_valuereference->_name,owner_valuereference);
+    return OWNED(_valuereference,owner_valuereference);
+}
 void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/){
     if(_valuereference->_name){freeChars(_valuereference->_name/*,owner*/);_valuereference->_name=NULL;}
     /* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
@@ -187,6 +203,7 @@ void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner own
     if(_valuereference->_itemid){assignValue(&_valuereference->_itemid,NULL);_valuereference->_itemid=NULL;}
     FREE_1(_valuereference,'5'/*,owner*/); // MDH@19NOV2019: type changed from @ to 5 (See M.c for the allocations)
 }/* VALIDATED */
+// #define FREE_VALUEREFERENCE(_valuereference,owner_valuereference) free_reference(disowned_valuereference(_valuereference,owner_valuereference))
 
 // manage a list of created values
 // if we make a map out of it, we can annote the value with a name????
@@ -453,29 +470,29 @@ Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const sour
     }
     Mvalue* _listValue=__value(weak?"weak list":"strong list");
     if(!_listValue){
-        free_list(_list,owner);
+        FREE_LIST(_list,owner);
         return NULL;
     }
     _list->weak=weak;
     _list->valuetype=listValuetype; // register what type of elements this list should have    
     _listValue->type=VT_LIST;
-    _listValue->value._list=SUBOWNED(OWNED(DISOWNED(_list,owner),getValueOwner()),1);
+    _listValue->value._list=SUBOWNED(OWNED(disowned_list(_list,owner),getValueOwner()),1);
     return _listValue;
 }/* VALIDATED */
 
 Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=OWNED(_getListOfType(VT_INTEGER),owner);
+    Mlist* _list=owned_list(_getListOfType(VT_INTEGER),owner);
     if(!_list)return NULL;
     Mlistelement* listelement=list->_first;
     while(listelement){
-        Mvalue* indexValue=OWNED(_getIntegerValue(listelement->index),owner);
+        Mvalue* indexValue=_getIntegerValue(listelement->index);
         if(appendedToList(_list,owner,indexValue,M_LL_INVALID)<=0){
             // NO need to free indexValue because it is a Value!!!
             outputError("Failed to append list element index");break;
         }
         listelement=listelement->_next;
     }
-    return DISOWNED(_list,owner);
+    return disowned_list(_list,owner);
 }/* VALIDATED */
 
 // MDH@30MAR2020: the general idea of flattening a list is that all elements of the list are not lists anymore
@@ -487,7 +504,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
     if(value){
         if(amVerboseDebugging())
             outputValue("Flattening '",value,"'.\n");
-        _list=OWNED(_getListOfType(VT_UNDEFINED),owner);
+        _list=owned_list(_getListOfType(VT_UNDEFINED),owner);
         if(_list){
             bool success=true;
             if(value->type==VT_LIST){
@@ -500,7 +517,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
                         // MDH@31MAR2020: a little more effort to check if the value is a list in which case flattening is required, otherwise it is not
                         // MDH@06APR2020: if flattenLevel>0 we need to add all list elements individually instead of all together
                         if(flattenLevel>0&&valueListelement->_value->type==VT_LIST){
-                            Mlist* _subList=OWNED(_getFlattenedList(valueListelement->_value,(flattenLevel>0?flattenLevel-1:0),reversed),owner);
+                            Mlist* _subList=owned_list(_getFlattenedList(valueListelement->_value,(flattenLevel>0?flattenLevel-1:0),reversed),owner);
                             if(_subList){
                                 Mlistelement* valueSubListelement=_subList->_first;
                                 while(valueSubListelement){
@@ -509,7 +526,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
                                     valueSubListelement=valueSubListelement->_next;
                                 }
                                 // ALWAYS free _sublist
-                                free_list(_subList,owner);
+                                FREE_LIST(_subList,owner);
                             }else
                                 success=false;
                         }else
@@ -520,13 +537,14 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
                 }
             }else // a single element to add to the list
                 if(appendedToList(_list,owner,value,M_LL_INVALID)<=0)success=false;
-            if(!success){free_list(_list,owner);_list=NULL;} // on failure release the list
+            if(!success){FREE_LIST(_list,owner);_list=NULL;} // on failure release the list
         }    
     }
     if(amVerboseDebugging())
         {if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}}
-    return DISOWNED(_list,owner);
+    return disowned_list(_list,owner);
 }
+
 Mvalue* getFirstScalarValue(Mvalue* value){
     if(!value)return NULL;
     if(value->type==VT_MAP)return NULL; // can't go into a map
@@ -541,16 +559,16 @@ Mvalue* getFirstScalarValue(Mvalue* value){
 }
 
 Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=(Mlist*)OWNED(_getListOfType(VT_TEXT),owner);
+    Mlist* _list=owned_list(_getListOfType(VT_TEXT),owner);
     if(!_list)return NULL;
     Mmapelement* mapelement=map->_first;
     while(mapelement){
         // I guess we'll have to duplicate the attribute name because it will be wrapped inside a Value
         // this is a bit of an issue because typically text should be enquoted
-        Mstring* _attributeName=OWNED(_getString("'"),owner);
+        Mstring* _attributeName=owned_string(_getString("'"),owner);
         if(!_attributeName){outputError("Failed to duplicate a map attribute name");break;}
         string_append(_attributeName,mapelement->_variable->_name->chars); // MDH@17APR2020: char* _name replaced by Mchars* _name // append the attribute name
-        Mvalue* attributeValue=OWNED(_getTextValue(string(_attributeName)),owner);
+        Mvalue* attributeValue=_getTextValue(string(_attributeName));
         FREE_STRING(_attributeName,owner);
         if(!attributeValue){outputError("Failed to store a map attribute name");break;}
         if(appendedToList(_list,owner,attributeValue,M_LL_INVALID)<=0){
@@ -559,7 +577,7 @@ Mlist* _getMapAttributes(Mmap const * const map){Mallocationowner owner=getOwner
         }
         mapelement=mapelement->_next;
     }
-    return DISOWNED(_list,owner);
+    return disowned_list(_list,owner);
 }
 
 // MDH@23MAY2020: although a value is (weakly but permanently) stored in _valuelist we can set its owner to the function that created it
@@ -573,7 +591,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
         _mapValue->type=VT_MAP;
         _mapValue->value._map=(Mmap*)SUBOWNED(OWNED(DISOWNED(_map,owner),getValueOwner()),1);
     }else
-        free_map(_map,owner);
+        FREE_MAP(_map,owner);
     return _mapValue;
 }/* VALIDATED */
 
@@ -586,25 +604,41 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
 Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer){
     if(!_integer)return NULL;
     Mvalue* _value=__value("integer"); // make the value create have the same owner as the integer
-    if(_value){_value->value._integer=OWNED(DISOWNED(_integer,owner_integer),owner_value_data);_value->type=VT_INTEGER;}else if(owner_integer.level==0)FREE_INTEGER(_integer,owner_integer);
+    if(_value)
+    {_value->value._integer=owned_integer(disowned_integer(_integer,owner_integer),owner_value_data);_value->type=VT_INTEGER;}
+    else 
+    if(owner_integer.level==0)
+        FREE_INTEGER(_integer,owner_integer);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfFloat(Mfloat* _float,Mallocationowner owner_float){
     if(!_float)return NULL;
     Mvalue* _value=__value("float");
-    if(_value){_value->value._float=(Mfloat*)OWNED(DISOWNED(_float,owner_float),owner_value_data);_value->type=VT_FLOAT;}else if(owner_float.level==0)free_float(_float,owner_float);
+    if(_value)
+    {_value->value._float=(Mfloat*)owned_float(disowned_float(_float,owner_float),owner_value_data);_value->type=VT_FLOAT;}
+    else 
+    if(owner_float.level==0)
+        FREE_FLOAT(_float,owner_float);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map){
     if(!_map)return NULL;
     Mvalue* _value=__value("map");
-    if(_value){_value->value._map=(Mmap*)OWNED(DISOWNED(_map,owner_map),owner_value_data);_value->type=VT_MAP;}else if(owner_map.level==0)free_map(_map,owner_map);
+    if(_value)
+    {_value->value._map=(Mmap*)owned_map(disowned_map(_map,owner_map),owner_value_data);_value->type=VT_MAP;}
+    else 
+    if(owner_map.level==0)
+        FREE_MAP(_map,owner_map);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token){
     if(!_token)return NULL;
     Mvalue* _value=__value("token");
-    if(_value){_value->value._token=(Mtoken*)OWNED(DISOWNED(_token,owner_token),owner_value_data);_value->type=VT_TOKEN;}else if(owner_token.level==0)FREE_TOKEN(_token,owner_token);
+    if(_value)
+    {_value->value._token=(Mtoken*)owned_token(disowned_token(_token,owner_token),owner_value_data);_value->type=VT_TOKEN;}
+    else 
+    if(owner_token.level==0)
+        FREE_TOKEN(_token,owner_token);
     return _value;
 }/* VALIDATED */
 
@@ -618,10 +652,10 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 
 // MDH@09JUN2020: interface between _getVariable (now requiring a Mchars name) and all that still use a char* thing
 static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){if(!name||strlen(name)==0)return NULL;Mallocationowner owner=getOwner(__LINE__);
-    Mchars* _name=OWNED(_getChars(name),owner_variable);
-    Mvariable* _variable=OWNED(_getVariable(_name,valuetype,immutable),owner_variable);
-    if(_variable)SUBOWNED(_variable->_name,1);else freeChars(_name,owner_variable);
-    return _variable;
+    Mchars* _name=owned_chars(_getChars(name),owner_variable); // TODO don't need a separate _name anymore I think
+    Mvariable* _variable=owned_variable(_getVariable(_name,valuetype,immutable),owner_variable);
+    if(_variable)/*SUBOWNED(_variable->_name,1)*/;else FREECHARS(_name,owner_variable);
+    return disowned_variable(_variable,owner_variable);
 }
 // helper function to create a parameter map with a single value
 // the following is a nuisance

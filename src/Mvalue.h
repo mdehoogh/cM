@@ -60,8 +60,12 @@ typedef struct Mreference{
     size_t referenceindex;
 }Mreference;
 
+Mreference* owned_reference(Mreference* reference,Mallocationowner owner);
+Mreference* disowned_reference(Mreference* reference,Mallocationowner owner);
+void free_reference(Mreference* _reference);
+#define FREE_REFERENCE(_reference,owner_reference) free_reference(disowned_reference(_reference,owner_reference))
+
 Mreference* _getReference(Mvariable* variable);
-void free_reference(Mreference* reference,Mallocationowner owner);
 
 typedef struct Mlistelement{
     unsigned long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
@@ -110,6 +114,7 @@ typedef struct Mexpressionlist{
     Mexpressionlistelement* _next;
 }Mexpressionlist;
 
+Mmap* owned_map(Mmap* _map,Mallocationowner owner_map);
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map);
 void free_map(Mmap* _map/*,Mallocationowner owner*/);
 #define FREE_MAP(_map,owner_map) free_map(disowned_map(_map,owner_map))
@@ -172,6 +177,7 @@ Mallocationowner getValueOwner();
 
 Mlist* __list(char* source,Mallocationowner owner_list);
 
+Mlist* owned_list(Mlist* _list,Mallocationowner owner_list);
 Mlist* disowned_list(Mlist* _list,Mallocationowner owner_list);
 void free_list(Mlist* _list/*,Mallocationowner owner*/);
 #define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
@@ -250,12 +256,16 @@ size_t getNumberOfRemovedValues(bool showInfo);
 unsigned long long getNumberOfValues();
 
 Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
-void free_variable(Mvariable* _variable,bool weak,Mallocationowner owner);
+Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable);
+Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable);
+void free_variable(Mvariable* _variable,bool weak);
+#define FREE_VARIABLE(_variable,weak,owner_variable) free_variable(disowned_variable(_variable,owner_variable),weak)
 
 Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement);
 bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/);
 #define FREE_MAPELEMENT(_mapelement,weak,owner_mapelement) free_mapelement(disowned_mapelement(_mapelement,owner_mapelement))
 
+Mlistelement* owned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement);
 Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement);
 bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/);
 #define FREE_LISTELEMENT(_listelement,owner_listelement) free_listelement(disowned_listelement(_listelement,owner_listelement))

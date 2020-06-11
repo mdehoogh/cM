@@ -21,12 +21,12 @@ mpd_t* get_mpd_copy(mpd_context_t const * mpd_context,mpd_t* mpd){
 	return _mpd;
 }
 
-void owned_sincoselement(Msincoselement* _sincoselement,Mallocationowner owner_sincoselement){
+Msincoselement* owned_sincoselement(Msincoselement* _sincoselement,Mallocationowner owner_sincoselement){
     if(!_sincoselement)return NULL;
 	if(_sincoselement->_next)owned_sincoselement(_sincoselement->_next,owner_sincoselement); // unlikely though
 	return OWNED(_sincoselement,owner_sincoselement);
 }
-void disowned_sincoselement(Msincoselement* _sincoselement,Mallocationowner owner_sincoselement){
+Msincoselement* disowned_sincoselement(Msincoselement* _sincoselement,Mallocationowner owner_sincoselement){
     if(!_sincoselement)return NULL;
 	if(_sincoselement->_next)disowned_sincoselement(_sincoselement->_next,owner_sincoselement); // unlikely though
 	return DISOWNED(_sincoselement,owner_sincoselement);
@@ -40,6 +40,7 @@ void free_sincoselement(Msincoselement* _sincoselement/*,Mallocationowner owner_
 		FREE_1(_sincoselement,'#'/*,owner_sincoselement*/);
     }
 }
+#define FREE_SINCOSELEMENT(_sincoselement,owner_sincoselement) free_sincoselement(disowned_sincoselement(_sincoselement,owner_sincoselement))
 
 mpd_context_t* owned_mpd_context(mpd_context_t* _mpd_context,Mallocationowner owner_mpd_context){
 	return OWNED(_mpd_context,owner_mpd_context);
@@ -59,18 +60,18 @@ mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){Mallocationowner owne
 }
 
 Mdecimalcontext* disowned_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner_decimalcontext){
-	if(!_decimalcontext)return;
+	if(!_decimalcontext)return NULL;
 	if(_decimalcontext->mpd_context)DISOWNED(_decimalcontext->mpd_context,owner_decimalcontext);
 	if(_decimalcontext->_firstCordicelement)disowned_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
 	if(_decimalcontext->_firstSincoselement)disowned_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
 	return DISOWNED(_decimalcontext,owner_decimalcontext);
 }
 Mdecimalcontext* owned_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner_decimalcontext){
-	if(!_decimalcontext)return;
+	if(!_decimalcontext)return NULL;
 	if(_decimalcontext->mpd_context)OWNED(_decimalcontext->mpd_context,owner_decimalcontext);
-	if(_decimalcontext->_firstCordicelement)disowned_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
-	if(_decimalcontext->_firstSincoselement)disowned_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
-	return DISOWNED(_decimalcontext,owner_decimalcontext);
+	if(_decimalcontext->_firstCordicelement)owned_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
+	if(_decimalcontext->_firstSincoselement)owned_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
+	return OWNED(_decimalcontext,owner_decimalcontext);
 }
 void free_decimalcontext(Mdecimalcontext* _decimalcontext/*,Mallocationowner owner_decimalcontext*/){
 	if(!_decimalcontext)return;
@@ -87,6 +88,7 @@ void free_decimalcontext(Mdecimalcontext* _decimalcontext/*,Mallocationowner own
 	if(_decimalcontext->_firstSincoselement)free_sincoselement(_decimalcontext->_firstSincoselement/*,owner_decimalcontext*/);
 	FREE_1(_decimalcontext,'C'/*,owner_decimalcontext*/);
 }
+#define FREE_DECIMALCONTEXT(_decimalcontext,owner_decimalcontext) free_decimalcontext(disowned_decimalcontext(_decimalcontext,owner_decimalcontext))
 
 // if we want to keep a list of all decimal contexts, we need to be able to iterate over all decimal contexts to see if it is already there
 // create a single Mdecimalcontextelement
@@ -94,12 +96,27 @@ typedef struct MdecimalcontextElement{
 	Mdecimalcontext* _decimalcontext;
 	struct MdecimalcontextElement* _next;
 }MdecimalcontextElement;
-void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
-	if(!_decimalcontextElement)return;
-	if(_decimalcontextElement->_next)free_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
-	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
-	FREE_DISOWNED_1(_decimalcontextElement,'e',owner_decimalcontextElement);
+
+MdecimalcontextElement* owned_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
+	if(!_decimalcontextElement)return NULL;
+	if(_decimalcontextElement->_next)owned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
+	if(_decimalcontextElement->_decimalcontext)owned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
+	return(MdecimalcontextElement*)OWNED(_decimalcontextElement,owner_decimalcontextElement);
 }
+MdecimalcontextElement* disowned_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement,Mallocationowner owner_decimalcontextElement){
+	if(!_decimalcontextElement)return NULL;
+	if(_decimalcontextElement->_next)disowned_decimalcontextElement(_decimalcontextElement->_next,owner_decimalcontextElement); // free whatever it is pointing to
+	if(_decimalcontextElement->_decimalcontext)disowned_decimalcontext(_decimalcontextElement->_decimalcontext,owner_decimalcontextElement); // free whatever decimal context it is referring to
+	return(MdecimalcontextElement*)DISOWNED(_decimalcontextElement,owner_decimalcontextElement);
+}
+void free_decimalcontextElement(MdecimalcontextElement* _decimalcontextElement/*,Mallocationowner owner_decimalcontextElement*/){
+	if(!_decimalcontextElement)return;
+	if(_decimalcontextElement->_next)free_decimalcontextElement(_decimalcontextElement->_next/*,owner_decimalcontextElement*/); // free whatever it is pointing to
+	if(_decimalcontextElement->_decimalcontext)free_decimalcontext(_decimalcontextElement->_decimalcontext/*,owner_decimalcontextElement*/); // free whatever decimal context it is referring to
+	FREE_1(_decimalcontextElement,'e'/*,owner_decimalcontextElement*/);
+}
+#define FREE_DECIMALCONTEXTELEMENT(_decimalcontextElement,owner_decimalcontextElement) free_decimalcontextElement(disowned_decimalcontextElement(_decimalcontextElement,owner_decimalcontextElement))
+
 static MdecimalcontextElement *_firstDecimalcontextElement=NULL,*_lastDecimalcontextElement=NULL;Mallocationowner owner_decimalcontextElement={MODULE_ID,__LINE__,1};
 // to get the unique decimal context with the requested precision
 static Mdecimalcontext* _getExistingDecimalcontext(mpd_ssize_t prec){
@@ -125,7 +142,7 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=get
 			// not bound!!!
 			DISOWNED(decimalcontextElement->_decimalcontext,owner);
 		}
-		free_decimalcontextElement(decimalcontextElement,owner);
+		FREE_DECIMALCONTEXTELEMENT(decimalcontextElement,owner);
 	}else
 		output("%sFailed to create the decimal context with precision " PRIu64 ".\n",M_ERROR_PREFIX,prec);
 	return NULL;
@@ -133,7 +150,7 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=get
 
 // if decimal->repeating fixedpoint will determine whether or not to append ] so pass in false in that case!!!!!
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _decimalText=OWNED(__string(),owner);
+    Mstring* _decimalText=owned_string(__string(),owner);
     if(_decimalText){
 		if(_decimal&&_decimal->mpd){
 			/////////outputChar('D');
@@ -170,7 +187,7 @@ Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Malloc
         }else
 			string_append_char(_decimalText,'?');
     }else outputChar('?');
-    return DISOWNED(_decimalText,owner);
+    return disowned_string(_decimalText,owner);
 }/* VALIDATED */
 
 /**
@@ -183,10 +200,10 @@ Mdecimal* _getDecimalCopy(Mdecimal const * const _decimal){Mallocationowner owne
 	Mdecimalcontext* decimalcontext=_getDecimalcontext(_decimal->prec);
 	// MDH@31MAY2020 undone, so no need to do this: if(!decimalcontext)decimalcontext=_getNewDecimalContext(_decimal->prec);
     if(!decimalcontext)return NULL;
-	mpd_t* _mpd=OWNED(get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd),owner); // make a copy
+	mpd_t* _mpd=get_mpd_copy(decimalcontext->mpd_context,_decimal->mpd); // make a copy
 	if(!_mpd)return NULL;
-	Mdecimal* _decimalCopy=OWNED(_getDecimal(_mpd,_decimal->prec,_decimal->repeating,true),owner);
-	return DISOWNED(_decimalCopy,owner); // if failing to wrap the mpd copy free it
+	Mdecimal* _decimalCopy=owned_decimal(_getDecimal(_mpd,_decimal->prec,_decimal->repeating,true),owner);
+	return disowned_decimal(_decimalCopy,owner); // if failing to wrap the mpd copy free it
 	/* replacing:
 	// TODO use get_mpd_copy() to copy the mpd in _decimal to speed things up, and use the
     Mdecimal* _decimalCopy=__decimal(M_DECIMALCONTEXT->mpd_context,0,_decimal->repeating);
@@ -206,6 +223,7 @@ typedef struct MbigintegerListelement{
     Mbiginteger* _biginteger;
     struct MbigintegerListelement* _next;
 }MbigintegerListelement;
+
 // MDH@20MAY2020: you can't free what isn't yours to start with, we can make it easy by allowing passing in the owner id of the big integer list element
 static void free_bigintegerListelement(MbigintegerListelement* _bile,Mallocationowner owner){
     // ASSERT assume _bile to not be NULL
@@ -1395,8 +1413,12 @@ mpd_t* _dsinsquared(mpd_context_t const * const mpd_context,mpd_t const * const 
 	mpd_t* _sinsquared=NULL;
 	if(mpd_context&&x){
 		if(amVerbose()){
+			// TODO check whether we need to do something with get_mpd_copy
 			Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true),owner);
-			if(_decimal){output("Computing the square of the sine");outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal,owner);}
+			if(_decimal){
+				output("Computing the square of the sine");outputDecimal(" of '",_decimal,"'.\n");
+				FREE_DECIMAL(_decimal,owner);
+			}
 		}
 		uint32_t status=0;
 		/////////// REMOVED: mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)+2); // increment the precision by 2 decimal digits
@@ -1706,11 +1728,20 @@ typedef struct mpd_sincos_t{
 	mpd_t* sin;
 	mpd_t* cos;
 }mpd_sincos_t;
-void free_mpd_sincos(mpd_sincos_t* _mpd_sincos,Mallocationowner owner_mpd_sincos){
+
+mpd_sincos_t* owned_mpd_sincos(mpd_sincos_t* _mpd_sincos,Mallocationowner owner_mpd_sincos){
+	return(mpd_sincos_t*)OWNED(_mpd_sincos,owner_mpd_sincos);
+}
+mpd_sincos_t* disowned_mpd_sincos(mpd_sincos_t* _mpd_sincos,Mallocationowner owner_mpd_sincos){
+	return(mpd_sincos_t*)DISOWNED(_mpd_sincos,owner_mpd_sincos);
+}
+void free_mpd_sincos(mpd_sincos_t* _mpd_sincos){
 	free_mpd(_mpd_sincos->sin);
 	free_mpd(_mpd_sincos->cos);
-	FREE_DISOWNED_1(_mpd_sincos,'T',owner_mpd_sincos);
+	FREE_1(_mpd_sincos,'T');
 }
+#define FREE_MPD_SINCOS(_mpd_sincos,owner_mpd_sincos) free_mpd_sincos(disowned_mpd_sincos(_mpd_sincos,owner_mpd_sincos))
+
 /**
  * \brief returns a pair of mpd_t* instances containing the sine and cosine of \p x respectively guaranteeing their sum of squares equals 1
  * \p x the decimal to compute the sine/cosine of
@@ -1727,7 +1758,10 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 			if(_mpd_sinandcos->sin&&_mpd_sinandcos->cos){
 				if(amVerboseDebugging()){
 					Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true),owner);
-					if(_decimal){outputDecimal("Computing the sine and cosine of '",_decimal,"'.\n");free_decimal(_decimal,owner);}
+					if(_decimal){
+						outputDecimal("Computing the sine and cosine of '",_decimal,"'.\n");
+						FREE_DECIMAL(_decimal,owner);
+					}
 				}
 				// we have the numerator and denominator of the term to add
 				uint32_t status=0;
@@ -1784,8 +1818,8 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 						mpd_qcopy(_mpd_sinandcos->cos,_newcosine,&status);
 						mpd_qcopy(_mpd_sinandcos->sin,_newsine,&status);
 					}
-					if(_intermediateSine)free_decimal(_intermediateSine,owner);
-					if(_intermediateCosine)free_decimal(_intermediateCosine,owner);
+					if(_intermediateSine)FREE_DECIMAL(_intermediateSine,owner);
+					if(_intermediateCosine)FREE_DECIMAL(_intermediateCosine,owner);
 				}else{
 					status=1;
 					outputError("Failed to create the internal helper decimals in computing the sine and cosine of a decimal");
@@ -1803,7 +1837,10 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 							mpd_qadd(_sumofsquares,_cosinesquared,_sinesquared,mpd_context,&status); // add the squares
 							if(mpd_qcmp(_sumofsquares,_one,&status)!=0){ // sum of squares does not equal 1
 								mpd_qsqrt(_sumofsquares,_sumofsquares,mpd_context,&status);
-								if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_sumofsquares),mpd_context->prec,0,true);if(_decimal){outputDecimal("Sum of sine squared and cosine squared: '",_decimal,"'.\n");free_decimal(_decimal,owner);}}
+								if(amVerbose()){
+									Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,_sumofsquares),mpd_context->prec,0,true),owner);
+									if(_decimal){outputDecimal("Sum of sine squared and cosine squared: '",_decimal,"'.\n");FREE_DECIMAL(_decimal,owner);}
+								}
 								mpd_qdiv(_mpd_sinandcos->sin,_mpd_sinandcos->sin,_sumofsquares,mpd_context,&status);
 								mpd_qdiv(_mpd_sinandcos->cos,_mpd_sinandcos->cos,_sumofsquares,mpd_context,&status);
 								if((status&0xEFBF)!=0){free_mpd(_sumofsquares);_sumofsquares=NULL;}
@@ -1817,7 +1854,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 					if(_sumofsquares){free_mpd(_sumofsquares);return DISOWNED(_mpd_sinandcos,owner);}
 				}
 			}
-			free_mpd_sincos(_mpd_sinandcos,owner);
+			FREE_MPD_SINCOS(_mpd_sinandcos,owner);
 		}else
 			outputError("Failed to initialize the object storing the sine and cosine of a decimal");
 	}else
@@ -1830,7 +1867,7 @@ mpd_t* _dsinorcos(mpd_context_t const * const mpd_context,mpd_t const * const x,
 	if(mpd_context&&x){
 		if(amVerbose()){
 			Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,x),mpd_context->prec,0,true),owner);
-			if(_decimal){output("Computing the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");free_decimal(_decimal,owner);}
+			if(_decimal){output("Computing the %s",(sin?"sine":"cosine"));outputDecimal(" of '",_decimal,"'.\n");FREE_DECIMAL(_decimal,owner);}
 		}
 		uint32_t status=0;
 		// the sine of x equals the som of an infinite number of terms multiplied by x
@@ -1989,7 +2026,7 @@ mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * c
 								mpd_qcopy(_relativeAngle->sincoselement->_sine,decimalcontext->predefinedsines[predefinedAngleIndex],&status);
 								mpd_qcopy(_relativeAngle->sincoselement->_cosine,decimalcontext->predefinedsines[256-predefinedAngleIndex],&status); // we know where to find the cosine of the predefined angle
 							}else{
-								free_sincoselement(_relativeAngle->sincoselement,owner);
+								FREE_SINCOSELEMENT(_relativeAngle->sincoselement,owner);
 								_relativeAngle->sincoselement=NULL;
 								status=0xFFFFFFFF;
 							}
@@ -2005,7 +2042,7 @@ mpd_relative_angle_t* _getPredefinedSinesRelativeAngle(Mdecimalcontext const * c
 					status=0xFFFFFFFF;
 					outputError("Predefined sines index invalid");
 				}
-				if((status&0xEFBF)!=0){free_mpd_relative_angle(_relativeAngle,owner);_relativeAngle=NULL;}
+				if((status&0xEFBF)!=0){FREE_MPD_RELATIVE_ANGLE(_relativeAngle,owner);_relativeAngle=NULL;}
 			}else 
 				outputError("Failed to create a relative angle offset and remainder.");
 			free_mpd(_deltaAngle);free_mpd(_predefinedAngleIndex);
@@ -2062,14 +2099,16 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext const * const decimalcon
 						}
 						sincoselement=nextsincoselement;
 					}
-					if(!sincoselement){FREE_DISOWNED_1(_relativeAngle,'A',owner);_relativeAngle=NULL;}else _relativeAngle->sincoselement=sincoselement;
+					if(!sincoselement)
+					{FREE_DISOWNED_1(_relativeAngle,'A',owner);_relativeAngle=NULL;}else
+					_relativeAngle->sincoselement=sincoselement;
 				}else
 					outputError("No predefined angles");
 			}else
 				outputError("Failed to initialize the relative angle");
 		}else
 			outputError("Failed to prepare for computing the relative angle");
-		if(_intermediateResult){_intermediateResult->mpd=NULL;free_decimal(_intermediateResult,owner);}
+		if(_intermediateResult){_intermediateResult->mpd=NULL;FREE_DECIMAL(_intermediateResult,owner);}
 		free_mpd(_deltaAngle1);free_mpd(_deltaAngle2);
 	}
 	return DISOWNED(_relativeAngle,owner);
@@ -2083,7 +2122,7 @@ mpd_t* _getCORDICsinorcos(Mdecimalcontext const * const decimalcontext,mpd_t con
 	// we can't start with the smallest we have to start with 45 degrees, then 22.5 degrees etc.
 	// if we have many of these angles we can use a big integer to store the booleans that determine whether or not to perform a rotation
 	mpd_context_t* mpd_context=decimalcontext->mpd_context;
-	Mdecimal* _intermediateResult=(amVerbose()?OWNED(__decimal(mpd_context,0,0),owner):NULL);
+	Mdecimal* _intermediateResult=(amVerbose()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
 	uint32_t status=0;
 	mpd_t* _xcopy=get_mpd_copy(mpd_context,x);
 	// as long as the remaining angle isn't zero keep going
@@ -2131,7 +2170,7 @@ mpd_t* _getCORDICsinorcos(Mdecimalcontext const * const decimalcontext,mpd_t con
 	}
 	free_mpd(_xcopy);
 	free_mpd(_t1);free_mpd(_t2);free_mpd(_t3);free_mpd(_t4);if(sin)free_mpd(_resultcosine);else free_mpd(_resultsine); // OOPS forgotten below
-	if(_intermediateResult){_intermediateResult->mpd=NULL;free_decimal(_intermediateResult,owner);}
+	if(_intermediateResult){_intermediateResult->mpd=NULL;FREE_DECIMAL(_intermediateResult,owner);}
 	return(sin?_resultsine:_resultcosine);
 }
 // for testing it's a good idea to be able to ask for the CORDIC sine
@@ -2142,16 +2181,19 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
-			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)free_decimal(pi_decimal(decimalcontext,true),owner); // compute and immediately free the returned copy
+			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
+				FREE_DECIMAL(pi_decimal(decimalcontext,true),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
 			if(mpd_context){
-				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				if(isDecimalZero(x))
+					return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
 				uint32_t status=0;
 				mpd_t* _absx=NULL;
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
-					if(!_absx){outputError("Failed to negate the decimal to compute the CORDIC sine of");return NULL;}
+					if(!_absx)
+					{outputError("Failed to negate the decimal to compute the CORDIC sine of");return NULL;}
 					if(amVerbose())outputInfo("Computing the CORDIC sine of a negative decimal.");
 				}
 				mpd_t* _CORDICsine=NULL;
@@ -2160,11 +2202,17 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 				if(_xtemp&&_xmod&&_xquadrant){
 					// normalize x to the range [0,2*pi)
 					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
-					if(amVerbose()){Mdecimal* _decimal=_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true);if(_decimal){outputDecimal("Normalized CORDIC sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal,owner);}}
+					if(amVerbose()){
+						Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
+						if(_decimal){outputDecimal("Normalized CORDIC sine (abs) argument: '",_decimal,"'.\n");FREE_DECIMAL(_decimal,owner);}
+					}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
-					if(amVerbose()){outputDecimal("Quadrant of CORDIC sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if(amVerbose()){
+						outputDecimal("Quadrant of CORDIC sine argument '",x,"': ");
+						output("%" PRIu32 ".\n",xquadrant);
+					}
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the CORDIC sine of a decimal");
 						report_mpd_status(status);
@@ -2212,7 +2260,7 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 										_decimal->mpd=_CORDICsine;
 										outputDecimal("CORDIC sine: '",_decimal,"'.\n");
 										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
-										free_decimal(_decimal,owner);
+										FREE_DECIMAL(_decimal,owner);
 									}else
 										outputError("Failed to create a decimal for showing the CORDIC sine");
 								}
@@ -2228,7 +2276,7 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 				if(_absx)free_mpd(_absx);
 				if(_CORDICsine){
 					////////output("Returning the CORDIC decimal.\n");
-					return DISOWNED(OWNED(_getDecimal(_CORDICsine,mpd_context->prec,0,true),owner),owner);
+					return _getDecimal(_CORDICsine,mpd_context->prec,0,true); // TODO I suppose this is ok, because it does not matter who disowns it
 				}
 			}
 		}
@@ -2244,17 +2292,21 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
-			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)free_decimal(OWNED(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
+			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
+				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
 			if(mpd_context){
-				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				if(isDecimalZero(x))
+					return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
 				uint32_t status=0;
 				mpd_t* _absx=NULL;
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
-					if(!_absx){outputError("Failed to negate the decimal to compute the CORDIC cosine of");return NULL;}
-					if(amVerbose())outputInfo("Computing the CORDIC cosine of a negative decimal.");
+					if(!_absx)
+					{outputError("Failed to negate the decimal to compute the CORDIC cosine of");return NULL;}
+					if(amVerbose())
+						outputInfo("Computing the CORDIC cosine of a negative decimal.");
 				}
 				mpd_t* _CORDICcosine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2263,8 +2315,11 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 					// normalize x to the range [0,2*pi)
 					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
 					if(amVerbose()){
-						Mdecimal* _decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
-						if(_decimal){outputDecimal("Normalized CORDIC cosine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal,owner);}
+						Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
+						if(_decimal){
+							outputDecimal("Normalized CORDIC cosine (abs) argument: '",_decimal,"'.\n");
+							FREE_DECIMAL(_decimal,owner);
+						}
 					}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
@@ -2310,14 +2365,15 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 									if(amVerbose())outputInfo("Negating the computed CORDIC cosine!");
 									mpd_set_negative(_CORDICcosine); // negate the _sine
 								}else
-								if(amVerbose())outputInfo("Not negating the CORDIC cosine!");
+								if(amVerbose())
+									outputInfo("Not negating the CORDIC cosine!");
 								if(amVerbose()){
-									Mdecimal* _decimal=OWNED(__decimal(mpd_context,0,0),owner);
+									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 									if(_decimal){
 										_decimal->mpd=_CORDICcosine;
 										outputDecimal("CORDIC cosine: '",_decimal,"'.\n");
 										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
-										free_decimal(_decimal,owner);
+										FREE_DECIMAL(_decimal,owner);
 									}else
 										outputError("Failed to create a decimal for showing the CORDIC cosine");
 								}
@@ -2333,7 +2389,7 @@ Mdecimal* _dcordiccosine(Mdecimalcontext const * decimalcontext,Mdecimal const *
 				if(_absx)free_mpd(_absx);
 				if(_CORDICcosine){
 					////////output("Returning the CORDIC decimal.\n");
-					return DISOWNED(OWNED(_getDecimal(_CORDICcosine,mpd_context->prec,0,true),owner),owner);
+					return _getDecimal(_CORDICcosine,mpd_context->prec,0,true); // TODO doesn't matter who disowns it?
 				}
 			}
 		}
@@ -2423,17 +2479,20 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
-			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)free_decimal(OWNED(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
+			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
+				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
 			if(mpd_context){
-				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				if(isDecimalZero(x))
+					return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
 				uint32_t status=0;
 				mpd_t* _absx=NULL;
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
 					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
 					if(!_absx){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
-					if(amVerbose())outputInfo("Computing the sine of a negative decimal.");
+					if(amVerbose())
+						outputInfo("Computing the sine of a negative decimal.");
 				}
 				mpd_t* _sine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2442,13 +2501,15 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 					// normalize x to the range [0,2*pi)
 					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
 					if(amVerbose()){
-						Mdecimal* _decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
-						if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal,owner);}
+						Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
+						if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");FREE_DECIMAL(_decimal,owner);}
 					}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
-					if(amVerbose()){outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if(amVerbose()){
+						outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
+					}
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the sine of a decimal");
 						report_mpd_status(status);
@@ -2484,12 +2545,12 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 							// looking up should return the nearest sincos element in the table
 							mpd_t* _CORDICsine=_getCORDICsinorcos(decimalcontext,x->mpd,true);
 							if(_CORDICsine){
-								Mdecimal* _decimal=(amVerbose()?OWNED(__decimal(mpd_context,0,0),owner):NULL);
+								Mdecimal* _decimal=(amVerbose()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
 								if(_decimal){
 									_decimal->mpd=_CORDICsine;
 									outputDecimal("CORDIC sine: '",_decimal,"'.\n");
 									_decimal->mpd=NULL; // so it won't get freed by free_decimal()
-									free_decimal(_decimal,owner);
+									FREE_DECIMAL(_decimal,owner);
 								}else
 								if(amVerbose())
 									outputError("Failed to create a decimal for showing the CORDIC sine");
@@ -2551,11 +2612,11 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 								outputError("Failed to compute the relative angle");
 							*/
 							// MDH@11SEP2019: the following is preferred because we have precomputed 257 equidistant angle sines between 0 and pi/2
-							mpd_relative_angle_t* _predefinedSinesRelativeAngle=OWNED(_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd),owner);
+							mpd_relative_angle_t* _predefinedSinesRelativeAngle=owned_mpd_relative_angle(_getPredefinedSinesRelativeAngle(decimalcontext,x->mpd),owner);
 							if(_predefinedSinesRelativeAngle){
 								if(amVerbose()){
 									output("Predefined sines relative angle: ");
-									Mdecimal* _decimal=OWNED(__decimal(mpd_context,0,0),owner);
+									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 									if(_decimal){
 										_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;
 										outputDecimal(NULL,_decimal,NULL);
@@ -2563,7 +2624,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 										_decimal->mpd=_predefinedSinesRelativeAngle->_delta_angle;
 										outputDecimal(NULL,_decimal,NULL);
 										_decimal->mpd=NULL; // so it won't get freed by free_decimal()
-										free_decimal(_decimal,owner);
+										FREE_DECIMAL(_decimal,owner);
 									}else
 										outputChar('?');
 									outputInfo(".");
@@ -2572,7 +2633,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 								// which consists of two terms that need to be added or subtracted
 								mpd_t *_term1=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_sine),*_term2=get_mpd_copy(mpd_context,_predefinedSinesRelativeAngle->sincoselement->_cosine);
 								if(_term1&&_term2){
-									Mdecimal* _decimal=(amVerbose()?OWNED(__decimal(mpd_context,0,0),owner):NULL);
+									Mdecimal* _decimal=(amVerbose()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
 									if(_decimal){
 										output("Predefined sines angle #%" PRIu32 ":",_predefinedSinesRelativeAngle->sincoselement->mult);
 										_decimal->mpd=_predefinedSinesRelativeAngle->sincoselement->_angle;outputDecimal("'",_decimal,"'");
@@ -2598,10 +2659,10 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 										free_mpd(_deltasinsquared);
 									}
 									free_mpd(_deltasin);free_mpd(_deltacos);
-									if(_decimal){_decimal->mpd=NULL;free_decimal(_decimal,owner);}
+									if(_decimal){_decimal->mpd=NULL;FREE_DECIMAL(_decimal,owner);}
 								}
 								free_mpd(_term1);free_mpd(_term2);
-								free_mpd_relative_angle(_predefinedSinesRelativeAngle,owner);
+								FREE_MPD_RELATIVE_ANGLE(_predefinedSinesRelativeAngle,owner);
 							}else
 								outputError("Failed to compute the predefined sines relative angle");
 
@@ -2611,7 +2672,11 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // reset precision (TODO not thread-safe if we would be running multiple versions using the same mpd_context!!!!)
 							if(_sine)mpd_qfinalize(_sine,mpd_context,&status);else status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
 							// some extra work as we've received the sine squared
-							if((status&0xEFBF)!=0){outputError("Failed to compute the cosine from the sine square approximation");free_mpd(_sine);_sine=NULL;}
+							if((status&0xEFBF)!=0){
+								outputError("Failed to compute the cosine from the sine square approximation");
+								free_mpd(_sine);
+								_sine=NULL;
+							}
 							/* replacing:
 
 							_sine=_dsquarerootofsinorcossquared(mpd_context,(sin?_xmod:_xsin),true);
@@ -2644,7 +2709,7 @@ Mdecimal* _dsine(Mdecimalcontext const * decimalcontext,Mdecimal const * const x
 					outputError("Failed to create helper decimals for computing the sine of a decimal");
 				free_mpd(_xmod);free_mpd(_xtemp);free_mpd(_xquadrant);
 				if(_absx)free_mpd(_absx);
-				if(_sine)return DISOWNED(OWNED(_getDecimal(_sine,mpd_context->prec,0,true),owner),owner);				
+				if(_sine)return _getDecimal(_sine,mpd_context->prec,0,true); // TODO does it matter who disowns it?				
 			}
 		}else
 			outputError("No decimal context to compute the sine of a decimal in");
@@ -2660,18 +2725,23 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
-			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)free_decimal(OWNED(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
+			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
+				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
 			if(mpd_context){
-				if(isDecimalZero(x))return DISOWNED(OWNED(_getDecimal(__mpd(mpd_context,1),mpd_context->prec,0,true),owner),owner);
+				if(isDecimalZero(x))
+					return _getDecimal(__mpd(mpd_context,1),mpd_context->prec,0,true); // TODO ?
 				uint32_t status=0;
 				// with the cosine we can forget about the sign i.e. cos(-x)=cos(x), which means we can simply ignore the sign
 				mpd_t* _absx=NULL;
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
-					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
-					if(!_absx){outputError("Failed to negate the decimal to compute the cosine of");return NULL;}
-					if(amVerbose())outputInfo("Computing the cosine of a negative decimal.");
+					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0)
+					{free_mpd(_absx);_absx=NULL;}}
+					if(!_absx)
+					{outputError("Failed to negate the decimal to compute the cosine of");return NULL;}
+					if(amVerbose())
+						outputInfo("Computing the cosine of a negative decimal.");
 				}
 				mpd_t* _cosine=NULL;
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2680,13 +2750,17 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 					// normalize x to the range [0,2*pi)
 					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
 					if(amVerbose()){
-						Mdecimal* _decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
-						if(_decimal){outputDecimal("Normalized cosine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal,owner);}
+						Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
+						if(_decimal){
+							outputDecimal("Normalized cosine (abs) argument: '",_decimal,"'.\n");
+							FREE_DECIMAL(_decimal,owner);
+						}
 					}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
-					if(amVerbose()){outputDecimal("Quadrant of cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if(amVerbose())
+						outputDecimal("Quadrant of cosine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the cosine of a decimal");
 						report_mpd_status(status);
@@ -2733,7 +2807,11 @@ Mdecimal* _dcosine(Mdecimalcontext const * decimalcontext,Mdecimal const * const
 							}
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // approximate with two additional digits
 							if(_cosine)mpd_qfinalize(_cosine,mpd_context,&status); // round to the 'original' precision
-							if((status&0xEFBF)!=0){outputError("Failed to compute the cosine from the sine square approximation");free_mpd(_cosine);_cosine=NULL;}
+							if((status&0xEFBF)!=0){
+								outputError("Failed to compute the cosine from the sine square approximation");
+								free_mpd(_cosine);
+								_cosine=NULL;
+							}
 							/* replacing:
 							_cosine=_dsquarerootofsinorcossquared(mpd_context,(cos?_xmod:_xcos),false);
 							*/
@@ -2776,17 +2854,25 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 		if(!decimalcontext)decimalcontext=M_DECIMALCONTEXT;
 		if(decimalcontext){
 			// we need pi in the given precision (now stored in any Mdecimalcontext)
-			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)free_decimal(OWNED(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
+			if(!decimalcontext->pi||!decimalcontext->predefinedsinedeltaangle)
+				FREE_DECIMAL(owned_decimal(pi_decimal(decimalcontext,true),owner),owner); // compute and immediately free the returned copy
 			mpd_context_t* mpd_context=(decimalcontext->pi?decimalcontext->mpd_context:NULL);
 			if(mpd_context){
-				if(isDecimalZero(x))return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true);
+				if(isDecimalZero(x))
+					return _getDecimal(__mpd(mpd_context,0),mpd_context->prec,0,true); // TODO ?
 				uint32_t status=0;
 				mpd_t* _absx=NULL;
 				if(mpd_isnegative(x->mpd)){
 					_absx=__mpd(mpd_context,0);
-					if(_absx){mpd_qabs(_absx,x->mpd,mpd_context,&status);if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}}
-					if(!_absx){outputError("Failed to negate the decimal to compute the sine of");return NULL;}
-					if(amVerbose())outputInfo("Computing the sine of a negative decimal.");
+					if(_absx){
+						mpd_qabs(_absx,x->mpd,mpd_context,&status);
+						if((status&0xEFBF)!=0){free_mpd(_absx);_absx=NULL;}
+					}
+					if(!_absx){
+						outputError("Failed to negate the decimal to compute the sine of");return NULL;
+					}
+					if(amVerbose())
+						outputInfo("Computing the sine of a negative decimal.");
 				}
 				mpd_t* _tan=NULL; // the end result
 				// TODO the following works for x in [0,1) but we have to ascertain to pass a value below 1 to _sincos
@@ -2796,12 +2882,13 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
 					if(amVerbose()){
 						Mdecimal* _decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
-						if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");free_decimal(_decimal,owner);}
+						if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");FREE_DECIMAL(_decimal,owner);}
 					}
 					// determine the quadrant by dividing the normalized x by pi/2
 					mpd_qdivmod(_xquadrant,_xtemp,_xmod,decimalcontext->pidiv2,mpd_context,&status);
 					uint64_t xquadrant=mpd_qget_u64(_xquadrant,&status);
-					if(amVerbose()){outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);}
+					if(amVerbose())
+						outputDecimal("Quadrant of sine argument '",x,"': ");output("%" PRIu32 ".\n",xquadrant);
 					if((status&0xEFBF)!=0){
 						outputError("Failed to compute the sine of a decimal");
 						report_mpd_status(status);
@@ -2835,7 +2922,8 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 								if(_sinsquared){
 									// the tangent is the squareroot of (_sine/1-sine)=1/(1-_sine)-1
 									// the last part allows us to re-use _sine
-									mpd_qsub_i32(_sinsquared,_sinsquared,1,mpd_context,&status);mpd_set_positive(_sinsquared); // denominator 1-sine
+									mpd_qsub_i32(_sinsquared,_sinsquared,1,mpd_context,&status);
+									mpd_set_positive(_sinsquared); // denominator 1-sine
 									mpd_qdiv(_sinsquared,_tan,_sinsquared,mpd_context,&status);
 									mpd_qsub_i32(_sinsquared,_sinsquared,1,mpd_context,&status);
 									mpd_qsqrt(_tan,_sinsquared,mpd_context,&status);
@@ -2847,14 +2935,20 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 							mpd_qsetprec(mpd_context,mpd_getprec(mpd_context)-2); // reset precision (TODO not thread-safe if we would be running multiple versions using the same mpd_context!!!!)
 							if(_tan){
 								if(amVerbose()){
-									Mdecimal* _decimal=OWNED(__decimal(mpd_context,0,0),owner);
-									if(_decimal){_decimal->mpd=_tan;outputDecimal("Tangent: ",_decimal,"'.\n");_decimal->mpd=NULL;free_decimal(_decimal,owner);}
+									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
+									if(_decimal){
+										_decimal->mpd=_tan;
+										outputDecimal("Tangent: ",_decimal,"'.\n");
+										_decimal->mpd=NULL;
+										FREE_DECIMAL(_decimal,owner);
+									}
 								}
 								mpd_qfinalize(_tan,mpd_context,&status);
 							}else 
 								status=0xFFFFFFFF; // round to the original precision (NOTE if sqrt failed we didn't have to do this though!!!)
 							// some extra work as we've received the sine squared
-							if((status&0xEFBF)!=0){outputError("Failed to compute the tangent from the sine square approximation");free_mpd(_tan);_tan=NULL;}
+							if((status&0xEFBF)!=0)
+							{outputError("Failed to compute the tangent from the sine square approximation");free_mpd(_tan);_tan=NULL;}
 
 							if(_tan){
 								if((_absx!=NULL)!=(xquadrant==1||xquadrant==3)){ // NOTE equivalent to using the ^ bitwise operator!!!
@@ -2891,7 +2985,7 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 			mpd_t* _exp=__mpd(mpd_context,1);
 			if(!mpd_iszero(x->mpd)){
 				if(_exp){
-					Mdecimal* _intermediateResult=(amVerbose()?OWNED(__decimal(mpd_context,0,0),owner):NULL);
+					Mdecimal* _intermediateResult=(amVerbose()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
 					mpd_t *_num=get_mpd_copy(mpd_context,x->mpd),*_den=__mpd(mpd_context,1),*_add=get_mpd_copy(mpd_context,x->mpd),*_i=__mpd(mpd_context,1),*_prevexp=get_mpd_copy(mpd_context,_exp); // a copy of what we need to use
 					if(_num&&_den&&_add&&_i&&_prevexp){
 						uint32_t status=0;
@@ -2916,7 +3010,7 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 						if((status&0xEFBF)!=0){outputError("Something went wrong in executing dexp()");free_mpd(_exp);_exp=NULL;}
 					}else
 						outputError("Failed to create all dexp() execution helper decimals");
-					if(_intermediateResult)free_decimal(_intermediateResult,owner);
+					if(_intermediateResult)FREE_DECIMAL(_intermediateResult,owner);
 					free_mpd(_prevexp);
 					free_mpd(_i);
 					free_mpd(_num);
@@ -2926,7 +3020,8 @@ Mdecimal* _dexp(Mdecimalcontext const * decimalcontext,Mdecimal const * const x)
 					outputError("Failed to initialize the result of dexp()");
 			}else
 			if(amVerbose())outputInfo("Zero argument to exp() approximation.");
-			if(_exp)return DISOWNED(OWNED(_getDecimal(_exp,mpd_context->prec,0,true),owner),owner);
+			if(_exp)
+				return _getDecimal(_exp,mpd_context->prec,0,true);
 		}else
 			outputError("No decimal context available for use in dexp().");
 	}
@@ -2937,16 +3032,20 @@ Mdecimal* _getInverseDecimal(Mdecimal const * const decimal){Mallocationowner ow
 	if(decimal){
 		Mdecimalcontext* decimalcontext=_getDecimalcontext(decimal->prec);
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:M_DECIMALCONTEXT->mpd_context);
-		Mdecimal* _inverseDecimal=OWNED(__decimal(mpd_context,0,0),owner);
+		Mdecimal* _inverseDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 		if(_inverseDecimal){
 			mpd_t* _mpd1=__mpd(mpd_context,1);
 			if(_mpd1){
 				uint32_t status=0;
 				mpd_qdiv(_inverseDecimal->mpd,_mpd1,decimal->mpd,mpd_context,&status);
 				free_mpd(_mpd1);
-				if((status&0xEFBF)){free_decimal(_inverseDecimal,owner);_inverseDecimal=NULL;outputError("Failed to compute the reciprocal of a decimal");}
+				if((status&0xEFBF)){
+					FREE_DECIMAL(_inverseDecimal,owner);
+					outputError("Failed to compute the reciprocal of a decimal");
+					return NULL;
+				}
 			}
-			return DISOWNED(_inverseDecimal,owner);
+			return disowned_decimal(_inverseDecimal,owner);
 		}
 	}
 	return NULL;
@@ -2961,7 +3060,10 @@ long long isDecimalNegative(Mdecimal const * const decimal){long long decimalSig
 // MDH@25AUG2019: I'd see that decimalOne should be an Mdecimal? we can leave it the way it is for now but instead require the context passed to __mpd to be non-NULL!! i.e. __mpd does no longer default to _decimalContext
 static mpd_t* decimalOne=NULL;
 // getDecimalOne() return a decimal but this is a decimal that should never be freed
-const mpd_t* getDecimalOne(){if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);return decimalOne;}/* VALIDATED */
+const mpd_t* getDecimalOne(){
+	if(!decimalOne)decimalOne=__mpd(M_DECIMALCONTEXT->mpd_context,1);
+	return decimalOne;
+}/* VALIDATED */
 long long isDecimalOne(Mdecimal const * const decimal){
 	long long result=M_LL_INVALID;
 	if(isDecimalUndefined(decimal)==M_FALSE&&decimal->repeating==0){

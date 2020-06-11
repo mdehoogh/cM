@@ -264,7 +264,7 @@ void free_text(Mtext* _text/*,Mallocationowner owner*/){
         outputInfo("No text to free!");
 }/* VALIDATED */
 
-Minteger* owned_integer(Minteger* _integer,Mallocationowner owner){return(Minteger*)OWNED(_integer,owner_integer);}
+Minteger* owned_integer(Minteger* _integer,Mallocationowner owner_integer){return(Minteger*)OWNED(_integer,owner_integer);}
 Minteger* disowned_integer(Minteger* _integer,Mallocationowner owner_integer){return(Minteger*)DISOWNED(_integer,owner_integer);}
 void free_integer(Minteger* _integer/*,Mallocationowner owner*/){
     if(_integer){
@@ -283,7 +283,7 @@ void free_float(Mfloat* _float/*,Mallocationowner owner*/){
     if(_float){
         if(amVerboseDebugging())
             output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
-        FREE_1(_float,'F',owner);
+        FREE_1(_float,'F'/*,owner*/);
     }else
     if(amVerboseDebugging())
         outputInfo("No real to free!");

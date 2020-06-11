@@ -5,18 +5,20 @@ static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_I
 
 extern char const * const M_ERROR_PREFIX;
 
-Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(CALLOC_1(sizeof(Mtoken),'O',owner),owner);
-}
 
 // MDH@11JUN2020: always call free_token on disowned tokens
+Mtoken* owned_token(Mtoken* _token,Mallocationowner owner_token){
+    if(!_token)return NULL;
+    owned_token(_token->next,owner_token);
+    owned_string(_token->text,Msubowner(owner_token,1));
+    return OWNED(_token,owner_token);
+}
 Mtoken* disowned_token(Mtoken* _token,Mallocationowner owner_token){
     if(!_token)return NULL;
     disowned_token(_token->next,owner_token);
     disowned_string(_token->text,owner_token);
     return DISOWNED(_token,owner_token);
 }
-
 void free_token(Mtoken* _token/*,Mallocationowner owner*/){
     // MDH@19MAY2020: we can free it only when we own it
     if(!_token)return;
@@ -26,6 +28,9 @@ void free_token(Mtoken* _token/*,Mallocationowner owner*/){
         free_string(_token->text/*,owner*/);_token->text=NULL;
     }
     FREE_1(_token,'O'/*,owner*/);
+}
+Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
+    return disowned_token(CALLOC_1(sizeof(Mtoken),'O',owner),owner);
 }
 
 // MDH@11JUN2020: a useful macro
