@@ -1559,7 +1559,7 @@ Mbiginteger* _Iadd(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Malloca
 			_sum=owned_biginteger(_getBigintegerCopy(isBigintegerZero(a)?b:a),owner);
 	}
 	///////outputBiginteger("\nBig integer sum of ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",sum,".");
-	// if(!sum)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
+	// if(!sum)if(freeonfailure){FREE_BIGINTEGER(a);FREE_BIGINTEGER(b);}
 	return disowned_biginteger(_sum,owner);
 } // adding two big integers, if either is NULL return NULL
 Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Mallocationowner owner=getOwner(__LINE__);
@@ -1572,7 +1572,7 @@ Mbiginteger* _Imultiply(Mbiginteger* a,Mbiginteger* b/*,bool freeonfailure*/){Ma
 			_product=owned_biginteger(_getBigintegerCopy(isBigintegerOne(a)?b:a),owner);
 	}
 	//////////outputBiginteger("\nProduct of big integers ",a,NULL);outputBiginteger(" and ",b,NULL);outputBiginteger(" equals ",product,".");
-	// if(!product)if(freeonfailure){free_biginteger(a);free_biginteger(b);}
+	// if(!product)if(freeonfailure){FREE_BIGINTEGER(a);FREE_BIGINTEGER(b);}
 	return disowned_biginteger(_product,owner);
 } // multiplying two big integers, if either is NULL return NULL
 
@@ -1634,9 +1634,9 @@ Mrational* _qdivide(Mrational* rational1,Mrational* rational2){
 			Mbiginteger* _numerator=(rational2->den?_Imultiply(rational1->num,rational2->den,false):_getBigintegerCopy(rational1->num));
 			Mbiginteger* _denominator=(rational1->den?_Imultiply(rational2->num,rational1->den,false):_getBigintegerCopy(rational2->num));
 			if(!_numerator||!_denominator){ // failed to compute either, so somewhere it went wrong
-				free_biginteger(_numerator);free_biginteger(_denominator);
+				FREE_BIGINTEGER(_numerator);FREE_BIGINTEGER(_denominator);
 			}else{
-				if(isBigintegerOne(_denominator)){free_biginteger(_denominator);_denominator=NULL;} // prevent storing 1 explicitly...
+				if(isBigintegerOne(_denominator)){FREE_BIGINTEGER(_denominator);_denominator=NULL;} // prevent storing 1 explicitly...
 				_rational=_getRational(_numerator,_denominator,M_LD_NAN,true,true); // free num/den when failing to bind them
 			}
 		}else{ // either one or both are unpure i.e. 'reals' approximated by rationals 
@@ -1653,7 +1653,7 @@ Mrational* _qsum(Mrational* _rational1,Mrational* _rational2){
 		outputInfo("Adding two rationals.");
 		mp_err status=_qadd(_rational,_rational1,_rational2);
 		output("Two rationals added (status=%i).\n",status);
-		if(status!=MP_OKAY){free_rational(_rational);_rational=NULL;outputError("Failed to add two rationals");}else outputInfo("Two rationals added successfully."); // addition failed somehow...
+		if(status!=MP_OKAY){FREE_RATIONAL(_rational);_rational=NULL;outputError("Failed to add two rationals");}else outputInfo("Two rationals added successfully."); // addition failed somehow...
 	}
 	return _rational;
 }
@@ -1666,7 +1666,7 @@ Mrational* _qadd(Mrational* _rational1,Mrational* _rational2){
 		Mbiginteger *_num1=_Imul(_rational1->num,_rational2->den),*_num2=_Imul(_rational2->num,_rational1->den);
 		if(_num1&&_num2) // we got (and need) both
 			_rational=_getRational(_Iadd(_num1,_num2,false),_Imul(_rational1->den,_rational2->den),realsum(_rational1->delta,_rational2->delta),true,true); // free the numerator and denominator
-		if(_num1)free_biginteger(_num1);if(_num2)free_biginteger(_num2);
+		if(_num1)FREE_BIGINTEGER(_num1);if(_num2)FREE_BIGINTEGER(_num2);
 	}
 	return _rational;
 }
@@ -1683,7 +1683,7 @@ Mrational* _qsubtract(Mrational* _rational1,Mrational* _rational2){
 	if(!_rational1||!_rational2)return NULL;
 	Mrational* _rational2Neg=_qneg(_rational2); // get the negated rational2
 	Mrational* _rational=_qsum(_rational1,_rational2Neg);
-	free_rational(_rational2Neg); // free the negated rational2
+	FREE_RATIONAL(_rational2Neg); // free the negated rational2
 	return _rational;
 }
 */
@@ -1700,7 +1700,7 @@ Mdecimal* _dadd(Mdecimal* _decimal1,Mdecimal* _decimal2){
 	if(_result){
 		uint32_t status=0;
 		mpd_qadd(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
-		if(status&0xEFBF){free_decimal(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
+		if(status&0xEFBF){FREE_DECIMAL(_result);_result=NULL;outputError("Failed to compute the sum of two decimals.");}
 	}else
 		outputError("Failed to create the sum decimal");
 	return _result;
@@ -1716,7 +1716,7 @@ Mdecimal* _ddiv(Mdecimal* _decimal1,Mdecimal* _decimal2){
 		uint32_t status=0;
 		mpd_qdiv(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
-			free_decimal(_result);_result=NULL;
+			FREE_DECIMAL(_result);_result=NULL;
 			outputError("Failed to compute the quotient of two decimals");
 		}
 	}else 
@@ -1734,7 +1734,7 @@ Mdecimal* _dmul(Mdecimal* _decimal1,Mdecimal* _decimal2){
 		uint32_t status=0;
 		mpd_qmul(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
-			free_decimal(_result);_result=NULL;
+			FREE_DECIMAL(_result);_result=NULL;
 			outputError("Failed to compute the product of two decimals");
 		}
 	}else
@@ -1752,7 +1752,7 @@ Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 		uint32_t status=0;
 		mpd_qsub(_result->mpd,_decimal1->mpd,_decimal2->mpd,mpd_context,&status);
 		if(status&0xEFBF){
-			free_decimal(_result);_result=NULL;
+			FREE_DECIMAL(_result);_result=NULL;
 			outputError("Failed to compute the difference of two decimals");
 		}
 	}else
@@ -1856,7 +1856,7 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 								outputBiginteger("Incrementing the addendum denominator by ",_denominatorIncrement,".\n");		
 							Mbiginteger* _newAddendumDenominator=owned_biginteger(_Iadd(_addendumDenominator,_denominatorIncrement),owner);
 							if(!_newAddendumDenominator){
-								// MDH@27MAY2020: free_biginteger(_addendumDenominator,owner); // won't be using this in the addendum rational
+								// MDH@27MAY2020: FREE_BIGINTEGER(_addendumDenominator,owner); // won't be using this in the addendum rational
 								outputError("Failed to increment the addendum denominator");
 								break;
 							}
@@ -2134,7 +2134,7 @@ Mvalue* getLongDoubleDecimalMapValue(long double ld,bool littleEndianOrder){Mall
 	if(_exponentText){appendedToMap(_dmap,owner,"e",_getTextValue(string(_exponentText)));FREE_STRING(_exponentText,owner);}
 	/* replacing:
 	Mbiginteger* _mantisse=new_Mbiginteger();mp_set_u64(_mantisse,mantisse); // we need a big integer here because uint64_t might not fit into a long long!!
-	appendedToMap(_dmap,"m",_getBigintegerValue(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
+	appendedToMap(_dmap,"m",getValueOfBiginteger(disowned_biginteger(_mantisse));appendedToMap(_dmap,"e",_getIntegerValue(exponent));
 	*/
 	return _getValueOfMap(disowned_map(_dmap,owner));
 }
@@ -2443,9 +2443,10 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 			outputError("Failed to purify a rational");
 			return NULL;
 		}
-		return _getRationalValue(disowned_rational(_purifiedRational,owner));
+		return _getValueOfRational(disowned_rational(_purifiedRational,owner));
 	}
-	if(_value->type==VT_FLOAT)return _getRationalValue(_getLongDoubleRational(_value->value._float->ld,250));
+	if(_value->type==VT_FLOAT)
+		return _getValueOfRational(_getLongDoubleRational(_value->value._float->ld,250));
 	// all remaining value types
 	return _getValueOfRational(_getValueRational(_value));
 }
@@ -2466,7 +2467,7 @@ Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
 Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* result=NULL;
+	Mvalue* _result=NULL;
 	Mstring* _valueText=owned_string(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
 		if(amVerbose())
@@ -2485,13 +2486,14 @@ Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)ret
 			}
 		}
 		if(string_insert_char(_valueText,0,(value->type==VT_TEXT?value->value._text->presuffix:'\''))){ // prepend a quote character otherwise we're in trouble in _getTextValue
-			if(amVerbose()){outputValue("Text representation of '",value,"': ");output("'%s'.\n",string(_valueText));}
-			result=owned_string(_getTextValue(string(_valueText)),owner);
+			if(amVerbose())
+				{outputValue("Text representation of '",value,"': ");output("'%s'.\n",string(_valueText));}
+			_result=_getTextValue(string(_valueText));
 		}else
 			outputError("Failed to prepend a quote character to a text representation");
 		FREE_STRING(_valueText,owner);
 	}
-	return result;
+	return _result;
 }
 Mvalue* add(Mvalue* _value1,Mvalue* _value2);
 Mvalue* Msum(Mvalue* _value){
@@ -2500,13 +2502,13 @@ Mvalue* Msum(Mvalue* _value){
         if(_value->type==VT_LIST){
 			Mvalue* _sumValue=NULL;
 			// all the values in the list could be integer
-			Mlist* _list=_value->value._list;
-			if(_list){
-				Mlistelement* _listelement=_list->_first;
-				if(_listelement){
+			Mlist* list=_value->value._list;
+			if(list){
+				Mlistelement* listelement=list->_first;
+				if(listelement){
 					// how about adding as decimals????
-					assignValue(&_sumValue,_listelement->_value); // TODO I suppose we can do this????
-					while(_listelement->_next){_listelement=_listelement->_next;_sumValue=add(_sumValue,_listelement->_value);}
+					assignValue(&_sumValue,listelement->_value); // TODO I suppose we can do this????
+					while(listelement->_next){listelement=listelement->_next;_sumValue=add(_sumValue,listelement->_value);}
 				}
 			}
 			return _sumValue;
@@ -2527,6 +2529,7 @@ Mvalue* _functionAppliedToList(Mlist* _list,OneArgumentFunction function){Malloc
 	}
 	return (_result?_getValueOfList(disowned_list(_result,owner)):NULL);
 }
+
 // MDH@10OCT2019: a special function to compute a reciprocal value
 Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _reciprocalValue=NULL;
@@ -2537,7 +2540,7 @@ Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		case VT_MAP:/*_reciprocalValue=_functionAppliedToMap(value->value._map,Mreciprocal); TODO where is it?*/break;
 		// scalar types
 		case VT_FLOAT:_reciprocalValue=_getFloatValue(1/value->value._float->ld);break; // TODO check what happens when the real equals 0
-		case VT_RATIONAL:_reciprocalValue=_getRationalValue(OWNED(_getInverseRational(value->value._rational));break;
+		case VT_RATIONAL:_reciprocalValue=_getValueOfRational(_getInverseRational(value->value._rational));break;
 		case VT_INTEGER:
 			{
 				Mbiginteger* _denominator=owned_biginteger(_getBiginteger(value->value._integer->ll),owner); // create the big integer denominator
@@ -2602,18 +2605,18 @@ Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	if(value->type==VT_LIST)return _functionAppliedToList(value->value._list,Mfibonacci);
 	Mvalue* _fibonnacciValue=NULL;
 	// ASSERT assuming scalars
-	Mbiginteger* _biginteger=OWNED(_getValueBiginteger(value),owner);
+	Mbiginteger* _biginteger=owned_biginteger(_getValueBiginteger(value),owner);
 	if(_biginteger){
 		mp_err status=MP_OKAY; // keep track of the result status
 		Mbiginteger* _fibonacciBiginteger=NULL;
 		if(isBigintegerUndefined(_biginteger)==M_FALSE){ // not an undefined big integer
 			if(isBigintegerNegative(_biginteger)!=M_TRUE){ // not a negative big integer
-				Mbiginteger *_counterBiginteger=OWNED(_getBigintegerCopy(_biginteger),owner); // the number of times we will have to do an addition
-				_fibonacciBiginteger=OWNED(__biginteger(),owner); // where the result should be stored
+				Mbiginteger *_counterBiginteger=owned_biginteger(_getBigintegerCopy(_biginteger),owner); // the number of times we will have to do an addition
+				_fibonacciBiginteger=owned_biginteger(__biginteger(),owner); // where the result should be stored
 				if(_fibonacciBiginteger&&_counterBiginteger)status=mp_decr(MP_INT_POINTER(_counterBiginteger));else status=MP_ERR;
 				if(status==MP_OKAY){
 					if(isBigintegerPositive(_counterBiginteger)==M_TRUE){ // at least one addition to do
-						Mbiginteger *_firstBiginteger=OWNED(_getBiginteger(0),owner),*_secondBiginteger=OWNED(_getBiginteger(1),owner);
+						Mbiginteger *_firstBiginteger=owned_biginteger(_getBiginteger(0),owner),*_secondBiginteger=owned_biginteger(_getBiginteger(1),owner);
 						if(_firstBiginteger&&_secondBiginteger){
 							// NOTE _counterBiginteger defines the number of times we need to add the first and second big integer
 							while(isBigintegerZero(_counterBiginteger)!=M_TRUE){ // the counter is not zero yet
@@ -2625,18 +2628,18 @@ Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 							}
 						}else 
 							outputError("Failed to initialize the Fibonacci sequence");
-						free_biginteger(_firstBiginteger,owner);free_biginteger(_secondBiginteger,owner);
+						FREE_BIGINTEGER(_firstBiginteger,owner);FREE_BIGINTEGER(_secondBiginteger,owner);
 					}else // no additions
 						status=mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_fibonacciBiginteger));
 				}else
 					outputError("Failed to initialize the Fibonacci sum");
-				free_biginteger(_counterBiginteger,owner);
+				FREE_BIGINTEGER(_counterBiginteger,owner);
 			}
 		}
-		if(value->type!=VT_BIGINTEGER)free_biginteger(_biginteger,owner);
-		if(status==MP_OKAY)_fibonnacciValue=_getBigintegerValue(_fibonacciBiginteger,owner);
+		if(value->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger,owner);
+		if(status==MP_OKAY)_fibonnacciValue=_getValueOfBiginteger(disowned_biginteger(_fibonacciBiginteger,owner));
 	}
-	return DISOWNED(_fibonnacciValue,owner);
+	return _fibonnacciValue;
 }
 
 // HERE THE EVALUATION OF EXPRESSIONS TAKE PLACE
@@ -2774,7 +2777,7 @@ Mtoken* expressionToken=NULL; // the current evaluation token
  * \brief makes a copy useful for evaluation (not for editing)
  */
 Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner(__LINE__);
-	Mtoken* _tokenCopy=(_token?OWNED(__token(),owner):NULL);
+	Mtoken* _tokenCopy=(_token?owned_token(__token(),owner):NULL);
 	if(_tokenCopy){
 		if(amVerbose()){
 			output("Copying token '%s' of type '%s'.\n",string(_token->text),TOKENTYPE_STRING[_token->type]);
@@ -2788,7 +2791,7 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner
 		// we're NOT copying _next, _prev, _offset
 		//////_tokenCopy->prev=NULL;_tokenCopy->next=NULL;_tokenCopy->offset=0;
 	}
-	return DISOWNED(_tokenCopy,owner);
+	return disowned_token(_tokenCopy,owner);
 }
 
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
@@ -2797,7 +2800,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
-	Mlist* _list=__list("getValueOfList",owner);
+	Mlist* _list=owned_list(__list("getValueOfList"),owner);
 	if(!_list){output("Failed to create a list to return.\n");return NULL;}
 	_list->weak=weak;
 	/* MDH@27MAY2020 replacing:
@@ -2822,37 +2825,40 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
 			// however this would require passing the bool argument along to every function getValueOfExpression calls
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
-			Mtoken* _firstUnevaluatedToken=OWNED(_getEvaluatableTokenCopy(expressionToken),owner);
+			Mtoken* _firstUnevaluatedToken=owned_token(_getEvaluatableTokenCopy(expressionToken),owner);
 			if(_firstUnevaluatedToken){
 				if(amVerbose())
 				output("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 				while(unevaluatedToken){
 					if(amVerbose())
-					output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
+						output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(!expressionToken)break; // NOTE shouldn't happen though
 					if(!expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
-					unevaluatedToken->next=_getEvaluatableTokenCopy(expressionToken); // set next to the copy of the expression token
+					unevaluatedToken->next=owned_token(_getEvaluatableTokenCopy(expressionToken),owner); // set next to the copy of the expression token
 					unevaluatedToken=unevaluatedToken->next;
 				}
 				if(amVerbose())
 					outputChar('\n');
-				_listElementValue=_getValueOfToken(_firstUnevaluatedToken,owner);
+				_listElementValue=_getValueOfToken(disowned_token(_firstUnevaluatedToken,owner));
 			}
 		}else{ // evaluate
 			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
-			if(amVerbose())outputValue("List element value: '",_listElementValue,"'.\n");
+			if(amVerboseDebugging())outputValue("List element value: '",_listElementValue,"'.\n");
 		}
-		if(!_listElementValue){if(amVerbose())output("List element missing!\n");continue;} // undefined list elements should NEVER be added to the list
-		if(expressionToken)if(amVerbose())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
+		if(!_listElementValue){
+			if(amVerboseDebugging())output("List element missing!\n");
+			continue;
+		} // undefined list elements should NEVER be added to the list
+		if(expressionToken)if(amVerboseDebugging())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
-			if(amVerbose())output("Appending list element #%llu.\n",listElementIndex);
+			if(amVerboseDebugging())output("Appending list element #%llu.\n",listElementIndex);
 			unsigned long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex==0){
@@ -2866,9 +2872,8 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		if(!expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
-	Mvalue* _listValue=_getValueOfList(_list,owner);
-	if(amVerboseDebugging())
-		outputValue("List '",_listValue,"' extracted!\n");
+	Mvalue* _listValue=_getValueOfList(disowned_list(_list,owner));
+	if(amVerboseDebugging())outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
 
@@ -2890,7 +2895,7 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 		Mvalue* _attributeNameValue=getValueOfExpression("map attribute name",'s',(TokenType[]){TT_MAP_VALUE,TT_END_OF_MAP,TT_LISTELEMENT},3);
 		expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 		// MDH@22JUL2019: it's better to dequote the name here because otherwise the name of the attribute would be in quotes (and it is clear to be text)
-		Mstring* _attributeName=(Mstring*)OWNED(_getValueText(_attributeNameValue,true),owner); // parse the attribute name value (could be undefined though)
+		Mstring* _attributeName=owned_string(_getValueText(_attributeNameValue,true),owner); // parse the attribute name value (could be undefined though)
 		// NOTE _attributeNameValue will be released after evaluation because it is not assigned to something else...
 		/////////////////////if(expressionToken->type==TT_END_OF_MAP)break;
 		// for now let's decide to simply not store the attribute if the name is not of type string
@@ -2909,10 +2914,9 @@ Mvalue* getValueOfMap(){Mallocationowner owner=getOwner(__LINE__);
 		FREE_STRING(_attributeName,owner); // ALWAYS free the name text
 		if(!expressionToken)break;
 		if(expressionToken->type==TT_END_OF_MAP)break;
-		if(amVerbose())
-			output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerboseDebugging())output("Continued map parsing with token of type '%s'.\n",TOKENTYPE_STRING[expressionToken->type]);
 	}
-	Mvalue* _mapValue=_getValueOfMap(_map,owner);
+	Mvalue* _mapValue=_getValueOfMap(disowned_map(_map,owner));
 	if(amVerboseDebugging())outputValue("Map '",_mapValue,"' extracted!\n");
 	return _mapValue;
 }
@@ -2925,7 +2929,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 			{
 				// TODO replace following by calling getFunctionExecutionEnvironment
 				// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-				Menvironment* _functionExecutionEnvironment=(Menvironment*)OWNED(_getFunctionExecutionEnvironment(_function,functionName,_argumentMap),owner);
+				Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(_function,functionName,_argumentMap),owner);
 				if(_functionExecutionEnvironment){
 					if(pushExecutionEnvironment(_functionExecutionEnvironment)){
 						// execute ALL the commands in _bodyCommandList
@@ -2955,7 +2959,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 						return (functionResultValue?functionResultValue:functionEvaluationValue);
 					}else{
 						output("%sFailed to create the function execution environment of function '%s'.\n",M_ERROR_PREFIX,functionName);
-						free_environment(_functionExecutionEnvironment,owner);
+						FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 					}
 				}else
 					output("%sFailed to create the environment to execute function '%s'.\n",M_ERROR_PREFIX,functionName);
@@ -2963,16 +2967,16 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 			}
 			break;
 		case FT_INTERNAL_NO_ARGUMENTS:
-			if(amVerbose())output("Calling no-argument function '%s'.\n",functionName);
+			if(amVerboseDebugging())output("Calling no-argument function '%s'.\n",functionName);
 			return (*_function->functionunion.noArgumentFunction)();
 		case FT_INTERNAL_ONE_ARGUMENT:
-			if(amVerbose()){output("Applying one-argument function '%s'",functionName);outputValue(" to '",_argumentMap->_first->_variable->_value,"'.\n");}
+			if(amVerboseDebugging()){output("Applying one-argument function '%s'",functionName);outputValue(" to '",_argumentMap->_first->_variable->_value,"'.\n");}
 			return (*_function->functionunion.oneArgumentFunction)(_argumentMap->_first->_variable->_value);
 		case FT_INTERNAL_TWO_ARGUMENTS:
 			{
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
-				if(amVerbose()){
+				if(amVerboseDebugging()){
 					output("Applying two-argument function '%s'",functionName);
 					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
@@ -2986,7 +2990,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				Mmapelement* _firstArgumentmapelement=_argumentMap->_first;
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
-				if(amVerbose()){
+				if(amVerboseDebugging()){
 					output("Applying three-argument function '%s'",functionName);
 					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
@@ -3003,7 +3007,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				Mmapelement* _secondArgumentmapelement=(_firstArgumentmapelement?_firstArgumentmapelement->_next:NULL);
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
 				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement?_thirdArgumentmapelement->_next:NULL);
-				if(amVerbose()){
+				if(amVerboseDebugging()){
 					output("Applying four-argument function '%s'",functionName);
 					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
@@ -3024,7 +3028,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				Mmapelement* _thirdArgumentmapelement=(_secondArgumentmapelement?_secondArgumentmapelement->_next:NULL);
 				Mmapelement* _fourthArgumentmapelement=(_thirdArgumentmapelement?_thirdArgumentmapelement->_next:NULL);
 				Mmapelement* _fifthArgumentmapelement=(_fourthArgumentmapelement?_fourthArgumentmapelement->_next:NULL);
-				if(amVerbose()){
+				if(amVerboseDebugging()){
 					output("Applying five-argument function '%s'",functionName);
 					if(_firstArgumentmapelement)outputValue(" to '",_firstArgumentmapelement->_variable->_value,"'");
 					if(_secondArgumentmapelement)outputValue(" and '",_secondArgumentmapelement->_variable->_value,"'");
@@ -3046,7 +3050,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 // MDH@19JUL2019: in order to be able to obtain the body code of functions we're keeping a stack of function names of which the body is requested
 // requests can come out of a single command containing multiple function definitions
 // _firstFunctionBodyRequest represents the first one to execute
-FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
+FunctionBodyRequest* __functionbodyrequest(char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
 	FunctionBodyRequest* _functionBodyRequest=NULL;
 	if(functionName){
 		_functionBodyRequest=CALLOC_1(sizeof(FunctionBodyRequest),'9',owner);
@@ -3061,7 +3065,7 @@ FunctionBodyRequest* new_functionbodyrequest(char const * const functionName){Ma
 }
 void free_functionbodyrequest(FunctionBodyRequest* _functionBodyRequest,Mallocationowner owner_functionBodyRequest){
 	if(!_functionBodyRequest)return;
-	freeChars(_functionBodyRequest->_functionName,owner_functionBodyRequest);
+	FREECHARS(_functionBodyRequest->_functionName,owner_functionBodyRequest);
 	FREE_DISOWNED_1(_functionBodyRequest,'9',owner_functionBodyRequest);
 }
 // active 'list' of function body requests
@@ -3078,7 +3082,7 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 	// ASSERT a 'valid' function name
 	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",M_ERROR_PREFIX,functionName);return NULL;} // already have it
 	// technically it should not have been requested already (or exist)
-	FunctionBodyRequest* _functionBodyRequest=OWNED(new_functionbodyrequest(functionName),owner_functionBodyRequest); // guarantees that functionName is defined
+	FunctionBodyRequest* _functionBodyRequest=OWNED(__functionbodyrequest(functionName),owner_functionBodyRequest); // guarantees that functionName is defined
 	if(_functionBodyRequest){		
 		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
 		_lastFunctionBodyRequest=_functionBodyRequest;
@@ -3109,12 +3113,12 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		// we can use the functions parameterMap as argumentMap (providing the defaults to use for executing the newly entered body commands)
 		// MDH@02MAR2020: _getFunctionExecutionEnvironment() will ALSO duplicate _functionName, so that we can safely release _firstFunctionBodyRequest!!!
 		// MDH@03MAR2020 TODO can we pass function->_parameterMap like this or should we pass _getFunctionArgumentMap(function,NULL)????????
-		Menvironment* _functionExecutionEnvironment=(Menvironment*)OWNED(_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName->chars,function->_parameterMap),owner);
+		Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName->chars,function->_parameterMap),owner);
 		if(_functionExecutionEnvironment){
 			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
 			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
 			outputError("Failed to register the function execution environment.");
-			free_environment(_functionExecutionEnvironment,owner);
+			free_environment(disowned_environment(_functionExecutionEnvironment,owner));
 		}else
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
@@ -3235,7 +3239,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 					// MDH@11MAR2020: let's distinguish between an unnamed ref (with no variable name defined), and a named ref (where the variable SHOULD exist)
 					Mvariable* variable=getVariable(getExecutionEnvironment(),&_valuereference->_name->chars[1],false);
 					if(variable||strlen(_valuereference->_name->chars)==1){
-						referencedValue=_getReferenceValue(_getReference(variable),owner);
+						referencedValue=_getValueOfReference(_getReference(variable));
 						// MDH@11MAR2020: if such a variable could not be found we got a segmentation fault which should be prevented obviously, in which case we should still set the reference pointing to a NULL as variable
 						//                so the variable is still recognized as reference variable ALTHOUGH it will not be assignable that way which is a nuisance
 					}else
@@ -3462,14 +3466,19 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 							if(amVerboseDebugging())
 								output("Storing the values of %d elements.\n",numberOfValueholders);
 							// convert the values to a list
-							Mlist* _resultList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner);
+							Mlist* _resultList=owned_list(_getListOfType(VT_UNDEFINED),owner);
 							int valueholderIndex=numberOfValueholders;
 							while(--valueholderIndex>=0){
 								if(amVerboseDebugging())
 									{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
-								if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){FREE_LIST(_resultList,owner);_resultList=NULL;output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));break;}
+								if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){
+									FREE_LIST(_resultList,owner);
+									_resultList=NULL;
+									output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));
+									break;
+								}
 							}
-							referencedValue=_getValueOfList(_resultList,owner); // the result
+							referencedValue=_getValueOfList(disowned_list(_resultList,owner)); // the result
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
@@ -4253,7 +4262,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
-					Mstring* _realText=_getString(_significantTokenText); // the integer part
+					Mstring* _realText=owned_string(_getString(_significantTokenText),owner); // the integer part
 					expressionToken=nextEnvironmentExpressionToken(); // now pointing to the real fraction part text following the given integer!!!!
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
 					Mstring* pRealText=_realText;
@@ -4277,21 +4286,21 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						if(getDP()<l)outputWarning("More decimals present in literal than expected. Rounding may occur.");
 						if(amVerboseDebugging())
 							outputInfo("Decimal precision checked!");
-						Mdecimal* _decimal=OWNED(__decimal(get_default_mpd_context(),0,0),owner);
+						Mdecimal* _decimal=owned_decimal(__decimal(get_default_mpd_context(),0,0),owner);
 						if(amVerboseDebugging())
 							outputInfo("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
 							if(amDebugging())outputInfo("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
-								assignValue(&_valueReference->_value,_getDecimalValue(_decimal,owner));
+								assignValue(&_valueReference->_value,_getValueOfDecimal(disowned_decimal(_decimal,owner)));
 							else
 								outputErrorAndText("The decimal value of %s is undefined",string(pRealText));
 						}else
 							outputError("Failed to create a decimal");
 						/* replacing:
 						// MDH@07JUN2019: instead of converting the text representation to a long double 'real' we convert the decimal text representation to a rational
-						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getRationalValue(_rational));
+						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getValueOfRational(_rational));
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
 						if(amVerboseDebugging())
@@ -4303,7 +4312,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
 					// first we make a big integer, and if it fits into a VT_INTEGER that's where we put it
-					Mbiginteger* _biginteger=OWNED(__biginteger(),owner);
+					Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
 					// output("Converting '%s' to a big integer.\n",_significantTokenText); // DEBUG
 					if(mp_read_radix(MP_INT_POINTER(_biginteger),_significantTokenText,10)==MP_OKAY){
 						// outputBiginteger("Big integer: '",_biginteger,"'.\n"); // DEBUG
@@ -4311,14 +4320,14 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							// outputBiginteger("Storing the small integer of '",_biginteger,"' as referenced value.\n"); // DEBUG
 							_valueReference->_value=_getIntegerValue(mp_get_i64(MP_INT_POINTER(_biginteger)));
               				// MDH@02NOV2019 replacing: assignValue(&_valueReference->_value,_getIntegerValue(mp_get_i64(_biginteger)));
-							free_biginteger(_biginteger,owner);
+							FREE_BIGINTEGER(_biginteger,owner);
 						}else{
 							outputBiginteger("Storing big integer '",_biginteger,"' as referenced value.\n"); // DEBUG
-							_valueReference->_value=_getBigintegerValue(_biginteger,owner);
-							// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,_getBigintegerValue(_biginteger,true));
+							_valueReference->_value=_getValueOfBiginteger(disowned_biginteger(_biginteger,owner));
+							// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,getValueOfBiginteger(disowned_biginteger(_biginteger,true));
 						}
 					}else{
-						free_biginteger(_biginteger,owner);
+						FREE_BIGINTEGER(_biginteger,owner);
 						outputErrorAndText("Failed to create the big integer to store integer ",_significantTokenText);
 					}
 					// outputValue("Value referenced: '",_valueReference->_value,"'.\n"); // DEBUG
@@ -4337,7 +4346,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				break;
 			case TT_LIST: // a list literal
 				canbeindexedtheoretically=true;
-				_valueReference=OWNED(_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false)),owner);
+				_valueReference=owned_valuereference(_getValuereference(getValueOfList(TT_END_OF_LIST,0,0,false)),owner);
 				break;
 			case TT_MAP: // a map literal
 				{
@@ -4346,7 +4355,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 					if(amVerboseDebugging())
 						outputValue("Map extracted: '",_mapValue,"'.\n");
-					_valueReference=OWNED(_getValuereference(_mapValue),owner);
+					_valueReference=owned_valuereference(_getValuereference(_mapValue),owner);
 				}
 				break;
 			case TT_EXPRESSION: // an expression wrapped in parentheses which ends with a TT_END_OF_FUNCTION_CALL (although theoretically it's not an end of function call of course)
@@ -4359,9 +4368,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
 					if(_expressionListValue->value._list->numberOfElements==1){
-						_valueReference=OWNED(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
+						_valueReference=owned_valuereference(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
 					}else
-						_valueReference=OWNED(_getValuereference(_expressionListValue),owner);
+						_valueReference=owned_valuereference(_getValuereference(_expressionListValue),owner);
 					if(amVerboseDebugging())
 						outputInfo("Extracted list wrapped!");
 				}
@@ -4416,7 +4425,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// indexListValue will be removed by the garbage collector
 				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
 					// we have to wrap the property name inside a value as text
-					Mstring* _propertyName=(Mstring*)OWNED(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),owner);
+					Mstring* _propertyName=owned_string(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),owner);
 					if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 						Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
 						if(!propertyNameValue||!appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)){
@@ -4434,7 +4443,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			}
 			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
 			if(itemIdsList){
-				assignValue(&_valueReference->_itemid,_getValueOfList(itemIdsList,owner));
+				assignValue(&_valueReference->_itemid,_getValueOfList(disowned_list(itemIdsList,owner)));
 				if(amVerboseDebugging())
 					outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
 			}
@@ -4459,7 +4468,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				///////////////////////if(_valueReference->_value)incrementReferenceCount(_valueReference->_value);
 				// MDH@17NOV2019: applying a unary operator is dangerous because we may set the value BUT that's NOT enough
 				//                because if the name and/or item id remains it will be used again later on
-				if(_valueReference->_name){freeChars(_valueReference->_name,Msubowner(getValueOwner(),1));_valueReference->_name=NULL;}
+				if(_valueReference->_name){FREECHARS(_valueReference->_name,Msubowner(getValueOwner(),1));_valueReference->_name=NULL;}
 				if(_valueReference->_itemid){ // this is is a value wrapping a list of indices
 					// conform what would happen in free_valuereference!!! 
 					// TODO consider alternative creating a new value reference
@@ -4490,7 +4499,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			outputInfo("No value result!");
 	}
 	
-	return DISOWNED(_valueReference,owner);
+	return disowned_valuereference(_valueReference,owner);
 
 	/*
 		// it could be an assignment in which case we remove the assignee and assigned value
@@ -4537,7 +4546,7 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 	// MDH@30OCT2019: ALWAYS apply the binary operator i.e. do NOT just return the value!!! (which makes perfect sense for equality / unequality)
 	//                TODO if the result equals NULL, should we then NOT add the given element?????
 	// ASSERT neither are NULL
-	Mlist* _result=OWNED(_getListOfType(_list1->valuetype==_list2->valuetype?_list1->valuetype:VT_UNDEFINED),owner); // TODO if the types are the same use that?
+	Mlist* _result=owned_list(_getListOfType(_list1->valuetype==_list2->valuetype?_list1->valuetype:VT_UNDEFINED),owner); // TODO if the types are the same use that?
 	// elements with the same index are to be added and stored under that index
 	Mlistelement* _listelement1=_list1->_first;
 	Mlistelement* _listelement2=_list2->_first;
@@ -4564,7 +4573,7 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 		if(consumed1)_listelement1=_listelement1->_next;
 		if(consumed2)_listelement2=_listelement2->_next;
 	}
-	return _result;
+	return disowned_list(_result,owner);
 }
 // we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
 Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
@@ -4572,25 +4581,25 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=(Mlist*)OWNED(_getListOfType(_list->valuetype),owner);
+		_result=owned_list(_getListOfType(_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index))
 			_listelement=_listelement->_next;
 	}else
 		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
-	return _getValueOfList(_result,owner);
+	return _getValueOfList(disowned_list(_result,owner));
 }
 Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=(Mlist*)OWNED(_getListOfType(_list->valuetype),owner);
+		_result=owned_list(_getListOfType(_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index))_listelement=_listelement->_next;
 	}else
 		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
-	return _getValueOfList(_result,owner);
+	return _getValueOfList(disowned_list(_result,owner));
 }
 
 // two-argument arithmetic
@@ -4598,7 +4607,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 // NOTE the following takes a lot of precision because we should never return the originals always copies which should be freed if they are not used anymore
 /* see Mexecution.c
 Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
-	Mbiginteger* _bigintegerCopy=new_Mbiginteger();if(mp_copy(_biginteger,_bigintegerCopy)!=MP_OKAY){free_biginteger(_bigintegerCopy);return NULL;}return _bigintegerCopy;
+	Mbiginteger* _bigintegerCopy=new_Mbiginteger();if(mp_copy(_biginteger,_bigintegerCopy)!=MP_OKAY){FREE_BIGINTEGER(_bigintegerCopy);return NULL;}return _bigintegerCopy;
 }
 */
 // rational number addition
@@ -4636,24 +4645,24 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
 		// ASSERT both integers are considered valid (i.e. not invalid)
-		Mbiginteger *_biginteger1=(smallinteger1?OWNED(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
-		Mbiginteger *_biginteger2=(smallinteger2?OWNED(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// outputBiginteger("Adding '",_biginteger1,"' and '");outputBiginteger(NULL,_biginteger2,"'.\n"); // DEBUG
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
 			if(amVerboseDebugging())
 				{outputBiginteger("Adding big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
-			_sumBiginteger=OWNED(__biginteger(),owner);
+			_sumBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_sumBiginteger&&mp_add(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_sumBiginteger))!=MP_OKAY){
-				free_biginteger(_sumBiginteger,owner);_sumBiginteger=NULL;
+				FREE_BIGINTEGER(_sumBiginteger,owner);_sumBiginteger=NULL;
 				outputError("Failed to add two big integers");
 			} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				outputBiginteger(" - Sum: '",_sumBiginteger,"'.\n");
 		}else
 			outputError("Failed to convert an integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1,owner);
-		if(smallinteger2)free_biginteger(_biginteger2,owner);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -4662,16 +4671,16 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 			long long llsum=getBigintegerInteger(_sumBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llsum!=M_LL_INVALID){
-				free_biginteger(_sumBiginteger,owner);
+				FREE_BIGINTEGER(_sumBiginteger,owner);
 				return _getIntegerValue(llsum);
 			}
 			outputWarning("Small integer sum out of range, will continue using big integer sum.");
 		}
-		return _getBigintegerValue(_sumBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_sumBiginteger,owner));
 	}
 	// if the first value is a text we should always do concatenation!!!!
 	if(_value1->type==VT_TEXT){ // force string concatenation using the quote character in the Mvalue in the resulting text
-		Mstring* _valueText=OWNED(__string(),owner);
+		Mstring* _valueText=owned_string(__string(),owner);
 		if(!_valueText)return NULL;
 		Mstring* p=_valueText;
 		p=string_append_char(p,_value1->value._text->presuffix);
@@ -4679,7 +4688,7 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 		// MDH@17OCT2019: we can't use _getValueText() here, because _getValueText() will resolve escape sequences which we do NOT want here
 		// MDH@28OCT2019: think twice this is only true when _value2 is also of type text
 		if(_value2->type!=VT_TEXT){
-			Mstring* _value2Text=OWNED(_getValueText(_value2,true),owner); // get the text representation of the second argument without quotes
+			Mstring* _value2Text=owned_string(_getValueText(_value2,true),owner); // get the text representation of the second argument without quotes
 			if(_value2Text){p=string_append(p,string(_value2Text));FREE_STRING(_value2Text,owner);}
 		}else // second argument also of type text
 			p=string_append(p,_value2->value._text->_c);
@@ -4690,31 +4699,31 @@ Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__L
 	// if either is a rational, compute the sum rational (NOTE or rationals disguised as decimals)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
-		if(_value1->type!=VT_RATIONAL)OWNED(_rational1,owner);else if(_value2->type!=VT_RATIONAL)OWNED(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		/////outputInfo("Adding two rationals.");
-		Mrational* _sumRational=_getRationalSum(_rational1,_rational2); // _qsum replaced by _getRationalSum that takes the deltas into account as well
+		Mrational* _sumRational=owned_rational(_getRationalSum(_rational1,_rational2),owner); // _qsum replaced by _getRationalSum that takes the deltas into account as well
 		/////outputInfo("Rationals added!");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(amVerboseDebugging())
 			outputInfo("Rational copies released.");
 		Mvalue* _sumValue=NULL;
 		if(_sumRational){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_sumValue=_getDecimalValue(OWNED(_getRationalDecimal(_sumRational),owner),owner);
-				free_rational(_sumRational,owner);
+				_sumValue=_getValueOfDecimal(_getRationalDecimal(_sumRational));
+				FREE_RATIONAL(_sumRational,owner);
 			}else
-				_sumValue=_getRationalValue(_sumRational,owner);
+				_sumValue=_getValueOfRational(disowned_rational(_sumRational,owner));
 		}
 		return _sumValue;
 	}
 	// if either is a decimal, compute the sum decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner);
-		Mdecimal* _sumDecimal=(Mdecimal*)OWNED(_getDecimalSum(_decimal1,_decimal2),owner); // _dadd replaced by _getDecimalSum that takes the repeating decimal digits into account as well
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner);
+		Mdecimal* _sumDecimal=owned_decimal(_getDecimalSum(_decimal1,_decimal2),owner); // _dadd replaced by _getDecimalSum that takes the repeating decimal digits into account as well
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_sumDecimal)return NULL; // failed to create the sum for whatever reason
-		return _getDecimalValue(_sumDecimal,owner);
+		return _getValueOfDecimal(disowned_decimal(_sumDecimal,owner));
 	}
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
@@ -4776,20 +4785,20 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
 		// ASSERT both integers are considered valid (i.e. not invalid)
-		Mbiginteger *_biginteger1=(smallinteger1?_getBiginteger(_value1->value._integer->ll):_value1->value._biginteger);
-		Mbiginteger *_biginteger2=(smallinteger2?_getBiginteger(_value2->value._integer->ll):_value2->value._biginteger);
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		if(_biginteger1&&_biginteger2){
 			if(amVerboseDebugging())
 				{outputBiginteger("Subtracting big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
-			_differenceBiginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
+			_differenceBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_differenceBiginteger&&mp_sub(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_differenceBiginteger))!=MP_OKAY)
-			{free_biginteger(_differenceBiginteger,owner);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			{FREE_BIGINTEGER(_differenceBiginteger,owner);_differenceBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				{outputBiginteger(" - Difference: '",_differenceBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert an integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1,owner);
-		if(smallinteger2)free_biginteger(_biginteger2,owner);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -4797,36 +4806,36 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 			if(!_differenceBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llsum=getBigintegerInteger(_differenceBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llsum!=M_LL_INVALID){free_biginteger(_differenceBiginteger,owner);return _getIntegerValue(llsum);}
+			if(llsum!=M_LL_INVALID){FREE_BIGINTEGER(_differenceBiginteger,owner);return _getIntegerValue(llsum);}
 			outputWarning("Small integer difference out of range, will continue using big integer difference.");
 		}
-		return _getBigintegerValue(_differenceBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_differenceBiginteger,owner));
 	}
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2); // OOPS careful here, _getValueRational might construct a new rational or what????
-		if(_value1->type!=VT_RATIONAL)OWNED(_rational1,owner);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(amVerboseDebugging())
 			{outputRational("Computing the difference of rational '",_rational1,"'");outputRational(" and rational '",_rational2,"'.\n");}
-		Mrational* _differenceRational=OWNED(_getRationalDifference(_rational1,_rational2),owner); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		Mrational* _differenceRational=owned_rational(_getRationalDifference(_rational1,_rational2),owner); // _qsubtract replaced by _getRationalDifference() which takes deltas into account as well
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		Mvalue* _differenceValue=NULL;
 		if(_differenceRational){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_differenceValue=_getDecimalValue(OWNED(_getRationalDecimal(_differenceRational),owner),owner);
-				free_rational(_differenceRational,owner);
+				_differenceValue=_getValueOfDecimal(_getRationalDecimal(_differenceRational));
+				FREE_RATIONAL(_differenceRational,owner);
 			}else
-				_differenceValue=_getRationalValue(_differenceRational,owner);
+				_differenceValue=_getValueOfRational(disowned_rational(_differenceRational,owner));
 		}
 		return _differenceValue;
 	}
 	// if either is a decimal, compute the difference decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		Mdecimal* _differenceDecimal=OWNED(_getDecimalDifference(_decimal1,_decimal2),owner); // _dsub replaced by _getDecimalDifference which takes repeating decimal digits into account as well
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		Mdecimal* _differenceDecimal=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner); // _dsub replaced by _getDecimalDifference which takes repeating decimal digits into account as well
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_differenceDecimal)return NULL; // failed to create the sum for whatever reason
-		return _getDecimalValue(_differenceDecimal,owner);
+		return _getValueOfDecimal(disowned_decimal(_differenceDecimal,owner));
 	}
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
@@ -4862,21 +4871,21 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
 		// ASSERT both integers are considered valid (i.e. not invalid)
-		Mbiginteger *_biginteger1=(smallinteger1?(Mbiginteger*)OWNED(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
-		Mbiginteger *_biginteger2=(smallinteger2?(Mbiginteger*)OWNED(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
 			if(amVerboseDebugging())
 				{outputBiginteger("Multiplying big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
-			_productBiginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
+			_productBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_productBiginteger&&mp_mul(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_productBiginteger))!=MP_OKAY)
-			{free_biginteger(_productBiginteger,owner);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			{FREE_BIGINTEGER(_productBiginteger,owner);_productBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerboseDebugging())
 				{outputBiginteger(" - Product: '",_productBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1,owner);
-		if(smallinteger2)free_biginteger(_biginteger2,owner);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -4884,10 +4893,10 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 			if(!_productBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llproduct=getBigintegerInteger(_productBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llproduct!=M_LL_INVALID){free_biginteger(_productBiginteger,owner);return _getIntegerValue(llproduct);}
+			if(llproduct!=M_LL_INVALID){FREE_BIGINTEGER(_productBiginteger,owner);return _getIntegerValue(llproduct);}
 			outputWarning("Small integer product out of range, will continue using big integer product.");
 		}
-		return _getBigintegerValue(_productBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_productBiginteger,owner));
 	}
 	/* replacing:
 	// if both are integers, the result should be integer as well!!!
@@ -4904,30 +4913,30 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 			_productBiginteger=__biginteger();
 			if(!_productBiginteger)outputError("Failed to create the product big integer");else
 			if(mp_mul(_biginteger1,_biginteger2,_productBiginteger)!=MP_OKAY){
-				free_biginteger(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
+				FREE_BIGINTEGER(_productBiginteger);_productBiginteger=NULL;outputError("Failed to multiply two big integers");
 			}else
 			if(amVerbose())outputBiginteger("Big integer product: '",_productBiginteger,"'.\n");
 			 // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 		}else
 			outputError("Failed to create two helper big integers");
-		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
-		return _getBigintegerValue(_productBiginteger,true);
+		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getValueOfBiginteger(disowned_biginteger(_productBiginteger,true);
 	}
 	*/
 	// if either is rational do a rational multiplication
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		if(amVerbose()){outputValue("Multiplying rationals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		if(_value1->type!=VT_RATIONAL)OWNED(_rational1,owner);else if(_value2->type!=VT_RATIONAL)OWNED(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
-		Mrational* _productRational=OWNED(_getRationalProduct(_rational1,_rational2),owner); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
+		Mrational* _productRational=owned_rational(_getRationalProduct(_rational1,_rational2),owner); // _qproduct replaced by _getRationalProduct as defined in Mrational.h/c
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
 		Mvalue* _productValue=NULL;
 		if(_productRational){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_productValue=_getDecimalValue(OWNED(_getRationalDecimal(_productRational),owner),owner);
-				free_rational(_productRational,owner);
+				_productValue=_getValueOfDecimal(_getRationalDecimal(_productRational));
+				FREE_RATIONAL(_productRational,owner);
 			}else
-				_productValue=_getRationalValue(_productRational,owner);
+				_productValue=_getValueOfRational(disowned_rational(_productRational,owner));
 		}
 		return _productValue;
 	}
@@ -4936,11 +4945,11 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 		if(amVerboseDebugging())
 			{outputValue("Multiplying decimals '",_value1,"'");outputValue(" and '",_value2,"'.\n");}
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		Mdecimal* _productDecimal=(Mdecimal*)OWNED(_getDecimalProduct(_decimal1,_decimal2),owner); // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		Mdecimal* _productDecimal=owned_decimal(_getDecimalProduct(_decimal1,_decimal2),owner); // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_productDecimal)return NULL; // failed to create the sum for whatever reason
-		return _getDecimalValue(_productDecimal,owner);
+		return _getValueOfDecimal(disowned_decimal(_productDecimal,owner));
 	}
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
@@ -4955,10 +4964,10 @@ Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 Mvalue* _getValueOneOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
 	switch(valuetype){
 		case VT_INTEGER: return _getIntegerValue(1);
-		case VT_BIGINTEGER: return _getBigintegerValue((Mbiginteger*)OWNED(_getBiginteger(1),owner),owner);
+		case VT_BIGINTEGER: return _getValueOfBiginteger(_getBiginteger(1));
 		case VT_FLOAT: return _getFloatValue(1.0);
-		case VT_RATIONAL: return _getRationalValue((Mrational*)OWNED(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false),owner),owner);
-		case VT_DECIMAL: return _getDecimalValue((Mdecimal*)OWNED(_getDecimal(__mpd(get_default_mpd_context(),1),M_DP,0,true),owner),owner);
+		case VT_RATIONAL: return _getValueOfRational(_getRational(_getBiginteger(1),NULL,M_LD_NAN,false));
+		case VT_DECIMAL: return _getValueOfDecimal(_getDecimal(__mpd(get_default_mpd_context(),1),M_DP,0,true));
 		default:break;
 	}
 	return NULL;
@@ -5008,17 +5017,17 @@ long double getFloatValuePower(Mvalue* _baseValue,long double power){
 Mdecimal* _getDecimalPower(mpd_t* base,mpd_t* exponent,mpd_context_t* mpd_context){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _decimalPower=NULL;
 	if(base&&exponent&&mpd_context){
-		_decimalPower=OWNED(__decimal(mpd_context,0,0),owner);
+		_decimalPower=owned_decimal(__decimal(mpd_context,0,0),owner);
 		if(_decimalPower){
 			uint32_t status=0;
 			mpd_qpow(_decimalPower->mpd,base,exponent,mpd_context,&status);
 			if((status&0xEFBF)!=0)
-			{outputError("Failed to apply the decimal power function");free_decimal(_decimalPower,owner);_decimalPower=NULL;}
+			{outputError("Failed to apply the decimal power function");FREE_DECIMAL(_decimalPower,owner);_decimalPower=NULL;}
 		}else
 			outputError("Failed to create decimal power function result");
 	}else
 		outputError("Insufficient input for computing a decimal power");
-	return DISOWNED(_decimalPower,owner);
+	return disowned_decimal(_decimalPower,owner);
 }
 
 // computing the integer power of some value, can be performed more exact than when the exponent is not an integer
@@ -5028,30 +5037,30 @@ Mbiginteger* _getBigintegerPowerWithPositiveBigintegerExponent(Mbiginteger* base
 	if(baseBiginteger&&exponentBiginteger){
 		////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
 		if(isBigintegerZero(exponentBiginteger))
-			_resultBiginteger=OWNED(_getBiginteger(1),owner);
+			_resultBiginteger=owned_biginteger(_getBiginteger(1),owner);
 		else
 		if(!isBigintegerOne(exponentBiginteger)){
 			// determine half the exponent
-			Mbiginteger* _halfexponentBiginteger=__biginteger();
+			Mbiginteger* _halfexponentBiginteger=owned_biginteger(__biginteger(),owner);
 			if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
-				Mbiginteger* _halfresultBiginteger=(Mbiginteger*)OWNED(_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,_halfexponentBiginteger),owner);
+				Mbiginteger* _halfresultBiginteger=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,_halfexponentBiginteger),owner);
 				if(_halfresultBiginteger){
-					Mbiginteger* _doublehalfresultBiginteger=OWNED(__biginteger(),owner);
+					Mbiginteger* _doublehalfresultBiginteger=owned_biginteger(__biginteger(),owner);
 					if(mp_sqr(MP_INT_POINTER(_halfresultBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY){
 						if(!mp_isodd(MP_INT_POINTER(exponentBiginteger))||mp_mul(MP_INT_POINTER(_doublehalfresultBiginteger),MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(_doublehalfresultBiginteger))==MP_OKAY)
 							_resultBiginteger=_doublehalfresultBiginteger;
 						else
-							free_biginteger(_doublehalfresultBiginteger,owner);
+							FREE_BIGINTEGER(_doublehalfresultBiginteger,owner);
 					}else
-						free_biginteger(_doublehalfresultBiginteger,owner);
-					free_biginteger(_halfresultBiginteger,owner);
+						FREE_BIGINTEGER(_doublehalfresultBiginteger,owner);
+					FREE_BIGINTEGER(_halfresultBiginteger,owner);
 				}
 			}
-			free_biginteger(_halfexponentBiginteger,owner);
+			FREE_BIGINTEGER(_halfexponentBiginteger,owner);
 		}else
-			_resultBiginteger=OWNED(_getBigintegerCopy(baseBiginteger),owner);
+			_resultBiginteger=owned_biginteger(_getBigintegerCopy(baseBiginteger),owner);
 	}
-	return DISOWNED(_resultBiginteger,owner);
+	return disowned_biginteger(_resultBiginteger,owner);
 }
 Mvalue* _getBigintegerBigintegerPowerValue(Mbiginteger* baseBiginteger,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	Mbiginteger* _bigintegerPower=NULL;
@@ -5062,13 +5071,13 @@ Mvalue* _getBigintegerBigintegerPowerValue(Mbiginteger* baseBiginteger,Mbiginteg
 			neg=(mp_isneg(MP_INT_POINTER(exponentBiginteger))==MP_YES);
 			if(mp_iszero(MP_INT_POINTER(exponentBiginteger))!=MP_YES){ // not zero
 				MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS; // sneaky, sneaky!! ascertaining to use a positive exponent!
-				_bigintegerPower=OWNED(_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,exponentBiginteger),owner);
+				_bigintegerPower=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseBiginteger,exponentBiginteger),owner);
 			}else
-				_bigintegerPower=OWNED(_getBiginteger(1),owner);
+				_bigintegerPower=owned_biginteger(_getBiginteger(1),owner);
 		}else // base is zero, so power is zero as well
-			_bigintegerPower=OWNED(_getBiginteger(0),owner);
+			_bigintegerPower=owned_biginteger(_getBiginteger(0),owner);
 	}
-	return(_bigintegerPower?(neg?_getRationalValue((Mrational*)OWNED(_getRational(NULL,_bigintegerPower,0,false),owner),owner):_getBigintegerValue(_bigintegerPower,owner)):NULL);
+	return(_bigintegerPower?(neg?_getValueOfRational(_getRational(NULL,_bigintegerPower,0,false)):_getValueOfBiginteger(disowned_biginteger(_bigintegerPower,owner))):NULL);
 }
 Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* exponentBiginteger){Mallocationowner owner=getOwner(__LINE__);
 	// the result is the rational of the power of the numerator and the power of the denominator
@@ -5078,15 +5087,15 @@ Mrational* _getRationalBigintegerPower(Mrational* baseRational,Mbiginteger* expo
 		bool neg=(mp_isneg(MP_INT_POINTER(exponentBiginteger))==MP_YES);
 		MP_INT_POINTER(exponentBiginteger)->sign=MP_ZPOS;
 		Mbiginteger *baseNumerator=(neg?baseRational->den:baseRational->num),*baseDenominator=(neg?baseRational->num:baseRational->den);
-		Mbiginteger *_numerator=OWNED(_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger),owner);
-		Mbiginteger *_denominator=OWNED(_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger),owner);
-		_rationalPower=OWNED(_getRational(_numerator,_denominator,M_LD_NAN,true),owner);
-		if(!_rationalPower||!_rationalPower->num)free_biginteger(_numerator,owner);
-		if(!_rationalPower||!_rationalPower->den)free_biginteger(_denominator,owner);
+		Mbiginteger *_numerator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseNumerator,exponentBiginteger),owner);
+		Mbiginteger *_denominator=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(baseDenominator,exponentBiginteger),owner);
+		_rationalPower=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner);
+		if(!_rationalPower||!_rationalPower->num)FREE_BIGINTEGER(_numerator,owner);
+		if(!_rationalPower||!_rationalPower->den)FREE_BIGINTEGER(_denominator,owner);
 	}
-	return DISOWNED(_rationalPower,owner);
+	return disowned_rational(_rationalPower,owner);
 }
-mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){
+mpd_context_t* getContextOfDecimals(Mdecimal* d1,Mdecimal* d2){// TODO check ownership 
 	Mdecimalcontext* decimalcontext=_getDecimalcontext(MAX((d1?d1->prec:0),(d2?d2->prec:0)));
 	return(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 }
@@ -5097,30 +5106,30 @@ Mvalue* _getBigintegerPowerValue(Mvalue* baseValue,Mbiginteger* exponentBiginteg
 		case VT_INTEGER:
 			{
 				Mvalue* _resultValue=NULL;
-				Mbiginteger* _baseBiginteger=(Mbiginteger*)OWNED(_getBiginteger(baseValue->value._integer->ll),owner);
+				Mbiginteger* _baseBiginteger=owned_biginteger(_getBiginteger(baseValue->value._integer->ll),owner);
 				if(_baseBiginteger){
 					_resultValue=_getBigintegerBigintegerPowerValue(_baseBiginteger,exponentBiginteger);
-					free_biginteger(_baseBiginteger,owner);
+					FREE_BIGINTEGER(_baseBiginteger,owner);
 				}
 				return _resultValue;
 			}
 		case VT_BIGINTEGER:
 			return _getBigintegerBigintegerPowerValue(baseValue->value._biginteger,exponentBiginteger);
 		case VT_RATIONAL:
-			return _getRationalValue((Mrational*)OWNED(_getRationalBigintegerPower(baseValue->value._rational,exponentBiginteger),owner),owner);
+			return _getValueOfRational(_getRationalBigintegerPower(baseValue->value._rational,exponentBiginteger));
 		case VT_DECIMAL:
 			if(baseValue->value._decimal->repeating>0){
-				Mrational* _decimalRational=(Mrational*)OWNED(_getDecimalRational(baseValue->value._decimal),owner);
+				Mrational* _decimalRational=owned_rational(_getDecimalRational(baseValue->value._decimal),owner);
 				if(_decimalRational){
-					Mrational* _decimalRationalPower=(Mrational*)OWNED(_getRationalBigintegerPower(_decimalRational,exponentBiginteger),owner);
-					free_rational(_decimalRational,owner);
-					return _getRationalValue(_decimalRationalPower,owner);
+					Mrational* _decimalRationalPower=owned_rational(_getRationalBigintegerPower(_decimalRational,exponentBiginteger),owner);
+					FREE_RATIONAL(_decimalRational,owner);
+					return _getValueOfRational(disowned_rational(_decimalRationalPower,owner));
 				}
 			}else{ // base is a 'true' decimal
-				Mdecimal* _exponentDecimal=(Mdecimal*)OWNED(_getBigintegerDecimal(exponentBiginteger),owner);
-				Mdecimal* _decimalPower=(Mdecimal*)OWNED(_getDecimalPower(baseValue->value._decimal->mpd,_exponentDecimal->mpd,getContextOfDecimals(baseValue->value._decimal,_exponentDecimal)),owner);
-				free_decimal(_exponentDecimal,owner);
-				return _getDecimalValue(_decimalPower,owner);
+				Mdecimal* _exponentDecimal=owned_decimal(_getBigintegerDecimal(exponentBiginteger),owner);
+				Mdecimal* _decimalPower=owned_decimal(_getDecimalPower(baseValue->value._decimal->mpd,_exponentDecimal->mpd,getContextOfDecimals(baseValue->value._decimal,_exponentDecimal)),owner);
+				FREE_DECIMAL(_exponentDecimal,owner);
+				return _getValueOfDecimal(disowned_decimal(_decimalPower,owner));
 			}
 		default:
 			break;
@@ -5136,43 +5145,43 @@ Mdecimal* _getDecimalPowerWithPositiveBigintegerExponent(Mdecimal* baseDecimal,M
 	if(baseDecimal&&exponentBiginteger){
 		////////////outputBiginteger("Computing big integer ",baseBiginteger,NULL);outputBiginteger(" ** ",exponentBiginteger,".\n");
 		if(isBigintegerZero(exponentBiginteger))
-			_resultDecimal=(Mdecimal*)OWNED(__decimal(NULL,1,0),owner);
+			_resultDecimal=owned_decimal(__decimal(NULL,1,0),owner);
 		else
 		if(!isBigintegerOne(exponentBiginteger)){
 			// get a decimal context
 			Mdecimalcontext* decimalcontext=_getDecimalcontext(baseDecimal->prec);
 			mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:get_default_mpd_context());
 			// determine half the exponent
-			Mbiginteger* _halfexponentBiginteger=OWNED(__biginteger(),owner);
+			Mbiginteger* _halfexponentBiginteger=owned_biginteger(__biginteger(),owner);
 			if(mp_div_2(MP_INT_POINTER(exponentBiginteger),MP_INT_POINTER(_halfexponentBiginteger))==MP_OKAY){
-				Mdecimal* _halfresultDecimal=(Mdecimal*)OWNED(_getDecimalPowerWithPositiveBigintegerExponent(baseDecimal,_halfexponentBiginteger),owner);
+				Mdecimal* _halfresultDecimal=owned_decimal(_getDecimalPowerWithPositiveBigintegerExponent(baseDecimal,_halfexponentBiginteger),owner);
 				if(_halfresultDecimal){
-					Mdecimal* _doublehalfresultDecimal=(Mdecimal*)OWNED(__decimal(NULL,1,0),owner);
+					Mdecimal* _doublehalfresultDecimal=owned_decimal(__decimal(NULL,1,0),owner);
 					if(_doublehalfresultDecimal){
 						uint32_t status=0;
 						mpd_qmul(_doublehalfresultDecimal->mpd,_halfresultDecimal->mpd,_halfresultDecimal->mpd,mpd_context,&status);
 						if((status&0xEFBF)==0){
 							if(mp_isodd(MP_INT_POINTER(exponentBiginteger))){
-								_resultDecimal=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner);
+								_resultDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 								if(_resultDecimal){
 									mpd_qmul(_resultDecimal->mpd,_doublehalfresultDecimal->mpd,baseDecimal->mpd,mpd_context,&status);
-									if((status&0xEFBF)!=0){free_decimal(_resultDecimal,owner);_resultDecimal=NULL;}
+									if((status&0xEFBF)!=0){FREE_DECIMAL(_resultDecimal,owner);_resultDecimal=NULL;}
 								}else
 									outputError("Failed to create a decimal in computing the integer power of a decimal");
 							}else
-								_resultDecimal=(Mdecimal*)OWNED(_getDecimalCopy(_doublehalfresultDecimal),owner);
+								_resultDecimal=owned_decimal(_getDecimalCopy(_doublehalfresultDecimal),owner);
 						}else
 							outputError("Failed to compute the square of a decimal in computing the integer power of a decimal");
-						free_decimal(_doublehalfresultDecimal,owner);
+						FREE_DECIMAL(_doublehalfresultDecimal,owner);
 					}
-					free_decimal(_halfresultDecimal,owner);
+					FREE_DECIMAL(_halfresultDecimal,owner);
 				}
 			}
-			free_biginteger(_halfexponentBiginteger,owner);
+			FREE_BIGINTEGER(_halfexponentBiginteger,owner);
 		}else
-			_resultDecimal=(Mdecimal*)OWNED(_getDecimalCopy(baseDecimal),owner);
+			_resultDecimal=owned_decimal(_getDecimalCopy(baseDecimal),owner);
 	}
-	return DISOWNED(_resultDecimal,owner);
+	return disowned_decimal(_resultDecimal,owner);
 }
 
 // MDH@11OCT2019: until we know a better way I stick to using squared exponentation
@@ -5180,8 +5189,8 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 	mp_err result=(baseBiginteger&&exponentBiginteger&&powerBiginteger?MP_OKAY:MP_ERR);
 	if(result==MP_OKAY){
 		if(!isBigintegerOne(baseBiginteger)&&!isBigintegerZero(exponentBiginteger)){
-			Mbiginteger *_multiplierBiginteger=(Mbiginteger*)OWNED(_getBigintegerCopy(baseBiginteger),owner)
-			           ,*_exponentBiginteger=(Mbiginteger*)OWNED(_getBigintegerCopy(exponentBiginteger),owner);
+			Mbiginteger *_multiplierBiginteger=owned_biginteger(_getBigintegerCopy(baseBiginteger),owner)
+			           ,*_exponentBiginteger=owned_biginteger(_getBigintegerCopy(exponentBiginteger),owner);
 			if(_multiplierBiginteger&&_exponentBiginteger){
 				if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))!=MP_YES)mp_set_i32(MP_INT_POINTER(powerBiginteger),1);else result=mp_copy(MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(powerBiginteger)); // initialize powerBiginteger to 1
 				// can we do this iteratively???
@@ -5194,7 +5203,7 @@ mp_err computeBigintegerPower(Mbiginteger const * const baseBiginteger,Mbiginteg
 					if(mp_isodd(MP_INT_POINTER(_exponentBiginteger))==MP_YES)if((result=mp_mul(MP_INT_POINTER(powerBiginteger),MP_INT_POINTER(_multiplierBiginteger),MP_INT_POINTER(powerBiginteger)))!=MP_OKAY)break;
 				}
 			}
-			free_biginteger(_multiplierBiginteger,owner);free_biginteger(_exponentBiginteger,owner);
+			FREE_BIGINTEGER(_multiplierBiginteger,owner);FREE_BIGINTEGER(_exponentBiginteger,owner);
 		}else
 			result=mp_copy(MP_INT_POINTER(baseBiginteger),MP_INT_POINTER(powerBiginteger));
 	}
@@ -5214,8 +5223,8 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 				if(MP_INT_POINTER(rootDegreeBiginteger)->used==1){ // should ALWAYS be the case!!!!
 					outputBiginteger("Computing the rational approximation to the ",rootDegreeBiginteger,"th root");
 					outputRational(" of ",rootArgumentRational,".\n");
-					Mbiginteger *p_a=rootArgumentRational->num,*q_a=(rootArgumentRational->den?rootArgumentRational->den:(Mbiginteger*)OWNED(_getBiginteger(1),owner)); // helpers that will contain the numerator and denominator of A (the root argument)
-					Mbiginteger *_pk=(Mbiginteger*)OWNED(__biginteger(),owner),*_qk=(Mbiginteger*)OWNED(_getBiginteger(1),owner); // initialize the solution to the root argument allowing that q_k equals NULL to indicate it is equal to 1
+					Mbiginteger *p_a=rootArgumentRational->num,*q_a=(rootArgumentRational->den?rootArgumentRational->den:owned_biginteger(_getBiginteger(1),owner)); // helpers that will contain the numerator and denominator of A (the root argument)
+					Mbiginteger *_pk=owned_biginteger(__biginteger(),owner),*_qk=owned_biginteger(_getBiginteger(1),owner); // initialize the solution to the root argument allowing that q_k equals NULL to indicate it is equal to 1
 					if(_pk&&_qk){
 						// TODO how to check whether rootDegreeBiginteger is nottoo large????
 						mp_err result=MP_OKAY;
@@ -5236,37 +5245,37 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 						}
 						if(result==MP_OKAY){
 							// try to initialize root degree times the denominator of the root argument (which could be NULL when it equals 1)
-							Mbiginteger* _np_a=(Mbiginteger*)OWNED(_getBigintegerCopy(rootDegreeBiginteger),owner);
+							Mbiginteger* _np_a=owned_biginteger(_getBigintegerCopy(rootDegreeBiginteger),owner);
 							if(_np_a&&q_a&&mp_mul(MP_INT_POINTER(_np_a),MP_INT_POINTER(q_a),MP_INT_POINTER(_np_a))!=MP_OKAY){
-								free_biginteger(_np_a,owner);_np_a=NULL;
+								FREE_BIGINTEGER(_np_a,owner);_np_a=NULL;
 							}
 							if(_np_a){
 								// MDH@30MAY2020: TOTO own all the bigintegers
 								// we need some additional helper big integers
-								Mbiginteger *_pktothepowern=(Mbiginteger*)OWNED(__biginteger(),owner)
-								           ,*_qktothepowern=(Mbiginteger*)OWNED(_getBiginteger(1),owner)
-										   ,*_delta1=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_delta2=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_distancenumerator=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_pktothepowernminus1=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_divremainder=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_gcd=(Mbiginteger*)OWNED(__biginteger(),owner);
-								Mbiginteger *_num1=(Mbiginteger*)OWNED(__biginteger(),owner)
-								           ,*_num=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_den=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_nextpk=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_nextqk=(Mbiginteger*)OWNED(__biginteger(),owner); // initially the same as _pk and _qk
-								Mbiginteger *_distancedenominator=(Mbiginteger*)OWNED(__biginteger(),owner); // the distance to the root
-								Mbiginteger *_pkctothepowern=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_pkonthisside=(Mbiginteger*)OWNED(__biginteger(),owner)
-								           ,*_pkontheotherside=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_deltapk=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_distanceonthisside=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_distanceontheotherside=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_pkdifference=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_pkhalfway=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_distancehalfway=(Mbiginteger*)OWNED(__biginteger(),owner)
-										   ,*_one=(Mbiginteger*)OWNED(_getBiginteger(1),owner); // what we'll use for determining a value below the root
+								Mbiginteger *_pktothepowern=owned_biginteger(__biginteger(),owner)
+								           ,*_qktothepowern=owned_biginteger(_getBiginteger(1),owner)
+										   ,*_delta1=owned_biginteger(__biginteger(),owner)
+										   ,*_delta2=owned_biginteger(__biginteger(),owner)
+										   ,*_distancenumerator=owned_biginteger(__biginteger(),owner)
+										   ,*_pktothepowernminus1=owned_biginteger(__biginteger(),owner)
+										   ,*_divremainder=owned_biginteger(__biginteger(),owner)
+										   ,*_gcd=owned_biginteger(__biginteger(),owner);
+								Mbiginteger *_num1=owned_biginteger(__biginteger(),owner)
+								           ,*_num=owned_biginteger(__biginteger(),owner)
+										   ,*_den=owned_biginteger(__biginteger(),owner)
+										   ,*_nextpk=owned_biginteger(__biginteger(),owner)
+										   ,*_nextqk=owned_biginteger(__biginteger(),owner); // initially the same as _pk and _qk
+								Mbiginteger *_distancedenominator=owned_biginteger(__biginteger(),owner); // the distance to the root
+								Mbiginteger *_pkctothepowern=owned_biginteger(__biginteger(),owner)
+										   ,*_pkonthisside=owned_biginteger(__biginteger(),owner)
+								           ,*_pkontheotherside=owned_biginteger(__biginteger(),owner)
+										   ,*_deltapk=owned_biginteger(__biginteger(),owner)
+										   ,*_distanceonthisside=owned_biginteger(__biginteger(),owner)
+										   ,*_distanceontheotherside=owned_biginteger(__biginteger(),owner)
+										   ,*_pkdifference=owned_biginteger(__biginteger(),owner)
+										   ,*_pkhalfway=owned_biginteger(__biginteger(),owner)
+										   ,*_distancehalfway=owned_biginteger(__biginteger(),owner)
+										   ,*_one=owned_biginteger(_getBiginteger(1),owner); // what we'll use for determining a value below the root
 								if(_pktothepowern&&_qktothepowern&&_delta1&&_delta2&&_distancenumerator&&_pktothepowernminus1&&_divremainder&&_gcd&&_nextpk&&_nextqk&&_num1&&_num&&_den&&_distancedenominator&&_pkctothepowern&&_pkonthisside&&_pkontheotherside&&_deltapk&&_distanceonthisside&&_distanceontheotherside&&_pkdifference&&_pkhalfway&&_distancehalfway&&_one){
 									char c;
 									unsigned long long iter=0;
@@ -5275,18 +5284,20 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 									while(++iter){
 										output("\nRational root approximation #%lld: ",iter);outputBiginteger("(",_pk,NULL);outputBiginteger("/",_qk,")");
 										// let's show the decimal representation of this value
-										_rational=OWNED(_getRational(/*_getBigintegerCopy*/(_pk),/*_getBigintegerCopy*/(_qk),M_LD_NAN,false),owner);
+										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_pk),/*_getBigintegerCopy*/(_qk),M_LD_NAN,false),owner);
 										if(_rational){
-											_decimal=(Mdecimal*)OWNED(_getRationalDecimal(_rational),owner);free_rational(_rational,owner);
-											if(_decimal){outputDecimal("=",_decimal,NULL);free_decimal(_decimal,owner);}
+											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
+											if(_decimal){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
 										}
 										output(".\n");
 										// update the delta
 										outputBiginteger("\tNumerator ",_pk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
-										if(computeBigintegerPower(_pk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										if(computeBigintegerPower(_pk,rootDegreeBiginteger,_pktothepowern)!=MP_OKAY)
+										{outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										outputBiginteger(" ",_pktothepowern,".\n");
 										outputBiginteger("\tDenominator ",_qk," to power");outputBiginteger(" ",rootDegreeBiginteger,":");
-										if(computeBigintegerPower(_qk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY){outputError("Failed to compute the power of the numerator of the rational approximation");break;}
+										if(computeBigintegerPower(_qk,rootDegreeBiginteger,_qktothepowern)!=MP_OKAY)
+										{outputError("Failed to compute the power of the numerator of the rational approximation");break;}
 										outputBiginteger(" ",_qktothepowern,".\n");
 
 										/* replacing:
@@ -5304,10 +5315,10 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										outputBiginteger("\tDistance from (",_pk,"/");outputBiginteger(NULL,_qk,")");outputBiginteger("**",rootDegreeBiginteger," to ");
 										outputBiginteger("root argument (",p_a,"/");outputBiginteger(NULL,q_a,"): ");
 										outputBiginteger("(",_distancenumerator,"/");outputBiginteger(NULL,_distancedenominator,")");
-										_rational=(Mrational*)OWNED(_getRational(/*_getBigintegerCopy*/(_distancenumerator),/*_getBigintegerCopy*/(_distancedenominator),M_LD_NAN,false),owner);
+										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_distancenumerator),/*_getBigintegerCopy*/(_distancedenominator),M_LD_NAN,false),owner);
 										if(_rational){
-											_decimal=_getRationalDecimal(_rational);free_rational(_rational,owner);
-											if(_decimal){outputDecimal("=",_decimal,NULL);free_decimal(_decimal,owner);}
+											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
+											if(_decimal){outputDecimal("=",_decimal,NULL);FREE_DECIMAL(_decimal,owner);}
 										}
 										outputChar('\n');
 
@@ -5400,13 +5411,13 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										{outputError("Failed to normalize the change in the rational approximation to the root of a rational");break;}
 										output("\tChange in rational approximation: ",iter);outputBiginteger("(",_num,NULL);outputBiginteger("/",_den,")");
 										bool decimalprecisionreached=false;
-										_rational=(Mrational*)OWNED(_getRational(/*_getBigintegerCopy*/(_num),/*_getBigintegerCopy*/(_den),M_LD_NAN,false),owner);
+										_rational=owned_rational(_getRational(/*_getBigintegerCopy*/(_num),/*_getBigintegerCopy*/(_den),M_LD_NAN,false),owner);
 										if(_rational){
-											_decimal=(Mdecimal*)OWNED(_getRationalDecimal(_rational),owner);free_rational(_rational,owner);
+											_decimal=owned_decimal(_getRationalDecimal(_rational),owner);FREE_RATIONAL(_rational,owner);
 											if(_decimal){
 												if(mpd_iszero(_decimal->mpd)==MP_YES)decimalprecisionreached=true;
 												outputDecimal("=",_decimal,NULL);
-												free_decimal(_decimal,owner);
+												FREE_DECIMAL(_decimal,owner);
 											}
 										}
 										output(".\n");
@@ -5419,48 +5430,48 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 										if(mp_copy(MP_INT_POINTER(_nextqk),MP_INT_POINTER(_qk))!=MP_OKAY){outputError("Failed to update the denominator of the rational root approximation");break;}
 
 									}
-									free_biginteger(_pktothepowern,owner);
-									free_biginteger(_qktothepowern,owner);
-									free_biginteger(_delta1,owner);
-									free_biginteger(_delta2,owner);
-									free_biginteger(_distancenumerator,owner);
-									free_biginteger(_pktothepowernminus1,owner);
-									free_biginteger(_divremainder,owner);
-									free_biginteger(_gcd,owner);
-									free_biginteger(_num1,owner);
-									free_biginteger(_num,owner);
-									free_biginteger(_den,owner);
-									free_biginteger(_nextpk,owner);
-									free_biginteger(_nextqk,owner);
-									free_biginteger(_distancedenominator,owner);
-									free_biginteger(_pkctothepowern,owner);
-									free_biginteger(_pkonthisside,owner);
-									free_biginteger(_pkontheotherside,owner);
-									free_biginteger(_deltapk,owner);
-									free_biginteger(_distanceonthisside,owner);
-									free_biginteger(_distanceontheotherside,owner);
-									free_biginteger(_pkhalfway,owner);
-									free_biginteger(_distancehalfway,owner);
-									free_biginteger(_one,owner);
+									FREE_BIGINTEGER(_pktothepowern,owner);
+									FREE_BIGINTEGER(_qktothepowern,owner);
+									FREE_BIGINTEGER(_delta1,owner);
+									FREE_BIGINTEGER(_delta2,owner);
+									FREE_BIGINTEGER(_distancenumerator,owner);
+									FREE_BIGINTEGER(_pktothepowernminus1,owner);
+									FREE_BIGINTEGER(_divremainder,owner);
+									FREE_BIGINTEGER(_gcd,owner);
+									FREE_BIGINTEGER(_num1,owner);
+									FREE_BIGINTEGER(_num,owner);
+									FREE_BIGINTEGER(_den,owner);
+									FREE_BIGINTEGER(_nextpk,owner);
+									FREE_BIGINTEGER(_nextqk,owner);
+									FREE_BIGINTEGER(_distancedenominator,owner);
+									FREE_BIGINTEGER(_pkctothepowern,owner);
+									FREE_BIGINTEGER(_pkonthisside,owner);
+									FREE_BIGINTEGER(_pkontheotherside,owner);
+									FREE_BIGINTEGER(_deltapk,owner);
+									FREE_BIGINTEGER(_distanceonthisside,owner);
+									FREE_BIGINTEGER(_distanceontheotherside,owner);
+									FREE_BIGINTEGER(_pkhalfway,owner);
+									FREE_BIGINTEGER(_distancehalfway,owner);
+									FREE_BIGINTEGER(_one,owner);
 								}
-								free_biginteger(_np_a,owner);
-								_rationalBigintegerRootRational=(Mrational*)OWNED(_getRational(_pk,_qk,M_LD_NAN,true),owner);
+								FREE_BIGINTEGER(_np_a,owner);
+								_rationalBigintegerRootRational=owned_rational(_getRational(_pk,_qk,M_LD_NAN,true),owner);
 							}
 						}else
 							outputError("Failed to initialize the rational root approximation");
 					}else
 						outputError("Failed to initialize the rational rational root approximation");
-					if(!rootArgumentRational->den)free_biginteger(q_a,owner); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
+					if(!rootArgumentRational->den)FREE_BIGINTEGER(q_a,owner); // MDH@30OCT2019: if the root argument denominator equals 1 i.e. the rational is actually a (big) integer...
 					// take care of freeing the result numerator and denominator when we do not have a rational root rational
-					if(!_rationalBigintegerRootRational){free_biginteger(_pk,owner);free_biginteger(_qk,owner);}
+					if(!_rationalBigintegerRootRational){FREE_BIGINTEGER(_pk,owner);FREE_BIGINTEGER(_qk,owner);}
 				}else
 					outputError("The root degree is too large (which should never happen though, as it should have been prevented)");
 			}else
-				_rationalBigintegerRootRational=(Mrational*)OWNED(_getRationalCopy(rootArgumentRational),owner);
+				_rationalBigintegerRootRational=owned_rational(_getRationalCopy(rootArgumentRational),owner);
 		}else // the root degree equals 0
-			_rationalBigintegerRootRational=(Mrational*)OWNED(_getRational(NULL,NULL,M_LD_NAN,false),owner);
+			_rationalBigintegerRootRational=owned_rational(_getRational(NULL,NULL,M_LD_NAN,false),owner);
 	}
-	return DISOWNED(_rationalBigintegerRootRational,owner);
+	return disowned_rational(_rationalBigintegerRootRational,owner);
 }
 // MDH@10OCT2019: better to return a decimal instead of already wrapping the result in a value (so we can do postprocessing!!!!)
 //                wait we're wrapping it because the result could be different from a decimal!!!!
@@ -5473,7 +5484,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 		// computing with true decimals is fine, but with a decimal that is a rational approximation (i.e. with repeating) we're in trouble
 		// a rational with a delta should be purified
 		// we can do the decimal approximation first
-		Mdecimal* _rootArgumentDecimal=(Mdecimal*)OWNED(_getValueDecimal(rootArgumentValue),owner);
+		Mdecimal* _rootArgumentDecimal=owned_decimal(_getValueDecimal(rootArgumentValue),owner);
 		if(_rootArgumentDecimal){
 			uint32_t status=0;
 			outputDecimal("Root argument decimal: '",_rootArgumentDecimal,"'.\n");
@@ -5481,14 +5492,14 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 			Mdecimalcontext* _decimalcontext=_getDecimalcontext(_rootArgumentDecimal->prec);
 			mpd_context_t* mpd_context=(_decimalcontext?_decimalcontext->mpd_context:get_default_mpd_context());
 			if(mpd_context){
-				Mdecimal* _rootDegreeDecimal=(Mdecimal*)OWNED(_getBigintegerDecimal(rootDegreeBiginteger),owner);
+				Mdecimal* _rootDegreeDecimal=owned_decimal(_getBigintegerDecimal(rootDegreeBiginteger),owner);
 				if(_rootDegreeDecimal){
 					outputDecimal("Root degree decimal: '",_rootDegreeDecimal,"'.\n");
 					// MDH@10OCT2019: to anticipate on root arguments smaller than 1 of which the root will be larger instead of smaller we use the square root as first approximation
 					// MDH@10OCT2019: because we are approaching the root from above, as soon as the next approximation is equal to or larger than the previous approximation we're done
 					//                this means not using the distance anymore because e.g. 2**(7/9) with decimal precision 20 failed to converge (resulted in toggling between two decimals that different by the final digit)
-					Mdecimal *_bigintegerRootDecimal=(Mdecimal*)OWNED(__decimal(mpd_context,1,0),owner)
-					        ,*_nextBigintegerRootDecimal=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
+					Mdecimal *_bigintegerRootDecimal=owned_decimal(__decimal(mpd_context,1,0),owner)
+					        ,*_nextBigintegerRootDecimal=owned_decimal(__decimal(mpd_context,0,0),owner); // let's use 1 as first approximation for any decimal that is below 1
 					if(_bigintegerRootDecimal&&_nextBigintegerRootDecimal){
 						outputInfo("Root computation result decimals created...");
 						uint32_t status=0;
@@ -5501,7 +5512,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 							outputDecimal("Root computation result decimals initialized to ",_bigintegerRootDecimal,".\n");
 							// TODO only when the root degree is larger than 2 do we do the iterative process
 							// 0. preparations: we need (root degree - 1 ) regularly
-							Mdecimal* _rootDegreeMinus1Decimal=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner); /////_getDecimalCopy(_rootDegreeDecimal);
+							Mdecimal* _rootDegreeMinus1Decimal=owned_decimal(__decimal(mpd_context,0,0),owner); /////_getDecimalCopy(_rootDegreeDecimal);
 							if(_rootDegreeMinus1Decimal){
 								outputInfo("Root computation helper decimal created...");
 								// can't I use getDecimalOne() here?????? apparently not!!
@@ -5511,7 +5522,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 								if((status&0xEFBF)==0){
 									outputInfo("Root computation helper decimal initialized...");
 									// we need the root degree minus 1 as big integer as well
-									Mbiginteger* _rootDegreeMinus1Biginteger=(Mbiginteger*)OWNED(_getBigintegerCopy(rootDegreeBiginteger),owner);
+									Mbiginteger* _rootDegreeMinus1Biginteger=owned_biginteger(_getBigintegerCopy(rootDegreeBiginteger),owner);
 									if(_rootDegreeMinus1Biginteger){
 										outputInfo("Root computation helper big integer created...");
 										if(mp_decr(MP_INT_POINTER(_rootDegreeMinus1Biginteger))==MP_OKAY){
@@ -5520,10 +5531,10 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 											/*
 											Mdecimal *_distance=__decimal(mpd_context,0,0),*_prevdistance=__decimal(mpd_context,0,0);
 											*/
-											Mdecimal *_product=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner)
-											        ,*_quotient=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner)
-													,*_productplusquotient=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner)
-													,*_power=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner);
+											Mdecimal *_product=owned_decimal(__decimal(mpd_context,0,0),owner)
+											        ,*_quotient=owned_decimal(__decimal(mpd_context,0,0),owner)
+													,*_productplusquotient=owned_decimal(__decimal(mpd_context,0,0),owner)
+													,*_power=owned_decimal(__decimal(mpd_context,0,0),owner);
 											// initial value of the quotient denominator that we need for checking whether we're done and in the computation
 											if(/*_distance&&_prevdistance&&*/_product&&_quotient&&_productplusquotient&&_power){
 												outputInfo("Root computation helper decimals created...");
@@ -5535,7 +5546,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 												while((status&0xEFBF)==0){
 													// 'update' the quotient denominator, so we can use it in checking whether we are already there yet, and if not in the computation
 													// TODO might it be a good idea to compute the quotient and compare the quotient with the current solution??????
-													_quotientdenominator=(Mdecimal*)OWNED(_getDecimalPowerWithPositiveBigintegerExponent(_bigintegerRootDecimal,_rootDegreeMinus1Biginteger),owner);
+													_quotientdenominator=owned_decimal(_getDecimalPowerWithPositiveBigintegerExponent(_bigintegerRootDecimal,_rootDegreeMinus1Biginteger),owner);
 													if(!_quotientdenominator){status=0xFFFFFFFF;break;}
 													/* MDH@10OCT2019: not using the distance anymore!!!
 													// are we there yet?????
@@ -5566,7 +5577,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 														outputChar('\n');
 													}
 													mpd_qdiv(_quotient->mpd,_rootArgumentDecimal->mpd,_quotientdenominator->mpd,mpd_context,&status);
-													free_decimal(_quotientdenominator,owner); // don't need it anymore
+													FREE_DECIMAL(_quotientdenominator,owner); // don't need it anymore
 													mpd_qmul(_product->mpd,_rootDegreeMinus1Decimal->mpd,_bigintegerRootDecimal->mpd,mpd_context,&status);
 													mpd_qadd(_productplusquotient->mpd,_product->mpd,_quotient->mpd,mpd_context,&status);
 													// update the solution
@@ -5578,24 +5589,24 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 												}
 												if((status&0xEFBF)!=0){
 													output("%sRoot computation ended with error code " PRIu32 ".\n",M_ERROR_PREFIX,status);
-													free_decimal(_bigintegerRootDecimal,owner);
+													FREE_DECIMAL(_bigintegerRootDecimal,owner);
 												}else{
-													_bigintegerRootValue=_getDecimalValue(_bigintegerRootDecimal,owner);
-													///////if(amVerbose())
-													outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
+													_bigintegerRootValue=_getValueOfDecimal(disowned_decimal(_bigintegerRootDecimal,owner));
+													if(amVerboseDebugging())
+														outputDecimal("Root computation result decimal: '",_bigintegerRootDecimal,"'.\n");
 												}
 											}else
 												outputError("Failed to create helper decimals in computing a root decimal");
 											/*
-											free_decimal(_distance);free_decimal(_prevdistance);
+											FREE_DECIMAL(_distance);FREE_DECIMAL(_prevdistance);
 											*/
-											free_decimal(_product,owner);
-											free_decimal(_quotient,owner);
-											free_decimal(_productplusquotient,owner);
-											free_decimal(_power,owner);
+											FREE_DECIMAL(_product,owner);
+											FREE_DECIMAL(_quotient,owner);
+											FREE_DECIMAL(_productplusquotient,owner);
+											FREE_DECIMAL(_power,owner);
 										}else
 											outputError("Failed to compute a helper big integer in computing a root decimal");
-										free_biginteger(_rootDegreeMinus1Biginteger,owner);
+										FREE_BIGINTEGER(_rootDegreeMinus1Biginteger,owner);
 										outputInfo("Root computation helper big integer released...");
 									}else
 										outputError("Failed to copy the root degree in computing a root decimal");
@@ -5603,16 +5614,16 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 									outputError("Failed to compute a helper decimal in computing a root decimal");
 							}else
 								outputError("Failed to create a helper decimal in computing a root decimal");
-							free_decimal(_rootDegreeMinus1Decimal,owner);
+							FREE_DECIMAL(_rootDegreeMinus1Decimal,owner);
 							outputInfo("Root computation helper decimal released...");
 						}else
 						if(rootArgumentComparison)
 							outputError("Failed to initialize the result of the root computation to the square root");
 						else // wrap the result (which is 1)
-							_bigintegerRootValue=_getDecimalValue(_bigintegerRootDecimal,owner);
+							_bigintegerRootValue=_getValueOfDecimal(disowned_decimal(_bigintegerRootDecimal,owner));
 					}
-					free_decimal(_nextBigintegerRootDecimal,owner);
-					free_decimal(_rootDegreeDecimal,owner);
+					FREE_DECIMAL(_nextBigintegerRootDecimal,owner);
+					FREE_DECIMAL(_rootDegreeDecimal,owner);
 					outputInfo("Root computation degree decimal released...");
 				}else{
 					output("%s",M_ERROR_PREFIX);
@@ -5620,7 +5631,7 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 				}
 			}else
 				outputError("Failed to create a decimal context for computing a decimal root");
-			if(rootArgumentValue->type!=VT_DECIMAL)free_decimal(_rootArgumentDecimal,owner);
+			if(rootArgumentValue->type!=VT_DECIMAL)FREE_DECIMAL(_rootArgumentDecimal,owner);
 		}else{
 			output("%s",M_ERROR_PREFIX);outputValue("Failed to convert root argument '",rootArgumentValue,"' to a decimal.\n");
 		}
@@ -5650,19 +5661,19 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
 		Mbiginteger* _powerBiginteger=NULL;
 		// ASSERT both integers are considered valid (i.e. not invalid)
-		Mbiginteger *_biginteger1=(smallinteger1?(Mbiginteger*)OWNED(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
-		Mbiginteger *_biginteger2=(smallinteger2?(Mbiginteger*)OWNED(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose())
 				{outputBiginteger("Exponentiating big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'.\n");}
-			_powerBiginteger=(Mbiginteger*)OWNED(_getBigintegerPowerWithPositiveBigintegerExponent(_biginteger1,_biginteger2),owner);
+			_powerBiginteger=owned_biginteger(_getBigintegerPowerWithPositiveBigintegerExponent(_biginteger1,_biginteger2),owner);
 			if(amVerbose())
 				{outputBiginteger("Power: '",_powerBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1,owner);
-		if(smallinteger2)free_biginteger(_biginteger2,owner);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: if the base is integer, we're going to try to return a small integer
 		if(smallinteger1){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
 			if(amVerbose())outputInfo("Will try to convert the big integer result back to a small integer.");
@@ -5671,14 +5682,14 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llpower!=M_LL_INVALID){
 				if(amVerbose())outputInfo("Will remove the big integer exponentiation result!");
-				free_biginteger(_powerBiginteger,owner);
+				FREE_BIGINTEGER(_powerBiginteger,owner);
 				if(amVerbose())outputInfo("Returning the small integer equivalent of the big integer exponentation result.");
 				return _getIntegerValue(llpower);
 			}
 			outputWarning("Small integer exponentation result out of range, will continue using the big integer exponentiation result.");
 		}
 		///////outputBiginteger("Exponentation result: '",_powerBiginteger,"'.\n");
-		return _getBigintegerValue(_powerBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_powerBiginteger,owner));
 	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER||_value1->type==VT_DECIMAL||_value1->type==VT_RATIONAL)&&
 		(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||_value2->type==VT_DECIMAL||_value2->type==VT_RATIONAL)){
@@ -5688,9 +5699,9 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 		Mvalue* _returnValue=NULL;
 		// 1. when the exponent is integer
 		if(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER||(_value2->type==VT_RATIONAL&&(!_value2->value._rational->den||isBigintegerOne(_value2->value._rational->den)))){
-			Mbiginteger* _exponentBiginteger=(Mbiginteger*)OWNED(_getValueBiginteger(_value2),owner);
+			Mbiginteger* _exponentBiginteger=owned_biginteger(_getValueBiginteger(_value2),owner);
 			_returnValue=_getBigintegerPowerValue(_value1,_exponentBiginteger);
-			if(_value2->type!=VT_BIGINTEGER)free_biginteger(_exponentBiginteger,owner);
+			if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_exponentBiginteger,owner);
 		}else{ // non-integer exponent, only decimals and rationals remaining
 			// if the exponent is inherently rational we should use 
 			Mrational* _exponentRational=NULL;
@@ -5698,14 +5709,14 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 				_exponentRational=_value2->value._rational;
 			else 
 			if(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0)
-				_exponentRational=(Mrational*)OWNED(_getDecimalRational(_value2->value._decimal),owner);
+				_exponentRational=owned_rational(_getDecimalRational(_value2->value._decimal),owner);
 			// MDH@14OCT2019: let's only do a rational approximation if the exponent is rational but the denominator is not too large i.e. using at most a single mp_digit (which might be large enough as it is though)
 			if(_exponentRational&&(!_exponentRational->den||MP_INT_POINTER(_exponentRational->den)->used==1)){ // the exponent is rational and the exponent denominator (which results in root finding is not too large)
 				Mvalue* _rootValue=NULL; // the result of the computation of taking the power of a decimal to a rational exponent
 				//if(amVerbose())
 				outputRational("Computing a power with rational exponent ",_exponentRational,".\n");
 				bool neg=(MP_INT_POINTER(_exponentRational->num)->sign==MP_NEG);
-				Mbiginteger* _positiveExponentNumerator=(neg?(Mbiginteger*)OWNED(_getBigintegerNeg(_exponentRational->num),owner):_exponentRational->num);
+				Mbiginteger* _positiveExponentNumerator=(neg?owned_biginteger(_getBigintegerNeg(_exponentRational->num),owner):_exponentRational->num);
 				Mbiginteger* exponentDenominator=_exponentRational->den;
 				if(_positiveExponentNumerator){ // we 
 					// TODO now we are testing whether the denominator does not equal one, but in the future all rationals with denominator 1 should have a NULL denominator!!!
@@ -5717,8 +5728,8 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 						
 						mp_ord numdencomp=mp_cmp(MP_INT_POINTER(_positiveExponentNumerator),MP_INT_POINTER(exponentDenominator));
 						if(numdencomp!=MP_EQ){ // numerator and denominator are not equal
-							Mbiginteger *_integerdividend=(Mbiginteger*)OWNED(__biginteger(),owner)
-							           ,*_remainder=(Mbiginteger*)OWNED(__biginteger(),owner); // the defaults when the denominator equals NULL
+							Mbiginteger *_integerdividend=owned_biginteger(__biginteger(),owner)
+							           ,*_remainder=owned_biginteger(__biginteger(),owner); // the defaults when the denominator equals NULL
 							// we divide the maximum of the numerator and the denominator by the minimum of the numerator and the denominator (which typically means that _integerdividend will always be nonzero essentially)
 							if(_integerdividend
 									&&_remainder
@@ -5734,17 +5745,17 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 								//                and also when the it's a rational in disguise (stored as a decimal with repeating digits) CAREFUL use a copy of the big integer calling _getRational!!!
 								Mrational* _rootArgumentRational=NULL;
 								if(rootArgumentValue->type==VT_BIGINTEGER)
-									_rootArgumentRational=(Mrational*)OWNED(_getRational(_getBigintegerCopy(rootArgumentValue->value._biginteger),NULL,M_LD_NAN,false),owner);
+									_rootArgumentRational=owned_rational(_getRational(_getBigintegerCopy(rootArgumentValue->value._biginteger),NULL,M_LD_NAN,false),owner);
 								else
 								if(rootArgumentValue->type==VT_RATIONAL&&floatIsUndefinedOrZero(rootArgumentValue->value._rational->delta))
 									_rootArgumentRational=rootArgumentValue->value._rational;
 								else
 								if(rootArgumentValue->type==VT_DECIMAL&&rootArgumentValue->value._decimal->repeating>0)
-									_rootArgumentRational=(Mrational*)OWNED(_getDecimalRational(rootArgumentValue->value._decimal),owner);
+									_rootArgumentRational=owned_rational(_getDecimalRational(rootArgumentValue->value._decimal),owner);
 								if(_rootArgumentRational){ // the root argument is supposedly a rational
 									// TODO if the base is not a pure rational, we could of course purify it
-									_rootValue=_getRationalValue((Mrational*)OWNED(_getRationalBigintegerRootRational(_rootArgumentRational,exponentDenominator),owner),owner);
-									if(rootArgumentValue->type!=VT_RATIONAL)free_rational(_rootArgumentRational,owner);
+									_rootValue=_getValueOfRational(_getRationalBigintegerRootRational(_rootArgumentRational,exponentDenominator));
+									if(rootArgumentValue->type!=VT_RATIONAL)FREE_RATIONAL(_rootArgumentRational,owner);
 								}else // base NOT a pure rational, so we're goint go stick with using decimal root approximation i.e. the decimal approximation to the base will be used 
 									_rootValue=_getBigintegerRootValue(rootArgumentValue,exponentDenominator);
 								// now apply the multiplier if need be
@@ -5770,7 +5781,7 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 								*/
 							}else
 								outputError("Failed to determine the integer and fractional part of a rational exponent");
-							free_biginteger(_integerdividend,owner);free_biginteger(_remainder,owner);
+							FREE_BIGINTEGER(_integerdividend,owner);FREE_BIGINTEGER(_remainder,owner);
 						}else // the numerator equals the denominator meaning that _value1 is the value to return
 							_rootValue=_value1;
 					}else // an integer rational, so no need to take the root at all!!!
@@ -5783,18 +5794,18 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 					else
 						_returnValue=_rootValue;
 					if(neg){
-						free_biginteger(_positiveExponentNumerator,owner);
+						FREE_BIGINTEGER(_positiveExponentNumerator,owner);
 						if(_returnValue)_returnValue=Mreciprocal(_returnValue);
 					}
 				}else
 					outputError("Failed to reverse the sign of the rational exponent");
-				if(_value2->type!=VT_RATIONAL)free_rational(_exponentRational,owner);
+				if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_exponentRational,owner);
 			}else{ // not integer based exponent (so if the exponent is a decimal is does not have a repeating part), so use decimals
 				// there's a mpd_pow() methods that we technically use on anything that convertable to a decimal
 				// converting a rational to a decimal is difficult unless the rational represents a decimal (i.e. the denominator is a power of 10 or we can make it a power of 10 somehow)
 				Mdecimal *_baseDecimal=getValueDecimal(_value1),*_exponentDecimal=getValueDecimal(_value2);
-				if(_value1->type!=VT_DECIMAL)OWNED(_baseDecimal,owner);
-				if(_value2->type!=VT_DECIMAL)OWNED(_exponentDecimal,owner);
+				if(_value1->type!=VT_DECIMAL)owned_decimal(_baseDecimal,owner);
+				if(_value2->type!=VT_DECIMAL)owned_decimal(_exponentDecimal,owner);
 				if(_baseDecimal&&_exponentDecimal){
 					Mdecimal* _powerDecimal=NULL;
 					mpd_context_t* mpd_context=getContextOfDecimals(_baseDecimal,_exponentDecimal);
@@ -5804,33 +5815,33 @@ Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(_
 					if(_baseDecimal->repeating>0){
 						if(amVerbose())outputInfo("Computing the power of a rational.");
 						// the result is the quotient of the power of the numerator divided by the power of the denominator of the associated rational
-						Mrational* _baseRational=getValueRational(_value1);if(_value1->type!=VT_RATIONAL)OWNED(_baseRational,owner);
-						Mdecimal* _baseNumDecimal=(Mdecimal*)OWNED(_getBigintegerDecimal(_baseRational->num),owner);
-						Mdecimal* _numPowerDecimal=(Mdecimal*)OWNED(_getDecimalPower(_baseNumDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
-						Mdecimal* _baseDenDecimal=(Mdecimal*)OWNED(_getBigintegerDecimal(_baseRational->den),owner);
-						Mdecimal* _denPowerDecimal=(Mdecimal*)OWNED(_getDecimalPower(_baseDenDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
-						_powerDecimal=(Mdecimal*)OWNED(__decimal(mpd_context,0,0),owner);
+						Mrational* _baseRational=getValueRational(_value1);if(_value1->type!=VT_RATIONAL)owned_rational(_baseRational,owner);
+						Mdecimal* _baseNumDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->num),owner);
+						Mdecimal* _numPowerDecimal=owned_decimal(_getDecimalPower(_baseNumDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
+						Mdecimal* _baseDenDecimal=owned_decimal(_getBigintegerDecimal(_baseRational->den),owner);
+						Mdecimal* _denPowerDecimal=owned_decimal(_getDecimalPower(_baseDenDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
+						_powerDecimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 						// the quotient of the numerator and denominator power is the end result
 						if(_powerDecimal){
 							uint32_t status=0;
 							mpd_qdiv(_powerDecimal->mpd,_numPowerDecimal->mpd,_denPowerDecimal->mpd,mpd_context,&status);
 							if((status&0xEFBF)!=0)
-							{outputError("Failed to divide the numerator and denominator powers");free_decimal(_powerDecimal,owner);_powerDecimal=NULL;}
+							{outputError("Failed to divide the numerator and denominator powers");FREE_DECIMAL(_powerDecimal,owner);_powerDecimal=NULL;}
 						}else
 							outputError("Failed to create the decimal result of applying the power function to a rational");
-						free_decimal(_baseNumDecimal,owner);free_decimal(_baseDenDecimal,owner);
-						free_decimal(_numPowerDecimal,owner);free_decimal(_denPowerDecimal,owner);
-						if(_value1->type!=VT_RATIONAL)free_rational(_baseRational,owner);
+						FREE_DECIMAL(_baseNumDecimal,owner);FREE_DECIMAL(_baseDenDecimal,owner);
+						FREE_DECIMAL(_numPowerDecimal,owner);FREE_DECIMAL(_denPowerDecimal,owner);
+						if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_baseRational,owner);
 					}else{ // base and exponent decimals is true
-						_powerDecimal=(Mdecimal*)OWNED(_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
+						_powerDecimal=owned_decimal(_getDecimalPower(_baseDecimal->mpd,_exponentDecimal->mpd,mpd_context),owner);
 						outputInfo("Power decimal computed!");
 						// if the exponent is integer typed, the base type determines what to return
 					}
-					if(_powerDecimal)_returnValue=_getDecimalValue(_powerDecimal,owner);else outputError("Failed to create the power function result decimal");
+					if(_powerDecimal)_returnValue=_getValueOfDecimal(disowned_decimal(_powerDecimal,owner));else outputError("Failed to create the power function result decimal");
 				}
 				// if the originals weren't decimals, free the created decimals!!!!
-				if(_value1->type!=VT_DECIMAL)free_decimal(_baseDecimal,owner);
-				if(_value2->type!=VT_DECIMAL)free_decimal(_exponentDecimal,owner);
+				if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_baseDecimal,owner);
+				if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_exponentDecimal,owner);
 			}
 		}
 		return _returnValue;
@@ -5859,7 +5870,7 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 			if(_value1->type==VT_DECIMAL){
 				Mdecimal* _decimal=_getDecimalCopy(_value1->value._decimal);
 				_decimal->mpd->exp+=exponentOf10; // TODO theoretically we can get overflow here!! the exponent is an int64_t (alternative is using mpd_scaleb)
-				return _getDecimalValue(_decimal,true);
+				return _getValueOfDecimal(_decimal,true);
 			}
 			if(_value1->type==VT_RATIONAL){
 				// either to multiply the numerator or the denominator with the exponent
@@ -5882,9 +5893,9 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 						else
 							outputError("Failed to multiply the denominator of the rational by an integer power of 10.");
 					}
-					free_biginteger(_biginteger10);
+					FREE_BIGINTEGER(_biginteger10);
 				}
-				return _getRationalValue(_rational,true);
+				return _getValueOfRational(_rational,true);
 			}
 		}
 		return multiply(_value1,power(_getIntegerValue(10),_value2)); // temp. value like the power result and _getIntegerValue(10) will be garbage collected if not bound somewhere!!!
@@ -5911,34 +5922,34 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		// if the denominator is negative, both the numerator and denominator should be negated (should this be part of the normalization procedure?), theoretically storing the sign separate from the big integers in a rational could also be the way to go
 		// so when the sign of the two big integers is different, the rational is negative, otherwise it is positive and _getRational would store the absolute values of the big integer
 		// if _getRational would take care of negating the numerator and denominator it would have to free the passed in big integers (if so requested)
-		Mrational* _rational=_getRational(_numerator,_denominator,M_LD_NAN,true); // free num/den when failing to bind
-		free_biginteger(_numerator,owner);free_biginteger(_denominator,owner);
-		return _getRationalValue(_rational,owner); // when failing to bind _rational to a value, free it as well
+		Mrational* _rational=owned_rational(_getRational(_numerator,_denominator,M_LD_NAN,true),owner); // free num/den when failing to bind
+		FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner);
+		return _getValueOfRational(disowned_rational(_rational,owner)); // when failing to bind _rational to a value, free it as well
 	}
 	// if one of them is a rational do a rational division
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		if(_value1->type!=VT_RATIONAL)OWNED(_rational1,owner);else if(_value2->type!=VT_RATIONAL)OWNED(_rational2,owner);	
-		Mrational* _quotientRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner);	
+		Mrational* _quotientRational=owned_rational(_getRationalQuotient(_rational1,_rational2),owner); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
 		Mvalue* _quotientValue=NULL;
 		if(_quotientRational){
 			if(_value1->type==VT_DECIMAL&&_value2->type==VT_DECIMAL){
-				_quotientValue=_getDecimalValue((Mdecimal*)OWNED(_getRationalDecimal(_quotientRational),owner),owner);
-				free_rational(_quotientRational,owner);
+				_quotientValue=_getValueOfDecimal(_getRationalDecimal(_quotientRational));
+				FREE_RATIONAL(_quotientRational,owner);
 			}else
-				_quotientValue=_getRationalValue(_quotientRational,owner);
+				_quotientValue=_getValueOfRational(disowned_rational(_quotientRational,owner));
 		}
 		return _quotientValue;
 	}
 	// if either is a decimal, compute the quotient decimal
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
-		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
+		if(_value1->type!=VT_DECIMAL)owned_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)owned_decimal(_decimal2,owner); 
 		// after adding the two rationals we do not need the newly created rationals anymore		
-		Mdecimal* _divideDecimal=(Mdecimal*)OWNED(_getDecimalQuotient(_decimal1,_decimal2),owner); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
-		return _getDecimalValue(_divideDecimal,owner);
+		Mdecimal* _divideDecimal=owned_decimal(_getDecimalQuotient(_decimal1,_decimal2),owner); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getValueOfDecimal(disowned_decimal(_divideDecimal,owner));
 	}
 	// if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
@@ -5974,19 +5985,19 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
 		// ASSERT both integers are considered valid (i.e. not invalid)
-		Mbiginteger *_biginteger1=(smallinteger1?(Mbiginteger*)OWNED(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
-		Mbiginteger *_biginteger2=(smallinteger2?(Mbiginteger*)OWNED(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose()){outputBiginteger("Integer dividing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
 			_integerquotientBiginteger=__biginteger();
 			if(_integerquotientBiginteger&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_integerquotientBiginteger),NULL)!=MP_OKAY)
-			{free_biginteger(_integerquotientBiginteger,owner);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			{FREE_BIGINTEGER(_integerquotientBiginteger,owner);_integerquotientBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer quotient: '",_integerquotientBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1,owner);
-		if(smallinteger2)free_biginteger(_biginteger2,owner);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -5995,12 +6006,12 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 			long long llintegerquotient=getBigintegerInteger(_integerquotientBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
 			if(llintegerquotient!=M_LL_INVALID){
-				free_biginteger(_integerquotientBiginteger,owner);
+				FREE_BIGINTEGER(_integerquotientBiginteger,owner);
 				return _getIntegerValue(llintegerquotient);
 			}
 			outputWarning("Small integer integer quotient out of range, will continue using big integer integer quotient.");
 		}
-		return _getBigintegerValue(_integerquotientBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_integerquotientBiginteger,owner));
 	}
 	/* replacing:
 	// if both are integers, the result should be integer as well!!!
@@ -6019,16 +6030,16 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 				if(_integerdivideBiginteger){
 					Mbiginteger* _integerremainderBiginteger=__biginteger();
 					if(_integerremainderBiginteger){
-						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerdivideBiginteger);_integerdivideBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-						free_biginteger(_integerremainderBiginteger);
+						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_integerdivideBiginteger);_integerdivideBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+						FREE_BIGINTEGER(_integerremainderBiginteger);
 					}
 				}else 
 					outputError("Failed to create the integer divide result big integer");
 			}
 		}else 
 			outputError("Failed to create two helper big integers");
-		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
-		return _getBigintegerValue(_integerdivideBiginteger,true);
+		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getValueOfBiginteger(disowned_biginteger(_integerdivideBiginteger,true);
 	}
 	*/
 	// MDH@28OCT2019: copied over from divide() and adjusted to return an integer
@@ -6038,23 +6049,23 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 		if(amVerbose()){outputRational("Determining the integer part of dividing rational '",_rational1,"'");outputRational(" by '",_rational2,"'.\n");}
 		Mrational* _quotientRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
 		if(amVerbose())outputRational("Quotient: '",_quotientRational,"'.\n");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner); // after dividing the two rationals we do not need the newly created rationals anymore
 		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
 		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
 		if(!_quotientRational)return NULL;
-		Mbiginteger* _rationalInteger=(Mbiginteger*)OWNED(_getRationalInteger(_quotientRational,true,true),owner);
-		free_rational(_quotientRational,owner); // only used for temporary storage of the division rational
-		return _getBigintegerValue(_rationalInteger,owner);
+		Mbiginteger* _rationalInteger=owned_biginteger(_getRationalInteger(_quotientRational,true,true),owner);
+		FREE_RATIONAL(_quotientRational,owner); // only used for temporary storage of the division rational
+		return _getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner));
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
 		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_divideDecimal)return NULL;
-		Mdecimal* _decimalInteger=(Mdecimal*)OWNED(_getDecimalInteger(_divideDecimal,true,true),owner);
-		free_decimal(_divideDecimal,owner); // only used for temporary storage of the division result
-		return _getDecimalValue(_decimalInteger,owner);
+		Mdecimal* _decimalInteger=owned_decimal(_getDecimalInteger(_divideDecimal,true,true),owner);
+		FREE_DECIMAL(_divideDecimal,owner); // only used for temporary storage of the division result
+		return _getValueOfDecimal(disowned_decimal(_decimalInteger,owner));
 	}
 	// MDH@28OCT2019: if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
@@ -6092,20 +6103,20 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 		bool invalidinteger1=(smallinteger1&&_value1->value._integer->ll==M_LL_INVALID),invalidinteger2=(smallinteger2&&_value2->value._integer->ll==M_LL_INVALID);
 		if(invalidinteger1||invalidinteger2)return _getIntegerValue(M_LL_INVALID); // if either integer is invalid return an invalid integer (which per definition will be small)
 		// ASSERT both integers are considered valid (i.e. not invalid)
-		Mbiginteger *_biginteger1=(smallinteger1?(Mbiginteger*)OWNED(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
-		Mbiginteger *_biginteger2=(smallinteger2?(Mbiginteger*)OWNED(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
+		Mbiginteger *_biginteger1=(smallinteger1?owned_biginteger(_getBiginteger(_value1->value._integer->ll),owner):_value1->value._biginteger);
+		Mbiginteger *_biginteger2=(smallinteger2?owned_biginteger(_getBiginteger(_value2->value._integer->ll),owner):_value2->value._biginteger);
 		// replacing: Mbiginteger *_biginteger1=_getValueBiginteger(_value1),*_biginteger2=_getValueBiginteger(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_biginteger1&&_biginteger2){
 			if(amVerbose())
 				{outputBiginteger("Moduloing big integers '",_biginteger1,"'");outputBiginteger(" and '",_biginteger2,"'");}
-			_moduloBiginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
+			_moduloBiginteger=owned_biginteger(__biginteger(),owner);
 			if(_moduloBiginteger&&mp_div(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),NULL,MP_INT_POINTER(_moduloBiginteger))!=MP_OKAY)
-			{free_biginteger(_moduloBiginteger,owner);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+			{FREE_BIGINTEGER(_moduloBiginteger,owner);_moduloBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
 			if(amVerbose()){outputBiginteger(" - Integer division remainder: '",_moduloBiginteger,"'.\n");}
 		}else
 			outputError("Failed to convert a small integer to a big integer");
-		if(smallinteger1)free_biginteger(_biginteger1,owner);
-		if(smallinteger2)free_biginteger(_biginteger2,owner);
+		if(smallinteger1)FREE_BIGINTEGER(_biginteger1,owner);
+		if(smallinteger2)FREE_BIGINTEGER(_biginteger2,owner);
 		// MDH@24OCT2019: now we're going to try to convert the sum back to an integer if we can
 		//                but if we can't don't
 		if(smallinteger1||smallinteger2){ // we could decide to try to keep the value in range if at least one of the integers is small (instead of demanding both are small integers)
@@ -6113,10 +6124,10 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 			if(!_moduloBiginteger)return _getIntegerValue(M_LL_INVALID);
 			long long llmodulo=getBigintegerInteger(_moduloBiginteger); // will return M_LL_INVALID when _sumBiginteger equals NULL (which we want to exclude)
 			// if we do NOT have a sum big integer or the sum big integer is in range ()
-			if(llmodulo!=M_LL_INVALID){free_biginteger(_moduloBiginteger,owner);return _getIntegerValue(llmodulo);}
+			if(llmodulo!=M_LL_INVALID){FREE_BIGINTEGER(_moduloBiginteger,owner);return _getIntegerValue(llmodulo);}
 			outputWarning("Small integer quotient remainder out of range, will continue using big integer quotient remainder.");
 		}
-		return _getBigintegerValue(_moduloBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_moduloBiginteger,owner));
 	}
 	/* replacing:
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER){
@@ -6134,43 +6145,43 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 				if(_integerremainderBiginteger){
 					Mbiginteger *_integerdivideBiginteger=__biginteger();
 					if(_integerdivideBiginteger){
-						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){free_biginteger(_integerremainderBiginteger);_integerremainderBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
-						free_biginteger(_integerdivideBiginteger);
+						if(mp_div(_biginteger1,_biginteger2,_integerdivideBiginteger,_integerremainderBiginteger)!=MP_OKAY){FREE_BIGINTEGER(_integerremainderBiginteger);_integerremainderBiginteger=NULL;} // _dmul replaced by _getDecimalProduct which should be able to multiply any two decimals (not just the pure decimals)
+						FREE_BIGINTEGER(_integerdivideBiginteger);
 					}
 				}
 			}
 		}
-		if(_value1->type!=VT_BIGINTEGER)free_biginteger(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)free_biginteger(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
-		return _getBigintegerValue(_integerremainderBiginteger,true);
+		if(_value1->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger1);else if(_value2->type!=VT_BIGINTEGER)FREE_BIGINTEGER(_biginteger2); // after adding the two rationals we do not need the newly created rationals anymore
+		return _getValueOfBiginteger(disowned_biginteger(_integerremainderBiginteger,true);
 	}
 	*/
 	// MDH@28OCT2019: copied over from integerdivide() and adjusted to return the remainder
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		Mrational *_rational1=getValueRational(_value1),*_rational2=getValueRational(_value2);
-		if(_value1->type!=VT_RATIONAL)OWNED(_rational1,owner);else if(_value2->type!=VT_RATIONAL)OWNED(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)owned_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)owned_rational(_rational2,owner);
 		if(amVerbose()){outputRational("Determining the remainder of dividing rational '",_rational1,"'");outputRational(" by '",_rational2,"'.\n");}
-		Mrational* _quotientRational=_getRationalQuotient(_rational1,_rational2); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
+		Mrational* _quotientRational=owned_rational(_getRationalQuotient(_rational1,_rational2),owner); // _qdivide replaced by _getRationalQuotient (as defined in Mrational.h/c)
 		if(amVerbose())outputRational("Quotient: '",_quotientRational,"'.\n");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);else if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);else if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		// after dividing the two rationals we do not need the newly created rationals anymore
 		// we're supposed to return the big integer by dividing the numerator by the denominator and forgetting the remainder
 		// this means that we can reuse _getRationalInteger passing in _divisionRational and telling it to return the truncated integer
 		if(!_quotientRational)return NULL;
-		Mbiginteger* _rationalInteger=(Mbiginteger*)OWNED(_getRationalInteger(_quotientRational,true,true),owner);
-		free_rational(_quotientRational,owner); // only used for temporary storage of the division rational
+		Mbiginteger* _rationalInteger=owned_biginteger(_getRationalInteger(_quotientRational,true,true),owner);
+		FREE_RATIONAL(_quotientRational,owner); // only used for temporary storage of the division rational
 		if(!_rationalInteger)return NULL;
-		return subtract(_value1,multiply(_value2,_getBigintegerValue(_rationalInteger,owner))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
+		return subtract(_value1,multiply(_value2,_getValueOfBiginteger(disowned_biginteger(_rationalInteger,owner)))); // it's easiest to simply subtract the result from the first value NOTE the intermediate _getBigintegerValue itself will never be bound, so _rationalInteger will be released when the value wrapper is by the GC
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		Mdecimal *_decimal1=getValueDecimal(_value1),*_decimal2=getValueDecimal(_value2); // OOPS careful here, _getValueDecimal would make a copy which we do not want here!!!!
 		if(_value1->type!=VT_DECIMAL)OWNED(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)OWNED(_decimal2,owner); 
 		Mdecimal* _divideDecimal=_getDecimalQuotient(_decimal1,_decimal2); // _ddiv now replaced by _getDecimalQuotient which should be able to divide any two decimals not just the pure once!!!!!
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);else if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner); // after adding the two rationals we do not need the newly created rationals anymore
 		if(!_divideDecimal)return NULL;
-		Mdecimal* _decimalInteger=(Mdecimal*)OWNED(_getDecimalInteger(_divideDecimal,true,true),owner);
-		free_decimal(_divideDecimal,owner); // only used for temporary storage of the division result
+		Mdecimal* _decimalInteger=owned_decimal(_getDecimalInteger(_divideDecimal,true,true),owner);
+		FREE_DECIMAL(_divideDecimal,owner); // only used for temporary storage of the division result
 		if(!_decimalInteger)return NULL;
-		return subtract(_value1,multiply(_value2,_getDecimalValue(_decimalInteger,owner)));
+		return subtract(_value1,multiply(_value2,_getValueOfDecimal(disowned_decimal(_decimalInteger,owner))));
 	}
 	// MDH@28OCT2019: if either is a real
 	if(_value1->type==VT_FLOAT||_value2->type==VT_FLOAT){
@@ -6200,15 +6211,15 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 		return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _xorbiginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
+		Mbiginteger* _xorbiginteger=owned_biginteger(__biginteger(),owner);
 		if(_xorbiginteger){
 			// creating two intermediate big integers that need to be freed asap
-			Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-			Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+			Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+			Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 			if(_biginteger1&&_biginteger2&&mp_xor(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_xorbiginteger))!=MP_OKAY)
-			{free_biginteger(_xorbiginteger,owner);_xorbiginteger=NULL;}
-			free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
-			return _getBigintegerValue(_xorbiginteger,owner);
+			{FREE_BIGINTEGER(_xorbiginteger,owner);_xorbiginteger=NULL;}
+			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+			return _getValueOfBiginteger(disowned_biginteger(_xorbiginteger,owner));
 		}else
 			outputError("Failed to create the xor result big integer");
 	}
@@ -6224,15 +6235,15 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseand);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _bitwiseandbiginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
+		Mbiginteger* _bitwiseandbiginteger=owned_biginteger(__biginteger(),owner);
 		if(_bitwiseandbiginteger){
 			// creating two intermediate big integers that need to be freed asap
-			Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-			Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+			Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+			Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 			if(_biginteger1&&_biginteger2&&mp_and(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseandbiginteger))!=MP_OKAY)
-			{free_biginteger(_bitwiseandbiginteger,owner);_bitwiseandbiginteger=NULL;}
-			free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
-			return _getBigintegerValue(_bitwiseandbiginteger,owner);
+			{FREE_BIGINTEGER(_bitwiseandbiginteger,owner);_bitwiseandbiginteger=NULL;}
+			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+			return _getValueOfBiginteger(disowned_biginteger(_bitwiseandbiginteger,owner));
 		}else
 			outputError("Failed to create the bitwise and result big integer");
 	}
@@ -6249,15 +6260,15 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 	return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
-		Mbiginteger* _bitwiseorbiginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
+		Mbiginteger* _bitwiseorbiginteger=owned_biginteger(__biginteger(),owner);
 		if(_bitwiseorbiginteger){
 			// creating two intermediate big integers that need to be freed asap
-			Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-			Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+			Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+			Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 			if(_biginteger1&&_biginteger2&&mp_or(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2),MP_INT_POINTER(_bitwiseorbiginteger))!=MP_OKAY)
-			{free_biginteger(_bitwiseorbiginteger,owner);_bitwiseorbiginteger=NULL;}
-			free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
-			return _getBigintegerValue(_bitwiseorbiginteger,owner);
+			{FREE_BIGINTEGER(_bitwiseorbiginteger,owner);_bitwiseorbiginteger=NULL;}
+			FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+			return _getValueOfBiginteger(disowned_biginteger(_bitwiseorbiginteger,owner));
 		}else
 			outputError("Failed to create the bitwise or result big integer");
 	}
@@ -6278,11 +6289,11 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _logicalandbiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		if(_biginteger1&&_biginteger2)_logicalandbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_YES||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_YES?0:1); // if either is zero, the result is zero otherwise 1
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
-		return _getBigintegerValue(_logicalandbiginteger,owner);
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+		return _getValueOfBiginteger(disowned_biginteger(_logicalandbiginteger,owner));
 	}	
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -6299,11 +6310,11 @@ Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _logicalorbiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		if(_biginteger1&&_biginteger2)_logicalorbiginteger=_getBiginteger(mp_iszero(MP_INT_POINTER(_biginteger1))==MP_NO||mp_iszero(MP_INT_POINTER(_biginteger2))==MP_NO?1:0); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
-		return _getBigintegerValue(_logicalorbiginteger,owner);
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
+		return _getValueOfBiginteger(disowned_biginteger(_logicalorbiginteger,owner));
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 	}else
@@ -6333,24 +6344,24 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,shiftleftinteger));
 	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,shiftleftinteger));
 	if(_value1->type==VT_BIGINTEGER){
-		Mbiginteger* _shiftleftBiginteger=(Mbiginteger*)OWNED(_getBigintegerCopy(_value1->value._biginteger),owner); // make a copy of the big integer to shift left
+		Mbiginteger* _shiftleftBiginteger=owned_biginteger(_getBigintegerCopy(_value1->value._biginteger),owner); // make a copy of the big integer to shift left
 		if(_shiftleftBiginteger){
 			if((shiftleftinteger<0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),shiftleftinteger,MP_INT_POINTER(_shiftleftBiginteger)))!=MP_OKAY){
-				free_biginteger(_shiftleftBiginteger,owner);_shiftleftBiginteger=NULL;
+				FREE_BIGINTEGER(_shiftleftBiginteger,owner);_shiftleftBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the left.\n");			
 			}else 
 				outputError("Failed to shift left a big integer");
 		}else
 			outputError("Failed to create the shift left result big integer");
-		return _getBigintegerValue(_shiftleftBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_shiftleftBiginteger,owner));
 	}
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
 		Mrational* _shiftleftRational=NULL;
-		Mrational* _rational1=(Mrational*)OWNED(_getValueRational(_value1),owner);
+		Mrational* _rational1=owned_rational(_getValueRational(_value1),owner);
 		if(_rational1){
 			// shifting to the right means dividing the rational by 2 the given number of times but this means doubling the denominator
 			// i.e. we should never divide because we could end up with zero (and loose the precision of exact computations)
-			_shiftleftRational=(Mrational*)OWNED(_getRationalCopy(_rational1),owner);
+			_shiftleftRational=owned_rational(_getRationalCopy(_rational1),owner);
 			if(_shiftleftRational){
 				///if(amVerbose())
 				outputRational("Rational shift left copy: '",_shiftleftRational,"'.\n");
@@ -6358,35 +6369,35 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 					// multiply the denominator by 2 shiftleftinteger times
 					if(!_shiftleftRational->den)_shiftleftRational->den=_getBiginteger(1); // force having a non NULL denominator before trying to shift it
 					if(_shiftleftRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftleftRational->den),-shiftleftinteger,MP_INT_POINTER(_shiftleftRational->den))!=MP_OKAY){
-						free_rational(_shiftleftRational,owner);_shiftleftRational=NULL;
+						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
 						outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftleftRational){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational,owner);}
 				}else{ 
 					if(mp_mul_2d(MP_INT_POINTER(_shiftleftRational->num),shiftleftinteger,MP_INT_POINTER(_shiftleftRational->num))!=MP_OKAY){
-						free_rational(_shiftleftRational,owner);_shiftleftRational=NULL;
+						FREE_RATIONAL(_shiftleftRational,owner);_shiftleftRational=NULL;
 						outputError("Failed to double a rational");
 					}
 				}
 				if(_shiftleftRational){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational,owner);}
 			}else 
 				outputError("Failed to copy a rational");
-			if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);
+			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		}else 
 			outputError("Failed to convert a decimal to a rational");
-		return _getRationalValue(_shiftleftRational,owner);
+		return _getValueOfRational(disowned_rational(_shiftleftRational,owner));
 	}
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
 		// similar approach as with a rational, except decimals have a shiftl and shiftr method
-		Mdecimal* _shiftleftDecimal=(Mdecimal*)OWNED(_getDecimalCopy(_value1->value._decimal),owner);
+		Mdecimal* _shiftleftDecimal=owned_decimal(_getDecimalCopy(_value1->value._decimal),owner);
 		if(_shiftleftDecimal){
 			uint32_t status=0;
 			if(_shiftleftDecimal>0)mpd_qshiftr(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,shiftleftinteger,&status);else mpd_qshiftl(_shiftleftDecimal->mpd,_shiftleftDecimal->mpd,-shiftleftinteger,&status);
-			if((status&0xEFBF)!=0){free_decimal(_shiftleftDecimal,owner);_shiftleftDecimal=NULL;outputError("Failed to shift a decimal to the left");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftleftDecimal,owner);_shiftleftDecimal=NULL;outputError("Failed to shift a decimal to the left");}
 		}else 
 			outputError("Failed to copy a decimal");
-		return _getDecimalValue(_shiftleftDecimal,owner);
+		return _getValueOfDecimal(disowned_decimal(_shiftleftDecimal,owner));
 	}
 	return NULL;
 }
@@ -6403,16 +6414,16 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	if(_value1->type==VT_INTEGER)return _getIntegerValue(integerShift(_value1->value._integer->ll,-shiftrightinteger));
 	if(_value1->type==VT_FLOAT)return _getFloatValue(ldShift(_value1->value._float->ld,-shiftrightinteger));
 	if(_value1->type==VT_BIGINTEGER){
-		Mbiginteger* _shiftrightBiginteger=(Mbiginteger*)OWNED(_getBigintegerCopy(_value1->value._biginteger),owner); // make a copy of the big integer to shift right
+		Mbiginteger* _shiftrightBiginteger=owned_biginteger(_getBigintegerCopy(_value1->value._biginteger),owner); // make a copy of the big integer to shift right
 		if(_shiftrightBiginteger){
 			if((shiftrightinteger>0?mp_div_2d(MP_INT_POINTER(_value1->value._biginteger),shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger),NULL):mp_mul_2d(MP_INT_POINTER(_value1->value._biginteger),-shiftrightinteger,MP_INT_POINTER(_shiftrightBiginteger)))!=MP_OKAY){
-				free_biginteger(_shiftrightBiginteger,owner);_shiftrightBiginteger=NULL;
+				FREE_BIGINTEGER(_shiftrightBiginteger,owner);_shiftrightBiginteger=NULL;
 				output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_value1->value._biginteger,"' to the right.\n");			
 			}else 
 				outputError("Failed to shift right a big integer");
 		}else
 			outputError("Failed to create the shift right result big integer");
-		return _getBigintegerValue(_shiftrightBiginteger,owner);
+		return _getValueOfBiginteger(disowned_biginteger(_shiftrightBiginteger,owner));
 		/* replacing:
 		// what we shift by should fit in int64_t!!!!
 		if(_value2->type==VT_INTEGER||_value2->value._biginteger->used<=1){
@@ -6421,9 +6432,9 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 				Mbiginteger* _biginteger1=(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger));
 				if(_biginteger1){
 					if(amVerbose()){outputBiginteger("Shifting big integer '",_biginteger1,"' left");output(" by %" PRIi64 ".\n",shr);}
-					if((shr>0?mp_div_2d(_biginteger1,shr,_biginteger1,NULL):mp_mul_2d(_biginteger1,-shr,_biginteger1))==MP_OKAY)return _getBigintegerValue(_biginteger1,true);
+					if((shr>0?mp_div_2d(_biginteger1,shr,_biginteger1,NULL):mp_mul_2d(_biginteger1,-shr,_biginteger1))==MP_OKAY)return _getValueOfBiginteger(disowned_biginteger(_biginteger1,true);
 					output("%s",M_ERROR_PREFIX);outputBiginteger("Failed to shift '",_biginteger1,"' to the right.\n");			
-					free_biginteger(_biginteger1);
+					FREE_BIGINTEGER(_biginteger1);
 				}
 			}
 		}else
@@ -6432,11 +6443,11 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 	}
 	if(_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0)){
 		Mrational* _shiftrightRational=NULL;
-		Mrational* _rational1=(Mrational*)OWNED(_getValueRational(_value1),owner);
+		Mrational* _rational1=owned_rational(_getValueRational(_value1),owner);
 		if(_rational1){
 			// shifting to the right means dividing the rational by 2 the given number of times but this means doubling the denominator
 			// i.e. we should never divide because we could end up with zero (and loose the precision of exact computations)
-			_shiftrightRational=(Mrational*)OWNED(_getRationalCopy(_rational1),owner);
+			_shiftrightRational=owned_rational(_getRationalCopy(_rational1),owner);
 			if(_shiftrightRational){
 				///if(amVerbose())
 				outputRational("Rational shift right copy: '",_shiftrightRational,"'.\n");
@@ -6444,35 +6455,35 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 					// multiply the denominator by 2 shiftrightinteger times
 					if(!_shiftrightRational->den)_shiftrightRational->den=OWNED(_getBiginteger(1),owner); // force having a non NULL denominator before trying to shift it
 					if(_shiftrightRational->den==NULL||mp_mul_2d(MP_INT_POINTER(_shiftrightRational->den),shiftrightinteger,MP_INT_POINTER(_shiftrightRational->den))!=MP_OKAY){
-						free_rational(_shiftrightRational,owner);_shiftrightRational=NULL;
+						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
 						outputError("Failed to half a rational");
 					}
 					// force normalization
 					if(_shiftrightRational){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational,owner);}
 				}else{ // naughty boy (or girl for that matter)...
 					if(mp_mul_2d(MP_INT_POINTER(_shiftrightRational->num),-shiftrightinteger,MP_INT_POINTER(_shiftrightRational->num))!=MP_OKAY){
-						free_rational(_shiftrightRational,owner);_shiftrightRational=NULL;
+						FREE_RATIONAL(_shiftrightRational,owner);_shiftrightRational=NULL;
 						outputError("Failed to double a rational");
 					}
 				}
 				if(_shiftrightRational){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational,owner);}
 			}else 
 				outputError("Failed to copy a rational");
-			if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);
+			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		}else 
 			outputError("Failed to convert a decimal to a rational");
-		return _getRationalValue(_shiftrightRational,owner);
+		return _getValueOfRational(disowned_rational(_shiftrightRational,owner));
 	}
 	if(_value1->type==VT_DECIMAL){ // a pure decimal 
 		// similar approach as with a rational, except decimals have a shiftl and shiftr method
-		Mdecimal* _shiftrightDecimal=(Mdecimal*)OWNED(_getDecimalCopy(_value1->value._decimal),owner);
+		Mdecimal* _shiftrightDecimal=owned_decimal(_getDecimalCopy(_value1->value._decimal),owner);
 		if(_shiftrightDecimal){
 			uint32_t status=0;
 			if(_shiftrightDecimal>0)mpd_qshiftr(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,shiftrightinteger,&status);else mpd_qshiftl(_shiftrightDecimal->mpd,_shiftrightDecimal->mpd,-shiftrightinteger,&status);
-			if((status&0xEFBF)!=0){free_decimal(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;outputError("Failed to shift a decimal to the right");}
+			if((status&0xEFBF)!=0){FREE_DECIMAL(_shiftrightDecimal,owner);_shiftrightDecimal=NULL;outputError("Failed to shift a decimal to the right");}
 		}else 
 			outputError("Failed to copy a decimal");
-		return _getDecimalValue(_shiftrightDecimal,owner);
+		return _getValueOfDecimal(disowned_decimal(_shiftrightDecimal,owner));
 	}
 	return NULL;
 }
@@ -6487,48 +6498,48 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getIntegerValue(llsmallerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=(Mrational*)OWNED(_getValueRational(_value1),owner)
-		         ,*_rational2=(Mrational*)OWNED(_getValueRational(_value2),owner);
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
+		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
-			Mrational* _rationalDifference=(Mrational*)OWNED(_getRationalDifference(_rational1,_rational2),owner);
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than another rational: '",_rationalDifference,"'.\n");
 				result=isRationalNegative(_rationalDifference);
-				free_rational(_rationalDifference,owner);
+				FREE_RATIONAL(_rationalDifference,owner);
 			}else
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=(Mdecimal*)OWNED(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=(Mdecimal*)OWNED(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
+		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
-			Mdecimal* _decimalDifference=_getDecimalDifference(_decimal1,_decimal2);
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())
 					outputDecimal("Difference in determining whether a decimal is smaller than another decimal: '",_decimalDifference,"'.\n");
 				result=isDecimalNegative(_decimalDifference);
-				free_decimal(_decimalDifference,owner);
+				FREE_DECIMAL(_decimalDifference,owner);
 			}else
 				outputError("Failed to compute the difference of two decimals");
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner);
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6541,46 +6552,46 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long lllargerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getIntegerValue(lllargerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=(Mrational*)OWNED(_getValueRational(_value1),owner)
-		         ,*_rational2=(Mrational*)OWNED(_getValueRational(_value2),owner);
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
+		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
-			Mrational* _rationalDifference=(Mrational*)OWNED(_getRationalDifference(_rational1,_rational2),owner);
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is larger than another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalNegative(_rationalDifference));
-				free_rational(_rationalDifference,owner);
+				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=(Mdecimal*)OWNED(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=(Mdecimal*)OWNED(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
+		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
-			Mdecimal* _decimalDifference=(Mdecimal*)OWNED(_getDecimalDifference(_decimal1,_decimal2),owner);
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is larger than another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalNegative(_decimalDifference));
-				free_decimal(_decimalDifference,owner);
+				FREE_DECIMAL(_decimalDifference,owner);
 			}else
 				outputError("Failed to compute the difference of two decimals");
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner);
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6593,48 +6604,48 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long lllargerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getIntegerValue(lllargerthanorequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=(Mrational*)OWNED(_getValueRational(_value1),owner)
-		         ,*_rational2=(Mrational*)OWNED(_getValueRational(_value2),owner);
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
+		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
-			Mrational* _rationalDifference=(Mrational*)OWNED(_getRationalDifference(_rational1,_rational2),owner);
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is larger than or equal to another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalNegative(_rationalDifference));
-				free_rational(_rationalDifference,owner);
+				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=(Mdecimal*)OWNED(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=(Mdecimal*)OWNED(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
+		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
-			Mdecimal* _decimalDifference=(Mdecimal*)OWNED(_getDecimalDifference(_decimal1,_decimal2),owner);
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is larger than or equal to another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalNegative(_decimalDifference));
-				free_decimal(_decimalDifference,owner);
+				FREE_DECIMAL(_decimalDifference,owner);
 			}else
 				outputError("Failed to compute the difference of two decimals");
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner);
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6648,48 +6659,48 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llunequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getIntegerValue(llunequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=(Mrational*)OWNED(_getValueRational(_value1),owner)
-		         ,*_rational2=(Mrational*)OWNED(_getValueRational(_value2),owner);
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
+		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
-			Mrational* _rationalDifference=(Mrational*)OWNED(_getRationalDifference(_rational1,_rational2),owner);
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is not equal to another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalZero(_rationalDifference)); 
-				free_rational(_rationalDifference,owner);
+				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=(Mdecimal*)OWNED(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=(Mdecimal*)OWNED(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
+		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
-			Mdecimal* _decimalDifference=(Mdecimal*)OWNED(_getDecimalDifference(_decimal1,_decimal2),owner);
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is not equal to another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalZero(_decimalDifference));
-				free_decimal(_decimalDifference,owner);
+				FREE_DECIMAL(_decimalDifference,owner);
 			}else
 				outputError("Failed to compute the difference of two decimals");
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner);
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6703,47 +6714,47 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){		Mbiginteger* _equaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getIntegerValue(llequalto);
 	}
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=(Mrational*)OWNED(_getValueRational(_value1),owner)
-		         ,*_rational2=(Mrational*)OWNED(_getValueRational(_value2),owner);
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
+		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
-			Mrational* _rationalDifference=(Mrational*)OWNED(_getRationalDifference(_rational1,_rational2),owner);
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is equal to another rational: '",_rationalDifference,"'.\n");
 				result=isRationalZero(_rationalDifference);
-				free_rational(_rationalDifference,owner);
+				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=(Mdecimal*)OWNED(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=(Mdecimal*)OWNED(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
+		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
-			Mdecimal* _decimalDifference=(Mdecimal*)OWNED(_getDecimalDifference(_decimal1,_decimal2),owner);
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is equal to another decimal: '",_decimalDifference,"'.\n");
 				result=isDecimalZero(_decimalDifference);
-				free_decimal(_decimalDifference,owner);
+				FREE_DECIMAL(_decimalDifference,owner);
 			}else
 				outputError("Failed to compute the difference of two decimals");
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner);
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6756,48 +6767,48 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
-		Mbiginteger* _biginteger1=(Mbiginteger*)OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _biginteger2=(Mbiginteger*)OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
-		free_biginteger(_biginteger1,owner);free_biginteger(_biginteger2,owner); // free the created copies
+		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
 		return _getIntegerValue(llsmallerthanorequalto);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
-		Mrational *_rational1=(Mrational*)OWNED(_getValueRational(_value1),owner)
-		         ,*_rational2=(Mrational*)OWNED(_getValueRational(_value2),owner);
+		Mrational *_rational1=owned_rational(_getValueRational(_value1),owner)
+		         ,*_rational2=owned_rational(_getValueRational(_value2),owner);
 		if(_rational1&&_rational2){
-			Mrational* _rationalDifference=(Mrational*)OWNED(_getRationalDifference(_rational1,_rational2),owner);
+			Mrational* _rationalDifference=owned_rational(_getRationalDifference(_rational1,_rational2),owner);
 			if(_rationalDifference){
 				if(amVerbose())outputRational("Difference in determining whether a rational is smaller than or equal to another rational: '",_rationalDifference,"'.\n");
 				result=not(isRationalPositive(_rationalDifference)); // i.e. if difference is NOT positive, we should return M_TRUE
-				free_rational(_rationalDifference,owner);
+				FREE_RATIONAL(_rationalDifference,owner);
 			}else 
 				outputError("Failed to compute the difference of two rationals");
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
-		if(_value1->type!=VT_RATIONAL)free_rational(_rational1,owner);
-		if(_value2->type!=VT_RATIONAL)free_rational(_rational2,owner);
+		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
+		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
 		return _getIntegerValue(result);
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
 		long long result=M_LL_INVALID;
-		Mdecimal *_decimal1=(Mdecimal*)OWNED(_getValueDecimal(_value1),owner)
-		        ,*_decimal2=(Mdecimal*)OWNED(_getValueDecimal(_value2),owner);
+		Mdecimal *_decimal1=owned_decimal(_getValueDecimal(_value1),owner)
+		        ,*_decimal2=owned_decimal(_getValueDecimal(_value2),owner);
 		if(_decimal1&&_decimal2){
-			Mdecimal* _decimalDifference=(Mdecimal*)OWNED(_getDecimalDifference(_decimal1,_decimal2),owner);
+			Mdecimal* _decimalDifference=owned_decimal(_getDecimalDifference(_decimal1,_decimal2),owner);
 			if(_decimalDifference){
 				if(amVerbose())outputDecimal("Difference in determining whether a decimal is smaller than or equal to another decimal: '",_decimalDifference,"'.\n");
 				result=not(isDecimalPositive(_decimalDifference));
-				free_decimal(_decimalDifference,owner);
+				FREE_DECIMAL(_decimalDifference,owner);
 			}else
 				outputError("Failed to compute the difference of two decimals");
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
-		if(_value1->type!=VT_DECIMAL)free_decimal(_decimal1,owner);
-		if(_value2->type!=VT_DECIMAL)free_decimal(_decimal2,owner);
+		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
+		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
 		return _getIntegerValue(result);
 	}
 	return NULL;
@@ -6929,7 +6940,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 			if(_multFactorList->numberOfElements>0){
 				// initialize the start integer range start and end list element
 				// endIntegerRangeListelement=(_value2->type==VT_LIST?_value2->value._list->_first:NULL);
-				_resultList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner);
+				_resultList=owned_list(_getListOfType(VT_UNDEFINED),owner);
 				if(_resultList){
 					// iterating over all elements in _integerRangeList
 					Mvalue *firstRangeValue=startDeltaValue,*incrementValue=_getIntegerValue(1); // MDH@03MAR2020: no need to use assign here because firstRangeValue is temporary
@@ -6960,7 +6971,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 						}
 						if(!_resultList)break;
 						// append _pointList to the result list
-						if(appendedToList(_resultList,owner,_getValueOfList(_pointList,owner),M_LL_INVALID)<0)
+						if(appendedToList(_resultList,owner,_getValueOfList(disowned_list(_pointList,owner)),M_LL_INVALID)<0)
 						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						_integerRangeListelement=_integerRangeListelement->_next;
 						firstRangeValue=add(firstRangeValue,incrementValue); // increment the first range value (which is the X offset so to speak from the first dimension)
@@ -6971,12 +6982,12 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 				_resultList=_integerRangeList;
 			FREE_LIST(_multFactorList,owner);
 		}
-		return _getValueOfList(_resultList,owner);
+		return _getValueOfList(disowned_list(_resultList,owner));
 		// replacing: return _appliedToList(_value1->value._list,_value2,Mrange);
 	}
 	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange);
 	// now we're dealing with scalars
-	return _getValueOfList((Mlist*)OWNED(_getScalarRangeList(_value1,_value2,&up),owner),owner);
+	return _getValueOfList(_getScalarRangeList(_value1,_value2,&up));
 	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
 }
 
@@ -7062,7 +7073,7 @@ size_t free_formulaelement(Mformulaelement* _formulaelement,Mallocationowner own
 	if(_formulaelement){
 		if(_formulaelement->_next)result+=free_formulaelement(_formulaelement->_next,owner_formulaelement);
 		if(_formulaelement->_operator)FREE_STRING(_formulaelement->_operator,owner_formulaelement);
-		if(_formulaelement->_operand)free_valuereference(_formulaelement->_operand,owner_formulaelement);
+		if(_formulaelement->_operand)FREE_VALUEREFERENCE(_formulaelement->_operand,owner_formulaelement);
 		FREE_DISOWNED_1(_formulaelement,'4',owner_formulaelement);
 		result+=1; // another one
 		// output("FORMULA ELEMENT FREED: %zd:%zd.\n",getAllocationTypeOccupied('4',0),getAllocationTypeFreed('4',0));
@@ -7304,7 +7315,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					_formulaelement->_operand->_value=_result;
 					// MDH@02NOV2019 replacing: assignValue(&(_formulaelement->_operand->_value),_result);
 					// but because _result could be NULL we have to force _name to be NULL just in case 
-					if(_formulaelement->_operand->_name){freeChars(_formulaelement->_operand->_name,owner);_formulaelement->_operand->_name=NULL;}
+					if(_formulaelement->_operand->_name){FREECHARS(_formulaelement->_operand->_name,owner);_formulaelement->_operand->_name=NULL;}
 					// we need to point the formula operand to the next of the consumed formula element, so the consumed formula element won't be used again in computations
 					nextformulaelement=_formulaelement->_next;
 					// point the formula element now storing the result to the next of the consumed formula element
@@ -7312,7 +7323,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					// release the applied operator, and replace it by the successor operator
 					// MDH@14MAY2020: if we make a copy of the next operator we can free the disconnected formula element entirely
 					FREE_STRING(_formulaelement->_operator,owner); // TODO is owner correct?
-					_formulaelement->_operator=OWNED(_getString(string(nextformulaelement->_operator)),owner); // MDH@09JUN2020: do NOT forget to obtain ownership of the next operator
+					_formulaelement->_operator=owned_string(_getString(string(nextformulaelement->_operator)),owner); // MDH@09JUN2020: do NOT forget to obtain ownership of the next operator
 					nextformulaelement->_next=NULL;free_formulaelement(nextformulaelement,owner); // NULL next of the nextformulaelement so it won't free all successive formula elements left to be applied
 					formulaElementCount--;
 					/* replacing:
@@ -7364,9 +7375,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				while(_formulaelement){
 					_valuereference=_formulaelement->_operand;
 					if(amVerboseDebugging()){
-						Mstring* _indexidText=(Mstring*)OWNED(_getValueText(_valuereference->_itemid,false),owner);
-						output("Assignment to %s%s using operator %s!\n",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
-						if(_indexidText)FREE_STRING(_indexidText,owner);
+						Mstring* _indexidText=owned_string(_getValueText(_valuereference->_itemid,false),owner);
+						if(_indexidText){
+							output("Assignment to %s%s using operator %s!\n",_valuereference->_name,(_indexidText?string(_indexidText):""),string(_formulaelement->_operator));
+							FREE_STRING(_indexidText,owner);
+						}
 					}
 					string_shorten(_formulaelement->_operator,1); // cutting off the assignment operator is fine, as we do not need it anymore!!!
 					if(string_length(_formulaelement->_operator)){ // _result will change due to applying the shortcut binary operator
@@ -7381,13 +7394,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					
 					setReferencedValue(_valuereference,_result);
 					
-					if(amVerboseDebugging())
-						outputValue("Stored in the value reference: '",_valuereference->_value,"'.\n");
+					if(amVerboseDebugging())outputValue("Stored in the value reference: '",_valuereference->_value,"'.\n");
 					
 					Mvalue* referencedValue=getReferencedValue(_valuereference);
 					
-					if(amVerboseDebugging())
-						outputValue("Referenced value to use as result: '",referencedValue,"'.\n");
+					if(amVerboseDebugging())outputValue("Referenced value to use as result: '",referencedValue,"'.\n");
 					
 					// MDH@02NOV2019: we still didn't get a change to a list argument so here also we need to prevent copying the list/map
 					_result=referencedValue; // MDH@02NOV2019: replacing: assignValue(&_result,referencedValue); // should we do this???? well, in case the assignment failed!!!
@@ -7408,22 +7419,19 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
-			if(amVerboseDebugging())
-				{outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
+			if(amVerboseDebugging()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
 			
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
-			if(amVerboseDebugging())
-				output("Freeing %zd formula elements.\n",formulaElementCount);
+			if(amVerboseDebugging())output("Freeing %zd formula elements.\n",formulaElementCount);
 			
 			// if(amVerbose())outputAllocationTypeMarks();
 
 			// MDH@14MAY2020 think we shouldn't free formula actually as its pointer is passed to a formula element which is freed eventually:
 			size_t numberOfFormulaElementsFreed=free_formulaelement(formula,owner);
 			
-			if(amVerboseDebugging())
-				output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+			if(amVerboseDebugging())output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
 
 			//*/
 			/* replacing:
@@ -7439,11 +7447,11 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			newline();
 			*/
-			if(amVerbose()&&amDebugging())outputInfo("Formula elements freed.");
+			if(amVerboseDebugging())outputInfo("Formula elements freed.");
 		}else
-		if(amVerbose()&&amDebugging())output("No result of expression '%s' to store.",info);
+		if(amVerboseDebugging())output("No result of expression '%s' to store.",info);
 	}
-	if(amVerbose()&&amDebugging()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
+	if(amVerboseDebugging()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 /**
@@ -7536,10 +7544,11 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputWarning("Failing to create the results list. The results will not be available through the M function!");
 	*/
 
-	Menvironment* _Menvironment=(Menvironment*)OWNED(__environment(),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
+	output("Creating the root environment.\n"); // DEBUG
+	Menvironment* _Menvironment=owned_environment(__environment(),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
 		if(amVerbose())output("M environment created.\n");
-		_Menvironment->_name=SUBOWNED(OWNED(_getChars("M"),owner),1); // TODO why make a dynamic copy???
+		_Menvironment->_name=owned_chars(_getChars("M"),Msubowner(owner,1)); // TODO why make a dynamic copy???
 		if(amVerbose())output("M environment named.\n");
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
 		Mfunctionmap* environmentFunctionMap=CALLOC_1(sizeof(Mfunctionmap),'W',owner);

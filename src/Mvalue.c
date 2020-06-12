@@ -88,6 +88,11 @@ Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool imm
     return NULL; // replacing: return DISOWNED(_variable,owner);
 }/* VALIDATED */
 
+Mlistelement* owned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
+    if(!_listelement)return NULL;
+    owned_listelement(_listelement->_next,owner_listelement);
+    return OWNED(_listelement,owner_listelement);
+}
 Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
     if(!_listelement)return NULL;
     disowned_listelement(_listelement->_next,owner_listelement);
@@ -102,19 +107,6 @@ bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner ow
     }
     return false;
 }/* VALIDATED */
-
-Mlist* __list(char* source,Mallocationowner owner_list){// Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner_list);
-    if(source){
-        _list->_creator=SUBOWNED(owned_chars(_getChars(source),owner_list),1); // replacing: keep disowned, so easy to reown... SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
-        if(!_list->_creator)
-            output("%sFailed to register list creator '%s'.\n",M_ERROR_PREFIX,source);
-        else
-        if(amVerboseDebugging())
-            output("List creator: '%s'.\n",_list->_creator->chars);
-    }
-    return DISOWNED(_list,owner_list);
-}
 
 Mlist* owned_list(Mlist* _list,Mallocationowner owner_list){
     if(!_list)return NULL;
@@ -139,8 +131,27 @@ void free_list(Mlist* _list){
     }
     FREE_1(_list,'L'/*,owner*/);
 }/* VALIDATED */
+Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner owner=getOwner(__LINE__);
+    Mlist* _list=CALLOC_1(sizeof(Mlist),'L',owner);
+    if(source){
+        _list->_creator=owned_chars(_getChars(source),Msubowner(owner,1)); // replacing: keep disowned, so easy to reown... SUBOWNED(OWNED(_getChars(source),owner),1); // MDH@17APR2020 replacing: _strdup(source);
+        if(!_list->_creator)
+            output("%sFailed to register list creator '%s'.\n",M_ERROR_PREFIX,source);
+        else
+        if(amVerboseDebugging())
+            output("List creator: '%s'.\n",_list->_creator->chars);
+    }
+    return disowned_list(_list,owner);
+}
 
+Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
+    if(!_mapelement)return NULL;
+    owned_mapelement(_mapelement->_next,owner_mapelement);
+    owned_variable(_mapelement->_variable,owner_mapelement);
+    return OWNED(_mapelement,owner_mapelement);
+}
 Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
+    if(!_mapelement)return NULL;
     disowned_mapelement(_mapelement->_next,owner_mapelement);
     disowned_variable(_mapelement->_variable,owner_mapelement);
     return DISOWNED(_mapelement,owner_mapelement);
@@ -168,7 +179,12 @@ bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner
     return true;
 }/* VALIDATED */
 
+Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
+    owned_mapelement(_map->_first,Msubowner(owner_map,1));
+    return OWNED(_map,owner_map);
+}
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
+    if(!_map)return NULL;
     disowned_mapelement(_map->_first,owner_map);
     return DISOWNED(_map,owner_map);
 }
@@ -215,11 +231,11 @@ Mallocationowner getValueOwner(){return owner_value;}
 Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* _value=NULL;
     if(!_valueList){
-        _valueList=__list("global value list",owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
+        _valueList=owned_list(__list("global value list"),owner_valueList); // MDH@19MAY2020: _valueList is global and we use 0 as function owner id (which is the rule for module global variables)
         if(!_valueList){outputBug("Failed to create the global value list.");return NULL;}
         // MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
         //                as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
-        if(appendedToList(_valueList,owner_valueList,(Mvalue*)CALLOC_1(sizeof(Mvalue),'U',owner),M_LL_INVALID)<=0){outputBug("Failed to store the global undefined value.");return NULL;}
+        if(appendedToList(_valueList,owner_valueList,(Mvalue*)DISOWNED(CALLOC_1(sizeof(Mvalue),'U',owner),owner),M_LL_INVALID)<=0){outputBug("Failed to store the global undefined value.");return NULL;}
         _valueList->weak=true; // MDH@11NOV2019: from now on a weak list i.e. elements are not added using assignValue but directly
     }
     Mlistelement* _valueListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner_valueListelement); // both pointers NULL
@@ -233,7 +249,9 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
             _valueList->numberOfElements++;
             // MDH@11NOV2019: by remembering the number of elements as index, removing intermediate elements will NOT prevent informing about what element was removed!!!
             _valueListelement->index=_valueList->numberOfElements;
-            if(descriptor)if(amVerbose()&&amDebugging())output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
+            if(descriptor)
+            if(amVerboseDebugging())
+            output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
         }else // couldn't get a new value, so free the value list element immediately
             FREE_DISOWNED_1(_valueListelement,'l',owner);
     }
@@ -376,15 +394,8 @@ Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure){
 }// VALIDATED 
 */
 // MDH@04NOV2019: no matter where the variable originates we can store it so it can be used elsewhere
-Mreference* _getReference(Mvariable* variable){Mallocationowner owner=getOwner(__LINE__);
-    // MDH@11MAR2020: variable can now be NULL
-    Mreference* _reference=CALLOC_1(sizeof(Mreference),'Q',owner);
-    if(_reference){_reference->variable=SUBOWNED(variable,1);if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
-    return DISOWNED(_reference,owner);
-}
-#ifndef __PRODUCTION__
-Mreference* disowned_reference(Mreference* _reference,Mallocationowner owner_reference){return DISOWNED(_reference,owner_reference);}
-#endif
+Mreference* owned_reference(Mreference* _reference,Mallocationowner owner_reference){return DISOWNED(_reference,owner_reference);}
+Mreference* disowned_reference(Mreference* _reference,Mallocationowner owner_reference){return OWNED(_reference,owner_reference);}
 void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
     if(!reference)return;
     if(reference->variable){
@@ -395,8 +406,14 @@ void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
     }
     FREE_1(reference,'Q'/*,owner_reference*/);
 }
+Mreference* _getReference(Mvariable* variable){Mallocationowner owner=getOwner(__LINE__);
+    // MDH@11MAR2020: variable can now be NULL
+    Mreference* _reference=CALLOC_1(sizeof(Mreference),'Q',owner);
+    if(_reference){_reference->variable=SUBOWNED(variable,1);if(variable)_reference->referenceindex=(++variable->referencecount);} // MDH@11MAR2020: if variable is undefined, no reference count we can increment and assign
+    return DISOWNED(_reference,owner);
+}
 
-Mvalue* _getReferenceValue(Mreference* _reference/*,Mallocationowner owner_reference*/){
+Mvalue* _getValueOfReference(Mreference* _reference/*,Mallocationowner owner_reference*/){
     // MDH@19MAY2020: should we check whether _reference is ownable???????
     if(!_reference){outputWarning("No reference to wrap.");return NULL;}
     Mvalue* _referenceValue=__value("reference");
@@ -408,7 +425,7 @@ Mvalue* _getReferenceValue(Mreference* _reference/*,Mallocationowner owner_refer
     return _referenceValue;
 }
 // MDH@26MAY2020: new contract, if NULL is returned _decimal is NOT bound and should be freed if desirable...
-Mvalue* _getDecimalValue(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
+Mvalue* _getValueOfDecimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
     if(!_decimal)return NULL;
     Mvalue* _decimalValue=__value("decimal");
     if(_decimalValue){//////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
@@ -419,7 +436,7 @@ Mvalue* _getDecimalValue(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
     return _decimalValue;
 }/* VALIDATED */
 
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/){
+Mvalue* _getValueOfBiginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/){
     if(!_biginteger)return NULL;
     Mvalue* _bigintegerValue=__value("biginteger");
     if(_bigintegerValue){
@@ -464,7 +481,7 @@ Mvalue* _getCharTextValue(char _c){
 }/* VALIDATED */
 // we can force all listelements to have the same type????
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source){Mallocationowner owner=getOwner(__LINE__);
-    Mlist* _list=__list(source?source:"_getListValue",owner);
+    Mlist* _list=owned_list(__list(source?source:"_getListValue"),owner);
     if(!_list){
         // if(amVerboseDebugging())
             outputError("Failed to create a list.\n");
@@ -1247,14 +1264,14 @@ Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName){
 
 // END MAP STUFF
 
-Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner_rational){
+Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_rational*/){
     if(!_rational)return NULL;
     Mvalue* _rationalValue=__value("rational");
     if(_rationalValue){
         _rationalValue->type=VT_RATIONAL;
-        _rationalValue->value._rational=_rational;
+        _rationalValue->value._rational=(Misdisowned(_rational)?owned_rational(_rational,owner_value_data):_rational);
     }else
-    if(owner_rational.level==0)FREE_RATIONAL(_rational,owner_rational);
+    if(Misdisowned(_rational))free_rational(_rational);
     return _rationalValue;
 }/* VALIDATED */
 
@@ -1368,18 +1385,18 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
         ////outputChar('+');
 		////output("TYPE: %d\n",_value->type);
 		switch(_value->type){
-            case VT_UNDEFINED:valueText=OWNED(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
-			case VT_INTEGER:valueText=OWNED(_getIntegerText(_value->value._integer),owner);break;
-            case VT_BIGINTEGER:valueText=OWNED(_getBigintegerText(_value->value._biginteger),owner);break; // how many characters do we need????
-            case VT_DECIMAL:valueText=OWNED(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
-            case VT_RATIONAL:valueText=OWNED(_getRationalText(_value->value._rational),owner);break;
-			case VT_FLOAT:valueText=OWNED(_getFloatText(_value->value._float),owner);break;
-			case VT_TEXT:valueText=OWNED(_getStringText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
-			case VT_MAP:valueText=OWNED(_getMapText(_value->value._map,true,true,true),owner);break;
-			case VT_LIST:valueText=OWNED(_getListText(_value->value._list),owner);break;
+            case VT_UNDEFINED:valueText=owned_string(_getString(M_UNDEFINED_VALUE_TEXT),owner);break; // calling _getString() will create a new string every time but I think we have to do that because _getValueText() typically returns something that is freed elsewhere
+			case VT_INTEGER:valueText=owned_string(_getIntegerText(_value->value._integer),owner);break;
+            case VT_BIGINTEGER:valueText=owned_string(_getBigintegerText(_value->value._biginteger),owner);break; // how many characters do we need????
+            case VT_DECIMAL:valueText=owned_string(_getDecimalText(_value->value._decimal,false),owner);break; // fixedpoint to obligatory (i.e. e-notation allowed for very big/small (positive) numbers)
+            case VT_RATIONAL:valueText=owned_string(_getRationalText(_value->value._rational),owner);break;
+			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
+			case VT_TEXT:valueText=owned_string(_getStringText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
+			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
+			case VT_LIST:valueText=owned_string(_getListText(_value->value._list),owner);break;
             case VT_TOKEN:
                 { // can't just show the single token because we could have following ones
-                    valueText=OWNED(__string(),owner);
+                    valueText=owned_string(__string(),owner);
                     if(valueText){
                         Mstring* p=valueText;
                         Mtoken* token=_value->value._token;
@@ -1394,7 +1411,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                 break; // we need to return a copy because that copy will be freed typically (and we do not want to free the original now do we?)
 			case VT_REFERENCE:
                 {
-                    valueText=OWNED(__string(),owner);
+                    valueText=owned_string(__string(),owner);
                     if(valueText){
                         Mstring* p=valueText;
                         p=string_append_char(p,M_DEREFERENCE_CHARACTER);
@@ -1424,7 +1441,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                 break;
             case VT_FUNCTION:
                 {
-                    valueText=OWNED(_getString("function"),owner);
+                    valueText=owned_string(_getString("function"),owner);
                     if(valueText){
                         Mstring* p=valueText;
                         Mfunction* function=_value->value._function;
@@ -1453,7 +1470,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                 break;
             case VT_ENVIRONMENT:
                 {
-                    valueText=OWNED(_getString("environment"),owner);
+                    valueText=owned_string(_getString("environment"),owner);
                     if(valueText){
                         Mstring* p=valueText;
                         Menvironment* environment=_value->value._environment;
@@ -1474,10 +1491,10 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
             default:break;
 		}
 	}else // the text we use for an value that is NULL!
-        valueText=OWNED(_getString(M_NULL_VALUE_TEXT),owner);
-    if(_value)if(amAssisting())if(valueText)valueText=OWNED(appendll(string_append_char(valueText,'#'),_value->count),owner); // show the reference count as well
+        valueText=owned_string(_getString(M_NULL_VALUE_TEXT),owner);
+    if(_value)if(amAssisting())if(valueText)valueText=owned_string(appendll(string_append_char(valueText,'#'),_value->count),owner); // show the reference count as well
     /////outputChar('.');
-    return(Mstring*)DISOWNED(valueText?valueText:OWNED(_getUndefinedValueText(),owner),owner);
+    return (valueText?disowned_string(valueText,owner):_getUndefinedValueText());
     /* replacing:
     if(valueText)return valueText;
 	////////if(amVerbose())if(valueText)output("Value text: '%s'.",string(valueText));else output("Value not represented.");
@@ -1490,7 +1507,7 @@ size_t outputValue(const char* const prefix,const Mvalue* const value,const char
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(value){
-        Mstring* _valueText=OWNED(_getValueText(value,false),owner); // free asap
+        Mstring* _valueText=owned_string(_getValueText(value,false),owner); // free asap
         if(_valueText){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
     }else
         written+=outputChar('-');
@@ -1873,16 +1890,17 @@ Menvironment* getValueEnvironment(Mvalue* value){return(value&&value->type==VT_E
 
 Mlist* _getListOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
     // output("Allocating list (size: %zd).\n",sizeof(Mlist));
-    Mlist* _list=__list("getListOfType",owner);
+    Mlist* _list=owned_list(__list("getListOfType"),owner);
     if(!_list)return NULL;
     _list->valuetype=valuetype;
-    return DISOWNED(_list,owner);
+    return disowned_list(_list,owner);
 }/* VALIDATED */
+
 Mmap* _getMapOfType(Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
     Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
     if(!_map)return NULL;
     _map->valuetype=valuetype;
-    return DISOWNED(_map,owner);
+    return disowned_map(_map,owner);
 }/* VALIDATED */
 
 Mlist* listMadeWeak(Mlist* list){if(list)list->weak=true;return list;}
@@ -2039,8 +2057,8 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     ///// doesn't work!!!!! if(fabsl(rem)<eps)return;
                     delta=(ld*q)-p;
                     ////////////replacing (see above): if(fabsl(delta)<=M_LD_Q_EPS)break; // if the p and q we've got are fine, stop!!!
-                    Mbiginteger *_numerator=(Mbiginteger*)OWNED(_getBiginteger(neg?-p:p),owner)
-                               ,*_denominator=(Mbiginteger*)OWNED(_getBiginteger(q),owner);
+                    Mbiginteger *_numerator=owned_biginteger(_getBiginteger(neg?-p:p),owner)
+                               ,*_denominator=owned_biginteger(_getBiginteger(q),owner);
                     _rational=_getRational(_numerator,_denominator,delta,false/*,true*/); // construct the intermediate result without normalizing
                     FREE_BIGINTEGER(_numerator,owner);FREE_BIGINTEGER(_denominator,owner); // MDH@26MAY2020 now always!!!
                     if(!_rational){
@@ -2049,7 +2067,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     }
                     // NOTE once we have the created big integer numerator and denominator bound in _rational we're responsible of freeing _rational when not bound
                     // NOT being able to append the intermediate result to the list shouldn't be enough reason to abort, as long as we manage to add the end result
-                    Mvalue* _rationalValue=_getRationalValue(_rational,owner);
+                    Mvalue* _rationalValue=_getValueOfRational(disowned_rational(_rational,owner));
                     if(!_rationalValue){FREE_RATIONAL(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
                     // NOTE probably best to break if we can't append approximations!!
                     // NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
@@ -2072,12 +2090,13 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                 }
                 */
             }else{ // long double is zero, TODO should we store 0 as the delta, or just NaN???? what would be the difference??????
-                Mbiginteger* _numerator=(Mbiginteger*)OWNED(__biginteger(),owner);
+                Mbiginteger* _numerator=owned_biginteger(__biginteger(),owner);
                 Mrational* _rational=(Mrational*)OWNED(_getRational(_numerator,NULL,M_LD_NAN,false),owner);
                 FREE_BIGINTEGER(_numerator,owner); // ALWAYS!!
-                Mvalue* _rationalValue=_getRationalValue(_rational,owner); // OK free __biginteger() if failing to get that _rational
+                Mvalue* _rationalValue=_getValueOfRational(disowned_rational(_rational,owner)); // OK free __biginteger() if failing to get that _rational
                 if(!_rationalValue)FREE_RATIONAL(_rational,owner);else 
-                if(appendedToList(_iterationsList,owner,_rationalValue,0)<=0)outputError("Failed to append rational approximation to the result list"); // no need to free _rational because it's value wrapper will be garbage collected!!
+                if(appendedToList(_iterationsList,owner,_rationalValue,0)<=0)
+                    outputError("Failed to append rational approximation to the result list"); // no need to free _rational because it's value wrapper will be garbage collected!!
             }
         }
         /* 
@@ -2160,18 +2179,18 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner o
         bool neg=mp_isneg(MP_INT_POINTER(_rational->num)); // determine whether negative or not
         // get the absolute value of the numerator
         Mbiginteger* _dividend=NULL;
-        Mbiginteger* _absnum=(Mbiginteger*)OWNED(__biginteger(),owner); // to be freed asap
+        Mbiginteger* _absnum=owned_biginteger(__biginteger(),owner); // to be freed asap
         if(_absnum){ // freeable
             if(mp_abs(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_absnum))==MP_OKAY){
-                Mbiginteger* _twicenum=(Mbiginteger*)OWNED(__biginteger(),owner);
+                Mbiginteger* _twicenum=owned_biginteger(__biginteger(),owner);
                 if(_twicenum){ // freeable
                     if(mp_mul_2(MP_INT_POINTER(_absnum),MP_INT_POINTER(_twicenum))==MP_OKAY){
-                        Mbiginteger* _twiceden=(Mbiginteger*)OWNED(__biginteger(),owner);
+                        Mbiginteger* _twiceden=owned_biginteger(__biginteger(),owner);
                         if(_twiceden){
                             if(mp_mul_2(MP_INT_POINTER(_rational->den),MP_INT_POINTER(_twiceden))==MP_OKAY){
-                                Mbiginteger* _remainder=(Mbiginteger*)OWNED(__biginteger(),owner);
+                                Mbiginteger* _remainder=owned_biginteger(__biginteger(),owner);
                                 if(_remainder){
-                                    _dividend=(Mbiginteger*)OWNED(__biginteger(),owner);
+                                    _dividend=owned_biginteger(__biginteger(),owner);
                                     if(_dividend){
                                         bool success=(mp_div(MP_INT_POINTER(_twicenum),MP_INT_POINTER(_twiceden),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
                                         // increment _dividend if _remainder larger than denominator
@@ -2215,7 +2234,7 @@ Mbiginteger* _getRationalInteger(Mrational* _rational,bool floor,bool towardszer
         Mbiginteger* _absnum=OWNED(__biginteger(),owner); // to be freed asap
         if(mp_abs(MP_INT_POINTER(_rational->num),MP_INT_POINTER(_absnum))!=MP_OKAY)
         {FREE_BIGINTEGER(_absnum,owner);outputError("Failed to compute the absolute of a big integer");return NULL;}
-        Mbiginteger *_dividend=(Mbiginteger*)OWNED(__biginteger(),owner),*_remainder=(Mbiginteger*)OWNED(__biginteger(),owner);
+        Mbiginteger *_dividend=owned_biginteger(__biginteger(),owner),*_remainder=owned_biginteger(__biginteger(),owner);
         bool success=(mp_div(MP_INT_POINTER(_absnum),MP_INT_POINTER(_rational->den),MP_INT_POINTER(_dividend),MP_INT_POINTER(_remainder))==MP_OKAY);
         if(success&&mp_iszero(MP_INT_POINTER(_remainder))!=MP_YES){ // division succeeded with a non-zero remainder
             if(neg){
@@ -2442,14 +2461,18 @@ void free_userfunction(Muserfunction* _userfunction){
 // Menvironment stuff
 Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owner_environment){
     if(!_environment)return NULL;
+    if(amVerboseDebugging())output("Taking over ownership environment.\n");
     owned_chars(_environment->_name,Msubowner(owner_environment,1));
     owned_map(_environment->_variableMap,Msubowner(owner_environment,1));
     return OWNED(_environment,owner_environment);
 }
 Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment){
     if(!_environment)return NULL;
+    if(amVerboseDebugging())output("Releasing ownership environment.\n");
     disowned_chars(_environment->_name,owner_environment);
+    if(amVerboseDebugging())output("Environment name ownership released.\n");
     disowned_map(_environment->_variableMap,owner_environment);
+    if(amVerboseDebugging())output("Environment variable map ownership released.\n");
     // disowned_map(_environment->_functionMap);
     return DISOWNED(_environment,owner_environment);
 }

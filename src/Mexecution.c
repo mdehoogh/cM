@@ -1064,8 +1064,8 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Malloc
 /////////////Mstring* _UNDEFINED_VALUETEXT=NULL;
 // the problem here is that whatever _getValueText returns will be freed on the other side, which we would not want to happen with _UNDEFINED_VALUETEXT, so perhaps we should return NULL in that case after all????
 // we can solve that by returning a new undefined value text instance every time
-Mstring* _getUndefinedValueText(){Mallocationowner owner=getOwner(__LINE__);
-    return(Mstring*)DISOWNED(OWNED(_getString(M_UNDEFINED_VALUE_TEXT),owner),owner); // just wrapping UNDEFINED_VALUETEXT again...
+Mstring* _getUndefinedValueText(){//Mallocationowner owner=getOwner(__LINE__);
+    return _getString(M_UNDEFINED_VALUE_TEXT); // just wrapping UNDEFINED_VALUETEXT again...
     /* replacing:
     if(!_UNDEFINED_VALUETEXT)_UNDEFINED_VALUETEXT=string_append(__string(),UNDEFINED_VALUETEXT);
     return string_copy(_UNDEFINED_VALUETEXT);

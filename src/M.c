@@ -1285,7 +1285,7 @@ bool registerCommand(Mcommand* command){Mallocationowner owner=getOwner(__LINE__
 		// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
 		if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
 			getCurrentFunctionBodyInput()->_function->_bodyCommandList=
-				__list("body command list",Msubowner(owner_currentFunctionBodyInput,2));
+				owned_list(__list("body command list"),Msubowner(owner_currentFunctionBodyInput,2));
 		// MDH@08JUN2020: if we succeed in adding the command value to the function body we still return false as result which will result in command to be freed
 		//                BUT by NULLing command->_firstToken we prevent the tokens from being freed in the command as we should
 		if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,owner_currentFunctionBodyInput,_commandToEvaluateTokenValue,M_LL_INVALID)>0)
@@ -2863,7 +2863,7 @@ Mvalue* Min(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* result=NULL;
     // value represents the text to write in front of the prompt for text i.e. it's a prompt text
     Mout(value); // just get it out!!!!
-    Mstring* _inText=(Mstring*)OWNED(_getString("'"),owner); // initialize _inText to a a single quote character (as required by _getTextValue)
+    Mstring* _inText=owned_string(_getString("'"),owner); // initialize _inText to a a single quote character (as required by _getTextValue)
     char c;
     while(inputCharRead(&c)){ // should be Ok to use inputCharRead() here
         outputChar(c);/////output("[%u]",c);
@@ -2946,7 +2946,7 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner
 				  }
 			}
 			pclose(fp);
-			_commandOutputValue=_getValueOfList(disowned(_commandOutputList,owner));
+			_commandOutputValue=_getValueOfList(disowned_list(_commandOutputList,owner));
 		}else
 			output("%sFailed to execute OS command '%s'.\n",M_ERROR_PREFIX,string(_commandText));
 	}

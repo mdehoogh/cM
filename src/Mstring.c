@@ -78,7 +78,7 @@ Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE
     if(!ans)printf("\nFailed to create a string.");
 #endif
     // MDH@19MAY2020: do NOT disown ans because whoever's receiving it should obtain ownership and you can only grab ownership on pointers currently being owned unless disowning
-    return(Mstring*)DISOWNED(ans,owner);
+    return disowned_string(ans,owner);
 }
 
 // MDH@17APR2020: it's best for every variable size allocation unit to have a method that will return its size to be used in a call to REALLOC as from_count
@@ -90,9 +90,9 @@ Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=g
     if(!src)return NULL;
     // MDH@17APR2020: replacing src->chars by src->_chars->chars
     src->_chars->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    Mstring* _result=(Mstring*)OWNED(_getString(src->_chars->chars),owner);
+    Mstring* _result=owned_string(_getString(src->_chars->chars),owner);
     if(length>0)if(_result)string_setlength(_result,length);
-    return(Mstring*)DISOWNED(_result,owner);
+    return disowned_string(_result,owner);
     /* replacing:
     Mstring* dst=__string();
     if(dst){

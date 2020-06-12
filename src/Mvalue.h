@@ -42,6 +42,7 @@ typedef struct Mvaluereference{
 	Mvalue* _value; // either the host value (if no variable name is defined), or the value of the host variable
 	Mvalue* _itemid; // the item referenced!!!
 }Mvaluereference;
+Mvaluereference* owned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference);
 Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference);
 void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/);
 #define FREE_VALUEREFERENCE(_valuereference,owner_valuereference) free_valuereference(disowned_valuereference(_valuereference,owner_valuereference))
@@ -92,23 +93,22 @@ Mlist* disowned_list(Mlist * const _list,Mallocationowner owner_list);
 void free_list(Mlist* _list/*,Mallocationowner owner*/);
 #define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
 
-Mlist* __list(char* source,Mallocationowner owner_list);
+Mlist* __list(char* source/*,Mallocationowner owner_list*/);
+
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mlist* listMadeWeak(Mlist * const list);
-
-/*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,const Mvalue * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
-
 Mlist* _getListCopy(Mlist const * const _list);
-
 Mlist* _getListIndices(Mlist const * const _list);
-
 Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
 long long isListUndefined(Mlist* list);
+
+/*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
 
 typedef struct Mmapelement{
     Mvariable* _variable;
     struct Mmapelement* _next;
 }Mmapelement;
+
 Mmapelement* owned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
 Mmapelement* disowned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
 bool free_mapelement(Mmapelement* _mapelement,bool weak);
@@ -256,14 +256,14 @@ Mvalue* __value(char const * const descriptor); // TODO expose __value()????? ye
 size_t getNumberOfRemovedValues(bool showInfo);
 unsigned long long getNumberOfValues();
 
-Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
 Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable);
 Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable);
 void free_variable(Mvariable* _variable,bool weak);
 #define FREE_VARIABLE(_variable,weak,owner_variable) free_variable(disowned_variable(_variable,owner_variable),weak)
+Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
 
-Mlistelement* owned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement);
-Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement);
+Mlistelement* owned_listelement(Mlistelement * const _listelement,Mallocationowner owner_listelement);
+Mlistelement* disowned_listelement(Mlistelement * const _listelement,Mallocationowner owner_listelement);
 bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/);
 #define FREE_LISTELEMENT(_listelement,weak,owner_listelement) free_listelement(disowned_listelement(_listelement,owner_listelement),weak)
 

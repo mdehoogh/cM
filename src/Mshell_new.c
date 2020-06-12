@@ -3739,7 +3739,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 				if(expressionToken->next&&expressionToken->next->type==TT_REAL){ // the integer part of a real
 					// TODO fix this
 					// first compose the full real text (with the integer text prepended to it)
-					Mstring* _realText=_getString(_significantTokenText); // the integer part
+					Mstring* _realText=owned_string(_getString(_significantTokenText),owner); // the integer part
 					expressionToken=nextEnvironmentExpressionToken(); // now pointing to the real fraction part text following the given integer!!!!
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
 					Mstring* pRealText=_realText;
