@@ -1260,6 +1260,7 @@ Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MODULE_ID,__L
 Mcommand** commands=NULL;Mallocationowner owner_commands=(Mallocationowner){MODULE_ID,__LINE__,1};
 uint32_t commandBlocks=0;
 // MDH@24MAY2020 NOTE: registerCommand is ONLY called once with _userInputCommand as argument but 
+// MDH@12JUN2020 TODO TODO TODO how to deal with the command being registered and whether or not the tokens are to be disowned when put in the value 
 bool registerCommand(Mcommand* command){Mallocationowner owner=getOwner(__LINE__);
 	if(!command)return false;
 	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
@@ -1279,8 +1280,8 @@ bool registerCommand(Mcommand* command){Mallocationowner owner=getOwner(__LINE__
 	// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
 	// MDH@25MAY2020 TODO should we pass {1} to _getValueOfToken()?????????
 	// MDH@08JUN2020 TODO still have to check the following... what would be the owner of the first command token??????? I suppose it will be subowned by the user input command
-	Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(command->_firstToken,Msubowner(owner_userInputCommand,1));
-	if(_commandToEvaluateTokenValue){ // the first command token is now bound 
+	Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(disowned_token(command->_firstToken,owner_userInputCommand)); // MDH@12JUN2020: TODO as we do NOT want to loose _firstToken we do NOT disown it before asking for the value of the token
+	if(_commandToEvaluateTokenValue){ // the first command token is now bound (or otherwise released)
 		// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
 		if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
 			getCurrentFunctionBodyInput()->_function->_bodyCommandList=
@@ -1315,7 +1316,7 @@ void reset(){Mallocationowner owner=getOwner(__LINE__);
 		outputInfo("No commands to delete!");
 #ifndef __PRODUCTION__
 	////syncallocations();
-	Mstring* _hms=OWNED(_getTimestamp("%H:%M:%S"),owner);
+	Mstring* _hms=owned_string(_getTimestamp("%H:%M:%S"),owner);
 	if(resetAllocationTypes(string(_hms)))
 		outputInfo("Allocation type recording reset.");
 	else
@@ -2840,21 +2841,21 @@ bool registerCommandEvaluation(char const * const commandText,Mvalue* evaluation
 	return false;
 }
 
-Mvalue* Mvariables(){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mvariables(){//Mallocationowner owner=getOwner(__LINE__);
 	if(amVerbose())
 		outputInfo("Getting the variables!");
 	// returning the names of the local variables (including the hidden ones)
 	// NOTE _getVariableNamesMap() always requires a non NULL environment to start with
-	return _getValueOfMap(OWNED(_getVariableNamesMap(getExecutionEnvironment()),owner),owner);
+	return _getValueOfMap(_getVariableNamesMap(getExecutionEnvironment()));
 }
 // MDH@15NOV2019: returning value counts (per value type), passing in a list of variable names
 // MDH@25NOV2019: what about returning a table??? which is a list
-Mvalue* Mvalues(Mvalue* variableNamesValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mvalues(Mvalue* variableNamesValue){//Mallocationowner owner=getOwner(__LINE__);
 	if(amVerbose())
 		outputInfo("Getting the values!");
 	// MDH@25NOV2019: requesting the table allows for better reproduction
 	//                TODO instead of the table return the text representation of the table (which is easier to inspect!!!)
-	return _getValueOfList(OWNED(_getValuesTable(variableNamesValue),owner),owner);
+	return _getValueOfList(_getValuesTable(variableNamesValue));
 	// replacing: return _getValueOfMap(_getValuesTable(variableNamesValue),true);
 }
 // method for reading a text from standard out which means reading characters until Enter-key is encountered!!
@@ -2926,11 +2927,11 @@ Mvalue* Min(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 // MDH@03MAR2020: useful to have a command to execute an OS command
 Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _commandOutputValue=NULL;
-	Mstring* _commandText=(Mstring*)OWNED(_getValueText(_commandValue,true),owner);
+	Mstring* _commandText=owned_string(_getValueText(_commandValue,true),owner);
 	if(_commandText&&string_length(_commandText)){
 		FILE *fp=popen(string(_commandText),"r");
 		if(fp){
-			Mlist* _commandOutputList=(Mlist*)OWNED(_getListOfType(VT_TEXT),owner);	
+			Mlist* _commandOutputList=owned_list(_getListOfType(VT_TEXT),owner);	
 	  		char path[1036]; // incremented by one to store the single quote
 			path[0]='\''; // a single-quote to surround the output text lines
   			/* Read the output a line at a time - output it. */
@@ -2945,12 +2946,12 @@ Mvalue* MexecuteOSCommand(Mvalue* _commandValue){Mallocationowner owner=getOwner
 				  }
 			}
 			pclose(fp);
-			_commandOutputValue=_getValueOfList(_commandOutputList,owner);
+			_commandOutputValue=_getValueOfList(disowned(_commandOutputList,owner));
 		}else
 			output("%sFailed to execute OS command '%s'.\n",M_ERROR_PREFIX,string(_commandText));
 	}
 	if(_commandText)FREE_STRING(_commandText,owner);
-	return(Mvalue*)DISOWNED(_commandOutputValue,owner);
+	return _commandOutputValue;
 }
 
 // in an interactive session we'll have additional variables to set up

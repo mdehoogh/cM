@@ -29,9 +29,9 @@ void free_token(Mtoken* _token/*,Mallocationowner owner*/){
     }
     FREE_1(_token,'O'/*,owner*/);
 }
+// MDH@11JUN2020: a useful macro
+#define FREE_TOKEN(_token,owner_token) free_token(disowned_token(_token,owner_token))
+
 Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
     return disowned_token(CALLOC_1(sizeof(Mtoken),'O',owner),owner);
 }
-
-// MDH@11JUN2020: a useful macro
-#define FREE_TOKEN(_token,owner_token) free_token(disowned_token(_token,owner_token))

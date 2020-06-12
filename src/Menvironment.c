@@ -51,7 +51,7 @@ void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner 
 bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
     // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
-    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment((Menvironment*)OWNED(_environment,owner),owner):NULL);
+    Mvalue* _environmentValue=(_environment?_getValueOfEnvironment(_environment):NULL); // TODO check whether _environment passed in needs to be disowned or not (I think better not!!!)
     if(!_environmentValue)return false;
     // MDH@04MAR2020 what WAS I thinking? to point the environment to itself but to the current execution environment
     if(!_environment->_parent)assignValue(&_environment->_parent,_executionEnvironmentValue); // if without a parent give it the current one
@@ -135,14 +135,14 @@ Mstring* _getVariableNames(Menvironment const * const _environment,const char* c
 Mlist* _getVariableNamesList(Menvironment* environment){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _variableNamesList=NULL;
     if(environment){
-        _variableNamesList=(Mlist*)OWNED(_getListOfType(VT_TEXT),owner);
+        _variableNamesList=owned_list(_getListOfType(VT_TEXT),owner);
         if(_variableNamesList){
             if(environment->_variableMap){
                 if(amVerbose())output("Creating the list of variable names of '%s'.\n",environment->_name);
                 Mmapelement* variableMapelement=environment->_variableMap->_first;
                 while(variableMapelement){
                     if(variableMapelement->_variable){
-                        Mstring* variableNameText=(Mstring*)OWNED(_getString("'"),owner);
+                        Mstring* variableNameText=owned_string(_getString("'"),owner);
                         if(variableNameText){
                             if(string_append(variableNameText,variableMapelement->_variable->_name->chars))
                                 appendedToList(_variableNamesList,owner,_getTextValue(string(variableNameText)),M_LL_INVALID);
@@ -154,22 +154,22 @@ Mlist* _getVariableNamesList(Menvironment* environment){Mallocationowner owner=g
             }
         }
     }
-    return DISOWNED(_variableNamesList,owner);
+    return disowned_list(_variableNamesList,owner);
 }
 Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationowner owner=getOwner(__LINE__);
     // how about returning for each environment that is active an attribute in a map?
     // first get the map of the parent
-    Mmap* _variableNamesMap=(environment?(Mmap*)OWNED(_getMapOfType(VT_UNDEFINED),owner):NULL);
+    Mmap* _variableNamesMap=(environment?owned_map(_getMapOfType(VT_UNDEFINED),owner):NULL);
     if(_variableNamesMap){
         // storing the local variables in a list that we're going to store in an attribute with name ''
-        Mvalue* _localVariableNamesListValue=_getValueOfList((Mlist*)OWNED(_getVariableNamesList(environment),owner),owner);
+        Mvalue* _localVariableNamesListValue=_getValueOfList(_getVariableNamesList(environment));
         if(_localVariableNamesListValue&&!appendedToMap(_variableNamesMap,owner,"",_localVariableNamesListValue)){
             /// OOPS, no need to free values!!! free_value(_localVariableNamesListValue); // not bound to the variableNamesMap, so free immediately
             output("%sFailed to register the local variable names of '%s'.\n",M_ERROR_PREFIX,environment->_name);
         }
         if(environment->_parent){
             // determine the variable names map of the parent environment and wrap it
-            Mvalue* _parentVariableNamesMapValue=_getValueOfMap((Mmap*)OWNED(_getVariableNamesMap(getValueEnvironment(environment->_parent)),owner),owner);
+            Mvalue* _parentVariableNamesMapValue=_getValueOfMap(_getVariableNamesMap(getValueEnvironment(environment->_parent)));
             // if successfully wrapped append it to the result map but free the value when unsuccesful doing so!!
             if(_parentVariableNamesMapValue&&!appendedToMap(_variableNamesMap,owner,getValueEnvironment(environment->_parent)->_name->chars,_parentVariableNamesMapValue)){
                 /// OOPS, no need to free values!!! free_value(_parentVariableNamesMapValue);
@@ -177,35 +177,35 @@ Mmap* _getVariableNamesMap(Menvironment const * const environment){Mallocationow
             }
         }
     }
-    return _variableNamesMap;
+    return disowned_map(_variableNamesMap,owner);
 }
 // MDH@25NOV2019: if we ask for the table, we receive a list with first element containing the column names
 Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner owner_columnNamesList){Mallocationowner owner=getOwner(__LINE__);
     if(columnNamesList){
-        Mlist* _table=(Mlist*)OWNED(_getListOfType(VT_LIST),owner);
+        Mlist* _table=owned_list(_getListOfType(VT_LIST),owner);
         if(_table){
             _table->weak=true; // MDH@27NOV2019: if we do the following no value copying will occur!!
             // wrap the column names list in a value
             // oops this is going to be a nuisance as the list would be copied wouldn't it????????
             //      NO because _getValueOfList() will simply assign the argument to the _list property, nothing more!!!
             //      
-            Mvalue* columnNamesListValue=_getValueOfList(columnNamesList,owner_columnNamesList);
+            Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
             if(columnNamesListValue){
                 outputValue("Column names values table: '",columnNamesListValue,"'.\n");
                 if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)){
                     while(numberOfRows>0){
                         numberOfRows--;
-                        Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED),owner);
+                        Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED));
                         if(!_rowValue)break;
                         if(!appendedToList(_table,owner,_rowValue,M_LL_INVALID))break;
                     }
-                    return _table;
+                    return disowned_list(_table,owner);
                 }
             }
         }
         // in essence the values in the list have their counts incremented when being added to it
         // and only by decrementing their counts in free_list() do the elements go free
-        if(owner_columnNamesList.level==0)free_list(columnNamesList,owner_columnNamesList);
+        //  TODO do we need this???? if(owner_columnNamesList.level==0)FREE_LIST(columnNamesList,owner_columnNamesList);
     }
     return NULL;
 }
@@ -291,7 +291,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
     // MDH@14APR2020 now present in the allocation types: t_count* _allocationcounts=_getAllocationCounts();
     Mlist* _valuesTable=NULL;
     // let's create the list containing the column names
-    Mlist* _valuesColumnNames=(Mlist*)OWNED(_getListOfType(VT_TEXT),owner);
+    Mlist* _valuesColumnNames=owned_list(_getListOfType(VT_TEXT),owner);
     if(_valuesColumnNames
         &&appendedToList(_valuesColumnNames,owner,_getTextValue("'Values: "),M_LL_INVALID)>0
         &&appendedToList(_valuesColumnNames,owner,_getTextValue("'TYPE        "),M_LL_INVALID)>0
@@ -304,19 +304,19 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
         long long numberOfAllocationTypes=getNumberOfAllocationTypes();
         // get a table with the given values column names and number of rows (which are initialized to empty lists)
         // NOTE tell _getTable() to free the values column names if failing to bind them in a table!!!!
-        _valuesTable=(Mlist*)OWNED(_getTable(_valuesColumnNames,numberOfAllocationTypes,owner),owner);
+        _valuesTable=owned_list(_getTable(_valuesColumnNames,numberOfAllocationTypes,owner),owner);
         if(_valuesTable){
             if(numberOfAllocationTypes){
                 // we start with a general overview (the counts per type)
                 // NOTE dividing by sizeof(char) is far fetched
                 for(long long i=0;i<numberOfAllocationTypes;i++){
-                    Mstring* _allocationTypeText=(Mstring*)OWNED(_getString("'"),owner);
+                    Mstring* _allocationTypeText=owned_string(_getString("'"),owner);
                     if(_allocationTypeText
                             &&string_append_char(_allocationTypeText,_allocationTypes[i].type)
                             &&string_append(_allocationTypeText,"=0x")
                             &&string_append(_allocationTypeText,HEXCHARS[_allocationTypes[i].type]))
                     {
-                        Mlist* _valuecountsList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner); // we're going to store the value counts in a map
+                        Mlist* _valuecountsList=owned_list(_getListOfType(VT_UNDEFINED),owner); // we're going to store the value counts in a map
                         if(_valuecountsList){
                             Mvalue* _zeroTextValue=_getTextValue("'"); // will be garbage collected automatically when the reference count is not incremented (as in weak lists)
                             _valuecountsList->weak=true; // TODO should we do this???
@@ -330,10 +330,10 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
                                 appendedToList(_valuecountsList,owner,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)),M_LL_INVALID);
                                 appendedToList(_valuecountsList,owner,_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)),M_LL_INVALID);
                                 appendedToList(_valuecountsList,owner,_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,1)),M_LL_INVALID);
-                                if(appendedToList(_valuesTable,owner,_getValueOfList(_valuecountsList,owner),M_LL_INVALID)<=0)
+                                if(appendedToList(_valuesTable,owner,_getValueOfList(disowned_list(_valuecountsList,owner)),M_LL_INVALID)<=0)
                                     outputError("Failed to remember a values table row.");
                             }else{
-                                free_list(_valuecountsList,owner); // have to explicitly free the list of the row that we failed to register
+                                FREE_LIST(_valuecountsList,owner); // have to explicitly free the list of the row that we failed to register
                                 outputError("Failed to initialize a values table row.");
                             }
                             /*
@@ -352,7 +352,7 @@ Mlist* _getValuesTable(Mvalue* variableNamesMapValue){Mallocationowner owner=get
     }else
         outputError("Failed to create the values table header.");
     free(_allocationTypes);
-    return DISOWNED(_valuesTable,owner);
+    return disowned_list(_valuesTable,owner);
 }
 Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwner(__LINE__);
     Mmap* _valuesMap=(Mmap*)OWNED(_getMapOfType(VT_UNDEFINED),owner);
@@ -363,22 +363,22 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwn
             // we start with a general overview (the counts per type)
 	        Mallocationtype* _allocationTypes=_getAllocationTypes(); // TODO put under memory management control?
             // MDH@14APR2020 replacing: size_t* _allocationcounts=_getAllocationCounts();
-            Mstring *_allocationTypeText=(Mstring*)OWNED(__string(),owner)
-                   ,*_allocationTypeCharactersText=(Mstring*)OWNED(_getString("'"),owner); // free ASAP
+            Mstring *_allocationTypeText=owned_string(__string(),owner)
+                   ,*_allocationTypeCharactersText=owned_string(_getString("'"),owner); // free ASAP
             if(_allocationTypeText&&_allocationTypeCharactersText){
-                Mmap* _valuecountsMap=(Mmap*)OWNED(_getMapOfType(VT_MAP),owner); // we're going to store the value counts in a map
+                Mmap* _valuecountsMap=owned_map(_getMapOfType(VT_MAP),owner); // we're going to store the value counts in a map
                 // NOTE dividing by sizeof(char) is far fetched
                 for(size_t i=0;i<numberOfAllocationTypes;i++){
                     if(string_append_char(_allocationTypeCharactersText,_allocationTypes[i].type)&&string_append_char(_allocationTypeText,_allocationTypes[i].type)){
                         if(_valuecountsMap){
-                            Mmap* _valuecountMap=(Mmap*)OWNED(_getMapOfType(VT_INTEGER),owner);
+                            Mmap* _valuecountMap=owned_map(_getMapOfType(VT_INTEGER),owner);
                             if(_valuecountMap){
                                 appendedToMap(_valuecountMap,owner,(i==0?"count sum":"count"),_getIntegerValue(_allocationTypes[i]/*.allocationsizeunion*/.size));
                                 appendedToMap(_valuecountMap,owner,(i==0?"bytes allocated":"allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,0)/*_allocationTypes[i].occupied*/));
                                 appendedToMap(_valuecountMap,owner,(i==0?"bytes freed":"freed"),_getIntegerValue(getAllocationTypeFreed(_allocationTypes[i].type,0)/*_allocationTypes[i].freed*/));
                                 appendedToMap(_valuecountMap,owner,(i==0?"mark bytes allocated":"mark allocated"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_occupied*/));
                                 appendedToMap(_valuecountMap,owner,(i==0?"mark bytes freed":"mark freed"),_getIntegerValue(getAllocationTypeOccupied(_allocationTypes[i].type,1)/*_allocationTypes[i].mark_freed*/));
-                                if(appendedToMap(_valuecountsMap,owner,string(_allocationTypeText),_getValueOfMap(_valuecountMap,owner))<=0)
+                                if(appendedToMap(_valuecountsMap,owner,string(_allocationTypeText),_getValueOfMap(disowned_map(_valuecountMap,owner)))<=0)
                                     output("%sFailed to store the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
                             }else
                                 output("%sFailed to create the allocation count map of '%c'.\n",M_ERROR_PREFIX,_allocationTypes[i].type);
@@ -389,7 +389,7 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue){Mallocationowner owner=getOwn
                 if(appendedToMap(_valuesMap,owner,"types",_getTextValue(string(_allocationTypeCharactersText)))<=0)
                     outputError("Failed to store the data type characters.");
                 if(_valuecountsMap){
-                    if(appendedToMap(_valuesMap,owner,"counts",_getValueOfMap(_valuecountsMap,owner))<=0){
+                    if(appendedToMap(_valuesMap,owner,"counts",_getValueOfMap(disowned_map(_valuecountsMap,owner)))<=0){
                         outputError("Failed to store the data type counts.");
                         FREE_MAP(_valuecountsMap,owner);
                     }
@@ -759,9 +759,9 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
                     // MDH@08JUN2020: _getVariable() adjusted to accept an Mchars* properly owned to start with (and freed automatically on failure)
-                    Mchars* _variableName=OWNED(_getChars(name),owner);
+                    Mchars* _variableName=owned_chars(_getChars(name),owner);
                     if(_variableName){
-                        _variable=(Mvariable*)OWNED(_getVariable(_variableName,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
+                        _variable=owned_variable(_getVariable(_variableName,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
                         if(_variable){
                             // store the references
                             _variableMapelement->_next=NULL;
@@ -776,9 +776,10 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
                                 map->_first=_variableMapelement;
                             map->_last=_variableMapelement;
                             map->numberOfElements++;
-                            if(amVerbose())output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
+                            if(amVerbose())
+                                output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
                         }else{
-                            freeChars(_variableName,owner_environment);
+                            FREECHARS(_variableName,owner_environment);
                         }
                     }else
                         output("%sFailed to create variable name '%s'.\n",M_ERROR_PREFIX,name);
@@ -810,24 +811,24 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
                 Mmapelement* _variableMapelement=(Mmapelement*)MALLOC_1(sizeof(Mmapelement),'m',owner);
                 if(_variableMapelement){
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
-                    Mchars* _variablename=OWNED(_getChars(property),owner); // technically I am the one that has to disown it
+                    Mchars* _variablename=owned_chars(_getChars(property),owner); // technically I am the one that has to disown it
                     if(_variablename){
                         // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
-                        _variable=(Mvariable*)OWNED(_getVariable(_variablename,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
+                        _variable=owned_variable(_getVariable(_variablename,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
                         // store the references
                         if(_variable){
                             _variableMapelement->_next=NULL;
-                            _variableMapelement->_variable=(Mvariable*)OWNED(DISOWNED(_variable,owner),owner_variable);
+                            _variableMapelement->_variable=owned_variable(disowned_variable(_variable,owner),owner_variable);
                             Mmapelement* _lastVariableMapelement=map->_last;
                             if(_lastVariableMapelement!=NULL)_lastVariableMapelement->_next=_variableMapelement;else map->_first=_variableMapelement;
                             map->_last=_variableMapelement;
-                            OWNED(DISOWNED(_variableMapelement,owner),owner_variablemapelement);
-                            OWNED(_variable->_name,owner_variablename); // MDH@09JUNE2020: assuming _variablename is now bound
+                            owned_mapelement(disowned_mapelement(_variableMapelement,owner),owner_variablemapelement);
+                            owned_chars(_variable->_name,owner_variablename); // MDH@09JUNE2020: assuming _variablename is now bound
                             map->numberOfElements++;
                             if(amVerbose())
                                 output("Property '%s' added.\n",property);
                         }else{
-                            freeChars(_variablename,owner); // _variablename NOT bound, so has to be freed
+                            FREECHARS(_variablename,owner); // _variablename NOT bound, so has to be freed
                             output("%sFailed to add property '%s'.\n",property);
                         }
                     }else{
@@ -1100,11 +1101,11 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
                 _argumentmapelement->_variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner_functionargumentmap);
-                if(!_argumentmapelement->_variable){free_mapelement(_argumentmapelement,true,owner_functionargumentmap);break;}
+                if(!_argumentmapelement->_variable){FREE_MAPELEMENT(_argumentmapelement,true,owner_functionargumentmap);break;}
                 // probably can't simply assign??? let's use _strdup then 
                 // MDH@17APR2020: _strdup() replaced by _getChars() as on so many other places today
-                _argumentmapelement->_variable->_name=SUBOWNED(OWNED(_getChars(functionParameterMapelement->_variable->_name->chars),owner_functionargumentmap),1); // MDH@09JUN2020: OOPS make the right owner
-                if(!_argumentmapelement->_variable->_name){free_mapelement(_argumentmapelement,true,owner_functionargumentmap);break;}
+                _argumentmapelement->_variable->_name=SUBOWNED(owned_chars(_getChars(functionParameterMapelement->_variable->_name->chars),owner_functionargumentmap),1); // MDH@09JUN2020: OOPS make the right owner
+                if(!_argumentmapelement->_variable->_name){FREE_MAPELEMENT(_argumentmapelement,true,owner_functionargumentmap);break;}
                 // associate the argument list element value (if available)
                 // MDH@02NOV2019: OK, using assignValue() here (after adjusting assignValue to copy maps and lists)
                 //                we get a problem with functions like push() and shove() that try to adjust their argument
@@ -1195,7 +1196,7 @@ Mfunction* _getFunction(Menvironment * const _environment,Mallocationowner owner
                 if(!_functionName){
                     if(_function){
                         if(amVerbose())outputChar('!');
-                        free_function(_function,owner);_function=NULL;
+                        FREE_FUNCTION(_function,owner);_function=NULL;
                         if(amVerbose())outputChar('!');
                     }
                 }else
@@ -1776,7 +1777,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){M
                     _function->_parameterMap=SUBOWNED(OWNED(_getMapCopy(_parameterMapValue->value._map),owner),1); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
                 _function->functionunion._userfunction=_userfunction;
                 // return the result of applying the function to the default parameter map
-                _functionValue=_getValueOfFunction(_function,owner);
+                _functionValue=_getValueOfFunction(disowned_function(_function,owner));
             }else
                 outputError("Failed to create an anonymous function.");
         }
@@ -1798,7 +1799,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                 Mtext* functionName=_nameValue->value._text;
                 // user function expects a list of commands, so we have to wrap the single token (if any)
                 if(_bodyTokenValue){
-                    _userfunction->_bodyCommandList=SUBOWNED(OWNED(_getListOfType(VT_TOKEN),owner),1);
+                    _userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
                     if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID))
                         output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
                     // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
@@ -1807,12 +1808,12 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                 ///////if(_userfunctionValue){
                     // MDH@17JUL2019: the map needs to be stored with the Mfunction
                 Mallocationowner owner_environment=getOwnerExecutionEnvironment();
-                Mfunction* _function=_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c);
+                Mfunction* _function=owned_function(_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c),owner);
                 if(_function){
                     // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                     //                so we have to make a copy of the parameter map
-                    _function->_parameterMap=SUBOWNED(OWNED(_getMapCopy(_parameterMapValue->value._map),owner_environment),3); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
-                    _function->functionunion._userfunction=_userfunction;
+                    _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,3)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+                    _function->functionunion._userfunction=owned_userfunction(disowned_userfunction(_userfunction,owner),Msubowner(owner_environment,3));
                     // return the result of applying the function to the default parameter map
 
                     return _getIntegerValue(1);

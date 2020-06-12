@@ -395,36 +395,38 @@ void free_reference(Mreference* reference/*,Mallocationowner owner_reference*/){
     }
     FREE_1(reference,'Q'/*,owner_reference*/);
 }
-Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference){
+
+Mvalue* _getReferenceValue(Mreference* _reference/*,Mallocationowner owner_reference*/){
     // MDH@19MAY2020: should we check whether _reference is ownable???????
     if(!_reference){outputWarning("No reference to wrap.");return NULL;}
     Mvalue* _referenceValue=__value("reference");
     if(_referenceValue){
         _referenceValue->type=VT_REFERENCE;
-        _referenceValue->value._reference=SUBOWNED(OWNED(_reference,owner_valueList),3);
+        _referenceValue->value._reference=(Misdisowned(_reference)?owned_reference(_reference,owner_value_data):_reference);
     }else
-    if(owner_reference.level==0)FREE_REFERENCE(_reference,owner_reference);
+    if(Misdisowned(_reference))free_reference(_reference);
     return _referenceValue;
 }
 // MDH@26MAY2020: new contract, if NULL is returned _decimal is NOT bound and should be freed if desirable...
-Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner_decimal){
+Mvalue* _getDecimalValue(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
     if(!_decimal)return NULL;
     Mvalue* _decimalValue=__value("decimal");
     if(_decimalValue){//////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
         _decimalValue->type=VT_DECIMAL;
-        _decimalValue->value._decimal=SUBOWNED(OWNED(_decimal,owner_valueList),3);
+        _decimalValue->value._decimal=(Misdisowned(_decimal)?owned_decimal(_decimal,owner_value_data):_decimal);
     }else
-    if(owner_decimal.level==0)FREE_DECIMAL(_decimal,owner_decimal);
+    if(Misdisowned(_decimal))free_decimal(_decimal);
     return _decimalValue;
 }/* VALIDATED */
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_biginteger){
+
+Mvalue* _getBigintegerValue(Mbiginteger* _biginteger/*,Mallocationowner owner_biginteger*/){
     if(!_biginteger)return NULL;
     Mvalue* _bigintegerValue=__value("biginteger");
     if(_bigintegerValue){
         _bigintegerValue->type=VT_BIGINTEGER;
-        _bigintegerValue->value._biginteger=SUBOWNED(OWNED(_biginteger,getValueOwner()),1);
+        _bigintegerValue->value._biginteger=(Misdisowned(_biginteger)?owned_biginteger(_biginteger,owner_value_data):_biginteger);
     }else
-    if(owner_biginteger.level==0)FREE_BIGINTEGER(_biginteger,owner_biginteger);
+    if(Misdisowned(_biginteger))free_biginteger(_biginteger);
     return _bigintegerValue;
 }/* VALIDATED */
 
@@ -433,7 +435,7 @@ Mvalue* _getFloatValue(long double ld){
     Mvalue* _floatValue=__value("long double");
     if(!_floatValue)return NULL;
     _floatValue->type=VT_FLOAT;
-    _floatValue->value._float=SUBOWNED(OWNED(_getFloat(ld),owner_valueList),3);
+    _floatValue->value._float=owned_float(_getFloat(ld),owner_value_data);
     return _floatValue;
 }/* VALIDATED */
 Mvalue* _getIntegerValue(long long ll){
@@ -441,7 +443,7 @@ Mvalue* _getIntegerValue(long long ll){
     Mvalue* _integerValue=__value("integer");
     if(!_integerValue)return NULL;
     _integerValue->type=VT_INTEGER;
-    _integerValue->value._integer=SUBOWNED(OWNED(_getInteger(ll),getValueOwner()),1);
+    _integerValue->value._integer=owned_integer(_getInteger(ll),owner_value_data);
     return _integerValue;
 }/* VALIDATED */
 // MDH@25MAY2020: s is a constant character array that does not need change ownership (because it is supposed to be owned elsewhere or not owned)
@@ -450,14 +452,14 @@ Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){
     Mvalue* _textValue=__value("text"); // the result, when NULL check freeonfailure
     if(!_textValue)return NULL;
     _textValue->type=VT_TEXT;
-    _textValue->value._text=SUBOWNED(OWNED(_getText(s),owner_valueList),3);
+    _textValue->value._text=owned_text(_getText(s),owner_value_data);
     return _textValue;
 }/* VALIDATED */
 Mvalue* _getCharTextValue(char _c){
     Mvalue* _textValue=__value("char");
     if(!_textValue)return NULL;
     _textValue->type=VT_TEXT;
-    _textValue->value._text=SUBOWNED(OWNED(_getCharText(_c),owner_valueList),3);
+    _textValue->value._text=owned_text(_getCharText(_c),owner_value_data);
     return _textValue;
 }/* VALIDATED */
 // we can force all listelements to have the same type????
@@ -476,7 +478,7 @@ Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const sour
     _list->weak=weak;
     _list->valuetype=listValuetype; // register what type of elements this list should have    
     _listValue->type=VT_LIST;
-    _listValue->value._list=SUBOWNED(OWNED(disowned_list(_list,owner),getValueOwner()),1);
+    _listValue->value._list=owned_list(disowned_list(_list,owner),owner_value_data);
     return _listValue;
 }/* VALIDATED */
 
@@ -601,44 +603,44 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
 // the point is that we cannot free an integer or obtain ownership if owner_integer is not correct
 // however, it should be possibly to bind _integer to the value that is created in which case we should be able to obtain ownership
 // meaning that whatever we receive should be a disowned integer unless we do a super own
-Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer){
+Mvalue* _getValueOfInteger(Minteger* _integer/*,Mallocationowner owner_integer*/){
     if(!_integer)return NULL;
     Mvalue* _value=__value("integer"); // make the value create have the same owner as the integer
     if(_value)
-    {_value->value._integer=owned_integer(disowned_integer(_integer,owner_integer),owner_value_data);_value->type=VT_INTEGER;}
+    {_value->value._integer=(Misdisowned(_integer)?owned_integer(_integer,owner_value_data):_integer);_value->type=VT_INTEGER;}
     else 
-    if(owner_integer.level==0)
-        FREE_INTEGER(_integer,owner_integer);
+    if(Misdisowned(_integer))
+        free_integer(_integer);
     return _value;
 }/* VALIDATED */
-Mvalue* _getValueOfFloat(Mfloat* _float,Mallocationowner owner_float){
+Mvalue* _getValueOfFloat(Mfloat* _float/*,Mallocationowner owner_float*/){
     if(!_float)return NULL;
     Mvalue* _value=__value("float");
     if(_value)
-    {_value->value._float=(Mfloat*)owned_float(disowned_float(_float,owner_float),owner_value_data);_value->type=VT_FLOAT;}
+    {_value->value._float=(Misdisowned(_float)?owned_float(_float,owner_value_data):_float);_value->type=VT_FLOAT;}
     else 
-    if(owner_float.level==0)
-        FREE_FLOAT(_float,owner_float);
+    if(Misdisowned(_float))
+        free_float(_float);
     return _value;
 }/* VALIDATED */
-Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map){
+Mvalue* _getValueOfMap(Mmap* _map/*,Mallocationowner owner_map*/){
     if(!_map)return NULL;
     Mvalue* _value=__value("map");
     if(_value)
-    {_value->value._map=(Mmap*)owned_map(disowned_map(_map,owner_map),owner_value_data);_value->type=VT_MAP;}
+    {_value->value._map=(Misdisowned(_map)?owned_map(_map,owner_value_data):_map);_value->type=VT_MAP;}
     else 
-    if(owner_map.level==0)
-        FREE_MAP(_map,owner_map);
+    if(Misdisowned(_map))
+        free_map(_map);
     return _value;
 }/* VALIDATED */
-Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token){
+Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/){
     if(!_token)return NULL;
     Mvalue* _value=__value("token");
     if(_value)
-    {_value->value._token=(Mtoken*)owned_token(disowned_token(_token,owner_token),owner_value_data);_value->type=VT_TOKEN;}
+    {_value->value._token=(Misdisowned(_token)?owned_token(_token,owner_value_data):_token);_value->type=VT_TOKEN;}
     else 
-    if(owner_token.level==0)
-        FREE_TOKEN(_token,owner_token);
+    if(Misdisowned(_token))
+        free_token(_token);
     return _value;
 }/* VALIDATED */
 
@@ -678,10 +680,10 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
                     return DISOWNED(_map,owner);
                 }
                 outputError("Failed to create the float variable map");
-                free_mapelement(_mapelement,false,owner);
+                FREE_MAPELEMENT(_mapelement,false,owner);
             }else
                 outputError("Failed to create the float variable map element");
-            free_variable(_realVariable,false,owner);
+            FREE_VARIABLE(_realVariable,false,owner);
         }else
             outputError("Failed to create the float variable name");
     }
@@ -695,15 +697,15 @@ Mmap* _getMap(char* name){if(!name)return NULL;Mallocationowner owner=getOwner(_
             Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
             if(_map){
                 _map->numberOfElements=1;
-                _mapelement->_variable=SUBOWNED(_variable,1);
-                SUBOWNED(_variable->_name,1);
+                _mapelement->_variable=SUBOWNED(_variable,2); // TODO we can do this better given the new disowned_map usage
+                SUBOWNED(_variable->_name,2);
                 _map->_first=_mapelement;
                 _map->_last=_mapelement;
-                return DISOWNED(_map,owner);
+                return disowned_map(_map,owner);
             }
-            FREE_DISOWNED_1(_mapelement,'m',owner); // MDH@11NOV2019: no need to call free_mapelement() 
+            FREE_MAPELEMENT(_mapelement,false,owner); // MDH@11NOV2019: no need to call free_mapelement() 
         }
-        free_variable(_variable,false,owner);
+        FREE_VARIABLE(_variable,false,owner);
     }else
         output("%sFailed to create map '%s'.\n",M_ERROR_PREFIX,name);
     return NULL;
@@ -736,7 +738,7 @@ Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE
                 }
                 mapelement=mapelement->_next;
             }
-            return DISOWNED(_map,owner);
+            return disowned_map(_map,owner);
         }else
             outputError("Failed to create a map");
     }
@@ -762,7 +764,7 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
                     outputError("Failed to copy a list element");
                 listelement=listelement->_next;
             }
-            return DISOWNED(_list,owner);
+            return disowned_list(_list,owner);
         }else
             outputError("Failed to create a list");
     }
@@ -786,10 +788,10 @@ static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowne
                     return DISOWNED(_map,owner);
                 }
                 outputError("Failed to create the one variable map");
-                free_mapelement(_mapelement,false,owner);
+                FREE_MAPELEMENT(_mapelement,false,owner);
             }else
                 outputError("Failed to create the one variable map element");
-            free_variable(_variable,false,owner);
+            FREE_VARIABLE(_variable,false,owner);
         }else
             outputError("Failed to create the variable of the one variable map");
     }
@@ -798,12 +800,12 @@ static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowne
 Mmap* _getIntegerMap(char* name,Mvalue* _integerValue){Mallocationowner owner=getOwner(__LINE__);
     // NOTE wait with filling the single integer value map until we have all the ingredients
     if(!name||strlen(name)==0)return NULL;
-    Mmap* _integerMap=OWNED(_getOneArgumentMap(name,VT_INTEGER),owner);
+    Mmap* _integerMap=owned_map(_getOneArgumentMap(name,VT_INTEGER),owner);
     if(_integerMap&&_integerValue){
         assignValue(&_integerMap->_first->_variable->_value,_integerValue);
-        return DISOWNED(_integerMap,owner);
+        return disowned_map(_integerMap,owner);
     }
-    if(_integerMap)free_map(_integerMap,owner);
+    if(_integerMap)FREE_MAP(_integerMap,owner);
     return NULL;
 }/* VALIDATED */
 Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__);
@@ -813,14 +815,14 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
             output("Unable to create list map: no list value to put in list.\n");
         return NULL;
     }
-    Mmap* _listMap=OWNED(_getOneArgumentMap(name,VT_LIST),owner);
+    Mmap* _listMap=owned_map(_getOneArgumentMap(name,VT_LIST),owner);
     if(!_listMap){
         // if(amVerboseDebugging())
            output("%sFailed to create a one argument list map.\n",M_ERROR_PREFIX);
         return NULL;
     }
     assignValue(&_listMap->_first->_variable->_value,_listValue);
-    return DISOWNED(_listMap,owner);
+    return disowned_map(_listMap,owner);
 }/* VALIDATED */
 
 static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);
@@ -841,35 +843,25 @@ static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mv
                         return DISOWNED(_map,owner);
                     }
                     outputError("Failed to create both map element variables");
-                    free_map(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                    FREE_MAP(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
                 }else
                     outputError("Failed to create a map");
             }else
                 outputError("Failed to create both integer map elements");
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1,false,owner);
-            free_mapelement(_mapelement2,false,owner);
+            FREE_MAPELEMENT(_mapelement1,false,owner);
+            FREE_MAPELEMENT(_mapelement2,false,owner);
         }else
             output("%sTwo argument map element names '%s' and '%s' undefined or the same.\n",M_ERROR_PREFIX,name1,name2);
     }else
         outputError("Not both two map element names defined");
     return NULL;    
 }
-Mmap* _getIntegerBooleanMap(char* name1,char* name2){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getTwoArgumentMap(name1,name2,VT_INTEGER,VT_INTEGER),owner),owner);
-}/* VALIDATED */
-Mmap* _getStringStringMap(char* name1,char* name2){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getTwoArgumentMap(name1,name2,VT_TEXT,VT_TEXT),owner),owner);
-}/* VALIDATED */
-Mmap* _getFloatFloatMap(char* name1,char* name2){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getTwoArgumentMap(name1,name2,VT_FLOAT,VT_FLOAT),owner),owner);
-}/* VALIDATED */
-Mmap* _getMapTokenMap(char* name1,char* name2){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getTwoArgumentMap(name1,name2,VT_MAP,VT_TOKEN),owner),owner);
-}/* VALIDATED */
-Mmap* _getTokenTokenMap(char* name1,char* name2){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getTwoArgumentMap(name1,name2,VT_TOKEN,VT_TOKEN),owner),owner);
-}/* VALIDATED */
+Mmap* _getIntegerBooleanMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_INTEGER,VT_INTEGER);}/* VALIDATED */
+Mmap* _getStringStringMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_TEXT,VT_TEXT);}/* VALIDATED */
+Mmap* _getFloatFloatMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_FLOAT,VT_FLOAT);}/* VALIDATED */
+Mmap* _getMapTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_MAP,VT_TOKEN);}/* VALIDATED */
+Mmap* _getTokenTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 
 Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3){
@@ -889,31 +881,23 @@ Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuet
                         _mapelement2->_next=SUBOWNED(_mapelement3,1);
                         _map->_last=_mapelement3;
                         _map->numberOfElements=3;
-                        return DISOWNED(_map,owner);
+                        return disowned_map(_map,owner);
                     }
-                    free_map(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                    FREE_MAP(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1,false,owner);
-            free_mapelement(_mapelement2,false,owner);
-            free_mapelement(_mapelement3,false,owner);
+            FREE_MAPELEMENT(_mapelement1,false,owner);
+            FREE_MAPELEMENT(_mapelement2,false,owner);
+            FREE_MAPELEMENT(_mapelement3,false,owner);
         }
     }
     return NULL;
 }
-Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getThreeArgumentMap(name1,name2,name3,VT_TEXT,VT_MAP,VT_TOKEN),owner),owner);
-}/* VALIDATED */
-Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_TOKEN,VT_TOKEN),owner),owner);
-}/* VALIDATED */
-Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getThreeArgumentMap(name1,name2,name3,VT_INTEGER,VT_INTEGER,VT_INTEGER),owner),owner);
-}/* VALIDATED */
-Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_UNDEFINED,VT_INTEGER),owner),owner);
-}/* VALIDATED */
+Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_TEXT,VT_MAP,VT_TOKEN);}/* VALIDATED */
+Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_UNDEFINED,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
+Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_INTEGER,VT_INTEGER,VT_INTEGER);}/* VALIDATED */
+Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3){return _getThreeArgumentMap(name1,name2,name3,VT_LIST,VT_UNDEFINED,VT_INTEGER);}/* VALIDATED */
 
 Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3,Mvaluetype valuetype4){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3&&name4){
@@ -937,23 +921,21 @@ Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvalue
                         _mapelement3->_next=SUBOWNED(_mapelement4,1);
                         _map->_last=_mapelement4;
                         _map->numberOfElements=4;
-                        return DISOWNED(_map,owner);
+                        return disowned_map(_map,owner);
                     }
-                    free_map(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                    FREE_MAP(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1,false,owner);
-            free_mapelement(_mapelement2,false,owner);
-            free_mapelement(_mapelement3,false,owner);
-            free_mapelement(_mapelement4,false,owner);
+            FREE_MAPELEMENT(_mapelement1,false,owner);
+            FREE_MAPELEMENT(_mapelement2,false,owner);
+            FREE_MAPELEMENT(_mapelement3,false,owner);
+            FREE_MAPELEMENT(_mapelement4,false,owner);
         }
     }
     return NULL;
 }
-Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getFourArgumentMap(name1,name2,name3,name4,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN),owner),owner);
-}/* VALIDATED */
+Mmap* _getTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4){return _getFourArgumentMap(name1,name2,name3,name4,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 
 Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *name5,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3,Mvaluetype valuetype4,Mvaluetype valuetype5){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3&&name4&&name5){
@@ -983,38 +965,37 @@ Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *
                         _mapelement4->_next=SUBOWNED(_mapelement5,1);
                         _map->_last=_mapelement5;
                         _map->numberOfElements=5;
-                        return DISOWNED(_map,owner);
+                        return disowned_map(_map,owner);
                     }
-                    free_map(_map,owner); // failed to create the five map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
+                    FREE_MAP(_map,owner); // failed to create the five map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
                 }
             }
             // either map element might have been created and we need to release them
-            free_mapelement(_mapelement1,false,owner);
-            free_mapelement(_mapelement2,false,owner);
-            free_mapelement(_mapelement3,false,owner);
-            free_mapelement(_mapelement4,false,owner);
-            free_mapelement(_mapelement5,false,owner);
+            FREE_MAPELEMENT(_mapelement1,false,owner);
+            FREE_MAPELEMENT(_mapelement2,false,owner);
+            FREE_MAPELEMENT(_mapelement3,false,owner);
+            FREE_MAPELEMENT(_mapelement4,false,owner);
+            FREE_MAPELEMENT(_mapelement5,false,owner);
         }
     }
     return NULL;
 }
-Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5){Mallocationowner owner=getOwner(__LINE__);
-    return DISOWNED(OWNED(_getFiveArgumentMap(name1,name2,name3,name4,name5,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN),owner),owner);
-}/* VALIDATED */
+Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char *name4,char *name5){return _getFiveArgumentMap(name1,name2,name3,name4,name5,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 // end helper functions 
 
 // LIST STUFF
-Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
     if(!_list)return NULL;
     Mvalue* _value=__value(_list->weak?"weak list":"strong list");
     if(!_value){
-        if(owner_list.level==0)free_list(_list,owner_list);
+        if(Misdisowned(_list))free_list(_list);
         return NULL;
     }
-    _value->value._list=SUBOWNED(OWNED(DISOWNED(_list,owner_list),getValueOwner()),1); // MDH@09JUN2020: _value is to take over ownership of _list
+    _value->value._list=(Misdisowned(_list)?owned_list(_list,owner_value_data):_list); // MDH@09JUN2020: _value is to take over ownership of _list
     _value->type=VT_LIST;
     return _value;
 }/* VALIDATED */
+
 void checkList(Mlist* _list){
     if(_list){
         long long l=_list->numberOfElements;
@@ -1196,7 +1177,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                             _map->numberOfElements++;
                             // result=M_TRUE; // success
                         }else{ // we have a map element BUT no variable, so no go
-                            free_mapelement(_mapelement,false,owner);_mapelement=NULL;
+                            FREE_MAPELEMENT(_mapelement,false,owner);_mapelement=NULL;
                             outputError("Failed to create a new attribute");
                         }
                     }else
@@ -1228,7 +1209,7 @@ long long removedFromMap(Mmap* _map,Mallocationowner owner_map,char const * cons
                 if(previousmapelement)previousmapelement->_next=mapelement->_next;else _map->_first=mapelement->_next; // disconnect the map element
                 if(mapelement->_next==NULL)_map->_last=previousmapelement;else mapelement->_next=NULL;
                 _map->numberOfElements--; // one less element in the map now
-                free_mapelement(mapelement,_map->weak,owner_map); // free (all parts of) the map element
+                FREE_MAPELEMENT(mapelement,_map->weak,owner_map); // free (all parts of) the map element
             }
             result=M_TRUE;
         }
@@ -2130,14 +2111,14 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){Mallocationowner 
         //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
         if(_value->type==VT_MAP){
             // if(amVerbose()&&amDebugging())outputValue("Copying map ",_value,".\n");
-            Mmap* _mapCopy=(Mmap*)OWNED(_getMapCopy(_value->value._map),owner);
-            _value=_getValueOfMap(_mapCopy,owner);
+            Mmap* _mapCopy=owned_map(_getMapCopy(_value->value._map),owner);
+            _value=_getValueOfMap(disowned_map(_mapCopy,owner));
             // if(!_value)free_map(_mapCopy,owner);
         }else
         if(_value->type==VT_LIST){
-            Mlist* _listCopy=(Mlist*)OWNED(_getListCopy(_value->value._list),owner);
+            Mlist* _listCopy=owned_list(_getListCopy(_value->value._list),owner);
             // if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
-            _value=_getValueOfList(_listCopy,owner);
+            _value=_getValueOfList(disowned_list(_listCopy,owner));
             // if(!_value)free_list(_listCopy,owner);
         }
     }
@@ -2373,53 +2354,98 @@ void free_expressionlist(Mexpressionlist* _expressionlist){
 
 // NOTE typically you're not supposed to free internal functions safe M function definitions 
 // TODO if a function map is freed, we shouldn't free internal functions BUT those are only present in the main environment which is never released!!
-bool free_function(Mfunction* _function,Mallocationowner owner_function){
-    if(_function){
+Mfunction* owned_function(Mfunction* _function,Mallocationowner owner_function){
+    if(!_function)return NULL;
+    /////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
+    owned_map(_function->_parameterMap,Msubowner(owner_function,1));
+    if(_function->type==FT_USER)owned_userfunction(_function->functionunion._userfunction,Msubowner(owner_function,1)); // TODO ?????
+    return OWNED(_function,owner_function);
+}
+Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function){
+    if(!_function)return NULL;
+    /////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
+    disowned_map(_function->_parameterMap,owner_function);
+    if(_function->type==FT_USER)disowned_userfunction(_function->functionunion._userfunction,owner_function); // TODO ?????
+    return DISOWNED(_function,owner_function);
+}
+void free_function(Mfunction* _function/*,Mallocationowner owner_function*/){
+    if(!_function)return;
         /////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
-        free_map(_function->_parameterMap,owner_function);
-        if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction,owner_function);
-        FREE_DISOWNED_1(_function,'F',owner_function);
-        return true;
-    }
-    return false;
+    free_map(_function->_parameterMap);
+    if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction);
+    FREE_1(_function,'F');
 }/* VALIDATED */
-bool free_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocationowner owner_functionmapelement){
-    if(_functionmapelement){
-        if(free_functionmapelement(_functionmapelement->_next,owner_functionmapelement))_functionmapelement->_next=NULL;
-        if(free_function(_functionmapelement->_function,owner_functionmapelement)){
-            FREE_STRING(_functionmapelement->_name,owner_functionmapelement);
-            FREE_DISOWNED_1(_functionmapelement,'f',owner_functionmapelement);
-            return true;
-        }
-    }
-    return false;
+
+Mfunctionmapelement* owned_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocationowner owner_functionmapelement){
+    if(!_functionmapelement)return NULL;
+    owned_functionmapelement(_functionmapelement->_next,owner_functionmapelement);
+    owned_function(_functionmapelement->_function,Msubowner(owner_functionmapelement,1));
+    owned_string(_functionmapelement->_name,Msubowner(owner_functionmapelement,1));
+    return OWNED(_functionmapelement,owner_functionmapelement);
+}
+Mfunctionmapelement* disowned_functionmapelement(Mfunctionmapelement* _functionmapelement,Mallocationowner owner_functionmapelement){
+    if(!_functionmapelement)return NULL;
+    disowned_functionmapelement(_functionmapelement->_next,owner_functionmapelement);
+    disowned_function(_functionmapelement->_function,owner_functionmapelement);
+    disowned_string(_functionmapelement->_name,owner_functionmapelement);
+    return DISOWNED(_functionmapelement,owner_functionmapelement);
+}
+void free_functionmapelement(Mfunctionmapelement* _functionmapelement){
+    if(!_functionmapelement)return;
+    free_functionmapelement(_functionmapelement->_next);
+    free_function(_functionmapelement->_function);
+    free_string(_functionmapelement->_name);
+    FREE_1(_functionmapelement,'f');
 }// VALIDATED
-void free_functionmap(Mfunctionmap* _functionmap,Mallocationowner owner_functionmap){
-    if(_functionmap){
-        free_functionmapelement(_functionmap->_first,Msubowner(owner_functionmap,1));
-        FREE_DISOWNED_1(_functionmap,'F',owner_functionmap);
-    }
+#define FREE_FUNCTIONMAPELEMENT(_functionmapelement,owner_functionmapelement) free_functionmapelement(disowned_functionmapelement(_functionmapelement,owner_functionmapelement))
+
+Mfunctionmap* owned_functionmap(Mfunctionmap* _functionmap,Mallocationowner owner_functionmap){
+    if(!_functionmap)return NULL;
+    owned_functionmapelement(_functionmap->_first,Msubowner(owner_functionmap,1));
+    return OWNED(_functionmap,owner_functionmap);
+}
+Mfunctionmap* disowned_functionmap(Mfunctionmap* _functionmap,Mallocationowner owner_functionmap){
+    if(!_functionmap)return NULL;
+    disowned_functionmapelement(_functionmap->_first,owner_functionmap);
+    return DISOWNED(_functionmap,owner_functionmap);
+}
+void free_functionmap(Mfunctionmap* _functionmap){
+    if(!_functionmap)return;
+    free_functionmapelement(_functionmap->_first);
+    FREE_1(_functionmap,'F');
 }// VALIDATED
+#define FREE_FUNCTIONMAP(_functionmap,owner_functionmap) free_functionmap(disowned_functionmap(_functionmap,owner_functionmap))
+
 // MDH@20JUL2019: might never get called, wel perhaps on internal functions when it goes out of scope???????
-void free_userfunction(Muserfunction* _userfunction,Mallocationowner owner_userfunction){
-    if(_userfunction){
-        ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
-        // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
-        free_list(_userfunction->_bodyCommandList,owner_userfunction);
-        // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
-        FREE_DISOWNED_1(_userfunction,'U',owner_userfunction);
-    }
+Muserfunction* owned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction){
+    if(!_userfunction)return NULL;
+    owned_list(_userfunction->_bodyCommandList,Msubowner(owner_userfunction,1));
+    // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
+    return OWNED(_userfunction,owner_userfunction);
+}
+Muserfunction* disowned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction){
+    if(!_userfunction)return NULL;
+    disowned_list(_userfunction->_bodyCommandList,owner_userfunction);
+    // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
+    return DISOWNED(_userfunction,owner_userfunction);
+}
+void free_userfunction(Muserfunction* _userfunction){
+    if(!_userfunction)return;
+    ///////////if(_userfunction->_parameterMap)free_map(_userfunction->_parameterMap);
+    // NOTE do NOT call free_value() on the body token value, instead NULL it so the reference count of the value is decremented!!!!
+    free_list(_userfunction->_bodyCommandList);
+    // replacing: assignValue(&_userfunction->_bodyTokenValue,NULL); // replacing: if(_userfunction->_bodyTokenValue)free_value(_userfunction->_bodyTokenValue);
+    FREE_1(_userfunction,'U');
 }/* VALIDATED */
 // END RELEASERS
 
 // Menvironment stuff
-Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
-    Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
-    if(!_environment){outputError("Failed to create an environment");return NULL;}
-    _environment->_variableMap=CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
-    if(!_environment->_variableMap){free_environment(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
-    return DISOWNED(_environment,owner);
-}/* VALIDATED */
+Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owner_environment){
+    if(!_environment)return NULL;
+    owned_chars(_environment->_name,Msubowner(owner_environment,1));
+    owned_map(_environment->_variableMap,Msubowner(owner_environment,1));
+    return OWNED(_environment,owner_environment);
+}
 Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment){
     if(!_environment)return NULL;
     disowned_chars(_environment->_name,owner_environment);
@@ -2443,6 +2469,13 @@ void free_environment(Menvironment* _environment/*,Mallocationowner owner_enviro
         FREE_1(_environment,'E'/*,owner_environment*/);
     }
 }/* VALIDATED */
+Menvironment* __environment(){Mallocationowner owner=getOwner(__LINE__);
+    Menvironment* _environment=CALLOC_1(sizeof(Menvironment),'E',owner);
+    if(!_environment){outputError("Failed to create an environment");return NULL;}
+    _environment->_variableMap=CALLOC_1(sizeof(Mmap),'M',Msubowner(owner,1)); // ascertain that the environment contains a variable map
+    if(!_environment->_variableMap){FREE_ENVIRONMENT(_environment,owner);_environment=NULL;outputError("Failed to create the new environment variable map");}
+    return disowned_environment(_environment,owner);
+}/* VALIDATED */
 
 Menvironment* getEnvironmentParent(Menvironment* _environment){
     return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
@@ -2463,25 +2496,27 @@ Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=
 }
 
 // additional function for wrapping environments and functions
-Mvalue* _getValueOfFunction(Mfunction* _function,Mallocationowner owner_function){
+Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_function*/){
     if(!_function)return NULL;
     Mvalue* _value=__value("function");
     if(!_value){
-        if(owner_function.level==0)free_function(_function,owner_function);
+        if(Misdisowned(_function))free_function(_function);
         return NULL;
     }
     _value->type=VT_FUNCTION;
-    _value->value._function=SUBOWNED(OWNED(DISOWNED(_function,owner_function),owner_valueList),3);
+    _value->value._function=(Misdisowned(_function)?owned_function(_function,owner_value_data):_function);
     return _value;
 }/* VALIDATED */
-Mvalue* _getValueOfEnvironment(Menvironment* _environment,Mallocationowner owner_environment){
+
+Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/){
     if(!_environment)return NULL;
     Mvalue* _value=__value("environment");
     if(!_value){
-        if(owner_environment.level==0)free_environment(_environment,owner_environment);
+        if(Misdisowned(_environment))free_environment(_environment);
         return NULL;
     }
     _value->type=VT_ENVIRONMENT;
-    _value->value._environment=SUBOWNED(OWNED(DISOWNED(_environment,owner_environment),owner_valueList),3);
+    // MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
+    _value->value._environment=(Misdisowned(_environment)?owned_environment(_environment,owner_value_data):_environment);
     return _value;
 }/* VALIDATED */

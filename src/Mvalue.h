@@ -87,10 +87,32 @@ typedef struct Mlist{
     bool immutable:1;
 }Mlist;
 
+Mlist* owned_list(Mlist * const _list,Mallocationowner owner_list);
+Mlist* disowned_list(Mlist * const _list,Mallocationowner owner_list);
+void free_list(Mlist* _list/*,Mallocationowner owner*/);
+#define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
+
+Mlist* __list(char* source,Mallocationowner owner_list);
+Mlist* _getListOfType(Mvaluetype valuetype);
+Mlist* listMadeWeak(Mlist * const list);
+
+/*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,const Mvalue * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+
+Mlist* _getListCopy(Mlist const * const _list);
+
+Mlist* _getListIndices(Mlist const * const _list);
+
+Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
+long long isListUndefined(Mlist* list);
+
 typedef struct Mmapelement{
     Mvariable* _variable;
     struct Mmapelement* _next;
 }Mmapelement;
+Mmapelement* owned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
+Mmapelement* disowned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
+bool free_mapelement(Mmapelement* _mapelement,bool weak);
+#define FREE_MAPELEMENT(_mapelement,weak,owner_mapelement) free_mapelement(disowned_mapelement(_mapelement,owner_mapelement),weak)
 
 typedef struct Mmap{
     unsigned long long numberOfElements; // keep track of the total number of variables
@@ -100,6 +122,21 @@ typedef struct Mmap{
     bool weak:1;
     bool immutable:1;
 }Mmap;
+
+Mmap* owned_map(Mmap* _map,Mallocationowner owner_map);
+Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map);
+void free_map(Mmap* _map);
+#define FREE_MAP(_map,owner_map) free_map(disowned_map(_map,owner_map))
+
+Mmap* _getMap(char *name);
+Mmap* _getMapCopy(Mmap const * const map);
+Mmap* _getFloatMap(char* name,Mvalue* _floatValue);
+Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
+Mmap* _getListMap(char* name,Mvalue* _listValue);
+Mmap* _getStringStringMap(char* name1,char* name2);
+Mmap* _getFloatFloatMap(char* name1,char* name2);
+Mlist* _getMapAttributes(Mmap const * const _map);
+long long isMapUndefined(Mmap* map);
 
 //Mvalue* getVariableValue(Mvariablelist variablelist,char* name);
 
@@ -114,21 +151,7 @@ typedef struct Mexpressionlist{
     Mexpressionlistelement* _next;
 }Mexpressionlist;
 
-Mmap* owned_map(Mmap* _map,Mallocationowner owner_map);
-Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map);
-void free_map(Mmap* _map/*,Mallocationowner owner*/);
-#define FREE_MAP(_map,owner_map) free_map(disowned_map(_map,owner_map))
-
 Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter); // convert a long double to its rational equivalent and wraps it in a value
-
-Mmap* _getMap(char *name);
-Mmap* _getMapCopy(Mmap const * const map);
-Mmap* _getFloatMap(char* name,Mvalue* _floatValue);
-Mmap* _getIntegerMap(char* name,Mvalue* _integerValue);
-Mmap* _getListMap(char* name,Mvalue* _listValue);
-Mmap* _getStringStringMap(char* name1,char* name2);
-Mmap* _getFloatFloatMap(char* name1,char* name2);
-long long isMapUndefined(Mmap* map);
 
 // in order to find out if a big integer is out of the long long range we need the smallest and largest long long big integer values
 // data wrappers
@@ -139,11 +162,6 @@ Mvalue* _getCharTextValue(char _c);
 
 // MDH@13JUN2019: anything that receives a pointer and might fail, should allow freeing the input pointer
 // MDH@28MAY2020 TODO shouldn't we rename these to _getValueOfReference etc.
-Mvalue* _getReferenceValue(Mreference* _reference,Mallocationowner owner_reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
-Mvalue* _getBigintegerValue(Mbiginteger* _biginteger,Mallocationowner owner_biginteger); // MDH@31MAY2019: we cannot use a big integer long here
-Mvalue* _getRationalValue(Mrational* _rational,Mallocationowner owner_rational);
-Mvalue* _getDecimalValue(Mdecimal* _decimal,Mallocationowner owner_decimal);
-
 Mvalue* _getFloatValue(long double ld);
 Mvalue* _getTextValue(char const * const text);
 Mvalue* _getListValue(Mvaluetype listValuetype,bool weak,char const * const source); // returning an empty list with all values to be of type listValuetype
@@ -151,16 +169,17 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak); // returning an empty m
 //////Mvalue* _getUserfunctionValue(Muserfunction* _userfunction,bool freeonfailure);
 //////Mvalue* _getTokenValue(char* text);
 
-Mvalue* _getValueOfList(Mlist* _list,Mallocationowner owner_list);
-Mvalue* _getValueOfInteger(Minteger* _integer,Mallocationowner owner_integer);
-Mvalue* _getValueOfReal(Mfloat* _real,Mallocationowner owner_real);
-Mvalue* _getValueOfMap(Mmap* _map,Mallocationowner owner_map);
-Mvalue* _getValueOfToken(Mtoken* _token,Mallocationowner owner_token);
+Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/);
+Mvalue* _getValueOfInteger(Minteger* _integer/*,Mallocationowner owner_integer*/);
+Mvalue* _getValueOfReal(Mfloat* _real/*,Mallocationowner owner_real*/);
+Mvalue* _getValueOfMap(Mmap* _map/*,Mallocationowner owner_map*/);
+Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/);
+Mvalue* _getValueOfReference(Mreference* _reference); // MDH@04NOV2019: wrap a variable name as a reference (I suppose it ought to reference a variable though)
+Mvalue* _getValueOfBiginteger(Mbiginteger* _biginteger); // MDH@31MAY2019: we cannot use a big integer long here
+Mvalue* _getValueOfRational(Mrational* _rational);
+Mvalue* _getValueOfDecimal(Mdecimal* _decimal);
 
-Mlist* _getListOfType(Mvaluetype valuetype);
 Mmap* _getMapOfType(Mvaluetype valuetype);
-
-Mlist* listMadeWeak(Mlist * const list);
 Mmap* mapMadeWeak(Mmap * const map);
 
 // MDH@02MAY2019: not allowed to call free_value from the outside
@@ -172,25 +191,7 @@ bool incrementReferenceCount(Mvalue * const _value);
 Mallocationowner getValueOwner();
 // MDH@28MAY2020 better not to let the outside free values ever (except this module's garbage collector of course): void free_value(Mvalue* _value/*,Mallocationowner owner*/);
 //////////Mstring* appendld(Mstring* mstr,long double ld);
-
-/*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,const Mvalue * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
-
-Mlist* __list(char* source,Mallocationowner owner_list);
-
-Mlist* owned_list(Mlist* _list,Mallocationowner owner_list);
-Mlist* disowned_list(Mlist* _list,Mallocationowner owner_list);
-void free_list(Mlist* _list/*,Mallocationowner owner*/);
-#define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
-
-Mlist* _getListCopy(Mlist const * const _list);
-
-Mlist* _getListIndices(Mlist const * const _list);
-Mlist* _getMapAttributes(Mmap const * const _map);
-
-Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
 Mvalue* getFirstScalarValue(Mvalue* value);
-
-long long isListUndefined(Mlist* list);
 
 long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,const char* const attributeName,const Mvalue* const _attributeValue);
 long long removedFromMap(Mmap* const _map,Mallocationowner owner_map,const char* const attributeName);
@@ -261,14 +262,10 @@ Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable);
 void free_variable(Mvariable* _variable,bool weak);
 #define FREE_VARIABLE(_variable,weak,owner_variable) free_variable(disowned_variable(_variable,owner_variable),weak)
 
-Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement);
-bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/);
-#define FREE_MAPELEMENT(_mapelement,weak,owner_mapelement) free_mapelement(disowned_mapelement(_mapelement,owner_mapelement))
-
 Mlistelement* owned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement);
 Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement);
 bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/);
-#define FREE_LISTELEMENT(_listelement,owner_listelement) free_listelement(disowned_listelement(_listelement,owner_listelement))
+#define FREE_LISTELEMENT(_listelement,weak,owner_listelement) free_listelement(disowned_listelement(_listelement,owner_listelement),weak)
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
@@ -307,9 +304,10 @@ typedef struct Muserfunction{
     struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
     struct Mlist* _bodyCommandList; // a list of body commands
 }Muserfunction;
-void disowned_userfunction(Muserfunction* _userfunction,Mallocationowner owner_userfunction);
-void free_userfunction(Muserfunction* _userfunction/*,Mallocationowner owner_userfunction*/);
+Muserfunction* disowned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction);
+void free_userfunction(Muserfunction* _userfunction);
 #define FREE_USERFUNCTION(_userfunction,owner_userfunction) free_userfunction(disowned_userfunction(_userfunction,owner_userfunction))
+Muserfunction* owned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction);
 
 typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS,FT_INTERNAL_FIVE_ARGUMENTS}Mfunctiontype;
 
@@ -332,12 +330,19 @@ typedef struct Mfunction{
     Mfunctiontype type; // whether internal or external
     Mfunctionunion functionunion; // where either the internal function to call with the arguments is placed or 
 }Mfunction;
+Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function);
+void free_function(Mfunction* _function);
+#define FREE_FUNCTION(_function,owner_function) free_function(disowned_function(_function,owner_function))
+Mfunction* owned_function(Mfunction* _function,Mallocationowner owner_function);
+
+Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_function*/);
 
 typedef struct Mfunctionmapelement{
     Mstring* _name;
     Mfunction* _function;
     struct Mfunctionmapelement* _next;
 }Mfunctionmapelement;
+// Mfunctionmapelement* disowned_functionmapelement(Mfunctionmapelement * const _functionmapelement,Mallocationowner owner_functionmapelement);
 
 typedef struct Mfunctionmap{
     uint32_t numberOfFunctions;  // keeping track of the total number of functions...
@@ -364,15 +369,10 @@ Menvironment* __environment(); // creates a new (empty) environment
 Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment);
 void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
 #define FREE_ENVIRONMENT(_environment,owner_environment) free_environment(disowned_environment(_environment,owner_environment))
+Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owner_environment);
 
 Mstring* _getEnvironmentName(Menvironment* _environment); // for use in prompting
 Menvironment* getEnvironmentParent(Menvironment* _environment);
-
-Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function);
-bool free_function(Mfunction* _function/*,Mallocationowner owner_function*/);
-#define FREE_FUNCTION(_function,owner_function) free_function(disowned_function(_function,owner_function))
-
 Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 
-Mvalue* _getValueOfFunction(Mfunction* _function,Mallocationowner owner_function);
-Mvalue* _getValueOfEnvironment(Menvironment* _environment,Mallocationowner owner_environment);
+Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/);

@@ -249,6 +249,14 @@ Mrational* _getLongDoubleRational(long double ld){
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
+Mtext* owned_text(Mtext* _text,Mallocationowner owner_text){
+    if(!_text)return NULL;
+    return(Mtext*)OWNED(_text,owner_text);
+}
+Mtext* disowned_text(Mtext* _text,Mallocationowner owner_text){
+    if(!_text)return NULL;
+    return(Mtext*)DISOWNED(_text,owner_text);
+}
 void free_text(Mtext* _text/*,Mallocationowner owner*/){
     // MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
     // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
@@ -461,19 +469,19 @@ long long isTextUndefined(Mtext* text){return(text?M_FALSE:M_TRUE);}
 long long isTokenUndefined(Mtoken* token){return(token?M_FALSE:M_TRUE);}
 
 // Mtext is an immutable version of Mstring* in that it cannot be changed
-Mtext* _getText(char* text){Mallocationowner owner=getOwner(__LINE__);
-    return(text?(Mtext*)DISOWNED(OWNED(_strdup(text),owner),owner):NULL);
+Mtext* _getText(char* text){//Mallocationowner owner=getOwner(__LINE__);
+    return(text?(Mtext*)_strdup(text):NULL); // TODO assuming that _strdup will return a disowned text!!!
     // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
 }/* VALIDATED */
 
 Mtext* _getCharText(char c){Mallocationowner owner=getOwner(__LINE__); // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
     Mtext* _charText=NULL;
-    Mstring* _charString=(Mstring*)OWNED(_getString("\""),owner);
+    Mstring* _charString=owned_string(_getString("\""),owner);
     if(_charString){
-        if(string_append_char(_charString,c))_charText=(Mtext*)OWNED(_getText(string(_charString)),owner);
+        if(string_append_char(_charString,c))_charText=owned_text(_getText(string(_charString)),owner);
         FREE_STRING(_charString,owner);
     }
-    return(Mtext*)DISOWNED(_charText,owner);
+    return disowned_text(_charText,owner);
 }/* VALIDATED */
 /*
 void free_list(Mlist* _list);
