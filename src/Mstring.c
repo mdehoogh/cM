@@ -27,7 +27,7 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
         //                this means that we need to use REALLOC for all dynamic memory allocations of variable length
         // MDH@16APR2020: using Mchars* instance
         // MDH@03MAY2020 OOPS the size should go first!!!
-        ans->_chars=(Mchars*)SUBOWNED(OWNED(__chars(M_BLOCK_SIZE,1,'s'),owner),1);
+        ans->_chars=owned_chars(__chars(M_BLOCK_SIZE,1,'s'),Msubowner(owner,1));
         if(!ans->_chars){FREE_DISOWNED_1(ans,'S',owner);return NULL;}
         //OWNED(ans->_chars,owner);SUBOWNED(ans->_chars,1);
         ans->blocks=1;
@@ -41,7 +41,7 @@ Mstring* __string(){Mallocationowner owner=getOwner(__LINE__);
 #ifdef __DEBUGGING__
     if(!ans)printf("\nFailed to create a string.");
 #endif
-    return(Mstring*)DISOWNED(ans,owner);
+    return disowned_string(ans,owner);
 }
 
 Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE__);
@@ -53,7 +53,7 @@ Mstring* _getString(char const * const s){Mallocationowner owner=getOwner(__LINE
         // MDH@17APR2020: Mchars* replacing char*
         size_t blocks=1+(l/M_BLOCK_CHARACTERS);
         // NOTE __chars will return a disowned pointer which can then be owned by ans unless we create a subowned macro that will simply increment the level of ownership
-        ans->_chars=SUBOWNED(OWNED(__chars(M_BLOCK_SIZE,blocks,'s'),owner),1);
+        ans->_chars=owned_chars(__chars(M_BLOCK_SIZE,blocks,'s'),Msubowner(owner,1));
         if(ans->_chars){
             ans->length=l;
             ans->blocks=blocks;

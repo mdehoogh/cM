@@ -42,10 +42,16 @@ typedef struct Mvaluereference{
 	Mvalue* _value; // either the host value (if no variable name is defined), or the value of the host variable
 	Mvalue* _itemid; // the item referenced!!!
 }Mvaluereference;
+
+void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/);
+#ifndef __PRODUCTION__
 Mvaluereference* owned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference);
 Mvaluereference* disowned_valuereference(Mvaluereference* _valuereference,Mallocationowner owner_valuereference);
-void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/);
 #define FREE_VALUEREFERENCE(_valuereference,owner_valuereference) free_valuereference(disowned_valuereference(_valuereference,owner_valuereference))
+#else
+#define FREE_VALUEREFERENCE(_valuereference,owner_valuereference) free_valuereference(_valuereference)
+#endif
+
 
 // a variable is a named value of a certain value type
 typedef struct Mvariable{
@@ -61,12 +67,18 @@ typedef struct Mreference{
     size_t referenceindex;
 }Mreference;
 
+Mreference* _getReference(Mvariable* variable);
+void free_reference(Mreference* _reference);
+#ifndef __PRODUCTION__
 Mreference* owned_reference(Mreference* reference,Mallocationowner owner);
 Mreference* disowned_reference(Mreference* reference,Mallocationowner owner);
-void free_reference(Mreference* _reference);
 #define FREE_REFERENCE(_reference,owner_reference) free_reference(disowned_reference(_reference,owner_reference))
+#define __REFERENCE(_variable,owner_reference) owned_reference(_getReference(_variable),owner_reference)
+#else
+#define FREE_REFERENCE(_reference,owner_reference) free_reference(_reference)
+#define __REFERENCE(_variable,owner_reference) _getReference(_variable)
+#endif
 
-Mreference* _getReference(Mvariable* variable);
 
 typedef struct Mlistelement{
     unsigned long long index; // MDH@03MAY2019: keep track of the index in the list of this list element
@@ -88,12 +100,21 @@ typedef struct Mlist{
     bool immutable:1;
 }Mlist;
 
+Mlist* __list(char* source/*,Mallocationowner owner_list*/);
+void free_list(Mlist* _list/*,Mallocationowner owner*/);
+#ifndef __PRODUCTION__
 Mlist* owned_list(Mlist * const _list,Mallocationowner owner_list);
 Mlist* disowned_list(Mlist * const _list,Mallocationowner owner_list);
-void free_list(Mlist* _list/*,Mallocationowner owner*/);
+#define OWNED_LIST(_list,owner_list) owned_list(_list,owner_list)
+#define __LIST(source,owner_list) owned_list(__list(source),owner_list)
+#define DISOWNED_LIST(_list,owner_list) disowned_list(_list,owner_list)
 #define FREE_LIST(_list,owner_list) free_list(disowned_list(_list,owner_list))
-
-Mlist* __list(char* source/*,Mallocationowner owner_list*/);
+#else
+#define OWNED_LIST(_list,owner_list) _list
+#define __LIST(source,owner_list) __list(source)
+#define DISOWNED_LIST(_list,owner_list) _list
+#define FREE_LIST(_list,owner_list) free_list(_list)
+#endif
 
 Mlist* _getListOfType(Mvaluetype valuetype);
 Mlist* listMadeWeak(Mlist * const list);
@@ -109,10 +130,14 @@ typedef struct Mmapelement{
     struct Mmapelement* _next;
 }Mmapelement;
 
+bool free_mapelement(Mmapelement* _mapelement,bool weak);
+#ifndef __PRODUCTION__
 Mmapelement* owned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
 Mmapelement* disowned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
-bool free_mapelement(Mmapelement* _mapelement,bool weak);
 #define FREE_MAPELEMENT(_mapelement,weak,owner_mapelement) free_mapelement(disowned_mapelement(_mapelement,owner_mapelement),weak)
+#else
+#define FREE_MAPELEMENT(_mapelement,weak,owner_mapelement) free_mapelement(_mapelement,weak)
+#endif
 
 typedef struct Mmap{
     unsigned long long numberOfElements; // keep track of the total number of variables
@@ -123,10 +148,14 @@ typedef struct Mmap{
     bool immutable:1;
 }Mmap;
 
+void free_map(Mmap* _map);
+#ifndef __PRODUCTION__
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map);
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map);
-void free_map(Mmap* _map);
 #define FREE_MAP(_map,owner_map) free_map(disowned_map(_map,owner_map))
+#else
+#define FREE_MAP(_map,owner_map) free_map(_map)
+#endif
 
 Mmap* _getMap(char *name);
 Mmap* _getMapCopy(Mmap const * const map);
@@ -256,16 +285,25 @@ Mvalue* __value(char const * const descriptor); // TODO expose __value()????? ye
 size_t getNumberOfRemovedValues(bool showInfo);
 unsigned long long getNumberOfValues();
 
+void free_variable(Mvariable* _variable,bool weak);
+#ifndef __PRODUCTION__
 Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable);
 Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable);
-void free_variable(Mvariable* _variable,bool weak);
 #define FREE_VARIABLE(_variable,weak,owner_variable) free_variable(disowned_variable(_variable,owner_variable),weak)
+#else
+#define FREE_VARIABLE(_variable,weak,owner_variable) free_variable(_variable,weak)
+#endif
+
 Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
 
+bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/);
+#ifndef __PRODUCTION__
 Mlistelement* owned_listelement(Mlistelement * const _listelement,Mallocationowner owner_listelement);
 Mlistelement* disowned_listelement(Mlistelement * const _listelement,Mallocationowner owner_listelement);
-bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/);
 #define FREE_LISTELEMENT(_listelement,weak,owner_listelement) free_listelement(disowned_listelement(_listelement,owner_listelement),weak)
+#else
+#define FREE_LISTELEMENT(_listelement,weak,owner_listelement) free_listelement(_listelement,weak)
+#endif
 
 typedef Mvalue* (*NoArgumentFunction)();
 typedef Mvalue* (*OneArgumentFunction)(Mvalue* _argumentValue);
@@ -304,10 +342,15 @@ typedef struct Muserfunction{
     struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
     struct Mlist* _bodyCommandList; // a list of body commands
 }Muserfunction;
-Muserfunction* disowned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction);
+
 void free_userfunction(Muserfunction* _userfunction);
-#define FREE_USERFUNCTION(_userfunction,owner_userfunction) free_userfunction(disowned_userfunction(_userfunction,owner_userfunction))
+#ifndef __PRODUCTION__
+Muserfunction* disowned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction);
 Muserfunction* owned_userfunction(Muserfunction * const _userfunction,Mallocationowner owner_userfunction);
+#define FREE_USERFUNCTION(_userfunction,owner_userfunction) free_userfunction(disowned_userfunction(_userfunction,owner_userfunction))
+#else
+#define FREE_USERFUNCTION(_userfunction,owner_userfunction) free_userfunction(_userfunction)
+#endif
 
 typedef enum Mfunctiontype{FT_USER,FT_INTERNAL_NO_ARGUMENTS,FT_INTERNAL_ONE_ARGUMENT,FT_INTERNAL_TWO_ARGUMENTS,FT_INTERNAL_THREE_ARGUMENTS,FT_INTERNAL_FOUR_ARGUMENTS,FT_INTERNAL_FIVE_ARGUMENTS}Mfunctiontype;
 
@@ -330,10 +373,15 @@ typedef struct Mfunction{
     Mfunctiontype type; // whether internal or external
     Mfunctionunion functionunion; // where either the internal function to call with the arguments is placed or 
 }Mfunction;
-Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function);
+
 void free_function(Mfunction* _function);
-#define FREE_FUNCTION(_function,owner_function) free_function(disowned_function(_function,owner_function))
+#ifndef __PRODUCTION__
 Mfunction* owned_function(Mfunction* _function,Mallocationowner owner_function);
+Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function);
+#define FREE_FUNCTION(_function,owner_function) free_function(disowned_function(_function,owner_function))
+#else
+#define FREE_FUNCTION(_function,owner_function) free_function(_function)
+#endif
 
 Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_function*/);
 
@@ -366,10 +414,16 @@ typedef struct Menvironment{
 }Menvironment;
 
 Menvironment* __environment(); // creates a new (empty) environment
-Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment);
 void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
-#define FREE_ENVIRONMENT(_environment,owner_environment) free_environment(disowned_environment(_environment,owner_environment))
+#ifndef __PRODUCTION__
 Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owner_environment);
+Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner owner_environment);
+#define FREE_ENVIRONMENT(_environment,owner_environment) free_environment(disowned_environment(_environment,owner_environment))
+#define __ENVIRONMENT(owner_environment) owned_environment(__environment(),owner_environment)
+#else
+#define FREE_ENVIRONMENT(_environment,owner_environment) free_environment(_environment)
+#define __ENVIRONMENT(owner_environment) __environment()
+#endif
 
 Mstring* _getEnvironmentName(Menvironment* _environment); // for use in prompting
 Menvironment* getEnvironmentParent(Menvironment* _environment);

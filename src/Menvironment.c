@@ -42,12 +42,14 @@ Mstring* _getExecutionEnvironmentName(){
     return _getEnvironmentName(getExecutionEnvironment());
 }
 void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner owner=getOwner(__LINE__);
+    Mstring* _environmentName=owned_string(_getExecutionEnvironmentName(),owner);
+    if(!_environmentName)return;
     if(prefix)output("%s",prefix);
-    Mstring* _environmentName=(Mstring*)OWNED(_getExecutionEnvironmentName(),owner);
     output("%s",string(_environmentName));
     if(suffix)output("%s",suffix);
     FREE_STRING(_environmentName,owner);
 }
+// MDH@14JUN2020: _environment is supposedly disowned when doing this so _getValueOfEnvironment() can take over ownership
 bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
     // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
@@ -59,7 +61,7 @@ bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner
     assignValue(&_environment->execution,_executionEnvironmentValue); // MDH@03FEB2020 replacing: _environment->_execution=_executionEnvironment; // remember to what execution environment to pop back to
     // replace the current execution environment with the new one
     assignValue(&_executionEnvironmentValue,_environmentValue); // MDH@03FEB2020 OOPS almost forgot to use assignValue() here!!!
-    if(amVerbose())outputExecutionEnvironmentName("New execution environment '","'.\n");
+    if(amVerboseDebugging())outputExecutionEnvironmentName("New execution environment '","'.\n");
     return true;
 }/* NOT VALIDATED */
 void popExecutionEnvironment(){
@@ -759,30 +761,32 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
                     if(amVerbose())output("Variable '%s' to be created.\n",name);
                     // we may now safely create the variable BUT the type should be a map if this is NOT the last property BUT NO the type of a variable would limit what can be stored in it
                     // MDH@08JUN2020: _getVariable() adjusted to accept an Mchars* properly owned to start with (and freed automatically on failure)
-                    Mchars* _variableName=owned_chars(_getChars(name),owner);
-                    if(_variableName){
-                        _variable=owned_variable(_getVariable(_variableName,(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
-                        if(_variable){
-                            // store the references
-                            _variableMapelement->_next=NULL;
-                            SUBOWNED(OWNED(DISOWNED(_variable,owner),owner_environment),3); // TODO is this the best way to do that?
-                            SUBOWNED(OWNED(DISOWNED(_variable->_name,owner),owner_environment),4); // bound name one level below what we did to the variable
-                            _variableMapelement->_variable=_variable;
-                            Mmapelement* _lastVariableMapelement=map->_last;
-                            SUBOWNED(OWNED(DISOWNED(_variableMapelement,owner),owner_environment),2);
-                            if(_lastVariableMapelement!=NULL)
-                                _lastVariableMapelement->_next=_variableMapelement;
-                            else 
-                                map->_first=_variableMapelement;
-                            map->_last=_variableMapelement;
-                            map->numberOfElements++;
-                            if(amVerbose())
-                                output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
-                        }else{
-                            FREECHARS(_variableName,owner_environment);
-                        }
-                    }else
-                        output("%sFailed to create variable name '%s'.\n",M_ERROR_PREFIX,name);
+                    _variable=owned_variable(_getVariable(_getChars(name),(propertySeparator?VT_UNDEFINED:valuetype),immutable),owner); // creates the variable, free when not bound BUT that will NOT happen
+                    if(_variable){
+                        if(amVerboseDebugging())output("Variable '%s' created.\n",name);
+                        // store the references
+                        _variableMapelement->_next=NULL;
+                        _variableMapelement->_variable=_variable;
+                        /*
+                        owned_variable(disowned_variable(_variable,owner),Msubowner(owner_environment,3)); // TODO is this the best way to do that?
+                        if(amVerboseDebugging())output("Variable '%s' owned by new map element.\n",name);
+                        */
+                        /*
+                        owned_chars(disowned_chars(_variable->_name,owner),Msubowner(owner_environment,4)); // bound name one level below what we did to the variable
+                        if(amVerboseDebugging())output("Variable name '%s' owned by new map element.\n",name);
+                        */
+                        Mmapelement* _lastVariableMapelement=map->_last;
+                        if(_lastVariableMapelement!=NULL)
+                            _lastVariableMapelement->_next=_variableMapelement;
+                        else 
+                            map->_first=_variableMapelement;
+                        map->_last=_variableMapelement;
+                        if(amVerboseDebugging())output("New map element added to environment variable map.\n");
+                        owned_mapelement(disowned_mapelement(_variableMapelement,owner),Msubowner(owner_environment,2));
+                        map->numberOfElements++;
+                        if(amVerbose())
+                            output("Variable '%s' added to environment '%s'.\n",name,environment->_name);
+                    }
                 }else
                     output("%sFailed to create a new map element for variable '%s'.",M_ERROR_PREFIX,name);
             }else
@@ -900,17 +904,18 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
 bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("Cannot set the value: no variable name");return false;}
+    if(amVerboseDebugging()){output("Setting the value of '%s'",name);outputValue(" to '",_value,"'.\n");}
     Mvariable* variable=getVariable(_environment,name,amVerboseDebugging());
     if(variable){
         if(!variable->_value||!variable->immutable){
-            if(amVerbose())output("Variable '%s' to set.\n",variable->_name);
+            if(amVerboseDebugging())output("Value of variable '%s' to set.\n",variable->_name);
             // _value needs to be of the right type
             // MDH@03NOV2019: unless it's null (i.e. the type of _value->type is VT_UNDEFINED)
             if(!_value||variable->valuetype==VT_UNDEFINED||variable->valuetype==_value->type||_value->type==VT_UNDEFINED){
                 ///////////////if(_variable->_value)_variable->_value->count--; // decrement the reference count on the current value
                 assignValue(&variable->_value,_value); // 'assign' the reference (takes care of updating the reference counts)
-                if(amVerbose()){
-                    Mstring* _valueText=(Mstring*)OWNED(_getValueText(variable->_value,false),owner);
+                if(amVerboseDebugging()){
+                    Mstring* _valueText=owned_string(_getValueText(variable->_value,false),owner);
                     if(_valueText){
                         output("Value '%s' with count %zd assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
                         FREE_STRING(_valueText,owner);
@@ -933,7 +938,7 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 }/* VALIDATED */
 
 // MDH@14NOV2019: sometimes we need a setValue that does not use assignValue() because we do not want to copy the (composite) value passed in
-bool setVariable(Menvironment * const _environment,char /*const*/ * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
+bool setVariable(Menvironment * const _environment,char * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("No variable specified to set the value of");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
@@ -947,7 +952,7 @@ bool setVariable(Menvironment * const _environment,char /*const*/ * const name,M
                 variable->_value=_value;
                 if(variable->_value)incrementReferenceCount(variable->_value);
                 if(amVerbose()){
-                    Mstring* _valueText=(Mstring*)OWNED(_getValueText(variable->_value,false),owner);
+                    Mstring* _valueText=owned_string(_getValueText(variable->_value,false),owner);
                     if(_valueText){
                         output("Value '%s' (reference count: %zd) assigned to variable '%s'.\n",string(_valueText),(variable->_value?variable->_value->count:0),name);
                         FREE_STRING(_valueText,owner);
@@ -1451,7 +1456,7 @@ bool completedValueFunction(Mfunction* const _function,const char* const functio
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getMap("v"),owner),1);
+        _function->_parameterMap=owned_map(_getMap("v"),Msubowner(owner,1));
         if(_function->_parameterMap){
             // no defaults here!!!
             if(amVerbose())output("Registered single value argument function '%s' completed.\n",functionName);
@@ -1466,7 +1471,7 @@ bool completedFloatFunction(Mfunction* const _function,const char* const functio
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getFloatMap("x",_getFloatValue(M_LD_NAN)),owner),1); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
+        _function->_parameterMap=owned_map(_getFloatMap("x",_getFloatValue(M_LD_NAN)),Msubowner(owner,1)); // MDH@20JUN2019: now using the invalid real value as default (to indicate a missing value)
         if(_function->_parameterMap){
             if(amVerbose())output("Registered single real argument function '%s' completed.\n",functionName);
             return true;
@@ -1481,7 +1486,7 @@ bool completedIntegerFunction(Mfunction* const _function,const char* const funct
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=SUBOWNED(OWNED(_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)),owner),1); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
+        _function->_parameterMap=owned_map(_getIntegerMap("i",_getIntegerValue(M_LL_INVALID)),Msubowner(owner,1)); // MDH@20JUN2019: now using the invalid value as default (to indicate a missing!!!!)
         if(_function->_parameterMap){
            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;    
@@ -1496,7 +1501,7 @@ bool completedListFunction(Mfunction* const _function,const char* const function
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=SUBOWNED(OWNED(_getListMap("l",_getListValue(VT_UNDEFINED,false,"completedListFunction")),owner),1);
+        _function->_parameterMap=owned_map(_getListMap("l",_getListValue(VT_UNDEFINED,false,"completedListFunction")),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered list function '%s' completed.\n",functionName);
             return true;
@@ -1511,7 +1516,7 @@ bool completedTokenListFunction(Mfunction* const _function,const char* const fun
         _function->type=FT_INTERNAL_ONE_ARGUMENT;
         _function->functionunion.oneArgumentFunction=oneArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=SUBOWNED(OWNED(_getListMap("l",_getListValue(VT_TOKEN,false,"completedTokenListFunction")),owner),1);
+        _function->_parameterMap=owned_map(_getListMap("l",_getListValue(VT_TOKEN,false,"completedTokenListFunction")),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())
                 output("Registered token list function '%s' completed.\n",functionName);
@@ -1527,7 +1532,7 @@ bool completedIntegerBooleanFunction(Mfunction* const _function,const char* cons
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
         // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
-        _function->_parameterMap=SUBOWNED(OWNED(_getIntegerBooleanMap("number of decimals","compute sine table"),owner),1);
+        _function->_parameterMap=owned_map(_getIntegerBooleanMap("number of decimals","compute sine table"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered integer boolean function '%s' completed.\n",functionName);
             return true;
@@ -1541,7 +1546,7 @@ bool completedStringStringFunction(Mfunction* const _function,const char* const 
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getStringStringMap("variable","type"),owner),1);
+        _function->_parameterMap=owned_map(_getStringStringMap("variable","type"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1555,7 +1560,7 @@ bool completedFloatFloatFunction(Mfunction* const _function,const char* const fu
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getFloatFloatMap("base","exponent"),owner),1);
+        _function->_parameterMap=owned_map(_getFloatFloatMap("base","exponent"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1569,7 +1574,7 @@ bool completedStringMapTokenFunction(Mfunction* const _function,const char* cons
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getStringMapTokenMap("name","parameters","body"),owner),1);
+        _function->_parameterMap=owned_map(_getStringMapTokenMap("name","parameters","body"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1583,7 +1588,7 @@ bool completedMapTokenFunction(Mfunction* const _function,const char* const func
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getMapTokenMap("parameters","body"),owner),1);
+        _function->_parameterMap=owned_map(_getMapTokenMap("parameters","body"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1597,7 +1602,7 @@ bool completedValueTextValueFunction(Mfunction* const _function,const char* cons
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getStringMapTokenMap("variable name, list or map","value type","immutable"),owner),1);
+        _function->_parameterMap=owned_map(_getStringMapTokenMap("variable name, list or map","value type","immutable"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1611,7 +1616,7 @@ bool completedTokenTokenFunction(Mfunction* const _function,const char* const fu
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenMap("while condition","while body"),owner),1);
+        _function->_parameterMap=owned_map(_getTokenTokenMap("while condition","while body"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1625,7 +1630,7 @@ bool completedValueValueFunction(Mfunction* const _function,const char* const fu
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenMap("value to text","format specifier"),owner),1);
+        _function->_parameterMap=owned_map(_getTokenTokenMap("value to text","format specifier"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1639,7 +1644,7 @@ bool completedListValueFunction(Mfunction* const _function,const char* const fun
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_TWO_ARGUMENTS;
         _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenMap("list","value"),owner),1);
+        _function->_parameterMap=owned_map(_getTokenTokenMap("list","value"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1653,7 +1658,7 @@ bool completedListValueIntegerFunction(Mfunction* const _function,const char* co
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getListValueIntegerMap("list to search","value to find","maximum number of elements"),owner),1);
+        _function->_parameterMap=owned_map(_getListValueIntegerMap("list to search","value to find","maximum number of elements"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1667,7 +1672,7 @@ bool completedValueTokenTokenFunction(Mfunction* const _function,const char* con
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getValueTokenTokenMap("if condition","then clause","else clause"),owner),1);
+        _function->_parameterMap=owned_map(_getValueTokenTokenMap("if condition","then clause","else clause"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1681,7 +1686,7 @@ bool completedThreeIntegersFunction(Mfunction* const _function,const char* const
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_THREE_ARGUMENTS;
         _function->functionunion.threeArgumentFunction=threeArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getThreeIntegerMap("red","green","blue"),owner),1);
+        _function->_parameterMap=owned_map(_getThreeIntegerMap("red","green","blue"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1695,7 +1700,7 @@ bool completedTokenTokenTokenTokenFunction(Mfunction* const _function,const char
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_FOUR_ARGUMENTS;
         _function->functionunion.fourArgumentFunction=fourArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body"),owner),1);
+        _function->_parameterMap=owned_map(_getTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
@@ -1709,7 +1714,7 @@ bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const
         // OWNED(_function,owner);
         _function->type=FT_INTERNAL_FIVE_ARGUMENTS;
         _function->functionunion.fiveArgumentFunction=fiveArgumentFunction;
-        _function->_parameterMap=SUBOWNED(OWNED(_getTokenTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body","result"),owner),1);
+        _function->_parameterMap=owned_map(_getTokenTokenTokenTokenTokenMap("for initialization","for condition","for increment","for body","result"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;

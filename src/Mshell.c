@@ -2556,7 +2556,7 @@ Mvalue* Mreciprocal(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 }
 // MDH@29OCT2019: concatenate textual, typically used for lists
 static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner owner=getOwner(__LINE__);
-	Mstring* _concatenated=OWNED(__string(),owner);
+	Mstring* _concatenated=owned_string(__string(),owner);
 	if(_concatenated){
 		Mlistelement* listelement=list->_first;
 		Mvalue* listelementValue=NULL;
@@ -2565,9 +2565,9 @@ static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner o
 			Mstring* _listelementText=NULL;
 			if(listelementValue){
 				if(listelementValue->type==VT_LIST)
-					_listelementText=_getConcatenated(listelementValue->value._list,separator);
+					_listelementText=owned_string(_getConcatenated(listelementValue->value._list,separator),owner);
 				else
-					_listelementText=_getValueText(listelementValue,true);
+					_listelementText=owned_string(_getValueText(listelementValue,true),owner);
 			}
 			if(_listelementText){
 				if(separator)if(string_length(_concatenated)>0)string_append(_concatenated,separator);
@@ -2578,26 +2578,29 @@ static Mstring* _getConcatenated(Mlist* list,char* separator){Mallocationowner o
 		}
 	}else 
 		outputError("Failed to initialize the concatenation result text");
-	return DISOWNED(_concatenated,owner);
+	return disowned_string(_concatenated,owner);
 }
 Mvalue* Mconcat(Mvalue* value1,Mvalue* value2){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _concatValue=NULL;
 	// the first value would be the list of things to concatenate, the second value the separator text (if any)
 	if(value1){
-		Mstring* _separator=(value2?OWNED(_getValueText(value2,true),owner):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
+		Mstring* _separator=(value2?owned_string(_getValueText(value2,true),owner):NULL); // _getValueText() would return ? when receiving NULL, so for now we have to prevent that!!
 		Mstring* _concat;
 		if(value1->type==VT_LIST)
-			_concat=OWNED(_getConcatenated(value1->value._list,(_separator?string(_separator):NULL)),owner);
+			_concat=owned_string(_getConcatenated(value1->value._list,(_separator?string(_separator):NULL)),owner);
 		else
-			_concat=OWNED(_getValueText(value1,true),owner);
+			_concat=owned_string(_getValueText(value1,true),owner);
 		if(_concat){
 			// _result itself won't contain quotes, so in order to make it usable we need to prepend either a single quote or a double quote
-			if(string_insert_char(_concat,0,'\''))_concatValue=_getTextValue(string(_concat));else outputError("Failed to construct the concatenation text");
+			if(string_insert_char(_concat,0,'\''))
+				_concatValue=_getTextValue(string(_concat));
+			else 
+				outputError("Failed to construct the concatenation text");
 			FREE_STRING(_concat,owner);
 		}
 		if(_separator)FREE_STRING(_separator,owner);
 	}
-	return DISOWNED(_concatValue,owner);
+	return _concatValue;
 }
 Mvalue* Mfibonacci(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	// are we allowing big integers?
@@ -7544,14 +7547,14 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	if(_resultListValue)incrementReferenceCount(_resultListValue);else outputWarning("Failing to create the results list. The results will not be available through the M function!");
 	*/
 
-	output("Creating the root environment.\n"); // DEBUG
+	if(amVerboseDebugging())output("Creating the root environment.\n"); // DEBUG
 	Menvironment* _Menvironment=owned_environment(__environment(),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
 		if(amVerbose())output("M environment created.\n");
 		_Menvironment->_name=owned_chars(_getChars("M"),Msubowner(owner,1)); // TODO why make a dynamic copy???
 		if(amVerbose())output("M environment named.\n");
 		Mmap* environmentVariableMap=_Menvironment->_variableMap; // which must exist!!!
-		Mfunctionmap* environmentFunctionMap=CALLOC_1(sizeof(Mfunctionmap),'W',owner);
+		Mfunctionmap* environmentFunctionMap=CALLOC_1(sizeof(Mfunctionmap),'W',Msubowner(owner,1));
 		if(environmentFunctionMap){
 
 			// TODO should we allow assigning to NULL by defining NULL as a variable??????
@@ -7624,7 +7627,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				return false;
 			}
 			*/
-			_Menvironment->_functionMap=SUBOWNED(environmentFunctionMap,1);
+			_Menvironment->_functionMap=environmentFunctionMap;
 
 			// register if, while and for special functions
 		    if(!completedValueTokenTokenFunction(_getFunction(_Menvironment,owner,IFFUNCTION_NAME),IFFUNCTION_NAME,Miffunction))return false;
@@ -7784,7 +7787,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 
 	// if we successfully push _Menvironment (to become the current execution environment we succeeded)
 
-	return(pushExecutionEnvironment(DISOWNED(_Menvironment,owner)));
+	return(pushExecutionEnvironment(disowned_environment(_Menvironment,owner)));
 
 }
 

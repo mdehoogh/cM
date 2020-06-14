@@ -24,11 +24,11 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@11MAR2020
 
 Mvariable* disowned_variable(Mvariable* _variable,Mallocationowner owner_variable){
     if(_variable->_name)disowned_chars(_variable->_name,owner_variable); // dynamically allocated (indicated by _) so we should free it...
-    return DISOWNED(_variable,owner_variable);
+    return(Mvariable*)DISOWNED(_variable,owner_variable);
 }
 Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable){
-    if(_variable->_name)owned_chars(_variable->_name,owner_variable); // dynamically allocated (indicated by _) so we should free it...
-    return OWNED(_variable,owner_variable);
+    if(_variable->_name)owned_chars(_variable->_name,Msubowner(owner_variable,1)); // dynamically allocated (indicated by _) so we should free it...
+    return(Mvariable*)OWNED(_variable,owner_variable);
 }
 void free_variable(Mvariable* _variable,bool weak){
     if(_variable->_name)freeChars(_variable->_name); // dynamically allocated (indicated by _) so we should free it...
@@ -44,11 +44,13 @@ Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool imm
     if(_name){
         Mvariable* _variable=(Mvariable*)CALLOC_1(sizeof(Mvariable),'V',owner); // all pointers will be NULL!!
         if(_variable){
-            _variable->_name=_name; // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
+            _variable->_name=(Misdisowned(_name)?owned_chars(_name,Msubowner(owner,1)):_name); // MDH@17APR2020 _strdup() replaced by _getChars(): // create a dynamic pointer on the heap
             _variable->immutable=immutable;
             _variable->valuetype=valuetype;
-            return DISOWNED(_variable,owner);
+            output("Returning new disowned variable '%s'.\n",_name);
+            return disowned_variable(_variable,owner);
         }
+        if(Misdisowned(_name))freeChars(_name);
         outputError("Failed to create a variable.");
     }else
         outputError("No variable name defined");
@@ -141,13 +143,13 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
         if(amVerboseDebugging())
             output("List creator: '%s'.\n",_list->_creator->chars);
     }
-    return disowned_list(_list,owner);
+    return DISOWNED_LIST(_list,owner);
 }
-
+#ifndef __PRODUCTION__
 Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
     if(!_mapelement)return NULL;
     owned_mapelement(_mapelement->_next,owner_mapelement);
-    owned_variable(_mapelement->_variable,owner_mapelement);
+    owned_variable(_mapelement->_variable,Msubowner(owner_mapelement,1));
     return OWNED(_mapelement,owner_mapelement);
 }
 Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
@@ -156,6 +158,7 @@ Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner
     disowned_variable(_mapelement->_variable,owner_mapelement);
     return DISOWNED(_mapelement,owner_mapelement);
 }
+#endif
 bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
     if(amVerboseDebugging())
         output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
@@ -670,31 +673,27 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 }*/
 
 // MDH@09JUN2020: interface between _getVariable (now requiring a Mchars name) and all that still use a char* thing
-static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){if(!name||strlen(name)==0)return NULL;Mallocationowner owner=getOwner(__LINE__);
-    Mchars* _name=owned_chars(_getChars(name),owner_variable); // TODO don't need a separate _name anymore I think
-    Mvariable* _variable=owned_variable(_getVariable(_name,valuetype,immutable),owner_variable);
-    if(_variable)/*SUBOWNED(_variable->_name,1)*/;else FREECHARS(_name,owner_variable);
-    return disowned_variable(_variable,owner_variable);
+static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){if(!name||strlen(name)==0)return NULL;//Mallocationowner owner=getOwner(__LINE__);
+    return owned_variable(_getVariable(_getChars(name),valuetype,immutable),owner_variable);
 }
 // helper function to create a parameter map with a single value
 // the following is a nuisance
 Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwner(__LINE__);
     if(name&&_floatValue){
-        Mvariable* _realVariable=_getVariableWithName(name,VT_FLOAT,true,owner); // MDH@11JUN2020: _getChars(name) returns a disowned pointer that we need in _getVariable()
+        Mvariable* _realVariable=_getVariableWithName(name,VT_FLOAT,true,Msubowner(owner,2)); // MDH@11JUN2020: _getChars(name) returns a disowned pointer that we need in _getVariable()
         if(_realVariable){
-            Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
             if(_mapelement){
                 Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
                     assignValue(&_realVariable->_value,_floatValue); //////////////incrementReferenceCount(_realValue); // now bound to the real variable!!!// ESSENTIAL to prevent loosing _zeroIntegerValue!!!
-                    _mapelement->_variable=SUBOWNED(_realVariable,1);
-                    SUBOWNED(_realVariable->_name,1); // another level down
+                    _mapelement->_variable=_realVariable;
                     _map->numberOfElements=1;
                     _map->_first=_mapelement;
                     _map->_last=_mapelement;
                     if(amVerboseDebugging())
                         outputInfo("Returning the single float map!");
-                    return DISOWNED(_map,owner);
+                    return disowned_map(_map,owner);
                 }
                 outputError("Failed to create the float variable map");
                 FREE_MAPELEMENT(_mapelement,false,owner);
@@ -707,15 +706,14 @@ Mmap* _getFloatMap(char* name,Mvalue* _floatValue){Mallocationowner owner=getOwn
     return NULL;
 }/* VALIDATED */
 Mmap* _getMap(char* name){if(!name)return NULL;Mallocationowner owner=getOwner(__LINE__);
-    Mvariable* _variable=_getVariableWithName(name,VT_UNDEFINED,true,owner);
+    Mvariable* _variable=_getVariableWithName(name,VT_UNDEFINED,true,Msubowner(owner,2));
     if(_variable){
-        Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner);
+        Mmapelement* _mapelement=CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
         if(_mapelement){
             Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
             if(_map){
                 _map->numberOfElements=1;
-                _mapelement->_variable=SUBOWNED(_variable,2); // TODO we can do this better given the new disowned_map usage
-                SUBOWNED(_variable->_name,2);
+                _mapelement->_variable=_variable; // TODO we can do this better given the new disowned_map usage
                 _map->_first=_mapelement;
                 _map->_last=_mapelement;
                 return disowned_map(_map,owner);
@@ -730,22 +728,22 @@ Mmap* _getMap(char* name){if(!name)return NULL;Mallocationowner owner=getOwner(_
 
 Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
     if(map){
-        Mmap* _map=OWNED(_getMapOfType(map->valuetype),owner);
+        Mmap* _map=owned_map(_getMapOfType(map->valuetype),owner);
         if(_map){
             Mvariable *mapelementVariable,*_mapelementVariable=NULL;
             Mmapelement *mapelement=map->_first,*_mapelement=NULL;
             while(mapelement){
                 mapelementVariable=mapelement->_variable;
                 if(mapelementVariable){
-                    _mapelement=CALLOC_1(sizeof(Mmapelement),'m',owner); // new map element to hold a copy
+                    _mapelement=CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1)); // new map element to hold a copy
                     if(_mapelement){
                         // create a variable with the same name and value as the variable in mapelement
                         // MDH@12MAR2020 OOPS: why would we make the copy ALWAYS immutable: replacing true by mapelementVariable->immutable
-                        _mapelement->_variable=SUBOWNED(_getVariableWithName(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/,owner),2);
+                        _mapelement->_variable=_getVariableWithName(mapelementVariable->_name->chars,mapelementVariable->valuetype,mapelementVariable->immutable/*true*/,Msubowner(owner,2));
                         if(_mapelement->_variable){
                             assignValue(&_mapelement->_variable->_value,mapelementVariable->_value); // 'copy' the value over
                             if(_map->_last)_map->_last->_next=_mapelement; // make the current last point to the new last
-                            _map->_last=SUBOWNED(_mapelement,1); // replace current last by the new last
+                            _map->_last=_mapelement; // replace current last by the new last
                             if(!_map->_first)_map->_first=_map->_last; // initialize first if necessary
                             _map->numberOfElements++; // count one more
                         }else
@@ -763,18 +761,18 @@ Mmap* _getMapCopy(Mmap const * const map){Mallocationowner owner=getOwner(__LINE
 }
 Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__LINE__); // creates a 'deep' copy
     if(list){
-        Mlist* _list=OWNED(_getListOfType(list->valuetype),owner);
+        Mlist* _list=owned_list(_getListOfType(list->valuetype),owner);
         if(_list){
             Mlistelement *listelement=list->_first,*_listelement=NULL;
             while(listelement){
-                _listelement=CALLOC_1(sizeof(Mlistelement),'l',owner);
+                _listelement=CALLOC_1(sizeof(Mlistelement),'l',Msubowner(owner,1));
                 if(_listelement){
                     // 'copy' the value over, here we have the same problem as with copying any other value: if the value to copy is composite (a list or a map) we should copy by value i.e. point to a new map or list and not to the original
                     // technically we could let assignValue() take care of that 
                     assignValue(&_listelement->_value,listelement->_value); // no need to 'copy' the value itself, we only need to make another (strong) reference to that value
                     _listelement->index=listelement->index;
                     if(_list->_last)_list->_last->_next=_listelement;
-                    _list->_last=SUBOWNED(_listelement,1);
+                    _list->_last=_listelement;
                     if(!_list->_first)_list->_first=_list->_last;
                     _list->numberOfElements++;
                 }else 
@@ -791,18 +789,17 @@ Mlist* _getListCopy(Mlist const * const list){Mallocationowner owner=getOwner(__
 static Mmap* _getOneArgumentMap(char* name,Mvaluetype valuetype){Mallocationowner owner=getOwner(__LINE__);
     // NOTE wait with filling the single integer value map until we have all the ingredients
     if(name&&strlen(name)>0){
-        Mvariable* _variable=_getVariableWithName(name,valuetype,true,owner);
+        Mvariable* _variable=_getVariableWithName(name,valuetype,true,Msubowner(owner,2));
         if(_variable){
-            Mmapelement* _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
             if(_mapelement){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement->_variable=SUBOWNED(_variable,2);
+                    _mapelement->_variable=_variable;
                     _map->numberOfElements=1;
-                    _map->_first=SUBOWNED(_mapelement,1);
-                    if(amVerboseDebugging())
-                        outputInfo("Returning the single integer map!");
-                    return DISOWNED(_map,owner);
+                    _map->_first=_mapelement;
+                    if(amVerboseDebugging())outputInfo("Returning the single integer map!");
+                    return disowned_map(_map,owner);
                 }
                 outputError("Failed to create the one variable map");
                 FREE_MAPELEMENT(_mapelement,false,owner);
@@ -845,19 +842,19 @@ Mmap* _getListMap(char* name,Mvalue* _listValue){Mallocationowner owner=getOwner
 static Mmap* _getTwoArgumentMap(char* name1,char* name2,Mvaluetype valuetype1,Mvaluetype valuetype2){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2){
         if(strlen(name1)&&strlen(name2)&&strcmp(name1,name2)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
             if(_mapelement1&&_mapelement2){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,valuetype1,true,owner),2);
-                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_INTEGER,true,owner),2);
+                    _mapelement1->_variable=_getVariableWithName(name1,valuetype1,true,Msubowner(owner,2));
+                    _mapelement2->_variable=_getVariableWithName(name2,VT_INTEGER,true,Msubowner(owner,2));
                     if(_mapelement1->_variable&&_mapelement2->_variable){
-                        _map->_first=SUBOWNED(_mapelement1,1);
+                        _map->_first=_mapelement1;
                         _mapelement1->_next=_mapelement2;
-                        _map->_last=SUBOWNED(_mapelement2,1);
+                        _map->_last=_mapelement2;
                         _map->numberOfElements=2;
-                        return DISOWNED(_map,owner);
+                        return disowned_map(_map,owner);
                     }
                     outputError("Failed to create both map element variables");
                     FREE_MAP(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
@@ -883,21 +880,22 @@ Mmap* _getTokenTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1
 Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name2,name3)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
             if(_mapelement1&&_mapelement2&&_mapelement3){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,VT_TEXT,true,owner),2);
-                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_MAP,true,owner),2);
-                    _mapelement3->_variable=SUBOWNED(_getVariableWithName(name3,VT_TOKEN,true,owner),2);
+                    _mapelement1->_variable=_getVariableWithName(name1,VT_TEXT,true,Msubowner(owner,2));
+                    _mapelement2->_variable=_getVariableWithName(name2,VT_MAP,true,Msubowner(owner,2));
+                    _mapelement3->_variable=_getVariableWithName(name3,VT_TOKEN,true,Msubowner(owner,2));
                     if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable){
-                        _map->_first=SUBOWNED(_mapelement1,1);
-                        _mapelement1->_next=SUBOWNED(_mapelement2,1);
-                        _mapelement2->_next=SUBOWNED(_mapelement3,1);
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
                         _map->_last=_mapelement3;
                         _map->numberOfElements=3;
+                        output("Returning disowned map of '%s', '%s' and '%s'.\n",name1,name2,name3);
                         return disowned_map(_map,owner);
                     }
                     FREE_MAP(_map,owner); // failed to create the two map attribute variables, so get rid of the map NOTE free_mapelement() will free the associated variable (if any)
@@ -920,22 +918,22 @@ Mmap* _getFourArgumentMap(char* name1,char* name2,char* name3,char *name4,Mvalue
     if(name1&&name2&&name3&&name4){
         if(strlen(name1)&&strlen(name2)&&strlen(name3)&&strlen(name4)&&
             strcmp(name1,name2)&&strcmp(name1,name3)&&strcmp(name1,name4)&&strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name3,name4)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',Msubowner(owner,1));
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,valuetype1,true,owner),2);
-                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_TOKEN,true,owner),2);
-                    _mapelement3->_variable=SUBOWNED(_getVariableWithName(name3,VT_TOKEN,true,owner),2);
-                    _mapelement4->_variable=SUBOWNED(_getVariableWithName(name4,VT_TOKEN,true,owner),2);
+                    _mapelement1->_variable=_getVariableWithName(name1,valuetype1,true,Msubowner(owner,2));
+                    _mapelement2->_variable=_getVariableWithName(name2,VT_TOKEN,true,Msubowner(owner,2));
+                    _mapelement3->_variable=_getVariableWithName(name3,VT_TOKEN,true,Msubowner(owner,2));
+                    _mapelement4->_variable=_getVariableWithName(name4,VT_TOKEN,true,Msubowner(owner,2));
                     if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable){
-                        _map->_first=SUBOWNED(_mapelement1,1);
-                        _mapelement1->_next=SUBOWNED(_mapelement2,1);
-                        _mapelement2->_next=SUBOWNED(_mapelement3,1);
-                        _mapelement3->_next=SUBOWNED(_mapelement4,1);
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
+                        _mapelement3->_next=_mapelement4;
                         _map->_last=_mapelement4;
                         _map->numberOfElements=4;
                         return disowned_map(_map,owner);
@@ -961,25 +959,27 @@ Mmap* _getFiveArgumentMap(char* name1,char* name2,char* name3,char *name4,char *
             strcmp(name2,name3)&&strcmp(name2,name4)&&strcmp(name2,name5)&&
             strcmp(name3,name4)&&strcmp(name3,name5)&&
             strcmp(name4,name5)){
-            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
-            Mmapelement* _mapelement5=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner);
+            Mallocationowner owner_mapelement=Msubowner(owner,1);
+            Mmapelement* _mapelement1=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
+            Mmapelement* _mapelement2=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
+            Mmapelement* _mapelement3=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
+            Mmapelement* _mapelement4=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
+            Mmapelement* _mapelement5=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_mapelement);
             if(_mapelement1&&_mapelement2&&_mapelement3&&_mapelement4&&_mapelement5){
                 Mmap* _map=(Mmap*)CALLOC_1(sizeof(Mmap),'M',owner);
                 if(_map){
-                    _mapelement1->_variable=SUBOWNED(_getVariableWithName(name1,VT_TOKEN,true,owner),2);
-                    _mapelement2->_variable=SUBOWNED(_getVariableWithName(name2,VT_TOKEN,true,owner),2);
-                    _mapelement3->_variable=SUBOWNED(_getVariableWithName(name3,VT_TOKEN,true,owner),2);
-                    _mapelement4->_variable=SUBOWNED(_getVariableWithName(name4,VT_TOKEN,true,owner),2);
-                    _mapelement5->_variable=SUBOWNED(_getVariableWithName(name5,VT_TOKEN,true,owner),2);
+                    Mallocationowner owner_variable=Msubowner(owner,2);
+                    _mapelement1->_variable=_getVariableWithName(name1,VT_TOKEN,true,owner_variable);
+                    _mapelement2->_variable=_getVariableWithName(name2,VT_TOKEN,true,owner_variable);
+                    _mapelement3->_variable=_getVariableWithName(name3,VT_TOKEN,true,owner_variable);
+                    _mapelement4->_variable=_getVariableWithName(name4,VT_TOKEN,true,owner_variable);
+                    _mapelement5->_variable=_getVariableWithName(name5,VT_TOKEN,true,owner_variable);
                     if(_mapelement1->_variable&&_mapelement2->_variable&&_mapelement3->_variable&&_mapelement4->_variable&&_mapelement5->_variable){
-                        _map->_first=SUBOWNED(_mapelement1,1);
-                        _mapelement1->_next=SUBOWNED(_mapelement2,1);
-                        _mapelement2->_next=SUBOWNED(_mapelement3,1);
-                        _mapelement3->_next=SUBOWNED(_mapelement4,1);
-                        _mapelement4->_next=SUBOWNED(_mapelement5,1);
+                        _map->_first=_mapelement1;
+                        _mapelement1->_next=_mapelement2;
+                        _mapelement2->_next=_mapelement3;
+                        _mapelement3->_next=_mapelement4;
+                        _mapelement4->_next=_mapelement5;
                         _map->_last=_mapelement5;
                         _map->numberOfElements=5;
                         return disowned_map(_map,owner);
@@ -1494,7 +1494,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
         valueText=owned_string(_getString(M_NULL_VALUE_TEXT),owner);
     if(_value)if(amAssisting())if(valueText)valueText=owned_string(appendll(string_append_char(valueText,'#'),_value->count),owner); // show the reference count as well
     /////outputChar('.');
-    return (valueText?disowned_string(valueText,owner):_getUndefinedValueText());
+    return(valueText?disowned_string(valueText,owner):_getUndefinedValueText());
     /* replacing:
     if(valueText)return valueText;
 	////////if(amVerbose())if(valueText)output("Value text: '%s'.",string(valueText));else output("Value not represented.");
@@ -2120,7 +2120,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
     return _iterationsList;
 }/* VALIDATED */
 
-void assignValue(Mvalue** _valueholder, Mvalue const * _value){Mallocationowner owner=getOwner(__LINE__);
+void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowner owner=getOwner(__LINE__);
     // ASSERT not a composite value (so like an end node)
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
     // MDH@01NOV2019: it's a leap of faith to let assignValue() create copies of composite values i.e. instead of assigning _value to the *_valueholder we assign a new map or list value
@@ -2130,14 +2130,12 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){Mallocationowner 
         //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
         if(_value->type==VT_MAP){
             // if(amVerbose()&&amDebugging())outputValue("Copying map ",_value,".\n");
-            Mmap* _mapCopy=owned_map(_getMapCopy(_value->value._map),owner);
-            _value=_getValueOfMap(disowned_map(_mapCopy,owner));
+            _value=_getValueOfMap(_getMapCopy(_value->value._map));
             // if(!_value)free_map(_mapCopy,owner);
         }else
         if(_value->type==VT_LIST){
-            Mlist* _listCopy=owned_list(_getListCopy(_value->value._list),owner);
             // if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
-            _value=_getValueOfList(disowned_list(_listCopy,owner));
+            _value=_getValueOfList(_getListCopy(_value->value._list));
             // if(!_value)free_list(_listCopy,owner);
         }
     }
@@ -2504,7 +2502,7 @@ Menvironment* getEnvironmentParent(Menvironment* _environment){
     return(_environment&&_environment->_parent?getValueEnvironment(_environment->_parent):NULL);
 }/* VALIDATED */
 Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _environmentName=OWNED(__string(),owner);
+    Mstring* _environmentName=owned_string(__string(),owner);
     if(_environmentName){
         Mstring* p=_environmentName;
         while(p&&_environment){
@@ -2515,7 +2513,7 @@ Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=
         }
         if(!p){FREE_STRING(_environmentName,owner);_environmentName=NULL;}
     }
-    return DISOWNED(_environmentName,owner);
+    return disowned_string(_environmentName,owner);
 }
 
 // additional function for wrapping environments and functions
