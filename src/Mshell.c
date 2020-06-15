@@ -2788,7 +2788,7 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner
 		}
 		_tokenCopy->type=_token->type;
 		_tokenCopy->significantCharacterCount=_token->significantCharacterCount;
-		if(_token->text)_tokenCopy->text=SUBOWNED(OWNED(_stringCopy(_token->text,0),owner),1);
+		if(_token->text)_tokenCopy->text=owned_string(_stringCopy(_token->text,0),Msubowner(owner,1));
 		_tokenCopy->expr=_token->expr; // TODO do I need to do this??? this is also an issue because if we start comparing expr (on evaluation)
 		_tokenCopy->argument=_token->argument; // MDH@11AUG2019: we need the argument as well bro' TODO how about the envid?????
 		// we're NOT copying _next, _prev, _offset
@@ -4429,15 +4429,17 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
 					// we have to wrap the property name inside a value as text
 					Mstring* _propertyName=owned_string(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),owner);
-					if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
-						Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
-						if(!propertyNameValue||!appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)){
-							output("%sFailed to add property name '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
-							// TODO can't break here
+					if(_propertyName){
+						if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
+							Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
+							if(!propertyNameValue||!appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)){
+								output("%sFailed to add property name '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
+								// TODO can't break here
+							}
 						}
+						// NOTE have to release _propertyName here
+						FREE_STRING(_propertyName,owner);
 					}
-					// NOTE have to release _propertyName here
-					if(_propertyName)FREE_STRING(_propertyName,owner);
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				// if(amDebugging())
@@ -7225,17 +7227,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				endTokenTypeIndex=endTokenTypeCount;
 				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
 				if(endTokenTypeIndex){
-					if(amVerboseDebugging())
-						outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
+					if(amVerboseDebugging())outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
 					break;
 				}
-				if(amVerboseDebugging())
-					outputInfo(" NO");
+				if(amVerboseDebugging())outputInfo(" NO");
 
-				if(amVerboseDebugging())
-					output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+				if(amVerboseDebugging())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
-				_formulaelement->_operator=SUBOWNED(OWNED(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),owner),1); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
+				_formulaelement->_operator=owned_string(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
 				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)
@@ -7247,8 +7246,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					expressionToken=nextEnvironmentExpressionToken();
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
-				if(amVerboseDebugging())
-					output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
+				if(amVerboseDebugging())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
 				_formulaelement->_next=OWNED(__formulaelement("successor"),owner); // MDH@08JUN2020: similar to all other formula elements this one needs to be owned by me as well otherwise I won't be able to free it myself
 				_formulaelement=_formulaelement->_next;
 				if(!_formulaelement){
@@ -7258,8 +7256,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				formulaElementCount++;
 				expressionToken=nextEnvironmentExpressionToken();
 			}else
-			if(amVerboseDebugging())
-				outputInfo("No further formula elements!");
+			if(amVerboseDebugging())outputInfo("No further formula elements!");
 		}
 
 		// evaluate the formula

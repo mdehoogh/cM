@@ -281,7 +281,7 @@ Mstring* _getFunctionMapText(Mfunctionmap* _functionmap){Mallocationowner owner=
 				// I guess we might show the parameter map (if any)
 				string_append_char(p,'(');
 				if(_function->_parameterMap){
-					Mstring* parameterMapText=OWNED(_getMapText(_function->_parameterMap,false,false,false),owner); // do NOT show curly braces, quotes or missing defaults
+					Mstring* parameterMapText=owned_string(_getMapText(_function->_parameterMap,false,false,false),owner); // do NOT show curly braces, quotes or missing defaults
 					if(parameterMapText){
 						string_append(p,string(parameterMapText));
 						FREE_STRING(parameterMapText,owner);

@@ -71,26 +71,34 @@ void outputAllocationTypeMarks(char* linePrefix){
     output("%s#\tTime\tType ->",linePrefix);
     for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++)
         if(_allocationTypes[allocationMarkTypeIndex].size>0)
-            output("\t%c",_allocationTypes[allocationMarkTypeIndex].type);
+            output("\t%s%c",(_allocationTypes[allocationMarkTypeIndex].type<0?"-":""),abs(_allocationTypes[allocationMarkTypeIndex].type));
     output("\tTotal (bytes)\n");
     // how about showing the oldest until the newest
     unsigned long long allocationMarkIndex=(lastActiveAllocationMark+1)%numberOfAllocationMarks; // the successor of the last active allocation mark
     while(1){
-        output("%s%llu\t%s",linePrefix,allocationMarkIndex+1,_allocationTypeMarkIds[allocationMarkIndex]);
-        if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
-        totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
-        for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
-            size=_allocationTypes[allocationMarkTypeIndex].size;
-            if(size==0)continue; // only the case for the * allocation type mark
-            outputChar('\t');// output(" %c:",_allocationTypes[allocationMarkTypeIndex].type);
-            // how about showing the number of elements instead of the size??????
-            occupied=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
-            freed=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
-            output("%llu",(occupied-freed)/size);
-            totaloccupied+=occupied;
-            totalfreed+=freed;
+        outputChar('a');
+        if(allocationMarkIndex>=0&&allocationMarkIndex<numberOfAllocationMarks&&_allocationTypeMarkIds[allocationMarkIndex]){
+            outputChar('b');
+            output("%s",linePrefix);
+            output("%llu",allocationMarkIndex+1);
+            outputChar('\t');
+            output("%s",_allocationTypeMarkIds[allocationMarkIndex]);
+            outputChar('c');
+            if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+            totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
+            for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
+                size=_allocationTypes[allocationMarkTypeIndex].size;
+                if(size==0)continue; // only the case for the * allocation type mark
+                outputChar('\t');// output(" %c:",_allocationTypes[allocationMarkTypeIndex].type);
+                // how about showing the number of elements instead of the size??????
+                occupied=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
+                freed=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
+                output("%llu",(occupied-freed)/size);
+                totaloccupied+=occupied;
+                totalfreed+=freed;
+            }
+            output("\t%llu = %llu - %llu",totaloccupied-totalfreed,totaloccupied,totalfreed);
         }
-        output("\t%llu = %llu - %llu",totaloccupied-totalfreed,totaloccupied,totalfreed);
         outputChar('\n');
         if(allocationMarkIndex==lastActiveAllocationMark)break; // final active allocation mark output
         allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks;
@@ -539,9 +547,11 @@ bool resetAllocationTypes(){
 // MDH@25NOV2019: markAllocationTypes() remembers the current allocation type counts in the 4th and 5th element
 // MDH@11MAY2020: either we can use a reusable allocation mark or append one
 bool allocationMarkAdded(){
+    output("Last active allocation mark before: %llu.\n",lastActiveAllocationMark); // DEBUG
     if(_allocationTypeMarks){
         // if we can't increment the last active allocation mark without bumping into the first active allocation mark we have to add an allocation mark
         unsigned long long newLastActiveAllocationMark=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
+        output("New last active allocation mark: %llu.\n",newLastActiveAllocationMark);
         if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
             char** newAllocationTypeMarkIds=realloc(_allocationTypeMarkIds,(numberOfAllocationMarks+1)*sizeof(char*));
             if(!newAllocationTypeMarkIds)return false;
@@ -561,8 +571,10 @@ bool allocationMarkAdded(){
                 newLastActiveAllocationMark=numberOfAllocationMarks;
             numberOfAllocationMarks++;
         }else // free the mark id that is going to be replaced!!!!
-        if(_allocationTypeMarkIds[newLastActiveAllocationMark])free(_allocationTypeMarkIds[newLastActiveAllocationMark]);
-
+        if(_allocationTypeMarkIds[newLastActiveAllocationMark]){
+            free(_allocationTypeMarkIds[newLastActiveAllocationMark]);
+            _allocationTypeMarkIds[newLastActiveAllocationMark]=NULL; // MDH@15JUN2020: might be an issue if we don't!!!
+        }
         // we have to make room for the new allocation and copy the current last active mark over
         // moving over lastActiveAllocationMark to newLastActiveAllocationMark (nonoverlapping allocation type marks so we can use memcpy)
         memcpy(_allocationTypeMarks+(newLastActiveAllocationMark*numberOfAllocationMarkTypes)
@@ -590,9 +602,10 @@ bool allocationMarkAdded(){
         printf("\tAllocation marks registration initialized...\n");        
     }
  
+    output("Last active allocation mark after: %llu.\n",lastActiveAllocationMark); // DEBUG
     time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
     _allocationTypeMarkIds[lastActiveAllocationMark]=strdup(hms); // TODO for now assume that strdup() will NOT fail!!!! of course if it does it will return NULL so that's OK
- 
+    output("Allocation type mark id #%llu: '%s'.\n",lastActiveAllocationMark,_allocationTypeMarkIds[lastActiveAllocationMark]); // DEBUG
     return true;
     /* replacing:
     long long numberOfAllocationTypes=getNumberOfAllocationTypes();

@@ -113,13 +113,15 @@ Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=g
     */
 }
 
-Mstring* disowned_string(Mstring* str,Mallocationowner owner_str){
-    disowned_chars(str->_chars,owner_str);
-    return DISOWNED(str,owner_str);
+Mstring* disowned_string(Mstring* _str,Mallocationowner owner_str){
+    if(!_str)return NULL;
+    disowned_chars(_str->_chars,owner_str);
+    return DISOWNED(_str,owner_str);
 }
-Mstring* owned_string(Mstring* str,Mallocationowner owner_str){
-    owned_chars(str->_chars,Msubowner(owner_str,1));
-    return OWNED(str,owner_str);
+Mstring* owned_string(Mstring* _str,Mallocationowner owner_str){
+    if(!_str)return NULL;
+    owned_chars(_str->_chars,Msubowner(owner_str,1));
+    return OWNED(_str,owner_str);
 }
 /** 
  * Free the memory associated with a String

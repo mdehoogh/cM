@@ -54,7 +54,7 @@ bool isLittleEndian(){
  * needs to be freed with FREE_STRING() after use (e.g. of its string representation) as indicated by the _ that starts the name
  */
 Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _binaryText=(Mstring*)OWNED(__string(),owner);
+    Mstring* _binaryText=owned_string(__string(),owner);
     if(_binaryText){
         Mstring* _p=_binaryText;
         int l=64;
@@ -62,7 +62,7 @@ Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner
         if(presuffix)_p=string_append_char(_p,presuffix);
         if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
     }
-    return(Mstring*)DISOWNED(_binaryText,owner);
+    return disowned_string(_binaryText,owner);
 }/* VALIDATED */
 /**
  * \brief determines the binary text representation of the 16-bit unsigned integer \p us using text prefix and postfix \p presuffix
@@ -72,7 +72,7 @@ Mstring* _getUint64BinaryText(uint64_t ul,char presuffix){Mallocationowner owner
  * needs to be freed with FREE_STRING() after use (e.g. of its string representation) as indicated by the _ that starts the name
  */
 Mstring* _getUint16BinaryText(uint16_t us,char presuffix){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _binaryText=(Mstring*)OWNED(__string(),owner);
+    Mstring* _binaryText=owned_string(__string(),owner);
     if(_binaryText){
         Mstring* _p=_binaryText;
         int l=16;
@@ -80,7 +80,7 @@ Mstring* _getUint16BinaryText(uint16_t us,char presuffix){Mallocationowner owner
         if(presuffix)_p=string_append_char(_p,presuffix);
         if(!_p){FREE_STRING(_binaryText,owner);_binaryText=NULL;}else string_reverse(_p);
     }
-    return(Mstring*)DISOWNED(_binaryText,owner);
+    return disowned_string(_binaryText,owner);
 }/* VALIDATED */
 
 /* initialization for big integer arithmetic
@@ -114,7 +114,7 @@ Mbiginteger* __biginteger(){Mallocationowner owner=getOwner(__LINE__);
         if(mp_init((mp_int*)_biginteger)!=MP_OKAY){free_biginteger(_biginteger);_biginteger=NULL;} // ESSENTIAL to release the big integer, when failing to initialize it!!
 #endif
     }
-    return(Mbiginteger*)disowned_biginteger(_biginteger,owner);
+    return disowned_biginteger(_biginteger,owner);
 }/* VALIDATED */
 // end of block that uses __PRODUCTION__ flag
 /** \brief __biginteger creates a new big integer (on the heap) ready to be used, if successful, NULL otherwise
@@ -136,10 +136,10 @@ void free_biginteger(Mbiginteger* _biginteger/*,Mallocationowner owner_bigintege
 
 // MDH@09APR2020: for all methods that call mp_int methods now require calling MP_INT_POINTER() on Mbiginteger instances
 Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* biginteger=(Mbiginteger*)OWNED(__biginteger(),owner);
+    Mbiginteger* _biginteger=owned_biginteger(__biginteger(),owner);
     // MDH@09APR2020: in the non-production version we're keeping track of the allocations and get_mpint on Mbiginteger will return what is required
-    if(biginteger)mp_set_i64(MP_INT_POINTER(biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
-    return(Mbiginteger*)DISOWNED(biginteger,owner);
+    if(_biginteger)mp_set_i64(MP_INT_POINTER(_biginteger),ll); // even if l equals 0 set it TODO check is that necessary???
+    return disowned_biginteger(_biginteger,owner);
 }/* VALIDATED */
 
 // replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
@@ -159,8 +159,7 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger){Mallocati
 }/* VALIDATED */
 
 // using constant big integers 0, 1 and 2 (do NOT wrap these constants in Mvalue's though or they will need to be created over and over again)
-static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;
-static Mallocationowner owner_biginteger=(Mallocationowner){MODULE_ID,__LINE__,1};
+static Mbiginteger *bi0=NULL,*bi1=NULL,*bi2=NULL,*bi3=NULL;static Mallocationowner owner_biginteger=(Mallocationowner){MODULE_ID,__LINE__,1};
 // NOTE do NOT start with underscore (_) to indicate that the result is to be left alone!!
 const Mbiginteger* getBigintegerZero(){if(!bi0)bi0=owned_biginteger(_getBiginteger(0),owner_biginteger);return bi0;}/* VALIDATED */
 const Mbiginteger* getBigintegerOne(){if(!bi1)bi1=owned_biginteger(_getBiginteger(1),owner_biginteger);return bi1;}/* VALIDATED */
@@ -306,7 +305,7 @@ Minteger* _getInteger(long long ll){Mallocationowner owner=getOwner(__LINE__);
     if(!_integer)return NULL;
     _integer->ll=ll;
     // output("Integer: %lld.\n",_integer->ll); // DEBUG
-    return(Minteger*)DISOWNED(_integer,owner);
+    return disowned_integer(_integer,owner);
 }/* VALIDATED */
 /*
 Mbiginteger*__biginteger(z_t zt){
@@ -323,7 +322,7 @@ Mfloat* _getFloat(long double ld){Mallocationowner owner=getOwner(__LINE__);
     Mfloat* _float=MALLOC_1(sizeof(Mfloat),'F',owner); // change MALLOC to also allow passing in the number of items, although the production version doesn't care!!!!
     if(!_float)return NULL;
     _float->ld=ld;
-    return(Mfloat*)DISOWNED(_float,owner);
+    return disowned_float(_float,owner);
 }/* VALIDATED */
 
 // special integer values to consider
@@ -457,11 +456,11 @@ long long areFloatsEqual(Mfloat* afloat1,Mfloat* afloat2){
 bool floatIsUndefined(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld));}
 bool floatIsUndefinedOrZero(Mfloat* afloat){return(!afloat||ldIsNaN(afloat->ld)||isFloatZero(afloat)==M_TRUE);}
 
-Mfloat* _getFloatCopy(Mfloat* afloat){Mallocationowner owner=getOwner(__LINE__);
-    return(floatIsUndefined(afloat)?NULL:(Mfloat*)DISOWNED(OWNED(_getFloat(afloat->ld),owner),owner));
+Mfloat* _getFloatCopy(Mfloat* afloat){//Mallocationowner owner=getOwner(__LINE__);
+    return(floatIsUndefined(afloat)?NULL:_getFloat(afloat->ld));
 }/* VALIDATED */ // only when not undefined return a copy (even when zero), NULL otherwise
-Mfloat* _getFloatNeg(Mfloat* afloat){Mallocationowner owner=getOwner(__LINE__);
-    return(floatIsUndefined(afloat)?NULL:(Mfloat*)DISOWNED(OWNED(_getFloat(-afloat->ld),owner),owner));
+Mfloat* _getFloatNeg(Mfloat* afloat){//Mallocationowner owner=getOwner(__LINE__);
+    return(floatIsUndefined(afloat)?NULL:_getFloat(-afloat->ld));
 }/* VALIDATED */ // just switching the sign of what _getRealCopy returns
 
 long long isBigintegerUndefined(Mbiginteger* biginteger){return(biginteger&&biginteger->_bi?M_FALSE:M_TRUE);}
@@ -615,14 +614,14 @@ Mstring* appendld(Mstring* const ms,long double ld){return string_append_ld(ms,l
 // Mvalue -> text
 // whatever is returned by getIntegerText(),getRealText(),getStringText() needs to be freed!!!!
 Mstring* _getIntegerText(Minteger* _integer){Mallocationowner owner=getOwner(__LINE__);
-	Mstring* _s=(Mstring*)OWNED(__string(),owner);
+	Mstring* _s=owned_string(__string(),owner);
     if(!_s)return NULL;
     Mstring* p=_s;
     if(amVerboseDebugging())p=string_append_char(p,'i');
     if(p&&_integer)p=appendll(p,_integer->ll);
     if(!p){FREE_STRING(_s,owner);return NULL;}
 	////////if(amVerbose())output("Integer '%s'.",string(s));
-	return(Mstring*)DISOWNED(_s,owner);
+	return disowned_string(_s,owner);
 }/* VALIDATED */
 /* replaced by getValueInteger()
 long long getInteger(Mvalue* _value){
@@ -644,7 +643,7 @@ long long getInteger(Mvalue* _value){
 // BigInteger stuff
 // MDH@09APR2020: certain functions only know the mp_int* and not the big integer
 static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _mpintText=(Mstring*)OWNED(__string(),owner);
+    Mstring* _mpintText=owned_string(__string(),owner);
     ////outputChar('A');
     if(_mpintText){
         /// output("Initial big integer text length: %zu.\n",_bigintegerText->length);
@@ -658,7 +657,8 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
             int arepsize=0;
 #endif
             ///outputChar('C');
-            clock_t then=clock();
+            clock_t then=0;
+            // if(amVerboseDebugging())then=clock(); // DEBUG
             ///////if(amVerbose())outputInfo("Determining a big integer text representation.");
             // output("Big integer text length: %zu.\n",_bigintegerText->length);
             // output("Before calling mp_radix_size: ");Mstring* str_info=_string_info(_bigintegerText);output("Big integer text info: '%s'.\n",string(str_info));FREE_STRING(str_info);
@@ -713,38 +713,33 @@ static Mstring* _getMpintText(mp_int const * const _mpint){Mallocationowner owne
                     output("%sCan't store more than %u characters in a string.\n",M_ERROR_PREFIX,SIZE_MAX);
             }else
                 outputError("Couldn't determine the size of a big integer");
-            if(amVerboseDebugging())
-                output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
+            if(then)output("Determining the big integer representation took %lld ms.\n",(clock()-then)/1000);
         }else
             outputError("No big integer to represent");
     }else
         output("%sFailed to create a text for storing the representation of a big integer.\n",M_ERROR_PREFIX);
     ///outputChar('H');
-    return(Mstring*)DISOWNED(_mpintText,owner);
+    return disowned_string(_mpintText,owner);
 }
-Mstring* _getBigintegerText(const Mbiginteger* _biginteger){Mallocationowner owner=getOwner(__LINE__);
-    return(_biginteger?(Mstring*)DISOWNED(OWNED(_getMpintText(MP_INT_POINTER(_biginteger)),owner),owner):(Mstring*)DISOWNED(OWNED(__string(),owner),owner));
+Mstring* _getBigintegerText(const Mbiginteger* _biginteger){//Mallocationowner owner=getOwner(__LINE__);
+    return(_biginteger?_getMpintText(MP_INT_POINTER(_biginteger)):__string());
 }
 
-Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;
+Mbiginteger *_biLLMin=NULL,*_biLLMax=NULL;Mallocationowner owner_biLLextreme=(Mallocationowner){MODULE_ID,__LINE__,1};
 // MDH@11JUN2020: if we return something that is owned instead of something that is disowned we prevent external freeing (i.e. unwarned that is)
-Mbiginteger* getBigintegerLLMin(){Mallocationowner owner=getOwner(__LINE__);
+Mbiginteger* getBigintegerLLMin(){//Mallocationowner owner=getOwner(__LINE__);
     if(!_biLLMin){
-        if(amVerboseDebugging())
-            outputInfo("Determining the big integer equivalent of the smallest small integer.");
-        _biLLMin=owned_biginteger(_getBiginteger(M_LL_MIN),owner_biginteger);
-        if(amVerboseDebugging())
-            outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
+        if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the smallest small integer.");
+        _biLLMin=owned_biginteger(_getBiginteger(M_LL_MIN),owner_biLLextreme);
+        if(amVerboseDebugging())outputBiginteger("Smallest valid small integer '",_biLLMin,".\n");
     }
     return _biLLMin;
 }/* VALIDATED */
 Mbiginteger* getBigintegerLLMax(){
     if(!_biLLMax){
-        if(amVerboseDebugging())
-            outputInfo("Determining the big integer equivalent of the largest small integer.");
-        _biLLMax=owned_biginteger(_getBiginteger(M_LL_MAX),owner_biginteger);
-        if(amVerboseDebugging())
-            outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
+        if(amVerboseDebugging())outputInfo("Determining the big integer equivalent of the largest small integer.");
+        _biLLMax=owned_biginteger(_getBiginteger(M_LL_MAX),owner_biLLextreme);
+        if(amVerboseDebugging())outputBiginteger("Largest valid small integer '",_biLLMax,".\n");
     }
     return _biLLMax;
 }/* VALIDATED */
@@ -799,7 +794,7 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){Mallocat
     if(exp!=0){
         mp_set_u64(a,mantisse);
         if(amVerbose()){
-            Mstring* _mantisseBigIntegerText=(Mstring*)OWNED(_getMpintText(a),owner); // MDH@09APR2020: ask _getMpintText(), replacing _getBigintegerText()
+            Mstring* _mantisseBigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020: ask _getMpintText(), replacing _getBigintegerText()
             output("Value after setting the fraction: %s.\n",string(_mantisseBigIntegerText));
             FREE_STRING(_mantisseBigIntegerText,owner);
         }
@@ -813,7 +808,7 @@ mp_err mp_set_me_verbose(mp_int* a,uint64_t mantisse,uint16_t exponent){Mallocat
             if(err!=MP_OKAY){outputError("Failed to use the exponent of a real value in the conversion to a big integer");return err;}
         }
         if(amVerbose()){
-            Mstring* _bigIntegerText=(Mstring*)OWNED(_getMpintText(a),owner); // MDH@09APR2020
+            Mstring* _bigIntegerText=owned_string(_getMpintText(a),owner); // MDH@09APR2020
             output("Value after applying the exponent: %s.\n",string(_bigIntegerText));
             FREE_STRING(_bigIntegerText,owner);
         }
@@ -971,7 +966,7 @@ long long double2long(long double ld){
 // STRINGIFY FUNCTIONS
 Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__);
     if(!_float)return NULL;
-	Mstring* _floatText=(Mstring*)OWNED(__string(),owner);
+	Mstring* _floatText=owned_string(__string(),owner);
     if(_floatText){
         Mstring* p=_floatText;
         if(amVerboseDebugging())
@@ -985,7 +980,7 @@ Mstring* _getFloatText(Mfloat* _float){Mallocationowner owner=getOwner(__LINE__)
         }
         if(!p){FREE_STRING(_floatText,owner);return NULL;}
     }
-	return(Mstring*)DISOWNED(_floatText,owner);
+	return disowned_string(_floatText,owner);
 }/* VALIDATED */
 
 char hexdigit(char c){
@@ -995,7 +990,7 @@ char hexdigit(char c){
     return '\0';
 }
 Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Mallocationowner owner=getOwner(__LINE__);
-	Mstring* _stringText=(Mstring*)OWNED(__string(),owner);
+	Mstring* _stringText=owned_string(__string(),owner);
     if(_stringText){
         Mstring* p=_stringText;
         if(amVerboseDebugging())
@@ -1058,7 +1053,7 @@ Mstring* _getStringText(Mtext* _text,bool dequoted){if(!_text)return NULL;Malloc
         }
         if(!p){FREE_STRING(_stringText,owner);return NULL;}
     }
-	return(Mstring*)DISOWNED(_stringText,owner);
+	return disowned_string(_stringText,owner);
 }/* VALIDATED */
 
 /////////////Mstring* _UNDEFINED_VALUETEXT=NULL;
@@ -1076,7 +1071,7 @@ size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _big
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(_biginteger){
-        Mstring* _bigintegerText=(Mstring*)OWNED(_getBigintegerText(_biginteger),owner);
+        Mstring* _bigintegerText=owned_string(_getBigintegerText(_biginteger),owner);
         if(_bigintegerText){
             written+=output("%s",string(_bigintegerText));
             FREE_STRING(_bigintegerText,owner);
@@ -1091,7 +1086,7 @@ size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,c
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(_decimal){
-        Mstring* _decimalText=(Mstring*)OWNED(_getDecimalText(_decimal,false),owner);
+        Mstring* _decimalText=owned_string(_getDecimalText(_decimal,false),owner);
         if(_decimalText){
             written+=output("%s",string(_decimalText));
             FREE_STRING(_decimalText,owner);
