@@ -74,17 +74,22 @@ void outputAllocationTypeMarks(char* linePrefix){
             output("\t%s%c",(_allocationTypes[allocationMarkTypeIndex].type<0?"-":""),abs(_allocationTypes[allocationMarkTypeIndex].type));
     output("\tTotal (bytes)\n");
     // how about showing the oldest until the newest
-    unsigned long long allocationMarkIndex=(lastActiveAllocationMark+1)%numberOfAllocationMarks; // the successor of the last active allocation mark
+    unsigned long long allocationMarkIndex=lastActiveAllocationMark; // the successor of the last active allocation mark (which supposedly is the oldest)
     while(1){
+        allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks; // increment the allocation mark index
         outputChar('a');
-        if(allocationMarkIndex>=0&&allocationMarkIndex<numberOfAllocationMarks&&_allocationTypeMarkIds[allocationMarkIndex]){
+        if(_allocationTypeMarkIds[allocationMarkIndex]){
             outputChar('b');
             output("%s",linePrefix);
             output("%llu",allocationMarkIndex+1);
             outputChar('\t');
             output("%s",_allocationTypeMarkIds[allocationMarkIndex]);
             outputChar('c');
-            if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+            if(lastActiveAllocationMark>=firstActiveAllocationMark){
+                if(allocationMarkIndex>=firstActiveAllocationMark&&allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+            }else{
+                if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+            }
             totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
             for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
                 size=_allocationTypes[allocationMarkTypeIndex].size;
@@ -101,7 +106,6 @@ void outputAllocationTypeMarks(char* linePrefix){
         }
         outputChar('\n');
         if(allocationMarkIndex==lastActiveAllocationMark)break; // final active allocation mark output
-        allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks;
     }
 }
 static bool updateAllocationTypeMarks(){
@@ -558,7 +562,6 @@ bool allocationMarkAdded(){
             _allocationTypeMarkIds=newAllocationTypeMarkIds;
             // MDH@07MAY2020: we have to add a new mark
             size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
-
             Mallocationmark* newAllocationTypeMarks=realloc(_allocationTypeMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark));
             if(!newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
             _allocationTypeMarks=newAllocationTypeMarks;
