@@ -63,49 +63,80 @@ static char* *_allocationTypeMarkIds=NULL; // the pointer to the list of allocat
 
 // as we're expecting more marks to be added then types we do mark 1 type 1, mark 1 type 2, etc.
 // every time a new allocation type is created we need to expand the allocation marks
+static uint8_t getTextRepresentationLength(unsigned long long units){
+    uint8_t textRepresentationLength=1;while(units>9){units/=10;textRepresentationLength+=1;}return textRepresentationLength;
+}
 void outputAllocationTypeMarks(char* linePrefix){
     size_t size;
     unsigned long long freed,occupied,totaloccupied,totalfreed;
-    // output("%llu allocation marks of %llu types:\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
-    // I suppose it's best to write the types first
-    output("%s#\tTime\tType ->",linePrefix);
-    for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++)
-        if(_allocationTypes[allocationMarkTypeIndex].size>0)
-            output("\t%s%c",(_allocationTypes[allocationMarkTypeIndex].type<0?"-":""),abs(_allocationTypes[allocationMarkTypeIndex].type));
-    output("\tTotal (bytes)\n");
-    // how about showing the oldest until the newest
-    unsigned long long allocationMarkIndex=lastActiveAllocationMark; // the successor of the last active allocation mark (which supposedly is the oldest)
-    while(1){
-        allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks; // increment the allocation mark index
-        outputChar('a');
-        if(_allocationTypeMarkIds[allocationMarkIndex]){
-            outputChar('b');
-            output("%s",linePrefix);
-            output("%llu",allocationMarkIndex+1);
-            outputChar('\t');
-            output("%s",_allocationTypeMarkIds[allocationMarkIndex]);
-            outputChar('c');
-            if(lastActiveAllocationMark>=firstActiveAllocationMark){
-                if(allocationMarkIndex>=firstActiveAllocationMark&&allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
-            }else{
-                if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+    uint8_t *_allocationTypeColumnLengths=calloc(numberOfAllocationMarkTypes,sizeof(uint8_t)); // all zero
+    if(_allocationTypeColumnLengths){
+        unsigned long long units,allocationMarkIndex=0; // the successor of the last active allocation mark (which supposedly is the oldest)
+        uint8_t unitsTextLength=0;
+        while(allocationMarkIndex<numberOfAllocationMarks){
+            if(_allocationTypeMarkIds[allocationMarkIndex]){
+                for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
+                    size=_allocationTypes[allocationMarkTypeIndex].size;
+                    if(size==0)continue; // only the case for the * allocation type mark
+                    occupied=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
+                    freed=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
+                    unitsTextLength=getTextRepresentationLength((occupied-freed)/size);
+                    if(unitsTextLength>_allocationTypeColumnLengths[allocationMarkTypeIndex])
+                        _allocationTypeColumnLengths[allocationMarkTypeIndex]=unitsTextLength;
+                }
             }
-            totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
-            for(unsigned long long allocationMarkTypeIndex=0;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
-                size=_allocationTypes[allocationMarkTypeIndex].size;
-                if(size==0)continue; // only the case for the * allocation type mark
-                outputChar('\t');// output(" %c:",_allocationTypes[allocationMarkTypeIndex].type);
-                // how about showing the number of elements instead of the size??????
-                occupied=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
-                freed=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
-                output("%llu",(occupied-freed)/size);
-                totaloccupied+=occupied;
-                totalfreed+=freed;
-            }
-            output("\t%llu = %llu - %llu",totaloccupied-totalfreed,totaloccupied,totalfreed);
+            allocationMarkIndex++;
         }
-        outputChar('\n');
-        if(allocationMarkIndex==lastActiveAllocationMark)break; // final active allocation mark output
+        // output("%llu allocation marks of %llu types:\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
+        // I suppose it's best to write the types first
+        output("%s#\tTime\tType ->\t",linePrefix);
+        uint8_t l;
+        for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
+            if(_allocationTypes[allocationMarkTypeIndex].type<0){
+                if(_allocationTypeColumnLengths[allocationMarkTypeIndex]<2)_allocationTypeColumnLengths[allocationMarkTypeIndex]=2;
+                outputChar('-');
+                l=2;
+            }else
+                l=1;
+            outputChar(abs(_allocationTypes[allocationMarkTypeIndex].type));
+            while(l++<=_allocationTypeColumnLengths[allocationMarkTypeIndex])outputChar(' ');
+        }
+        output("\tTotal (bytes)\n");
+        // how about showing the oldest until the newest
+        // how about determining the widths of the columns first??????
+        // when actually showing the values the order is important
+        allocationMarkIndex=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
+        while(allocationMarkIndex!=lastActiveAllocationMark){
+            if(_allocationTypeMarkIds[allocationMarkIndex]){
+                output("%s",linePrefix);
+                output("%llu",allocationMarkIndex+1);
+                outputChar('\t');
+                output("%s",_allocationTypeMarkIds[allocationMarkIndex]);
+                if(lastActiveAllocationMark>=firstActiveAllocationMark){
+                    if(allocationMarkIndex>=firstActiveAllocationMark&&allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+                }else{
+                    if(allocationMarkIndex>=firstActiveAllocationMark||allocationMarkIndex<=lastActiveAllocationMark)outputChar('*'); // mark an active one with an asterisk
+                }
+                outputChar('\t');
+                totaloccupied=totalfreed=0; // the total we're reporting for the mark (at the end)
+                for(unsigned long long allocationMarkTypeIndex=1;allocationMarkTypeIndex<numberOfAllocationMarkTypes;allocationMarkTypeIndex++){
+                    size=_allocationTypes[allocationMarkTypeIndex].size;
+                    if(size==0)continue; // only the case for the * allocation type mark
+                    // how about showing the number of elements instead of the size??????
+                    occupied=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].occupied;
+                    freed=_allocationTypeMarks[allocationMarkIndex*numberOfAllocationMarkTypes+allocationMarkTypeIndex].freed;
+                    units=(occupied-freed)/size;
+                    unitsTextLength=getTextRepresentationLength(units);
+                    output("%llu",units);
+                    while(unitsTextLength++<=_allocationTypeColumnLengths[allocationMarkTypeIndex])outputChar(' ');
+                    totaloccupied+=occupied;
+                    totalfreed+=freed;
+                }
+                output("\t%llu = %llu - %llu\n",totaloccupied-totalfreed,totaloccupied,totalfreed);
+            }
+            allocationMarkIndex=(allocationMarkIndex+1)%numberOfAllocationMarks; // increment the allocation mark index
+        }
+        free(_allocationTypeColumnLengths);
     }
 }
 static bool updateAllocationTypeMarks(){
