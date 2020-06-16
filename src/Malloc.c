@@ -982,7 +982,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
         );
     // only disowned stuff can be freed!!!!!
     if(_alloc->owner.disowned==0)
-        bug("\tStill disowned!");
+        bug("\tStill owned!");
     if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
         if(allocations._owners[_alloc->allocationIndex].owner.freed!=0)
             bug("\tFreed before!");

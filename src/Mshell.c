@@ -6824,7 +6824,7 @@ static Mlist* _getRangeList(Mlist* start,Mlist* delta,long long count){
 	return NULL;
 }
 static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
-	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?(Mlist*)OWNED(_getListOfType(VT_INTEGER),owner):NULL);
+	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?owned_list(_getListOfType(VT_INTEGER),owner):NULL);
 	if(_scalarRangeList){
 		Mvalue* upValue=smallerthanorequalto(firstRangeValue,lastRangeValue); // the direction we'll be going
 		if(upValue&&upValue->type==VT_INTEGER){
@@ -6867,7 +6867,7 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 			outputError("Unable to determine whether to go up or down in the integer range");
 	}else
 		outputError("Failed to create a list to store the integer range");
-	return _scalarRangeList;
+	return disowned_list(_scalarRangeList,owner);
 }
 // MDH@18OCT2019: we can get the range of integers between two values
 Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
@@ -6893,7 +6893,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		Mvalue* startIntegerRangeValue=startIntegerRangeListelement->_value;
 		if(!startIntegerRangeValue)return NULL;
 
-		Mlist* _integerRangeList=_getScalarRangeList(startIntegerRangeValue,endIntegerRangeValue,&up);
+		Mlist* _integerRangeList=owned_list(_getScalarRangeList(startIntegerRangeValue,endIntegerRangeValue,&up),owner);
 		if(!_integerRangeList||!_integerRangeList->_first)return NULL; // if undefined or empty apparently no integers between the start and end of the first dimensions
 
 		if(amDebugging())
@@ -6909,8 +6909,8 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 
 		// the multiplication factor (deltato use in each successive dimension equals the difference between end and start value divided by rangeValue
 
-		Mlist* _multFactorList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner);		
-		if(!_multFactorList)return NULL;
+		Mlist* _multFactorList=owned_list(_getListOfType(VT_UNDEFINED),owner);		
+		if(!_multFactorList){FREE_LIST(_integerRangeList,owner);return NULL;} // MDH@17JUN2020: free the integer range list please...
 
 		// iterate over all successive elements in the _value1 list
 		while(1){
@@ -6926,7 +6926,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 			// we need to compute the delta (step) 
 			Mvalue* deltaRangeValue=divide(subtract(endIntegerRangeValue,startIntegerRangeValue),rangeValue);
 			if(!deltaRangeValue)continue;
-			if(appendedToList(_multFactorList,owner,deltaRangeValue,M_LL_INVALID)<0){
+			if(appendedToList(_multFactorList,owner,deltaRangeValue,M_LL_INVALID)<=0){
 				FREE_LIST(_multFactorList,owner);
 				_multFactorList=NULL;
 				break;
@@ -6949,9 +6949,9 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 					Mvalue *firstRangeValue=startDeltaValue,*incrementValue=_getIntegerValue(1); // MDH@03MAR2020: no need to use assign here because firstRangeValue is temporary
 					Mlistelement* _integerRangeListelement=_integerRangeList->_first;
 					while(_integerRangeListelement){
-						Mlist* _pointList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner);
+						Mlist* _pointList=owned_list(_getListOfType(VT_UNDEFINED),owner);
 						if(!_pointList){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
-						if(appendedToList(_pointList,owner,_integerRangeListelement->_value,M_LL_INVALID)<0)
+						if(appendedToList(_pointList,owner,_integerRangeListelement->_value,M_LL_INVALID)<=0)
 						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						// now to compute the points in all other dimensions which means we have to increment startIntegerRangeListelement and endIntegerRangeListelement
 						Mlistelement* multFactorListelement=_multFactorList->_first;
@@ -6969,12 +6969,12 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 							// outputValue("First range value ",firstRangeValue,".\n");
 							rangeValue=add(startIntegerRangeValue,multiply(multFactorListelement->_value,firstRangeValue));
 							// outputValue("Range value: ",rangeValue,".\n");
-							if(appendedToList(_pointList,owner,rangeValue,M_LL_INVALID)<0){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
+							if(appendedToList(_pointList,owner,rangeValue,M_LL_INVALID)<=0){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 							multFactorListelement=multFactorListelement->_next;
 						}
 						if(!_resultList)break;
 						// append _pointList to the result list
-						if(appendedToList(_resultList,owner,_getValueOfList(disowned_list(_pointList,owner)),M_LL_INVALID)<0)
+						if(appendedToList(_resultList,owner,_getValueOfList(disowned_list(_pointList,owner)),M_LL_INVALID)<=0)
 						{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 						_integerRangeListelement=_integerRangeListelement->_next;
 						firstRangeValue=add(firstRangeValue,incrementValue); // increment the first range value (which is the X offset so to speak from the first dimension)
