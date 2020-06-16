@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
-char const * const M_BUILD="2";char const * const M_DATE="25 May 2020";
+char const * const M_BUILD="3";char const * const M_DATE="17 June 2020";
+//char const * const M_BUILD="2";char const * const M_DATE="25 May 2020";
 //char const * const M_BUILD="1";char const * const M_DATE="22 May 2020";
 
 // MDH@20APR2020: definitely not the first build but I think I forgot to switch to builds here (as opposed to git branching)

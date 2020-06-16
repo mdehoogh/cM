@@ -97,7 +97,7 @@ Mlistelement* owned_listelement(Mlistelement* _listelement,Mallocationowner owne
 }
 Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner owner_listelement){
     if(!_listelement)return NULL;
-    disowned_listelement(_listelement->_next,owner_listelement);
+    if(_listelement->_next)disowned_listelement(_listelement->_next,owner_listelement);
     return DISOWNED(_listelement,owner_listelement);
 }
 bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/){
@@ -112,14 +112,14 @@ bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner ow
 
 Mlist* owned_list(Mlist* _list,Mallocationowner owner_list){
     if(!_list)return NULL;
-    owned_chars(_list->_creator,Msubowner(owner_list,1));
-    owned_listelement(_list->_first,owner_list);
+    if(_list->_creator)owned_chars(_list->_creator,Msubowner(owner_list,1));
+    if(_list->_first)owned_listelement(_list->_first,owner_list);
     return OWNED(_list,owner_list);
 }
 Mlist* disowned_list(Mlist* _list,Mallocationowner owner_list){
     if(!_list)return NULL;
-    disowned_chars(_list->_creator,owner_list);
-    disowned_listelement(_list->_first,owner_list);
+    if(_list->_creator)disowned_chars(_list->_creator,owner_list);
+    if(_list->_first)disowned_listelement(_list->_first,owner_list);
     return DISOWNED(_list,owner_list);
 }
 void free_list(Mlist* _list){
