@@ -1519,23 +1519,22 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__LINE__);
 	Mcommand* _command=(Mcommand*)CALLOC_1(sizeof(Mcommand),'K',owner);
 	if(_command){
-		if(amDebugging())(*inputInfoFunction)("New command created.");
+		// if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
 			_command->_firstToken=SUBOWNED(OWNED(_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/),owner),1); // MDH@24MAY2020: obtain ownership immediately
 			if(_command->_firstToken){ // we've got a first token allocated
-				if(amVerboseDebugging())
-					if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
+				// if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
 				FREE_DISOWNED_1(_command,'K',owner);_command=NULL;
-				if(amVerboseDebugging())
-					if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
+				// if(amVerboseDebugging())
+				if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
 			}
 		}
 	}else
-	if(amVerboseDebugging())
-		if(inputErrorFunction)(*inputErrorFunction)("Failed to create the command.");
+	// if(amVerboseDebugging())
+	if(inputErrorFunction)(*inputErrorFunction)("Failed to create the command.");
 	return(Mcommand*)DISOWNED(_command,owner);
 }
 
@@ -4086,8 +4085,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate,true);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
-							if(amVerboseDebugging())
-								outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
+							if(amVerboseDebugging())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
 							if(amVerboseDebugging())
 								if(inputCharReadFunction){char c;output("Press any key to continue...");(*inputCharReadFunction)(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value

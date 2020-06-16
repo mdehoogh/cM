@@ -152,7 +152,7 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=get
 Mstring* _getDecimalText(Mdecimal const * const _decimal,bool fixedpoint){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _decimalText=owned_string(__string(),owner);
     if(_decimalText){
-		if(_decimal&&_decimal->mpd){
+		if(_decimal&&_decimal->mpd){ // MDH@16JUN2020: was getting Segmentation fault on _decimal->mpd TODO why????????
 			/////////outputChar('D');
             Mstring* _p=_decimalText;
             // NOTE not using mpd_to_sci as we do not know when we get an e-part!!!!
@@ -640,7 +640,7 @@ Mdecimal* owned_decimal(Mdecimal* _decimal,Mallocationowner owner_decimal){retur
 void free_decimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
 	if(!_decimal)return;
     if(amVerboseDebugging())output("Freeing decimal.\n");
-    if(_decimal->mpd)free_mpd(_decimal->mpd);//////else if(verbose)outputError("No data in decimal to free");
+    if(_decimal->mpd){free_mpd(_decimal->mpd);_decimal->mpd=NULL;}//////else if(verbose)outputError("No data in decimal to free");
     FREE_1(_decimal,'D'/*,owner_decimal*/);
 }/* VALIDATED */
 
@@ -649,6 +649,7 @@ void free_decimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
  */
 Mdecimal* __adecimal(){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _adecimal=(Mdecimal*)CALLOC_1(sizeof(Mdecimal),'D',owner);
+	// outputDecimal("Created decimal: '",_adecimal,"'."); // DEBUG
 	return disowned_decimal(_adecimal,owner);
 } /* VALIDATED */
 
@@ -662,7 +663,7 @@ Mdecimal* __decimal(mpd_context_t const * mpd_context,int64_t value,uint64_t rep
     Mdecimal* _decimal=NULL;
     if(!mpd_context)mpd_context=M_DECIMALCONTEXT->mpd_context; // use the application-wide decimal context if no context is defined
     if(mpd_context){
-        _decimal=OWNED(__adecimal(),owner); // get an uninitialized decimal
+        _decimal=owned_decimal(__adecimal(),owner); // get an uninitialized decimal
         if(_decimal){
             _decimal->mpd=__mpd(mpd_context,value); // initialize to zero by default
             if(_decimal->mpd){
@@ -1980,14 +1981,17 @@ typedef struct mpd_relative_angle{
 }mpd_relative_angle_t;
 
 mpd_relative_angle_t* disowned_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle,Mallocationowner owner_mpd_relative_angle){
+	if(!_mpd_relative_angle)return NULL;
 	disowned_sincoselement(_mpd_relative_angle->sincoselement,owner_mpd_relative_angle); // MDH@11SEP2019: now we do need to free the Msincoselement*
 	return (mpd_relative_angle_t*)DISOWNED(_mpd_relative_angle,owner_mpd_relative_angle);
 }
 mpd_relative_angle_t* owned_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle,Mallocationowner owner_mpd_relative_angle){
+	if(!_mpd_relative_angle)return NULL;
 	owned_sincoselement(_mpd_relative_angle->sincoselement,owner_mpd_relative_angle); // MDH@11SEP2019: now we do need to free the Msincoselement*
 	return(mpd_relative_angle_t*)OWNED(_mpd_relative_angle,owner_mpd_relative_angle);
 }
 void free_mpd_relative_angle(mpd_relative_angle_t* _mpd_relative_angle/*,Mallocationowner owner_mpd_relative_angle*/){
+	if(!_mpd_relative_angle)return;
 	free_sincoselement(_mpd_relative_angle->sincoselement/*,owner_mpd_relative_angle*/); // MDH@11SEP2019: now we do need to free the Msincoselement*
 	free_mpd(_mpd_relative_angle->_delta_angle);
 	FREE_1(_mpd_relative_angle,'$'/*,owner_mpd_relative_angle*/);

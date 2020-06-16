@@ -100,9 +100,6 @@ typedef struct Mtext{
 
 // MDH@17JUN2019: if we want to know when a decimal contains repeating fractions we should be able to remember how many decimals repeat themselves
 typedef struct Mdecimal{
-// #ifndef __PRODUCTION__
-//     t_count allocationIndex;
-// #endif
     mpd_t* mpd; // ok, for now use a pointer
     mpd_ssize_t repeating; // the number of decimals that repeat themselves at the end
     mpd_ssize_t prec; // MDH@25AUG2019: the precision used for creating this decimal (thus allowing to automatically set the decimal precision to use in computations)

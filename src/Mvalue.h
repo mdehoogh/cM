@@ -236,17 +236,17 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 Mvalue** getValueHolderAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
 Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName);
 
-Mstring* _getListText(Mlist* _list);
-Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings);
+Mstring* _getListText(Mlist const * const _list);
+Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquotes,bool showmissings);
 
-void outputList(char const * const prefix,Mlist* list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
-void outputMap(char const * const prefix,Mmap* map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
+void outputList(char const * const prefix,Mlist const * const list,char const * const suffix); // MDH@02MAR2020: utility function to output a list
+void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
 
-Mstring* _getValueText(const Mvalue* const _value,bool dequoted); // flag only applicable to string values!!!
+Mstring* _getValueText(Mvalue const * const _value,bool dequoted); // flag only applicable to string values!!!
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
-long long getValueInteger(const Mvalue* const _value);
-size_t outputValue(const char* const prefix,const Mvalue* value,const char* const suffix);
+long long getValueInteger(Mvalue const * const _value);
+size_t outputValue(char const * const prefix,Mvalue const * value,char const * const suffix);
 
 Mmap* _getStringMapTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getMapTokenMap(char* name1,char* name2);

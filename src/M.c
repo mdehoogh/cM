@@ -2185,14 +2185,14 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType){
 void createUserInputCommand(){
 	// MDH@24APR2019 obsolete: getCommandLength()=string_length(feedforwardText); // MDH@21APR2019: oops was 0 before...
 	resetOutputColor(); // TODO do we need this here?????
-	if(amDebugging())inputInfo("Creating the new user input command.");
+	// if(amDebugging())inputInfo("Creating the new user input command.");
 	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
 	_userInputCommand=_getNewCommand(true);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand){
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
 		updateLastTokenAutocompletionText(); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
-		if(amDebugging())inputInfo("New user input command created.");
+		// if(amDebugging())inputInfo("New user input command created.");
 	}else
 		inputError("Failed to create a new user input command.");
 	/* replacing: 

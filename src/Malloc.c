@@ -582,29 +582,33 @@ bool resetAllocationTypes(){
 // MDH@25NOV2019: markAllocationTypes() remembers the current allocation type counts in the 4th and 5th element
 // MDH@11MAY2020: either we can use a reusable allocation mark or append one
 bool allocationMarkAdded(){
-    output("Last active allocation mark before: %llu.\n",lastActiveAllocationMark); // DEBUG
+    // output("Last active allocation mark before: %llu.\n",lastActiveAllocationMark); // DEBUG
     if(_allocationTypeMarks){
         // if we can't increment the last active allocation mark without bumping into the first active allocation mark we have to add an allocation mark
         unsigned long long newLastActiveAllocationMark=(lastActiveAllocationMark+1)%numberOfAllocationMarks;
-        output("New last active allocation mark: %llu.\n",newLastActiveAllocationMark);
+        // output("New last active allocation mark: %llu.\n",newLastActiveAllocationMark); // DEBUG
         if(firstActiveAllocationMark==newLastActiveAllocationMark){ // the first active allocation mark is right behind the last active allocation mark and has to be moved up
             char** newAllocationTypeMarkIds=realloc(_allocationTypeMarkIds,(numberOfAllocationMarks+1)*sizeof(char*));
             if(!newAllocationTypeMarkIds)return false;
             _allocationTypeMarkIds=newAllocationTypeMarkIds;
+            _allocationTypeMarkIds[numberOfAllocationMarks]=NULL; // because we haven't set it yet!!!!
             // MDH@07MAY2020: we have to add a new mark
             size_t newNumberOfAllocationTypeMarks=(numberOfAllocationMarks+1)*numberOfAllocationMarkTypes;
             Mallocationmark* newAllocationTypeMarks=realloc(_allocationTypeMarks,newNumberOfAllocationTypeMarks*sizeof(Mallocationmark));
             if(!newAllocationTypeMarks)return false; // failure if unable to reallocate!!!!
             _allocationTypeMarks=newAllocationTypeMarks;
+            // if newLastActiveAllocationMark is now 0, we would be appending the mark instead of inserting
             if(newLastActiveAllocationMark>0){ // we need room at where the first active allocation mark is now (the oldest allocation mark)
                 // we move all allocation marks one mark up starting at firstActiveAllocationMark up until numberOfAllocationMarks
-                unsigned long long numberOfAllocationTypeMarks=(firstActiveAllocationMark+1)*numberOfAllocationMarkTypes; // the last allocation info to copy
-                while(--newNumberOfAllocationTypeMarks>=numberOfAllocationTypeMarks)
+                unsigned long long allocationTypeMarkOffset=(newLastActiveAllocationMark+1)*numberOfAllocationMarkTypes; // the last allocation info to copy
+                while(--newNumberOfAllocationTypeMarks>=allocationTypeMarkOffset)
                     _allocationTypeMarks[newNumberOfAllocationTypeMarks]=_allocationTypeMarks[newNumberOfAllocationTypeMarks-numberOfAllocationMarkTypes];
             }else // instead of writing the new mark at position 0, we can simply write it at the room we created!!!
                 newLastActiveAllocationMark=numberOfAllocationMarks;
             numberOfAllocationMarks++;
-        }else // free the mark id that is going to be replaced!!!!
+            firstActiveAllocationMark=(newLastActiveAllocationMark+1)%numberOfAllocationMarks;
+        }else
+        // free the mark id that is going to be replaced!!!!
         if(_allocationTypeMarkIds[newLastActiveAllocationMark]){
             free(_allocationTypeMarkIds[newLastActiveAllocationMark]);
             _allocationTypeMarkIds[newLastActiveAllocationMark]=NULL; // MDH@15JUN2020: might be an issue if we don't!!!
@@ -633,13 +637,13 @@ bool allocationMarkAdded(){
         if(!_allocationTypeMarks){free(_allocationTypeMarkIds);return false;}
 
         numberOfAllocationMarks=1;firstActiveAllocationMark=0;lastActiveAllocationMark=0;numberOfAllocationMarkTypes=numberOfAllocationTypes;
-        printf("\tAllocation marks registration initialized...\n");        
+        output("\tAllocation marks registration initialized...\n");        
     }
  
-    output("Last active allocation mark after: %llu.\n",lastActiveAllocationMark); // DEBUG
+    // output("Last active allocation mark after: %llu.\n",lastActiveAllocationMark); // DEBUG
     time_t now=time(NULL);struct tm * nowlocal=localtime(&now);char hms[9];strftime(hms,9,HMS_FORMAT_STRING,nowlocal);
     _allocationTypeMarkIds[lastActiveAllocationMark]=strdup(hms); // TODO for now assume that strdup() will NOT fail!!!! of course if it does it will return NULL so that's OK
-    output("Allocation type mark id #%llu: '%s'.\n",lastActiveAllocationMark,_allocationTypeMarkIds[lastActiveAllocationMark]); // DEBUG
+    // output("Allocation type mark id #%llu: '%s'.\n",lastActiveAllocationMark,_allocationTypeMarkIds[lastActiveAllocationMark]); // DEBUG
     return true;
     /* replacing:
     long long numberOfAllocationTypes=getNumberOfAllocationTypes();

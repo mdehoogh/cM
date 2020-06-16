@@ -1493,10 +1493,10 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	if(_newCommandToken)setTokenType(_newCommandToken,tokenType);else if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
 	return _newCommandToken;
 }
-Mcommand* _getNewCommand(bool withFirstToken){
-	Mcommand* _command=CALLOC(sizeof(Mcommand),'K');
+Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__LINE__);
+	Mcommand* _command=CALLOC_1(sizeof(Mcommand),'K');
 	if(_command){
-		if(amDebugging())(*inputInfoFunction)("New command created.");
+		// if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
 			_command->_firstToken=_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/);
 			if(_command->_firstToken){ // we've got a first token allocated
@@ -1504,7 +1504,7 @@ Mcommand* _getNewCommand(bool withFirstToken){
 				_command->_lastToken=_command->_firstToken;
 				_command->_firstToken->expr=NULL;
 			}else{ // too bad, out of memory!
-				FREE(_command,'K');_command=NULL;
+				FREE_1(_command,'K');_command=NULL;
 				if(amDebugging())if(inputErrorFunction)(*inputErrorFunction)("Failed to create the first command token.");
 			}
 		}

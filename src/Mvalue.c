@@ -227,6 +227,7 @@ void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner own
 // manage a list of created values
 // if we make a map out of it, we can annote the value with a name????
 static Mlist* _valueList=NULL;
+static unsigned long long valueCount=0; // MDH@16JUN2020: keeping track of the total number of values
 // MDH@28MAY2020: in one go we can set the owner of the value list, the owner of every element in the value list, the owner of each value in every element of the value list and finally that of any data bound to the value
 static Mallocationowner owner_valueList=(Mallocationowner){MODULE_ID,__LINE__,1},owner_valueListelement=(Mallocationowner){MODULE_ID,__LINE__,1,1},owner_value=(Mallocationowner){MODULE_ID,__LINE__,1,2},owner_value_data=(Mallocationowner){MODULE_ID,__LINE__,1,3};
 // MDH@28MAY2020: if someone want to add something to a value (s)he should use getValueOwner() to retrieve the owner of the value
@@ -238,7 +239,9 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
         if(!_valueList){outputBug("Failed to create the global value list.");return NULL;}
         // MDH@28MAY2020: it doesn't really matter what owner we pass to CALLOC_1 because appendedToList() will reposses it
         //                as an alternative we could call __value now to add an empty value representing undefined except that in that case it would get X as value type not U
-        if(appendedToList(_valueList,owner_valueList,(Mvalue*)DISOWNED(CALLOC_1(sizeof(Mvalue),'U',owner),owner),M_LL_INVALID)<=0){outputBug("Failed to store the global undefined value.");return NULL;}
+        long long valueIndex=appendedToList(_valueList,owner_valueList,(Mvalue*)DISOWNED(CALLOC_1(sizeof(Mvalue),'U',owner),owner),M_LL_INVALID);
+        if(valueIndex<=0){outputBug("Failed to store the global undefined value.");return NULL;}
+        valueCount=valueIndex;
         _valueList->weak=true; // MDH@11NOV2019: from now on a weak list i.e. elements are not added using assignValue but directly
     }
     Mlistelement* _valueListelement=(Mlistelement*)CALLOC_1(sizeof(Mlistelement),'l',owner_valueListelement); // both pointers NULL
@@ -251,7 +254,7 @@ Mvalue* __value(char const * const descriptor){Mallocationowner owner=getOwner(_
             _valueList->_last=_valueListelement;
             _valueList->numberOfElements++;
             // MDH@11NOV2019: by remembering the number of elements as index, removing intermediate elements will NOT prevent informing about what element was removed!!!
-            _valueListelement->index=_valueList->numberOfElements;
+            _valueListelement->index=(++valueCount); // MDH@17JUN2020 replacing: _valueList->numberOfElements;
             if(descriptor)
             if(amVerboseDebugging())
             output("Descriptor of value with id #%llu: '%s'.\n",_valueListelement->index,descriptor);
@@ -306,7 +309,10 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
         while(_valueListelement){
             checked++;
             if(_valueListelement->_value){
-                if(showInfo){output("Checking value #%llu ",checked);outputValue("(",_valueListelement->_value,")");output(" with id %llu.\n",_valueListelement->index);}
+                if(showInfo){
+                    output("Checking value #%llu with id %llu ",checked,_valueListelement->index);
+                    outputValue(": '",_valueListelement->_value,"'.\n");
+                }
                 // if(showInfo)outputInfo("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
                     if(showInfo)output("\tAbout to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
@@ -431,7 +437,7 @@ Mvalue* _getValueOfReference(Mreference* _reference/*,Mallocationowner owner_ref
 Mvalue* _getValueOfDecimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
     if(!_decimal)return NULL;
     Mvalue* _decimalValue=__value("decimal");
-    if(_decimalValue){//////////outputDecimal("Wrapping decimal '",_decimal,"'.\n");
+    if(_decimalValue){outputDecimal("Wrapping decimal '",_decimal,"'.\n");
         _decimalValue->type=VT_DECIMAL;
         _decimalValue->value._decimal=(Misdisowned(_decimal)?owned_decimal(_decimal,owner_value_data):_decimal);
     }else
@@ -611,7 +617,7 @@ Mvalue* _getMapValue(Mvaluetype mapValuetype,bool weak){Mallocationowner owner=g
         _map->weak=weak;
         _map->valuetype=mapValuetype;
         _mapValue->type=VT_MAP;
-        _mapValue->value._map=(Mmap*)SUBOWNED(OWNED(DISOWNED(_map,owner),getValueOwner()),1);
+        _mapValue->value._map=owned_map(disowned_map(_map,owner),owner_value_data);
     }else
         FREE_MAP(_map,owner);
     return _mapValue;
@@ -649,8 +655,7 @@ Mvalue* _getValueOfMap(Mmap* _map/*,Mallocationowner owner_map*/){
     if(_value)
     {_value->value._map=(Misdisowned(_map)?owned_map(_map,owner_value_data):_map);_value->type=VT_MAP;}
     else 
-    if(Misdisowned(_map))
-        free_map(_map);
+    if(Misdisowned(_map))free_map(_map);
     return _value;
 }/* VALIDATED */
 Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/){
@@ -659,8 +664,7 @@ Mvalue* _getValueOfToken(Mtoken* _token/*,Mallocationowner owner_token*/){
     if(_value)
     {_value->value._token=(Misdisowned(_token)?owned_token(_token,owner_value_data):_token);_value->type=VT_TOKEN;}
     else 
-    if(Misdisowned(_token))
-        free_token(_token);
+    if(Misdisowned(_token))free_token(_token);
     return _value;
 }/* VALIDATED */
 
@@ -1276,7 +1280,7 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
 }/* VALIDATED */
 
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
-Mstring* _getListText(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getListText(Mlist const * const _list){Mallocationowner owner=getOwner(__LINE__);
     ///////output("List to output.");char c;inputCharRead(&c);
 	Mstring* result=owned_string(__string(),owner);
     if(result){
@@ -1293,15 +1297,19 @@ Mstring* _getListText(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
             if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
             while(listindex<_listelement->index){listindex++;p=string_append_char(p,',');}
             if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
-	        //////////outputChar('.');
-			_listelementValue=_listelement->_value;
-			/////if(_listelementValue){
-				Mstring* _listelementValueText=owned_string(_getValueText(_listelementValue,false),owner); // to be freed asap
-				if(_listelementValueText){
-					p=string_append(p,string(_listelementValueText));
-					FREE_STRING(_listelementValueText,owner); // release AFTER copying over
-				}
-			/////}
+            // MDH@17JUN2020: because weak list values can be freed without the list knowing about it we cannot display it without possibly crashing...
+            if(!_list->weak){
+	            //////////outputChar('.');
+		    	_listelementValue=_listelement->_value;
+                if(_listelementValue){
+				    Mstring* _listelementValueText=owned_string(_getValueText(_listelementValue,false),owner); // to be freed asap
+				    if(_listelementValueText){
+					    p=string_append(p,string(_listelementValueText));
+					    FREE_STRING(_listelementValueText,owner); // release AFTER copying over
+				    }
+			    }
+            }else
+            if(!amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
 			_listelement=_listelement->_next;
 		}
 		p=string_append_char(p,']');
@@ -1312,13 +1320,13 @@ Mstring* _getListText(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	return disowned_string(result,owner);
 }/* VALIDATED */
 // MDH@02MAR2020: utility function to output a map
-void outputList(char const * const prefix,Mlist* list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
+void outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _listText=owned_string(_getListText(list),owner);
     output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
     FREE_STRING(_listText,owner);
 }/* VALIDATED */
 
-Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmissings){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquotes,bool showmissings){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* result=owned_string(__string(),owner);
     if(result){
 	    Mstring* p=result;
@@ -1366,7 +1374,7 @@ Mstring* _getMapText(Mmap* _map,bool showcurlybraces,bool showquotes,bool showmi
 	return disowned_string(result,owner);
 }/* VALIDATED */
 // MDH@02MAR2020: utility function to output a map
-void outputMap(char const * const prefix,Mmap* map,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
+void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
     Mstring* _mapText=owned_string(_getMapText(map,true,true,true),owner);
     output("%s%s%s",(prefix?prefix:""),(_mapText?string(_mapText):""),(suffix?suffix:""));
     FREE_STRING(_mapText,owner);

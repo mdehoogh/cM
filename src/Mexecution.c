@@ -1085,7 +1085,7 @@ size_t outputBiginteger(char const * const prefix,Mbiginteger const * const _big
 size_t outputDecimal(char const * const prefix,Mdecimal const * const _decimal,char const * const postfix){Mallocationowner owner=getOwner(__LINE__);
     size_t written=0;
     if(prefix)written=output("%s",prefix);
-    if(_decimal){
+    if(_decimal!=NULL){
         Mstring* _decimalText=owned_string(_getDecimalText(_decimal,false),owner);
         if(_decimalText){
             written+=output("%s",string(_decimalText));
