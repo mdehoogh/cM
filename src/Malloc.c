@@ -835,7 +835,7 @@ bool Misdisowned(void* ptr){if(!ptr)return false;Malloc* _alloc=(Malloc*)(((char
 void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
     if(!ptr)return NULL;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)/*+size*/);
-    info("%p: Releasing owner %s:%u(%s%u%s%s) by %s:%u(%s%u%s%s).\n",_alloc
+    info("%p: %s:%u(%s%u%s%s) requesting to disown the memory allocation owned by %s:%u(%s%u%s%s).\n",_alloc
         ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
         ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
         );
