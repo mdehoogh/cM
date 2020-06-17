@@ -856,9 +856,15 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
                     ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
                     );
         }else
-            bug("\tCan't release the ownership of an invalid owner.");
+            bug("\tCan't disown the memory owned by %s:%u(%s%u%s%s) as requested by %s:%u(%s%u%s%s): it is invalid."
+            ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
+            ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
+            );
     }else
-        bug("\tFailed to disown a memory allocation: it is not registered.");
+        bug("\tFailed to disown the memory allocation owned by %s:%u(%s%u%s%s) as requested by %s:%u(%s%u%s%s): it is not registered."
+            ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
+            ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
+            );
     info("\tDisowned by (%s:%u,%u,%u,%u,%u).\n",MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]);
     return ptr;
 }
@@ -904,11 +910,15 @@ void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){
                     );
             // printf("%s","Y");
         }else
-            bug("\tCan't set the ownership of a memory allocation to invalid owner %s:%u(%s%u%s%s)."
+            bug("\tCan't set the ownership of the memory allocation owned by %s:%u(%s%u%s%s) to invalid owner %s:%u(%s%u%s%s)."
+                ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
                 ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
                 );
     }else
-        bug("\tFailed to disown a memory allocation: it is not registered.");
+        bug("\tCan't set the ownership of the memory allocation owned by %s:%u(%s%u%s%s) to %s:%u(%s%u%s%s): it is not registered."
+                ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
+                ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
+                );
     info("\tOwned by %s:%u(%s%u%s%s).\n",MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]);
     return ptr;
 }
@@ -986,7 +996,9 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
         );
     // only disowned stuff can be freed!!!!!
     if(_alloc->owner.disowned==0)
-        bug("\tStill owned!");
+        bug("\tAbout to free the still owned memory allocation %s:%u(%s%u%s%s)!"
+        ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
+        );
     if(_alloc->allocationIndex>=0&&_alloc->allocationIndex<allocations.l){
         if(allocations._owners[_alloc->allocationIndex].owner.freed!=0)
             bug("\tFreed before!");
