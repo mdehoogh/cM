@@ -437,7 +437,8 @@ Mvalue* _getValueOfReference(Mreference* _reference/*,Mallocationowner owner_ref
 Mvalue* _getValueOfDecimal(Mdecimal* _decimal/*,Mallocationowner owner_decimal*/){
     if(!_decimal)return NULL;
     Mvalue* _decimalValue=__value("decimal");
-    if(_decimalValue){outputDecimal("Wrapping decimal '",_decimal,"'.\n");
+    if(_decimalValue){
+        // outputDecimal("Wrapping decimal '",_decimal,"'.\n"); // DEBUG
         _decimalValue->type=VT_DECIMAL;
         _decimalValue->value._decimal=(Misdisowned(_decimal)?owned_decimal(_decimal,owner_value_data):_decimal);
     }else

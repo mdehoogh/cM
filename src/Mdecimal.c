@@ -937,7 +937,7 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 	if(!decimalcontext->pi){
 
 		//if(amVerbose())
-		output("Computing %lld decimal digits of pi.\n",decimalprecision);
+		output("Computing %lld digits of pi.\n",decimalprecision); // MDH@17JUN2020: this includes the digit in front of the period (i.e. 3)
 
 		// initialize the variables we need for the iterations
 #ifdef __ADEBUG__

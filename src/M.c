@@ -1076,8 +1076,7 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 	long long numberOfAllocationMarks=incrementalNumberOfAllocationMarks+1; // request at least one more allocation mark than increments we need 
 	// MDH@22MAY2020 TODO unfortunately _getAllationTypeSizes is NOT under allocation managed control
 	long long * _allocationTypeSizes=_getAllocationTypeSizes("",&numberOfAllocationTypeSizes,&numberOfAllocationMarks);
-	if(amVerboseDebugging())
-		output("Number of allocation type sizes received: %lld. Number of allocation marks received: %lld.\n",numberOfAllocationTypeSizes,numberOfAllocationMarks);
+	if(amVerboseDebugging())output("Number of allocation type sizes received: %lld. Number of allocation marks received: %lld.\n",numberOfAllocationTypeSizes,numberOfAllocationMarks);
 	if(_allocationTypeSizes){
 		// I suppose we need at least two allocation marks returned so we can determine at least one increment
 		if(numberOfAllocationMarks>1){
@@ -1258,20 +1257,20 @@ Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MODULE_ID,__L
 // keep track of all commands so far
 #define COMMAND_BLOCKSIZE 8
  // array for storing the pointers to the first token of all commands entered
-Mcommand** commands=NULL;Mallocationowner owner_commands=(Mallocationowner){MODULE_ID,__LINE__,1};
+Mcommand** _commands=NULL;Mallocationowner owner_commands=(Mallocationowner){MODULE_ID,__LINE__,1};
 uint32_t commandBlocks=0;
 // MDH@24MAY2020 NOTE: registerCommand is ONLY called once with _userInputCommand as argument but 
 // MDH@12JUN2020 TODO TODO TODO how to deal with the command being registered and whether or not the tokens are to be disowned when put in the value 
-bool registerCommand(Mcommand* command){if(!command)return false;Mallocationowner owner=getOwner(__LINE__);
+bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!command)return false;Mallocationowner owner=getOwner(__LINE__);
 	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
-			Mcommand** createUserInputCommands=(commandBlocks==0?MALLOC(sizeof(Mtoken*),COMMAND_BLOCKSIZE,'C',owner_commands):REALLOC(commands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mtoken*),'C'));
+			Mcommand** createUserInputCommands=(commandBlocks==0?MALLOC(sizeof(Mtoken*),COMMAND_BLOCKSIZE,'C',owner_commands):REALLOC(_commands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mtoken*),'C'));
 			if(createUserInputCommands==NULL)return false;
 			commandBlocks++;
-			commands=createUserInputCommands;
+			_commands=createUserInputCommands;
 		}
-		commands[commandCount++]=command;
+		_commands[commandCount++]=owned_command(disowned_command(command,owner_command),owner_commands);
 		if(amVerboseDebugging())outputLine("Command registered!");
 		return true;
 	}
@@ -1279,7 +1278,10 @@ bool registerCommand(Mcommand* command){if(!command)return false;Mallocationowne
 	// NOTE we can create the value and when it is not appended to the list it will not be bound, and be released by the 'garbage collector'
 	// MDH@25MAY2020 TODO should we pass {1} to _getValueOfToken()?????????
 	// MDH@08JUN2020 TODO still have to check the following... what would be the owner of the first command token??????? I suppose it will be subowned by the user input command
-	Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(disowned_token(command->_firstToken,owner_userInputCommand)); // MDH@12JUN2020: TODO as we do NOT want to loose _firstToken we do NOT disown it before asking for the value of the token
+	// MDH@17JUN2020 if we store the first command token in a value it needs to be disowned so it can be owned by the value 
+	//               NOTE that _getValueOfToken will free the token (and all connected tokens) when failing to create the value
+	//               we need to determine what to do with the command itself
+	Mvalue* _commandToEvaluateTokenValue=_getValueOfToken(disowned_token(command->_firstToken,owner_command)); // MDH@12JUN2020: TODO as we do NOT want to loose _firstToken we do NOT disown it before asking for the value of the token
 	if(_commandToEvaluateTokenValue){ // the first command token is now bound (or otherwise released)
 		// MDH@22MAY2020: __list creates a list that is to be subowned by the function in the current function body input
 		if(!getCurrentFunctionBodyInput()->_function->_bodyCommandList)
@@ -1297,15 +1299,13 @@ bool registerCommand(Mcommand* command){if(!command)return false;Mallocationowne
 void reset(){Mallocationowner owner=getOwner(__LINE__);
 	newline();
 	if(commandCount>0){
-		output("Delete all remembered commands? ");
-		char c;inputCharRead(&c);
-		outputChar(c);
-		newline();
+		output("Delete all remembered commands? ");char c;inputCharRead(&c);outputChar(c);newline();
 		if(c=='Y'||c=='y'){
 			output("Deleting %lld command(s).\n",commandCount);
-			while(commandCount>0){
-				commandCount--;
-				free_command(commands[commandCount],owner_commands);
+			// TODO we might get a problem if a command is replicated in _commands
+			while(1){
+				FREE_COMMAND(_commands[--commandCount],owner_commands);
+				if(commandCount==0)break;
 			}
 			outputInfo("All commands deleted!");
 		}else
@@ -1315,12 +1315,12 @@ void reset(){Mallocationowner owner=getOwner(__LINE__);
 		outputInfo("No commands to delete!");
 #ifndef __PRODUCTION__
 	////syncallocations();
-	Mstring* _hms=owned_string(_getTimestamp("%H:%M:%S"),owner);
-	if(resetAllocationTypes(string(_hms)))
-		outputInfo("Allocation type recording reset.");
+	// Mstring* _hms=owned_string(_getTimestamp("%H:%M:%S"),owner);
+	if(resetAllocationManagement())
+		outputInfo("Allocation management reset.");
 	else
-		outputWarning("Failed to reset the allocation type count recording.");
-	FREE_STRING(_hms,owner);
+		outputWarning("Failed to reset allocation management.");
+	// FREE_STRING(_hms,owner);
 #endif
 }
 
@@ -1594,7 +1594,7 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 }
 
 void clearCommand(){
-	free_command(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL; // MDH@28OCT2019: using the command now...
+	FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL; // MDH@28OCT2019: using the command now...
 	/* replacing:
 	pLastCommandToEvaluate=NULL;
 	// a small precaution here!!!
@@ -1833,7 +1833,7 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
 		resetOutputColor();
 		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
-		Mtoken* token=commands[lastCommandToShowIndex+commandToShowIndex]->_firstToken;
+		Mtoken* token=_commands[lastCommandToShowIndex+commandToShowIndex]->_firstToken;
 		while(token){outputToken(token);token=token->next;}
 		outputChar('\n');
 	}
@@ -2083,7 +2083,7 @@ void setUserInputCommand(Mcommand* command){
 }
 void deleteUserInputCommand(){
 	// the problem is that _userInputCommand could be a new command??????
-	if(commandIndex==0)free_command(_userInputCommand,owner_userInputCommand);
+	if(commandIndex==0)FREE_COMMAND(_userInputCommand,owner_userInputCommand);
 	_userInputCommand=NULL;
 }
 
@@ -2110,7 +2110,7 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){Mallocationowner owne
 	if(commandIndex){
 		// MDH@29OCT2019 should already have _userInputCommand equal to NULL: _userInputCommand->_lastToken=NULL; 
 		// replacing: _userInputCommand->_lastToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
-		Mcommand* command=commands[commandCount-commandIndex];
+		Mcommand* command=_commands[commandCount-commandIndex];
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		// TODO this construction (with a return in the middle is a bit unclear)
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
@@ -2188,7 +2188,7 @@ void createUserInputCommand(){
 	resetOutputColor(); // TODO do we need this here?????
 	// if(amDebugging())inputInfo("Creating the new user input command.");
 	// MDH@23SEP2019: createUserInputCommandToken() added to take care of updating _userInputCommand->_lastToken (should be NULL as it is used to represent the previous last token)
-	_userInputCommand=_getNewCommand(true);
+	_userInputCommand=owned_command(_getNewCommand(true),owner_userInputCommand);
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand){
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
@@ -2216,7 +2216,7 @@ void createUserInputCommand(){
 void copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	//        it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
-	Mcommand* _newUserInputCommand=OWNED(_getNewCommand(false),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
+	Mcommand* _newUserInputCommand=owned_command(_getNewCommand(false),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
 	if(_newUserInputCommand){
 		// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
 		if(amDebugging())inputInfo("Preparing the user input command for editing.");
@@ -2268,11 +2268,11 @@ void copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 			// get the next token to copy...
 			_tokenToCopy=_tokenToCopy->next;
 		}
-		if(!_newUserInputCommand->_lastToken){free_command(_newUserInputCommand,owner);_newUserInputCommand=NULL;}
+		if(!_newUserInputCommand->_lastToken){FREE_COMMAND(_newUserInputCommand,owner);_newUserInputCommand=NULL;}
 	}else
 		inputError("Failed to prepare the command for editing");
 	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
-	_userInputCommand=OWNED(DISOWNED(_newUserInputCommand,owner),owner_userInputCommand); // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
+	_userInputCommand=owned_command(disowned_command(_newUserInputCommand,owner),owner_userInputCommand); // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
 }
 
 // NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual createUserInputCommand
@@ -3123,14 +3123,15 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 	// MDH@07APR2020 NOTE until we do the following allocation types will NOT get registered (which resulted in bug reports when they got freed by the garbage collector at the end)
 	// tell user whether allocation recording is active!!!
+	output("Initializing memory allocation management.\n");
 	if(allocationRecordingInitialized()){
 		if(addAllocation('!',owner)<0){
-			output("%sFailed to initialize allocation recording.",M_ERROR_PREFIX);
+			output("%sFailed to initialize memory allocation management.",M_ERROR_PREFIX);
 			exit(1);
 		}
-		outputInfo("Allocation recording ready!");
+		outputInfo("Allocation management initialized!");
 	}else
-		outputInfo("No allocation recording!");
+		output("%sFailed to initialize memory allocation management!",M_ERROR_PREFIX);
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
@@ -4057,22 +4058,22 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 					if(amVerbose())outputInfo("Command evaluated!");
 					deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
-					if(!registerCommand(_userInputCommand)){
+					if(!registerCommand(_userInputCommand,owner_userInputCommand)){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(commandIndex==0){ // a new command being registered!!!
-							free_command(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
+							FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
 							outputError("Failed to register the command! Probable cause: out of memory");
 						}else
 							outputError("Failed to register the command again! Probable cause: out of memory");
 					}else{
-						if(amVerbose())outputInfo("Command registered!");
+						if(amVerboseDebugging())outputInfo("Command registered!");
 						if(M_value){
 							// perhaps we should store the command text not the command itself?????
 							// NOTE prepend a single quote is essential to get the text enquoted!!!
 							if(!string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
 								outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
 							else
-							if(amVerbose()&&amDebugging())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
+							if(amVerboseDebugging())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
 						}
 					}
 					FREE_STRING(_userInputCommandText,owner); // MDH@14NOV2019: freed

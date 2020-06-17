@@ -55,7 +55,7 @@ Mchars* _getChars(char const * const chars){Mallocationowner owner=getOwner(__LI
             // if I'm the owner, I return a _chars disowned, otherwise I am returning as is because I never was the owner to start with
             return disowned_chars(_chars,owner);
         }
-        outputError("Failed to store the character array");
+        outputError("Failed to store the characters");
     }
     return NULL;
 }

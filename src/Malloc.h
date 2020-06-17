@@ -80,7 +80,7 @@ long long getNumberOfAllocationTypes();
 long long* _getAllocationCounts();
 Mallocationtype* _getAllocationTypes();
 
-bool resetAllocationTypes();
+bool resetAllocationManagement();
 
 long long getAllocationTypeOccupied(signed char allocationType,unsigned long long history);
 long long getAllocationTypeFreed(signed char allocationType,unsigned long long history);

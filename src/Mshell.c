@@ -545,9 +545,9 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 	if(_doTokenValue&&_doTokenValue->type==VT_LIST){
 		Mlist* doList=_doTokenValue->value._list;
 		if(doList&&doList->_first){ // something to do
-			Menvironment* _doEnvironment=OWNED(__environment(),owner);
+			Menvironment* _doEnvironment=owned_environment(__environment(),owner);
 			if(_doEnvironment){
-				_doEnvironment->_name=SUBOWNED(OWNED(_getChars("do"),owner),1);
+				_doEnvironment->_name=owned_chars(_getChars("do"),Msubowner(owner,1));
 				// let's add variable $ as result variable and ! as exit flag variable
 				bool doEnvironmentInitialized=addVariable(_doEnvironment,owner,"$",VT_UNDEFINED,false)
 												&&addVariable(_doEnvironment,owner,"!",VT_INTEGER,false)
@@ -572,10 +572,9 @@ Mvalue* Mdofunction(Mvalue* _doTokenValue){Mallocationowner owner=getOwner(__LIN
 						_result=(doResultValue?doResultValue:expressionValue);
 						popExecutionEnvironment(); // pop the do environment we successfully pushed
 					}
-				}else{
+				}else
 					outputError("Failed to create the do environment");
-					FREE_ENVIRONMENT(_doEnvironment,owner);
-				}
+				FREE_ENVIRONMENT(_doEnvironment,owner); // MDH@17JUN2020: check if this should be here
 			}
 		}
 	}
@@ -598,9 +597,9 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			outputValue(" Result=",_resultTokenValue,NULL);
 			newline();
 		}
-		Menvironment* _forEnvironment=(Menvironment*)OWNED(__environment(),owner);
+		Menvironment* _forEnvironment=owned_environment(__environment(),owner);
 		if(_forEnvironment){
-			_forEnvironment->_name=SUBOWNED(OWNED(_getChars("for loop"),owner),1);
+			_forEnvironment->_name=owned_chars(_getChars("for loop"),Msubowner(owner,1));
 			// better wait with pushing until _forEnvironment is initialized appropriately
 			// MDH@11MAR2020: $ is NOT needed when there's an explicit result token value!!
 			bool forEnvironmentInitialized=(_resultTokenValue?true:false);
@@ -643,7 +642,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							outputChar('\n');resetOutputColor();
 							*/
 							Mvalue* _conditionValue=getValueOfExpression("for condition",'f',(TokenType[]){},0);
-							if(amVerbose()&&amDebugging())outputValue("For loop condition value: '",_conditionValue,"'.\n");
+							if(amVerboseDebugging())outputValue("For loop condition value: '",_conditionValue,"'.\n");
 							// a for loop should continue unless the condition value is zero or undefined
 							if(isValueZero(_conditionValue)!=M_FALSE)break; // condition evaluates to zero or is undefined
 							// increment the implicit loop counter variable BEFORE executing the loop AFTER evaluating the condition
@@ -695,16 +694,14 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 							_result=getValue(_forEnvironment,"$"); // get the result
 							if(!_result){
 								_result=getValue(_forEnvironment,"_"); // just return the value of the counter if $ was not set!!
-								if(amVerboseDebugging())
-									outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
+								if(amVerboseDebugging())outputValue("For loop implicit result value (of increment counter local variable _): '",_result,"'.\n");
 							}else
 							if(amVerboseDebugging())
 								outputValue("For loop explicit result value (of the $ local variable): '",_result,"'.\n");
 						}
 					}
 					popExecutionEnvironment(); // pop the for execution environment (freeing it in the process)
-					if(amVerboseDebugging())
-						outputInfo("For loop environment popped.");
+					if(amVerboseDebugging())outputInfo("For loop environment popped.");
 				}else{
 					outputError("Failed to activate the for loop execution environment");
 					forEnvironmentInitialized=false;
@@ -712,10 +709,11 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 			}else
 				output("%sFailed to add or initialize the for loop result and counter local variables $ and _.\n",M_ERROR_PREFIX);
 			if(!forEnvironmentInitialized){
-				FREE_ENVIRONMENT(_forEnvironment,owner); // have to free the environment myself
-				if(amVerbose())
-					outputInfo("Uninitialized for loop environment discarded!");
+				// FREE_ENVIRONMENT(_forEnvironment,owner); // have to free the environment myself
+				// if(amVerbose())
+				outputInfo("Uninitialized for loop environment discarded!");
 			}
+			FREE_ENVIRONMENT(_forEnvironment,owner); // MDH@17JUN2020: TODO should this be here???
 		}else
 			outputError("Failed to create the for loop execution environment");
 	}
@@ -1286,16 +1284,17 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			if(amVerbose())outputInfo("'.");
 			if(_evalCommand->_lastToken){
 				// just like with do() we have to evaluate the command in a subenvironment
-				Menvironment* _evalEnvironment=(Menvironment*)OWNED(__environment(),owner);
+				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
 				if(_evalEnvironment){
-					_evalEnvironment->_name=(Mchars*)SUBOWNED(OWNED(_getChars("eval"),owner),1);
+					_evalEnvironment->_name=owned_chars(_getChars("eval"),Msubowner(owner,1));
 					if(pushExecutionEnvironment(_evalEnvironment)){
 						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
 						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
-						_evalValue=(Mvalue*)OWNED(getCommandValue(_evalCommand,owner,'e'),owner); // NOTE only place where getCommandValue() is called in Mshell.c
+						_evalValue=getCommandValue(_evalCommand,owner,'e'); // NOTE only place where getCommandValue() is called in Mshell.c
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
+					FREE_ENVIRONMENT(_evalEnvironment,owner); // MDH@17JUN2020: TODO check if it is correct to do that here
 				}else
 					output("%sUnable to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}else
@@ -1304,15 +1303,25 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		}
 		FREE_STRING(_evalValueText,owner);
 	}
-	return DISOWNED(_evalValue,owner);
+	return _evalValue;
 }
 // end very special M functions
 
 // MCommand stuff
-void free_command(Mcommand* _command,Mallocationowner owner_command){
+Mcommand* owned_command(Mcommand* _command,Mallocationowner owner_command){
+	if(!_command)return NULL;
+	if(_command->_firstToken)owned_token(_command->_firstToken,Msubowner(owner_command,1));
+	return OWNED(_command,owner_command);
+}
+Mcommand* disowned_command(Mcommand* _command,Mallocationowner owner_command){
+	if(!_command)return NULL;
+	if(_command->_firstToken)disowned_token(_command->_firstToken,Msubowner(owner_command,1));
+	return DISOWNED(_command,owner_command);
+}
+void free_command(Mcommand* _command){
 	if(!_command)return;
-	if(_command->_firstToken)FREE_TOKEN(_command->_firstToken,owner_command); //Msubowner(owner_command,1)); // will free ALL connected tokens!!!
-	FREE_DISOWNED_1(_command,'K',owner_command);
+	if(_command->_firstToken)free_token(_command->_firstToken); //Msubowner(owner_command,1)); // will free ALL connected tokens!!!
+	FREE_1(_command,'K');
 }
 
 // MDH@23SEP2019: whenever the type of the current token (_userInputCommand->_lastToken) changes (possibly with the start of a new token), so will the feed forward text associated with that token
@@ -1331,7 +1340,7 @@ void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/){
 // MDH@23SEP2019: setting the type of the new token is moved outside because setLastTokenType() replaces setting the type of a token directly
 //                this means that _getToken can use newTokenType but should NOT set ->type of the given token unless we decide to remove newTokenType from _getToken of cours in the future...
 Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner owner=getOwner(__LINE__);
-	Mtoken* pNewToken=(Mtoken*)OWNED(__token(),owner);
+	Mtoken* pNewToken=owned_token(__token(),owner);
 	if(pNewToken){
 		/////if(amDebugging())inputInfo("E1");
 		// MDH@03MAY2019: if the previous token starts an expression itself, use prevToken itself and not its expr field!!!!
@@ -1482,7 +1491,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		}
 		/////if(amDebugging())inputInfo("E8");
 		// MDH@03MAY2019: TT_EXPRESSION is the default (0) now (always ending at the next non-space character): pNewToken->type=TT_EXPRESSION; // makes more sense to start as expression (same as what we get after a ( or [
-		pNewToken->text=__string();
+		pNewToken->text=owned_string(__string(),Msubowner(owner,1));
 		// MDH@23JUL2019: we can do this for now TODO this is a serious memory error which a better way to deal with that is crucial
 		if(!pNewToken->text){
 			pNewToken->type=TT_ERROR; 
@@ -1500,7 +1509,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		return NULL;
 	}
 	pNewToken->type=newTokenType;
-	return DISOWNED(pNewToken,owner);
+	return disowned_token(pNewToken,owner);
 }
 // MDH@23SEP2019: prudent to replace all calls to _getToken that simply append a new token to the command, by a method that will always call setLastTokenType() 
 // command generic (i.e. it does not need to be the user input command, it could be some command that is being parsed)
@@ -1508,20 +1517,20 @@ Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool 
 	// MDH@01OCT2019: because the current token is NOT removed from the command, we should NOT delete its associated feed forward text
 	//                but we should remove any identifier continuation
 	// MDH@02OCT2019 no need for this anymore here: if(endOfInput)deleteIdentifierContinuation(); // remove whatever feed forward text that was associated with the now finished last command token as it will no longer be applicabld
-	Mtoken* _newCommandToken=(Mtoken*)OWNED(_getToken(lastCommandToken,tokenType),owner);
+	Mtoken* _newCommandToken=owned_token(_getToken(lastCommandToken,tokenType),owner);
 	if(_newCommandToken)
 		setTokenType(_newCommandToken,tokenType);
 	else
 	if(amVerboseDebugging())
 		if(inputErrorFunction)(*inputErrorFunction)("Failed to create a command token");
-	return DISOWNED(_newCommandToken,owner);
+	return disowned_token(_newCommandToken,owner);
 }
 Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__LINE__);
 	Mcommand* _command=(Mcommand*)CALLOC_1(sizeof(Mcommand),'K',owner);
 	if(_command){
 		// if(amDebugging())(*inputInfoFunction)("New command created.");
 		if(withFirstToken){
-			_command->_firstToken=SUBOWNED(OWNED(_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/),owner),1); // MDH@24MAY2020: obtain ownership immediately
+			_command->_firstToken=owned_token(_getNewCommandToken(NULL,TT_EXPRESSION/*,endInput*/),Msubowner(owner,1)); // MDH@24MAY2020: obtain ownership immediately
 			if(_command->_firstToken){ // we've got a first token allocated
 				// if(amVerboseDebugging())if(inputInfoFunction)(*inputInfoFunction)("New command token created.");
 				_command->_lastToken=_command->_firstToken;
@@ -1535,7 +1544,7 @@ Mcommand* _getNewCommand(bool withFirstToken){Mallocationowner owner=getOwner(__
 	}else
 	// if(amVerboseDebugging())
 	if(inputErrorFunction)(*inputErrorFunction)("Failed to create the command.");
-	return(Mcommand*)DISOWNED(_command,owner);
+	return disowned_command(_command,owner);
 }
 
 // and finally
@@ -3057,7 +3066,7 @@ FunctionBodyRequest* __functionbodyrequest(char const * const functionName){Mall
 	if(functionName){
 		_functionBodyRequest=CALLOC_1(sizeof(FunctionBodyRequest),'9',owner);
 		if(_functionBodyRequest){
-			_functionBodyRequest->_functionName=SUBOWNED(OWNED(_getChars(functionName),owner),1);
+			_functionBodyRequest->_functionName=owned_chars(_getChars(functionName),Msubowner(owner,1));
 			if(!_functionBodyRequest->_functionName){
 				FREE_DISOWNED_1(_functionBodyRequest,'9',owner);_functionBodyRequest=NULL;
 			}
@@ -4184,7 +4193,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				// MDH@25MAR2020 allow indexing of new variables as well!!!! removing: if(expressionToken->type==TT_VARIABLE)
 				canbeindexedtheoretically=true;
 				// MDH@17APR2020: replacing char* by Mchars* so no need to NULL _significantTokenText anymore (so it will be freed below) (_getChars() will copy the characters)
-				_valueReference->_name=_getChars(_significantTokenText);
+				_valueReference->_name=owned_chars(_getChars(_significantTokenText),Msubowner(owner,1));
 				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
 				if(amVerboseDebugging())
 					output("Value reference variable name: '%s'.\n",_valueReference->_name->chars);
@@ -4243,8 +4252,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// MDH@02NOV2019: replacing: assignValue(&_valueReference->_value,getValue(getExecutionEnvironment(),_valueReference->_name));
 				}
 				*/
-				if(amVerboseDebugging())
-					outputValuereference("Completed variable value reference: '",_valueReference,"'.\n");
+				if(amVerboseDebugging())outputValuereference("Completed variable value reference: '",_valueReference,"'.\n");
 				break;
 			case TT_REFERENCE:
 				// TODO might allow indexing in the future???
@@ -4253,10 +4261,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				//                so it's much similar to an unindexed variable at the moment
 				//                for now the only thing we're going to do is store the name of the reference (i.e. starting with @) (without value) so that whoever uses it will know how to resolve it!!!
 				// MDH@17APR2020: here we go again
-				_valueReference->_name=SUBOWNED(OWNED(_getChars(_significantTokenText),owner),1); // MDH@09JUN2020: OOPS ownership again
+				_valueReference->_name=owned_chars(_getChars(_significantTokenText),Msubowner(owner,1)); // MDH@09JUN2020: OOPS ownership again
 				// replacing: _valueReference->_name=_significantTokenText;_significantTokenText=NULL; // store a copy of the name of the variable being referenced
-				if(amVerboseDebugging())
-					output("Value reference referenced variable name: '%s'.\n",_valueReference->_name->chars);
+				if(amVerboseDebugging())output("Value reference referenced variable name: '%s'.\n",_valueReference->_name->chars);
 				break;			
 			case TT_INTEGER: // an integer possibly followed by a real (fractional) part
 				// MDH@20JUN2019: some error in the following part because every now and then we get a segmentation fault!!!!
@@ -4269,30 +4276,25 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					Mstring* pRealText=_realText;
 					if(pRealText){
 						char* _realSignificantTokenText=_stringstart(expressionToken->text,expressionToken->significantCharacterCount); // free asap
-						if(amVerboseDebugging())
-							output("Integer part of decimal text: '%s'.\n",string(pRealText));
+						if(amVerboseDebugging())output("Integer part of decimal text: '%s'.\n",string(pRealText));
 						pRealText=string_append(pRealText,_realSignificantTokenText);
 						if(amVerboseDebugging())
 							outputInfo("Fractional part appended!");
 						if(strlen(_realSignificantTokenText)==1)pRealText=string_append_char(pRealText,'0'); // a single period is NOT considered equal to zero apparently!!!!
-						if(amVerboseDebugging())
-							output("Parsing '%s' to a decimal.\n",string(pRealText));
+						if(amVerboseDebugging())output("Parsing '%s' to a decimal.\n",string(pRealText));
 						// MDH@13JUN2019: instead of using a rational we can now use a decimal
 						//                the problem is that we need a context, and therefore a decimal precision 
 						//                to this purpose I've added an integer variable in which the actual decimal precision can be set
 						uint32_t l=strlen(_realSignificantTokenText); // replacing: string_length(expressionToken->text);
 						free(_realSignificantTokenText); // freed!!!
-						if(amVerboseDebugging())
-							output("Real part string length: %u.\n",l);
+						if(amVerboseDebugging())output("Real part string length: %u.\n",l);
 						if(getDP()<l)outputWarning("More decimals present in literal than expected. Rounding may occur.");
-						if(amVerboseDebugging())
-							outputInfo("Decimal precision checked!");
+						if(amVerboseDebugging())outputInfo("Decimal precision checked!");
 						Mdecimal* _decimal=owned_decimal(__decimal(get_default_mpd_context(),0,0),owner);
-						if(amVerboseDebugging())
-							outputInfo("Decimal created!");
+						if(amVerboseDebugging())outputInfo("Decimal created!");
 						if(_decimal){
 							mpd_set_string(_decimal->mpd,string(pRealText),get_default_mpd_context());
-							if(amDebugging())outputInfo("Decimal initialized.");
+							if(amVerboseDebugging())outputInfo("Decimal initialized.");
 							if(!mpd_isnan(_decimal->mpd))
 								assignValue(&_valueReference->_value,_getValueOfDecimal(disowned_decimal(_decimal,owner)));
 							else
@@ -4304,11 +4306,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						Mrational* _rational=_getDecimalTextRational(string(pRealText));assignValue(&_valueReference->_value,_getValueOfRational(_rational));
 						*/
 						// replacing: assignValue(&_valueReference->_value,_getFloatValue(_strtold(string(pRealText),getNAR())));
-						if(amVerboseDebugging())
-							outputInfo("Releasing decimal text.");
+						if(amVerboseDebugging())outputInfo("Releasing decimal text.");
 						FREE_STRING(_realText,owner);
-						if(amVerboseDebugging())
-							outputInfo("Decimal text released.");
+						if(amVerboseDebugging())outputInfo("Decimal text released.");
 					}else
 						outputError("Failed to initialize the text representation of a decimal");
 				}else{ // just an integer
@@ -4354,8 +4354,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					canbeindexedtheoretically=true;
 					Mvalue* _mapValue=getValueOfMap();
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-					if(amVerboseDebugging())
-						outputValue("Map extracted: '",_mapValue,"'.\n");
+					if(amVerboseDebugging())outputValue("Map extracted: '",_mapValue,"'.\n");
 					_valueReference=owned_valuereference(_getValuereference(_mapValue),owner);
 				}
 				break;
@@ -4364,16 +4363,14 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					canbeindexedtheoretically=true;
 					Mvalue* _expressionListValue=getValueOfList(TT_END_OF_FUNCTION_CALL,1,0,false);
 					expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
-					if(amVerboseDebugging())
-						outputInfo("Going to wrap the list extracted!");
+					if(amVerboseDebugging())outputInfo("Going to wrap the list extracted!");
 					// well, actually, we need the first element of the list that is returned!!!
 					// use only the first element if the list only has one element, otherwise use the list itself
 					if(_expressionListValue->value._list->numberOfElements==1){
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue->value._list->_first->_value),owner);
 					}else
 						_valueReference=owned_valuereference(_getValuereference(_expressionListValue),owner);
-					if(amVerboseDebugging())
-						outputInfo("Extracted list wrapped!");
+					if(amVerboseDebugging())outputInfo("Extracted list wrapped!");
 				}
 				break;
 			default:
@@ -7166,7 +7163,7 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			
 			if(_formulaelement){
-				_formulaelement->_operand=SUBOWNED(OWNED(_getValueReference("operand",endTokenTypes,endTokenTypeCount),owner),1); // MDH@08JUN2020: whatever we bind in the formula element needs to be subowned by it
+				_formulaelement->_operand=owned_valuereference(_getValueReference("operand",endTokenTypes,endTokenTypeCount),Msubowner(owner,1)); // MDH@08JUN2020: whatever we bind in the formula element needs to be subowned by it
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				if(amVerboseDebugging())
 					outputValue("Operand: ",getReferencedValue(_formulaelement->_operand),"'.\n");

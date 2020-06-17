@@ -521,7 +521,7 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
     }
     // MDH@20JUL2019: if found return
     if(_variableMapelement){
-        if(amVerbose()){output("Variable '%s' found in environment '%s'",name,environment->_name->chars);outputValue(" with value '",value,"'.\n");}
+        if(amVerboseDebugging()){output("Variable '%s' found in environment '%s'",name,environment->_name->chars);outputValue(" with value '",value,"'.\n");}
         return _variableMapelement->_variable->_name->chars;
     }
     // if there's an environment and it has a parent check that, otherwise (e.g. in a closure) no global variables available!!!
@@ -530,7 +530,7 @@ char* getConstantWithValue(Menvironment const * const _environment,char * name,M
 Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcurlybraces,bool showquotes,bool showmissings,bool showhiddenvariablevalues){Mallocationowner owner=getOwner(__LINE__);
     Menvironment* environment=(_environment?_environment:getExecutionEnvironment());
     Mmap* map=(environment?environment->_variableMap:NULL);
-	Mstring* result=(map?(Mstring*)OWNED(__string(),owner):NULL);
+	Mstring* result=(map?owned_string(__string(),owner):NULL);
     if(result){
 	    Mstring* p=result;
         if(amDebugging())p=string_append_char(p,'m');
@@ -562,7 +562,7 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
                         char* constantWithValue=getConstantWithValue(environment,_mapVariable->_name->chars,_mapVariable->_value);
                         if(!constantWithValue){ // not a 'symbolic' value
                             /////output("%s",string(p));
-                            Mstring* _mapelementValueText=(Mstring*)OWNED(_getValueText(_mapVariable->_value,false),owner); // free asap
+                            Mstring* _mapelementValueText=owned_string(_getValueText(_mapVariable->_value,false),owner); // free asap
                             /////output("Map element: %s",string(p));
                             // TODO technically NULL is also a value, so shouldn't be use the undefined value text????
                             if(_mapelementValueText){
@@ -584,7 +584,7 @@ Mstring* _getVariableMapText(Menvironment const * const _environment,bool showcu
 		// if we failed, we have to free s here!!!
 		if(!p){FREE_STRING(result,owner);result=NULL;}
 	}
-	return DISOWNED(result,owner);
+	return disowned_string(result,owner);
 }/* VALIDATED */
 // MDH@24OCT2019 END
 

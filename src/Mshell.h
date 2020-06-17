@@ -23,7 +23,12 @@ typedef struct{
 	Mtoken *_firstToken,*_lastToken;
 	/////////////////bool identifierContinuationIsDirty; // convenient to keep it with the command itself
 }Mcommand;
-void free_command(Mcommand* _command,Mallocationowner owner);
+
+Mcommand* owned_command(Mcommand* _command,Mallocationowner owner_command);
+Mcommand* disowned_command(Mcommand* _command,Mallocationowner owner_command);
+void free_command(Mcommand* _command/*,Mallocationowner owner*/);
+#define FREE_COMMAND(_command,owner_command) free_command(disowned_command(_command,owner_command))
+
 void setTokenType(Mtoken* token,TokenType tokenType/*,bool endOfInput*/);
 Mtoken* _getNewCommandToken(Mtoken* lastCommandToken,TokenType tokenType/*,bool endOfInput*/); // prototype
 Mcommand* _getNewCommand(bool withFirstToken);
