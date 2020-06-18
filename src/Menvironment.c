@@ -983,7 +983,7 @@ long long appendToListVariable(Menvironment const * const _environment,const cha
         if(variableValue&&variableValue->type==VT_LIST){ // yes a list we can append to
             // we should prevent circular references
             if(variableValue!=_value){
-                unsigned long long index=appendedToList(variableValue->value._list,Msubowner(getValueOwner(),1),_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
+                long long index=appendedToList(variableValue->value._list,Msubowner(getValueOwner(),1),_value,M_LL_INVALID); // NOTE always append to the end of the list with the first available index that's why I'm passing in 0 instead of a positive index value!!
                 if(index>0)return index;
                 output("%sFailed to append the value to the list stored in variable '%s': the type of the new value (%u) is wrong.\n",M_ERROR_PREFIX,name,(_value?_value->type:-1));
             }else
@@ -1805,7 +1805,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
                 // user function expects a list of commands, so we have to wrap the single token (if any)
                 if(_bodyTokenValue){
                     _userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
-                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID))
+                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
                         output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
                     // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
                 }

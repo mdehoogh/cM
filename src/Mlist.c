@@ -179,7 +179,8 @@ Mvalue* Mremoved(Mvalue* listValue,Mvalue* listIndexValue){Mallocationowner owne
                                 Mvalue* removedFromListValue;
                                 while(indexListelement){
                                     removedFromListValue=removedFromList(list,Msubowner(getValueOwner(),1),getValueInteger(indexListelement->_value));
-                                    if(removedFromListValue&&!appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID))outputError("Failed to remember a removed list element");
+                                    if(removedFromListValue&&appendedToList(_removedElementsList,owner,removedFromListValue,M_LL_INVALID)<=0)
+                                        outputError("Failed to remember a removed list element");
                                     indexListelement=indexListelement->_next;
                                 }
                                 removedValue=_getValueOfList(disowned_list(_removedElementsList,owner)); // MDH@12JUN2020: by passing the list disowned, it will be freed when failing to bind it

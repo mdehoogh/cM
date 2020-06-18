@@ -2880,9 +2880,9 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
 			if(amVerboseDebugging())output("Appending list element #%llu.\n",listElementIndex);
-			unsigned long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
+		    long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
-			if(newListElementIndex==0){
+			if(newListElementIndex<=0){
 				output("%s",M_ERROR_PREFIX);
 				outputValue("Failed to append list element '",_listElementValue,"'.\n");
 				break;
@@ -3434,7 +3434,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																					newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																					if(!newValueholder){
 																						listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
-																						if(listIndex!=M_LL_INVALID){
+																						if(listIndex>0){
 																							newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																							if(amDebugging())
 																								output("List element at index #%zd retrieved.\n",listIndex);	
@@ -3769,7 +3769,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																				newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																				if(!newValueholder){
 																					listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
-																					if(listIndex!=M_LL_INVALID){
+																					if(listIndex>0){
 																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																						if(amDebugging())
 																							output("List element at index #%zd retrieved.\n",listIndex);	
@@ -4415,7 +4415,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						Mlist* newItemIdsList=indexListValue->value._list;
 						Mlistelement* newItemIdListElement=newItemIdsList->_first;
 						while(newItemIdListElement){
-							if(!appendedToList(itemIdsList,owner,newItemIdListElement->_value,M_LL_INVALID)){
+							if(appendedToList(itemIdsList,owner,newItemIdListElement->_value,M_LL_INVALID)<=0){
 								outputError("Failed to append augmented item id.");
 								// TODO can't break here?????
 							}
@@ -4430,7 +4430,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					if(_propertyName){
 						if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 							Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
-							if(!propertyNameValue||!appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)){
+							if(!propertyNameValue||appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)<=0){
 								output("%sFailed to add property name '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
 								// TODO can't break here
 							}
@@ -4554,18 +4554,23 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 		consumed2=false;
 		if(_listelement1&&_listelement2){
 			if(_listelement1->index==_listelement2->index){
-				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index))consumed1=consumed2=true;
+				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,_listelement2->_value),_listelement1->index)>0)
+					consumed1=consumed2=true;
 			}else
 			if(_listelement1->index<_listelement2->index){
-				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
+				if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index)>0)
+					consumed1=true;
 			}else{
-				if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
+				if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index)>0)
+					consumed2=true;
 			}
 		}else
 		if(_listelement1){
-			if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index))consumed1=true;
+			if(appendedToList(_result,owner,binaryoperator(_listelement1->_value,NULL),_listelement1->index)>0)
+				consumed1=true;
 		}else
-			if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index))consumed2=true;
+			if(appendedToList(_result,owner,binaryoperator(NULL,_listelement2->_value),_listelement2->index)>0)
+				consumed2=true;
 		// done?????
 		if(!consumed1&&!consumed2)break; // if neither consumed done
 		if(consumed1)_listelement1=_listelement1->_next;
@@ -4581,7 +4586,7 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 	if(_value->type!=VT_LIST){
 		_result=owned_list(_getListOfType(_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index))
+		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index)>0)
 			_listelement=_listelement->_next;
 	}else
 		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
@@ -4594,7 +4599,8 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 	if(_value->type!=VT_LIST){
 		_result=owned_list(_getListOfType(_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index))_listelement=_listelement->_next;
+		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index)>0)
+			_listelement=_listelement->_next;
 	}else
 		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
 	return _getValueOfList(disowned_list(_result,owner));
@@ -6847,7 +6853,8 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 							inrangeValue=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
 							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
 							if(inrangeValue->value._integer->ll==0)break; // not in range
-							if(appendedToList(_scalarRangeList,owner,integerrangeValue,M_LL_INVALID)<=0){FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
+							if(appendedToList(_scalarRangeList,owner,integerrangeValue,M_LL_INVALID)<=0)
+							{FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
 							// determine the next value to insert into the integer range
 							if(*up)rangeInteger++;else rangeInteger--;
 							integerrangeValue=_getIntegerValue(rangeInteger);
@@ -6964,7 +6971,8 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 							// outputValue("First range value ",firstRangeValue,".\n");
 							rangeValue=add(startIntegerRangeValue,multiply(multFactorListelement->_value,firstRangeValue));
 							// outputValue("Range value: ",rangeValue,".\n");
-							if(appendedToList(_pointList,owner,rangeValue,M_LL_INVALID)<=0){FREE_LIST(_resultList,owner);_resultList=NULL;break;}
+							if(appendedToList(_pointList,owner,rangeValue,M_LL_INVALID)<=0)
+							{FREE_LIST(_resultList,owner);_resultList=NULL;break;}
 							multFactorListelement=multFactorListelement->_next;
 						}
 						if(!_resultList)break;

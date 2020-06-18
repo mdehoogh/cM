@@ -1769,7 +1769,7 @@ bool mapAppendedToList(Mlist* const _list,Mallocationowner owner_list,const Mmap
             while(result&&_mapelement){
                 // only add those map elements of which the key can be converted to a positive integer
                 long long index=atoll(_mapelement->_variable->_name->chars);
-                if(index>0&&!appendedToList(_list,owner_list,_mapelement->_variable->_value,index)){
+                if(index>0&&appendedToList(_list,owner_list,_mapelement->_variable->_value,index)<=0){
                     outputError("Failed to append a map element to a list (using the integer value of the name as index)");
                     result=false;
                 }
@@ -1800,8 +1800,8 @@ bool mapAppendedToMaplist(Mlist* const _maplist,Mallocationowner owner_maplist,c
                         p=string_append(p,_mapelement->_variable->_name->chars);
                         if(p){
                             Mvalue* _attributeNameValue=_getTextValue(string(_attributeName));
-                            if(_attributeNameValue&&appendedToList(_maplistelement,owner_maplistelement,_attributeNameValue,M_LL_INVALID)){
-                                if(!appendedToList(_maplistelement,owner_maplist,_mapelement->_variable->_value,M_LL_INVALID)||!appendedToList(_maplist,owner_maplist,_maplistelementValue,M_LL_INVALID)){
+                            if(_attributeNameValue&&appendedToList(_maplistelement,owner_maplistelement,_attributeNameValue,M_LL_INVALID)>0){
+                                if(appendedToList(_maplistelement,owner_maplist,_mapelement->_variable->_value,M_LL_INVALID)<=0||appendedToList(_maplist,owner_maplist,_maplistelementValue,M_LL_INVALID)<=0){
                                     result=false;
                                     outputError("Failed to append the attribute value in constructing a map list element");
                                 }
@@ -2089,7 +2089,8 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
                     if(!_rationalValue){FREE_RATIONAL(_rational,owner);outputError("Failed to value wrap the intermediate rational approximation to a real");break;}
                     // NOTE probably best to break if we can't append approximations!!
                     // NOTE no need to free _rational even then as it is bound in _rationalValue so it will be freed anyway
-                    if(appendedToList(_iterationsList,owner,_rationalValue,i)<=0){/*FREE_RATIONAL(_rational);*/outputError("Failed to register a rational approximation");break;}
+                    if(appendedToList(_iterationsList,owner,_rationalValue,i)<=0)
+                    {/*FREE_RATIONAL(_rational);*/outputError("Failed to register a rational approximation");break;}
                     // if we get here success in updating the iterations list!!!!
                     // if delta is now zero, we're done!!!
                     if(isLongDoubleZero(delta))break; ///// MDH@07JUN2019: when a list is returned like this don't stop below the system's epsilon but only when the delta is zero!!!!
