@@ -6109,7 +6109,7 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){
 // end comparison operator implementation
 
 // MDH@18OCT2019: we can get the range of integers between two values
-Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
+Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
 	if(_value1->type==VT_MAP||_value2->type==VT_MAP)return NULL; // neither operand can be a map for sure
 	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mrange);
@@ -6135,19 +6135,19 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){
 							}
 						}
 					}
-					Mlist* integerrangeValueList=_getListOfType(VT_INTEGER);
+					Mlist* integerrangeValueList=owned_list(_getListOfType(VT_INTEGER),owner);
 					Mvalue* inrangeValue;
 					while(integerrangeValue){
 						// determine whether this value does not exceed the last value
 						inrangeValue=(up?smallerthanorequalto(integerrangeValue,_value2):largerthanorequalto(integerrangeValue,_value2));
 						if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
 						if(inrangeValue->value._integer->ll==0)break; // not in range
-						if(appendedToList(integerrangeValueList,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
+						if(appendedToList(integerrangeValueList,owner,integerrangeValue,M_LL_INVALID)==0){outputError("Failed to add an integer to an integer range");break;}
 						// determine the next value to insert into the integer range
 						if(up)rangeInteger++;else rangeInteger--;
 						integerrangeValue=_getIntegerValue(rangeInteger);
 					}
-					return _getValueOfList(integerrangeValueList,true);
+					return _getValueOfList(subowned_list(integerrangeValueList,owner));
 				}else
 					outputError("Failed to initialize the first candidate range integer");
 			}else

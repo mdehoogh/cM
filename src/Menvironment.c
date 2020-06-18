@@ -194,12 +194,12 @@ Mlist* _getTable(Mlist* columnNamesList,size_t numberOfRows,Mallocationowner own
             Mvalue* columnNamesListValue=_getValueOfList(disowned_list(columnNamesList,owner_columnNamesList));
             if(columnNamesListValue){
                 outputValue("Column names values table: '",columnNamesListValue,"'.\n");
-                if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)){
+                if(appendedToList(_table,owner,columnNamesListValue,M_LL_INVALID)>0){
                     while(numberOfRows>0){
                         numberOfRows--;
                         Mvalue* _rowValue=_getValueOfList(_getListOfType(VT_UNDEFINED));
                         if(!_rowValue)break;
-                        if(!appendedToList(_table,owner,_rowValue,M_LL_INVALID))break;
+                        if(appendedToList(_table,owner,_rowValue,M_LL_INVALID)<=0)break;
                     }
                     return disowned_list(_table,owner);
                 }
@@ -1769,7 +1769,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){M
             if(amVerbose())if(_parameterMapValue)outputValue("Defining an anonymous function with parameters ",_parameterMapValue,".\n");
             // user function expects a list of commands, so we have to wrap the single token (if any)
             if(_bodyTokenValue){
-                _userfunction->_bodyCommandList=_getListOfType(VT_TOKEN);
+                _userfunction->_bodyCommandList=owned_list(_getListOfType(VT_TOKEN),Msubowner(owner,1));
                 if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
                     outputError("Failed to store the inline command as body of an anonymous function.");
                 // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
@@ -1779,7 +1779,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){M
                 // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                 //                so we have to make a copy of the parameter map
                 if(_parameterMapValue)
-                    _function->_parameterMap=SUBOWNED(OWNED(_getMapCopy(_parameterMapValue->value._map),owner),1); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+                    _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner,1)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
                 _function->functionunion._userfunction=_userfunction;
                 // return the result of applying the function to the default parameter map
                 _functionValue=_getValueOfFunction(disowned_function(_function,owner));

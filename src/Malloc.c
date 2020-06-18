@@ -197,10 +197,11 @@ struct{
 }allocations={0,NULL};
 
 // you HAVE to call this method to be able to register allocations
-bool allocationRecordingInitialized(){
+bool allocationRecordingInitialized(){Mallocationowner owner=getOwner(__LINE__);
     
     bool result=false;
 
+    /* MDH@18JUN2020: we cannot (currently) clear the allocation history because then pointers to the history allocation record index will become invalid, and the pointers wouldn't know about it
     // MDH@13MAY2020: remove whatever is currently allocated
     if(allocations._owners){
         free(allocations._owners);
@@ -208,7 +209,8 @@ bool allocationRecordingInitialized(){
         output("\tHistory of allocations released...\n");
     }
     if(allocations.l>0){output("\t%lld registered allocations released...\n",allocations.l);allocations.l=0;}
-
+    */
+   
     if(_allocationMarks){
         if(numberOfAllocationMarks*numberOfAllocationMarkTypes>0)output("\tReleasing %llu allocation marks of %llu registered allocation types...\n",numberOfAllocationMarks,numberOfAllocationMarkTypes);
         free(_allocationMarks);
@@ -218,9 +220,11 @@ bool allocationRecordingInitialized(){
     numberOfAllocationMarks=0;numberOfAllocationMarkTypes=0;
 
 #ifndef __PRODUCTION__
-    allocations._owners=calloc(16,sizeof(Mallocationownertype)); // starting out with one block
-    if(!allocations._owners)return false;
-    printf("\tHistory of allocations initialized...\n");
+    if(!allocations._owners){
+        allocations._owners=calloc(16,sizeof(Mallocationownertype)); // starting out with one block
+        if(!allocations._owners)return false;
+        printf("\tHistory of allocations initialized...\n");
+    }
 
     // keep all current allocation types (if any)
     if(numberOfAllocationTypes==0){
@@ -253,7 +257,14 @@ bool allocationRecordingInitialized(){
     numberOfAllocationMarkTypes=numberOfAllocationTypes;
     output("\tMemory allocation mark management initialized...\n");
 
+    // MDH@18JUN2020: force mark the first allocation
+    if(addAllocation('\0',owner)!=0){
+        error("\tFailed to mark the start of allocation management.");
+        return false;
+    }
+
     return true;
+
     // replacing: if(!allocations._chars)info("ERROR: Failed to initialize recording allocations.\n");else info("Allocation recording initialized.\n");
 }
 
@@ -851,21 +862,21 @@ void* Mdisowned(void* ptr/*,size_t size*/,Mallocationowner owner){
                 allocations._owners[_alloc->allocationIndex].owner.disowned=1; // replacing: _owner->disowned=1;
                 _alloc->owner.disowned=1; // TODO we might have to comment this out in due course
             }else
-                bug("\tUnable to remove ownership %s:%u(%s%u%s%s) of a memory allocation: it is owned by %s:%u(%s%u%s%s)."
+                bug("\t%s:%u(%s%u%s%s) can't disown the allocation owned by %s:%u(%s%u%s%s)."
                     ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
                     ,MODULE_NAMES[_owner->module],_owner->id,GLOBAL_FLAG_TEXTS[_owner->global],_owner->level,DISOWNED_FLAG_TEXTS[_owner->disowned],FREED_FLAG_TEXTS[_owner->freed]
                     );
         }else
-            bug("\tCan't disown the memory owned by %s:%u(%s%u%s%s) as requested by %s:%u(%s%u%s%s): it is invalid."
+            bug("\t%s:%u(%s%u%s%s) can't disown the allocation owned by %s:%u(%s%u%s%s): it is invalid."
             ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
             ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
             );
     }else
-        bug("\tFailed to disown the memory allocation owned by %s:%u(%s%u%s%s) as requested by %s:%u(%s%u%s%s): it is not registered."
+        bug("\t%s:%u(%s%u%s%s) can't disown the allocation owned by %s:%u(%s%u%s%s): it is not registered."
             ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
             ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
             );
-    info("\tDisowned by (%s:%u,%u,%u,%u,%u).\n",MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]);
+    info("\tDisowned by %s:%u(%s%u%s%s).\n",MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]);
     return ptr;
 }
 void* Mowned(void* ptr/*,size_t size*/,Mallocationowner owner){

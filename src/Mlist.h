@@ -1,6 +1,7 @@
 // some common list functions
 #include "Mvalue.h"
 
+Mvalue* Mclear(Mvalue* value); // will also work on a map though (TODO move over to functions.h/c I guess)
 Mvalue* Mempty(Mvalue* value); // will also work on a map though (TODO move over to functions.h/c I guess)
 Mvalue* Mkeys(Mvalue* value); // will also work on a map (although perhaps those are attributes)
 

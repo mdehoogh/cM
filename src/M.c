@@ -441,12 +441,12 @@ Mstring* _manualFeedforwardText=NULL;Mallocationowner owner_manualFeedforwardTex
 size_t numberOfIdentifierContinuationManualFeedforwardCharacters=0; // MDH@06OCT2019: determine the number of manual feed forward characterr matching the identifier continuation
 bool manualFeedforwardCharacterPrepended(char c){
 	if(!c)return false;
-	if(!_manualFeedforwardText)_manualFeedforwardText=__string();
+	if(!_manualFeedforwardText)_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);
 	return(_manualFeedforwardText&&string_insert_char(_manualFeedforwardText,0,c));
 }
 bool prependedToManualFeedforwardText(char const * const characters){
 	if(!characters)return false;
-	if(!_manualFeedforwardText)_manualFeedforwardText=__string();
+	if(!_manualFeedforwardText)_manualFeedforwardText=owned_string(__string(),owner_manualFeedforwardText);
 	return string_prepend(_manualFeedforwardText,characters);
 }
 char getFirstManualFeedforwardCharacterRemoved(){
@@ -970,10 +970,9 @@ void deleteAutocompletionTextOfToken(Mtoken* token,bool deleteIdentifierContinua
 */
 Mstring* _suggestedText=NULL;Mallocationowner owner_suggestedText=(Mallocationowner){MODULE_ID,__LINE__,1}; // MDH@04SEP2019: where we'll be storing the entire feed forward text (i.e. identifier continuation, immediate feed forward and auto completion text)
 
-
 // keeping track of the command count, the cursor position and the prompt length (so we can write information messages on the line above where the prompt is)
 long long commandCount=0; // the total number of command input
-long long commandIndex=0;
+long long commandIndex=0; // the index of the current command from the end of the command list (stored in commands)
 
 /// MDH@28OCT2019: replaced by _userInputCommand: Mtoken* _userInputCommand->_firstToken=NULL;
 
@@ -1257,20 +1256,30 @@ Mallocationowner owner_currentFunctionBodyInput=(Mallocationowner){MODULE_ID,__L
 // keep track of all commands so far
 #define COMMAND_BLOCKSIZE 8
  // array for storing the pointers to the first token of all commands entered
-Mcommand** _commands=NULL;Mallocationowner owner_commands=(Mallocationowner){MODULE_ID,__LINE__,1};
-uint32_t commandBlocks=0;
+// MDH@18JUN2020: a registered command might be a command that is a duplicate of a previous command
+typedef struct{
+	Mcommand* _command;
+	unsigned long long previousCommandIndex;
+}Mregisteredcommand;
+Mregisteredcommand* _registeredcommands=NULL;Mallocationowner owner_registeredcommands=(Mallocationowner){MODULE_ID,__LINE__,1};
+size_t commandBlocks=0;
 // MDH@24MAY2020 NOTE: registerCommand is ONLY called once with _userInputCommand as argument but 
 // MDH@12JUN2020 TODO TODO TODO how to deal with the command being registered and whether or not the tokens are to be disowned when put in the value 
 bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!command)return false;Mallocationowner owner=getOwner(__LINE__);
 	if(!getCurrentFunctionBodyInput()){ // a top-level (non function body) command
 		if(commandCount==commandBlocks*COMMAND_BLOCKSIZE){
 			// I have to copy all first token pointers to a new array large enough
-			Mcommand** createUserInputCommands=(commandBlocks==0?MALLOC(sizeof(Mtoken*),COMMAND_BLOCKSIZE,'C',owner_commands):REALLOC(_commands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mtoken*),'C'));
-			if(createUserInputCommands==NULL)return false;
+			Mregisteredcommand* newRegisteredCommands=(commandBlocks==0?MALLOC(sizeof(Mregisteredcommand),COMMAND_BLOCKSIZE,'C',owner_registeredcommands):REALLOC(_registeredcommands,commandBlocks*COMMAND_BLOCKSIZE,(commandBlocks+1)*COMMAND_BLOCKSIZE,sizeof(Mregisteredcommand),'C'));
+			if(newRegisteredCommands==NULL)return false;
 			commandBlocks++;
-			_commands=createUserInputCommands;
+			_registeredcommands=newRegisteredCommands;
 		}
-		_commands[commandCount++]=owned_command(disowned_command(command,owner_command),owner_commands);
+		// MDH@18JUN2020: NOTE commandIndex now stored in any command will equal 0 when it is a new command, so when it is being stored commandIndex will tell us whether it is a new command or not
+		//                as soon as we store the current command and it is a new command we store the index of the command i.e. where it is located in the list of registered commands
+		// if(commandIndex>0)command->sourceCommandIndex=(commandCount-commandIndex+1);
+		_registeredcommands[commandCount]=(Mregisteredcommand){owned_command(disowned_command(command,owner_command),owner_registeredcommands)};
+		if(commandIndex>0)_registeredcommands[commandCount].previousCommandIndex=commandCount-commandIndex+1; // will be positive for any positive commandIndex, because commandIndex is in [1,commandCount-1)
+		commandCount++;
 		if(amVerboseDebugging())outputLine("Command registered!");
 		return true;
 	}
@@ -1295,35 +1304,6 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!comma
 	outputError("Failed to add the command to the body of the function");
 	return false;
 }
-// MDH@21JUN2019: reset() takes care of removing all stored commands
-void reset(){Mallocationowner owner=getOwner(__LINE__);
-	newline();
-	if(commandCount>0){
-		output("Delete all remembered commands? ");char c;inputCharRead(&c);outputChar(c);newline();
-		if(c=='Y'||c=='y'){
-			output("Deleting %lld command(s).\n",commandCount);
-			// TODO we might get a problem if a command is replicated in _commands
-			while(1){
-				FREE_COMMAND(_commands[--commandCount],owner_commands);
-				if(commandCount==0)break;
-			}
-			outputInfo("All commands deleted!");
-		}else
-			outputInfo("No commands deleted!");
-		if(c==27)while(inputCharRead(&c)); // clear the input buffer
-	}else
-		outputInfo("No commands to delete!");
-#ifndef __PRODUCTION__
-	////syncallocations();
-	// Mstring* _hms=owned_string(_getTimestamp("%H:%M:%S"),owner);
-	if(resetAllocationManagement())
-		outputInfo("Allocation management reset.");
-	else
-		outputWarning("Failed to reset allocation management.");
-	// FREE_STRING(_hms,owner);
-#endif
-}
-
 // tokenizer constants moved over to Mshell.h
 
 /* MDH@11AUG2019: NOT doing the following anymore, instead we store the identifier information in the tokens themselves
@@ -1833,7 +1813,7 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 	while(--commandToShowIndex>=0&&lastCommandToShowIndex+commandToShowIndex>=0){
 		resetOutputColor();
 		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
-		Mtoken* token=_commands[lastCommandToShowIndex+commandToShowIndex]->_firstToken;
+		Mtoken* token=_registeredcommands[lastCommandToShowIndex+commandToShowIndex]._command->_firstToken;
 		while(token){outputToken(token);token=token->next;}
 		outputChar('\n');
 	}
@@ -2082,8 +2062,13 @@ void setUserInputCommand(Mcommand* command){
 	////////// removing: determineCommandInitializations();
 }
 void deleteUserInputCommand(){
+	if(!_userInputCommand)return;
 	// the problem is that _userInputCommand could be a new command??????
-	if(commandIndex==0)FREE_COMMAND(_userInputCommand,owner_userInputCommand);
+	if(commandIndex==0){
+		// if(amVerboseDebugging())
+		output("Freeing the current user input command.\n");
+		FREE_COMMAND(_userInputCommand,owner_userInputCommand);
+	}
 	_userInputCommand=NULL;
 }
 
@@ -2107,19 +2092,17 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){Mallocationowner owne
 	// MDH@24APR2019 obsolete: getCommandLength()=getUserInputLength()=0; // do we need this????
 	// TODO do we need to do this: clear the behind cursor text (in any situation)
 	deleteAutocompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
-	if(commandIndex){
+	if(commandIndex>0){
 		// MDH@29OCT2019 should already have _userInputCommand equal to NULL: _userInputCommand->_lastToken=NULL; 
 		// replacing: _userInputCommand->_lastToken=NULL; // MDH@03SEP2019: I have to do this otherwise inputInfo() won't work the way we want it to
-		Mcommand* command=_commands[commandCount-commandIndex];
+		Mcommand* command=_registeredcommands[commandCount-commandIndex]._command; // MDH@18JUN2020: 
 		// MDH@19APR2019: if not to accept the history command we use the previous command as behind cursor text
 		// TODO this construction (with a return in the middle is a bit unclear)
 		if(amAcceptinghistorycommand()){ // use the history command as autocompletion text instead of accepting it immediately as command!!!
-			if(amVerbose())
-				inputInfo("Showing registered command #%lld.",commandCount-commandIndex+1);
+			if(amVerboseDebugging())inputInfo("Showing registered command #%lld.",commandCount-commandIndex+1);
 			setUserInputCommand(command);
 		}else{
-			if(amVerbose())
-				inputInfo("Showing command #%lld as suggested text.",commandCount-commandIndex+1);
+			if(amVerboseDebugging())inputInfo("Showing command #%lld as suggested text.",commandCount-commandIndex+1);
 			// the previous command will be used as behind cursor text, and not immediately as command
 			// MDH@20SEP2019
 			// this is a bit of a nuisance as there will be no associated tokens for the entire behind cursor text
@@ -2213,66 +2196,67 @@ void createUserInputCommand(){
 
 // TODO copyUserInputCommand() should set ->expr correctly
 // MDH@29OCT2019: TODO caller should check whether or not _userInputCommand is NULL if it is copying failed!!!!
-void copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
+bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	//        it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
 	Mcommand* _newUserInputCommand=owned_command(_getNewCommand(false),owner); // get a new command without tokens (should NEVER fail unless memory shortage)
-	if(_newUserInputCommand){
-		// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
-		if(amDebugging())inputInfo("Preparing the user input command for editing.");
-		///// NOT NEEDED using the false flag in _getNewCommand()!!!! _newUserInputCommand->_lastToken=NULL;_newUserInputCommand->_firstToken=NULL;
-		Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
-		// the essence is that _userInputCommand->_lastToken points to the last token in _userInputCommand->_firstToken
-		// NOTE theoretically _userInputCommand->_lastToken could be NULL due to _getToken() failing to create a new token
-		while(_tokenToCopy){
-			// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to _userInputCommand->_lastToken!!!
-			_newUserInputCommand->_lastToken=owned_token(_getNewCommandToken(_newUserInputCommand->_lastToken,_tokenToCopy->type),Msubowner(owner,1));
-			if(!_newUserInputCommand->_lastToken)break;
-			// replacing: if(!setLastUserInputCommandToken(_getNewCommandToken(_userInputCommand->_lastToken,_tokenToCopy->type)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
-			/* MDH@23SEP2019 replacing:
-			_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,_tokenToCopy->type);
-			///////// MDH@23SEP2019: moved out of _getToken() using false for endOfInput to prevent adding/changing the associated feed forward text
-			setLastTokenType(_tokenToCopy->type,false);
-			*/
-			/* TODO check whether the following is correct!!! guess not!!
-			if(_userInputCommand->_lastToken->type==TT_END_OF_FUNCTION_CALL||_userInputCommand->_lastToken->type==TT_END_OF_LIST||_userInputCommand->_lastToken->type==TT_END_OF_MAP){
-				if(_tokenToCopy->expr)
-					_userInputCommand->_lastToken->expr=_userInputCommand->_lastToken->expr->expr;
-				else
-					outputInfo("BUG: End of argument list or map encountered, but not started.");
-			}
-			*/
-
-			// MDH@29OCT2019: if we want to do it right we should check who's referencing back to _tokenToCopy
-			Mtoken *referencedToken=_tokenToCopy->expr;
-			if(_tokenToCopy->expr){ // some token referenced
-				Mtoken *referencedToken=_tokenToCopy,*newReferencedToken=_newUserInputCommand->_lastToken;
-				// move back until we find the token referenced (and we should find it)
-				while(referencedToken!=_tokenToCopy->expr){referencedToken=referencedToken->prev;newReferencedToken=newReferencedToken->prev;}
-				// ASSERT referencedToken now equals the token in the original command being referenced (which could be itself obviously), and newReferencedToken is a token in the new user input command that should be pointed to!!!
-				if(newReferencedToken)_newUserInputCommand->_lastToken->expr=newReferencedToken;else inputError("%sFailed to synchronize a token reference.",M_BUG_PREFIX);
-			}else // nothing pointed to, so just in case
-				_newUserInputCommand->_lastToken->expr=NULL;
-			// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
-			
-			_newUserInputCommand->_lastToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
-			// if failing to copy the text over get rid of the command constructed so far, and break
-			_newUserInputCommand->_lastToken->text=owned_string(_stringCopy(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over
-			if(!_newUserInputCommand->_lastToken->text){_newUserInputCommand->_lastToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
-			// MDH@24APR2019 obsolete: getCommandLength()+=string_length(_userInputCommand->_lastToken->text);
-			// some additional fields to copy over (NOT the offset is that is set automatically)
-#ifdef __DEBUG__
-			printf("%d:%s",_userInputCommand->_lastToken->type,string(_userInputCommand->_lastToken->text));
-#endif
-			if(!_newUserInputCommand->_firstToken)_newUserInputCommand->_firstToken=_newUserInputCommand->_lastToken; // TODO=DONE will never happen???? it does here
-			// get the next token to copy...
-			_tokenToCopy=_tokenToCopy->next;
+	if(!_newUserInputCommand){outputError("Failed to duplicate the current user input command");return false;}
+	
+	// if fails to copy _userInputCommand->_firstToken _userInputCommand->_lastToken should end up as NULL
+	if(amVerboseDebugging())inputInfo("Preparing the user input command for editing.");
+	///// NOT NEEDED using the false flag in _getNewCommand()!!!! _newUserInputCommand->_lastToken=NULL;_newUserInputCommand->_firstToken=NULL;
+	Mtoken* _tokenToCopy=_userInputCommand->_firstToken;
+	// the essence is that _userInputCommand->_lastToken points to the last token in _userInputCommand->_firstToken
+	// NOTE theoretically _userInputCommand->_lastToken could be NULL due to _getToken() failing to create a new token
+	while(_tokenToCopy){
+		// MDH@28OCT2019: because we adapted _getNewCommandToken to receive the last command token as argument, and returning the new command token, we need to assign the result to _userInputCommand->_lastToken!!!
+		_newUserInputCommand->_lastToken=owned_token(_getNewCommandToken(_newUserInputCommand->_lastToken,_tokenToCopy->type),Msubowner(owner,1));
+		if(!_newUserInputCommand->_lastToken)break;
+		// replacing: if(!setLastUserInputCommandToken(_getNewCommandToken(_userInputCommand->_lastToken,_tokenToCopy->type)))break; // MDH@23SEP2019: TODO should we do something to _userInputCommand->_firstToken when this happens? or show some error???
+		/* MDH@23SEP2019 replacing:
+		_userInputCommand->_lastToken=_getToken(_userInputCommand->_lastToken,_tokenToCopy->type);
+		///////// MDH@23SEP2019: moved out of _getToken() using false for endOfInput to prevent adding/changing the associated feed forward text
+		setLastTokenType(_tokenToCopy->type,false);
+		*/
+		/* TODO check whether the following is correct!!! guess not!!
+		if(_userInputCommand->_lastToken->type==TT_END_OF_FUNCTION_CALL||_userInputCommand->_lastToken->type==TT_END_OF_LIST||_userInputCommand->_lastToken->type==TT_END_OF_MAP){
+			if(_tokenToCopy->expr)
+				_userInputCommand->_lastToken->expr=_userInputCommand->_lastToken->expr->expr;
+			else
+				outputInfo("BUG: End of argument list or map encountered, but not started.");
 		}
-		if(!_newUserInputCommand->_lastToken){FREE_COMMAND(_newUserInputCommand,owner);_newUserInputCommand=NULL;}
-	}else
-		inputError("Failed to prepare the command for editing");
+		*/
+
+		// MDH@29OCT2019: if we want to do it right we should check who's referencing back to _tokenToCopy
+		Mtoken *referencedToken=_tokenToCopy->expr;
+		if(_tokenToCopy->expr){ // some token referenced
+			Mtoken *referencedToken=_tokenToCopy,*newReferencedToken=_newUserInputCommand->_lastToken;
+			// move back until we find the token referenced (and we should find it)
+			while(referencedToken!=_tokenToCopy->expr){referencedToken=referencedToken->prev;newReferencedToken=newReferencedToken->prev;}
+			// ASSERT referencedToken now equals the token in the original command being referenced (which could be itself obviously), and newReferencedToken is a token in the new user input command that should be pointed to!!!
+			if(newReferencedToken)_newUserInputCommand->_lastToken->expr=newReferencedToken;else inputError("%sFailed to synchronize a token reference.",M_BUG_PREFIX);
+		}else // nothing pointed to, so just in case
+			_newUserInputCommand->_lastToken->expr=NULL;
+		// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
+		
+		_newUserInputCommand->_lastToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
+		// if failing to copy the text over get rid of the command constructed so far, and break
+		_newUserInputCommand->_lastToken->text=owned_string(_stringCopy(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over
+		if(!_newUserInputCommand->_lastToken->text){_newUserInputCommand->_lastToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
+		// MDH@24APR2019 obsolete: getCommandLength()+=string_length(_userInputCommand->_lastToken->text);
+		// some additional fields to copy over (NOT the offset is that is set automatically)
+#ifdef __DEBUG__
+		printf("%d:%s",_userInputCommand->_lastToken->type,string(_userInputCommand->_lastToken->text));
+#endif
+		if(!_newUserInputCommand->_firstToken)_newUserInputCommand->_firstToken=_newUserInputCommand->_lastToken; // TODO=DONE will never happen???? it does here
+		// get the next token to copy...
+		_tokenToCopy=_tokenToCopy->next;
+	}
+	if(!_newUserInputCommand->_lastToken){FREE_COMMAND(_newUserInputCommand,owner);return NULL;}
+
 	// OOPS do NOT call setUserInputCommand() here as it will write the command once more so it might suffice to assign
 	_userInputCommand=owned_command(disowned_command(_newUserInputCommand,owner),owner_userInputCommand); // replacing: setUserInputCommand(_newUserInputCommand); // testing whether successful: inputInfoCommand(_userInputCommand);
+	return true;
 }
 
 // NEWYEAR'S DAY 2019: It's a nuisance to show a command without copying it into an actual createUserInputCommand
@@ -2550,31 +2534,34 @@ char removedTokenCharacter(bool endOfInput){
 }
 
 // in response to backspace the previous token character is to be removed
-void removePreviousTokenCharacter(){ // NOTE always due to a backspace!
-	if(commandIndex){commandIndex=0;copyUserInputCommand();} // MDH@03SEP2019 BUG FIX: I have to do this if scrolling through the list of previous commands!!!
+bool removePreviousTokenCharacter(){ // NOTE always due to a backspace!
+	if(commandIndex>0){
+		commandIndex=0;
+		if(!copyUserInputCommand())return false;
+	} // MDH@03SEP2019 BUG FIX: I have to do this if scrolling through the list of previous commands!!!
 	char removedCharacter=removedTokenCharacter(true); // MDH@01OCT2019: will now also perform moveCursorLeft(1) when the argument is true and success
-	if(removedCharacter){
-		// MDH@01OCT2019: moveCursorLeft(1); // TODO check if this is necessary also when cancelling the command
-		if(amVerbose()){inputInfo("Character '%c' removed.",removedCharacter);}
-		// if no text is left in the command we cancel the command (as a service to the user who wouldn't understand that Enter wouldn't switch to Control mode on an otherwise empty command!!!)
-		if(_userInputCommand){ // we still have a command being evaluated (NOTE that removedTokenCharacter() can actually set _userInputCommand->_firstToken to NULL)
-			if(_userInputCommand->_lastToken==_userInputCommand->_firstToken&&string_length(_userInputCommand->_firstToken->text)==0){
-				if(amDebugging()){inputInfo("%s","Cancelling the command.");}
-				cancelCommand();
-				if(amDebugging()){inputInfo("%s","Command cancelled.");}
-				/* replacing:
-				if(string_length(feedforwardText))inputInfo("Use Ctrl-C to clear the text suggestion as well.");else cancelCommand();
-				*/
-			}else{
-				if(amDebugging()){inputInfo("%s","Updating.");}
-				updateOnTokenCharacterRemoved(removedCharacter);
-				if(amDebugging()){inputInfo("%s","Updated.");}
-			}
-		}else
-		if(amVerbose())
-			inputInfo("Command cleared.");
-	}else // MDH@03MAY2019: can't switch to control mode here (so we just report the error!!!)
-		inputError("%s","Failed to remove the last entered character.");
+	if(!removedCharacter){inputError("%s","Failed to remove the last entered character.");return false;}
+	// MDH@01OCT2019: moveCursorLeft(1); // TODO check if this is necessary also when cancelling the command
+	if(amVerboseDebugging())inputInfo("Character '%c' removed.",removedCharacter);
+	// if no text is left in the command we cancel the command (as a service to the user who wouldn't understand that Enter wouldn't switch to Control mode on an otherwise empty command!!!)
+	// MDH@18JUN2020: I've adapted copyUserInputCommand() in such a way that if it fails _userInputCommand will NOT be replaced so it will not become NULL (i.e. it will remain as it was), so the following test will always evaluate to TRUE
+	if(_userInputCommand){ // we still have a command being evaluated (NOTE that removedTokenCharacter() can actually set _userInputCommand->_firstToken to NULL)
+		if(_userInputCommand->_lastToken==_userInputCommand->_firstToken&&string_length(_userInputCommand->_firstToken->text)==0){
+			if(amVerboseDebugging())inputInfo("%s","Cancelling the command.");
+			cancelCommand();
+			if(amVerboseDebugging())inputInfo("%s","Command cancelled.");
+			/* replacing:
+			if(string_length(feedforwardText))inputInfo("Use Ctrl-C to clear the text suggestion as well.");else cancelCommand();
+			*/
+		}else{
+			if(amVerboseDebugging())inputInfo("%s","Updating.");
+			updateOnTokenCharacterRemoved(removedCharacter);
+			if(amVerboseDebugging())inputInfo("%s","Updated.");
+		}
+		return true;
+	}
+	inputError("%s","The user input command vanished.");
+	return false;
 }
 
 // MDH@09JUL2019: count the number of list elements in front of the current token
@@ -3030,6 +3017,52 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 	return errorflags;
 }
 
+// MDH@21JUN2019: reset() takes care of removing all stored commands
+void reset(){Mallocationowner owner=getOwner(__LINE__);
+	newline();
+	if(_registeredcommands){ // MDH@18JUN2020: testing commandBlocks is better than testing commandCount, and testing _registeredcommands is perhaps even better
+		output("Delete all remembered commands? ");char c;inputCharRead(&c);outputChar(c);newline();
+		if(c=='Y'||c=='y'){
+			if(commandCount>0){
+				output("Deleting %lld command%s.\n",commandCount,(commandCount>1?"s":""));
+				unsigned long long numberOfOriginalCommandsFreed=0;
+				// TODO we might get a problem if a command is replicated in _registeredcommands // DONE MDH@18JUN2020: commandIndex added to Mcommand so if it is the same as where it is located in _registeredcommands we free it otherwise we do not
+				while(1){
+					commandCount--;
+					if(_registeredcommands[commandCount].previousCommandIndex==0){
+						FREE_COMMAND(_registeredcommands[commandCount]._command,owner_registeredcommands); // freeing all new (i.e. not duplicated) commands
+						numberOfOriginalCommandsFreed++;
+					}
+					if(commandCount==0)break;
+				}
+				if(numberOfOriginalCommandsFreed>0)output("Number of original commands freed: %llu.\n",numberOfOriginalCommandsFreed);else outputWarning("No original commands freed");
+			}
+			if(commandBlocks>0){FREE_DISOWNED(_registeredcommands,commandBlocks*COMMAND_BLOCKSIZE,'C',owner_registeredcommands);commandBlocks=0;} // free all (disowned!!!!!) allocated command blocks
+			_registeredcommands=NULL; // MDH@18JUN2020: makes sense to do this as well
+			outputInfo("All commands deleted!");
+			// MDH@18JUN2020: also remove all the items in the command result 
+			if(M_value){
+				Mvalue* clearValue=Mclear(M_value);
+				if(isValueZero(clearValue))output("Command result history cleared...\n");else if(isValueNegative(clearValue))outputWarning("Command result history not completely cleared...");
+			}
+		}else
+			outputInfo("Deleting commands canceled by user!");
+		if(c==27)while(inputCharRead(&c)); // clear the input buffer
+	}else
+		outputInfo("No commands to delete!");
+#ifndef __PRODUCTION__
+	/* MDH@18JUN2020: let's NOT reset the allocation management on reset()
+	////syncallocations();
+	// Mstring* _hms=owned_string(_getTimestamp("%H:%M:%S"),owner);
+	if(resetAllocationManagement())
+		outputInfo("Allocation management reset.");
+	else
+		outputWarning("Failed to reset allocation management.");
+	// FREE_STRING(_hms,owner);
+	*/
+#endif
+}
+
 // additional functions are available in an interactive session to be added to the shell environment
 // as well as specific functions for displaying input info and input error messages
 bool interactiveSessionInitialized(){
@@ -3123,15 +3156,12 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 	// MDH@07APR2020 NOTE until we do the following allocation types will NOT get registered (which resulted in bug reports when they got freed by the garbage collector at the end)
 	// tell user whether allocation recording is active!!!
-	output("Initializing memory allocation management.\n");
-	if(allocationRecordingInitialized()){
-		if(addAllocation('!',owner)<0){
-			output("%sFailed to initialize memory allocation management.",M_ERROR_PREFIX);
-			exit(1);
-		}
-		outputInfo("Allocation management initialized!");
-	}else
+	output("Initializing dynamic memory allocation management.\n");
+	if(!allocationRecordingInitialized()){
 		output("%sFailed to initialize memory allocation management!",M_ERROR_PREFIX);
+		exit(1);
+	}
+	outputInfo("Dynamic memory allocation management initialized!");
 
 	// MDH@23FEB2019: how about being able to continue with commands stored in a file, or perhaps allow for -log <logfile> or log=
 	// whereas any filename without prefix is the file to execute at the start
@@ -3512,9 +3542,10 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 				if(inputCharType=='b'){ // backspace
 					///////debugWrite("BACKSPACE");
 					// something to remove?
-					if(getUserInputLength()) // TODO _userInputCommand->_firstToken should be NULL at the same time getCommandLength() becomes 0!!!
-						removePreviousTokenCharacter();
-					else // nothing to remove
+					if(getUserInputLength()){ // TODO _userInputCommand->_firstToken should be NULL at the same time getCommandLength() becomes 0!!!
+						if(!removePreviousTokenCharacter())
+							switchToControlMode("Failed to remove the previous token character. Possible cause: out of memory.");
+					}else // nothing to remove
 						beep();
 				}else
 				if(inputCharType=='h'){
@@ -4058,7 +4089,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 					if(amVerbose())outputInfo("Command evaluated!");
 					deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
-					if(!registerCommand(_userInputCommand,owner_userInputCommand)){
+					// MDH@18JUN2020: if the current command is not an original command 
+					if(!registerCommand(_userInputCommand,(commandIndex>0?owner_registeredcommands:owner_userInputCommand))){
 						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
 						if(commandIndex==0){ // a new command being registered!!!
 							FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);

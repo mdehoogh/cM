@@ -7,6 +7,46 @@ extern long long M_LL_INVALID,M_TRUE,M_FALSE;
 extern long double M_LD_NAN;
 extern char const * const M_ERROR_PREFIX;
 
+Mvalue* Mclear(Mvalue* value){
+    long long result=M_LL_INVALID;
+    if(value)
+    switch(value->type){
+        case VT_MAP:
+            if(value->value._map){
+                result=0;
+                Mmap* map=value->value._map;
+                if(map){
+                    if(!map->immutable){
+                        result=map->numberOfElements-free_mapelement(disowned_mapelement(map->_first,getValueOwner()),map->weak);
+                        if(result<=0){
+                            map->_first=NULL;
+                            map->_last=NULL;
+                            map->numberOfElements=0;
+                        }
+                    }
+                }
+            }
+            break;
+        case VT_LIST:
+            {
+                result=0;
+                Mlist* list=value->value._list;
+                if(list){
+                    if(!list->immutable){
+                        result=list->numberOfElements-free_listelement(disowned_listelement(list->_first,getValueOwner()),list->weak);
+                        if(result<=0){
+                            list->_first=NULL;
+                            list->_last=NULL;
+                            list->numberOfElements=0;
+                        }
+                    }
+                }
+            }
+        default:
+            break;
+    }
+    return _getIntegerValue(result);
+}
 Mvalue* Mempty(Mvalue* value){
     long long result=M_LL_INVALID;
     if(value)

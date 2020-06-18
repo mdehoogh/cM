@@ -130,7 +130,7 @@ typedef struct Mmapelement{
     struct Mmapelement* _next;
 }Mmapelement;
 
-bool free_mapelement(Mmapelement* _mapelement,bool weak);
+long long free_mapelement(Mmapelement* _mapelement,bool weak);
 #ifndef __PRODUCTION__
 Mmapelement* owned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
 Mmapelement* disowned_mapelement(Mmapelement * const _mapelement,Mallocationowner owner_mapelement);
@@ -296,7 +296,8 @@ Mvariable* owned_variable(Mvariable* _variable,Mallocationowner owner_variable);
 
 Mvariable* _getVariable(Mchars const * const _name,Mvaluetype valuetype,bool immutable);
 
-bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/);
+long long free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/); // returning the number of successive list elements freed
+
 #ifndef __PRODUCTION__
 Mlistelement* owned_listelement(Mlistelement * const _listelement,Mallocationowner owner_listelement);
 Mlistelement* disowned_listelement(Mlistelement * const _listelement,Mallocationowner owner_listelement);

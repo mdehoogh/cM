@@ -20,6 +20,7 @@ mpd_context_t* get_default_mpd_context();
 // Mcommand stuff
 // MDH@28OCT2019: because now often we need both the first and last token in a command it's probably best to combine them in a single command
 typedef struct{
+	unsigned long long sourceCommandIndex; // MDH@18JUN2020: storing what this command is a duplicate of
 	Mtoken *_firstToken,*_lastToken;
 	/////////////////bool identifierContinuationIsDirty; // convenient to keep it with the command itself
 }Mcommand;

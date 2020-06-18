@@ -1771,7 +1771,17 @@ Mdecimal* _dsub(Mdecimal* _decimal1,Mdecimal* _decimal2){
 
 Mvalue* Mpi(Mvalue* value,Mvalue* computesinetableValue){Mallocationowner owner=getOwner(__LINE__);
 	// _value should be a positive integer defining the required precision
-	if(amVerbose())output("Computing pi using decimals.\n");
+	if(amVerboseDebugging())output("Computing pi using decimals.\n");
+	// MDH@18JUN2020: if a list of values
+	if(value->type==VT_LIST&&isValueUndefined(computesinetableValue)){
+		Mlist* _piList=owned_list(__list("pi"),owner);
+		Mlistelement* listelement=value->value._list->_first;
+		while(listelement){
+			if(appendedToList(_piList,owner,Mpi(listelement->_value,NULL),M_LL_INVALID)<0)break;
+			listelement=listelement->_next;
+		}
+		return _getValueOfList(disowned_list(_piList,owner));
+	}
 	// MDH@17AUG2019: delegate to pi_decimal defined in Mdecimal.h/c
 	long long numberOfRequestedDecimals=getValueInteger(value);
 	if(numberOfRequestedDecimals==M_LL_INVALID){
@@ -3200,16 +3210,14 @@ bool endFunctionBodyInput(){
  * \param _value the Mvalue to wrap
  */
 Mvaluereference* _getValuereference(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-	if(amVerboseDebugging())
-		outputValue("Wrapping value '",_value,"'.\n");
+	if(amVerboseDebugging())outputValue("Wrapping value '",_value,"'.\n");
 	Mvaluereference* _valuereference=(Mvaluereference*)CALLOC_1(sizeof(Mvaluereference),'5',owner);
 	if(_valuereference){
 		_valuereference->_value=_value; // MDH@02NOV2019 replacing: assignValue(&_valuereference->_value,_value);
-		if(amVerboseDebugging())
-			outputValue("Value '",_value,"' wrapped in value reference.\n");
+		if(amVerboseDebugging())outputValue("Value '",_value,"' wrapped in value reference.\n");
 	}
 	// MDH@18MAY2020: whatever you return should be disowned before passing along (and BOUND by the receiver)
-	return DISOWNED(_valuereference,owner);
+	return disowned_valuereference(_valuereference,owner);
 }
 /* MDH@26OCT2019: moved over to Mvalue.h/c as we need it there so we can have value references as well!!!!!
 void free_valuereference(Mvaluereference* _valuereference){
@@ -3296,7 +3304,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								indexorattributenameListelementValue=indexorattributenameListelement->_value;
 								// if no value is defined, it is ignored TODO should we????
 								if(indexorattributenameListelementValue){
-									if(amDebugging())
+									if(amVerboseDebugging())
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 									// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 									// NOTE we need to check ALL valueholders
@@ -3308,12 +3316,11 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 									// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 									//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
-									Mlist* _flattenedIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
+									Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
 									size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
-										if(amDebugging())
-											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
+										if(amVerboseDebugging())outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
 										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_newValueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
@@ -3356,8 +3363,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 												numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 												indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
 												if(indexorattributenameListelementValue){
-													if(amDebugging())
-														outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
+													if(amVerboseDebugging())outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
 													int valueholderIndex=numberOfValueholders;
 													while(--valueholderIndex>=0){
 														valueholder=_valueholders[valueholderIndex];
@@ -3370,16 +3376,14 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																	//                which means that we can only retrieve successive elements from maps
 																	//                we could flatten the value here????? so if it is a list we get the list of indices here
 																	Mmap* valueholderMap=(*valueholder)->value._map;
-																	Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
-																	if(amVerboseDebugging())
-																		outputList("Value index list: ",_valueIndexList,".\n");
+																	Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
+																	if(amVerboseDebugging())outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																	if(valueIndexListelement){
 																		Mvalue** newValueholder;
 																		while(valueholderMap){
-																			if(amVerboseDebugging())
-																				outputMap("Value holder map: ",valueholderMap,".");
+																			if(amVerboseDebugging())outputMap("Value holder map: ",valueholderMap,".");
 																			indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																			if(indexorattributenameListelementValue){
 																				Mstring* _attributenameText=_getValueText(indexorattributenameListelementValue,true);
@@ -3413,7 +3417,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 															if((*valueholder)->type==VT_LIST){
 																if(_flattenedIndexList->valuetype==VT_INTEGER){
 																	Mlist* valueholderList=(*valueholder)->value._list;
-																	Mlist* _valueIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
+																	Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
 																	// outputList("Value index list: ",_valueIndexList,".\n");
 																	// 'iterating' over all list elements
 																	Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
@@ -3578,11 +3582,11 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
-		if(amVerboseDebugging()){
+		// if(amVerboseDebugging()){
 			output("Setting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
 			outputValue("' to '",_newValue,"'.\n");
-		}
+		// }
 		// MDH@18OCT2019: without an _itemid the variable is allowed to NOT yet exist
 		Mlist* itemidList=(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST?_valuereference->_itemid->value._list:NULL); // let's assume that is it always a list
 		if(itemidList&&!itemidList->_first)itemidList=NULL; // MDH@31MAR2020: empty lists are ignored (although that's an error theoretically)
@@ -3629,12 +3633,11 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 								//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 								// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 								//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
-								Mlist* _flattenedIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
+								Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
 								size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 								if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 									// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
-									if(amVerboseDebugging())
-										outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
+									if(amVerboseDebugging())outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 									// which we now did
 									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
@@ -3708,7 +3711,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																//                which means that we can only retrieve successive elements from maps
 																//                we could flatten the value here????? so if it is a list we get the list of indices here
 																Mmap* valueholderMap=(*valueholder)->value._map;
-																Mlist* _valueIndexList=(Mlist*)OWNED(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
+																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
 																outputList("Value index list: ",_valueIndexList,".\n");
 																// 'iterating' over all list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
@@ -3749,7 +3752,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 														if((*valueholder)->type==VT_LIST){
 															if(_flattenedIndexList->valuetype==VT_INTEGER){
 																Mlist* valueholderList=(*valueholder)->value._list;
-																Mlist* _valueIndexList=_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false);
+																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
 																// outputList("Value index list: ",_valueIndexList,".\n");
 																// 'iterating' over all list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
@@ -4101,7 +4104,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							Mlist* functionCallArgumentList=NULL;
 							if(!strcmp(_significantTokenText,DOFUNCTION_NAME)){
 								// MDH@02NOV2019: making the list weak
-								functionCallArgumentList=(Mlist*)OWNED(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
+								functionCallArgumentList=owned_list(listMadeWeak(_getListOfType(VT_UNDEFINED)),owner); // creating a list
 								if(functionCallArgumentList&&appendedToList(functionCallArgumentList,owner,_functionArgumentsValue,M_LL_INVALID)<=0){
 									outputError("Failed to create the to do expression list");
 									FREE_LIST(functionCallArgumentList,owner);
@@ -4399,7 +4402,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			Mlist* itemIdsList=NULL;
 			while(expressionToken&&expressionToken->next&&(expressionToken->next->type==TT_LIST||expressionToken->next->type==TT_PROPERTY)){
 				if(!itemIdsList){
-					itemIdsList=(Mlist*)OWNED(_getListOfType(VT_UNDEFINED),owner); // we know we're going to need to list
+					itemIdsList=owned_list(_getListOfType(VT_UNDEFINED),owner); // we know we're going to need to list
 					if(!itemIdsList){output("%sFailed to create a list to store the indices of '%s'.\n",M_ERROR_PREFIX,_valueReference->_name);break;}
 				}
 				expressionToken=nextEnvironmentExpressionToken();
@@ -4438,14 +4441,12 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				}
 				expressionToken=getEnvironmentExpressionToken(); // essential after calling a function that might advance the current expression token
 				// if(amDebugging())
-				if(amVerboseDebugging())
-					{output("End of augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
+				if(amVerboseDebugging()){output("End of augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 			}
 			// MDH@24MAR2020: assuming itemIdsList contains all the index ids (indices and property names) we assign the value wrapped list to the _itemid of the current value reference
 			if(itemIdsList){
 				assignValue(&_valueReference->_itemid,_getValueOfList(disowned_list(itemIdsList,owner)));
-				if(amVerboseDebugging())
-					outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
+				if(amVerboseDebugging())outputValue("Augmented item ids: ",_valueReference->_itemid,".\n");
 			}
 		}
 
@@ -4460,8 +4461,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 			while(l>0&&_valueReference){
 				unaryOperator=string_char(unaryOperators,--l);
 				referencedValue=getReferencedValue(_valueReference);
-				if(amVerboseDebugging())
-					{output("Applying unary operators: '%c'",unaryOperator);outputValue(" to '",referencedValue,"'.\n");}
+				if(amVerboseDebugging()){output("Applying unary operators: '%c'",unaryOperator);outputValue(" to '",referencedValue,"'.\n");}
 				/////////////decrementReferenceCount(_valueReference->_value);
 				_valueReference->_value=applyUnaryOperator(unaryOperator,referencedValue); // MDH@17NOV2019 replacing: _valueReference->_value);
 				// MDH@02NOV2019 replacing:	assignValue(&_valueReference->_value,applyUnaryOperator(string_char(unaryOperators,--l),_valueReference->_value));
@@ -4480,11 +4480,9 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					*/
 				}
 			}
-			if(amVerboseDebugging())
-				outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
+			if(amVerboseDebugging())outputValue("Result after applying unary operators: '",_valueReference->_value,"'.\n");
 		}else
-		if(amVerboseDebugging())
-			outputInfo("No unary operators to apply!");
+		if(amVerboseDebugging())outputInfo("No unary operators to apply!");
 		
 		// move over to the next expression token (following the end token)
 		if(expressionToken)expressionToken=nextEnvironmentExpressionToken();
@@ -7718,8 +7716,8 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				return NULL;
 			}
 			// MDH@01NOV2019: I have some generic list functions implemented
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"empty"),"empty",Mempty)){
-				outputError("Failed to register the empty function");
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"empty"),"empty",Mempty)||!completedValueFunction(_getFunction(_Menvironment,owner,"clear"),"clear",Mclear)){
+				outputError("Failed to register the empty and clear function");
 				return false;
 			}
 			if(!completedListFunction(_getFunction(_Menvironment,owner,"statistics"),"statistics",Mstats)

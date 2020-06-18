@@ -405,7 +405,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 					MbigintegerListelement *_firstRemainderListelement=NULL,*lastRemainderListelement=NULL;
 					////////////////////////if(!_lastRemainderListelement){outputError("Failed to create the list to store the remainders");return NULL;}
 					/* replacing, using an Mlist):
-					Mlist* _remainderList=_getListOfType(VT_BIGINTEGER);
+					Mlist* _remainderList=owned_list(_getListOfType(VT_BIGINTEGER),owner);
 					Mlistelement* _remainderListelement=NULL;
 					*/
 					uint64_t remainderIndex,remainderCount=0; // where we found a match

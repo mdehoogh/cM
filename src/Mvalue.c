@@ -100,14 +100,18 @@ Mlistelement* disowned_listelement(Mlistelement* _listelement,Mallocationowner o
     if(_listelement->_next)disowned_listelement(_listelement->_next,owner_listelement);
     return DISOWNED(_listelement,owner_listelement);
 }
-bool free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/){
+// MDH@18JUN2020: how about returning the number of list elements removed or perhaps the last list element removed????
+//                let's return the number of list elements freed
+long long free_listelement(Mlistelement* _listelement,bool weak/*,Mallocationowner owner*/){
+    long long result=M_LL_INVALID; // when there's nothing to free!!!!
     if(_listelement){
-        if(_listelement->_next){free_listelement(_listelement->_next,weak);_listelement->_next=NULL;}
+        // free_listelement on a non-null next will ALWAYS return a positive value
+        result=(_listelement->_next?free_listelement(_listelement->_next,weak):0);_listelement->_next=NULL;
         if(_listelement->_value){if(!weak)decrementReferenceCount(_listelement->_value);_listelement->_value=NULL;} ///////// replacing: free_value(_listelement->_value);
         FREE_1(_listelement,'l'/*,owner*/);
-        return true;
+        result+=1;
     }
-    return false;
+    return result;
 }/* VALIDATED */
 
 Mlist* owned_list(Mlist* _list,Mallocationowner owner_list){
@@ -159,27 +163,26 @@ Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner
     return DISOWNED(_mapelement,owner_mapelement);
 }
 #endif
-bool free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
-    if(amVerboseDebugging())
-        output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
-    if(_mapelement->_next){
-        if(!free_mapelement(_mapelement->_next,weak/*,owner*/))
-            outputError("Failed to free a map element!");//////else outputInfo("Next map element freed!");
+long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
+    long long result=M_LL_INVALID;
+    if(_mapelement){
+        if(amVerboseDebugging())output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
+        result=(_mapelement->_next?free_mapelement(_mapelement->_next,weak):0);
         _mapelement->_next=NULL;
-    }
-    if(_mapelement->_variable){
-        if(_mapelement->_variable->_name){
-            if(amVerboseDebugging())
-                output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
+        if(_mapelement->_variable){
+            if(_mapelement->_variable->_name){
+                if(amVerboseDebugging())output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
+            }else
+                outputWarning("Unnamed map attribute!");
+            free_variable(_mapelement->_variable,weak);
+            _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
         }else
-            outputWarning("Unnamed map attribute!");
-        free_variable(_mapelement->_variable,weak);
-        _mapelement->_variable=NULL; // MDH@11NOV2019: for safety purposes (won't wanna try it again)
-    }else
-        outputWarning("No map attribute to free!");
-    FREE_1(_mapelement,'m'/*,owner*/);
-    if(amVerboseDebugging())outputInfo("\tMap element freed!");
-    return true;
+            outputWarning("No map attribute to free!");
+        FREE_1(_mapelement,'m'/*,owner*/);
+        result+=1;
+        if(amVerboseDebugging())outputInfo("\tMap element freed!");
+    }
+    return result;
 }/* VALIDATED */
 
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
@@ -1072,7 +1075,9 @@ void checkList(Mlist* _list){
     if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
     // MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
     if(index<0){output("%sIndex %lld of (new) list element too small.\n",M_ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
-    if(amVerboseDebugging())outputValue((index>0?"Appending '":"Prepending '"),_value,"' to a list.\n");
+    // if(amVerboseDebugging()){
+        outputValue("Adding '",_value,"' to a list");output(" at index %lld.\n",index);
+    // }
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
     Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index>0&&index<=lastindex?_list->_first:NULL);
@@ -1113,19 +1118,23 @@ void checkList(Mlist* _list){
         _list->_first=_listelement;
         if(!_list->_last)_list->_last=_list->_first;
         (_list->numberOfElements)++;
-        if(amVerbose())outputValue("Prepending '",_listelement->_value,"'.\n");
+        // if(amVerboseDebugging())
+            outputValue("Prepending '",_listelement->_value,"'.\n");
         // we should increment the index of all elements (consuming _listelement on the go which is OK)
         _nextListelement=_listelement;
         while(_nextListelement){
-            if(amDebugging()){outputValue("Incrementing the index of '",_nextListelement->_value,"'.\n");}
+            // if(amVerboseDebugging())
+            {outputValue("Incrementing the index of '",_nextListelement->_value,"'.\n");}
             (_nextListelement->index)++;
-            if(amDebugging()){outputValue("Index of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);}
+            // if(amVerboseDebugging())
+            {outputValue("Index of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);}
             _nextListelement=_nextListelement->_next;
-            if(amDebugging()){if(_nextListelement)outputInfo("A element to consider!");else outputInfo("No next element to consider!");}
+            // if(amVerboseDebugging())
+            {if(_nextListelement)outputInfo("A next element to consider!");else outputInfo("No next element to consider!");}
         }
-        if(amVerbose())outputValue("'",_listelement->_value,"' prepended.\n");
+        if(amVerboseDebugging())outputValue("'",_listelement->_value,"' prepended.\n");
     }
-    if(amDebugging())checkList(_list);
+    if(amVerboseDebugging())checkList(_list);
     return _listelement->index;
 }/* VALIDATED */
 
