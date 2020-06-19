@@ -527,6 +527,18 @@ Mlist* _getListIndices(Mlist const * const list){Mallocationowner owner=getOwner
     return disowned_list(_list,owner);
 }/* VALIDATED */
 
+// MDH@19JUN2020: if something goes wrong reversing the list NULL is returned!!!
+Mlist* _getReversedList(Mlist const * const list){if(!list)return NULL;Mallocationowner owner=getOwner(__LINE__);
+    Mlist* _list=owned_list(_getListOfType(list->valuetype),owner); // make a list of the same type as the list argument
+    if(!_list)return NULL;
+    Mlistelement* listelement=list->_first;
+    while(listelement){
+        if(appendedToList(_list,owner,listelement->_value,0)<=0){FREE_LIST(_list,owner);return NULL;}
+        listelement=listelement->_next;
+    }
+    return disowned_list(_list,owner);
+}
+
 // MDH@30MAR2020: the general idea of flattening a list is that all elements of the list are not lists anymore
 //                let's assume that NULL means something went wrong, caller should take care of situation where value is NULL unless ?TODO? we allow putting a NULL value in the list
 //                reversed tells _getFlattenedList to prepend instead of append
@@ -1066,7 +1078,7 @@ void checkList(Mlist* _list){
     // MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
     if(_value&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
     if(_value->type!=_list->valuetype)
-    {output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_value,"' to a list: it is of the wrong type.");return 0;}
+    {output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_value,"' to a list: it is of the wrong type.\n");return 0;}
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     // MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
@@ -1075,9 +1087,7 @@ void checkList(Mlist* _list){
     if(index<0)index+=(lastindex+1); // if index is nonpositive add lastindex+1 to it
     // MDH@17OCT2019: a negative index might still end up with index 0, this happens with -len(x)-1, ok, for now just accept this when it happens
     if(index<0){output("%sIndex %lld of (new) list element too small.\n",M_ERROR_PREFIX,index);return M_LL_INVALID;} // MDH@17OCT2019: can't return negative value!!! // MDH@05NOV2019: to indicate invalid input
-    // if(amVerboseDebugging()){
-        outputValue("Adding '",_value,"' to a list");output(" at index %lld.\n",index);
-    // }
+    // if(amVerboseDebugging()){outputValue("Adding '",_value,"' to a list");output(" at index %lld.\n",index);}
     // MDH@23MAY2019: let's allow inserting or replacing as well
     // determine _listelement as element to host the value, store the successor in _nextlistelement
     Mlistelement *_prevListelement=NULL,*_nextListelement=NULL,*_listelement=(index>0&&index<=lastindex?_list->_first:NULL);
@@ -1085,7 +1095,7 @@ void checkList(Mlist* _list){
         // NOTE testing _listelement is just a fail-safe as that should never happen
         while(index>_listelement->index){
             _prevListelement=_listelement;
-            if(!_listelement->_next){output("BUG: Index (%llu) ",_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
+            if(!_listelement->_next){output("%sIndex (%llu) ",M_BUG_PREFIX,_listelement->index);outputValue("of existing list element '",_listelement->_value,"' probably out of order.\n");return M_LL_INVALID;}
             _listelement=_listelement->_next;
         }
         // if we're going to insert there will be a successor
@@ -1118,23 +1128,20 @@ void checkList(Mlist* _list){
         _list->_first=_listelement;
         if(!_list->_last)_list->_last=_list->_first;
         (_list->numberOfElements)++;
-        // if(amVerboseDebugging())
-            outputValue("Prepending '",_listelement->_value,"'.\n");
+        // if(amVerboseDebugging())outputValue("\tPrepending '",_listelement->_value,"'.\n");
         // we should increment the index of all elements (consuming _listelement on the go which is OK)
         _nextListelement=_listelement;
         while(_nextListelement){
             // if(amVerboseDebugging())
-            {outputValue("Incrementing the index of '",_nextListelement->_value,"'.\n");}
+            // {outputValue("\tIncrementing the index of '",_nextListelement->_value,"'.\n");} // DEBUG
             (_nextListelement->index)++;
-            // if(amVerboseDebugging())
-            {outputValue("Index of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);}
+            // if(amVerboseDebugging()){outputValue("\tIndex of '",_nextListelement->_value,"' incremented");output(" to %llu.\n",_nextListelement->index);} // DEBUG
             _nextListelement=_nextListelement->_next;
-            // if(amVerboseDebugging())
-            {if(_nextListelement)outputInfo("A next element to consider!");else outputInfo("No next element to consider!");}
+            // if(amVerboseDebugging()){if(_nextListelement)outputInfo("\tA next element to consider!");else outputInfo("\tNo next element to consider!");}
         }
-        if(amVerboseDebugging())outputValue("'",_listelement->_value,"' prepended.\n");
+        //if(amVerboseDebugging()){outputValue("\t'",_listelement->_value,"' prepended to a list");output(" (now) with %llu elements.\n",_list->numberOfElements);}
     }
-    if(amVerboseDebugging())checkList(_list);
+    if(amDebugging())checkList(_list);
     return _listelement->index;
 }/* VALIDATED */
 
@@ -1162,6 +1169,7 @@ Mvalue* getValueAtIndex(Mlist* _list,long long index){
 Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
     // NOTE if index is equal to zero definitely no value there!!!
     if(_list&&index){
+        // if(amVerboseDebugging()){outputList("Determining the value holder in '",_list,"'");output(" at index %lld.\n",index);}
         if(_list->_last){
             long long maxindex=_list->_last->index;
             if(index<0)index+=(maxindex+1);
@@ -1170,7 +1178,10 @@ Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
                 if(index<maxindex){
                     Mlistelement* _listelement=_list->_first;
                     while(_listelement){
-                        if(_listelement->index==index)return &(_listelement->_value);
+                        if(_listelement->index==index){
+                            // if(amVerboseDebugging())outputValue("\tFound with value '",_listelement->_value,"'.\n");
+                            return &(_listelement->_value);
+                        }
                         if(_listelement->index>index)break; // couldn't find it!!!
                         _listelement=_listelement->_next;
                     }
@@ -1419,7 +1430,7 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                         Mstring* p=valueText;
                         Mtoken* token=_value->value._token;
                         while(p&&token){
-                            p=string_append(p,string(token->text));
+                            if(token->text)p=string_append(p,string(token->text));
                             token=token->next;
                         }
                         if(!p){FREE_STRING(valueText,owner);valueText=NULL;}
@@ -2140,6 +2151,7 @@ Mlist* _getLongDoubleRationalList(long double ld,uint32_t maxiter){Mallocationow
 }/* VALIDATED */
 
 void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowner owner=getOwner(__LINE__);
+    // {outputValue("Storing '",_value,"'");output(" in %p.\n",_valueholder);} // DEBUG
     // ASSERT not a composite value (so like an end node)
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
     // MDH@01NOV2019: it's a leap of faith to let assignValue() create copies of composite values i.e. instead of assigning _value to the *_valueholder we assign a new map or list value

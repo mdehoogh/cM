@@ -245,7 +245,7 @@ Mvalue* Mlast(Mvalue* listValue){ // return the last value
 // count and missing are integers, sum, sumofsquares, mode, minimum and maximum are in the same unit as the input values
 // if we use sum and sumofsquares to compute the mean and variance we can store these in a rational for integer input values
 Mmap* _getIntegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwner(__LINE__);
-    Mmap* _statisticsMap=OWNED(_getMapOfType(VT_UNDEFINED),owner);
+    Mmap* _statisticsMap=owned_map(_getMapOfType(VT_UNDEFINED),owner);
     if(_statisticsMap){
         if(amVerbose())output("Computing integer sample statistics.\n");
         long long missings=0,errors=0;
@@ -499,11 +499,11 @@ Mvalue* Mstats(Mvalue* listValue){Mallocationowner owner=getOwner(__LINE__);
         if(list){
             if(list->valuetype!=VT_MAP&&list->valuetype!=VT_REFERENCE&&list->valuetype!=VT_LIST&&list->valuetype!=VT_UNDEFINED){
                 // the values in the list need to be scalars of the same type
-                if(list->valuetype==VT_INTEGER)_statsMap=(Mmap*)OWNED(_getIntegerSampleStatisticsMap(list),owner);
-                if(list->valuetype==VT_BIGINTEGER)_statsMap=(Mmap*)OWNED(_getBigintegerSampleStatisticsMap(list),owner);
-                if(list->valuetype==VT_RATIONAL)_statsMap=(Mmap*)OWNED(_getRationalSampleStatisticsMap(list),owner);
-                if(list->valuetype==VT_DECIMAL)_statsMap=(Mmap*)OWNED(_getDecimalSampleStatisticsMap(list),owner);
-                if(list->valuetype==VT_FLOAT)_statsMap=(Mmap*)OWNED(_getFloatSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_INTEGER)_statsMap=owned_map(_getIntegerSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_BIGINTEGER)_statsMap=owned_map(_getBigintegerSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_RATIONAL)_statsMap=owned_map(_getRationalSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_DECIMAL)_statsMap=owned_map(_getDecimalSampleStatisticsMap(list),owner);
+                if(list->valuetype==VT_FLOAT)_statsMap=owned_map(_getFloatSampleStatisticsMap(list),owner);
             }else
                 output("All values in the list should be of the same numeric type (integer, big integer, float, rational or decimal).\n");
         }else 

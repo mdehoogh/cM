@@ -3270,30 +3270,29 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 		}
 		// only composite values can be indexex...
 		if(referencedValue&&(referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
-			if(amVerbose()){
-				///////output("Current value of referenced variable '%s': ",_valuereference->_name);
-				outputValue("Top level value reference: '",referencedValue,"'.\n");
-			}
+			// if(amVerboseDebugging())outputValue("Top level value reference: '",referencedValue,"'.\n");
 			// MDH@14NOV2019: ANY value that evaluates to a list or map can be further indexed
 			// if we have index/attribute names we have to get the final subvalue
 			// MDH@07APR2020: TODO the following is copied over from setReferencedValue, so obviously it's possible to combine the two in a single function in the future
 			Mlist* itemidList=(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST?_valuereference->_itemid->value._list:NULL); // let's assume that is it always a list
-			if(itemidList&&!itemidList->_first)itemidList=NULL; // MDH@31MAR2020: empty lists are ignored (although that's an error theoretically)
+			if(itemidList&&!itemidList->_first)itemidList=NULL;
 			// empty lists should also return the full element, so only something to do when we actually have list elements!!!
 			// MDH@07APR2020: should be similar to what setReferencedValue does except for the part of setting the value!!!
 			if(itemidList){
+				outputList("Item id list: ",itemidList,"'.\n"); // DEBUG
 				Mvalue* *valueholder=&referencedValue; // MDH@07APR2020 replacing what we used in setReferencedValue(): getValueHolder(getExecutionEnvironment(),_valuereference->_name);
 				// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 				if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
-					if(amDebugging())outputInfo("************ Element(s) to set.");
+					// if(amVerboseDebugging())outputInfo("************ Element(s) to set.");
 					// let's get the first index/attribute name
-					Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
+					Mlistelement* indexorattributenameListelement=itemidList->_first; // MDH@19JUN2020 not anymore: MDH@31MAR2020: we know there is a _first (see the creation of _itemidList above)
 					// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 					//                this works for lists not for maps
 					// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-					Mvalue*** _valueholders=MALLOC_1(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
+					Mvalue*** _valueholders=MALLOC_1(sizeof(void*),-'_',owner); // set immediately so MALLOC suffices
 					if(_valueholders){
-						size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
+						// output("Value holder: %p.",_valueholders); // DEBUG
+						size_t numberOfValueholders=1,numberOfNewValueholders=0; // if allocating memory for a single Mvalue** succeeds we have a go
 						bool result=true;
 						_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
 						// we need to find the last index or attribute name
@@ -3317,12 +3316,12 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 									//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
 									Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
-									size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
+									numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
 										if(amVerboseDebugging())outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
-										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_newValueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_'):_valueholders);
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3430,6 +3429,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																				long long listIndex=M_LL_INVALID;
 																				if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
 																				if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
+																				// MDH@19JUN2020: I suppose we should also allow appending to the list if listIndex equals M_LL_INVALID
 																				if(listIndex!=M_LL_INVALID){
 																					newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																					if(!newValueholder){
@@ -3466,6 +3466,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											if(_flattenedIndexList->numberOfElements>1)numberOfValueholders*=_flattenedIndexList->numberOfElements; // because numberOfNewValueholders was consumed, we have to do it this way
 										}else{ // REALLOC failed
 											result=false;
+											numberOfNewValueholders=0;
 											outputError("Failed to reallocate the indexed value references");
 										}
 									}
@@ -3497,7 +3498,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-						FREE_DISOWNED_1(_valueholders,'_',owner);
+						FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
 					}
 				}
 				/* replacing:
@@ -3579,17 +3580,17 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
-bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
+bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
-		// if(amVerboseDebugging()){
-			output("Setting the value reference of '%s",_valuereference->_name);
+		if(amVerboseDebugging()){
+			output("\nSetting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
 			outputValue("' to '",_newValue,"'.\n");
-		// }
+		}
 		// MDH@18OCT2019: without an _itemid the variable is allowed to NOT yet exist
 		Mlist* itemidList=(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST?_valuereference->_itemid->value._list:NULL); // let's assume that is it always a list
-		if(itemidList&&!itemidList->_first)itemidList=NULL; // MDH@31MAR2020: empty lists are ignored (although that's an error theoretically)
+		// MDH@19JUN2020 allowing empty index lists again: if(itemidList&&!itemidList->_first)itemidList=NULL; // MDH@31MAR2020: empty lists are ignored (although that's an error theoretically)
 		if(itemidList){ // the hard part: index/attribute name list assignment!!
 			// _valuereference->_value=_newValue; // MDH@07APR2020: TODO do we need this?????
 			// MDH@25MAR2020: we can cut the user some slack by allowing automatic initialization to a list or map depending on the whether a property is added or an index
@@ -3601,6 +3602,8 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 			Mvalue* *valueholder=getValueHolder(getExecutionEnvironment(),_valuereference->_name->chars);
 			// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 			if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
+				// MDH@19JUN2020: if itemidList is empty, we use the default index or attribute name
+				if(!itemidList->_first)if(appendedToList(itemidList,owner_valuereference,(*valueholder)->type==VT_LIST?_getIntegerValue(M_LL_INVALID):_getTextValue("'"),M_LL_INVALID)<0)return false;
 				result=true;
 				if(amVerboseDebugging())
 					outputInfo("************ Element(s) to set.");
@@ -3609,9 +3612,9 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 				// MDH@18OCT2019: we now allow a list that is empty (indicative of appending to the list), in that case indexorattributenameListelement would be NULL
 				//                this works for lists not for maps
 				// if(/*MDH@31MAR2020 not needed anymore: indexorattributenameListelement||*/isValueUndefined(*valueholder)!=M_FALSE||(*valueholder)->type==VT_LIST){ // we've got one, so not an empty index/attribute name list!!
-				Mvalue*** _valueholders=MALLOC_1(sizeof(void*),'_',owner); // set immediately so MALLOC suffices
+				Mvalue*** _valueholders=MALLOC_1(sizeof(void*),-'_',owner); // set immediately so MALLOC suffices // MDH@19JUN2020: a single value holders array
 				if(_valueholders){
-					size_t numberOfValueholders=1; // if allocating memory for a single Mvalue** succeeds we have a go
+					size_t numberOfValueholders=1,numberOfNewValueholders=0; // if allocating memory for a single Mvalue** succeeds we have a go
 					_valueholders[0]=valueholder; // put the root value holder in the first element of the valueholders array
 					// we need to find the last index or attribute name
 					Mvalue* indexorattributenameListelementValue=NULL;
@@ -3634,12 +3637,13 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 								// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 								//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
 								Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
-								size_t numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
+								numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 								if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 									// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
-									if(amVerboseDebugging())outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
+									// if(amVerboseDebugging())
+									outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n"); // DEBUG
 									// which we now did
-									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),'_'):_valueholders);
+									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_'):_valueholders);
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
@@ -3675,8 +3679,12 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 											// as soon as the list or map valueholder is created we can use it to get the new value reference IFF the value is of the right type, we have to ascertain that all copies are zero
 										}
 										// now we can create the elements
+										// if(amVerboseDebugging())
+											outputList("****** Flattened index list: '",_flattenedIndexList,"'.\n");
 										flattenedIndexListelement=_flattenedIndexList->_first;
 										while(flattenedIndexListelement){
+											output("%c\n",'A'); // DEBUG
+											Mlist* _assignedIndexList=owned_list(__list("assigned indices"),owner); // where we'll be collecting all indices assigned based on this flattened index list element
 											numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 											indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
 											if(indexorattributenameListelementValue){
@@ -3712,23 +3720,27 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																//                we could flatten the value here????? so if it is a list we get the list of indices here
 																Mmap* valueholderMap=(*valueholder)->value._map;
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
-																outputList("Value index list: ",_valueIndexList,".\n");
+																outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
 																// 'iterating' over all list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																if(valueIndexListelement){
 																	Mvalue** newValueholder;
 																	while(valueholderMap){
-																		outputMap("Value holder map: ",valueholderMap,".");
+																		output("%c\n",'B'); // DEBUG
+																		outputMap("Value holder map: ",valueholderMap,"."); // DEBUG
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																		if(indexorattributenameListelementValue){
 																			Mstring* _attributenameText=_getValueText(indexorattributenameListelementValue,true);
 																			if(_attributenameText){
 																				newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																				if(!newValueholder){
-																					if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)!=1)
-																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
-																					else
+																					if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)==M_TRUE){
 																						newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
+																						// register in the assigned index list
+																						if(_assignedIndexList&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
+																						{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
+																					}else
+																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
 																				}/*else{
 																					//FREE_DISOWNED_1(valueholders,'_');
 																					_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
@@ -3741,6 +3753,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 																		if(!valueIndexListelement)break;
 																		// we have another property 'index', so we should have a value holder map
 																		valueholderMap=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_MAP?(*newValueholder)->value._map:NULL);
+																		output("%c\n",'C'); // DEBUG
 																	}
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																}
@@ -3753,37 +3766,44 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 															if(_flattenedIndexList->valuetype==VT_INTEGER){
 																Mlist* valueholderList=(*valueholder)->value._list;
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
-																// outputList("Value index list: ",_valueIndexList,".\n");
-																// 'iterating' over all list elements
+																// if(amVerboseDebugging())
+																outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
+																// 'iterating' over all index list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																if(valueIndexListelement){
 																	Mvalue** newValueholder;
 																	while(valueholderList){
+																		output("%c\n",'D');
 																		// outputList("Value holder list: ",valueholderList,".");
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																		if(indexorattributenameListelementValue){
 																			long long listIndex=M_LL_INVALID;
 																			if(indexorattributenameListelementValue->type==VT_INTEGER)listIndex=indexorattributenameListelementValue->value._integer->ll;else
 																			if(indexorattributenameListelementValue->type==VT_BIGINTEGER)listIndex=biginteger2long(indexorattributenameListelementValue->value._biginteger);
-																			if(listIndex!=M_LL_INVALID){
-																				newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
+																			// MDH@19JUN2020 M_LL_INVALID allowed as index indicating appending: if(listIndex!=M_LL_INVALID){
+																				newValueholder=(listIndex!=M_LL_INVALID?getValueHolderAtIndex(valueholderList,listIndex):NULL);
 																				if(!newValueholder){
 																					listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
 																					if(listIndex>0){
+																						// if(amVerboseDebugging())
+																						{output("List after appending NULL at index %lld",listIndex);outputList(": '",valueholderList,"'.\n");}
 																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
-																						if(amDebugging())
-																							output("List element at index #%zd retrieved.\n",listIndex);	
+																						// if(amVerboseDebugging())output("List element at index #%zd retrieved.\n",listIndex);
+																						// register in the assigned index list
+																						if(_assignedIndexList&&appendedToList(_assignedIndexList,owner,_getIntegerValue(listIndex),M_LL_INVALID)<=0)
+																						{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																					}else
 																						output("%sFailed to add list element at index '%lld'.\n",M_ERROR_PREFIX,listIndex);
 																				}
-																			}else
-																				newValueholder=NULL;
+																			//}else	newValueholder=NULL;
 																		}
 																		valueIndexListelement=valueIndexListelement->_next;
 																		if(!valueIndexListelement)break;
 																		// we have another property 'index', so we should have a value holder map
 																		valueholderList=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
+																		output("%c\n",'E'); // DEBUG
 																	}
+																	output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																}
 																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
@@ -3796,24 +3816,54 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 													}
 												}
 											}
+											// if we managed to collect all assigned indices we use these to replace the current value in the flattened index list element
+											if(_assignedIndexList){
+												if(_assignedIndexList->_first){
+													outputList("Assigned index list: '",_assignedIndexList,"'.\n"); // DEBUG
+													if(_assignedIndexList->_first==_assignedIndexList->_last){
+														assignValue(&flattenedIndexListelement->_value,_assignedIndexList->_first->_value);
+														FREE_LIST(_assignedIndexList,owner);
+													}else
+														assignValue(&flattenedIndexListelement->_value,_getValueOfList(disowned_list(_assignedIndexList,owner))); // now bound (or released)
+												}else
+													FREE_LIST(_assignedIndexList,owner);
+											}else
+												outputBug("Failed to populate the assigned index list");
 											flattenedIndexListelement=flattenedIndexListelement->_next;
+											// output("%c\n",'F'); // DEBUG
 										}
 										if(_flattenedIndexList->numberOfElements>1)numberOfValueholders*=_flattenedIndexList->numberOfElements; // because numberOfNewValueholders was consumed, we have to do it this way
 									}else{ // REALLOC failed
 										result=false;
+										numberOfNewValueholders=0;
 										outputError("Failed to reallocate the indexed value references");
 									}
 								}
-								if(_flattenedIndexList)FREE_LIST(_flattenedIndexList,owner);
+								// MDH@19JUN2020 TODO not too happy about using _flattenedIndexList and assignedIndexList to collect the actual ids of the properties or array elements
+								if(_flattenedIndexList){
+									if(_flattenedIndexList->_first){ // at least one element
+										outputList("Flattened index list: '",_flattenedIndexList,"'.\n");
+										if(_flattenedIndexList->_first!=_flattenedIndexList->_last){ // more than one element: replace the value by the reversed list (which is disowned to start with!!!!)
+											Mlist* _rereversedIndexList=owned_list(_getReversedList(_flattenedIndexList),owner);
+											if(_rereversedIndexList)assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));else outputBug("Failed to reverse an index list");
+										}else // replace the value by the first value in the flattened index list
+											assignValue(&indexorattributenameListelement->_value,_flattenedIndexList->_first->_value);
+									}
+									FREE_LIST(_flattenedIndexList,owner);
+								}
 							}
 							// if all the valueholders are NULL we break????
-							int valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
+							long long valueholderIndex=numberOfValueholders;while(--valueholderIndex>=0&&_valueholders[valueholderIndex]==NULL)asm("nop");if(valueholderIndex<0){result=false;break;}
+							// how about putting the flattenedIndexList back????
+
 							indexorattributenameListelement=indexorattributenameListelement->_next; // immediately increment
 						}
 					}
 					// MDH@31MAR2020: supposedly we have ALL value holders to which _newValue needs to be assigned!!!
 					if(result){
-						int valueholderIndex=numberOfValueholders;
+						long long valueholderIndex=numberOfValueholders;
+						// if(amVerboseDebugging())
+						{output("Setting %llu values",valueholderIndex);outputValue(" to '",_newValue,"'.\n");}
 						while(--valueholderIndex>=0)if(_valueholders[valueholderIndex])assignValue(_valueholders[valueholderIndex],_newValue);
 					}
 					/* MDH@31MAR2020 we've dealt with the last index element as well in the block above, so replacing:
@@ -3906,7 +3956,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mvalue* _newValue){Mall
 					}
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-					FREE_DISOWNED_1(_valueholders,'_',owner);
+					FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
 				}
 				/*
 				}else
@@ -7390,16 +7440,15 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 						// MDH@02NOV2019 replacing: assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getReferencedValue(_valuereference),_result));
 						// replacing:	assignValue(&_result,applyBinaryOperator(string(_formulaelement->_operator),getValue(_Menvironment,_valuereference->_name),_result));
 					}
-					if(amVerboseDebugging())
-						outputValue("Result to store in the value reference: '",_result,"'.\n");
+					if(amVerboseDebugging())outputValue("Result to store in the value reference: '",_result,"'.\n");
 					
-					setReferencedValue(_valuereference,_result);
+					setReferencedValue(_valuereference,Msubowner(owner,1),_result); // MDH@19JUN2020: should check whether or not we should pass the owner of the value reference
 					
-					if(amVerboseDebugging())outputValue("Stored in the value reference: '",_valuereference->_value,"'.\n");
+					// if(amVerboseDebugging())outputValue("###### Stored in the value reference: '",_valuereference->_value,"'.\n");
 					
 					Mvalue* referencedValue=getReferencedValue(_valuereference);
 					
-					if(amVerboseDebugging())outputValue("Referenced value to use as result: '",referencedValue,"'.\n");
+					// if(amVerboseDebugging())outputValue("###### Referenced value to use as result: '",referencedValue,"'.\n");
 					
 					// MDH@02NOV2019: we still didn't get a change to a list argument so here also we need to prevent copying the list/map
 					_result=referencedValue; // MDH@02NOV2019: replacing: assignValue(&_result,referencedValue); // should we do this???? well, in case the assignment failed!!!

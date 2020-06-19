@@ -1123,12 +1123,13 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
 void* Mrealloc(void* ptr,long long from_count,long long to_count,size_t size,signed char allocationType/*,Mallocationowner owner*/){
     // info("Size of Malloc: %zd, size of long long: %zd.\n",sizeof(Malloc),sizeof(long long));
     void* newptr=ptr;
+
     if(from_count>0&&to_count>0){ // not a (new) (de-)allocation
 
         if(from_count!=to_count){ // a change in the number of allocation elements
         
             newptr=((char*)newptr)-sizeof(Malloc);
-
+            
             size_t freed=size*from_count,occupied=size*to_count;
 
             Malloc* _alloc=(Malloc*)newptr; // pointer to Malloc allocation registration appendix

@@ -120,6 +120,7 @@ Mlist* _getListOfType(Mvaluetype valuetype);
 Mlist* listMadeWeak(Mlist * const list);
 Mlist* _getListCopy(Mlist const * const _list);
 Mlist* _getListIndices(Mlist const * const _list);
+Mlist* _getReversedList(Mlist const * const list); // MDH@19JUN2020: convenience method to reverse a list returns NULL on failure
 Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,bool reversed); // MDH@30MAR2020: to apply index element that can be lists, we need to flatten the list
 long long isListUndefined(Mlist* list);
 

@@ -61,14 +61,14 @@ mpd_context_t* __mpd_context(mpd_ssize_t decimalprecision){Mallocationowner owne
 
 Mdecimalcontext* disowned_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner_decimalcontext){
 	if(!_decimalcontext)return NULL;
-	if(_decimalcontext->mpd_context)DISOWNED(_decimalcontext->mpd_context,owner_decimalcontext);
+	if(_decimalcontext->mpd_context)disowned_mpd_context(_decimalcontext->mpd_context,owner_decimalcontext);
 	if(_decimalcontext->_firstCordicelement)disowned_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
 	if(_decimalcontext->_firstSincoselement)disowned_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
 	return DISOWNED(_decimalcontext,owner_decimalcontext);
 }
 Mdecimalcontext* owned_decimalcontext(Mdecimalcontext* _decimalcontext,Mallocationowner owner_decimalcontext){
 	if(!_decimalcontext)return NULL;
-	if(_decimalcontext->mpd_context)OWNED(_decimalcontext->mpd_context,owner_decimalcontext);
+	if(_decimalcontext->mpd_context)owned_mpd_context(_decimalcontext->mpd_context,owner_decimalcontext);
 	if(_decimalcontext->_firstCordicelement)owned_sincoselement(_decimalcontext->_firstCordicelement,owner_decimalcontext);
 	if(_decimalcontext->_firstSincoselement)owned_sincoselement(_decimalcontext->_firstSincoselement,owner_decimalcontext);
 	return OWNED(_decimalcontext,owner_decimalcontext);
@@ -128,11 +128,11 @@ static Mdecimalcontext* _getExistingDecimalcontext(mpd_ssize_t prec){
 Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=getOwner(__LINE__); // NOTE a global so use module level id
 	Mdecimalcontext* decimalcontext=_getExistingDecimalcontext(prec);
 	if(decimalcontext)return decimalcontext;
-	MdecimalcontextElement* decimalcontextElement=CALLOC_1(sizeof(MdecimalcontextElement),'e',owner);
+	MdecimalcontextElement* decimalcontextElement=(MdecimalcontextElement*)CALLOC_1(sizeof(MdecimalcontextElement),'e',owner);
 	if(decimalcontextElement){
-		decimalcontextElement->_decimalcontext=CALLOC_1(sizeof(Mdecimalcontext),'C',owner);
+		decimalcontextElement->_decimalcontext=(Mdecimalcontext*)CALLOC_1(sizeof(Mdecimalcontext),'C',owner);
 		if(decimalcontextElement->_decimalcontext){
-			decimalcontextElement->_decimalcontext->mpd_context=OWNED(__mpd_context(prec),owner);
+			decimalcontextElement->_decimalcontext->mpd_context=owned_mpd_context(__mpd_context(prec),owner);
 			if(decimalcontextElement->_decimalcontext->mpd_context){
 				if(_lastDecimalcontextElement)_lastDecimalcontextElement->_next=decimalcontextElement;
 				_lastDecimalcontextElement=decimalcontextElement;
@@ -140,7 +140,7 @@ Mdecimalcontext* _getDecimalcontext(mpd_ssize_t prec){Mallocationowner owner=get
 				return decimalcontextElement->_decimalcontext;
 			}
 			// not bound!!!
-			DISOWNED(decimalcontextElement->_decimalcontext,owner);
+			disowned_decimalcontext(decimalcontextElement->_decimalcontext,owner);
 		}
 		FREE_DECIMALCONTEXTELEMENT(decimalcontextElement,owner);
 	}else
@@ -237,7 +237,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
     Mrational* _rational=NULL;
     if(decimal){
         // get the decimal text in fixed point format if it is not repeating, otherwise we always get in in fixed point but then without the closing ]
-        Mstring* _decimalText=OWNED(_getDecimalText(decimal,decimal->repeating>0),owner); // replacing: mpd_to_sci(_decimal->mpd,0);
+        Mstring* _decimalText=owned_string(_getDecimalText(decimal,decimal->repeating>0),owner); // replacing: mpd_to_sci(_decimal->mpd,0);
         if(_decimalText){
             char* decimalText=string(_decimalText); // a pointer to the chars array in _decimalString, so you can't free _decimalText until being finished with decimalText
             if(amVerbose())output("Decimal text to parse to rational: '%s'.\n",decimalText);
@@ -255,7 +255,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                     ////////output("Repeating text: '%s'.\n",repeatingText);
                     // 2. extract the big integer representing the repeating digits (which will be the third part of the numerator)
                     // locally used dynamic variables
-                    Mbiginteger *_num3=OWNED(__biginteger(),owner),*_bi10=OWNED(_getBiginteger(10),owner),*_den2=OWNED(_getBiginteger(10),owner),*_den1=OWNED(_getBiginteger(1),owner);
+                    Mbiginteger *_num3=owned_biginteger(__biginteger(),owner),*_bi10=owned_biginteger(_getBiginteger(10),owner),*_den2=owned_biginteger(_getBiginteger(10),owner),*_den1=owned_biginteger(_getBiginteger(1),owner);
                     ////////output("Temporary dynamic variables created.\n");
                     if(_num3&&_bi10&&_den2&&_den1&&mp_read_radix(MP_INT_POINTER(_num3),repeatingText,10)==MP_OKAY){
                         if(amVerbose())outputBiginteger("Repeating digits numerator part: '",_num3,"'.\n");
@@ -275,7 +275,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 									if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_bi10),MP_INT_POINTER(_den1))!=MP_OKAY)
 									{outputError("Failed to multiply the first rational denominator part by 10");FREE_BIGINTEGER(_den1,owner);_den1=NULL;}
                                 if(_den1){
-                                    _den=OWNED(__biginteger(),owner);
+                                    _den=owned_biginteger(__biginteger(),owner);
                                     if(mp_mul(MP_INT_POINTER(_den1),MP_INT_POINTER(_den2),MP_INT_POINTER(_den))!=MP_OKAY){
 										FREE_BIGINTEGER(_den,owner);
 										_den=NULL;
@@ -283,17 +283,17 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
 									if(amVerbose())outputBiginteger("First denominator multiplier: '",_den1,"'.\n");
                                 }
                             }else
-                                _den=OWNED(_getBigintegerCopy(_den2),owner);
+                                _den=owned_biginteger(_getBigintegerCopy(_den2),owner);
                             if(_den){ // denominator computed successfully, either to be bound or freed in this block
                                 *periodText='\0'; // no harm overwriting the period with end-of-text character so _decimalText will contain the before period integer part
                                 periodText++; // point periodText to the first digit behind the decimal period
                                 if(amVerbose())output("Behind period text: '%s'.\n",periodText);
                                 
                                 // the numerator is the sum of what's in front of the repeating digits plus the integer representing the repeating digits (_num2)
-                                Mbiginteger* _num=OWNED(_getBigintegerCopy(_num3),owner); // initialize _num to the repeating digits integer
+                                Mbiginteger* _num=owned_biginteger(_getBigintegerCopy(_num3),owner); // initialize _num to the repeating digits integer
                                 // add the fixed part of the decimal digits (treated as integer)
                                 if(_num&&strlen(periodText)){ // something between the period and the repeating digits
-                                    Mbiginteger* _num2=OWNED(__biginteger(),owner); // _num2 is freed below, so that's good
+                                    Mbiginteger* _num2=owned_biginteger(__biginteger(),owner); // _num2 is freed below, so that's good
                                     if(mp_read_radix(MP_INT_POINTER(_num2),periodText,10)!=MP_OKAY||mp_mul(MP_INT_POINTER(_num2),MP_INT_POINTER(_den2),MP_INT_POINTER(_num2))!=MP_OKAY||mp_add(MP_INT_POINTER(_num),MP_INT_POINTER(_num2),MP_INT_POINTER(_num))!=MP_OKAY){
 										FREE_BIGINTEGER(_num,owner);
 										_num=NULL;
@@ -304,7 +304,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                                 if(_num){ // so far so good
                                     // _num to be bound or freed in this block!!!
                                     // add the part in front of the period multiplied by _den1 but it could be zero of course
-                                    Mbiginteger* _num1=OWNED(__biginteger(),owner); // _mul1 freed below (which is reachable)
+                                    Mbiginteger* _num1=owned_biginteger(__biginteger(),owner); // _mul1 freed below (which is reachable)
                                     if(mp_read_radix(MP_INT_POINTER(_num1),decimalText,10)==MP_OKAY){
                                         // of course the integer part could well be zero!!!!
                                         if(!isBigintegerZero(_num1)){
@@ -324,7 +324,7 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                                 // negate the numerator if the decimal is negative
                                 if(_num&&neg&&mp_neg(MP_INT_POINTER(_num),MP_INT_POINTER(_num))!=MP_OKAY){FREE_BIGINTEGER(_num,owner);_num=NULL;}
                                 if(_num){
-									_rational=OWNED(_getRational(_num,_den,M_LD_NAN,true),owner);
+									_rational=owned_rational(_getRational(_num,_den,M_LD_NAN,true),owner);
 									FREE_BIGINTEGER(_num,owner);
 								}
                                 // if rational is NULL, _den and _num are not bound, otherwise they are, can't harm to try to release if not set though
@@ -340,33 +340,33 @@ Mrational* _getDecimalRational(Mdecimal const * const decimal){Mallocationowner 
                     FREE_BIGINTEGER(_den1,owner);
                 }else{
                     if(amVerbose())outputDecimal("No fractional digits in decimal '",decimal,"'.\n");
-                    Mbiginteger* _num=OWNED(__biginteger(),owner);
+                    Mbiginteger* _num=owned_biginteger(__biginteger(),owner);
                     if(_num){
                         if(mp_read_radix(MP_INT_POINTER(_num),decimalText,10)==MP_OKAY)
-							_rational=OWNED(_getRational(_num,NULL,M_LD_NAN,false/*,false*/),owner);
+							_rational=owned_rational(_getRational(_num,NULL,M_LD_NAN,false/*,false*/),owner);
                         FREE_BIGINTEGER(_num,owner); // MDH@26MAY2020: always now
                     }
                 }
             }else // we can go through the text????
-                _rational=OWNED(_getDecimalTextRational(decimalText),owner);
+                _rational=owned_rational(_getDecimalTextRational(decimalText),owner);
             FREE_STRING(_decimalText,owner); // OOPS use FREE_STRING() not free()!
         }else
             outputError("Failed to convert the decimal to text");
     }
-    return DISOWNED(_rational,owner);
+    return disowned_rational(_rational,owner);
 }/* VALIDATED */
 
 // MDH@08OCT2019: TODO do we have this already somewhere else??????
 Mdecimal* _getBigintegerDecimal(Mbiginteger const * const biginteger){Mallocationowner owner=getOwner(__LINE__);
 	Mdecimal* _bigintegerDecimal=NULL;
 	if(biginteger){
-		Mstring* _bigintegerText=OWNED(_getBigintegerText(biginteger),owner);
+		Mstring* _bigintegerText=owned_string(_getBigintegerText(biginteger),owner);
 		if(_bigintegerText){
-			_bigintegerDecimal=OWNED(_getTextDecimal(string(_bigintegerText),0),owner);
+			_bigintegerDecimal=owned_decimal(_getTextDecimal(string(_bigintegerText),0),owner);
 			FREE_STRING(_bigintegerText,owner);
 		}
 	}
-	return DISOWNED(_bigintegerDecimal,owner);
+	return disowned_decimal(_bigintegerDecimal,owner);
 }/* VALIDATED */
 
 long double getDecimalLongDouble(Mdecimal* _decimal){
@@ -390,14 +390,14 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
     if(denominator){
         // local variables to be freed at the end (so NOT before)
 		// MDH@15OCT2019: take the sign into account
-		Mbiginteger *_nonnegativenumerator=(mp_isneg(MP_INT_POINTER(numerator))?OWNED(_getBigintegerNeg(numerator),owner):numerator);
+		Mbiginteger *_nonnegativenumerator=(mp_isneg(MP_INT_POINTER(numerator))?owned_biginteger(_getBigintegerNeg(numerator),owner):numerator);
 		if(_nonnegativenumerator){
-			Mbiginteger *_digit=OWNED(__biginteger(),owner),*_remainder=OWNED(__biginteger(),owner);
-			Mbiginteger* _bi10=OWNED(_getBiginteger(10),owner);
+			Mbiginteger *_digit=owned_biginteger(__biginteger(),owner),*_remainder=owned_biginteger(__biginteger(),owner);
+			Mbiginteger* _bi10=owned_biginteger(_getBiginteger(10),owner);
 			// MDH@20MAY2020 can't do this because there would be dangling owned pointers: if(!_bi10){outputError("Failed to create big integer 10");return NULL;}
 			if(_digit&&_remainder&&_bi10&&mp_div(MP_INT_POINTER(_nonnegativenumerator),MP_INT_POINTER(denominator),MP_INT_POINTER(_digit),MP_INT_POINTER(_remainder))==MP_OKAY){
 				// the integer part is _dividend
-				_decimalText=OWNED(_getBigintegerText(_digit),owner);
+				_decimalText=owned_string(_getBigintegerText(_digit),owner);
 				if(_decimalText&&!isBigintegerZero(_remainder)){ // we've got a fraction to add!!!
 					Mstring* _p=string_append_char(_decimalText,'.'); // append the decimal period, storing the result in _p so we will know when that failed...
 					// in order to find the repeating fraction we have to continue computing the remainders
@@ -438,7 +438,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 						if(!_remainderListelement){outputError("Failed to create a big integer list element for storing the new remainder");_p=NULL;break;}
 
 						// at this point we have a new remainder list element (in _remainderListelement) that should be bound or freed
-						_remainderListelement->_biginteger=OWNED(_getBigintegerCopy(_remainder),owner); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
+						_remainderListelement->_biginteger=owned_biginteger(_getBigintegerCopy(_remainder),owner); // NOTE we have to copy _remainder as we will be computing with _remainder further (see below)
 						if(!_remainderListelement->_biginteger){
 							outputError("Failed to store the remainder");
 							FREE_DISOWNED_1(_remainderListelement,'b',owner); // we have to free _remainderListelement here because it's not going to be remembered (and freed later on) in the list of remainders
@@ -501,7 +501,7 @@ Mdecimal* _getRationalDecimal(Mrational const * const _rational){Mallocationowne
 			FREE_BIGINTEGER(_digit,owner);FREE_BIGINTEGER(_remainder,owner);FREE_BIGINTEGER(_bi10,owner);
 		}
     }else
-        _decimalText=OWNED(_getBigintegerText(numerator),owner);
+        _decimalText=owned_string(_getBigintegerText(numerator),owner);
     // parse _decimalText to a decimal
     Mdecimal* _decimal=NULL;
     if(_decimalText){
@@ -709,14 +709,14 @@ Mdecimal* _dadd(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the sum
-			_decimal=OWNED(__decimal(mpd_context,0,false),owner);
+			_decimal=owned_decimal(__decimal(mpd_context,0,false),owner);
 			if(!_decimal)return NULL;
 			uint32_t status=0;mpd_qadd(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
 			if((status&0xEFBF)!=0){FREE_DECIMAL(_decimal,owner);_decimal=NULL;outputError("Failed to compute the sum of two decimals");}
 		}
 	}
-	return DISOWNED(_decimal,owner);
+	return disowned_decimal(_decimal,owner);
 }
 //MDH@19SEP2019: if we add two decimals we need to take the repeating digits into account (which we didn't do so far)
 //               which will make it a little harder to compute the decimal sum
@@ -725,11 +725,11 @@ Mdecimal* _getDecimalSum(Mdecimal const * const d1,Mdecimal const * const d2){Ma
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
-			Mrational *_r1=OWNED(_getDecimalRational(d1),owner),*_r2=OWNED(_getDecimalRational(d2),owner);
+			Mrational *_r1=owned_rational(_getDecimalRational(d1),owner),*_r2=owned_rational(_getDecimalRational(d2),owner);
 			if(_r1&&_r2){
-				Mrational* _r=OWNED(_getRationalSum(_r1,_r2),owner); // compute the sum of two rationals
+				Mrational* _r=owned_rational(_getRationalSum(_r1,_r2),owner); // compute the sum of two rationals
 				if(_r){
-					_decimal=OWNED(_getRationalDecimal(_r),owner);
+					_decimal=owned_decimal(_getRationalDecimal(_r),owner);
 					FREE_RATIONAL(_r,owner);
 				}else
 					outputError("Failed to compute the sum of two rational decimals");
@@ -756,7 +756,7 @@ Mdecimal* _dsub(Mdecimal const * const d1,Mdecimal const * const d2){Mallocation
 		mpd_context_t* mpd_context=(decimalcontext?decimalcontext->mpd_context:NULL);
 		if(mpd_context){
 			// compute the sum
-			_decimal=OWNED(__decimal(mpd_context,0,false),owner);
+			_decimal=owned_decimal(__decimal(mpd_context,0,false),owner);
 			if(!_decimal)return NULL;
 			uint32_t status=0;mpd_qsub(_decimal->mpd,d1->mpd,d2->mpd,mpd_context,&status);
 			// on failure free the decimal
@@ -772,7 +772,7 @@ Mdecimal* _getDecimalDifference(Mdecimal const * const d1,Mdecimal const * const
 	Mdecimal* _decimal=NULL;
 	if(d1&&d2){
 		if(d1->repeating+d2->repeating>0){ // not both pure decimals
-			Mrational *_r1=OWNED(_getDecimalRational(d1),owner),*_r2=OWNED(_getDecimalRational(d2),owner);
+			Mrational *_r1=owned_rational(_getDecimalRational(d1),owner),*_r2=owned_rational(_getDecimalRational(d2),owner);
 			if(_r1&&_r2){
 				Mrational* _r=owned_rational(_getRationalDifference(_r1,_r2),owner); // compute the product of two rationals
 				if(_r){
@@ -941,11 +941,11 @@ Mdecimal* pi_decimal(Mdecimalcontext* decimalcontext,bool computesinetable){Mall
 
 		// initialize the variables we need for the iterations
 #ifdef __ADEBUG__
-		Mdecimal *lasts=OWNED(__decimal(mpd_context,0,0),owner),*t=OWNED(__decimal(mpd_context,3,0),owner),*s=OWNED(__decimal(mpd_context,3,0),owner);
-		Mdecimal *n=OWNED(__decimal(mpd_context,1,0),owner),*na=OWNED(__decimal(mpd_context,0,0),owner),*d=OWNED(__decimal(mpd_context,0,0),owner);
-		Mdecimal *da=OWNED(__decimal(mpd_context,24,0),owner);
+		Mdecimal *lasts=owned_decimal(__decimal(mpd_context,0,0),owner),*t=owned_decimal(__decimal(mpd_context,3,0),owner),*s=owned_decimal(__decimal(mpd_context,3,0),owner);
+		Mdecimal *n=owned_decimal(__decimal(mpd_context,1,0),owner),*na=owned_decimal(__decimal(mpd_context,0,0),owner),*d=owned_decimal(__decimal(mpd_context,0,0),owner);
+		Mdecimal *da=owned_decimal(__decimal(mpd_context,24,0),owner);
 		// some constant decimals we need
-		Mdecimal *d8=OWNED(__decimal(mpd_context,8,0),owner),*d32=OWNED(__decimal(mpd_context,32,0),owner);
+		Mdecimal *d8=owned_decimal(__decimal(mpd_context,8,0),owner),*d32=owned_decimal(__decimal(mpd_context,32,0),owner);
 #else
 		mpd_t *lasts=__mpd(mpd_context,0),*t=__mpd(mpd_context,3),*s=__mpd(mpd_context,3),*n=__mpd(mpd_context,1),*na=__mpd(mpd_context,0),*d=__mpd(mpd_context,0),*da=__mpd(mpd_context,24);
 		// some constant decimals we need
@@ -1769,7 +1769,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 				mpd_t *_num=get_mpd_copy(mpd_context,x),*_den=__mpd(mpd_context,1),*_n=__mpd(mpd_context,1),*_term=__mpd(mpd_context,0);
 				mpd_t *_newsine=__mpd(mpd_context,0),*_newcosine=__mpd(mpd_context,0); // starting value doesn't matter will get copied to start with anyway
 				if(_n&&_num&&_den&&_term&&_newsine&&_newcosine){
-					Mdecimal *_intermediateSine=(amVerboseDebugging()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL),*_intermediateCosine=(amVerboseDebugging()?OWNED(__decimal(mpd_context,0,0),owner):NULL);
+					Mdecimal *_intermediateSine=(amVerboseDebugging()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL),*_intermediateCosine=(amVerboseDebugging()?owned_decimal(__decimal(mpd_context,0,0),owner):NULL);
 					// every other term should be negated
 					bool negate=true;
 					uint64_t iteration=0;
@@ -1852,7 +1852,7 @@ mpd_sincos_t* _dsinandcos(mpd_context_t const * const mpd_context,mpd_t const * 
 					// if we've got them, free them
 					free_mpd(_one);free_mpd(_sinesquared);free_mpd(_cosinesquared);
 					//	mpd_finalize(_mpd_sinandcos->sin,mpd_context);mpd_finalize(_mpd_sinandcos->cos,mpd_context);
-					if(_sumofsquares){free_mpd(_sumofsquares);return DISOWNED(_mpd_sinandcos,owner);}
+					if(_sumofsquares){free_mpd(_sumofsquares);return disowned_mpd_sincos(_mpd_sinandcos,owner);}
 				}
 			}
 			FREE_MPD_SINCOS(_mpd_sinandcos,owner);
@@ -2070,7 +2070,7 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext const * const decimalcon
 		}
 		mpd_t *_deltaAngle1=__mpd(decimalcontext->mpd_context,0),*_deltaAngle2=__mpd(decimalcontext->mpd_context,0);
 		if(_deltaAngle1&&_deltaAngle2){
-			_relativeAngle=CALLOC_1(sizeof(mpd_relative_angle_t),'A',owner);
+			_relativeAngle=(mpd_relative_angle_t*)CALLOC_1(sizeof(mpd_relative_angle_t),'A',owner);
 			if(_relativeAngle){
 				uint32_t status=0;
 				Msincoselement *sincoselement=decimalcontext->_firstSincoselement;
@@ -2115,7 +2115,7 @@ mpd_relative_angle_t* _getRelativeAngle(Mdecimalcontext const * const decimalcon
 		if(_intermediateResult){_intermediateResult->mpd=NULL;FREE_DECIMAL(_intermediateResult,owner);}
 		free_mpd(_deltaAngle1);free_mpd(_deltaAngle2);
 	}
-	return DISOWNED(_relativeAngle,owner);
+	return disowned_mpd_relative_angle(_relativeAngle,owner);
 }
 
 // MDH@12SEP2019: instead of first determining the rotations to do, and then doing them, we can immediately perform the rotation
@@ -2259,7 +2259,7 @@ Mdecimal* _dcordicsine(Mdecimalcontext const * decimalcontext,Mdecimal const * c
 								}else
 								if(amVerbose())outputInfo("Not negating the CORDIC sine!");
 								if(amVerbose()){
-									Mdecimal* _decimal=OWNED(__decimal(mpd_context,0,0),owner);
+									Mdecimal* _decimal=owned_decimal(__decimal(mpd_context,0,0),owner);
 									if(_decimal){
 										_decimal->mpd=_CORDICsine;
 										outputDecimal("CORDIC sine: '",_decimal,"'.\n");
@@ -2885,7 +2885,7 @@ Mdecimal* _dtangent(Mdecimalcontext const * decimalcontext,Mdecimal const * cons
 					// normalize x to the range [0,2*pi)
 					mpd_qdivmod(_xtemp,_xmod,(_absx?_absx:x->mpd),decimalcontext->pimul2,mpd_context,&status); // _xdiv is an integer number (sign)0,1,2,3,4,5,6,7,8,9,...
 					if(amVerbose()){
-						Mdecimal* _decimal=OWNED(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
+						Mdecimal* _decimal=owned_decimal(_getDecimal(get_mpd_copy(mpd_context,_xmod),mpd_context->prec,0,true),owner);
 						if(_decimal){outputDecimal("Normalized sine (abs) argument: '",_decimal,"'.\n");FREE_DECIMAL(_decimal,owner);}
 					}
 					// determine the quadrant by dividing the normalized x by pi/2
