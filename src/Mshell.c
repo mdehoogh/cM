@@ -1909,9 +1909,11 @@ Mvalue* pi_ql(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 					FREE_RATIONAL(_rational,owner);
 					return NULL;
 				} // multiply the numerator by 4 i.e. 2**2
-				normalizeRational(_rational,owner);
-				if(amVerbose())
-					outputRational("Normalized approximation of pi: ",_rational,".\n");
+				if(!normalizeRational(_rational,owner)){
+					output("%s",M_ERROR_PREFIX);
+					outputRational("Failed to normalize the rational approximation of pi ",_rational,".\n");
+				}else
+				if(amVerbose())outputRational("Normalized approximation of pi: ",_rational,".\n");
 				// if we get here _rational is the result to return
 				return _getValueOfRational(disowned_rational(_rational,owner));
 			}
@@ -5971,8 +5973,8 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	// NOT replacing:
 	// integer divisions are not computed but stored in rational format (without a delta to not suggest that the division is decimal)
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){ // both are integer
-		Mbiginteger* _numerator=OWNED(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
-		Mbiginteger* _denominator=OWNED(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
+		Mbiginteger* _numerator=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
+		Mbiginteger* _denominator=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		// if the denominator is negative, both the numerator and denominator should be negated (should this be part of the normalization procedure?), theoretically storing the sign separate from the big integers in a rational could also be the way to go
 		// so when the sign of the two big integers is different, the rational is negative, otherwise it is positive and _getRational would store the absolute values of the big integer
 		// if _getRational would take care of negating the numerator and denominator it would have to free the passed in big integers (if so requested)
@@ -6434,7 +6436,11 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 						outputError("Failed to double a rational");
 					}
 				}
-				if(_shiftleftRational){_shiftleftRational->normalized=false;normalizeRational(_shiftleftRational,owner);}
+				if(_shiftleftRational){
+					_shiftleftRational->normalized=false;
+					if(!normalizeRational(_shiftleftRational,owner))
+					{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize shift left rational ",_shiftleftRational,".\n");}
+				}
 			}else 
 				outputError("Failed to copy a rational");
 			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
@@ -6520,7 +6526,11 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 						outputError("Failed to double a rational");
 					}
 				}
-				if(_shiftrightRational){_shiftrightRational->normalized=false;normalizeRational(_shiftrightRational,owner);}
+				if(_shiftrightRational){
+					_shiftrightRational->normalized=false;
+					if(!normalizeRational(_shiftrightRational,owner))
+					{output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize shift right rational ",_shiftrightRational,".\n");}
+				}
 			}else 
 				outputError("Failed to copy a rational");
 			if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);

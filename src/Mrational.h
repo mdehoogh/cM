@@ -18,7 +18,7 @@ Mrational* __rational();
 void free_rational(Mrational* _rational/*,Mallocationowner owner*/);
 #define FREE_RATIONAL(_rational,owner_rational) free_rational(disowned_rational(_rational,owner_rational))
 
-void normalizeRational(Mrational * const _rational,Mallocationowner owner_rational);
+bool normalizeRational(Mrational * const _rational,Mallocationowner owner_rational);
 Mrational* _getRational(Mbiginteger const * const _numerator,Mbiginteger const * const _denominator,long double delta,bool normalize/*,bool freeonfailure*/);
 Mrational* _getInverseRational(Mrational const * const _rational);
 Mstring* _getRationalText(Mrational const * const _rational);

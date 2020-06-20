@@ -143,16 +143,16 @@ Mbiginteger* _getBiginteger(int64_t ll){Mallocationowner owner=getOwner(__LINE__
 }/* VALIDATED */
 
 // replace in due course by _getBigintegerNeg in Mbiginteger.c/h but that would require moving _getRational and some other functions as well from Mexecution.h/c
-Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* _bigintegerNeg=(_biginteger?owned_biginteger(__biginteger(),owner):NULL); // the result we will be returning
+Mbiginteger* _getBigintegerNeg(Mbiginteger const * const _biginteger){if(!_biginteger)return NULL;Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* _bigintegerNeg=(Mbiginteger*)owned_biginteger(__biginteger(),owner); // the result we will be returning
     if(!_bigintegerNeg)return NULL;
     if(mp_neg(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerNeg))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerNeg,owner); return NULL;}
     return disowned_biginteger(_bigintegerNeg,owner);
 }// VALIDATED
 
 // pass in NULL to _getBigIntegerCopy to get a big integer (initialized to zero)
-Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger){Mallocationowner owner=getOwner(__LINE__);
-    Mbiginteger* _bigintegerCopy=(_biginteger?(Mbiginteger*)owned_biginteger(__biginteger(),owner):NULL);
+Mbiginteger* _getBigintegerCopy(Mbiginteger const * const _biginteger){if(!_biginteger)return NULL;Mallocationowner owner=getOwner(__LINE__);
+    Mbiginteger* _bigintegerCopy=(Mbiginteger*)owned_biginteger(__biginteger(),owner);
     if(!_bigintegerCopy)return NULL;
     if(mp_copy(MP_INT_POINTER(_biginteger),MP_INT_POINTER(_bigintegerCopy))!=MP_OKAY){FREE_BIGINTEGER(_bigintegerCopy,owner);return NULL;}
     return disowned_biginteger(_bigintegerCopy,owner);
@@ -248,52 +248,42 @@ Mrational* _getLongDoubleRational(long double ld){
 // RELEASERS
 // however we can only NULL them if we have the address of the pointer)
 // but if these pointer are local to a function (which they will be typically if they are to be released in the first place) no NULLing is required!!!
-Mtext* owned_text(Mtext* _text,Mallocationowner owner_text){
-    if(!_text)return NULL;
-    return(Mtext*)OWNED(_text,owner_text);
-}
-Mtext* disowned_text(Mtext* _text,Mallocationowner owner_text){
-    if(!_text)return NULL;
-    return(Mtext*)DISOWNED(_text,owner_text);
-}
+Mtext* owned_text(Mtext* _text,Mallocationowner owner_text){return(_text?(Mtext*)OWNED(_text,owner_text):NULL);}
+Mtext* disowned_text(Mtext* _text,Mallocationowner owner_text){return(_text?(Mtext*)DISOWNED(_text,owner_text):NULL);}
 void free_text(Mtext* _text/*,Mallocationowner owner*/){
     // MDH@15NOV2019: text is now created using the _strdup() function which will manage the dynamic memory of the static text allocation
     // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
     //                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
     if(_text){
+        if(amVerboseDebugging())output("Freeing integer %c%s%c.\n",_text->presuffix,_text->_c,_text->presuffix);
         // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
         //                _text->_c is an array and yes strlen() can be applied to any char*
         //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
         FREE(_text,strlen(_text->_c)+sizeof(Mtext),-'"'/*,owner*/); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
         // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)FREE_STRING(_string->_m);_string->_m=NULL;free(_string);}
     }else
-    if(amVerboseDebugging())
-        outputInfo("No text to free!");
+    if(amVerboseDebugging())outputInfo("No text to free!");
 }/* VALIDATED */
 
-Minteger* owned_integer(Minteger* _integer,Mallocationowner owner_integer){return(Minteger*)OWNED(_integer,owner_integer);}
-Minteger* disowned_integer(Minteger* _integer,Mallocationowner owner_integer){return(Minteger*)DISOWNED(_integer,owner_integer);}
+Minteger* owned_integer(Minteger* _integer,Mallocationowner owner_integer){return(_integer?(Minteger*)OWNED(_integer,owner_integer):NULL);}
+Minteger* disowned_integer(Minteger* _integer,Mallocationowner owner_integer){return(_integer?(Minteger*)DISOWNED(_integer,owner_integer):NULL);}
 void free_integer(Minteger* _integer/*,Mallocationowner owner*/){
     if(_integer){
-        if(amVerboseDebugging())
-            output("Freeing integer %llu.\n",_integer->ll);
+        if(amVerboseDebugging())output("Freeing integer %llu.\n",_integer->ll);
         FREE_1(_integer,'I'/*,owner*/);
     }else
-    if(amVerboseDebugging())
-        outputInfo("No integer to free!");
+    if(amVerboseDebugging())outputInfo("No integer to free!");
 }/* VALIDATED */
 #define FREE_INTEGER(_integer,owner_integer) free_integer(disowned_integer(_integer,owner_integer))
 
-Mfloat* owned_float(Mfloat* _float,Mallocationowner owner_float){return OWNED(_float,owner_float);}
-Mfloat* disowned_float(Mfloat* _float,Mallocationowner owner_float){return DISOWNED(_float,owner_float);}
+Mfloat* owned_float(Mfloat* _float,Mallocationowner owner_float){return(_float?(Mfloat*)OWNED(_float,owner_float):NULL);}
+Mfloat* disowned_float(Mfloat* _float,Mallocationowner owner_float){return(_float?(Mfloat*)DISOWNED(_float,owner_float):NULL);}
 void free_float(Mfloat* _float/*,Mallocationowner owner*/){
     if(_float){
-        if(amVerboseDebugging())
-            output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
+        if(amVerboseDebugging())output("Freeing real %.*Lf.\n",LDBL_DIG,_float->ld);
         FREE_1(_float,'F'/*,owner*/);
     }else
-    if(amVerboseDebugging())
-        outputInfo("No real to free!");
+    if(amVerboseDebugging())outputInfo("No real to free!");
 }/* VALIDATED */
 #define FREE_FLOAT(_float,owner_float) free_float(disowned_float(_float,owner_float))
 

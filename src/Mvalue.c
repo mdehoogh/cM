@@ -2202,9 +2202,9 @@ Mbiginteger* _getRoundedRationalInteger(Mrational* _rational){Mallocationowner o
     // TODO ignores delta for now
     if(_rational){
         // denominator equal to 1?
-        if(!_rational->den||mp_cmp(MP_INT_POINTER(_rational->den),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return(Mbiginteger*)DISOWNED(OWNED(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1),owner),owner);
+        if(!_rational->den||mp_cmp(MP_INT_POINTER(_rational->den),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return disowned_biginteger(owned_biginteger(_rational->num?_getBigintegerCopy(_rational->num):_getBiginteger(1),owner),owner);
         // if the numerator equals 1, the result is 0
-        if(!_rational->num||mp_cmp(MP_INT_POINTER(_rational->num),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return DISOWNED(OWNED(_getBiginteger(0),owner),owner); // with the numerator at least equal to 2 the result will always be 0
+        if(!_rational->num||mp_cmp(MP_INT_POINTER(_rational->num),MP_INT_POINTER(getBigintegerOne()))==MP_EQ)return disowned_biginteger(owned_biginteger(_getBiginteger(0),owner),owner); // with the numerator at least equal to 2 the result will always be 0
         bool neg=mp_isneg(MP_INT_POINTER(_rational->num)); // determine whether negative or not
         // get the absolute value of the numerator
         Mbiginteger* _dividend=NULL;
