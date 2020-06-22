@@ -4657,7 +4657,7 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index)>0)
 			_listelement=_listelement->_next;
 	}else
-		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
+		_result=owned_list(_appliedToLists(_list,_value->value._list,binaryoperator),owner);
 	return _getValueOfList(disowned_list(_result,owner));
 }
 Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
@@ -4670,7 +4670,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index)>0)
 			_listelement=_listelement->_next;
 	}else
-		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
+		_result=owned_list(_appliedToLists(_value->value._list,_list,binaryoperator),owner);
 	return _getValueOfList(disowned_list(_result,owner));
 }
 
