@@ -195,6 +195,7 @@ Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
     return DISOWNED(_map,owner_map);
 }
 void free_map(Mmap* _map/*,Mallocationowner owner*/){
+    if(!_map)return;
     if(amVerboseDebugging())
         output("About to free a (%s) map with %llu attributes!\n",(_map->weak?"weak":"strong"),_map->numberOfElements);
     if(_map->_first){
@@ -2539,7 +2540,7 @@ Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=
         while(p&&_environment){
             if(string_length(p)>0)p=string_insert_char(p,0,'.');
             /////// printf("Prepending '%s'.\n",_environment->_name);
-            p=string_prepend(p,_environment->_name->chars);
+            if(_environment->_name)p=string_prepend(p,_environment->_name->chars);
             _environment=getEnvironmentParent(_environment); // MDH@03MAR2020 replacing: _environment->_parent;
         }
         if(!p){FREE_STRING(_environmentName,owner);_environmentName=NULL;}

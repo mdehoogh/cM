@@ -31,5 +31,15 @@ void free_token(Mtoken* _token/*,Mallocationowner owner*/){
 }
 
 Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
-    return disowned_token(CALLOC_1(sizeof(Mtoken),'O',owner),owner);
+    Mtoken* _token=CALLOC_1(sizeof(Mtoken),'O',owner);
+    _token->whitespaceCharacterCount=-1; // MDH@22JUN2020: or any other negative value to indicate an unfinished token
+    return disowned_token(_token,owner);
 }
+
+// MDH@22JUN2020: some special function to take care of (un)finishing tokens or checking whether they are (un)finished
+static bool canTokenFinish(Mtoken* _token){return(_token&&_token->whitespaceCharacterCount<0);}
+static bool canTokenUnfinish(Mtoken* _token){return(_token&&_token->whitespaceCharacterCount==0);}
+bool finishToken(Mtoken* _token){if(canTokenFinish(_token)){_token->whitespaceCharacterCount=0;return true;}return false;}
+bool unfinishToken(Mtoken* _token){if(canTokenUnfinish(_token)){_token->whitespaceCharacterCount=-1;return true;}return false;}
+bool isTokenFinished(Mtoken* _token){return(_token?_token->whitespaceCharacterCount>=0:false);}
+bool isTokenUnfinished(Mtoken* _token){return(_token?_token->whitespaceCharacterCount<0:false);}

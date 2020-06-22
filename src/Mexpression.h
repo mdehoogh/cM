@@ -144,10 +144,13 @@ typedef struct{
 	unsigned int subtype:4; // what subtype it is, i.e. the type of operator
 }TokenType;
 */
+// MDH@22JUN2022: how about keeping track of the x and y position of the start of the token??????
+// MDH@22JUN2022: TODO instead of keeping track of the total number of significant characters it would be better to keep track of the total number of whitespace at the end!!!!!!
 typedef struct Mtoken{
 	TokenType type; // actually the index into the TOKENTYPES array!!!
-	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
-	uint16_t offset; // number of characters in front of this token in the command
+	int16_t whitespaceCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
+	uint8_t start_line;uint16_t start_column; // MDH@22JUN2020: the position of the first character which depends on the maximum number of characters of the command window (and the wrapping mode)
+    uint16_t offset; // number of characters in front of this token in the command
 	Mstring* text; // NOTE this is not an Mtext, Mstring is mutable whereas Mtext is not!!!!
 	struct Mtoken* expr; // the expression this token is part of
 	struct Mtoken* prev; // we need this during user input
@@ -164,6 +167,13 @@ Mtoken* disowned_token(Mtoken* _token,Mallocationowner owner_token);
 void free_token(Mtoken* _token);
 #define FREE_TOKEN(_token,owner_token) free_token(disowned_token(_token,owner_token))
 
+// MDH@22JUN2020: some additional helpers for marking a token as finished or unfinished
+bool canFinishToken(Mtoken* _token);
+bool canUnfinishToken(Mtoken* _token);
+bool finishToken(Mtoken* _token);
+bool unfinishToken(Mtoken* _token);
+bool isTokenFinished(Mtoken* _token);
+bool isTokenUnfinished(Mtoken* _token);
 /* a list of Mexpressions holds the body of an M function
 typedef struct Mexpression{
     // a tokenized list of tokens, which means we have to move the definition of an Mtoken out of M.c to e.g. Mcommand or Mexpression even!!!
