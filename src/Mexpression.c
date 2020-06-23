@@ -1,10 +1,12 @@
 #include "Mexpression.h"
 
+#include <limit.h>
+
 static uint16_t const MODULE_ID=7;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
 
 extern char const * const M_ERROR_PREFIX;
-
+extern char const * const M_BUG_PREFIX;
 
 // MDH@11JUN2020: always call free_token on disowned tokens
 Mtoken* owned_token(Mtoken* _token,Mallocationowner owner_token){
@@ -32,4 +34,20 @@ void free_token(Mtoken* _token/*,Mallocationowner owner*/){
 
 Mtoken* __token(){Mallocationowner owner=getOwner(__LINE__);
     return disowned_token(CALLOC_1(sizeof(Mtoken),'O',owner),owner);
+}
+
+// MDH@23JUN2020: we might want to change the way we store the number of significant token characters in the future
+//                will return a negative value if _token is undefined
+size_t getTokenSignificantCharacterCount(Mtoken const * const token){
+    if(token)return token->significantCharacterCount;
+    output("%sCan't return the number of significant characters of an undefined token.\n",M_BUG_PREFIX);
+    return SIZE_T_MAX; // which is the best value to return to indicate invalid input
+}
+bool setTokenSignificantCharacterCount(Mtoken * const token,size_t significantCharacterCount){
+    if(token){
+        token->significantCharacterCount=significantCharacterCount;
+        return(token->significantCharacterCount==significantCharacterCount);
+    }
+    output("%sCan't set the number of significant characters of an undefined token.\n",M_BUG_PREFIX);
+    return false;
 }
