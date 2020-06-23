@@ -1686,6 +1686,9 @@ void unfinishCommandToken(Mtoken* commandToken){
 	// for all non-unary token that we are in now that is finished, unfinish 
 	// TODO there are other one-character tokens
 	// TODO is the test string_length(commandToken->text)==getTokenSignificantCharacterCount(commandToken) always correct?
+	//      NOTE I think it is because if that is the case there is no whitespace at the end of the token and we
+	//           should unfinish the token so we can append to it again
+	//           also 'one character' token types are always finished immediately, so we should not unfinish those!!!
 	if(commandToken)
 		if(!isOneCharacterTokenType(commandToken->type)) // not a unary operator (of length 1) we ended up in
 			if(string_length(commandToken->text)==getTokenSignificantCharacterCount(commandToken)) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
