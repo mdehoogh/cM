@@ -299,10 +299,10 @@ static void outputCommandInfo(Mcommand* command){
 	// tokens
 	Mtoken* token=command->_firstToken;
 	uint16_t tokenIndex=0;
-	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","BLANKS","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
+	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,token->whitespaceCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
 		if(token->expr)
 			output("\n%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
 		else
@@ -884,7 +884,7 @@ int8_t containsVariable(Menvironment const * const _environment,char /*const*/ *
 // MDH@11MAR2020: Ok, need to be careful here
 void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	Mtoken* functionToken=command->_lastToken;
-	char* _identifierName=_stringstartwithout(functionToken->text,functionToken->whitespaceCharacterCount); // free asap //MDH@22JUN2020: switching to removing whitespace characters
+	char* _identifierName=_stringstart(functionToken->text,functionToken->significantCharacterCount); // free asap
 	// MDH@07AUG2019: here we also need to exclude explicit local variables (with argument equal to 1) as possibly existing i.e. those variables are always non-existing so they will get created in the function call execution environment!!!
 	if(functionToken->argument==1)
 		functionToken->type=TT_NEW_VARIABLE;
@@ -993,11 +993,6 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				break;
 		}
 
-		// MDH@22JUN2020: now we switched from significantCharacterCount to whitespaceCharacterCount it's better to do this
-		// MDH@22JUN2020: should map to 0 when the whitespaceCharacterCount is negative!!!
-		size_t lastCommandTokenSignificantCharacterCount=
-				(lastCommandToken->whitespaceCharacterCount<0?-0:string_length(lastCommandToken->text)-lastCommandToken->whitespaceCharacterCount);
-
 		/////if(amDebugging())(*inputInfoFunction)("C");
 		// TODO just like unary operators expressions, maps and list end immediately
 		// some combinations are (still) not allowed...
@@ -1008,7 +1003,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			   MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
 			*/
 			if(newTokenType==lastCommandToken->type){
-				if(lastCommandTokenSignificantCharacterCount>0){
+				if(lastCommandToken->significantCharacterCount>0){
 					// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
 					// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
 					if(lastCommandToken->type!=TT_LIST&&lastCommandToken->type!=TT_FUNCTION_CALL&&lastCommandToken->type!=TT_UNARY&&lastCommandToken->type!=TT_TERNARY_aeru&&lastCommandToken->type!=TT_LISTELEMENT&&lastCommandToken->type!=TT_END_OF_FUNCTION_CALL&&lastCommandToken->type!=TT_END_OF_MAP&&lastCommandToken->type!=TT_END_OF_LIST){
@@ -1018,7 +1013,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				}else{ // MDH@25MAR2020: a property cannot contain a 'dot' (period) other than at the first position
 					// 'finishing' a token forces creating a new one below
 					if(newTokenType==TT_PROPERTY&&inputChar==M_PROPERTY_SEPARATOR_CHARACTER)
-						if(lastCommandTokenSignificantCharacterCount==0)lastCommandToken->whitespaceCharacterCount=0; // MDH@22JUN2020: significant... to whitespace...
+						if(lastCommandToken->significantCharacterCount==0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 				}
 			}
 		}else{ // different token types
@@ -1030,7 +1025,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			}else{
 				// MDH@26MAR2020: TODO check whether this should be done elsewhere???
 				if(newTokenType==TT_PROPERTY&&lastCommandToken->type==TT_FUNCTION){
-					if(lastCommandTokenSignificantCharacterCount==0)lastCommandToken->whitespaceCharacterCount=0; // MDH@22JUN2020: same here
+					if(lastCommandToken->significantCharacterCount==0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 					changeFunctionTokenToAVariable(command,true);
 				}
 			}
@@ -1042,7 +1037,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 		if(newTokenType<0){
 
 		}else
-		if(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||lastCommandTokenSignificantCharacterCount>0){
+		if(newTokenType!=lastCommandToken->type||lastCommandToken->type==TT_EXPRESSION||lastCommandToken->significantCharacterCount>0){
 			///////////if(amVerbose())outputInfo("!");/////(*inputInfoFunction)("New token!");
 			// MDH@10APR2019: NOT every new token type starts a new token:
 			//                if we're in a binary operator and move to another binary operator type it's an extension
@@ -1165,9 +1160,9 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			// MDH@27MAY2019: a lot of tokens are one-character tokens
 	
 			// MDH@15APR2019: there are some other characters as well, that immediately end the token like parentheses, comma's and semicolons and ? and : TODO are there more??????
-			if(lastCommandTokenSignificantCharacterCount==0){
+			if(lastCommandToken->significantCharacterCount==0){
 				if(isOneCharacterTokenType(lastCommandToken->type)){
-					lastCommandToken->whitespaceCharacterCount=string_length(lastCommandToken->text)-1; // MDH@22JUN2020: leaving a single token character at the start that is significant
+					lastCommandToken->significantCharacterCount=1;
 					////////bool initializationsChanged=false;
 					// MDH@06AUG2019: these are also the tokens we need to recognize for keeping track of the initialized variables (and the level)
 					switch(lastCommandToken->type){
@@ -1245,11 +1240,8 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			/////if(amDebugging())(*inputInfoFunction)("H");
 		}
 	}else{ // a functional whitespace character, ends a current token!!
-		// MDH@22JUN2020 TODO: it is really necessary to exclude expressions?????
-		if(lastCommandToken->type!=TT_EXPRESSION){ // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
-			if(lastCommandToken->whitespaceCharacterCount<0)lastCommandToken->whitespaceCharacterCount=0; // MDH@22JUN2020: i.e. if not finished yet, it definitely is now i.e. it is a prerequisite for incrementing 
-			lastCommandToken->whitespaceCharacterCount++; // MDH@22JUN2020: instead
-		}
+		if(lastCommandToken->significantCharacterCount==0&&lastCommandToken->type!=TT_EXPRESSION) // MDH@22MAR2019: first whitespace character in a non-whitespace token ends the current token (but should never change its type (see NO_TRANSITIONS))
+			lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 		if(inputChar==' ')inputChar=M_WHITESPACE_CHARACTER; // MDH@31OCT2019: so we can make the blanks visible!!
 	}
 	/////if(amDebugging())(*inputInfoFunction)("I");
@@ -1257,7 +1249,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 	string_append_char(lastCommandToken->text,inputChar);
 	/////if(amDebugging())(*inputInfoFunction)("J");
 
-	if(newTokenType<0)lastCommandToken->whitespaceCharacterCount=0; // MDH@22JUN2020 replacing: significantCharacterCount=string_length(lastCommandToken->text);
+	if(newTokenType<0)lastCommandToken->significantCharacterCount=string_length(lastCommandToken->text);
 
 	return lastCommandToken;
 
@@ -1291,7 +1283,6 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 			}
 			if(amVerbose())outputInfo("'.");
 			if(_evalCommand->_lastToken){
-				if(_evalCommand->_lastToken->whitespaceCharacterCount<0)_evalCommand->_lastToken->whitespaceCharacterCount=0; // MDH@22JUN2020: finish the last token in the command
 				// just like with do() we have to evaluate the command in a subenvironment
 				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
 				if(_evalEnvironment){
@@ -1356,12 +1347,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 		if(prevToken){
 			// finish the previous token
 			prevToken->next=pNewToken; // how could I forget about doing this (and checking whether prevToken is not NULL!)!!
-			// MDH@22JUN2020: by switching from significant... to whitespace... and knowing that whitespace... is always initialized to 0 we know the following is no longer required
-			//                CORRECTION whitespaceCharacterCount is initialized to -1 and 0 indicates that the token is finished and this means that we should do that here
-			if(prevToken->whitespaceCharacterCount<0)prevToken->whitespaceCharacterCount=0; // i.e. mark the previous token as finished if it is not already...
-			/* replacing:
 			if(!prevToken->significantCharacterCount)prevToken->significantCharacterCount=string_length(prevToken->text); // MDH@22MAR2019: if the token character length is NOT set, set it now...
-			*/
 			// initialize the new token
 			pNewToken->prev=prevToken; // set the predecessor
 			/////if(amDebugging())inputInfo("E2");
@@ -1430,7 +1416,7 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 			if(prevToken->type==TT_FUNCTION){ // a function identifier that we can point to (although perhaps we should not do that?) TODO shouldn't we test whether the new token type is TT_FUNCTION_CALL instead??????
 				pNewToken->prevIdentifier=prevToken;
 				// what should now be the argument value? this depends on the name of the function
-				char* _functionName=_stringstartwithout(prevToken->text,prevToken->whitespaceCharacterCount); // free asap
+				char* _functionName=_stringstart(prevToken->text,prevToken->significantCharacterCount); // free asap
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
 				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
 				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME)||!strcmp(_functionName,DEFINEANONYMOUSFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;else pNewToken->argument=-2;
@@ -2821,7 +2807,7 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner
 			if(_token->expr)output("\tpointing to token '%s' of type '%s'.\n",string(_token->expr->text),TOKENTYPE_STRING[_token->expr->type]);
 		}
 		_tokenCopy->type=_token->type;
-		_tokenCopy->whitespaceCharacterCount=_token->whitespaceCharacterCount; // MDH@22JUN2020: significant... to whitespace...
+		_tokenCopy->significantCharacterCount=_token->significantCharacterCount;
 		if(_token->text)_tokenCopy->text=owned_string(_stringCopy(_token->text,0),Msubowner(owner,1));
 		_tokenCopy->expr=_token->expr; // TODO do I need to do this??? this is also an issue because if we start comparing expr (on evaluation)
 		_tokenCopy->argument=_token->argument; // MDH@11AUG2019: we need the argument as well bro' TODO how about the envid?????
@@ -4049,19 +4035,17 @@ bool isOneCharacterTokenType(uint8_t tokenType){
 }
 
 static size_t outputToken(Mtoken* _token){
-	// MDH@22JUN2020: with significant... replaced by whitespace... we need a helper variable that stores the number of significant characters, so we can keep as much of the original code 'intact'
 	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
 	if(numberOfCharactersToOutput>0){
-		size_t tokenSignificantCharacterCount=numberOfCharactersToOutput-_token->whitespaceCharacterCount; // MDH@22JUN2020: helper representing the number of used characters
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
 		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
-		char firstWhitespaceCharacter=(tokenSignificantCharacterCount>0?string_replacedchar(_token->text,'\0',tokenSignificantCharacterCount):'\0');
+		char firstWhitespaceCharacter=(_token->significantCharacterCount>0?string_replacedchar(_token->text,'\0',_token->significantCharacterCount):'\0');
 		// if we allow comments in tokens we're in trouble!!!
 		output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
 		// if there's whitespace text to start with write it in the default output color
 		if(firstWhitespaceCharacter){ // some whitespace left to write
-			string_setchar(_token->text,firstWhitespaceCharacter,tokenSignificantCharacterCount);
-			output("%s",string_remainder(_token->text,tokenSignificantCharacterCount));
+			string_setchar(_token->text,firstWhitespaceCharacter,_token->significantCharacterCount);
+			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
 		}
 	}
 	return numberOfCharactersToOutput;
@@ -4124,7 +4108,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 		//                alternatively: we can determine the initial value reference and check afterwards
 		//                we can start with making the theoretic indexing possibility
 		bool canbeindexedtheoretically=false; // this should have the same result as the tokenizer does
-		char* _significantTokenText=_stringstartwithout(expressionToken->text,expressionToken->whitespaceCharacterCount); // MDH@22JUN2020: significant... to whitespace...
+		char* _significantTokenText=_stringstart(expressionToken->text,expressionToken->significantCharacterCount);
 		switch(expressionToken->type){
 			case TT_FUNCTION:
 				{
@@ -4346,7 +4330,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// OOPS do NOT add a '0' character to the token itself (as this would go wrong showing the tokens) TODO check why this goes wrong!!!
 					Mstring* pRealText=_realText;
 					if(pRealText){
-						char* _realSignificantTokenText=_stringstartwithout(expressionToken->text,expressionToken->whitespaceCharacterCount); // free asap // MDH@22JUN2020: significant... to whitespace...
+						char* _realSignificantTokenText=_stringstart(expressionToken->text,expressionToken->significantCharacterCount); // free asap
 						if(amVerboseDebugging())output("Integer part of decimal text: '%s'.\n",string(pRealText));
 						pRealText=string_append(pRealText,_realSignificantTokenText);
 						if(amVerboseDebugging())
@@ -4494,7 +4478,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// indexListValue will be removed by the garbage collector
 				}else{ // a property name (starting with M_PROPERTY_SEPARATOR_CHARACTER)
 					// we have to wrap the property name inside a value as text
-					Mstring* _propertyName=owned_string(_stringWithout(expressionToken->text,expressionToken->whitespaceCharacterCount),owner); // MDH@22JUN2020: significant... to whitespace...
+					Mstring* _propertyName=owned_string(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),owner);
 					if(_propertyName){
 						if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 							Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
@@ -4657,7 +4641,7 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index)>0)
 			_listelement=_listelement->_next;
 	}else
-		_result=owned_list(_appliedToLists(_list,_value->value._list,binaryoperator),owner);
+		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
 	return _getValueOfList(disowned_list(_result,owner));
 }
 Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
@@ -4670,7 +4654,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index)>0)
 			_listelement=_listelement->_next;
 	}else
-		_result=owned_list(_appliedToLists(_value->value._list,_list,binaryoperator),owner);
+		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
 	return _getValueOfList(disowned_list(_result,owner));
 }
 
@@ -7310,8 +7294,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				if(amVerboseDebugging())outputInfo(" NO");
 
 				if(amVerboseDebugging())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
-				// MDH@12JUL2019: 'remove' non-significant characters // MDH@22JUN2020: now whitespace characters
-				_formulaelement->_operator=owned_string(_stringWithout(expressionToken->text,expressionToken->whitespaceCharacterCount),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
+				// MDH@12JUL2019: 'remove' non-significant characters
+				_formulaelement->_operator=owned_string(_stringCopy(expressionToken->text,expressionToken->significantCharacterCount),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
 				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
 				// MDH@12JUL2019 no need for this anymore: string_setlength(_formulaelement->_operator,expressionToken->significantCharacterCount); // cut off the nonsignificant stuff
 				// append any other binary operator behind it (like a continuation or assignment operator)

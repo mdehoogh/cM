@@ -24,7 +24,6 @@ typedef struct{
 Mstring* disowned_string(Mstring* str,Mallocationowner owner_str);
 Mstring* owned_string(Mstring* str,Mallocationowner owner_str);
 
-// NOTE functions that start with an underscore (_) return a pointer that is the responsibility of the caller to free
 Mstring* __string();
 Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/); // changed from string_dispose() to free_mstring() to be more compatible with the other free methods (see Mexecution.h/c)
 
@@ -34,8 +33,7 @@ Mstring* free_string(Mstring* str/*,Mallocationowner owner_str*/); // changed fr
 // functions that create new string instances (and therefore start with _)
 Mstring* _getString(char const * const s); // convenient constructor
 // copying
-Mstring* _stringCopy(Mstring const * const src,size_t length);
-Mstring* _stringWithout(Mstring const * const str,size_t length); // MDH@22JUN2020: does not return length characters at the end of the string
+Mstring* _stringCopy(Mstring * const src,size_t length);
 
 bool string_empty(Mstring const * const str);
 
@@ -50,7 +48,6 @@ char* string_remainder(Mstring * const str,size_t pos);
 char* string(Mstring * const str);
 
 char* _stringstart(Mstring const * const str,size_t length); // returns a copy of the first part of the string
-char* _stringstartwithout(Mstring const * const str,size_t length); // removing length characters from the end of the string
 
 bool string_shorten(Mstring * const str,size_t length);
 

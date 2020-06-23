@@ -86,14 +86,12 @@ static size_t getSizeOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_SIZE*
 static size_t getNumberOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_CHARACTERS*str->blocks:0);}
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
-Mstring* _stringCopy(Mstring const * const str,size_t length){Mallocationowner owner=getOwner(__LINE__);
-    if(!str)return NULL;
-    if(str->length==0||length==0)return __string(); // MDH@22JUN2020: it's obvious that if either length or str->length equals zero the returned string should be empty and there's no need to do anything with `str`
+Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=getOwner(__LINE__);
+    if(!src)return NULL;
     // MDH@17APR2020: replacing src->chars by src->_chars->chars
-    str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    Mstring* _result=owned_string(_getString(str->_chars->chars),owner);
-    if(!_result)return NULL;
-    string_setlength(_result,length);
+    src->_chars->chars[src->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
+    Mstring* _result=owned_string(_getString(src->_chars->chars),owner);
+    if(length>0)if(_result)string_setlength(_result,length);
     return disowned_string(_result,owner);
     /* replacing:
     Mstring* dst=__string();
@@ -113,17 +111,6 @@ Mstring* _stringCopy(Mstring const * const str,size_t length){Mallocationowner o
     }
     return dst;
     */
-}
-
-// MDH@22JUN2020: if we want everything but the last `length` characters (copied and adjusted from _stringCopy)
-Mstring* _stringWithout(Mstring const * const str,size_t length){Mallocationowner owner=getOwner(__LINE__);
-    if(!str)return NULL;
-    if(length>=str->length)return __string(); // let's be lenient if length is larger than str->length NOTE if str->length equals 0 this will always be the case
-    str->_chars->chars[str->length]='\0'; // MDH@21JUN2019: mark the end of the text in the source (OOPS we would be in trouble otherwise)
-    Mstring* _result=owned_string(_getString(str->_chars->chars),owner); // an exact copy of all the characters in str
-    if(!_result)return NULL; // out of memory
-    if(length>0)string_setlength(_result,str->length-length); // cutting off length characters at the end
-    return disowned_string(_result,owner);
 }
 
 Mstring* disowned_string(Mstring* _str,Mallocationowner owner_str){
@@ -353,7 +340,7 @@ Mstring* string_append_char(Mstring* const str/*,Mallocationowner owner_str*/,ch
 }
 
 // MDH@12JUL2019: we can set a specific char which should only fail if pos is larger than the length
-Mstring* string_setchar(Mstring * const str,char c,size_t pos){
+Mstring* string_setchar(Mstring* const str,char c,size_t pos){
     if(!str)return NULL;
     if(pos>=str->length)return NULL;
     str->_chars->chars[pos]=c; // MDH@17APR2020 inserting ->_chars
@@ -361,27 +348,14 @@ Mstring* string_setchar(Mstring * const str,char c,size_t pos){
     if(c=='\0')str->length=pos;
     return str;
 }
-char* _stringstart(Mstring const * const str,size_t length){
+char* _stringstart(const Mstring* const str,size_t length){
     if(!str)return NULL;
     // MDH@17APR2020 inserting ->_chars
     str->_chars->chars[str->length]='\0'; // mark the end of the string
     char* _result=strdup(str->_chars->chars); // create a copy of the entire string // MDH@02MAY2020 TODO should we return an Mchars* instead???????
-    if(!_result)return NULL;
-    if(/*length>0&&*/length<str->length)
-    _result[length]='\0'; // 'cut off' the part we don't want!!
+    if(_result)if(length>0&&length<str->length)_result[length]='\0'; // 'cut off' the part we don't want!!
     return _result;
 }
-// MDH@22JUN2020: cutting of length characters at the end
-char* _stringstartwithout(Mstring const * const str,size_t length){
-    if(!str)return NULL;
-    // MDH@17APR2020 inserting ->_chars
-    str->_chars->chars[str->length]='\0'; // mark the end of the string
-    char* _result=strdup(str->_chars->chars); // create a copy of the entire string // MDH@02MAY2020 TODO should we return an Mchars* instead???????
-    if(!_result)return NULL;
-    // testing also takes an effort: if(length>0&&str->length>0) // if length is zero no characters to cut off, if str->length is zero also no change to the length
-    if(length<str->length)_result[str->length-length]='\0';else *_result='\0'; // get the right length
-    return _result;
-}/* NOT CHECKED */
 
 // MDH@24SEP2019: same as string_append but stopping when count characters were appended!!!
 //                changed it as little as possible by breaking out of the while as soon as the number of appended characters (index) exceeds count!!!!

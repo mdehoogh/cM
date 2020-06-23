@@ -46,8 +46,7 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
-char const * const M_BUILD="4";char const * const M_DATE="22 June 2020"; // dealing with command line wrapping issues
-//char const * const M_BUILD="3";char const * const M_DATE="17 June 2020"; // ownership bug fixing
+char const * const M_BUILD="3";char const * const M_DATE="17 June 2020";
 //char const * const M_BUILD="2";char const * const M_DATE="25 May 2020";
 //char const * const M_BUILD="1";char const * const M_DATE="22 May 2020";
 
@@ -147,10 +146,10 @@ static void outputCommandInfo(Mcommand* command){
 	// tokens
 	Mtoken* token=command->_firstToken;
 	uint16_t tokenIndex=0;
-	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","BLANKS","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
+	output("%s:\n%s\t%s\t%s\t%s\t%s\t%s\t%s\t\t\t%s\n","Tokens","#","OFFSET","USED","LENGTH","ARG","ENV DEPTH/INDEX","TYPE","TEXT");
 	while(token!=NULL){
 		tokenIndex++;
-		output("%u\t%u\t%i\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,token->whitespaceCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
+		output("%u\t%u\t%u\t%u\t%" PRId32 "\t%x/%x\t\t%-24s`%s`",tokenIndex,token->offset,token->significantCharacterCount,string_length(token->text),token->argument,(token->envid&15),(token->envid>>4),TOKENTYPE_STRING[token->type],string(token->text));
 		if(token->expr)
 			output("\n%s\t%u\t%s\t%s\t%-24s\n"," part of",token->expr->offset,"","",TOKENTYPE_STRING[token->expr->type]);
 		else
@@ -1171,18 +1170,17 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 static size_t outputToken(Mtoken* _token){
 	size_t numberOfCharactersToOutput=(_token&&_token->text?string_length(_token->text):0);
 	if(numberOfCharactersToOutput>0){
-		size_t tokenSignificantCharacterCount=numberOfCharactersToOutput-_token->whitespaceCharacterCount; // MDH@22JUN2020: significant... to whitespace... helper variable
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
 		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
-		char firstWhitespaceCharacter=(tokenSignificantCharacterCount>0?string_replacedchar(_token->text,'\0',tokenSignificantCharacterCount):'\0');
+		char firstWhitespaceCharacter=(_token->significantCharacterCount>0?string_replacedchar(_token->text,'\0',_token->significantCharacterCount):'\0');
 		// if we allow comments in tokens we're in trouble!!!
 		outputTokenColor(_token);
 		output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
 		// if there's whitespace text to start with write it in the default output color
 		if(firstWhitespaceCharacter){ // some whitespace left to write
-			string_setchar(_token->text,firstWhitespaceCharacter,tokenSignificantCharacterCount);
+			string_setchar(_token->text,firstWhitespaceCharacter,_token->significantCharacterCount);
 			resetOutputColor();
-			output("%s",string_remainder(_token->text,tokenSignificantCharacterCount));
+			output("%s",string_remainder(_token->text,_token->significantCharacterCount));
 		}
 		resetOutputColor();
 	}
@@ -1557,13 +1555,12 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 		while(commandToken){
 			// if we bump into a comment we're done!!!
 			if(commandToken->type==TT_COMMENT)break;
-			size_t commandTokenSignificantCharacterCount=string_length(commandToken->text)-commandToken->whitespaceCharacterCount;  // MDH@22JUN2020: significant... to whitespace... helper variable
 			// TODO there must be a better way to do the coloring!!!
 			if(color){string_append(_commandText,ES"38;5;");string_append(_commandText,getTokenColor(commandToken->type));string_append_char(_commandText,'m');} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
 			// MDH@31OCT2019: for now decided NOT to show the whitespace inside the tokens (by replacing the first whitespace character with the end-of-string marker)
-			char firstWhitespaceTokenCharacter=(commandTokenSignificantCharacterCount>0?string_replacedchar(commandToken->text,'\0',commandTokenSignificantCharacterCount):'\0');
+			char firstWhitespaceTokenCharacter=(commandToken->significantCharacterCount>0?string_replacedchar(commandToken->text,'\0',commandToken->significantCharacterCount):'\0');
 			string_append(_commandText,string(commandToken->text));
-			if(firstWhitespaceTokenCharacter)string_setchar(commandToken->text,firstWhitespaceTokenCharacter,commandTokenSignificantCharacterCount); // put first whitespace character (if any) back
+			if(firstWhitespaceTokenCharacter)string_setchar(commandToken->text,firstWhitespaceTokenCharacter,commandToken->significantCharacterCount); // put first whitespace character (if any) back
 			// MDH@03MAY2019: place an asterisk in front of the type to indicate that expr is NOT null!!
 			if(amAssisting()){
 				if(color){string_append(_commandText,ES"38;5;");string_append(_commandText,getInfoColor());string_append_char(_commandText,'m');}
@@ -1682,19 +1679,16 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 	resetOutputColor();
 	return written;
 }
-// MDH@22JUN2020: name changed to unfinishCommandToken as it calls unfinishToken() in Mexpression.c/h
-void unfinishCommandToken(Mtoken* lastCommandToken){
+
+void unfinishToken(Mtoken* lastCommandToken){
 	// MDH@03SEP2019: adjusted so that not only the unary operators are left finished but all one character token types (which are the only tokens that are immediately finished once a single character is entered!!)
 	//                NOTE unfinishing of the current token is done so that the token can be continued, so technically we should unfinish all tokens that can be continued after a character is removed from them
 	// for all non-unary token that we are in now that is finished, unfinish 
 	// TODO there are other one-character tokens
 	if(lastCommandToken)
 		if(!isOneCharacterTokenType(lastCommandToken->type)) // not a unary operator (of length 1) we ended up in
-			unfinishToken(lastCommandToken);
-			/* replacing: 
 			if(string_length(lastCommandToken->text)==lastCommandToken->significantCharacterCount) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
 				lastCommandToken->significantCharacterCount=0;
-			*/
 }
 
 // void outputCommandInfo(Mcommand* command);
@@ -1736,15 +1730,11 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		// MDH@20FEB2020: this is what we did in isAValidCommand() before, but removed from it: if the command ends with an error, we remove the error token, unfinish the (new) last token, so we can re-use it
 		if(_userInputCommand&&_userInputCommand->_lastToken&&_userInputCommand->_lastToken->type==TT_ERROR){
 			removeLastUserInputCommandToken();
-			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishCommandToken(_userInputCommand->_lastToken);
+			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishToken(_userInputCommand->_lastToken);
 		}
 		//output("%sInvalid command indicator: %d.\n",M_ERROR_PREFIX,aValidCommandIndicator);
 		return false;
 	}
-	
-	if(_userInputCommand->_lastToken->whitespaceCharacterCount<0)_userInputCommand->_lastToken->whitespaceCharacterCount=0; // MDH@22JUN2020: finish the last token BEFORE trying to evaluate it
-	
-	if(amVerbose())outputCommandInfo(_userInputCommand);
 
 	allocationMarksAdded=0;
 	if(amVerbose()){
@@ -2249,9 +2239,9 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 			_newUserInputCommand->_lastToken->expr=NULL;
 		// replacing: _newUserInputCommand->_lastToken->expr=_tokenToCopy->expr; // MDH@20MAY2019: just copy the expr over!!!!
 		
-		_newUserInputCommand->_lastToken->whitespaceCharacterCount=_tokenToCopy->whitespaceCharacterCount; // MDH@22JUN2020: replacing: =_tokenToCopy->significantCharacterCount;
+		_newUserInputCommand->_lastToken->significantCharacterCount=_tokenToCopy->significantCharacterCount;
 		// if failing to copy the text over get rid of the command constructed so far, and break
-		_newUserInputCommand->_lastToken->text=owned_string(_stringWithout(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over // MDH@22JUN2020: _stringCopy replaced by _stringWithout
+		_newUserInputCommand->_lastToken->text=owned_string(_stringCopy(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over
 		if(!_newUserInputCommand->_lastToken->text){_newUserInputCommand->_lastToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
 		// MDH@24APR2019 obsolete: getCommandLength()+=string_length(_userInputCommand->_lastToken->text);
 		// some additional fields to copy over (NOT the offset is that is set automatically)
@@ -2335,7 +2325,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 	// what about properties????? properties should NEVER be considered functions
 	if(lastCommandToken->type!=TT_VARIABLE&&lastCommandToken->type!=TT_NEW_VARIABLE&&lastCommandToken->type!=TT_FUNCTION)return false;
 	// non-existing variables should be assigned to so it's a good idea to put the assignment operator behind it, although it might be hard to remove it though
-	char* _identifierName=_stringstartwithout(lastCommandToken->text,lastCommandToken->whitespaceCharacterCount); // free asap
+	char* _identifierName=_stringstart(lastCommandToken->text,lastCommandToken->significantCharacterCount); // free asap
 	if(lastCommandToken->type!=TT_FUNCTION){ // is it a function (now)?
 		if(getFunction(getExecutionEnvironment(),_identifierName)){ // yes, it is
 			// if a new variable before (now a function), remove the (assignment) character in the behind cursor text
@@ -2521,7 +2511,7 @@ char removedTokenCharacter(bool endOfInput){
 #ifdef __DEBUG__
 			outputChar(tokenCharacterRemoved);
 #endif
-		if(tokenCharacterRemoved){ // a token was removed
+		if(tokenCharacterRemoved){
 			if(endOfInput){
 				// MDH@30OCT2019: with multiline user input it sometimes is a little harder than calling moveCursorLeft(1)
 				//                if the offset of the current user input line is beyond the total command length apparently we've 'removed' the last command character on the previous line
@@ -2532,15 +2522,10 @@ char removedTokenCharacter(bool endOfInput){
 				}else
 					moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
 			}
-
-			// MDH@22JUN2020: if the character we removed from the token is a whitespace (and thus whitespaceCharacterCount is )
-			//                NOTE whitespaceCharacterCount starts at -1 (when the token is unfinished)
-			if(_userInputCommand->_lastToken->whitespaceCharacterCount>0)_userInputCommand->_lastToken->whitespaceCharacterCount--;
-
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//                HOWEVER we're assuming that we're dealing with an end of input situation
 			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)?removeLastUserInputCommandToken():false);
-			unfinishCommandToken(_userInputCommand->_lastToken); // we need to do this to allow appending characters to the token again
+			unfinishToken(_userInputCommand->_lastToken); // we need to do this to allow appending characters to the token again
 			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,endOfInput);
 		}
 	}else
@@ -2636,7 +2621,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 		outputUserInputCommandTokenColor();
 	}else{
 		// MDH@31OCT2019: show whitespace in the standard info color!!
-		if(_userInputCommand->_lastToken->whitespaceCharacterCount==0){ // MDH@22JUN2020: if whitespace character count is zero, the token is finished!!!!
+		if(_userInputCommand->_lastToken->significantCharacterCount>0){
 			resetOutputColor();
 			if(*inputCharacterType=='W'&&inputChar==M_NEWLINE_CHARACTER)*inputCharacterType=' '; // convert the newlinecharacter (which type should be W to the blank)
 		}
@@ -4080,7 +4065,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand&&_userInputCommand->_firstToken){ // technically something to evaluate
-					// MDH@22JUN2020 moved over to evaluateCommand() after finishing the last token: if(amVerbose())outputCommandInfo(_userInputCommand);
+					if(amVerbose())outputCommandInfo(_userInputCommand);
 					// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 					Mvalue* userInputCommandResultValue=NULL;
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
