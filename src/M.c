@@ -1172,7 +1172,7 @@ static size_t outputToken(Mtoken* _token){
 	if(numberOfCharactersToOutput>0){
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
 		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
-		char firstWhitespaceCharacter=(getTokenSignificantCharacterCount(_token)>0?string_replacedchar(_token->text,'\0',getTokenSignificantCharacterCount(_token)):'\0');
+		char firstWhitespaceCharacter=(isTokenFinished(_token)?string_replacedchar(_token->text,'\0',getTokenSignificantCharacterCount(_token)):'\0');
 		// if we allow comments in tokens we're in trouble!!!
 		outputTokenColor(_token);
 		output("%s",string(_token->text)); // although string() will write the '\0' at the end we've already written one in front of that position
@@ -1558,7 +1558,7 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 			// TODO there must be a better way to do the coloring!!!
 			if(color){string_append(_commandText,ES"38;5;");string_append(_commandText,getTokenColor(commandToken->type));string_append_char(_commandText,'m');} // assuming the same back color is used on ALL tokens, so we won't have to pass that along
 			// MDH@31OCT2019: for now decided NOT to show the whitespace inside the tokens (by replacing the first whitespace character with the end-of-string marker)
-			char firstWhitespaceTokenCharacter=(getTokenSignificantCharacterCount(commandToken)>0?string_replacedchar(commandToken->text,'\0',getTokenSignificantCharacterCount(commandToken)):'\0');
+			char firstWhitespaceTokenCharacter=(isTokenFinished(commandToken)?string_replacedchar(commandToken->text,'\0',getTokenSignificantCharacterCount(commandToken)):'\0');
 			string_append(_commandText,string(commandToken->text));
 			if(firstWhitespaceTokenCharacter)string_setchar(commandToken->text,firstWhitespaceTokenCharacter,getTokenSignificantCharacterCount(commandToken)); // put first whitespace character (if any) back
 			// MDH@03MAY2019: place an asterisk in front of the type to indicate that expr is NOT null!!
@@ -1680,15 +1680,16 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 	return written;
 }
 
-void unfinishToken(Mtoken* lastCommandToken){
+void unfinishCommandToken(Mtoken* commandToken){
 	// MDH@03SEP2019: adjusted so that not only the unary operators are left finished but all one character token types (which are the only tokens that are immediately finished once a single character is entered!!)
 	//                NOTE unfinishing of the current token is done so that the token can be continued, so technically we should unfinish all tokens that can be continued after a character is removed from them
 	// for all non-unary token that we are in now that is finished, unfinish 
 	// TODO there are other one-character tokens
-	if(lastCommandToken)
-		if(!isOneCharacterTokenType(lastCommandToken->type)) // not a unary operator (of length 1) we ended up in
-			if(string_length(lastCommandToken->text)==getTokenSignificantCharacterCount(lastCommandToken)) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
-				setTokenSignificantCharacterCount(lastCommandToken,0);
+	// TODO is the test string_length(commandToken->text)==getTokenSignificantCharacterCount(commandToken) always correct?
+	if(commandToken)
+		if(!isOneCharacterTokenType(commandToken->type)) // not a unary operator (of length 1) we ended up in
+			if(string_length(commandToken->text)==getTokenSignificantCharacterCount(commandToken)) // the current length equals the number of significant characters (i.e. we remove the first whitespace in the token)
+				unfinishToken(commandToken);
 }
 
 // void outputCommandInfo(Mcommand* command);
@@ -1730,7 +1731,7 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 		// MDH@20FEB2020: this is what we did in isAValidCommand() before, but removed from it: if the command ends with an error, we remove the error token, unfinish the (new) last token, so we can re-use it
 		if(_userInputCommand&&_userInputCommand->_lastToken&&_userInputCommand->_lastToken->type==TT_ERROR){
 			removeLastUserInputCommandToken();
-			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishToken(_userInputCommand->_lastToken);
+			if(!_userInputCommand->_lastToken)_userInputCommand=NULL;else unfinishCommandToken(_userInputCommand->_lastToken);
 		}
 		//output("%sInvalid command indicator: %d.\n",M_ERROR_PREFIX,aValidCommandIndicator);
 		return false;
@@ -2525,7 +2526,7 @@ char removedTokenCharacter(bool endOfInput){
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//                HOWEVER we're assuming that we're dealing with an end of input situation
 			bool tokenRemoved=(string_empty(_userInputCommand->_lastToken->text)?removeLastUserInputCommandToken():false);
-			unfinishToken(_userInputCommand->_lastToken); // we need to do this to allow appending characters to the token again
+			unfinishCommandToken(_userInputCommand->_lastToken); // we need to do this to allow appending characters to the token again
 			if(endOfInput)if(!tokenRemoved)tokenCheckedForBeingAFunction(_userInputCommand->_lastToken,endOfInput);
 		}
 	}else

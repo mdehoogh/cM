@@ -1,6 +1,6 @@
 #include "Mexpression.h"
 
-#include <limit.h>
+#include <limits.h>
 
 static uint16_t const MODULE_ID=7;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
@@ -50,4 +50,33 @@ bool setTokenSignificantCharacterCount(Mtoken * const token,size_t significantCh
     }
     output("%sCan't set the number of significant characters of an undefined token.\n",M_BUG_PREFIX);
     return false;
+}
+
+// a lot of times we're doing the following with the significant character counts
+char* _getSignificantTokenCharacters(Mtoken const * const token){
+    return(token?_stringstart(token->text,token->significantCharacterCount):NULL);
+}
+Mstring* _getSignificantTokenText(Mtoken const * const token){
+    return(token?_stringCopy(token->text,token->significantCharacterCount):NULL);
+}
+Mstring* _getTokenText(Mtoken const * const token){
+    return(token?_stringCopy(token->text,0):NULL);
+}
+bool isTokenUnfinished(Mtoken const * const token){
+    if(token)return(token->significantCharacterCount==0);
+    output("%sCan't determine whether an undefined token is unfinished.",M_BUG_PREFIX);
+    return false;
+}
+bool isTokenFinished(Mtoken const * const token){
+    if(token)return(token->significantCharacterCount>0);
+    output("%sCan't determine whether an undefined token is finished.",M_BUG_PREFIX);
+    return false;
+}
+void finishToken(Mtoken * const token){
+    if(token)token->significantCharacterCount=string_length(token->text);
+    else output("%sCan't finish an undefined token.",M_BUG_PREFIX);
+}
+void unfinishToken(Mtoken * const token){
+    if(token)token->significantCharacterCount=0;
+    else output("%sCan't finish an undefined token.",M_BUG_PREFIX);
 }

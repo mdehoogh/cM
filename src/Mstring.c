@@ -86,6 +86,7 @@ static size_t getSizeOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_SIZE*
 static size_t getNumberOfChars(Mstring* str){return(str&&str->_chars?M_BLOCK_CHARACTERS*str->blocks:0);}
 
 // MDH@20JUN2019: instead of returning a bool (and requiring dst as second argument) we return the copy...
+// WARNING: if length==0 the entire string is returned!!!!!!
 Mstring* _stringCopy(Mstring * const src,size_t length){Mallocationowner owner=getOwner(__LINE__);
     if(!src)return NULL;
     // MDH@17APR2020: replacing src->chars by src->_chars->chars

@@ -175,3 +175,10 @@ void free_expression(Mexpression* _expression);
 size_t getTokenSignificantCharacterCount(Mtoken const * const token); // returns SIZE_T_MAX when invalid (no token given)
 bool setTokenSignificantCharacterCount(Mtoken * const token,size_t significantCharacterCount);
 
+// common helpers that also use the significantCharacterCount field
+char* _getSignificantTokenCharacters(Mtoken const * const token); // the significant text as char*
+Mstring* _getSignificantTokenText(Mtoken const * const token); // only the significant text
+Mstring* _getTokenText(Mtoken const * const token); // entire token text
+bool isTokenUnfinished(Mtoken const * const token);
+bool isTokenFinished(Mtoken const * const token);
+void finishToken(Mtoken * const token);
