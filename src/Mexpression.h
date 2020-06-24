@@ -148,6 +148,7 @@ typedef struct Mtoken{
 	TokenType type; // actually the index into the TOKENTYPES array!!!
 	uint8_t significantCharacterCount; // MDH@22MAR2019: the number of significant characters in the token (in front of any whitespace that the users add, should be set to the length of the text when that happens)
 	uint16_t offset; // number of characters in front of this token in the command
+    uint16_t position; // MDH@24JUN2020: keep track of the total number of lines and position on each line
 	Mstring* text; // NOTE this is not an Mtext, Mstring is mutable whereas Mtext is not!!!!
 	struct Mtoken* expr; // the expression this token is part of
 	struct Mtoken* prev; // we need this during user input
@@ -182,3 +183,4 @@ Mstring* _getTokenText(Mtoken const * const token); // entire token text
 bool isTokenUnfinished(Mtoken const * const token);
 bool isTokenFinished(Mtoken const * const token);
 void finishToken(Mtoken * const token);
+void unfinishToken(Mtoken * const token);
