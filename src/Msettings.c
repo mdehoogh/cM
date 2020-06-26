@@ -1,5 +1,7 @@
 #include "Msettings.h"
 
+extern char const * const M_ERROR_PREFIX;
+
 static uint16_t const MODULE_ID=6;
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
 
@@ -53,8 +55,10 @@ void setAcceptinghistorycommand(bool newAcceptinghistorycommand){
 
 // 'Origin' mode (not 'wrap' mode) in 132 columns (if possible)
 void activateWrapmode(){
+    int result=0;
+    // result=system(wrapping?"tput smam":"tput rmam"); 
     outputControlText(wrapping?"?7h":"?7l"); // 7h used to be 6l doesn't seem to work though, 6h === 7l????
-    output("Will %swrap!\n",(wrapping?"":"not "));
+    if(result)output("%sFailed to %s wrapping",M_ERROR_PREFIX,(wrapping?"activate":"deactivate"));else output("Will %swrap!\n",(wrapping?"":"not "));
 }
 // M settings
 void setWrapping(bool newWrapping){

@@ -1037,11 +1037,13 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	getUserInputLength()=0; // starting at position 0
 	*/
 }
+size_t numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
 // MDH@30OCT2019: we'd like to be able to continue a command on the next line
 bool showContinuedPrompt(){
 	// ASSERT only to be called in command mode with _userInputCommand not NULL
 	// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
 	if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
+	numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
 	clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
 	outputChar('\n'); // move over to the next line
 	uint8_t blanks=promptLength;while(blanks>3){outputChar(' ');blanks--;}
@@ -1053,12 +1055,12 @@ bool showContinuedPrompt(){
 
 // MDH@24JUN2020: if we know how many characters that can fit on a single user input line we will be able to 
 //                determine exactly where the soft-breaks will be
-// MDH@26JUN2020: this is a bit hazardous when getNumberOfWindowTextColumns() returns a value that is below promptLength which is not to be allowed!!!
+// MDH@26JUN2020: this is a bit hazardous when getCurrentNumberOfWindowTextColumns() returns a value that is below promptLength which is not to be allowed!!!
 int numberOfLineCharacters=0;
 // call initializeNumberOfLineCharacters every time the prompt is shown
 void initializeNumberOfLineCharacters(){
 	int minimumNumberOfLineCharacters=MIN(20,promptLength+10);
-	numberOfLineCharacters=getNumberOfWindowTextColumns();
+	numberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
 	// let's only accept values above 20 but at least 10 over the prompt length (which is at least 7)
 	if(numberOfLineCharacters<minimumNumberOfLineCharacters){
 		newline();
@@ -1299,7 +1301,7 @@ static void reoutputToken(Mtoken* _token){
 
 // MDH@22JUN2020: updateNumberOfLineCharacters() is to be called AFTER a character is input by the user and BEFORE that character is processed
 void updateNumberOfLineCharacters(){
-	int newNumberOfLineCharacters=getNumberOfWindowTextColumns();
+	int newNumberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
 	// if now less than what we had, the command output is corrupted with additional lines
 	// and we should reoutput the command
 	if(newNumberOfLineCharacters>0){ // we know how many
@@ -2714,6 +2716,7 @@ uint32_t getListElementCount(){
 //       		  ASSERTION _userInputCommand->_firstToken and _userInputCommand->_lastToken are  NOT  NULL
 //                the endOfInput flag is used to indicate whether this is the end of the input
 //                the aSuggestedCharacter flag tells commandCharacterAccepted() that the input character came from feedforwardText (the feed forward), so it will in that case not alter feedforwardText (by removing the same character that was entered)
+// MDH@26JUN2020: should now also keep track of the total number of command characters on the current user input line (numberOfLineCommandCharacters)
 bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
@@ -2771,9 +2774,12 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 #ifdef __DEBUG__
 	printf("[%s]",string(_userInputCommand->_lastToken->text));
 #endif
+
 	// MDH@24APR2019 obsolete: getCommandLength()++; // increment total command length
 	// outputChar('>');
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
+
+	numberOfLineCommandCharacters++;
 
 	//putchar('\b');
 
@@ -3536,6 +3542,10 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 				////outputChar('D');
 				if(amDebugging())outputDebugInfo();
 				/////outputChar('E');
+
+				// if the line is full now we put the character on the next line
+				// if(numberOfLineCommandCharacters+promptLength==numberOfLineCharacters){oneLineDown();showContinuedPrompt();}
+
 			}
 			////////outputChar('X');
 

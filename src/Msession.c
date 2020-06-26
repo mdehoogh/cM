@@ -124,6 +124,7 @@ void initDisplay(){
 	setColorscheme(getColorscheme());
 	resetOutputColor(); // MDH@16MAR2020: think we need this
 	clearScreenFromCursor(); // activate the current color scheme
+	activateWrapmode(); // MDH@26JUN2020: sync the wrap mode to the initial setting
 	///////setWrapping(amWrapping()); // activate the current wrap mode!!!
 }
 

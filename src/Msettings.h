@@ -22,4 +22,5 @@ void setAssisting(bool newAssisting);
 void setDebugging(bool newDebugging);
 void setMatchingparentheses(bool newMatchingparentheses);
 void setAcceptinghistorycommand(bool newAcceptinghistorycommand);
+void activateWrapmode();
 void setWrapping(bool newWrapping);
