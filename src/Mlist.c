@@ -334,7 +334,7 @@ Mmap* _getIntegerSampleStatisticsMap(Mlist* list){Mallocationowner owner=getOwne
         }
         appendedToMap(_statisticsMap,owner,"missings",_getIntegerValue(missings));
         appendedToMap(_statisticsMap,owner,"errors",_getIntegerValue(errors));
-        return _statisticsMap;
+        return disowned_map(_statisticsMap,owner);
     }
     outputMemoryError("Failed to create a map to store statistics in.");
     return NULL;
