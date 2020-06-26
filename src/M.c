@@ -987,9 +987,11 @@ void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
 	FREE_STRING(_promptTimestamp,owner);
 }
 
+size_t numberOfLineCommandCharacters;
 void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
+	numberOfLineCommandCharacters=0; // MDH@22JUN2020: here as well as in showContinuedPrompt()
 	///////////printf("%d-",commandIndex);
 	char str[11]; // with a maximum of 2,xxx,xxx,xxx 11 positions would suffice
 	promptLength=0;
@@ -1037,7 +1039,6 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	getUserInputLength()=0; // starting at position 0
 	*/
 }
-size_t numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
 // MDH@30OCT2019: we'd like to be able to continue a command on the next line
 bool showContinuedPrompt(){
 	// ASSERT only to be called in command mode with _userInputCommand not NULL
@@ -2780,6 +2781,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
 
 	numberOfLineCommandCharacters++;
+	if(numberOfLineCommandCharacters+promptLength==numberOfLineCharacters-1){oneLineDown();showContinuedPrompt();outputTokenColor(_userInputCommand->_lastToken);}
 
 	//putchar('\b');
 
