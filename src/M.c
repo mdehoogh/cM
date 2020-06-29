@@ -363,19 +363,20 @@ typedef struct Muserinputline{
 	size_t offset,index; // the number of characters on previous lines and the line index
 	struct Muserinputline *_prev; // for accessing previous lines
 }Muserinputline;
-Muserinputline* _userinputline=NULL;Mallocationowner owner_userinputline=(Mallocationowner){MODULE_ID,__LINE__,1};
-Muserinputline* __userinputline(){Mallocationowner owner=getOwner(__LINE__);
+static Muserinputline* _userinputline=NULL;static Mallocationowner owner_userinputline=(Mallocationowner){MODULE_ID,__LINE__,1};
+static size_t getNumberOfCommandLines(){return(_userinputline?_userinputline->index:0)+1;}
+static Muserinputline* __userinputline(){Mallocationowner owner=getOwner(__LINE__);
 	Muserinputline* _newUserinputline=CALLOC_1(sizeof(Muserinputline),'6',owner);
 	if(_newUserinputline){
 		_newUserinputline->_prev=_userinputline;
 		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
-		_newUserinputline->index=(_userinputline?_userinputline->index:0)+1; // count the lines
+		_newUserinputline->index=getNumberOfCommandLines(); // count the lines
 		_userinputline=_newUserinputline;
 	}
 	return DISOWNED(_newUserinputline,owner);
 }
 // call free_userinputline() when starting a new user input command
-size_t free_userinputline(){
+static size_t free_userinputline(){
 	size_t numberOfUserInputLines=0;
 	Muserinputline* prevUserinputline;
 	while(_userinputline){
@@ -386,16 +387,15 @@ size_t free_userinputline(){
 	}
 	return numberOfUserInputLines;
 }
-void removeUserinputline(){
+static void removeUserinputline(){
 	Muserinputline* prevUserinputline=_userinputline->_prev;
 	FREE_DISOWNED_1(_userinputline,'6',owner_userinputline);
 	_userinputline=prevUserinputline;
 }
 // MDH@30OCT2019 END
 size_t toInfoInputLine(){
-	size_t linesUp=0;
-    size_t lines=(_userinputline?_userinputline->index:0)+1;
-	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();
+	size_t linesUp=0,lines=getNumberOfCommandLines(); // ASSERT lines should be at least 1
+	while(++linesUp<=lines)oneLineUp();clearLine();
     return linesUp;
 } // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
 // output functions that require access to the current token
@@ -1301,44 +1301,50 @@ static void reoutputToken(Mtoken* _token){
 }
 
 // MDH@22JUN2020: updateNumberOfLineCharacters() is to be called AFTER a character is input by the user and BEFORE that character is processed
-void updateNumberOfLineCharacters(){
+// MDH@29JUN2020: let's use two different strategies depending on whether or not we know the change to the number of lines the command now occupies
+//                1. clear the screen before we rewrite the entire command (if we do not know the number of lines the command now occupies),  
+bool updateNumberOfLineCharacters(){
 	int newNumberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
-	// if now less than what we had, the command output is corrupted with additional lines
-	// and we should reoutput the command
-	if(newNumberOfLineCharacters>0){ // we know how many
-		if(newNumberOfLineCharacters<numberOfLineCharacters){ // less than we had before
-			if(inputMode==IM_COMMAND){
-				// determine how many extra lines we got depending how many characters are on each line
-				if(_userInputCommand){
-					// redetermine the position of the where the token should be placed
-					uint16_t l,left,line=0,position=promptLength;
-					Mtoken* token=_userInputCommand->_firstToken;
-					while(token){
-							token->position=position;
-							// left on the current line
-							left=newNumberOfLineCharacters-position; // what's left on the current line	
-							l=string_length(token->text);
-							while(l>left){
-								line++;
-								l-=left; // the number of characters to go on successive lines
-								left=newNumberOfLineCharacters-promptLength;
-							}
-							// ASSERT l now smaller than left
-							position=newNumberOfLineCharacters-left;
-							// determine the new line and position based on the last token
-							token=token->next;
+	if(newNumberOfLineCharacters==numberOfLineCharacters)return; // MDH@29JUN2020: no need to update as there is no change in the number of characters
+	// it is essential to realize that no changes need to be made iff the number of lines the command uses does not change
+	if(newNumberOfLineCharacters==0){ // number of line characters now unknown
+		// let's assume for now that should stop soft-wrapping
+	}else{ // number of line characters unknown
+		// although newNumberOfLineCharacters is positive it could be smaller than promptLength
+		if(newNumberOfLineCharacters<promptLength+2)return false;
+		// how about demanding newNumberOfLineCharacters to be at least promptLength+2!!!!
+		if(inputMode==IM_COMMAND){
+			// determine how many extra lines we got depending how many characters are on each line
+			if(_userInputCommand){
+				// redetermine the position of the where the token should be placed
+				uint16_t l,left,line=0,position=promptLength;
+				Mtoken* token=_userInputCommand->_firstToken;
+				while(token){
+					token->position=position;
+					// left on the current line (one less for soft-wrapping)
+					left=newNumberOfLineCharacters-position-1; // what's left on the current line	
+					l=string_length(token->text);
+					while(l>left){
+						line++;
+						l-=left; // the number of characters to go on successive lines
+						left=newNumberOfLineCharacters-promptLength;
 					}
-					// ASSERT line now contains the number of lines the command will occupy when displayed again
-					// go to the line where the prompt now is
-					while(line>0){oneLineUp();line--;}toStartOfLine();showPrompt();
-					// now to write the command
-					token=_userInputCommand->_firstToken;
-					while(token){outputToken(token);token=token->next;}
+					// ASSERT l now smaller than left
+					position=newNumberOfLineCharacters-left;
+					// determine the new line and position based on the last token
+					token=token->next;
 				}
+				// ASSERT line now contains the number of lines the command will occupy when displayed again
+				// go to the line where the prompt now is
+				while(line>0){oneLineUp();line--;}toStartOfLine();showPrompt();
+				// now to write the command
+				token=_userInputCommand->_firstToken;
+				while(token){outputToken(token);token=token->next;}
 			}
 		}
 	}
 	numberOfLineCharacters=newNumberOfLineCharacters;
+	return true;
 }
 
 void clearInfo(){
@@ -3565,10 +3571,13 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 			if(inputChar>127)continue; // undefined input character
 
-			inputCharType=INPUTCHARACTERTYPES[inputChar];
+			// MDH@29JUN2020: if we fail to update the number of line characters we switch to control mode
+			if(!updateNumberOfLineCharacters()){
+				// TODO consider storing the (unfinished) command (the same way we do when it ends with an error token)
+				switchToControlMode("The number of available positions for command characters is too small. Please increase the viewport width.");
+			}else
+				inputCharType=INPUTCHARACTERTYPES[inputChar];
 			
-			updateNumberOfLineCharacters(); // MDH@24JUN2020: should this go here?????????
-
 			///// WHY WAS IT DOING THIS!!!!!!! outputChar(inputCharType);
 			/* something terribly going wrong when the following code is executed!!!
 			if(inputMode==IM_COMMAND){
