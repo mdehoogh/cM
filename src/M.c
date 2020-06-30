@@ -2135,6 +2135,33 @@ void outputShellCommand(){
 	output("%s",string(_shellCommand));
 }
 
+void backToPrompt(){
+	// MDH@27SEP2019: assuming for now that whatever is written next will determine the number of characters written behind the prompt
+	numberOfBehindPromptCharactersWritten=0; // assume no text characters written so far
+	// this will be more complicated if the command occupies multiple lines
+	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
+	// replacing: restoreCursor();clearScreenFromCursor();
+
+	// MDH@31OCT2019: with a clearScreenFromCursor() following it suffices to first move to the initial prompt line
+	size_t linesfreed=free_userinputline();
+	while(linesfreed>0){linesfreed--;oneLineUp();}
+	toStartOfLine();moveCursorRight(promptLength); // should now be at the right position for clearing
+	/* replacing:
+	uint16_t cp=getUserInputLength();
+	while(cp--)backspace(); // MDH@24APR2019 replacing: while(getUserInputLength()>0){getUserInputLength()--;backspace();}
+	*/
+	/*
+	if(getUserInputLength()>0){moveCursorLeft(getUserInputLength());getUserInputLength()=0;}
+	clearScreenFromCursor();
+	*/
+	/* replacing:
+	while(characterCount>0){
+		characterCount--;
+		moveCursorLeft(1);resetOutputColor();outputChar(' ');moveCursorLeft(1);
+	}
+	*/
+}
+
 // MDH@22JUN2020: updateNumberOfLineCharacters() is to be called AFTER a character is input by the user and BEFORE that character is processed
 // MDH@29JUN2020: let's use two different strategies depending on whether or not we know the change to the number of lines the command now occupies
 //                1. clear the screen before we rewrite the entire command (if we do not know the number of lines the command now occupies),  
@@ -2205,14 +2232,66 @@ bool updateNumberOfLineCharacters(){
 		if(!_shellCommand||string_length(_shellCommand)==0)return true;
 	}
 
+	/* no need to clear the screen anymore if we manage to compute the actual number of command lines accurately
 	outputControlText("2J"); // clear screen
 	outputControlText("H"); // put cursor in top-left corner
 	
 	// much the same as what happens at the start of requesting a command loop
 	outputTotalMemoryUsage();
 	promptForUserInput();
+	*/
 
 	if(inputMode==IM_COMMAND){
+		// only when the new number of line characters is smaller should we redetermine how many lines back the prompt is
+		// if it is larger we assume that we the number of command lines did not change (visually)
+		size_t numberOfExtraCommandLines=0;
+		if(newNumberOfLineCharacters<numberOfLineCharacters){
+			// redetermine the position of where the token should be placed
+			// the problem is that for every current line we have to determine
+			size_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
+			size_t newMaximumNumberOfLineCommandCharacters=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength-1:0);
+			// as soon as the number of characters on a line exceeds newMaximumOfLineCommandCharacters we know an extra line is inserted
+			size_t l,numberOfLineCommandCharacters=0; // what's left on the first line of the command for command characters
+			// we should determine the number of command characters on each line
+			// if this number of characters exceeds the new number of line command characters we have to increment numberOfExtraCommandLines
+			Mtoken* token=_userInputCommand->_firstToken;
+			while(token){
+				l=string_length(token->text);
+				if(l>0){ // there are characters in the token (e.g. most of the time the first (expression) token will be empty)
+					// this token either fits on the current line or it does not but if newNumberOfLineCharacters equals zero it always does
+					if(maximumNumberOfLineCommandCharacters>0){ // a limited amount of characters fit on the current line, so there could be any number of soft-breaks
+						// how many characters of the token fit on this line????
+						if(l+numberOfLineCommandCharacters>maximumNumberOfLineCommandCharacters){ // fits partially on this line
+							// therefore the rest of the line is occupied by a part of this token
+							// and we know for sure that we have a wrap
+							numberOfExtraCommandLines++;
+							// determine the number of characters left in the token
+							l-=maximumNumberOfLineCommandCharacters-numberOfLineCommandCharacters;
+							// count all lines this token still occupies
+							while(l>=maximumNumberOfLineCommandCharacters){
+								numberOfExtraCommandLines++;
+								l-=maximumNumberOfLineCommandCharacters;
+							}
+							// ASSERT 0<=l<maximumNumberOfLineCommandCharacters is on a line of its own
+							// ASSERT l (the number of remaining characters) is on the last line and less than left
+							numberOfLineCommandCharacters=l; // the last l characters of the token go on the next line
+							// we cannot tell if this line is already finished
+						}else // fits completely on the line
+							numberOfLineCommandCharacters+=l;
+					}
+					// if the last token character (which always exists as l>0) equals M_NEWLINE_CHARACTER we have a hard-break 
+					if(string_last_char(token->text)==M_NEWLINE_CHARACTER){
+						if(numberOfLineCommandCharacters>newMaximumNumberOfLineCommandCharacters)
+							numberOfExtraCommandLines++;
+					}
+				}
+				// determine the new line and position based on the last token
+				token=token->next;
+			}
+		}
+		// for every extra command line we go one line up
+		while(numberOfExtraCommandLines>0){oneLineUp();numberOfExtraCommandLines--;}
+		backToPrompt();
 		// now to write the command
 		// output("UPDATING");moveCursorLeft(10);//sleep(1);
 		// we need to free the user input lines first because we're supposed to be right behind the prompt!!
@@ -2239,33 +2318,6 @@ void updateLastTokenAutocompletionText(){
 	// MDH@25MAY2020: TODO _getLastTokenAutoCompletionText() returns a dynamically allocated char* (using strdup) which therefore is NOT under version control
 	free(setLastTokenAutocompletionText(_getLastTokenAutoCompletionText())); // MDH@24SEP2019: the bool forces setting the identifier continuation characters when available, so we can show them to the user
 	// inputInfo("Last token auto completion text updated.");
-}
-
-void backToPrompt(){
-	// MDH@27SEP2019: assuming for now that whatever is written next will determine the number of characters written behind the prompt
-	numberOfBehindPromptCharactersWritten=0; // assume no text characters written so far
-	// this will be more complicated if the command occupies multiple lines
-	// therefore we need to move the cursor left, write a single blank and move the cursor one left again and so on
-	// replacing: restoreCursor();clearScreenFromCursor();
-
-	// MDH@31OCT2019: with a clearScreenFromCursor() following it suffices to first move to the initial prompt line
-	size_t linesfreed=free_userinputline();
-	while(linesfreed>0){linesfreed--;oneLineUp();}
-	toStartOfLine();moveCursorRight(promptLength); // should now be at the right position for clearing
-	/* replacing:
-	uint16_t cp=getUserInputLength();
-	while(cp--)backspace(); // MDH@24APR2019 replacing: while(getUserInputLength()>0){getUserInputLength()--;backspace();}
-	*/
-	/*
-	if(getUserInputLength()>0){moveCursorLeft(getUserInputLength());getUserInputLength()=0;}
-	clearScreenFromCursor();
-	*/
-	/* replacing:
-	while(characterCount>0){
-		characterCount--;
-		moveCursorLeft(1);resetOutputColor();outputChar(' ');moveCursorLeft(1);
-	}
-	*/
 }
 
 void setUserInputCommand(Mcommand* command){
