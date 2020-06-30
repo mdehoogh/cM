@@ -2251,7 +2251,7 @@ bool updateNumberOfLineCharacters(){
 			size_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
 			size_t newMaximumNumberOfLineCommandCharacters=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength-1:0);
 			// as soon as the number of characters on a line exceeds newMaximumOfLineCommandCharacters we know an extra line is inserted
-			size_t l,numberOfLineCommandCharacters=0; // what's left on the first line of the command for command characters
+			size_t l,left=maximumNumberOfLineCommandCharacters; // what's left on the first line of the command for command characters
 			// we should determine the number of command characters on each line
 			// if this number of characters exceeds the new number of line command characters we have to increment numberOfExtraCommandLines
 			Mtoken* token=_userInputCommand->_firstToken;
@@ -2261,28 +2261,31 @@ bool updateNumberOfLineCharacters(){
 					// this token either fits on the current line or it does not but if newNumberOfLineCharacters equals zero it always does
 					if(maximumNumberOfLineCommandCharacters>0){ // a limited amount of characters fit on the current line, so there could be any number of soft-breaks
 						// how many characters of the token fit on this line????
-						if(l+numberOfLineCommandCharacters>maximumNumberOfLineCommandCharacters){ // fits partially on this line
+						if(l>left){ // fits partially on this line
 							// therefore the rest of the line is occupied by a part of this token
 							// and we know for sure that we have a wrap
-							numberOfExtraCommandLines++;
+							// numberOfExtraCommandLines++;
 							// determine the number of characters left in the token
-							l-=maximumNumberOfLineCommandCharacters-numberOfLineCommandCharacters;
-							// count all lines this token still occupies
-							while(l>=maximumNumberOfLineCommandCharacters){
+							l-=left; // l = number of token characters on successive lines
+							left=maximumNumberOfLineCommandCharacters;
+							// count all successive lines this token fully occupies which we know for sure will generate extra command lines
+							while(l>=left){
 								numberOfExtraCommandLines++;
-								l-=maximumNumberOfLineCommandCharacters;
+								l-=left;
 							}
 							// ASSERT 0<=l<maximumNumberOfLineCommandCharacters is on a line of its own
-							// ASSERT l (the number of remaining characters) is on the last line and less than left
-							numberOfLineCommandCharacters=l; // the last l characters of the token go on the next line
-							// we cannot tell if this line is already finished
-						}else // fits completely on the line
-							numberOfLineCommandCharacters+=l;
+							// because left equals maximumNumberOfLineCommandCharacters subtracting l is exactly what we need to do
+							// to determine what's left on the last line the 
+						}
+						left-=l; // update the number of characters left on the line
 					}
 					// if the last token character (which always exists as l>0) equals M_NEWLINE_CHARACTER we have a hard-break 
 					if(string_last_char(token->text)==M_NEWLINE_CHARACTER){
-						if(numberOfLineCommandCharacters>newMaximumNumberOfLineCommandCharacters)
+						// if end of token is beyond the new line end another command line will be visible
+						if(left<maximumNumberOfLineCommandCharacters-newMaximumNumberOfLineCommandCharacters)
 							numberOfExtraCommandLines++;
+						// we know the next token is on the next line
+						left=maximumNumberOfLineCommandCharacters;
 					}
 				}
 				// determine the new line and position based on the last token
@@ -2296,11 +2299,14 @@ bool updateNumberOfLineCharacters(){
 		// output("UPDATING");moveCursorLeft(10);//sleep(1);
 		// we need to free the user input lines first because we're supposed to be right behind the prompt!!
 		// taken care of by promptForUserInput(): free_userinputline();
+		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
 		Mtoken* token=_userInputCommand->_firstToken;
 		while(token){outputToken(token);token=token->next;}
+		clearScreenFromCursor(); // TODO can't harm but not certain about this
 		showSuggestedText();
 	}else
 	if(inputMode==IM_SHELL){
+		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
 		// TODO output the shell command wrapped
 		outputShellCommand();
 	}
