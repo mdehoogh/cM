@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
-char const * const M_BUILD="3";char const * const M_DATE="17 June 2020";
+char const * const M_BUILD="4";char const * const M_DATE="30 June 2020";
+// char const * const M_BUILD="3";char const * const M_DATE="17 June 2020";
 //char const * const M_BUILD="2";char const * const M_DATE="25 May 2020";
 //char const * const M_BUILD="1";char const * const M_DATE="22 May 2020";
 
@@ -371,9 +372,9 @@ static Muserinputline* __userinputline(){Mallocationowner owner=getOwner(__LINE_
 		_newUserinputline->_prev=_userinputline;
 		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
 		_newUserinputline->index=getNumberOfCommandLines(); // count the lines
-		_userinputline=_newUserinputline;
+		_userinputline=OWNED(DISOWNED(_newUserinputline,owner),owner_userinputline); // MDH@30JUN2020: pass ownership when assigning to the global _userinputline because then it it bound!!!!
 	}
-	return DISOWNED(_newUserinputline,owner);
+	return _newUserinputline;
 }
 // call free_userinputline() when starting a new user input command
 static size_t free_userinputline(){
@@ -1041,15 +1042,20 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 }
 // MDH@30OCT2019: we'd like to be able to continue a command on the next line
 bool showContinuedPrompt(){
-	// ASSERT only to be called in command mode with _userInputCommand not NULL
-	// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
-	if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
-	numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
-	clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
-	outputChar('\n'); // move over to the next line
-	uint8_t blanks=promptLength;while(blanks>3){outputChar(' ');blanks--;}
-	resetOutputColor();
-	output(" = ");
+	if(inputMode==IM_COMMAND){
+		// ASSERT only to be called in command mode with _userInputCommand not NULL
+		// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
+		if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
+		numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
+		clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
+		outputChar('\n'); // move over to the next line
+		uint8_t blanks=promptLength;while(blanks>3){outputChar(' ');blanks--;}
+		resetOutputColor();
+		output(" = ");
+	}else
+	if(inputMode==IM_SHELL){
+		output(": "); // continuation of $ not certain what to display here but a colon is used often (e.g. in Python)
+	}
 	return true;
 	/// can't call this here!!!! outputTokenColor(_userInputCommand->_lastToken);
 }
@@ -1064,7 +1070,7 @@ void initializeNumberOfLineCharacters(){
 	numberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
 	// let's only accept values above 20 but at least 10 over the prompt length (which is at least 7)
 	if(numberOfLineCharacters<minimumNumberOfLineCharacters){
-		newline();
+		oneLineDown();toStartOfLine();
 		if(numberOfLineCharacters<=0)outputWarning("Failed to obtain the number of columns of the input window");
 		while(1){	
 			numberOfLineCharacters=0;
@@ -1176,7 +1182,7 @@ long long outputIncrementalMemoryUsage(long long incrementalNumberOfAllocationMa
 // MDH@30OCT2019 END
 void promptForUserInput(){
 	free_userinputline();if(_userinputline)outputBug("Failed to release user input line info"); // MDH@30OCT2019: get rid of all previously stored user input line info
-	enableRawmode();
+	enableRawmode(0);
 	resetOutputColor();
 	newline();
 	outputLine(promptinfo[inputMode]); // show the appropriate input mode prompt info
@@ -1209,6 +1215,7 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE__);
 	size_t tokenCharacterCount=(_token&&_token->text?string_length(_token->text):0);
 	if(tokenCharacterCount>0){
+		uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
 		// MDH@26JUN2020: we can speed things up a bit by immediately using string()
 		char* tokenText=string(_token->text);
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
@@ -1228,14 +1235,14 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 		// MDH@24JUN2020: if a token is on multiple lines (due to a limiting number of line characters)
 		//                we have to 'insert' so-called soft-breaks
 		size_t left;
-		if(_token->position+significantTokenCharacterCount>=numberOfLineCharacters-promptLength){
+		if(_token->position+significantTokenCharacterCount>=maximumNumberOfLineCommandCharacters){
 			// I think it's easier to simply write one character at a time
-			left=numberOfLineCharacters-promptLength-_token->position; // what we can fit on the line
+			left=maximumNumberOfLineCommandCharacters-_token->position; // what we can fit on the line
 			for(int tokenCharacterIndex=0;tokenCharacterIndex<significantTokenCharacterCount;tokenCharacterIndex++){
 				outputChar(tokenText[tokenCharacterIndex]);
 				if(--left==0){
-					oneLineDown();toStartOfLine();showContinuedPrompt();
-					left=numberOfLineCharacters-promptLength;
+					/*oneLineDown();toStartOfLine();*/showContinuedPrompt();outputTokenColor(_token);
+					left=maximumNumberOfLineCommandCharacters;
 				}
 			}
 			/* replacing:
@@ -1257,25 +1264,25 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 			*/
 		}else{ // all characters fit on this line (no soft-breaks required)
 			output("%s",tokenText); // although string() will write the '\0' at the end we've already written one in front of that position
-			left=numberOfLineCharacters-promptLength-_token->position-significantTokenCharacterCount;
+			left=maximumNumberOfLineCommandCharacters-_token->position-significantTokenCharacterCount;
 		}
 		// if there's whitespace text to start with write it in the default output color
+		resetOutputColor();
 		if(firstWhitespaceCharacter){
 			tokenText[significantTokenCharacterCount]=firstWhitespaceCharacter; // put it back
-			resetOutputColor();
 			// if spanning multiple lines write one character at a time
 			if(tokenCharacterCount>left+significantTokenCharacterCount){
 				for(size_t tokenCharacterIndex=significantTokenCharacterCount;tokenCharacterIndex<tokenCharacterCount;tokenCharacterIndex++){
 					outputChar(tokenText[tokenCharacterIndex]);
 					if(--left==0){
-						oneLineDown();toStartOfLine();showContinuedPrompt();
-						left=numberOfLineCharacters-promptLength;
+						/*oneLineDown();toStartOfLine();*/showContinuedPrompt();
+						left=maximumNumberOfLineCommandCharacters;
 					}
 				}
 			}else
 				output("%s",tokenText+significantTokenCharacterCount);
 		}
-		resetOutputColor();
+		// resetOutputColor();
 	}
 	return tokenCharacterCount;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
@@ -1298,53 +1305,6 @@ static void reoutputToken(Mtoken* _token){
 	moveCursorLeft(tokenCharacterCount);
 	outputToken(_token); // back where we started (hopefully)
 	if(tokenOnPreviousInputLine){oneLineDown();toStartOfLine();moveCursorRight(promptLength+getUserInputLength()-_userinputline->offset);}
-}
-
-// MDH@22JUN2020: updateNumberOfLineCharacters() is to be called AFTER a character is input by the user and BEFORE that character is processed
-// MDH@29JUN2020: let's use two different strategies depending on whether or not we know the change to the number of lines the command now occupies
-//                1. clear the screen before we rewrite the entire command (if we do not know the number of lines the command now occupies),  
-bool updateNumberOfLineCharacters(){
-	int newNumberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
-	if(newNumberOfLineCharacters==numberOfLineCharacters)return; // MDH@29JUN2020: no need to update as there is no change in the number of characters
-	// it is essential to realize that no changes need to be made iff the number of lines the command uses does not change
-	if(newNumberOfLineCharacters==0){ // number of line characters now unknown
-		// let's assume for now that should stop soft-wrapping
-	}else{ // number of line characters unknown
-		// although newNumberOfLineCharacters is positive it could be smaller than promptLength
-		if(newNumberOfLineCharacters<promptLength+2)return false;
-		// how about demanding newNumberOfLineCharacters to be at least promptLength+2!!!!
-		if(inputMode==IM_COMMAND){
-			// determine how many extra lines we got depending how many characters are on each line
-			if(_userInputCommand){
-				// redetermine the position of the where the token should be placed
-				uint16_t l,left,line=0,position=promptLength;
-				Mtoken* token=_userInputCommand->_firstToken;
-				while(token){
-					token->position=position;
-					// left on the current line (one less for soft-wrapping)
-					left=newNumberOfLineCharacters-position-1; // what's left on the current line	
-					l=string_length(token->text);
-					while(l>left){
-						line++;
-						l-=left; // the number of characters to go on successive lines
-						left=newNumberOfLineCharacters-promptLength;
-					}
-					// ASSERT l now smaller than left
-					position=newNumberOfLineCharacters-left;
-					// determine the new line and position based on the last token
-					token=token->next;
-				}
-				// ASSERT line now contains the number of lines the command will occupy when displayed again
-				// go to the line where the prompt now is
-				while(line>0){oneLineUp();line--;}toStartOfLine();showPrompt();
-				// now to write the command
-				token=_userInputCommand->_firstToken;
-				while(token){outputToken(token);token=token->next;}
-			}
-		}
-	}
-	numberOfLineCharacters=newNumberOfLineCharacters;
-	return true;
 }
 
 void clearInfo(){
@@ -2132,6 +2092,7 @@ void writeSuggestedText(bool updateUserInputCommandIdentifierContinuationText){
 // MDH@01OCT2019: it's better to show the suggested text JIT i.e. just before asking the user for input
 //                this is also better because at that moment we know the user should be seeing it
 size_t numberOfSuggestedCharactersWritten=0;
+// MDH@30JUN2020: the suggested text can also soft-break onto next lines!!!!
 void showSuggestedText(){
 	// ASSERT _suggestedText should not be NULL
 	// MDH@26SEP2019: behind cursor text now consists of two parts now: identifier continuation text and feed forward text
@@ -2155,6 +2116,118 @@ void hideSuggestedText(){
 	while(--numberOfBlanksToWrite>=0)outputChar(' ');
 	///////outputChar(' ');
 	moveCursorLeft(numberOfSuggestedCharactersWritten);
+}
+
+void outputShellCommand(){
+	// we're supposed to wrap write the shell command
+	if(numberOfLineCharacters>0){
+		uint16_t maximumNumberOfLineCommandCharacters=numberOfLineCharacters-promptLength-1;
+		size_t l=string_length(_shellCommand),left=maximumNumberOfLineCommandCharacters;
+		if(left<l){
+			for(size_t shellCommandIndex=0;shellCommandIndex<l;shellCommandIndex++){
+				outputChar(string_char(_shellCommand,shellCommandIndex));
+				if(--left==0){oneLineDown();toStartOfLine();showContinuedPrompt();left=maximumNumberOfLineCommandCharacters;}
+			}
+			return;
+		}
+	}
+	output("%s",string(_shellCommand));
+}
+
+// MDH@22JUN2020: updateNumberOfLineCharacters() is to be called AFTER a character is input by the user and BEFORE that character is processed
+// MDH@29JUN2020: let's use two different strategies depending on whether or not we know the change to the number of lines the command now occupies
+//                1. clear the screen before we rewrite the entire command (if we do not know the number of lines the command now occupies),  
+bool updateNumberOfLineCharacters(){
+	int newNumberOfLineCharacters=getCurrentNumberOfWindowTextColumns();
+	if(newNumberOfLineCharacters==numberOfLineCharacters)return true; // no change to the viewport width
+	// taken care of by promptForUserInput()!!!! numberOfLineCharacters=newNumberOfLineCharacters;
+	// printf("%c",'X'); // DEBUG
+	// it is essential to realize that no changes need to be made iff the number of lines the command uses does not change
+	// although newNumberOfLineCharacters is positive it could be smaller than promptLength
+	// how about demanding newNumberOfLineCharacters to be at least promptLength+2!!!!
+	if(newNumberOfLineCharacters>0&&newNumberOfLineCharacters<promptLength+2)return false; // if defined but too small to fit at least one command character behind the prompts
+	if(inputMode==IM_COMMAND){
+		// inputInfo("New number of line characters: %i.",newNumberOfLineCharacters); // DEBUG
+		// if we do not have at least one user input command characters, there's nothing to do NOTE a non-empty command has at least two tokens TODO check this assumption
+		// it's a bit of a nuisance that the first token can have no characters in it but if it does first and last token will be the same so we still have to test the number of characters
+		if(!_userInputCommand||!_userInputCommand->_firstToken||(_userInputCommand->_firstToken==_userInputCommand->_lastToken&&string_length(_userInputCommand->_lastToken->text)==0))return true;
+			/*
+			// determine how many extra lines we got depending how many characters are on each line
+			// but wait: due to the change of line characters the window has been wrapping/unwrapping
+			// technically it's easiest to simply write the entire command again
+			size_t newNumberOfCommandLines=1; // the current number of command lines
+			// redetermine the position of where the token should be placed
+			size_t maximumNumberOfLineCommandCharacters=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength-1:0);
+			size_t l,left=maximumNumberOfLineCommandCharacters; // what's left on the first line of the command for command characters
+			Mtoken* token=_userInputCommand->_firstToken;
+			while(token){
+				l=string_length(token->text);
+				if(l>0){ // there are characters in the token (e.g. most of the time the first (expression) token will be empty)
+					// this token either fits on the current line or it does not but if newNumberOfLineCharacters equals zero it always does
+					if(maximumNumberOfLineCommandCharacters>0){ // a limited amount of characters fit on the current line, so there could be any number of soft-breaks
+						if(l>left){ // at least one soft-break
+							// decrease l by left and by the total number of characters that fit on a single line until 
+							do{
+								l-=left; // all (remaining) characters fit the rest of the line
+								newNumberOfCommandLines++;
+								left=maximumNumberOfLineCommandCharacters; // what's left on the line for command characters
+							}while(l>left);
+						}
+						// ASSERT l is smaller than or equal to left
+						left-=l;
+					}
+					// if the last token character (which always exists as l>0) equals M_NEWLINE_CHARACTER we have a hard-break 
+					if(string_last_char(token->text)==M_NEWLINE_CHARACTER){left=maximumNumberOfLineCommandCharacters;newNumberOfCommandLines++;}
+				}
+				// determine the new line and position based on the last token
+				token=token->next;
+			}
+			if(newNumberOfCommandLines!=getNumberOfCommandLines()){
+				*/
+				// output("%i",newNumberOfCommandLines); // DEBUG
+				// ASSERT line now contains the number of lines the command will occupy when displayed again
+				// go to the line where the prompt now is
+				/*
+				clearScreenFromCursor(); // get rid of the suggested text
+				oneLineDown();toStartOfLine(); // move to the start of the next line
+				*/
+				// replacing:
+				/* replacing:
+				while(newNumberOfCommandLines>0){oneLineUp();newNumberOfCommandLines--;}toStartOfLine();moveCursorRight(promptLength); // TODO as this is similar to backToPrompt() can we use backToPrompt()????
+				if(newNumberOfLineCharacters==0||numberOfLineCharacters<newNumberOfLineCharacters)clearScreenFromCursor(); // in case we have less lines!!!
+				*/
+			// }
+			//else outputChar('Y'); // DEBUG
+		//}
+	}else
+	if(inputMode==IM_SHELL){ // TODO implement
+		if(!_shellCommand||string_length(_shellCommand)==0)return true;
+	}
+
+	outputControlText("2J"); // clear screen
+	outputControlText("H"); // put cursor in top-left corner
+	
+	// much the same as what happens at the start of requesting a command loop
+	outputTotalMemoryUsage();
+	promptForUserInput();
+
+	if(inputMode==IM_COMMAND){
+		// now to write the command
+		// output("UPDATING");moveCursorLeft(10);//sleep(1);
+		// we need to free the user input lines first because we're supposed to be right behind the prompt!!
+		// taken care of by promptForUserInput(): free_userinputline();
+		Mtoken* token=_userInputCommand->_firstToken;
+		while(token){outputToken(token);token=token->next;}
+		showSuggestedText();
+	}else
+	if(inputMode==IM_SHELL){
+		// TODO output the shell command wrapped
+		outputShellCommand();
+	}
+	
+		// inputInfo("New number of line characters: %i.",numberOfLineCharacters);
+		// outputChar('X');
+	return true;
 }
 
 // MDH@20SEP2019: whenever a token changes the associated feed forward text might change, so it makes sense to update the feed forward text accordingly
@@ -3558,7 +3631,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 			////////outputChar('X');
 
 			// ask the user for input
-			if(!inputCharRead(&inputChar))break;
+			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
+			if(!inputCharReadNonBlocking(&inputChar,&updateNumberOfLineCharacters))break;
 
 			// outputChar(inputChar);
 

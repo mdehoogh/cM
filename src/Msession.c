@@ -19,12 +19,12 @@ extern long long M_LL_INVALID;
 
 static struct termios orig_termios;
 
-static bool rawmode=false;
+static int16_t rawmode=-1;
 
 void disableRawmode(){
-    if(!rawmode)return;
+    if(rawmode<0)return;
 	outputLine("Disabling character input mode.");
-	rawmode=false;
+	rawmode=-1;
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&orig_termios);
 }
 
@@ -36,30 +36,52 @@ void endOfUserInput(){
 	disableRawmode();
 }
 
-void enableRawmode(){
-    if(rawmode)return;
-	outputLine("Enabling character input mode.\n");
-	rawmode=true;
-	tcgetattr(STDIN_FILENO,&orig_termios);
-	atexit(endOfUserInput); // or std::atexit() in C++
-	struct termios raw=orig_termios;
-
-  	// ISIG turns off Ctrl-C and Ctrl-Z
+// MDH@30JUN2020: let's allow a timeout (number of tenths of seconds to block for input every time)
+void enableRawmode(uint8_t timeout){
+	if(rawmode==timeout)return;
+	// output("Enabling character input mode with timeout %u.\n",timeout); // DEBUG
+	if(rawmode<0){
+		tcgetattr(STDIN_FILENO,&orig_termios);
+		atexit(endOfUserInput); // or std::atexit() in C++
+	}
+	rawmode=timeout;
+	struct termios raw=orig_termios; // making a copy
+	raw.c_cc[VMIN]=0; // NOT doing this caused positive timeout values to fail timing out!!!!! (all of a sudden so unclear how come though)
+	raw.c_cc[VTIME]=rawmode;
+	// ISIG turns off Ctrl-C and Ctrl-Z
 	raw.c_lflag&=~(ECHO|ICANON|ISIG); // we kill echoing so we can first look at what we received!!
 	tcsetattr(STDIN_FILENO,TCSAFLUSH,&raw);
 }
 
 ///////char inputChar='\0'; // the last read input character and its associated type (which we can set to o to escape to control mode!!)
 // currently inputCharRead() blocks until a character can be read (and put in _c)
-bool inputCharRead(char* _c){enableRawmode();return(read(STDIN_FILENO,_c,1)==1);}
-
+bool inputCharRead(char* _c){
+	enableRawmode(0);
+	return(read(STDIN_FILENO,_c,1)==1);
+}
+bool inputCharReadNonBlocking(char* _c,UpdateFunction updateFunction){
+	if(!updateFunction)return inputCharRead(_c);
+	enableRawmode(1);
+	// outputChar('Y'); // DEBUG
+	// as long as read timesout execute the updateFunction()
+	ssize_t result=0;
+	while(1){
+		// DEBUG: outputChar(result>0?'A':'B');
+		result=read(STDIN_FILENO,_c,1);
+		if(result!=0)break;
+		// outputChar('X'); // DEBUG
+		(*updateFunction)();
+	}
+	return(result>0);
+}
+/*
 int getch(){
 	// ASSERT assume in one-character-at-a-time-mode!!!
     int r;unsigned char c;
     if ((r=read(STDIN_FILENO,&c,sizeof(c)))>0)return r; // MDH@11NOV2019: changed <0 into >0 which makes more sense considering how inputCharRead() is implemented!!!
     return c;
 }
-
+*/
 //////char getInputChar(){return inputChar;}
 
 // interfacing with the console

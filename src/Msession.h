@@ -11,8 +11,11 @@
 #include "Mcolors.h"
 
 // input functions
-void enableRawmode();
-bool inputCharRead(char* inputChar); // passing in a pointer to where the input character is to be stored...
+void enableRawmode(uint8_t timeout);
+bool inputCharRead(char* inputChar);
+// MDH@30JUN2020: how about accepting a function to execute in non-blocking mode...
+typedef bool (*UpdateFunction)(); // an update function that should be execute every timeout
+bool inputCharReadNonBlocking(char* inputChar,UpdateFunction updateFunction); // passing in a pointer to where the input character is to be stored...
 // MDH@27FEB2020 moved over to Mmessage.h: int kbhit(); // check whether keyboard hit
 //int getch();
 
