@@ -1094,6 +1094,7 @@ void initializeNumberOfLineCharacters(){
 
 // MDH@06MAY2020
 void outputTotalMemoryUsage(){//Mallocationowner owner=getOwner(__LINE__);
+	resetOutputColor(); // MDH@30JUN2020: apparently sometimes required
 	if(!amVerbose()){
 		unsigned long long numberOfAllocationTypeSizes=0; // i.e. only interested in the overall types
 		long long numberOfAllocationMarks=-1; // i.e. only interested in the last (=current) mark
