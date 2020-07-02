@@ -3946,13 +3946,13 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						beep();
 				}else
 				if(inputCharType=='m'){ // Esc character...
-					if(inputCharRead(&inputChar)){
+					if(inputCharReadNonBlocking(&inputChar,NULL)){
 						///printf("(%d)",inputChar);
 						if(inputChar==91){
-							if(inputCharRead(&inputChar)){//inputChar=getInputChar();
+							if(inputCharReadNonBlocking(&inputChar,NULL)){//inputChar=getInputChar();
 								///printf("(%d)",inputChar);
 								if(inputChar==51){
-									if(inputCharRead(&inputChar)){//inputChar=getInputChar();
+									if(inputCharReadNonBlocking(&inputChar,NULL)){//inputChar=getInputChar();
 										if(inputChar==126){ // delete
 											/////////inputInfo("Delete");
 											// we should have suggested (identifier continuation or feed forward (autocompletion)) text
@@ -4244,11 +4244,11 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						beep();
 				}else
 				if(inputCharType=='m'){ // Esc character...
-					if(inputCharRead(&inputChar)){////inputChar=getInputChar();
+					if(inputCharReadNonBlocking(&inputChar,NULL)){////inputChar=getInputChar();
 						if(inputChar==91){
-							if(inputCharRead(&inputChar)){/////inputChar=getInputChar();
+							if(inputCharReadNonBlocking(&inputChar,NULL)){/////inputChar=getInputChar();
 								if(inputChar==51){
-									if(inputCharRead(&inputChar)){///////inputChar=getInputChar();
+									if(inputCharReadNonBlocking(&inputChar,NULL)){///////inputChar=getInputChar();
 										if(inputChar==126){ // delete
 											// TODO FIX this does not seem to be right!!!!!
 											if(getNumberOfSuggestedCharacters()){

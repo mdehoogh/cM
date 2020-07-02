@@ -59,8 +59,10 @@ bool inputCharRead(char* _c){
 	enableRawmode(0);
 	return(read(STDIN_FILENO,_c,1)==1);
 }
+// MDH@12JUL2020: even if updateFunction is NULL we switch to using a 1/10s timeout, only when updateFunction is not NULL do we execute the update function!!!!
+//                this is so that we can use NULL to read characters received as part of an escape sequence!!
 bool inputCharReadNonBlocking(char* _c,UpdateFunction updateFunction){
-	if(!updateFunction)return inputCharRead(_c);
+	// if(!updateFunction)return inputCharRead(_c);
 	enableRawmode(1);
 	// outputChar('Y'); // DEBUG
 	// as long as read timesout execute the updateFunction()
@@ -70,7 +72,7 @@ bool inputCharReadNonBlocking(char* _c,UpdateFunction updateFunction){
 		result=read(STDIN_FILENO,_c,1);
 		if(result!=0)break;
 		// outputChar('X'); // DEBUG
-		(*updateFunction)();
+		if(updateFunction)(*updateFunction)();
 	}
 	return(result>0);
 }
