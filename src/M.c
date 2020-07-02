@@ -2246,14 +2246,16 @@ bool updateNumberOfLineCharacters(){
 		if(!_userInputCommand||!_userInputCommand->_firstToken||(_userInputCommand->_firstToken==_userInputCommand->_lastToken&&string_length(_userInputCommand->_lastToken->text)==0))return true;
 		// MDH@02JUL2020: by experimenting I found out that that the cursor can also move to the next line if it is at the last position
 		//                in essence this means that we should actually accept that there's ONE additional position at the end of a line that is available for a character even though we are not using it
+		//                e.g. imagine that the user would decrement the viewport width by 1 this would NOT result in extra command lines because if it changed from 20 to 19 we'd have at most 19 characters on the line
+		//                which fit perfectly
 		// only when the new number of line characters is smaller should we redetermine how many lines back the prompt is
 		// if it is larger we assume that we the number of command lines did not change (visually)
 		size_t numberOfExtraCommandLines=0;
 		if(newNumberOfLineCharacters<numberOfLineCharacters){
 			// redetermine the position of where the token should be placed
 			// the problem is that for every current line we have to determine
-			size_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
-			size_t newMaximumNumberOfLineCommandCharacters=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength-1:0);
+			size_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0); // this would be the number of command characters that would be on a single line right now
+			size_t numberOfLineCommandCharactersThatWouldFit=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength/*-1*/:0); // one more than what we would actually use...
 			// as soon as the number of characters on a line exceeds newMaximumOfLineCommandCharacters we know an extra line is inserted
 			size_t l,left=maximumNumberOfLineCommandCharacters; // what's left on the first line of the command for command characters
 			// we should determine the number of command characters on each line
@@ -2286,7 +2288,7 @@ bool updateNumberOfLineCharacters(){
 					// if the last token character (which always exists as l>0) equals M_NEWLINE_CHARACTER we have a hard-break 
 					if(string_last_char(token->text)==M_NEWLINE_CHARACTER){
 						// if end of token is beyond the new line end another command line will be visible
-						if(left<maximumNumberOfLineCommandCharacters-newMaximumNumberOfLineCommandCharacters)
+						if(left<maximumNumberOfLineCommandCharacters-numberOfLineCommandCharactersThatWouldFit)
 							numberOfExtraCommandLines++;
 						// we know the next token is on the next line
 						left=maximumNumberOfLineCommandCharacters;
