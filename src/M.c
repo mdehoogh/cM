@@ -2174,64 +2174,65 @@ bool updateNumberOfLineCharacters(){
 	// although newNumberOfLineCharacters is positive it could be smaller than promptLength
 	// how about demanding newNumberOfLineCharacters to be at least promptLength+2!!!!
 	if(newNumberOfLineCharacters>0&&newNumberOfLineCharacters<promptLength+2)return false; // if defined but too small to fit at least one command character behind the prompts
+	/* MDH@02JUL2020: these exceptions can simply be combined with the input mode tests once (below)
 	if(inputMode==IM_COMMAND){
 		// inputInfo("New number of line characters: %i.",newNumberOfLineCharacters); // DEBUG
 		// if we do not have at least one user input command characters, there's nothing to do NOTE a non-empty command has at least two tokens TODO check this assumption
 		// it's a bit of a nuisance that the first token can have no characters in it but if it does first and last token will be the same so we still have to test the number of characters
 		if(!_userInputCommand||!_userInputCommand->_firstToken||(_userInputCommand->_firstToken==_userInputCommand->_lastToken&&string_length(_userInputCommand->_lastToken->text)==0))return true;
-			/*
-			// determine how many extra lines we got depending how many characters are on each line
-			// but wait: due to the change of line characters the window has been wrapping/unwrapping
-			// technically it's easiest to simply write the entire command again
-			size_t newNumberOfCommandLines=1; // the current number of command lines
-			// redetermine the position of where the token should be placed
-			size_t maximumNumberOfLineCommandCharacters=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength-1:0);
-			size_t l,left=maximumNumberOfLineCommandCharacters; // what's left on the first line of the command for command characters
-			Mtoken* token=_userInputCommand->_firstToken;
-			while(token){
-				l=string_length(token->text);
-				if(l>0){ // there are characters in the token (e.g. most of the time the first (expression) token will be empty)
-					// this token either fits on the current line or it does not but if newNumberOfLineCharacters equals zero it always does
-					if(maximumNumberOfLineCommandCharacters>0){ // a limited amount of characters fit on the current line, so there could be any number of soft-breaks
-						if(l>left){ // at least one soft-break
-							// decrease l by left and by the total number of characters that fit on a single line until 
-							do{
-								l-=left; // all (remaining) characters fit the rest of the line
-								newNumberOfCommandLines++;
-								left=maximumNumberOfLineCommandCharacters; // what's left on the line for command characters
-							}while(l>left);
-						}
-						// ASSERT l is smaller than or equal to left
-						left-=l;
-					}
-					// if the last token character (which always exists as l>0) equals M_NEWLINE_CHARACTER we have a hard-break 
-					if(string_last_char(token->text)==M_NEWLINE_CHARACTER){left=maximumNumberOfLineCommandCharacters;newNumberOfCommandLines++;}
-				}
-				// determine the new line and position based on the last token
-				token=token->next;
-			}
-			if(newNumberOfCommandLines!=getNumberOfCommandLines()){
-				*/
+			// removing:
+			//// determine how many extra lines we got depending how many characters are on each line
+			//// but wait: due to the change of line characters the window has been wrapping/unwrapping
+			//// technically it's easiest to simply write the entire command again
+			//size_t newNumberOfCommandLines=1; // the current number of command lines
+			//// redetermine the position of where the token should be placed
+			//size_t maximumNumberOfLineCommandCharacters=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength-1:0);
+			//size_t l,left=maximumNumberOfLineCommandCharacters; // what's left on the first line of the command for command characters
+			//Mtoken* token=_userInputCommand->_firstToken;
+			//while(token){
+			//	l=string_length(token->text);
+			//	if(l>0){ // there are characters in the token (e.g. most of the time the first (expression) token will be empty)
+			//		// this token either fits on the current line or it does not but if newNumberOfLineCharacters equals zero it always does
+			//		if(maximumNumberOfLineCommandCharacters>0){ // a limited amount of characters fit on the current line, so there could be any number of soft-breaks
+			//			if(l>left){ // at least one soft-break
+			//				// decrease l by left and by the total number of characters that fit on a single line until 
+			//				do{
+			//					l-=left; // all (remaining) characters fit the rest of the line
+			//					newNumberOfCommandLines++;
+			//					left=maximumNumberOfLineCommandCharacters; // what's left on the line for command characters
+			//				}while(l>left);
+			//			}
+			//			// ASSERT l is smaller than or equal to left
+			//			left-=l;
+			//		}
+			//		// if the last token character (which always exists as l>0) equals M_NEWLINE_CHARACTER we have a hard-break 
+			//		if(string_last_char(token->text)==M_NEWLINE_CHARACTER){left=maximumNumberOfLineCommandCharacters;newNumberOfCommandLines++;}
+			//	}
+			//	// determine the new line and position based on the last token
+			//	token=token->next;
+			//}
+			//if(newNumberOfCommandLines!=getNumberOfCommandLines()){
+				//*/
 				// output("%i",newNumberOfCommandLines); // DEBUG
 				// ASSERT line now contains the number of lines the command will occupy when displayed again
 				// go to the line where the prompt now is
-				/*
-				clearScreenFromCursor(); // get rid of the suggested text
-				oneLineDown();toStartOfLine(); // move to the start of the next line
-				*/
+				///*
+				//clearScreenFromCursor(); // get rid of the suggested text
+				//oneLineDown();toStartOfLine(); // move to the start of the next line
+				//*/
 				// replacing:
-				/* replacing:
-				while(newNumberOfCommandLines>0){oneLineUp();newNumberOfCommandLines--;}toStartOfLine();moveCursorRight(promptLength); // TODO as this is similar to backToPrompt() can we use backToPrompt()????
-				if(newNumberOfLineCharacters==0||numberOfLineCharacters<newNumberOfLineCharacters)clearScreenFromCursor(); // in case we have less lines!!!
-				*/
+				///* replacing:
+				//while(newNumberOfCommandLines>0){oneLineUp();newNumberOfCommandLines--;}toStartOfLine();moveCursorRight(promptLength); // TODO as this is similar to backToPrompt() can we use backToPrompt()????
+				//if(newNumberOfLineCharacters==0||numberOfLineCharacters<newNumberOfLineCharacters)clearScreenFromCursor(); // in case we have less lines!!!
+				//*/
 			// }
 			//else outputChar('Y'); // DEBUG
 		//}
-	}else
-	if(inputMode==IM_SHELL){ // TODO implement
-		if(!_shellCommand||string_length(_shellCommand)==0)return true;
-	}
-
+	//}else
+	//if(inputMode==IM_SHELL){ // TODO implement
+	//	if(!_shellCommand||string_length(_shellCommand)==0)return true;
+	//}
+	//*/
 	/* no need to clear the screen anymore if we manage to compute the actual number of command lines accurately
 	outputControlText("2J"); // clear screen
 	outputControlText("H"); // put cursor in top-left corner
@@ -2242,6 +2243,9 @@ bool updateNumberOfLineCharacters(){
 	*/
 
 	if(inputMode==IM_COMMAND){
+		if(!_userInputCommand||!_userInputCommand->_firstToken||(_userInputCommand->_firstToken==_userInputCommand->_lastToken&&string_length(_userInputCommand->_lastToken->text)==0))return true;
+		// MDH@02JUL2020: by experimenting I found out that that the cursor can also move to the next line if it is at the last position
+		//                in essence this means that we should actually accept that there's ONE additional position at the end of a line that is available for a character even though we are not using it
 		// only when the new number of line characters is smaller should we redetermine how many lines back the prompt is
 		// if it is larger we assume that we the number of command lines did not change (visually)
 		size_t numberOfExtraCommandLines=0;
@@ -2306,6 +2310,7 @@ bool updateNumberOfLineCharacters(){
 		showSuggestedText();
 	}else
 	if(inputMode==IM_SHELL){
+		if(!_shellCommand||string_length(_shellCommand)==0)return true;
 		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
 		// TODO output the shell command wrapped
 		outputShellCommand();
@@ -3691,7 +3696,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 			// ask the user for input
 			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
-			if(!inputCharReadNonBlocking(&inputChar,&updateNumberOfLineCharacters))break;
+			if(!inputCharReadNonBlocking(&inputChar,NULL))break; // let's see how the terminal window wraps... &updateNumberOfLineCharacters))break;
 
 			// outputChar(inputChar);
 
