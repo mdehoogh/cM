@@ -2252,12 +2252,14 @@ bool updateNumberOfLineCharacters(){
 		// if it is larger we assume that we the number of command lines did not change (visually)
 		size_t numberOfExtraCommandLines=0;
 		if(newNumberOfLineCharacters<numberOfLineCharacters){
+			// MDH@03JUL2020: how about using the user input lines instead of iterating over all tokens instead????
+
 			// redetermine the position of where the token should be placed
 			// the problem is that for every current line we have to determine
-			size_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0); // this would be the number of command characters that would be on a single line right now
+			size_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0); // this would be the maximum number of command characters that would be on a single line right now in case of a soft-break continued on the next line
 			size_t numberOfLineCommandCharactersThatWouldFit=(newNumberOfLineCharacters>0?newNumberOfLineCharacters-promptLength/*-1*/:0); // one more than what we would actually use...
 			// as soon as the number of characters on a line exceeds newMaximumOfLineCommandCharacters we know an extra line is inserted
-			size_t l,left=maximumNumberOfLineCommandCharacters; // what's left on the first line of the command for command characters
+			size_t l,numberOfLineCommandCharactersSoFar=0; // the number of command characters so far
 			// we should determine the number of command characters on each line
 			// if this number of characters exceeds the new number of line command characters we have to increment numberOfExtraCommandLines
 			Mtoken* token=_userInputCommand->_firstToken;
@@ -2265,33 +2267,23 @@ bool updateNumberOfLineCharacters(){
 				l=string_length(token->text);
 				if(l>0){ // there are characters in the token (e.g. most of the time the first (expression) token will be empty)
 					// this token either fits on the current line or it does not but if newNumberOfLineCharacters equals zero it always does
-					if(maximumNumberOfLineCommandCharacters>0){ // a limited amount of characters fit on the current line, so there could be any number of soft-breaks
+					if(maximumNumberOfLineCommandCharacters>0){ // this token could occupy multiple (original) lines
 						// how many characters of the token fit on this line????
-						if(l>left){ // fits partially on this line
-							// therefore the rest of the line is occupied by a part of this token
-							// and we know for sure that we have a wrap
-							// numberOfExtraCommandLines++;
+						while(l+numberOfLineCommandCharactersSoFar>=numberOfLineCommandCharactersThatWouldFit){ // rest of the current original command line is completely occupied by characters of this token
+							// if command characters on this line were wrapped onto the next terminal line increment the number of extra command lines
+							if(maximumNumberOfLineCommandCharacters>numberOfLineCommandCharactersThatWouldFit)numberOfExtraCommandLines++;
 							// determine the number of characters left in the token
-							l-=left; // l = number of token characters on successive lines
-							left=maximumNumberOfLineCommandCharacters;
-							// count all successive lines this token fully occupies which we know for sure will generate extra command lines
-							while(l>=left){
-								numberOfExtraCommandLines++;
-								l-=left;
-							}
-							// ASSERT 0<=l<maximumNumberOfLineCommandCharacters is on a line of its own
-							// because left equals maximumNumberOfLineCommandCharacters subtracting l is exactly what we need to do
-							// to determine what's left on the last line the 
+							l-=(numberOfLineCommandCharactersThatWouldFit-numberOfLineCommandCharactersSoFar-1); // subtract the number of token characters that actually are present 
+							numberOfLineCommandCharactersSoFar=0; // no characters on start of line
 						}
-						left-=l; // update the number of characters left on the line
+						numberOfLineCommandCharactersSoFar+=l; // update the number of characters used on the line the token ends on
 					}
 					// if the last token character (which always exists as l>0) equals M_NEWLINE_CHARACTER we have a hard-break 
 					if(string_last_char(token->text)==M_NEWLINE_CHARACTER){
-						// if end of token is beyond the new line end another command line will be visible
-						if(left<maximumNumberOfLineCommandCharacters-numberOfLineCommandCharactersThatWouldFit)
-							numberOfExtraCommandLines++;
+						// if this hard-break newline characters wrapped onto the next line we have an additional command line
+						if(l+numberOfLineCommandCharactersSoFar>numberOfLineCommandCharactersThatWouldFit)numberOfExtraCommandLines++;
 						// we know the next token is on the next line
-						left=maximumNumberOfLineCommandCharacters;
+						numberOfLineCommandCharacters=0;
 					}
 				}
 				// determine the new line and position based on the last token
@@ -2308,6 +2300,9 @@ bool updateNumberOfLineCharacters(){
 		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
 		Mtoken* token=_userInputCommand->_firstToken;
 		while(token){outputToken(token);token=token->next;}
+		// the cursor could end up on the last available position on the command line (i.e. when the last command line is full) where it is never supposed to be at
+		numberOfLineCommandCharacters=getUserInputLength()-(_userinputline?_userinputline->offset:0);
+		if(numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters){oneLineDown();showContinuedPrompt();}
 		clearScreenFromCursor(); // TODO can't harm but not certain about this
 		showSuggestedText();
 	}else
@@ -3698,7 +3693,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 			// ask the user for input
 			// MDH@30JUN2020: blocking call inputCharRead() replaced by a non-blocking call that allows executing updateNumberOfLineCharacters after each 1/10 second timeout
-			if(!inputCharReadNonBlocking(&inputChar,NULL))break; // let's see how the terminal window wraps... &updateNumberOfLineCharacters))break;
+			if(!inputCharReadNonBlocking(&inputChar,&updateNumberOfLineCharacters))break; // let's see how the terminal window wraps... &updateNumberOfLineCharacters))break;
 
 			// outputChar(inputChar);
 
