@@ -1282,6 +1282,9 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 				}
 			}else
 				output("%s",tokenText+significantTokenCharacterCount);
+			// MDH@04JUL2020: the token may end with the explicit newline character!
+			if(tokenText[tokenCharacterCount-1]==M_NEWLINE_CHARACTER)
+				showContinuedPrompt();
 		}
 		// resetOutputColor();
 	}
@@ -2300,10 +2303,10 @@ bool updateNumberOfLineCharacters(){
 		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
 		Mtoken* token=_userInputCommand->_firstToken;
 		while(token){outputToken(token);token=token->next;}
+		clearScreenFromCursor(); // TODO can't harm but not certain about this
 		// the cursor could end up on the last available position on the command line (i.e. when the last command line is full) where it is never supposed to be at
 		numberOfLineCommandCharacters=getUserInputLength()-(_userinputline?_userinputline->offset:0);
-		if(numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters){oneLineDown();showContinuedPrompt();}
-		clearScreenFromCursor(); // TODO can't harm but not certain about this
+		if(numberOfLineCommandCharacters+promptLength+1>=numberOfLineCharacters){/*oneLineDown();*/showContinuedPrompt();}
 		showSuggestedText();
 	}else
 	if(inputMode==IM_SHELL){
