@@ -1041,7 +1041,7 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	*/
 }
 // MDH@30OCT2019: we'd like to be able to continue a command on the next line
-bool showContinuedPrompt(){
+bool showContinuedPrompt(bool notsuggested){
 	if(inputMode==IM_COMMAND){
 		// ASSERT only to be called in command mode with _userInputCommand not NULL
 		// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
@@ -1051,10 +1051,10 @@ bool showContinuedPrompt(){
 		outputChar('\n'); // move over to the next line
 		uint8_t blanks=promptLength;while(blanks>3){outputChar(' ');blanks--;}
 		resetOutputColor();
-		output(" = ");
+		output(" %c ",(notsuggested?'=':' ')); // if not suggested write an equal sign, otherwise write a blank (as what's being written is not part of the command yet)
 	}else
 	if(inputMode==IM_SHELL){
-		output(": "); // continuation of $ not certain what to display here but a colon is used often (e.g. in Python)
+		output("%c ",(notsuggested?':':' ')); // TODO continuation of $ not certain what to display here but a colon is used often (e.g. in Python)
 	}
 	return true;
 	/// can't call this here!!!! outputTokenColor(_userInputCommand->_lastToken);
@@ -1209,11 +1209,37 @@ void promptForUserInput(){
  */
 void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 
-// Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
+// MDH@07JUL2020: if you want to output text that wraps to the number of command line characters call outputCommandText()
+//                passing in the text and the current position on the line, passing out the final position on the line
+static size_t outputCommandLineText(char* text,size_t position,char* textcolor){
+	size_t newposition=position;
+	size_t numberOfCommandCharactersToOutput=(text?strlen(text):0);
+	if(numberOfCommandCharactersToOutput>0){
+		uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
+		if(maximumNumberOfLineCommandCharacters>0&&position+numberOfCommandCharactersToOutput>maximumNumberOfLineCommandCharacters){
+			size_t left=maximumNumberOfLineCommandCharacters-newposition; // what we can fit on the line
+			for(int commandCharacterIndex=0;commandCharacterIndex<numberOfCommandCharactersToOutput;commandCharacterIndex++){
+				outputChar(text[commandCharacterIndex]);
+				if(--left==0){
+					showContinuedPrompt(true);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
+					left=maximumNumberOfLineCommandCharacters;
+				}
+			}
+			newposition=maximumNumberOfLineCommandCharacters-left;
+		}else{
+			output("%s",text);
+			newposition+=numberOfCommandCharactersToOutput;
+		}
+	}
+	return newposition;
+}
 
+// Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 // MDH@24JUN2020: need to reconsider how to output the token given that a single token can occupy multiple 
 //                output lines based on its position and length (and numberOfLineCharacters and promptLength)
 static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE__);
+	// ASSERT assuming _token->position actually contains the number of command characters on the current command line in front of this token
+	size_t position=0;
 	size_t tokenCharacterCount=(_token&&_token->text?string_length(_token->text):0);
 	if(tokenCharacterCount>0){
 		uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
@@ -1233,6 +1259,9 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 		}
 		// if we allow comments in tokens we're in trouble!!!
 		outputTokenColor(_token);
+		// MDH@07JUL2020: delegating writing the significant token characters to outputCommandLineText()
+		position=outputCommandLineText(tokenText,_token->position,getTokenColor(_token->type));
+		/* replacing:
 		// MDH@24JUN2020: if a token is on multiple lines (due to a limiting number of line characters)
 		//                we have to 'insert' so-called soft-breaks
 		size_t left;
@@ -1242,53 +1271,43 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 			for(int tokenCharacterIndex=0;tokenCharacterIndex<significantTokenCharacterCount;tokenCharacterIndex++){
 				outputChar(tokenText[tokenCharacterIndex]);
 				if(--left==0){
-					/*oneLineDown();toStartOfLine();*/showContinuedPrompt();outputTokenColor(_token);
+					showContinuedPrompt(true);outputTokenColor(_token);
 					left=maximumNumberOfLineCommandCharacters;
 				}
 			}
-			/* replacing:
-			Mstring* _tokenText=owned_string(_stringCopy(_token->text,0),owner);
-			size_t left=numberOfLineCharacters-promptLength-_token->position; // what we can fit on the line
-			char endCharacter;
-			while(left>0){
-				char endCharacter=string_replacedchar(_tokenText,'\0',left);
-				output("%s",string(_tokenText));
-				string_setchar(_tokenText,endCharacter,left);
-				// cut off the first left characters
-				string_removed(_tokenText,0,left);
-				// move to the next line
-				oneLineDown();toStartOfLine();showContinuedPrompt();
-				left=numberOfLineCharacters-promptLength; // the full next line
-				if(left>string_length(_tokenText))left=string_length(_tokenText);
-			}
-			free_string(_tokenText);
-			*/
 		}else{ // all characters fit on this line (no soft-breaks required)
 			output("%s",tokenText); // although string() will write the '\0' at the end we've already written one in front of that position
 			left=maximumNumberOfLineCommandCharacters-_token->position-significantTokenCharacterCount;
 		}
+		*/
 		// if there's whitespace text to start with write it in the default output color
 		resetOutputColor();
 		if(firstWhitespaceCharacter){
 			tokenText[significantTokenCharacterCount]=firstWhitespaceCharacter; // put it back
+			// MDH@07JUL2020: delegating to outputCommandLineText() for writing the whitespace characters
+			position=outputCommandLineText(tokenText+significantTokenCharacterCount,position,getInfoColor());
+			/*
 			// if spanning multiple lines write one character at a time
 			if(tokenCharacterCount>left+significantTokenCharacterCount){
 				for(size_t tokenCharacterIndex=significantTokenCharacterCount;tokenCharacterIndex<tokenCharacterCount;tokenCharacterIndex++){
 					outputChar(tokenText[tokenCharacterIndex]);
 					if(--left==0){
-						/*oneLineDown();toStartOfLine();*/showContinuedPrompt();
+						showContinuedPrompt(true);
 						left=maximumNumberOfLineCommandCharacters;
 					}
 				}
 			}else
 				output("%s",tokenText+significantTokenCharacterCount);
+			*/
 			// MDH@04JUL2020: the token may end with the explicit newline character!
-			if(tokenText[tokenCharacterCount-1]==M_NEWLINE_CHARACTER)
-				showContinuedPrompt();
+			if(tokenText[tokenCharacterCount-1]==M_NEWLINE_CHARACTER){
+				showContinuedPrompt(true);
+				position=0;
+			}
 		}
 		// resetOutputColor();
 	}
-	return tokenCharacterCount;
+	return position; // replacing: tokenCharacterCount;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
 // MDH@30APR2019: when a function returns to a variable and the other way round
@@ -1906,9 +1925,11 @@ void writeCommand(Mcommand * const command){
 	Mtoken* token=(command?command->_firstToken:NULL);
 	while(token){
 		numberOfBehindPromptCharactersWritten+=outputToken(command->_lastToken=token);
+		/* MDH@07JUL2020 CORRECTION outputToken() also takes care of showing continued prompts: 
 		// are we supposed to generate a newline?
 		// NOTE we're assuming there that a string can never end with this character which is also the text escape character (which requires another character following it)
-		if(string_last_char(command->_lastToken->text)==M_NEWLINE_CHARACTER)showContinuedPrompt();
+		if(string_last_char(command->_lastToken->text)==M_NEWLINE_CHARACTER)showContinuedPrompt(true);
+		*/
 		token=token->next;
 	}
 }
@@ -2130,7 +2151,7 @@ void outputShellCommand(){
 		if(left<l){
 			for(size_t shellCommandIndex=0;shellCommandIndex<l;shellCommandIndex++){
 				outputChar(string_char(_shellCommand,shellCommandIndex));
-				if(--left==0){oneLineDown();toStartOfLine();showContinuedPrompt();left=maximumNumberOfLineCommandCharacters;}
+				if(--left==0){showContinuedPrompt(true);left=maximumNumberOfLineCommandCharacters;}
 			}
 			return;
 		}
@@ -2302,11 +2323,16 @@ bool updateNumberOfLineCharacters(){
 		// taken care of by promptForUserInput(): free_userinputline();
 		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
 		Mtoken* token=_userInputCommand->_firstToken;
-		while(token){outputToken(token);token=token->next;}
+		// MDH@07JUL2020: outputToken() now outputs the position on the current command line, which we can use to initialize token->position as used by outputToken()
+		size_t position=0;
+		while(token){token->position=position;position=outputToken(token);token=token->next;}
+		numberOfLineCommandCharacters=position; // also essential to end up with the right value for numberOfLineCommandCharacters!!!!!
 		clearScreenFromCursor(); // TODO can't harm but not certain about this
+		/* MDH@07JUL2020 because we now allow the cursor on the last line position we do not need the following anymore:
 		// the cursor could end up on the last available position on the command line (i.e. when the last command line is full) where it is never supposed to be at
 		numberOfLineCommandCharacters=getUserInputLength()-(_userinputline?_userinputline->offset:0);
-		if(numberOfLineCommandCharacters+promptLength+1>=numberOfLineCharacters){/*oneLineDown();*/showContinuedPrompt();}
+		if(numberOfLineCommandCharacters+promptLength+1>=numberOfLineCharacters)showContinuedPrompt();
+		*/
 		showSuggestedText();
 	}else
 	if(inputMode==IM_SHELL){
@@ -2796,12 +2822,16 @@ char removedTokenCharacter(bool endOfInput){
 			if(endOfInput){
 				// MDH@30OCT2019: with multiline user input it sometimes is a little harder than calling moveCursorLeft(1)
 				//                if the offset of the current user input line is beyond the total command length apparently we've 'removed' the last command character on the previous line
-				if(_userinputline&&_userinputline->offset>getUserInputLength()){
+				size_t userInputLength=getUserInputLength();
+				if(_userinputline&&_userinputline->offset>userInputLength){
 					toStartOfLine();clearScreenFromCursor(); // clear this user input line and what's beyond it
 					removeUserinputline();
 					oneLineUp();toUserInputCursorPosition(0); // one line up and to the proper position (not sure what will happen to the suggested text though)
-				}else
+					numberOfLineCommandCharacters=userInputLength-(_userinputline?_userinputline->offset:0); // MDH@07JUL2020: essential to keep track of the number of line command characters
+				}else{
 					moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
+					numberOfLineCommandCharacters--; // MDH@07JUL2020: essential to keep track of the number of line command characters
+				}
 			}
 			// MDH@01OCT2019: whenever the last token does not change but the last token character is removed, we should check the type 
 			//                HOWEVER we're assuming that we're dealing with an end of input situation
@@ -2919,12 +2949,13 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	printf("[%s]",string(_userInputCommand->_lastToken->text));
 #endif
 
+	// MDH@07JUL2020: allowing the cursor to be on the last available line position BUT not to allow input characters to appear there!!!!!
+	if(numberOfLineCommandCharacters+promptLength+1==numberOfLineCharacters){showContinuedPrompt(true);outputTokenColor(_userInputCommand->_lastToken);}
 	// MDH@24APR2019 obsolete: getCommandLength()++; // increment total command length
 	// outputChar('>');
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
 
 	numberOfLineCommandCharacters++;
-	if(numberOfLineCommandCharacters+promptLength==numberOfLineCharacters-1){oneLineDown();showContinuedPrompt();outputTokenColor(_userInputCommand->_lastToken);}
 
 	//putchar('\b');
 
@@ -3921,7 +3952,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 								newInputChar='\0'; // to indicate some error occurred
 								break;
 							}
-							if(newInputCharType==' ')showContinuedPrompt(); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
+							if(newInputCharType==' ')showContinuedPrompt(true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
 							numberOfSuggestedCharactersAccepted+=1;
 						}
 						// remove at most numberOfSuggestedCharactersAccepted from the suggested text
@@ -4040,7 +4071,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 											char suggestedInputCharType=INPUTCHARACTERTYPES[c];
 											if(commandCharacterAccepted(c,&suggestedInputCharType,true,false)){
 												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
-												if(inputCharType==' ')showContinuedPrompt(); // MDH@31OCT2019: we just consumed a newline (request) character
+												if(inputCharType==' ')showContinuedPrompt(true); // MDH@31OCT2019: we just consumed a newline (request) character
 												// where to remove it from????
 												// NOTE identifier continuation and immediate feed forward are redetermined automatically so do not need to be adjusted here
 												if(string_length(_manualFeedforwardText)){
@@ -4160,7 +4191,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						if(commandCharacterAccepted(inputChar,&inputCharType,true,false)){
 							// outputChar('X');
 							if(inputCharType==' '){ // a newline request (whenever M_NEWLINE_CHARACTER is input at a functional position)
-								showContinuedPrompt();
+								showContinuedPrompt(true);
 								//////////showSuggestedText(); // we have to rewrite the suggested text though
 								///////////outputTokenColor(_userInputCommand->_lastToken); // and show the right color
 							}
