@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
-char const * const M_BUILD="4";char const * const M_DATE="30 June 2020";
+char const * const M_BUILD="5";char const * const M_DATE="21 September 2020";
+// char const * const M_BUILD="4";char const * const M_DATE="30 June 2020";
 // char const * const M_BUILD="3";char const * const M_DATE="17 June 2020";
 //char const * const M_BUILD="2";char const * const M_DATE="25 May 2020";
 //char const * const M_BUILD="1";char const * const M_DATE="22 May 2020";
@@ -389,6 +390,7 @@ static size_t free_userinputline(){
 	return numberOfUserInputLines;
 }
 static void removeUserinputline(){
+	if(!_userinputline)return;
 	Muserinputline* prevUserinputline=_userinputline->_prev;
 	FREE_DISOWNED_1(_userinputline,'6',owner_userinputline);
 	_userinputline=prevUserinputline;
@@ -396,7 +398,7 @@ static void removeUserinputline(){
 // MDH@30OCT2019 END
 size_t toInfoInputLine(){
 	size_t linesUp=0,lines=getNumberOfCommandLines(); // ASSERT lines should be at least 1
-	while(++linesUp<=lines)oneLineUp();clearLine();
+	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();output("[%zd]",lines);
     return linesUp;
 } // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
 // output functions that require access to the current token
@@ -404,17 +406,22 @@ void outputUserInputCommandTokenColor(){
 	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
 }
 uint8_t promptLength=0;
-void returnToUserInputCommandCursorPosition(){
+size_t returnToUserInputCommandCursorPosition(){
 	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
 	toStartOfLine();
-	moveCursorRight(promptLength+getUserInputLength()-(_userinputline?_userinputline->offset:0)); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
+	size_t numberOfInputCommandLineCharacters=getUserInputLength()-(_userinputline?_userinputline->offset:0);
+	// size_t debugInfoLength=output(" %zd ",numberOfInputCommandLineCharacters);moveCursorRight(promptLength+numberOfInputCommandLineCharacters-debugInfoLength); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
+	moveCursorRight(promptLength+numberOfInputCommandLineCharacters);
 	outputUserInputCommandTokenColor();
+	return numberOfInputCommandLineCharacters;
 }
-void toUserInputCursorPosition(size_t linesDown){
-	while(linesDown>0){oneLineDown();linesDown--;}returnToUserInputCommandCursorPosition();
+size_t toUserInputCursorPosition(size_t linesDown){
+	while(linesDown>0){oneLineDown();linesDown--;}
+	return returnToUserInputCommandCursorPosition();
 }
 // MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
 static void inputInfo(const char* const fmt,...){
+	return;
 	if(fmt&&strlen(fmt)){ // we have a format
 		// outputChar('X');
 		size_t linesMovedUp=toInfoInputLine();
@@ -1041,14 +1048,15 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	*/
 }
 // MDH@30OCT2019: we'd like to be able to continue a command on the next line
-bool showContinuedPrompt(bool notsuggested){
+// MDH@21SEP2020: added the newline flag to indicate that a new line character is to be written
+bool showContinuedPrompt(bool notsuggested,bool newline){
 	if(inputMode==IM_COMMAND){
 		// ASSERT only to be called in command mode with _userInputCommand not NULL
 		// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
 		if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
 		numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
-		clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
-		outputChar('\n'); // move over to the next line
+		if(newline)clearScreenFromCursor(); // to get rid of any suggested text behind the cursor
+		if(newline)outputChar('\n'); // move over to the next line
 		uint8_t blanks=promptLength;while(blanks>3){outputChar(' ');blanks--;}
 		resetOutputColor();
 		output(" %c ",(notsuggested?'=':' ')); // if not suggested write an equal sign, otherwise write a blank (as what's being written is not part of the command yet)
@@ -1221,7 +1229,7 @@ static size_t outputCommandLineText(char* text,size_t position,char* textcolor){
 			for(int commandCharacterIndex=0;commandCharacterIndex<numberOfCommandCharactersToOutput;commandCharacterIndex++){
 				outputChar(text[commandCharacterIndex]);
 				if(--left==0){
-					showContinuedPrompt(true);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
+					showContinuedPrompt(true,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
 					left=maximumNumberOfLineCommandCharacters;
 				}
 			}
@@ -1301,7 +1309,7 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 			*/
 			// MDH@04JUL2020: the token may end with the explicit newline character!
 			if(tokenText[tokenCharacterCount-1]==M_NEWLINE_CHARACTER){
-				showContinuedPrompt(true);
+				showContinuedPrompt(true,true);
 				position=0;
 			}
 		}
@@ -2151,7 +2159,7 @@ void outputShellCommand(){
 		if(left<l){
 			for(size_t shellCommandIndex=0;shellCommandIndex<l;shellCommandIndex++){
 				outputChar(string_char(_shellCommand,shellCommandIndex));
-				if(--left==0){showContinuedPrompt(true);left=maximumNumberOfLineCommandCharacters;}
+				if(--left==0){showContinuedPrompt(true,false);left=maximumNumberOfLineCommandCharacters;}
 			}
 			return;
 		}
@@ -2826,8 +2834,8 @@ char removedTokenCharacter(bool endOfInput){
 				if(_userinputline&&_userinputline->offset>userInputLength){
 					toStartOfLine();clearScreenFromCursor(); // clear this user input line and what's beyond it
 					removeUserinputline();
-					oneLineUp();toUserInputCursorPosition(0); // one line up and to the proper position (not sure what will happen to the suggested text though)
-					numberOfLineCommandCharacters=userInputLength-(_userinputline?_userinputline->offset:0); // MDH@07JUL2020: essential to keep track of the number of line command characters
+					oneLineUp();
+					numberOfLineCommandCharacters=toUserInputCursorPosition(0); // one line up and to the proper position (not sure what will happen to the suggested text though)
 				}else{
 					moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
 					numberOfLineCommandCharacters--; // MDH@07JUL2020: essential to keep track of the number of line command characters
@@ -2906,6 +2914,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	if(!_userInputCommand){inputError("%sNo user input command.",M_BUG_PREFIX);return false;}
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	/////outputChar('3');
+	// MDH@21SEP2020: clearInfo() is also responsible for the problem with right arrow because the result is that the character is output one line down with every right arrow
 	clearInfo(); // MDH@28FEB2020: is responsible for the experienced problem
 	/////outputChar('4');
 	/////////if(amDebugging())inputInfo("A");
@@ -2950,18 +2959,22 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 #endif
 
 	// MDH@07JUL2020: allowing the cursor to be on the last available line position BUT not to allow input characters to appear there!!!!!
-	if(numberOfLineCommandCharacters+promptLength+1==numberOfLineCharacters){showContinuedPrompt(true);outputTokenColor(_userInputCommand->_lastToken);}
+	// MDH@21SEP2020: if(numberOfLineCommandCharacters+promptLength+1==numberOfLineCharacters){showContinuedPrompt(true);outputTokenColor(_userInputCommand->_lastToken);}
 	// MDH@24APR2019 obsolete: getCommandLength()++; // increment total command length
 	// outputChar('>');
 	outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
 
 	numberOfLineCommandCharacters++;
 
+	// MDH21SEP2020:65th birthday: if the line is now full move the cursor to the next line
+	//                             not to write a newline character because we are supposedly already at the start of the next line
+	if(numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters){showContinuedPrompt(true,false);outputTokenColor(_userInputCommand->_lastToken);}
+
 	//putchar('\b');
 
 	if(endOfInput){
 		//////if(amAssisting())output(":%c",*inputCharacterType);
-		debugWrite("Command length after inserting %c: %zu.",inputChar,getCommandLength());
+		// debugWrite("Command length after inserting %c: %zu.",inputChar,getCommandLength());
 	}
 
 	// MDH@24APR2019 obsolete: getUserInputLength()++; // increment the current cursor position
@@ -3030,7 +3043,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 		updateLastTokenAutocompletionText(/*acceptedFirstSuggestedCharacterDeleted*/); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
 		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amDebugging())inputInfo("N");
-		debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
+		// debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
 		//////////if(!initializationsChanged)outputStatus(inputChar,*inputCharacterType);
 		/////if(amDebugging())inputInfo("O");
 	}
@@ -3952,7 +3965,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 								newInputChar='\0'; // to indicate some error occurred
 								break;
 							}
-							if(newInputCharType==' ')showContinuedPrompt(true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
+							if(newInputCharType==' ')showContinuedPrompt(true,true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
 							numberOfSuggestedCharactersAccepted+=1;
 						}
 						// remove at most numberOfSuggestedCharactersAccepted from the suggested text
@@ -4069,9 +4082,10 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 										if(c){
 											// MDH@31OCT2019: this might well be a newline character!!!
 											char suggestedInputCharType=INPUTCHARACTERTYPES[c];
+											// MDH@21SEP2020: it is a suggested character isn't it????? didn't help changing false to true!!!!
 											if(commandCharacterAccepted(c,&suggestedInputCharType,true,false)){
 												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
-												if(inputCharType==' ')showContinuedPrompt(true); // MDH@31OCT2019: we just consumed a newline (request) character
+												if(inputCharType==' ')showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
 												// where to remove it from????
 												// NOTE identifier continuation and immediate feed forward are redetermined automatically so do not need to be adjusted here
 												if(string_length(_manualFeedforwardText)){
@@ -4191,7 +4205,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						if(commandCharacterAccepted(inputChar,&inputCharType,true,false)){
 							// outputChar('X');
 							if(inputCharType==' '){ // a newline request (whenever M_NEWLINE_CHARACTER is input at a functional position)
-								showContinuedPrompt(true);
+								showContinuedPrompt(true,true);
 								//////////showSuggestedText(); // we have to rewrite the suggested text though
 								///////////outputTokenColor(_userInputCommand->_lastToken); // and show the right color
 							}
