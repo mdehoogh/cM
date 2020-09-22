@@ -1219,27 +1219,34 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 
 // MDH@07JUL2020: if you want to output text that wraps to the number of command line characters call outputCommandText()
 //                passing in the text and the current position on the line, passing out the final position on the line
-static size_t outputCommandLineText(char* text,size_t position,char* textcolor){
-	size_t newposition=position;
-	size_t numberOfCommandCharactersToOutput=(text?strlen(text):0);
-	if(numberOfCommandCharactersToOutput>0){
-		uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
-		if(maximumNumberOfLineCommandCharacters>0&&position+numberOfCommandCharactersToOutput>maximumNumberOfLineCommandCharacters){
-			size_t left=maximumNumberOfLineCommandCharacters-newposition; // what we can fit on the line
-			for(int commandCharacterIndex=0;commandCharacterIndex<numberOfCommandCharactersToOutput;commandCharacterIndex++){
-				outputChar(text[commandCharacterIndex]);
-				if(--left==0){
+// MDH@22SEP2020: it makes sense to return the number of characters written as well we can use a long long for that
+//                assuming 32 bits for the position and number of characters to write suffice or we could use 16 bits
+//                for the position and 48 bits for the maximum number of characters to write
+static unsigned long long outputCommandLineText(char* text,uint16_t position,char* textcolor){
+	size_t numberOfCharactersToOutput=(text?strlen(text):0);
+	if(numberOfCharactersToOutput==0)return (unsigned long long)position; // essential no change in position
+	unsigned long long newposition=position,numberOfCharactersOutput=0;
+	uint16_t maximumNumberOfLineCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
+	if(maximumNumberOfLineCharacters>0&&newposition+numberOfCharactersToOutput>maximumNumberOfLineCharacters){
+		unsigned long long leftOnLine=maximumNumberOfLineCharacters-newposition; // what we can fit on the line
+		for(int characterIndex=0;characterIndex<numberOfCharactersToOutput;characterIndex++){
+			size_t characterOutput=outputChar(text[characterIndex]);
+			if(characterOutput){
+				leftOnLine-=characterOutput;
+				numberOfCharactersOutput+=characterOutput;
+				if(leftOnLine==0){
 					showContinuedPrompt(true,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
-					left=maximumNumberOfLineCommandCharacters;
+					leftOnLine=maximumNumberOfLineCharacters;
 				}
 			}
-			newposition=maximumNumberOfLineCommandCharacters-left;
-		}else{
-			output("%s",text);
-			newposition+=numberOfCommandCharactersToOutput;
 		}
+		newposition=maximumNumberOfLineCharacters-leftOnLine;
+	}else{
+		size_t charactersOutput=output("%s",text);
+		newposition+=charactersOutput;
+		numberOfCharactersOutput+=charactersOutput;
 	}
-	return newposition;
+	return newposition+(numberOfCharactersOutput<<16);
 }
 
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
@@ -1268,7 +1275,8 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 		// if we allow comments in tokens we're in trouble!!!
 		outputTokenColor(_token);
 		// MDH@07JUL2020: delegating writing the significant token characters to outputCommandLineText()
-		position=outputCommandLineText(tokenText,_token->position,getTokenColor(_token->type));
+		// MDH@22SEP2020: outputCommandLineText() now also returning the number of characters written (and the position in the first 16 bits)
+		position=outputCommandLineText(tokenText,_token->position,getTokenColor(_token->type))&0xFFFF;
 		/* replacing:
 		// MDH@24JUN2020: if a token is on multiple lines (due to a limiting number of line characters)
 		//                we have to 'insert' so-called soft-breaks
@@ -1293,7 +1301,8 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 		if(firstWhitespaceCharacter){
 			tokenText[significantTokenCharacterCount]=firstWhitespaceCharacter; // put it back
 			// MDH@07JUL2020: delegating to outputCommandLineText() for writing the whitespace characters
-			position=outputCommandLineText(tokenText+significantTokenCharacterCount,position,getInfoColor());
+			// MDH@22SEP2020: same here
+			position=outputCommandLineText(tokenText+significantTokenCharacterCount,position,getInfoColor())&0xFFFF;
 			/*
 			// if spanning multiple lines write one character at a time
 			if(tokenCharacterCount>left+significantTokenCharacterCount){
@@ -2045,15 +2054,24 @@ size_t getNumberOfTokenAutocompletionTexts(){
 	return numberOfTokenAutocompletionTexts;
 }
 
-size_t getNumberOfManualFeedforwardCharactersWritten(){
+// MDH@22SEP2020: when suggested text is output on the command input line we need to embed prompt length blanks
+//                there's already a outputCommandLineText() function we can call
+//                added a position size_t argument that should tell the function where the cursor is currently located
+size_t getNumberOfManualFeedforwardCharactersWritten(uint16_t position){
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
 	size_t numberOfManualFeedforwardCharactersWritten=0;
 	// MDH@04OCT2019: append it to the suggested text
 	if(string_length(_manualFeedforwardText)>0){
 		if(numberOfIdentifierContinuationManualFeedforwardCharacters>0){
 			char c=string_replacedchar(_manualFeedforwardText,'\0',numberOfIdentifierContinuationManualFeedforwardCharacters);
+			// MDH@22SEP2020: the problem is that outputCommandLineText() does NOT return the number of characters
+			//                written, but the new position but this we can change
+			//                the first 16 bits contain the new position and the remaining 48 bits the number of characters written
+			numberOfManualFeedforwardCharactersWritten=outputCommandLineText(string(_manualFeedforwardText),position,getIdentifierContinuationTextColor())>>16;
+			/* replacing:
 			setColor(getIdentifierContinuationTextColor());
 			numberOfManualFeedforwardCharactersWritten=output("%s",string(_manualFeedforwardText));
+			*/
 			string_setchar(_manualFeedforwardText,c,numberOfIdentifierContinuationManualFeedforwardCharacters); // OOPS put it back before showing not after showing!!!
 		}
 		setColor(getManualFeedforwardTextColor());
@@ -2065,14 +2083,17 @@ size_t getNumberOfManualFeedforwardCharactersWritten(){
 	}
 	return numberOfManualFeedforwardCharactersWritten; // one less character written than the computed length!!!
 }
-size_t getNumberOfIdentifierContinuationTextCharactersWritten(){
+size_t getNumberOfIdentifierContinuationTextCharactersWritten(uint16_t position){
 	// MDH@27SEP2019 doesn't update the identifier continuation anymore (as it might be optional and is moved over to writeBehindCursorText) removing: updateUserInputCommandIdentifierContinuation();
 	size_t numberOfIdentifierContinuationCharactersWritten=(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0);
 	// MDH@04OCT2019: append it to the suggested text
 	if(numberOfIdentifierContinuationCharactersWritten>0)if(!string_append(_suggestedText,_identifierContinuationCharacters))numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
 	if(numberOfIdentifierContinuationCharactersWritten>0){
+		numberOfIdentifierContinuationCharactersWritten=outputCommandLineText(_identifierContinuationCharacters,position,getIdentifierContinuationTextColor())>>16;
+		/* replacing:
 		setColor(getIdentifierContinuationTextColor());
 		output("%s",_identifierContinuationCharacters);
+		*/
 		/*
 		size_t numberOfIdentifierContinuationCharactersToWrite=numberOfIdentifierContinuationCharactersWritten;
 		while(numberOfIdentifierContinuationCharactersToWrite){outputChar(' ');numberOfIdentifierContinuationCharactersToWrite--;}
@@ -2080,19 +2101,28 @@ size_t getNumberOfIdentifierContinuationTextCharactersWritten(){
 	}
 	return numberOfIdentifierContinuationCharactersWritten; // one less character written than the computed length!!!
 }
-size_t getNumberOfImmediateFeedforwardCharactersWritten(){
+size_t getNumberOfImmediateFeedforwardCharactersWritten(uint16_t position){
 	size_t numberOfImmediateFeedforwardCharactersWritten=(_immediateFeedforwardText?string_length(_immediateFeedforwardText):0);
 	if(numberOfImmediateFeedforwardCharactersWritten>0)if(!string_append(_suggestedText,string(_immediateFeedforwardText)))numberOfImmediateFeedforwardCharactersWritten=0; // append to suggested text
-	if(numberOfImmediateFeedforwardCharactersWritten>0){setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+	if(numberOfImmediateFeedforwardCharactersWritten>0){
+		numberOfImmediateFeedforwardCharactersWritten=outputCommandLineText(string(_immediateFeedforwardText),position,getFeedForwardTextColor())>>16;
+		/* replacing:
+		setColor(getFeedForwardTextColor());
+		output(string(_immediateFeedforwardText));
+		*/
+	}
 	return numberOfImmediateFeedforwardCharactersWritten;
 }
-size_t getNumberOfAutocompletionCharactersWritten(){
+size_t getNumberOfAutocompletionCharactersWritten(uint16_t position){
 	size_t numberOfAutocompletionCharactersWritten=(_autoCompletionText?string_length(_autoCompletionText):0);
 	if(numberOfAutocompletionCharactersWritten>0)if(!string_append(_suggestedText,string(_autoCompletionText)))numberOfAutocompletionCharactersWritten=0; // append to suggested text
 	if(numberOfAutocompletionCharactersWritten>0){ // additional auto completion text to write
 		/////debugWrite("Auto completion characters to write: '%s'.",string(_autoCompletionText));
+		numberOfAutocompletionCharactersWritten=outputCommandLineText(string(_autoCompletionText),position,getFeedForwardTextColor())>>16;
+		/* replacing:
 		setColor(getFeedForwardTextColor());
 		output("%s",string(_autoCompletionText));
+		*/
 	}
 	return numberOfAutocompletionCharactersWritten;
 }
@@ -2132,12 +2162,15 @@ void showSuggestedText(){
 	// 0. preparation
 	string_setlength(_suggestedText,0/*,owner_suggestedText*/); // clear the suggested text!!!
 	resetOutputColor();
+	// 0. do we know the current cursor position??????
+	uint16_t cursorPosition=numberOfLineCommandCharacters+promptLength; // where we are now right after the current command
 	// 1. write the identifier continuation first, then the manual feed forward, the immediate feed forward characters and finally the auto completion text
 	if(string_length(_manualFeedforwardText)>0)
-		numberOfSuggestedCharactersWritten=getNumberOfManualFeedforwardCharactersWritten();
+		numberOfSuggestedCharactersWritten=getNumberOfManualFeedforwardCharactersWritten(cursorPosition);
 	else
-		numberOfSuggestedCharactersWritten=getNumberOfIdentifierContinuationTextCharactersWritten();
-	numberOfSuggestedCharactersWritten+=getNumberOfImmediateFeedforwardCharactersWritten()+getNumberOfAutocompletionCharactersWritten();
+		numberOfSuggestedCharactersWritten=getNumberOfIdentifierContinuationTextCharactersWritten(cursorPosition);
+	numberOfSuggestedCharactersWritten+=getNumberOfImmediateFeedforwardCharactersWritten(cursorPosition);
+	numberOfSuggestedCharactersWritten+=getNumberOfAutocompletionCharactersWritten(cursorPosition);
 	// 2. and back to where the cursor is supposed to be
 	moveCursorLeft(numberOfSuggestedCharactersWritten); // return to where the command ends
 	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
