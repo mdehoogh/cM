@@ -1236,9 +1236,9 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 	size_t numberOfCharactersToOutput=(text?strlen(text):0);
 	if(numberOfCharactersToOutput>0){
 		setColor(textcolor);
-		uint16_t maximumNumberOfLineCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength:0); // MDH@23SEP2020: I suppose we have one character more (if we allow a character on the last position of the line)
-		if(maximumNumberOfLineCharacters>0&&_cursormovement->position+numberOfCharactersToOutput>maximumNumberOfLineCharacters){
-			unsigned long long leftOnLine=maximumNumberOfLineCharacters-_cursormovement->position; // what we can fit on the line
+		uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength:0); // MDH@23SEP2020: I suppose we have one character more (if we allow a character on the last position of the line)
+		if(maximumNumberOfLineCommandCharacters>0&&_cursormovement->position+numberOfCharactersToOutput>=maximumNumberOfLineCommandCharacters){
+			unsigned long long leftOnLine=maximumNumberOfLineCommandCharacters-_cursormovement->position; // what we can fit on the line
 			for(int characterIndex=0;characterIndex<numberOfCharactersToOutput;characterIndex++){
 				size_t written=outputChar(text[characterIndex]);
 				if(written){
@@ -1247,11 +1247,11 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 					if(leftOnLine==0){
 						size_t prompted=showContinuedPrompt(true,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
 						_cursormovement->skipped+=prompted;
-						leftOnLine=numberOfLineCharacters-prompted;
+						leftOnLine=maximumNumberOfLineCommandCharacters; // NOTE: so leftOnLine is the total number of command characters that we can fit after the prompt
 					}
 				}
 			}
-			_cursormovement->position=maximumNumberOfLineCharacters-leftOnLine;
+			_cursormovement->position=maximumNumberOfLineCommandCharacters-leftOnLine;
 		}else{
 			size_t charactersOutput=output("%s",text);
 			_cursormovement->position+=charactersOutput;
@@ -2209,7 +2209,7 @@ void showSuggestedText(){
 	string_setlength(_suggestedText,0/*,owner_suggestedText*/); // clear the suggested text!!!
 	
 	// 0. do we know the current cursor position??????
-	Mcursormovement cursormovement={numberOfLineCommandCharacters+promptLength};
+	Mcursormovement cursormovement={numberOfLineCommandCharacters};
 	if(string_length(_manualFeedforwardText)>0)
 		outputManualFeedforwardCharacters(&cursormovement);
 	else
@@ -2219,9 +2219,9 @@ void showSuggestedText(){
 
 	outputAutocompletionCharacters(&cursormovement);
 
-	numberOfSuggestedCharactersWritten=cursormovement.written;
+	numberOfSuggestedCharactersWritten=cursormovement.written+cursormovement.skipped;
 
-	moveCursorLeft(cursormovement.skipped+numberOfSuggestedCharactersWritten);
+	moveCursorLeft(numberOfSuggestedCharactersWritten);
 
 	/* replacing:
 	unsigned long long cursorPosition=numberOfLineCommandCharacters+promptLength;
