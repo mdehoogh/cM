@@ -2123,7 +2123,7 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 			string_setchar(_manualFeedforwardText,c,numberOfIdentifierContinuationManualFeedforwardCharacters); // OOPS put it back before showing not after showing!!!
 		}
 		// now write the rest in the manual feed forward text color
-		outputCommandLineText(string(_manualFeedforwardText)+_cursormovement->written,_cursormovement,getManualFeedforwardTextColor(),false); // MDH@23SEP2020 NOTE: remember numberOfManualFeedforwardCharactersWritten is a (position/characters written) ULL
+		outputCommandLineText(string(_manualFeedforwardText)+_cursormovement->written,_cursormovement,getManualFeedforwardTextColor(),-1); // MDH@23SEP2020 NOTE: remember numberOfManualFeedforwardCharactersWritten is a (position/characters written) ULL
 		// replacing:setColor(getManualFeedforwardTextColor());numberOfManualFeedforwardCharactersWritten+=output("%s",string(_manualFeedforwardText)+manualFeedforwardCharactersWrittenSoFar);
 		string_setlength(_manualFeedforwardText,_cursormovement->written); // in case not all characters were actually written
 		if(!string_append(_suggestedText,string(_manualFeedforwardText)))_cursormovement->written=0;
@@ -2262,9 +2262,9 @@ void showSuggestedText(){
 
 	numberOfSuggestedCharactersWritten=cursormovement.written+cursormovement.skipped;
 
-	if(string_length(_suggestedText)==0){
+	// if(string_length(_suggestedText)==0){
 		numberOfSuggestedCharactersWritten+=output("[%zd-%zd=%zd,%zd]",getUserInputLength(),numberOfLineCommandCharacters,(_userinputline?_userinputline->offset:0),(_userinputline?_userinputline->index:0));
-	}
+	// }
 
 	moveCursorLeft(numberOfSuggestedCharactersWritten);
 
