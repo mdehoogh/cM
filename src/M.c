@@ -367,11 +367,12 @@ typedef struct Muserinputline{
 }Muserinputline;
 static Muserinputline* _userinputline=NULL;static Mallocationowner owner_userinputline=(Mallocationowner){MODULE_ID,__LINE__,1};
 static size_t getNumberOfCommandLines(){return(_userinputline?_userinputline->index:0)+1;}
-static Muserinputline* __userinputline(){Mallocationowner owner=getOwner(__LINE__);
+// MDH@24SEP2020: unless we're at the end of a command getUserInputLength() would be the current offset BUT if a command is being output completely that would be an invalid assumption therefore we now pass in the offset to use
+static Muserinputline* __userinputline(size_t offset){Mallocationowner owner=getOwner(__LINE__);
 	Muserinputline* _newUserinputline=CALLOC_1(sizeof(Muserinputline),'6',owner);
 	if(_newUserinputline){
 		_newUserinputline->_prev=_userinputline;
-		_newUserinputline->offset=getUserInputLength(); // now passing it in because how else would we know?????
+		_newUserinputline->offset=offset; // this should be the total number of characters in the command on previous input lines
 		_newUserinputline->index=getNumberOfCommandLines(); // count the lines
 		_userinputline=OWNED(DISOWNED(_newUserinputline,owner),owner_userinputline); // MDH@30JUN2020: pass ownership when assigning to the global _userinputline because then it it bound!!!!
 	}
@@ -389,11 +390,14 @@ static size_t free_userinputline(){
 	}
 	return numberOfUserInputLines;
 }
-static void removeUserinputline(){
-	if(!_userinputline)return;
+// MDH@24SEP2020: if a user input line is removed, we return the difference between the removed line offset and the new line offset, which essentially is the number of command characters on the new command line
+static size_t removeUserinputline(){
+	if(!_userinputline)return 0;
+	size_t offset=_userinputline->offset;
 	Muserinputline* prevUserinputline=_userinputline->_prev;
 	FREE_DISOWNED_1(_userinputline,'6',owner_userinputline);
 	_userinputline=prevUserinputline;
+	return offset-(_userinputline?_userinputline->offset:0);
 }
 // MDH@30OCT2019 END
 size_t toInfoInputLine(){
@@ -406,10 +410,11 @@ void outputUserInputCommandTokenColor(){
 	if(_userInputCommand&&_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the current token color
 }
 uint8_t promptLength=0;
+size_t numberOfLineCommandCharacters=0; // the number of command characters on the current command line
 size_t returnToUserInputCommandCursorPosition(){
 	// ASSERT we're on the last user input line i.e. the input line the user is currently entering command characters
 	toStartOfLine();
-	size_t numberOfInputCommandLineCharacters=getUserInputLength()-(_userinputline?_userinputline->offset:0);
+	size_t numberOfInputCommandLineCharacters=numberOfLineCommandCharacters; // replacing: =getUserInputLength()-(_userinputline?_userinputline->offset:0);
 	// size_t debugInfoLength=output(" %zd ",numberOfInputCommandLineCharacters);moveCursorRight(promptLength+numberOfInputCommandLineCharacters-debugInfoLength); // the offset of the current user input line (if any) determines how many characters the user typed on this input line
 	moveCursorRight(promptLength+numberOfInputCommandLineCharacters);
 	outputUserInputCommandTokenColor();
@@ -995,7 +1000,6 @@ void outputTimestamp(){Mallocationowner owner=getOwner(__LINE__);
 	FREE_STRING(_promptTimestamp,owner);
 }
 
-size_t numberOfLineCommandCharacters;
 void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 	resetOutputColor();
 	numberOfBehindPromptCharactersWritten=0; // MDH@27SEP2019: so far no characters were written behind the prompt
@@ -1047,13 +1051,14 @@ void showPrompt(){Mallocationowner owner=getOwner(__LINE__);
 // MDH@30OCT2019: we'd like to be able to continue a command on the next line
 // MDH@21SEP2020: added the newline flag to indicate that a new line character is to be written
 // MDH@23SEP2020: now returning the number of prompt characters output
-unsigned long long showContinuedPrompt(bool notsuggested,bool newline){
+// MDH@24SEP2020: bool notsuggested replaced by offset which is either the number of characters in the command so far (and therefore positive), or indicates that we're not currently writing active command text (e.g. suggested text)
+unsigned long long showContinuedPrompt(int64_t offset,bool newline){
 	unsigned long long promptCharactersWritten=0;
 	if(inputMode==IM_COMMAND){
 		// ASSERT only to be called in command mode with _userInputCommand not NULL
 		// MDH@20FEB2020: passing getUserInputLength() to set the offset of the new user input line (because I'm the only one who can tell)
-		if(notsuggested){
-			if(!__userinputline())return false; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
+		if(offset>=0){
+			if(!__userinputline(offset))return 0; // if we fail to create a new user input line (to keep track of the number of characters on previous user input lines)
 			numberOfLineCommandCharacters=0; // MDH@26JUN2020: keeping track of the number of command characters on the current user input line
 		}
 		if(newline){
@@ -1062,10 +1067,10 @@ unsigned long long showContinuedPrompt(bool notsuggested,bool newline){
 		}
 		uint8_t blanks=promptLength;while(blanks>3){promptCharactersWritten+=outputChar(' ');blanks--;}
 		resetOutputColor();
-		promptCharactersWritten+=output(" %c ",(notsuggested?'=':' ')); // if not suggested write an equal sign, otherwise write a blank (as what's being written is not part of the command yet)
+		promptCharactersWritten+=output(" %c ",(offset>=0?'=':' ')); // if not suggested write an equal sign, otherwise write a blank (as what's being written is not part of the command yet)
 	}else
 	if(inputMode==IM_SHELL){
-		promptCharactersWritten=output("%c ",(notsuggested?':':' ')); // TODO continuation of $ not certain what to display here but a colon is used often (e.g. in Python)
+		promptCharactersWritten=output("%c ",(offset>=0?':':' ')); // TODO continuation of $ not certain what to display here but a colon is used often (e.g. in Python)
 	}
 	return promptCharactersWritten;
 	/// can't call this here!!!! outputTokenColor(_userInputCommand->_lastToken);
@@ -1232,7 +1237,9 @@ typedef struct{
 //                assuming 32 bits for the position and number of characters to write suffice or we could use 16 bits
 //                for the position and 48 bits for the maximum number of characters to write
 // MDH@23SEP2020: uses and updates cursormovement
-static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,char* textcolor,bool notsuggested){
+// MDH@24SEP2020: bool notsuggested replaced by int64_t offset (pass -1 for offset if not in the command)
+//                but be careful here because 
+static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,char* textcolor,int64_t commandCharactersWrittenSoFar){
 	if(!_cursormovement)return;
 	size_t numberOfCharactersToOutput=(text?strlen(text):0);
 	if(numberOfCharactersToOutput>0){
@@ -1243,12 +1250,13 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 			// careful: leftOnLine could now be zero, essentially we know that characters will be written on successive lines
 			for(int characterIndex=0;characterIndex<numberOfCharactersToOutput;characterIndex++){
 				if(leftOnLine==0){
-					size_t prompted=showContinuedPrompt(notsuggested,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
+					size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
 					_cursormovement->skipped+=prompted;
 					leftOnLine=maximumNumberOfLineCommandCharacters; // NOTE: so leftOnLine is the total number of command characters that we can fit after the prompt
 				}
 				size_t written=outputChar(text[characterIndex]);
 				if(written){
+					if(commandCharactersWrittenSoFar>=0)commandCharactersWrittenSoFar+=written; // increment offset indicating the number of command characters written so far
 					leftOnLine-=written;
 					_cursormovement->written+=written;
 				}
@@ -1291,12 +1299,13 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 			firstWhitespaceCharacter='\0';
 		}
 		// if we allow comments in tokens we're in trouble!!!
-		outputTokenColor(_token);
+		// now done by outputCommandLineText(): outputTokenColor(_token);
 		// MDH@07JUL2020: delegating writing the significant token characters to outputCommandLineText()
 		// MDH@22SEP2020: outputCommandLineText() now also returning the number of characters written (and the position in the first 16 bits)
 		// MDH@24SEP2020 with _cursormovement being the added parameter we do not need this anymore (passing &cursormovement to outputCommandLineText): Mcursormovement cursormovement={_token->position};
-		outputCommandLineText(tokenText,_cursormovement,getTokenColor(_token->type),true);
-		// MDH@24SEP2020 with _cursormovement being the added parameter we do not need this anymore: position=cursormovement.position;
+		int64_t commandCharactersWrittenSoFar=_token->offset;
+		outputCommandLineText(tokenText,_cursormovement,getTokenColor(_token->type),commandCharactersWrittenSoFar);
+		// MDH@24SEP2020 NOTE: _cursormovement->written now contains the number of token characters written
 		/* replacing:
 		// MDH@24JUN2020: if a token is on multiple lines (due to a limiting number of line characters)
 		//                we have to 'insert' so-called soft-breaks
@@ -1323,7 +1332,8 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 			// MDH@07JUL2020: delegating to outputCommandLineText() for writing the whitespace characters
 			// MDH@22SEP2020: same here
 			// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...
-			outputCommandLineText(tokenText+significantTokenCharacterCount,_cursormovement,getInfoColor(),true);
+			outputCommandLineText(tokenText+significantTokenCharacterCount,_cursormovement,getInfoColor(),commandCharactersWrittenSoFar+_cursormovement->written);
+			commandCharactersWrittenSoFar+=_cursormovement->written; // update the number of command characters written so far (that is including the token characters we've now written)
 			// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=cursormovement.position;
 			/*
 			// if spanning multiple lines write one character at a time
@@ -1340,7 +1350,7 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 			*/
 			// MDH@04JUL2020: the token may end with the explicit newline character!
 			if(tokenText[tokenCharacterCount-1]==M_NEWLINE_CHARACTER){
-				_cursormovement->skipped+=showContinuedPrompt(true,true); // MDH@24SEP2020: the number of prompt characters written now appended to the skipped field of _cursormovement
+				_cursormovement->skipped+=showContinuedPrompt(commandCharactersWrittenSoFar,true); // MDH@24SEP2020: the number of prompt characters written now appended to the skipped field of _cursormovement
 				_cursormovement->position=0; // MDH@24SEP2020: I guess we're at the beginning of the command line again
 				// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=0;
 			}
@@ -1738,6 +1748,7 @@ Mstring* _getCommandText(bool color){Mallocationowner owner=getOwner(__LINE__);
 
 void clearCommand(){
 	FREE_COMMAND(_userInputCommand,owner_userInputCommand);_userInputCommand=NULL; // MDH@28OCT2019: using the command now...
+	numberOfLineCommandCharacters=0;free_userinputline(); // MDH@24SEP2020: both essential BRO'
 	/* replacing:
 	pLastCommandToEvaluate=NULL;
 	// a small precaution here!!!
@@ -1977,6 +1988,11 @@ size_t outputCommand(Mcommand * const command){
 		*/
 		token=token->next;
 	}
+	// the last line could be full
+	if(numberOfLineCharacters>0&&cursormovement.position==numberOfLineCharacters-promptLength){
+		showContinuedPrompt(cursormovement.written,false);
+		cursormovement.position=0;
+	}
 	numberOfBehindPromptCharactersWritten=cursormovement.written; // MDH@24SEP2020: if we stick to the definition of numberOfBehindPromptCharactersWritten!!!!!!
 	// MDH@24SEP2020: don't know whether the following is still used somewhere TODO check if numberOfBehindPromptCharactersWritten is now obsolete (as we have numberOfCommandLineCharacters now)
 	return cursormovement.position;
@@ -2102,7 +2118,7 @@ void outputManualFeedforwardCharacters(Mcursormovement* _cursormovement){
 		if(numberOfIdentifierContinuationManualFeedforwardCharacters>0){
 			char c=string_replacedchar(_manualFeedforwardText,'\0',numberOfIdentifierContinuationManualFeedforwardCharacters);
 			// MDH@22SEP2020: update cursormovement by outputting the identifier continuation feed forward characters
-			outputCommandLineText(string(_manualFeedforwardText),_cursormovement,getIdentifierContinuationTextColor(),false);
+			outputCommandLineText(string(_manualFeedforwardText),_cursormovement,getIdentifierContinuationTextColor(),-1);
 			// replacing:setColor(getIdentifierContinuationTextColor());numberOfManualFeedforwardCharactersWritten=output("%s",string(_manualFeedforwardText));
 			string_setchar(_manualFeedforwardText,c,numberOfIdentifierContinuationManualFeedforwardCharacters); // OOPS put it back before showing not after showing!!!
 		}
@@ -2119,7 +2135,7 @@ void outputIdentifierContinuationTextCharacters(Mcursormovement* _cursormovement
 	size_t numberOfIdentifierContinuationCharactersWritten=(_identifierContinuationCharacters?strlen(_identifierContinuationCharacters):0);
 	// MDH@04OCT2019: append it to the suggested text
 	if(numberOfIdentifierContinuationCharactersWritten>0&&!string_append(_suggestedText,_identifierContinuationCharacters))numberOfIdentifierContinuationCharactersWritten=0; // append to suggested text
-	if(numberOfIdentifierContinuationCharactersWritten>0)outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),false);
+	if(numberOfIdentifierContinuationCharactersWritten>0)outputCommandLineText(_identifierContinuationCharacters,_cursormovement,getIdentifierContinuationTextColor(),-1);
 		// replacing: {setColor(getIdentifierContinuationTextColor());output("%s",_identifierContinuationCharacters);
 		// replacing: {size_t numberOfIdentifierContinuationCharactersToWrite=numberOfIdentifierContinuationCharactersWritten;while(numberOfIdentifierContinuationCharactersToWrite){outputChar(' ');numberOfIdentifierContinuationCharactersToWrite--;}
 	// return numberOfIdentifierContinuationCharactersWritten; // one less character written than the computed length!!!
@@ -2128,13 +2144,13 @@ void outputImmediateFeedforwardCharacters(Mcursormovement* _cursormovement){
 	if(!_cursormovement)return;
 	unsigned long long numberOfImmediateFeedforwardCharactersWritten=(_immediateFeedforwardText?string_length(_immediateFeedforwardText):0);
 	if(numberOfImmediateFeedforwardCharactersWritten>0)if(!string_append(_suggestedText,string(_immediateFeedforwardText)))numberOfImmediateFeedforwardCharactersWritten=0; // append to suggested text
-	if(numberOfImmediateFeedforwardCharactersWritten>0)outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),false);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
+	if(numberOfImmediateFeedforwardCharactersWritten>0)outputCommandLineText(string(_immediateFeedforwardText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output(string(_immediateFeedforwardText));}
 }
 void outputAutocompletionCharacters(Mcursormovement* _cursormovement){
 	if(!_cursormovement)return;
 	unsigned long long numberOfAutocompletionCharactersWritten=(_autoCompletionText?string_length(_autoCompletionText):0);
 	if(numberOfAutocompletionCharactersWritten>0)if(!string_append(_suggestedText,string(_autoCompletionText)))numberOfAutocompletionCharactersWritten=0; // append to suggested text
-	if(numberOfAutocompletionCharactersWritten>0)outputCommandLineText(string(_autoCompletionText),_cursormovement,getFeedForwardTextColor(),false);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
+	if(numberOfAutocompletionCharactersWritten>0)outputCommandLineText(string(_autoCompletionText),_cursormovement,getFeedForwardTextColor(),-1);// replacing: {setColor(getFeedForwardTextColor());output("%s",string(_autoCompletionText));}
 }
 /* replacing:
 // MDH@22SEP2020: when suggested text is output on the command input line we need to embed prompt length blanks
@@ -2247,7 +2263,7 @@ void showSuggestedText(){
 	numberOfSuggestedCharactersWritten=cursormovement.written+cursormovement.skipped;
 
 	if(string_length(_suggestedText)==0){
-		numberOfSuggestedCharactersWritten+=output("[%zd]",numberOfLineCommandCharacters);
+		numberOfSuggestedCharactersWritten+=output("[%zd-%zd=%zd,%zd]",getUserInputLength(),numberOfLineCommandCharacters,(_userinputline?_userinputline->offset:0),(_userinputline?_userinputline->index:0));
 	}
 
 	moveCursorLeft(numberOfSuggestedCharactersWritten);
@@ -2299,7 +2315,7 @@ void outputShellCommand(){
 		if(left<l){
 			for(size_t shellCommandIndex=0;shellCommandIndex<l;shellCommandIndex++){
 				outputChar(string_char(_shellCommand,shellCommandIndex));
-				if(--left==0){showContinuedPrompt(true,false);left=maximumNumberOfLineCommandCharacters;}
+				if(--left==0){showContinuedPrompt(shellCommandIndex,false);left=maximumNumberOfLineCommandCharacters;}
 			}
 			return;
 		}
@@ -2528,13 +2544,10 @@ void setUserInputCommand(Mcommand* command){
 	////////// removing: determineCommandInitializations();
 }
 void deleteUserInputCommand(){
+	numberOfLineCommandCharacters=0; // TODO is this the right place to do this?????? the principle should be that whenever _userInputCommand changes, we should compute numberOfLineCommandCharacters a new
 	if(!_userInputCommand)return;
-	// the problem is that _userInputCommand could be a new command??????
-	if(commandIndex==0){
-		// if(amVerboseDebugging())
-		output("Freeing the current user input command.\n");
-		FREE_COMMAND(_userInputCommand,owner_userInputCommand);
-	}
+	// if _userInputCommand is a registered command, it should NOT be freed
+	if(commandIndex==0)FREE_COMMAND(_userInputCommand,owner_userInputCommand);
 	_userInputCommand=NULL;
 }
 
@@ -2545,6 +2558,7 @@ void deleteUserInputCommand(){
 void setCommandIndex(uint32_t createUserInputCommandIndex){Mallocationowner owner=getOwner(__LINE__);
 	// MDH@25MAY2020: we should 'delete' the user input command BEFORE updating commandIndex because the current command index determines whether we're dealing with a new command or an existing command
 	//                we used to do that after clearing the screen below
+	clearInfo();
 	deleteUserInputCommand();
 	commandIndex=createUserInputCommandIndex;
 	////if(amVerbose())inputInfo("Command index %lld.",commandIndex);
@@ -2554,7 +2568,6 @@ void setCommandIndex(uint32_t createUserInputCommandIndex){Mallocationowner owne
 	clearScreenFromCursor();
 	// MDH@29OCT2019: we have to do the following because otherwise inputInfo() will jump back to the end of the command instead of right behind the prompt!!!!
 	//                NOTE typically _userInputCommand will not be NULL when we're scrolling through the list of previous commands!!!!
-	clearInfo();
 	// MDH@24APR2019 obsolete: getCommandLength()=getUserInputLength()=0; // do we need this????
 	// TODO do we need to do this: clear the behind cursor text (in any situation)
 	deleteAutocompletionText(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); 
@@ -2662,6 +2675,7 @@ void createUserInputCommand(){
 
 // TODO copyUserInputCommand() should set ->expr correctly
 // MDH@29OCT2019: TODO caller should check whether or not _userInputCommand is NULL if it is copying failed!!!!
+// MDH@24SEP2020: with _userInputCommand being a remembered command, any editing needs to occur on an exact copy which includes copying the tokens exactly
 bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT _userInputCommand must NOT be NULL and we're assuming that _userInputCommand now points to one of the remembered commands (that needs to be duplicated in order to allow editing it)
 	//        it's probably best to first create a new command, copy the tokens over from _userInputCommand and set the user input command to that new command
@@ -2710,7 +2724,12 @@ bool copyUserInputCommand(){Mallocationowner owner=getOwner(__LINE__);
 		_newUserInputCommand->_lastToken->text=owned_string(_stringCopy(_tokenToCopy->text,0),Msubowner(owner,2)); // copies the entire Mstring over
 		if(!_newUserInputCommand->_lastToken->text){_newUserInputCommand->_lastToken=NULL;break;} // TODO perhaps we'd have to do a little more than just this?????
 		// MDH@24APR2019 obsolete: getCommandLength()+=string_length(_userInputCommand->_lastToken->text);
-		// some additional fields to copy over (NOT the offset is that is set automatically)
+		// MDH@24SEP2020 DONE some additional fields to copy over (NOT the offset is that is set automatically)
+		_newUserInputCommand->_lastToken->argument=_tokenToCopy->argument;
+		_newUserInputCommand->_lastToken->offset=_tokenToCopy->offset;
+		_newUserInputCommand->_lastToken->position=_tokenToCopy->position;
+		_newUserInputCommand->_lastToken->envid=_tokenToCopy->envid;
+		_newUserInputCommand->_lastToken->prevIdentifier=_tokenToCopy->prevIdentifier;
 #ifdef __DEBUG__
 		printf("%d:%s",_userInputCommand->_lastToken->type,string(_userInputCommand->_lastToken->text));
 #endif
@@ -2981,13 +3000,17 @@ char removedTokenCharacter(bool endOfInput){
 			if(endOfInput){
 				// MDH@30OCT2019: with multiline user input it sometimes is a little harder than calling moveCursorLeft(1)
 				//                if the offset of the current user input line is beyond the total command length apparently we've 'removed' the last command character on the previous line
+				// MDH@24SEP2020: now it's probably better to test numberOfLineCommandCharacters because it it is zero we're obviously at the first position on a command line
+				if(numberOfLineCommandCharacters==0){
+				/* replacing:
 				size_t userInputLength=getUserInputLength();
 				if(_userinputline&&_userinputline->offset>userInputLength){
+					*/
 					toStartOfLine();clearScreenFromCursor(); // yes, we need this in particular when at the start of a new line and doing a left arrow in which case the prompt on the line needs to be removed
-					removeUserinputline();
+					numberOfLineCommandCharacters=removeUserinputline()-1; // MDH@24SEP2020: subtract 1 because we've actually consumed a single character just now!!
 					oneLineUp(); // I think oneLineUp() should not always be called?????????
-					numberOfLineCommandCharacters=toUserInputCursorPosition(0); // one line up and to the proper position (not sure what will happen to the suggested text though)
-				}else{
+					toUserInputCursorPosition(0); // one line up and to the proper position (not sure what will happen to the suggested text though)
+				}else{ // still command characters on the current command line
 					moveCursorLeft(1); // MDH@01OCT2019: this ought to be done BEFORE tokenCheckedForBeingAFunction() is called so we moved it over here!!!
 					numberOfLineCommandCharacters--; // MDH@07JUL2020: essential to keep track of the number of line command characters
 				}
@@ -3045,6 +3068,13 @@ uint32_t getListElementCount(){
 
 // MDH@27FEB2020: commandCharacterAppended() moved over to Mshell.c
 
+// MDH@24SEP2020: call newCommandLine() either to start a new command line either explicitly or implicitly (when no further characters fit on the current command line)
+static void newCommandLine(bool newline){
+	numberOfLineCommandCharacters=0; // MDH@24SEP2020: TODO we should never forget to reset numberOfLineCommandCharacters after showing a continued prompt
+	showContinuedPrompt(getUserInputLength(),newline);
+	outputTokenColor(_userInputCommand->_lastToken);
+}
+
 // MDH@12APR2019: in order to implement the Tab character we have to delegate entering a character (typed) to a separate function
 //       		  ASSERTION _userInputCommand->_firstToken and _userInputCommand->_lastToken are  NOT  NULL
 //                the endOfInput flag is used to indicate whether this is the end of the input
@@ -3066,7 +3096,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	/////outputChar('3');
 	// MDH@21SEP2020: clearInfo() is also responsible for the problem with right arrow because the result is that the character is output one line down with every right arrow
-	clearInfo(); // MDH@28FEB2020: is responsible for the experienced problem
+	// clearInfo(); // MDH@28FEB2020: is responsible for the experienced problem
 	/////outputChar('4');
 	/////////if(amDebugging())inputInfo("A");
 	/* MDH@28MAR2019: if the user enters the comment character we should toggle the token type's highest bit (bit 7)
@@ -3119,9 +3149,8 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 
 	// MDH21SEP2020:65th birthday: if the line is now full move the cursor to the next line
 	//                             not to write a newline character because we are supposedly already at the start of the next line
-	if(numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters){
-		showContinuedPrompt(true,false);outputTokenColor(_userInputCommand->_lastToken);
-	}
+	if(numberOfLineCharacters>0&&numberOfLineCommandCharacters+promptLength>=numberOfLineCharacters)
+		newCommandLine(false);
 
 	//putchar('\b');
 
@@ -4120,7 +4149,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 								newInputChar='\0'; // to indicate some error occurred
 								break;
 							}
-							if(newInputCharType==' ')showContinuedPrompt(true,true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
+							if(newInputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing (and improving upon): showContinuedPrompt(true,true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
 							numberOfSuggestedCharactersAccepted+=1;
 						}
 						// remove at most numberOfSuggestedCharactersAccepted from the suggested text
@@ -4240,7 +4269,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 											// MDH@21SEP2020: it is a suggested character isn't it????? didn't help changing false to true!!!!
 											if(commandCharacterAccepted(c,&suggestedInputCharType,true,false)){
 												inputCharType=suggestedInputCharType; // MDH@31OCT2019: because might have changed!!!
-												if(inputCharType==' ')showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
+												if(inputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true); // MDH@31OCT2019: we just consumed a newline (request) character
 												// where to remove it from????
 												// NOTE identifier continuation and immediate feed forward are redetermined automatically so do not need to be adjusted here
 												if(string_length(_manualFeedforwardText)){
@@ -4361,7 +4390,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						if(commandCharacterAccepted(inputChar,&inputCharType,true,false)){
 							// outputChar('X');
 							if(inputCharType==' '){ // a newline request (whenever M_NEWLINE_CHARACTER is input at a functional position)
-								showContinuedPrompt(true,true);
+								newCommandLine(true); // MDH@24SEP2020 replacing and improving upon: showContinuedPrompt(true,true);
 								//////////showSuggestedText(); // we have to rewrite the suggested text though
 								///////////outputTokenColor(_userInputCommand->_lastToken); // and show the right color
 							}
