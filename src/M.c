@@ -398,7 +398,7 @@ static void removeUserinputline(){
 // MDH@30OCT2019 END
 size_t toInfoInputLine(){
 	size_t linesUp=0,lines=getNumberOfCommandLines(); // ASSERT lines should be at least 1
-	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();output("[%zd]",lines);
+	while(linesUp<lines){oneLineUp();linesUp++;}clearLine();// debugging: output("[%zd]",lines);
     return linesUp;
 } // MDH@30OCT2019: only after moving all the input lines up do we need to go to the start, also clearLine() will ascertain to end up at the start of the line
 // output functions that require access to the current token
@@ -1265,12 +1265,17 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 // Token is now defined in Mexpression.h which is included by Mexecution.h so struct Token is indirectly supplied by Mexpression.h!!!
 // MDH@24JUN2020: need to reconsider how to output the token given that a single token can occupy multiple 
 //                output lines based on its position and length (and numberOfLineCharacters and promptLength)
-static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE__);
+// MDH@24SEP2020: every function that outputs text on the command line should receive a Mcursormovement reference to be passed along to outputCommandLineText...
+//                NOTE let's allow passing in NULL for _cursormovement which is valid when the result of outputToken is not used (as is often the case)
+static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
+	if(!_token)return;
+	// MDH@24SEP2020: the following ASSERT still holds except that _cursormovement->position should actually hold the same value
 	// ASSERT assuming _token->position actually contains the number of command characters on the current command line in front of this token
-	size_t position=0;
-	size_t tokenCharacterCount=(_token&&_token->text?string_length(_token->text):0);
+	// MDH@24SEP2020 with _cursormovement being the added parameter we do not need this anymore: size_t position=0;
+	size_t tokenCharacterCount=string_length(_token->text);
 	if(tokenCharacterCount>0){
-		uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
+		Mcursormovement cursormovement={_token->position};if(!_cursormovement)_cursormovement=&cursormovement; // if no cursor movement instance was provided, we create one from the token's position, of course no result will be available to the outside
+		// MDH@24SEP2020 not being used in this function apparently: uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength-1:0);
 		// MDH@26JUN2020: we can speed things up a bit by immediately using string()
 		char* tokenText=string(_token->text);
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
@@ -1289,9 +1294,9 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 		outputTokenColor(_token);
 		// MDH@07JUL2020: delegating writing the significant token characters to outputCommandLineText()
 		// MDH@22SEP2020: outputCommandLineText() now also returning the number of characters written (and the position in the first 16 bits)
-		Mcursormovement cursormovement={_token->position};
-		outputCommandLineText(tokenText,&cursormovement,getTokenColor(_token->type),true);
-		position=cursormovement.position;
+		// MDH@24SEP2020 with _cursormovement being the added parameter we do not need this anymore (passing &cursormovement to outputCommandLineText): Mcursormovement cursormovement={_token->position};
+		outputCommandLineText(tokenText,_cursormovement,getTokenColor(_token->type),true);
+		// MDH@24SEP2020 with _cursormovement being the added parameter we do not need this anymore: position=cursormovement.position;
 		/* replacing:
 		// MDH@24JUN2020: if a token is on multiple lines (due to a limiting number of line characters)
 		//                we have to 'insert' so-called soft-breaks
@@ -1317,8 +1322,9 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 			tokenText[significantTokenCharacterCount]=firstWhitespaceCharacter; // put it back
 			// MDH@07JUL2020: delegating to outputCommandLineText() for writing the whitespace characters
 			// MDH@22SEP2020: same here
-			outputCommandLineText(tokenText+significantTokenCharacterCount,&cursormovement,getInfoColor(),true);
-			position=cursormovement.position;
+			// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...
+			outputCommandLineText(tokenText+significantTokenCharacterCount,_cursormovement,getInfoColor(),true);
+			// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=cursormovement.position;
 			/*
 			// if spanning multiple lines write one character at a time
 			if(tokenCharacterCount>left+significantTokenCharacterCount){
@@ -1334,13 +1340,14 @@ static size_t outputToken(Mtoken* _token){Mallocationowner owner=getOwner(__LINE
 			*/
 			// MDH@04JUL2020: the token may end with the explicit newline character!
 			if(tokenText[tokenCharacterCount-1]==M_NEWLINE_CHARACTER){
-				showContinuedPrompt(true,true);
-				position=0;
+				_cursormovement->skipped+=showContinuedPrompt(true,true); // MDH@24SEP2020: the number of prompt characters written now appended to the skipped field of _cursormovement
+				_cursormovement->position=0; // MDH@24SEP2020: I guess we're at the beginning of the command line again
+				// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=0;
 			}
 		}
 		// resetOutputColor();
 	}
-	return position; // replacing: tokenCharacterCount;
+	// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: return position; // replacing: tokenCharacterCount;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
 // MDH@30APR2019: when a function returns to a variable and the other way round
@@ -1359,7 +1366,7 @@ static void reoutputToken(Mtoken* _token){
 	bool tokenOnPreviousInputLine=(_userinputline?(string_last_char(_token->text)==M_NEWLINE_CHARACTER):false);
 	if(tokenOnPreviousInputLine){oneLineUp();toStartOfLine();moveCursorRight(promptLength+(_userinputline->offset-(_userinputline->_prev?_userinputline->_prev->offset:0)));}
 	moveCursorLeft(tokenCharacterCount);
-	outputToken(_token); // back where we started (hopefully)
+	outputToken(_token,NULL); // back where we started (hopefully) // MDH@24SEP2020: not passing an Mcursormovement in, as the result of outputToken is not used!!!
 	if(tokenOnPreviousInputLine){oneLineDown();toStartOfLine();moveCursorRight(promptLength+getUserInputLength()-_userinputline->offset);}
 }
 
@@ -1952,12 +1959,17 @@ bool evaluateCommand(Mvalue* *resultValue){Mallocationowner owner=getOwner(__LIN
 
 }
 
-// MDH@24APR2019: writeCommand() writes the command to evaluate, and sets _userInputCommand->_lastToken in the process
+// MDH@24APR2019: outputCommand() writes the command to evaluate, and sets _userInputCommand->_lastToken in the process
 // MDH@31OCT2019: there's a complication when the last character in the token is the newline character
-void writeCommand(Mcommand * const command){
+// MDH@24SEP2020: now returning the position on the last command line 
+size_t outputCommand(Mcommand * const command){
 	Mtoken* token=(command?command->_firstToken:NULL);
+	Mcursormovement cursormovement={}; // MDH@24SEP2020: outputToken will update cursormovement accordingly
 	while(token){
-		numberOfBehindPromptCharactersWritten+=outputToken(command->_lastToken=token);
+		token->position=cursormovement.position; // MDH@24SEP2020: adding this because the prompt length might've changed in which case token->position would not be correct anymore
+		// MDH@24SEP2020: passing the cursor movement in to outputToken in order to keep track of where to place the continued prompts
+		outputToken(command->_lastToken=token,&cursormovement);
+		// replacing: numberOfBehindPromptCharactersWritten+=outputToken(command->_lastToken=token);
 		/* MDH@07JUL2020 CORRECTION outputToken() also takes care of showing continued prompts: 
 		// are we supposed to generate a newline?
 		// NOTE we're assuming there that a string can never end with this character which is also the text escape character (which requires another character following it)
@@ -1965,7 +1977,13 @@ void writeCommand(Mcommand * const command){
 		*/
 		token=token->next;
 	}
+	numberOfBehindPromptCharactersWritten=cursormovement.written; // MDH@24SEP2020: if we stick to the definition of numberOfBehindPromptCharactersWritten!!!!!!
+	// MDH@24SEP2020: don't know whether the following is still used somewhere TODO check if numberOfBehindPromptCharactersWritten is now obsolete (as we have numberOfCommandLineCharacters now)
+	return cursormovement.position;
 }
+
+// MDH@24SEP2020: not expecting the shell to output a token on a session command line, so outputTokenText replaces outputToken (which is now declared differently)
+size_t outputTokenText(Mtoken* _token){if(_token){outputTokenColor(_token);return output("%s",string(_token->text));}return 0;}
 
 uint32_t commandPage=0; // the command page to show (when 0 not paging through the commands)
 uint32_t commandPages=0; // the total number of command pages
@@ -1976,7 +1994,12 @@ void setCommandPage(uint32_t createUserInputCommandPage){
 		resetOutputColor();
 		output("%d. ",lastCommandToShowIndex+commandToShowIndex+1);
 		Mtoken* token=_registeredcommands[lastCommandToShowIndex+commandToShowIndex]._command->_firstToken;
-		while(token){outputToken(token);token=token->next;}
+		// MDH@24SEP2020: this is definitely an issue because outputToken() assumes the token is written on the command line which in this case is not the case, so we shouldn't use outputToken()
+		while(token){
+			outputTokenText(token); // write the token text in the color of it's type
+			// replacing: outputToken(token);
+			token=token->next;
+		}
 		outputChar('\n');
 	}
 	resetOutputColor();
@@ -2223,6 +2246,10 @@ void showSuggestedText(){
 
 	numberOfSuggestedCharactersWritten=cursormovement.written+cursormovement.skipped;
 
+	if(string_length(_suggestedText)==0){
+		numberOfSuggestedCharactersWritten+=output("[%zd]",numberOfLineCommandCharacters);
+	}
+
 	moveCursorLeft(numberOfSuggestedCharactersWritten);
 
 	/* replacing:
@@ -2443,11 +2470,22 @@ bool updateNumberOfLineCharacters(){
 		// we need to free the user input lines first because we're supposed to be right behind the prompt!!
 		// taken care of by promptForUserInput(): free_userinputline();
 		numberOfLineCharacters=newNumberOfLineCharacters; // we need this before actually showing the tokens
+		
+		// MDH@24SEP2020: giving that the following is essentially a rewrite of the user input command again we can simply do that
+		numberOfLineCommandCharacters=outputCommand(_userInputCommand);
+		/* replacing:
 		Mtoken* token=_userInputCommand->_firstToken;
 		// MDH@07JUL2020: outputToken() now outputs the position on the current command line, which we can use to initialize token->position as used by outputToken()
-		size_t position=0;
-		while(token){token->position=position;position=outputToken(token);token=token->next;}
-		numberOfLineCommandCharacters=position; // also essential to end up with the right value for numberOfLineCommandCharacters!!!!!
+		// MDH@24SEP2020: position replaced by an Mcursormovement 
+		Mcursormovement cursormovement={}; // replacing: size_t position=0;
+		while(token){
+			token->position=cursormovement.position; // replacing: =position;
+			outputToken(token,&cursormovement); // replacing: position=outputToken(token);
+			token=token->next;
+		}
+		numberOfLineCommandCharacters=cursormovement.position; // also essential to end up with the right value for numberOfLineCommandCharacters!!!!!
+		*/
+		
 		clearScreenFromCursor(); // TODO can't harm but not certain about this
 		/* MDH@07JUL2020 because we now allow the cursor on the last line position we do not need the following anymore:
 		// the cursor could end up on the last available position on the command line (i.e. when the last command line is full) where it is never supposed to be at
@@ -2483,7 +2521,7 @@ void setUserInputCommand(Mcommand* command){
 	//      so if it is a registered command we should NOT obtain ownership
 	_userInputCommand=command; // MDH@24MAY2020: take over ownership!!!!
 	// replacing: _userInputCommand->_lastToken=_userInputCommand->_firstToken=pCommand;
-	writeCommand(_userInputCommand);
+	numberOfLineCommandCharacters=outputCommand(_userInputCommand); // MDH@24SEP2020: essential to 'sync' numberOfLineCommandCharacters to the number of command characters on the last command line
 	// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=(_userInputCommand?inIdentifierToken(_userInputCommand->_lastToken):false); // MDH@02OCT2019 because we're setting _userInputCommand->_lastToken but not calling setLastUserInputCommandToken()
 	//////////writeSuggestedText(true);
 	// MDH@06AUG2019 TODO: determine the initializations associated with a stored command!!!
@@ -2945,7 +2983,7 @@ char removedTokenCharacter(bool endOfInput){
 				//                if the offset of the current user input line is beyond the total command length apparently we've 'removed' the last command character on the previous line
 				size_t userInputLength=getUserInputLength();
 				if(_userinputline&&_userinputline->offset>userInputLength){
-					// toStartOfLine();clearScreenFromCursor(); // clear this user input line and what's beyond it
+					toStartOfLine();clearScreenFromCursor(); // yes, we need this in particular when at the start of a new line and doing a left arrow in which case the prompt on the line needs to be removed
 					removeUserinputline();
 					oneLineUp(); // I think oneLineUp() should not always be called?????????
 					numberOfLineCommandCharacters=toUserInputCursorPosition(0); // one line up and to the proper position (not sure what will happen to the suggested text though)
@@ -3642,7 +3680,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 	// MDH@27FEB2020: initEnvironment() renamed to getShellEnvironment() and moved over to Mshell.h/c
 	// MDH@04MAR2020: initialize the shell passing in the required callbacks (replacing the original set... methods in Mshell.h/c) which is better to NOT forget any callbacks
-	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),inputCharRead,inputInfo,inputError,outputToken,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
+	// MDH@24SEP2020: replacing outputToken by outputTokenText as the shell is not session command line aware (knowing Mcursormovement)
+	if(!shellInitialized((_settingsCharacterText?string(_settingsCharacterText):NULL),inputCharRead,inputInfo,inputError,outputTokenText,reoutputToken,updateLastTokenAutocompletionText,outputCommandInfo)){ // ascertain to have an shell environment!!!
 		outputError("Failed to initialize the M shell!");
 		resetOutputColor();
 		exit(3);
@@ -3753,7 +3792,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 			commandIndex=0; // TODO should we do this always (even if we have an incomplete command?????)
 			// MDH@24APR2019: _userInputCommand->_firstToken could be non-null if we failed to evaluate it (e.g. when being imcomplete), and we allow a retry
 			//                NOTE registered commands should always be successfully evaluated, so do NOT get rid of any pending command!!!!
-			if(_userInputCommand)writeCommand(_userInputCommand);else deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0);
+			// MDH@24SEP2020: the result of outputCommand will now be the number of command characters written on the last command line, and therefore should be assigned to numberOfLineCommandCharacters!!!!
+			if(_userInputCommand)numberOfLineCommandCharacters=outputCommand(_userInputCommand);else deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0);
 			/////////////// if(_userInputCommand->_firstToken)clearCommand(); // TODO do we need this????
 			/* replacing:
 			if(_userInputCommand->_firstToken==NULL)if(!string_setlength(feedforwardText,0))output("??"); // TODO should we be loosing feedforwardText here????
@@ -3761,7 +3801,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 			*/
 			/////////outputStatus();
 		}
-		// which used to be: writeCommand(); // write the current command (if any)
+		// which used to be: outputCommand(); // write the current command (if any)
 
 		/* replacing:
 		_userInputCommand->_lastToken=_userInputCommand->_firstToken;

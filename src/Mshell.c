@@ -828,7 +828,6 @@ bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierE
 
 static UpdateLastTokenAutocompletionTextFunction* updateLastTokenAutocompletionTextFunction=NULL;
 // void setUpdateLastTokenAutocompletionTextFunction(UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction){updateLastTokenAutocompletionTextFunction=_updateLastTokenAutocompletionTextFunction;}
-
 static ReoutputTokenFunction* reoutputTokenFunction=NULL;
 // void setReoutputTokenFunction(ReoutputTokenFunction* _reoutputTokenFunction){reoutputTokenFunction=_reoutputTokenFunction;}
 
@@ -4054,6 +4053,7 @@ static size_t outputToken(Mtoken* _token){
 	return numberOfCharactersToOutput;
 	/////////if(amAssisting()){resetOutputColor();outputChar('|');}
 }
+
 static OutputTokenFunction* outputTokenFunction=NULL;
 
 void outputLastTokenChar(Mtoken* _token){
@@ -4462,8 +4462,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 				}
 				expressionToken=nextEnvironmentExpressionToken();
 				// if(amDebugging())
-				if(amVerboseDebugging())
-					{output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
+				if(amVerboseDebugging())if(*outputTokenFunction){output("Augmented item id(s) token: ");(*outputTokenFunction)(expressionToken);outputChar('\n');}
 				if(expressionToken->type==TT_LIST){
 					Mvalue* indexListValue=getValueOfList(TT_END_OF_LIST,0,0,false);
 					if(indexListValue&&indexListValue->type==VT_LIST&&indexListValue->value._list){
