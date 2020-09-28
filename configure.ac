@@ -1,8 +1,8 @@
-AC_INIT([M],[0.1.1,[m.p.a.j.dehoogh@tudelft.nl],[https://github.com/mdehoogh/cM.git]])
+AC_INIT([M],[0.1.3,[m.p.a.j.dehoogh@tudelft.nl],[https://github.com/mdehoogh/cM.git]])
 AC_CONFIG_SRCDIR([src/M.c])
 
 #PACKAGE=M
-#VERSION=0.1.0
+#VERSION=0.1.3
 
 # MDH@23OCT2019: we do not want to overwrite src/Makefile.in (because I adjusted it)
 #                NO we can change Makefile.in after autoconf creates it!!!
