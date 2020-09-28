@@ -39,7 +39,7 @@
 // defining VALUE_TYPES as an enum defining all possible value types
 // VT_UNDEFINED indicates that no value is currently to be associated
 // VT_REF coming up next for storing (second-level) references (main variables are the first named values)
-typedef enum Mvaluetype {VT_UNDEFINED=0,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE,VT_FUNCTION,VT_ENVIRONMENT}Mvaluetype;
+typedef enum Mvaluetype {VT_UNDEFINED=0,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP/*VT_USERFUNCTION*/,VT_REFERENCE,VT_FUNCTION,VT_ENVIRONMENT,VT_FILE}Mvaluetype;
 
 // we define the names of 'standard' function but it is a good idea to classify them by the number of arguments
 
@@ -276,3 +276,18 @@ long long isTokenUndefined(Mtoken* token);
 
 size_t outputBiginteger(const char* const prefix,const Mbiginteger* const _biginteger,const char* const postfix);
 size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,const char* const postfix);
+
+// starting with v0.1.4 we have file I/O support
+#include "sys/stat.h"
+
+// Mfile holds all information related to a single file
+typedef struct Mfile{
+    struct stat* _stat;
+    Mstring* _name; // if the file exists _name will contain the name of the file
+}Mfile;
+Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
+Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);
+
+Mfile* __file();
+void free_file(Mfile* _file);
+#define FREE_FILE(_file,owner_file) free_file(disowned_file(_file,owner_file))

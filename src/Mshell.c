@@ -7840,7 +7840,11 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				outputError("Failed to register map conversion functions");
 				return NULL;
 			}
-
+			// MDH@28SEP2020: register file functions
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"file"),"file",mfile)||!completedValueFunction(_getFunction(_Menvironment,owner,"files"),"files",mfiles)){
+				outputError("Failed to registered the file functions");
+				return NULL;
+			}
 		}
 	}
 

@@ -289,6 +289,7 @@ static void free_value(Mvalue* _value/*,Mallocationowner owner*/){
             case VT_REFERENCE:if(_value->value._reference){FREE_REFERENCE(_value->value._reference,owner_value_data);_value->value._reference=NULL;}break; // MDH@04NOV2019: decrement the reference count to the variable
             case VT_FUNCTION:if(_value->value._function){FREE_FUNCTION(_value->value._function,owner_value_data);_value->value._function=NULL;}break;
             case VT_ENVIRONMENT:if(_value->value._environment){FREE_ENVIRONMENT(_value->value._environment,owner_value_data);_value->value._environment=NULL;}break;
+            case VT_FILE:if(_value->value._file){FREE_FILE(_value->value._file,owner_value_data);_value->value._file=NULL;}break; // MDH@28SEP2020
             //case VT_USERFUNCTION:if(_value->value._userfunction)free_userfunction(_value->value._userfunction);break;
         }
         FREE_DISOWNED_1(_value,'X',owner_value);
@@ -1407,6 +1408,7 @@ void outputMap(char const * const prefix,Mmap const * const map,char const * con
 static Mstring* _nullValueTextRepresentation=NULL;
 Mstring* _getNullValueTextRepresentation(){if(!_nullValueTextRepresentation)_nullValueTextRepresentation=_getString(M_NULL_VALUE_TEXT_REPRESENTATION);return _getNullValueTextRepresentation;}
 */
+Mmap* getFilePropertyMap(Mfile* _file); // prototype
 Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE whatever is returned should be freed
 	Mstring* valueText=NULL;
@@ -1518,6 +1520,10 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                     }
                 }
                 break;
+            case VT_FILE: // MDH@28SEP2020: get the file property map and make text of it
+                {
+                    valueText=owned_string(_getMapText(getFilePropertyMap(_value->value._file),true,true,true),owner);
+                }
             default:break;
 		}
 	}else // the text we use for an value that is NULL!
@@ -2036,6 +2042,7 @@ long long isValueNull(Mvalue* value){
         case VT_REFERENCE:result=(value->value._reference?M_FALSE:M_TRUE);break;
         case VT_FUNCTION:result=(value->value._function?M_FALSE:M_TRUE);break;
         case VT_ENVIRONMENT:result=(value->value._environment?M_FALSE:M_TRUE);break;
+        case VT_FILE:result=(value->value._file?M_FALSE:M_TRUE);break; // MDH@28SEP2020
     }
     return result;
 }/* VALIDATED */
@@ -2059,6 +2066,7 @@ long long isValueUndefined(Mvalue* value){
         case VT_REFERENCE:result=(value->value._reference?M_FALSE:M_TRUE);break;
         case VT_FUNCTION:result=(value->value._function?M_FALSE:M_TRUE);break;
         case VT_ENVIRONMENT:result=(value->value._environment?M_FALSE:M_TRUE);break;
+        case VT_FILE:result=(value->value._file?M_FALSE:M_TRUE);break; // MDH@28SEP2020
     }
     return result;
 }/* VALIDATED */
@@ -2381,6 +2389,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2){
             break;
         case VT_FUNCTION:return(value1->value._function==value2->value._function);
         case VT_ENVIRONMENT:return(strcmp(value1->value._environment->_name->chars,value2->value._environment->_name->chars)==0); // TODO we might need to use the full name of the environment here though
+        case VT_FILE:return string_equal(value1->value._file->_name,value2->value._file->_name); // MDH@28SEP2020: the same if files are the same (TODO should be canonical of course)
     }
     return false;
 }
@@ -2573,3 +2582,79 @@ Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner own
     _value->value._environment=(Misdisowned(_environment)?owned_environment(_environment,owner_value_data):_environment);
     return _value;
 }/* VALIDATED */
+
+// Mfile support
+#include "unistd.h"
+#include "time.h"
+Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__);
+
+    struct stat* stats=(_file?_file->_stat:NULL);
+
+    Mmap* _map=(stats?owned_map(_getMapOfType(VT_TEXT),owner):NULL);
+
+    if(_map){
+        
+        struct tm dt;
+        // File permissions
+        Mstring* _access=owned_string(__string(),owner);
+
+        // File access property
+        if(stats->st_mode & R_OK)string_append_char(_access,'r');
+        if(stats->st_mode & W_OK)string_append_char(_access,'w');
+        if(stats->st_mode & X_OK)string_append_char(_access,'x');
+        appendedToMap(_map,owner,"access",_getTextValue(string(_access)));
+        FREE_STRING(_access,owner);
+
+        // File size property
+        Minteger* _integer=owned_integer(_getInteger(stats->st_size),owner);
+        appendedToMap(_map,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)));
+
+        // Get file creation time in seconds and convert seconds to date and time format
+        dt = *(gmtime(&stats->st_ctime));
+        Mstring* _created=owned_string(__string(),owner);
+		if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+        appendedToMap(_map,owner,"created",_getTextValue(string(_created)));
+        FREE_STRING(_created,owner);
+        // from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
+
+        // File modification time
+        dt = *(gmtime(&stats->st_mtime));
+        Mstring* _modified=owned_string(__string(),owner);
+		if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+        appendedToMap(_map,owner,"modified",_getTextValue(string(_modified)));
+        FREE_STRING(_modified,owner);
+
+        // from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
+        return disowned_map(_map,owner);
+    
+    }
+    return NULL;
+
+}
+Mvalue* _getValueOfFile(Mfile* _file){
+    if(!_file)return NULL;
+    Mvalue* _value=__value("file");
+    if(!_value){
+        if(Misdisowned(_file))free_file(_file);
+        return NULL;
+    }
+    _value->type=VT_FILE;
+    // MDH@12JUN2020: TODO supposedly this is a bit of a problem actually taking over the ownership of an environment completely
+    _value->value._file=(Misdisowned(_file)?owned_file(_file,owner_value_data):_file);
+    return _value;
+}
+Mvalue* mfile(Mvalue* filename_value){Mallocationowner owner=getOwner(__LINE__);
+    if(filename_value!=NULL){
+        Mstring* _filename=_getValueText(filename_value,true); // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
+        if(_filename){
+            Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
+            if(_file)if(stat(string(_filename),_file->_stat)==0){_file->_name=_filename;return _getValueOfFile(disowned_file(_file,owner));}
+            free_string(_filename);
+        }
+    }
+    return NULL;
+}
+
+Mvalue* mfiles(Mvalue* wildcard){
+    return NULL;
+}

@@ -24,6 +24,7 @@ typedef union Mvalueunion{
     struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
     struct Mfunction* _function; // MDH@03MAR2020
     struct Menvironment* _environment; // MDH@03MAR2020
+    struct Mfile* _file; // MDH@28SEP2020 (defined in Mexecution.h)
     //////////struct Muserfunction* _userfunction;
 }Mvalueunion;
 
@@ -244,6 +245,8 @@ void outputList(char const * const prefix,Mlist const * const list,char const * 
 void outputMap(char const * const prefix,Mmap const * const map,char const * const suffix); // MDH@02MAR2020: utility function to output a map
 
 Mstring* _getValueText(Mvalue const * const _value,bool dequoted); // flag only applicable to string values!!!
+Mvalue* _getStringValue(Mstring const * const _string); // MDH@28SEP2020: why wasn't this here so far?????
+
 
 // getValueInteger() should return a value unequal to invalid iff _value can be converted to an integer (therefore should NOT equal invalid itself!!!!)
 long long getValueInteger(Mvalue const * const _value);
@@ -432,3 +435,9 @@ Menvironment* getEnvironmentParent(Menvironment* _environment);
 Menvironment* getValueEnvironment(Mvalue* _value); // MDH@03FEB2020: the first additional function to obtain a specific data type value
 
 Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
+
+// Mfile is added starting from v0.1.4
+Mvalue* _getValueOfFile(Mfile* _file);
+
+Mvalue* mfile(Mvalue* filename_value);
+Mvalue* mfiles(Mvalue* wildcard_value);

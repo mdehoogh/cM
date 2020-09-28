@@ -1112,3 +1112,27 @@ bool isDecimalZero(Mdecimal* _decimal){
     return result;
 }// VALIDATED 
 */
+
+// MDH@28SEP2020: file access
+Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file){
+    if(!_file)return NULL;
+    if(_file->_stat)DISOWNED(_file->_stat,owner_file);
+    return DISOWNED(_file,owner_file);
+}
+Mfile* owned_file(struct Mfile* _file,Mallocationowner owner_file){
+    if(!_file)return NULL;
+    if(_file->_stat)OWNED(_file->_stat,Msubowner(owner_file,1));
+    return OWNED(_file,owner_file);
+}
+Mfile* __file(){Mallocationowner owner=getOwner(__LINE__);
+    Mfile* _file=CALLOC_1(sizeof(struct Mfile),'F',owner);
+    _file->_stat=(struct stat*)SUBOWNED(CALLOC_1(sizeof(struct stat),'f',owner),1); // allocate memory to store the file statistics
+    return disowned_file(_file,owner);
+}
+void free_file(Mfile* _file){
+    if(_file){
+        if(_file->_stat)FREE_1(_file->_stat,'f');
+        if(_file->_name)FREE_1(_file->_name,'S');
+        FREE_1(_file,'F');
+    }
+}
