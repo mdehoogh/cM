@@ -45,8 +45,11 @@ extern const long long M_FALSE;
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
-char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
-char const * const M_BUILD="5";char const * const M_DATE="21 September 2020";
+char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
+char const * const M_BUILD="1";char const * const M_DATE="28 September 2020";
+
+// char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
+// char const * const M_BUILD="5";char const * const M_DATE="21 September 2020";
 // char const * const M_BUILD="4";char const * const M_DATE="30 June 2020";
 // char const * const M_BUILD="3";char const * const M_DATE="17 June 2020";
 //char const * const M_BUILD="2";char const * const M_DATE="25 May 2020";
