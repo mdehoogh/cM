@@ -7845,7 +7845,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				||!completedValueFunction(_getFunction(_Menvironment,owner,"files"),"files",mfiles)
 				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fopen"),"fopen",mfopen)
 				||!completedValueFunction(_getFunction(_Menvironment,owner,"fclose"),"fclose",mfclose)
-				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fread"),"fread",mfread)){
+				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fread"),"fread",mfread)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"freadline"),"freadline",mfreadline)
+				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fwrite"),"fwrite",mfwrite)){
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}

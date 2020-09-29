@@ -2659,7 +2659,32 @@ Mvalue* mfile(Mvalue* filename_value){Mallocationowner owner=getOwner(__LINE__);
     }
     return NULL;
 }
+Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file&&!_file->_f){ // don't try to open the file when it is already open
+        if(mode_value&&mode_value->type==VT_TEXT){
+            char* mode=mode_value->value._text->_c;
+            if((mode[0]=='a'||mode[0]=='r'||mode[0]=='w')&&(mode[1]=='\0'||mode[1]=='+')){
+                // if the file does not exist, you cannot open it for reading only
+                if(!_file->_stat){ // the file does not yet exist
+                    if(mode[0]=='r'||(mode[0]=='a'&&mode[1]=='+'))return _getIntegerValue(M_FALSE);
+                }
+                _file->_f=fopen(string(_file->_name),mode);
+                return _getIntegerValue(_file->_f?M_TRUE:M_FALSE);
+            }
+        }
+    }
+    return _getIntegerValue(M_LL_INVALID);
+}
 // reading from a file by specifying the number of bytes to read
+static void openFileForReading(Mfile* _file){
+    // ASSERT _file should NOT be NULL and _file->_stat should not be NULL (i.e. it's an existing file) and _file->_f should be NULL
+    // if the file mode has not been set yet, or if it has been set to something that is supposedly readable
+    if(_file->mode[0]=='\0'||_file->mode[0]!='w'||_file->mode[1]=='+'){
+        _file->_f=fopen(string(_file->_name),(_file->mode[0]?_file->mode:"r+")); // an array is a pointer!!!!!
+        if(_file->_f)if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
+    }
+}
 // to allow for continued reading we should keep track of the position in the file?????? I guess we can keep a reference to the FILE pointer I suppose
 Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner owner=getOwner(__LINE__);
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
@@ -2670,15 +2695,7 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
             // it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
             if(_file->_stat){ // an existing file
                 // if the file wasn't opened before, try to open it
-                if(!_file->_f){ // the file is not open yet
-                    // if the file mode has not been set yet, or if it has been set to something that is supposedly readable
-                    if(_file->mode[0]=='\0'||_file->mode[0]!='w'||_file->mode[1]=='+'){
-                        _file->_f=fopen(string(_file->_name),(_file->mode[0]?_file->mode:"r+")); // an array is a pointer!!!!!
-                        if(_file->_f){
-                            if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
-                        }
-                    }
-                }
+                if(!_file->_f)openFileForReading(_file);
                 // if the file can be read from, we do
                 if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
                     Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
@@ -2700,27 +2717,64 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
     }
     return NULL; // some error
 }
-Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){
+Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-    if(_file&&!_file->_f){ // don't try to open the file when it is already open
-        if(mode_value&&mode_value->type==VT_TEXT){
-            char* mode=mode_value->value._text->_c;
-            if((mode[0]=='a'||mode[0]=='r'||mode[0]=='w')&&(mode[1]=='\0'||mode[1]=='+')){
-                // if the file does not exist, you cannot open it for reading only
-                if(!_file->_stat){ // the file does not yet exist
-                    if(mode[0]=='r'||(mode[0]=='a'&&mode[1]=='+'))return _getIntegerValue(M_FALSE);
+    if(_file){
+        if(_file->_stat){ // an existing file
+            if(!_file->_f)openFileForReading(_file);
+            // if the file can be read from, we do
+            if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+                Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
+                if(_bytesread){
+                    Mstring* p=_bytesread;
+                    // the file could be empty to start with
+                    char c='\0';
+                    while(!feof(_file->_f)){
+                        c=fgetc(_file->_f);
+                        if(c==13)break;
+                        p=string_append_char(p,c);
+                        if(!p)break;
+                    }
+                    // skip the optional linefeed following any carriage return, if something else push back again
+                    if(c==13)if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!=10)ungetc(c,_file->_f);}
+                    Mvalue* result=(p?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
+                    FREE_STRING(_bytesread,owner);
+                    return result;
                 }
-                _file->_f=fopen(string(_file->_name),mode);
-                return _getIntegerValue(_file->_f?M_TRUE:M_FALSE);
             }
         }
     }
-    return _getIntegerValue(M_LL_INVALID);
+    return NULL; // some error
 }
+
 Mvalue* mfclose(Mvalue* file_value){
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
     if(_file&&_file->_f){
         if(fclose(_file->_f)==0){_file->_f=NULL;return _getIntegerValue(M_TRUE);}return _getIntegerValue(M_FALSE);
+    }
+    return _getIntegerValue(M_LL_INVALID);
+}
+
+static void openFileForWriting(Mfile* _file){
+    // ASSERT _file should NOT be NULL and _file->_f should be NULL (but _file->stat might be NULL)
+    // if the file mode has not been set yet, or if it has been set to something that is supposedly readable
+    if(_file->mode[0]=='\0'||_file->mode[0]!='w'||_file->mode[1]=='+'){
+        _file->_f=fopen(string(_file->_name),(_file->mode[0]?_file->mode:"r+")); // an array is a pointer!!!!!
+        if(_file->_f)if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
+    }
+}Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
+    // how about returning the number of bytes NOT written...
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file){ // something to write to
+        if(write_value&&write_value->type==VT_TEXT&&write_value->value._text->_c[0]){ // something to write
+            if(!_file->_f)openFileForWriting(_file);
+            if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+                char* p=write_value->value._text->_c; // _c is an array so a pointer
+                while(*p){if(fputc(*p,_file->_f)==EOF)break;p++;}
+                long long notwritten=0;while(*p){notwritten++;p++;}
+                return _getIntegerValue(notwritten);
+            }
+        }
     }
     return _getIntegerValue(M_LL_INVALID);
 }
