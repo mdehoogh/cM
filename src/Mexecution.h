@@ -284,6 +284,10 @@ size_t outputDecimal(const char* const prefix,const Mdecimal* const _decimal,con
 typedef struct Mfile{
     struct stat* _stat;
     Mstring* _name; // if the file exists _name will contain the name of the file
+    // keep track of open file attributes
+    FILE* _f; // the pointer to the opened file
+    off_t pos; // the current position in the file
+    char mode[3]; // the '\0' terminated mode array which will contain 'r','a','w','r+','a+' or w+'
 }Mfile;
 Mfile* disowned_file(Mfile* _file,Mallocationowner owner_file);
 Mfile* owned_file(Mfile* _file,Mallocationowner owner_file);

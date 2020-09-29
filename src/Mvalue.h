@@ -440,4 +440,7 @@ Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner own
 Mvalue* _getValueOfFile(Mfile* _file);
 
 Mvalue* mfile(Mvalue* filename_value);
+Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value);
+Mvalue* mfclose(Mvalue* file_value);
+Mvalue* mfread(Mvalue* file_value,Mvalue* count_value); // reads at most count_value 
 Mvalue* mfiles(Mvalue* wildcard_value);

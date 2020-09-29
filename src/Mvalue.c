@@ -2645,14 +2645,84 @@ Mvalue* _getValueOfFile(Mfile* _file){
 }
 Mvalue* mfile(Mvalue* filename_value){Mallocationowner owner=getOwner(__LINE__);
     if(filename_value!=NULL){
-        Mstring* _filename=_getValueText(filename_value,true); // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
+        Mstring* _filename=owned_string(_getValueText(filename_value,true),owner); // supposedly always a copy of the input argument so we can bind it to _file in _file->_name
         if(_filename){
             Mfile* _file=owned_file(__file(),owner); // get an owned new file instance
-            if(_file)if(stat(string(_filename),_file->_stat)==0){_file->_name=_filename;return _getValueOfFile(disowned_file(_file,owner));}
-            free_string(_filename);
+            // the file might not exist in which case we could get rid of _file->_stat???
+            if(_file){
+                _file->_name=SUBOWNED(_filename,1); // bind _filename to _file->_name (ownership one level down)
+                if(stat(string(_filename),_file->_stat)!=0){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
+                return _getValueOfFile(disowned_file(_file,owner));
+            }
+            free_string(_filename); // not bound to _file->_name so to be released
         }
     }
     return NULL;
+}
+// reading from a file by specifying the number of bytes to read
+// to allow for continued reading we should keep track of the position in the file?????? I guess we can keep a reference to the FILE pointer I suppose
+Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner owner=getOwner(__LINE__);
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file){
+        long long numberofbytes=(numberofbytes_value?getValueInteger(numberofbytes_value):1); // the default is to read a single byte
+        if(numberofbytes>=0){ // only non-negative values are considered valid
+            // before checking the mode to see if the file can be read from, we might need to open it
+            // it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
+            if(_file->_stat){ // an existing file
+                // if the file wasn't opened before, try to open it
+                if(!_file->_f){ // the file is not open yet
+                    // if the file mode has not been set yet, or if it has been set to something that is supposedly readable
+                    if(_file->mode[0]=='\0'||_file->mode[0]!='w'||_file->mode[1]=='+'){
+                        _file->_f=fopen(string(_file->_name),(_file->mode[0]?_file->mode:"r+")); // an array is a pointer!!!!!
+                        if(_file->_f){
+                            if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
+                        }
+                    }
+                }
+                // if the file can be read from, we do
+                if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+                    Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
+                    if(_bytesread){
+                        Mstring* p=_bytesread;
+                        // the file could be empty to start with
+                        while(numberofbytes!=0&&!feof(_file->_f)){
+                            p=string_append_char(p,fgetc(_file->_f));
+                            if(!p)break;
+                            if(numberofbytes>0)numberofbytes--;
+                        }
+                        Mvalue* result=(p?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
+                        FREE_STRING(_bytesread,owner);
+                        return result;
+                    }
+                }
+            }
+        }
+    }
+    return NULL; // some error
+}
+Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file&&!_file->_f){ // don't try to open the file when it is already open
+        if(mode_value&&mode_value->type==VT_TEXT){
+            char* mode=mode_value->value._text->_c;
+            if((mode[0]=='a'||mode[0]=='r'||mode[0]=='w')&&(mode[1]=='\0'||mode[1]=='+')){
+                // if the file does not exist, you cannot open it for reading only
+                if(!_file->_stat){ // the file does not yet exist
+                    if(mode[0]=='r'||(mode[0]=='a'&&mode[1]=='+'))return _getIntegerValue(M_FALSE);
+                }
+                _file->_f=fopen(string(_file->_name),mode);
+                return _getIntegerValue(_file->_f?M_TRUE:M_FALSE);
+            }
+        }
+    }
+    return _getIntegerValue(M_LL_INVALID);
+}
+Mvalue* mfclose(Mvalue* file_value){
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file&&_file->_f){
+        if(fclose(_file->_f)==0){_file->_f=NULL;return _getIntegerValue(M_TRUE);}return _getIntegerValue(M_FALSE);
+    }
+    return _getIntegerValue(M_LL_INVALID);
 }
 
 Mvalue* mfiles(Mvalue* wildcard){

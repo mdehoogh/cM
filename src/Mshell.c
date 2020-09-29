@@ -7841,7 +7841,11 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				return NULL;
 			}
 			// MDH@28SEP2020: register file functions
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"file"),"file",mfile)||!completedValueFunction(_getFunction(_Menvironment,owner,"files"),"files",mfiles)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"file"),"file",mfile)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"files"),"files",mfiles)
+				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fopen"),"fopen",mfopen)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"fclose"),"fclose",mfclose)
+				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fread"),"fread",mfread)){
 				outputError("Failed to registered the file functions");
 				return NULL;
 			}
