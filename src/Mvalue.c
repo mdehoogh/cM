@@ -2596,7 +2596,7 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
         
         struct tm dt;
         // File permissions
-        Mstring* _access=owned_string(__string(),owner);
+        Mstring* _access=owned_string(_getString("'"),owner);
 
         // File access property
         if(stats->st_mode & R_OK)string_append_char(_access,'r');
@@ -2613,6 +2613,7 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
         dt = *(gmtime(&stats->st_ctime));
         Mstring* _created=owned_string(__string(),owner);
 		if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+        string_insert_char(_created,0,'\'');
         appendedToMap(_map,owner,"created",_getTextValue(string(_created)));
         FREE_STRING(_created,owner);
         // from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
@@ -2621,6 +2622,7 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
         dt = *(gmtime(&stats->st_mtime));
         Mstring* _modified=owned_string(__string(),owner);
 		if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+        string_insert_char(_modified,0,'\'');
         appendedToMap(_map,owner,"modified",_getTextValue(string(_modified)));
         FREE_STRING(_modified,owner);
 
@@ -2731,12 +2733,12 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
                     char c='\0';
                     while(!feof(_file->_f)){
                         c=fgetc(_file->_f);
-                        if(c==13)break;
+                        if(c=='\n'||c=='\r')break; // either LF or CR would stop the reading
                         p=string_append_char(p,c);
                         if(!p)break;
                     }
                     // skip the optional linefeed following any carriage return, if something else push back again
-                    if(c==13)if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!=10)ungetc(c,_file->_f);}
+                    if(c=='\r')if(!feof(_file->_f)){c=fgetc(_file->_f);if(c!='\n')ungetc(c,_file->_f);}
                     Mvalue* result=(p?_getTextValue(string(_bytesread)):NULL); // an immutable version of the bytes obtained
                     FREE_STRING(_bytesread,owner);
                     return result;
