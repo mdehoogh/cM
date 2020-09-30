@@ -6866,3 +6866,5 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
     return NULL;
 }
 
+Dit is een test\nDit is een test\nDit is een test!
+

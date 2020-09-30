@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <unistd.h>
 
 #include "Mshell.h"
 
@@ -12,6 +13,12 @@ Mvalue* NULL_value=NULL;
 // prototype definition of getValueOfExpression() so we can call it from getValueOfList() and getValueOfMap()
 
 // all the available constants go here...
+const char M_PATH_SEPARATOR =
+#ifdef _WIN32
+                              '\\';
+#else
+                              '/';
+#endif
 const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference"};
 const char* const M_VARIABLE_NAME="M"; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
 const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function for getting previous results
@@ -7655,6 +7662,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				outputError("Failed to initialize PI");
 				return NULL;
 			}
+
 			Mvalue* E_value=_getFloatValue(M_LD_E);
 			if(!E_value){
 				///////free_value(E_value);
@@ -7670,6 +7678,25 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				outputError("Failed to initialize E");
 				return NULL;
 			}
+
+			// MDH@30SEP2020: let's add a CWD variable to contain the current working directory (if any) to makes things a little easier
+			if(!addVariable(_Menvironment,owner,"CWD",VT_TEXT,true)){
+				outputError("Failed to add CWD");
+				return NULL;
+			}
+			char cwd[PATH_MAX];
+			Mstring* cwd_str=owned_string(_getString("'"),owner);
+			char* _cwd=getcwd(cwd,sizeof(cwd));output("Current working directory: '%s'.\n",_cwd);
+			string_append(cwd_str,_cwd);
+			if(string_last_char(cwd_str)!=M_PATH_SEPARATOR)string_append_char(cwd_str,M_PATH_SEPARATOR); // ascertain that CWD ends with a path separator!!!
+			Mvalue* CWD_value=_getTextValue(string(cwd_str)); // I suppose we can directly use the result of getcwd() in _getString
+			FREE_STRING(cwd_str,owner);
+			if(!setValue(_Menvironment,"CWD",CWD_value)){
+				//////free_value(E_value);
+				outputError("Failed to initialize CWD");
+				return NULL;
+			}
+
 			/*
 			// we're going to store all commands in a list called M
 			Mvalue* Mvalue=_getListValue(VT_UNDEFINED);
@@ -7842,6 +7869,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			}
 			// MDH@28SEP2020: register file functions
 			if(!completedValueFunction(_getFunction(_Menvironment,owner,"file"),"file",mfile)
+				||!completedValueFunction(_getFunction(_Menvironment,owner,"fdelete"),"fdelete",mfdelete)
 				||!completedValueFunction(_getFunction(_Menvironment,owner,"files"),"files",mfiles)
 				||!completedValueValueFunction(_getFunction(_Menvironment,owner,"fopen"),"fopen",mfopen)
 				||!completedValueFunction(_getFunction(_Menvironment,owner,"fclose"),"fclose",mfclose)

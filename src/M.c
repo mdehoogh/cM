@@ -2265,9 +2265,8 @@ void showSuggestedText(){
 
 	numberOfSuggestedCharactersWritten=cursormovement.written+cursormovement.skipped;
 
-	// if(string_length(_suggestedText)==0){
+	if(amVerboseDebugging())
 		numberOfSuggestedCharactersWritten+=output("[%zd-%zd=%zd,%zd]",getUserInputLength(),numberOfLineCommandCharacters,(_userinputline?_userinputline->offset:0),(_userinputline?_userinputline->index:0));
-	// }
 
 	moveCursorLeft(numberOfSuggestedCharactersWritten);
 

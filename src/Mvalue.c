@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <limits.h>
 #include <math.h>
+#include <stdio.h>
+#include <dirent.h>
 
 #include "Mvalue.h"
 
@@ -1235,7 +1237,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                     result=M_TRUE;
                 }
             }else{
-                output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a list: it is of the wrong type.\n");
+                output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a map: it is of the wrong type.\n");
             }
         }else 
             outputError("Unable to change the map: it is immutable");
@@ -2588,47 +2590,79 @@ Mvalue* _getValueOfEnvironment(Menvironment* _environment/*,Mallocationowner own
 #include "time.h"
 Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__);
 
-    struct stat* stats=(_file?_file->_stat:NULL);
+    if(_file){
 
-    Mmap* _map=(stats?owned_map(_getMapOfType(VT_TEXT),owner):NULL);
+        Mmap* _map=owned_map(_getMapOfType(VT_UNDEFINED),owner);
 
-    if(_map){
+        if(_map){
+            
+            if(_file->_name){
+                Mstring* _filename=owned_string(_getString("'"),owner);
+                if(_filename){
+                    string_append(_filename,string(_file->_name));
+                    appendedToMap(_map,owner,"name",_getTextValue(string(_filename)));
+                    FREE_STRING(_filename,owner);
+                }
+            }
+
+            if(_file->_f){ // the file is currently open
+                // show the mode the file was opened in
+                Mstring* _openmode=owned_string(_getString("'"),owner);
+                if(_openmode){
+                    if(_file->mode[0])string_append_char(_openmode,_file->mode[0]);
+                    if(_file->mode[1])string_append_char(_openmode,_file->mode[1]);
+                    if(_file->mode[2])string_append_char(_openmode,_file->mode[2]);
+                    appendedToMap(_map,owner,"mode",_getTextValue(string(_openmode)));
+                    FREE_STRING(_openmode,owner);
+                }
+                fpos_t filepos;fgetpos(_file->_f,&filepos);
+                Minteger* _integer=owned_integer(_getInteger(filepos),owner);
+                appendedToMap(_map,owner,"position",_getValueOfInteger(disowned_integer(_integer,owner)));
+            } 
+
+            struct stat* stats=_file->_stat;
+
+            if(stats){
+
+                struct tm dt;
+
+                // File permissions
+                Mstring* _access=owned_string(_getString("'"),owner);
+
+                // File access property
+                if(S_ISDIR(stats->st_mode))string_append_char(_access,'d'); // TODO we might need to consider other types as well like links, devices and the like
+                if(stats->st_mode & R_OK)string_append_char(_access,'r');
+                if(stats->st_mode & W_OK)string_append_char(_access,'w');
+                if(stats->st_mode & X_OK)string_append_char(_access,'x');
+                appendedToMap(_map,owner,"access",_getTextValue(string(_access)));
+                FREE_STRING(_access,owner);
+
+                // File size property
+                Minteger* _integer=owned_integer(_getInteger(stats->st_size),owner);
+                appendedToMap(_map,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)));
+
+                // Get file creation time in seconds and convert seconds to date and time format
+                dt = *(gmtime(&stats->st_ctime));
+                Mstring* _created=owned_string(__string(),owner);
+                if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+                string_insert_char(_created,0,'\'');
+                appendedToMap(_map,owner,"created",_getTextValue(string(_created)));
+                FREE_STRING(_created,owner);
+                // from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
+
+                // File modification time
+                dt = *(gmtime(&stats->st_mtime));
+                Mstring* _modified=owned_string(__string(),owner);
+                if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
+                string_insert_char(_modified,0,'\'');
+                appendedToMap(_map,owner,"modified",_getTextValue(string(_modified)));
+                FREE_STRING(_modified,owner);
+            }
+
+             // from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
+            return disowned_map(_map,owner);
         
-        struct tm dt;
-        // File permissions
-        Mstring* _access=owned_string(_getString("'"),owner);
-
-        // File access property
-        if(stats->st_mode & R_OK)string_append_char(_access,'r');
-        if(stats->st_mode & W_OK)string_append_char(_access,'w');
-        if(stats->st_mode & X_OK)string_append_char(_access,'x');
-        appendedToMap(_map,owner,"access",_getTextValue(string(_access)));
-        FREE_STRING(_access,owner);
-
-        // File size property
-        Minteger* _integer=owned_integer(_getInteger(stats->st_size),owner);
-        appendedToMap(_map,owner,"size",_getValueOfInteger(disowned_integer(_integer,owner)));
-
-        // Get file creation time in seconds and convert seconds to date and time format
-        dt = *(gmtime(&stats->st_ctime));
-        Mstring* _created=owned_string(__string(),owner);
-		if(string_setlength(_created,50))string_setlength(_created,strftime(_created->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
-        string_insert_char(_created,0,'\'');
-        appendedToMap(_map,owner,"created",_getTextValue(string(_created)));
-        FREE_STRING(_created,owner);
-        // from: printf("\nCreated on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900,dt.tm_hour, dt.tm_min, dt.tm_sec);
-
-        // File modification time
-        dt = *(gmtime(&stats->st_mtime));
-        Mstring* _modified=owned_string(__string(),owner);
-		if(string_setlength(_modified,50))string_setlength(_modified,strftime(_modified->_chars->chars,50,"%Y-%m-%d %H:%M:%S",&dt));
-        string_insert_char(_modified,0,'\'');
-        appendedToMap(_map,owner,"modified",_getTextValue(string(_modified)));
-        FREE_STRING(_modified,owner);
-
-        // from: printf("\nModified on: %d-%d-%d %d:%d:%d", dt.tm_mday, dt.tm_mon, dt.tm_year + 1900, dt.tm_hour, dt.tm_min, dt.tm_sec);
-        return disowned_map(_map,owner);
-    
+        }
     }
     return NULL;
 
@@ -2661,32 +2695,89 @@ Mvalue* mfile(Mvalue* filename_value){Mallocationowner owner=getOwner(__LINE__);
     }
     return NULL;
 }
-Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){
-    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
-    if(_file&&!_file->_f){ // don't try to open the file when it is already open
-        if(mode_value&&mode_value->type==VT_TEXT){
-            char* mode=mode_value->value._text->_c;
-            if((mode[0]=='a'||mode[0]=='r'||mode[0]=='w')&&(mode[1]=='\0'||mode[1]=='+')){
-                // if the file does not exist, you cannot open it for reading only
-                if(!_file->_stat){ // the file does not yet exist
-                    if(mode[0]=='r'||(mode[0]=='a'&&mode[1]=='+'))return _getIntegerValue(M_FALSE);
-                }
+// delete a file
+Mvalue* mfdelete(Mvalue* file_value){
+    if(file_value!=NULL&&file_value->type==VT_FILE){
+        // can only delete an existing file that is not currently open
+        Mfile* _file=file_value->value._file;
+        if(_file&&_file->_name&&!_file->_f){ // a file with a name that is not currently open
+            int success=remove(string(_file->_name));
+            if(success)return _getIntegerValue(M_FALSE); // if success is not zero return failure
+            // update stat accordingly, if we succeed we should free _stat
+            if(stat(string(_file->_name),_file->_stat)==0){FREE_1(_file->_stat,'f');_file->_stat=NULL;}
+            return _getIntegerValue(M_TRUE);
+        }
+    }
+    return NULL;
+}
+// opening a file might mean that afterwards the file exists, and we then should update _file->_stat accordingly!!!
+static void openFile(Mfile* _file,char* mode){
+    // only open when defined and currently not open
+    if(_file&&mode){ // valid input
+        if(!_file->_f){ // not opened yet
+            if(!_file->_stat||!S_ISDIR(_file->_stat->st_mode)){ // never try to open a directory (TODO perhaps we should not try to open other things here as well)
                 _file->_f=fopen(string(_file->_name),mode);
-                return _getIntegerValue(_file->_f?M_TRUE:M_FALSE);
+                if(_file->_f){ // now opened
+                    _file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2]; // register the opening mode (which consists of exactly three characters)
+                    if(stat(string(_file->_name),_file->_stat)!=0){FREE_1(_file->_stat,'f');_file->_stat=NULL;} // update stat (even if already set, because the file existed to start with)
+                }
             }
         }
     }
-    return _getIntegerValue(M_LL_INVALID);
 }
+// things we can do with a Mfile
+Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value){Mallocationowner owner=getOwner(__LINE__);
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file){ // there's a Mfile 
+        Mstring* mode_str=owned_string(_getString("'"),owner);
+        if(mode_str){
+            if(!_file->_f){
+                // how about checking whether the mode_value argument is correct first??????
+                char openmode=(mode_value?(mode_value->type==VT_TEXT?mode_value->value._text->_c[0]:'\0'):(_file->_stat?'r':'w')); // if mode_value is defined, it must be of type VT_TEXT, and the first character should be 'a', 'r' or 'w' to be a valid mode
+                // let's NOT allow overwriting an existing file!!!
+                if(openmode=='w'||openmode=='r'||openmode=='a'){ // a valid open mode
+                    if(openmode!='w'||_file->_stat==NULL){ // but do NOT allow deleting existing content
+                        // let's initialize the default mode
+                        char mode[4]={openmode}; // initialize mode to openmode NOTE mode always needs to end with '\0'
+                        if(mode_value){ // accepting two additional mode characters '+' and 'b'
+                            // let's simply copy the characters (even if they are wrong)
+                            mode[1]=mode_value->value._text->_c[1];
+                            if(mode[1])mode[2]=mode_value->value._text->_c[2];
+                        }else // for optimal flexibility allow for writing as well
+                            mode[1]='+';
+                        // try to open the file
+                        openFile(_file,mode); 
+                        /* replacing and augmenting:
+                        _file->_f=fopen(string(_file->_name),mode);
+                        if(_file->_f){_file->mode[0]=mode[0];_file->mode[1]=mode[1];_file->mode[2]=mode[2];} // remember the opening mode when the file was successfully opened
+                        */
+                    }
+                }
+            }
+            if(_file->_f){ // the file is (now) open
+                if(_file->mode[0])string_append_char(mode_str,_file->mode[0]);
+                if(_file->mode[1])string_append_char(mode_str,_file->mode[1]);
+                if(_file->mode[2])string_append_char(mode_str,_file->mode[2]);
+            }
+            Mvalue* result=_getTextValue(string(mode_str));
+            FREE_STRING(mode_str,owner);
+            return result;
+        }
+    }
+    return NULL;
+}
+/*
 // reading from a file by specifying the number of bytes to read
-static void openFileForReading(Mfile* _file){
+static void openFileForReadingText(Mfile* _file){
     // ASSERT _file should NOT be NULL and _file->_stat should not be NULL (i.e. it's an existing file) and _file->_f should be NULL
     // if the file mode has not been set yet, or if it has been set to something that is supposedly readable
-    if(_file->mode[0]=='\0'||_file->mode[0]!='w'||_file->mode[1]=='+'){
-        _file->_f=fopen(string(_file->_name),(_file->mode[0]?_file->mode:"r+")); // an array is a pointer!!!!!
-        if(_file->_f)if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
+    if(_file&&!_file->_f){ // defined, but not open yet
+        if(_file->mode[0]=='\0'||_file->mode[0]!='w'||_file->mode[1]=='+'){
+            _file->_f=fopen(string(_file->_name),(_file->mode[0]?_file->mode:"r+")); // an array is a pointer!!!!!
+            if(_file->_f)if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
+        }
     }
-}
+}*/
 // to allow for continued reading we should keep track of the position in the file?????? I guess we can keep a reference to the FILE pointer I suppose
 Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner owner=getOwner(__LINE__);
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
@@ -2696,8 +2787,8 @@ Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value){Mallocationowner 
             // before checking the mode to see if the file can be read from, we might need to open it
             // it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
             if(_file->_stat){ // an existing file
-                // if the file wasn't opened before, try to open it
-                if(!_file->_f)openFileForReading(_file);
+                // if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
+                if(!_file->_f)openFile(_file,"r+");
                 // if the file can be read from, we do
                 if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
                     Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
@@ -2723,9 +2814,9 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
     if(_file){
         if(_file->_stat){ // an existing file
-            if(!_file->_f)openFileForReading(_file);
-            // if the file can be read from, we do
-            if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+            if(!_file->_f)openFile(_file,"r+");
+            // if the file is not binary and can be read from
+            if(_file->mode[2]!='b'&&(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r')){ // the mode is defined (i.e. unequal to it's initial value '\0')
                 Mstring* _bytesread=owned_string(_getString("'"),owner); // start the string with a single quote for create a Mtext from it
                 if(_bytesread){
                     Mstring* p=_bytesread;
@@ -2756,7 +2847,7 @@ Mvalue* mfclose(Mvalue* file_value){
     }
     return _getIntegerValue(M_LL_INVALID);
 }
-
+/*
 static void openFileForWriting(Mfile* _file){
     // ASSERT _file should NOT be NULL and _file->_f should be NULL (but _file->stat might be NULL)
     // if the file mode has not been set yet, or if it has been set to something that is supposedly readable
@@ -2764,16 +2855,31 @@ static void openFileForWriting(Mfile* _file){
         _file->_f=fopen(string(_file->_name),(_file->mode[0]?_file->mode:"r+")); // an array is a pointer!!!!!
         if(_file->_f)if(!_file->mode[0]){_file->mode[0]='r';_file->mode[1]='+';} // if the file mode was not initialized, use r+ as access mode
     }
-}Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
+}*/
+Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value){Mallocationowner owner=getOwner(__LINE__); // reads all bytes until a new line character is encountered 
     // how about returning the number of bytes NOT written...
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
     if(_file){ // something to write to
         if(write_value&&write_value->type==VT_TEXT&&write_value->value._text->_c[0]){ // something to write
-            if(!_file->_f)openFileForWriting(_file);
+            if(!_file->_f)openFile(_file,"w+"); // TODO I guess opening explicitly for writing seems to be the right choice
             if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='w'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+                long long notwritten=0;
                 char* p=write_value->value._text->_c; // _c is an array so a pointer
-                while(*p){if(fputc(*p,_file->_f)==EOF)break;p++;}
-                long long notwritten=0;while(*p){notwritten++;p++;}
+                size_t towrite=strlen(p);
+                if(towrite>0){
+                    if(_file->mode[2]=='b'){ // binary write
+                        notwritten=towrite-fwrite(p,sizeof(char),strlen(p),_file->_f);
+                    }else{ // text write (i.e. as characters)
+                        // in case there are escape sequences in the text, we need to resolve these which _getStringText() does
+                        Mstring* _towrite=_getStringText(write_value->value._text,true);
+                        if(_towrite){
+                            char* p=string(_towrite);
+                            while(*p){if(fputc(*p,_file->_f)==EOF)break;p++;}
+                            while(*p){notwritten++;p++;}
+                        }else
+                            notwritten=towrite;
+                    }
+                }
                 return _getIntegerValue(notwritten);
             }
         }
@@ -2781,6 +2887,26 @@ static void openFileForWriting(Mfile* _file){
     return _getIntegerValue(M_LL_INVALID);
 }
 
-Mvalue* mfiles(Mvalue* wildcard){
-    return NULL;
+Mvalue* mfiles(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__);
+    Mfile* _file=(file_value?file_value->value._file:NULL);
+    if(_file&&_file->_name&&_file->_stat&&S_ISDIR(_file->_stat->st_mode)){ // the file is a directory
+        char* directoryname=string(_file->_name);
+        DIR* dr=(directoryname?opendir(directoryname):NULL);
+        if(dr){
+            Mlist* files_list=owned_list(_getListOfType(VT_TEXT),owner);
+            struct dirent *en;
+            while((en=readdir(dr))!=NULL){
+                Mstring* _filename=owned_string(_getString("'"),owner);
+                if(_filename){
+                    // let's NOT prepend the directory name!!!! string_append(_filename,directoryname);
+                    string_append(_filename,en->d_name);
+                    appendedToList(files_list,owner,_getTextValue(string(_filename)),M_LL_INVALID);
+                    FREE_STRING(_filename,owner);
+                }
+            }
+            closedir(dr); //close all directory
+            return _getValueOfList(disowned_list(files_list,owner));
+        }
+   }
+   return NULL;
 }
