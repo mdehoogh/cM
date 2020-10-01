@@ -2839,6 +2839,53 @@ Mvalue* mfreadline(Mvalue* file_value){Mallocationowner owner=getOwner(__LINE__)
     }
     return NULL; // some error
 }
+// MDH@01OCT2020: how about allowing to read a number of lines in one go??????
+Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value){Mallocationowner owner=getOwner(__LINE__);
+    Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);
+    if(_file&&_file->_stat&&!S_ISDIR(_file->_stat->st_mode)){ // an existing (non directory) file
+        long long numberoflines=(numberoflines_value?getValueInteger(numberoflines_value):1); // the default is to read a single byte
+        if(numberoflines>=0){ // only non-negative values are considered valid
+        Mlist* lines_list=owned_list(_getListOfType(VT_TEXT),owner);
+        if(lines_list){
+            // before checking the mode to see if the file can be read from, we might need to open it
+            // it's easiest to check whether it exists to start with, because if it doesn't it can't be read from anyway
+                // if the file wasn't opened before, try to open it for reading 'text' (i.e. not binary)
+                if(!_file->_f)openFile(_file,"r+");
+                // if the file can be read from, we do
+                if(_file->mode[1]=='+'||_file->mode[0]=='a'||_file->mode[0]=='r'){ // the mode is defined (i.e. unequal to it's initial value '\0')
+                    if(_file->mode[2]!='b'){
+                        long long lineindex=0;
+                        char buffer[128]; // the buffer to use with fgets
+                        size_t line_length;
+                        bool eoln;
+                        while(!feof(_file->_f)){ // there are still additional lines
+                            Mstring* _line=owned_string(_getString("'"),owner);
+                            buffer[0]='\0'; // ascertain for the buffer to have length 0 when we start
+                            lineindex=0;
+                            // keep reading until all of the line is read (or some error occurs)
+                            while(fgets(buffer,128,_file->_f)!=NULL){
+                                // the problem is that buffer might not end with a new line
+                                line_length=strlen(buffer);
+                                if(line_length==0)break; // if nothing was read we're done (technically won't happen as fgets will also append the end of line!!!)
+                                eoln=(buffer[line_length-1]=='\n');
+                                if(eoln)buffer[line_length-1]='\0';
+                                string_append(_line,buffer); // append the buffer to _line
+                                if(eoln){
+                                    lineindex=appendedToList(lines_list,owner,_getTextValue(string(_line)),M_LL_INVALID);
+                                    break;
+                                }
+                            }
+                            FREE_STRING(_line,owner);
+                            if(lineindex<=0)break; // either an error or failed to append the line to the list!!!!
+                        }
+                        return _getValueOfList(disowned_list(lines_list,owner));
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
+}
 
 Mvalue* mfclose(Mvalue* file_value){
     Mfile* _file=(file_value&&file_value->type==VT_FILE?file_value->value._file:NULL);

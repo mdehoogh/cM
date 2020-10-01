@@ -443,7 +443,8 @@ Mvalue* mfile(Mvalue* filename_value);
 Mvalue* mfdelete(Mvalue* file_value);
 Mvalue* mfopen(Mvalue* file_value,Mvalue* mode_value);
 Mvalue* mfclose(Mvalue* file_value);
-Mvalue* mfread(Mvalue* file_value,Mvalue* count_value); // reads at most count_value 
+Mvalue* mfread(Mvalue* file_value,Mvalue* numberofbytes_value); // reads at most count_value 
 Mvalue* mfreadline(Mvalue* file_value); // reads all bytes until a new line character is encountered 
+Mvalue* mfreadlines(Mvalue* file_value,Mvalue* numberoflines_value); // reads all bytes until a new line character is encountered 
 Mvalue* mfwrite(Mvalue* file_value,Mvalue* write_value);
 Mvalue* mfiles(Mvalue* wildcard_value);
