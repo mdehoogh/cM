@@ -2667,6 +2667,25 @@ Mmap* getFilePropertyMap(Mfile* _file){Mallocationowner owner=getOwner(__LINE__)
     return NULL;
 
 }
+
+// MDH@02OCT2020: when opening a file check whether the file is readable or writeable depending on the opening mode
+bool isFileReadable(Mfile* _file){
+    if(_file){
+        if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='w'); // an open file is readable if it can be read from
+        // an unopened file is readable when it exists, is not a directory and has the 'r' access flag set
+        // I suppose an open file is also readable when it has not been opened in write-only mode
+        return(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)&&_file->_stat->st_mode&R_OK);
+    }
+    return false;
+}
+bool isFileWriteable(Mfile* _file){
+    if(_file){
+        if(_file->_f)return(_file->mode[1]=='+'||_file->mode[0]!='r');
+        return(_file->_stat&&!S_ISDIR(_file->_stat->st_mode)&&_file->_stat->st_mode&W_OK);
+    }
+    return false;
+    // a file is writeable when it exists, is not open yet, is not a directory and has the 'w' access flag set
+}
 Mvalue* _getValueOfFile(Mfile* _file){
     if(!_file)return NULL;
     Mvalue* _value=__value("file");
