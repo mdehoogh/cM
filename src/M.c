@@ -1332,27 +1332,47 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 		resetOutputColor();
 		if(firstWhitespaceCharacter){
 			tokenText[significantTokenCharacterCount]=firstWhitespaceCharacter; // put it back
-			// MDH@07JUL2020: delegating to outputCommandLineText() for writing the whitespace characters
-			// MDH@22SEP2020: same here
-			// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...
-			outputCommandLineText(tokenText+significantTokenCharacterCount,_cursormovement,getInfoColor(),commandCharactersWrittenSoFar+_cursormovement->written);
-			commandCharactersWrittenSoFar+=_cursormovement->written; // update the number of command characters written so far (that is including the token characters we've now written)
-			// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=cursormovement.position;
-			/*
-			// if spanning multiple lines write one character at a time
-			if(tokenCharacterCount>left+significantTokenCharacterCount){
-				for(size_t tokenCharacterIndex=significantTokenCharacterCount;tokenCharacterIndex<tokenCharacterCount;tokenCharacterIndex++){
-					outputChar(tokenText[tokenCharacterIndex]);
-					if(--left==0){
-						showContinuedPrompt(true);
-						left=maximumNumberOfLineCommandCharacters;
-					}
+			// MDH@04OCT2020: with any number of explicit newline characters following the token itself
+			//                and knowing that outputCommandLineText does not take those into account
+			//                we need to 'split' the text by these newline characters
+			size_t endOfWhitespace,startOfWhitespace=significantTokenCharacterCount;
+			bool whitespaceEndsWithNewlineCharacter;
+			while(1){
+				endOfWhitespace=startOfWhitespace;
+				while(tokenText[endOfWhitespace]!='\0'&&tokenText[endOfWhitespace]!=M_NEWLINE_CHARACTER)endOfWhitespace++;
+				// make firstWhitespaceCharacter equal to the first whitespace character behind the end of line character (if any)
+				// if we detected an explicit end of line character we should write all text up until the newline character
+				whitespaceEndsWithNewlineCharacter=(tokenText[endOfWhitespace]==M_NEWLINE_CHARACTER);
+				if(whitespaceEndsWithNewlineCharacter){
+					endOfWhitespace++; // pointing to the first character behind the newline character
+					firstWhitespaceCharacter=tokenText[endOfWhitespace]; // yes, could as well be '\0'
+					tokenText[endOfWhitespace]='\0';
 				}
-			}else
-				output("%s",tokenText+significantTokenCharacterCount);
-			*/
-			// MDH@04JUL2020: the token may end with the explicit newline character!
-			if(tokenText[tokenCharacterCount-1]==M_NEWLINE_CHARACTER){
+				// MDH@07JUL2020: delegating to outputCommandLineText() for writing the whitespace characters
+				// MDH@22SEP2020: same here
+				if(endOfWhitespace>startOfWhitespace){ // there's whitespace in between to write
+					// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...
+					outputCommandLineText(tokenText+startOfWhitespace,_cursormovement,getInfoColor(),commandCharactersWrittenSoFar+_cursormovement->written);
+					commandCharactersWrittenSoFar+=_cursormovement->written; // update the number of command characters written so far (that is including the token characters we've now written)
+				}
+				// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=cursormovement.position;
+				/*
+				// if spanning multiple lines write one character at a time
+				if(tokenCharacterCount>left+significantTokenCharacterCount){
+					for(size_t tokenCharacterIndex=significantTokenCharacterCount;tokenCharacterIndex<tokenCharacterCount;tokenCharacterIndex++){
+						outputChar(tokenText[tokenCharacterIndex]);
+						if(--left==0){
+							showContinuedPrompt(true);
+							left=maximumNumberOfLineCommandCharacters;
+						}
+					}
+				}else
+					output("%s",tokenText+significantTokenCharacterCount);
+				*/
+				// MDH@04JUL2020: the token may end with the explicit newline character!
+				if(!whitespaceEndsWithNewlineCharacter)break; // if not ending with a new line characters 
+				startOfWhitespace=endOfWhitespace; // ready for the next time
+				tokenText[startOfWhitespace]=firstWhitespaceCharacter; // put the first whitespace character back
 				_cursormovement->skipped+=showContinuedPrompt(commandCharactersWrittenSoFar,true); // MDH@24SEP2020: the number of prompt characters written now appended to the skipped field of _cursormovement
 				_cursormovement->position=0; // MDH@24SEP2020: I guess we're at the beginning of the command line again
 				// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=0;
