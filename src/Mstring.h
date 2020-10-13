@@ -45,6 +45,8 @@ Mstring* string_synclength(Mstring * const str); // MDH@02JUN2019: check the len
 
 char string_char(Mstring const * const str,size_t pos);
 char string_last_char(Mstring const * const str);
+// MDH@13OCT2020: string_last_char_count() returns the number of times str ends with c
+size_t string_last_char_count(const Mstring* const str,char c);
 char* string_remainder(Mstring * const str,size_t pos);
 char* string(Mstring * const str);
 

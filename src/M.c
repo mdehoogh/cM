@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="1";char const * const M_DATE="28 September 2020";
+char const * const M_BUILD="2";char const * const M_DATE="13 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
+//char const * const M_BUILD="1";char const * const M_DATE="28 September 2020"; // file capabilities
 
 // char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
 // char const * const M_BUILD="5";char const * const M_DATE="21 September 2020";
@@ -3996,7 +3997,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 			// first the ones that will break in any input mode!!!!
 			if(inputCharType=='i')continue; // insignificant input character without specific purpose
 
-			if(inputCharType=='n'){ // end-of-line (CR of LF) character
+			if(inputCharType=='n'){ // end-of-line (now only the LF character, the CR character has been mapped to r now!!!!)
 				// MDH@27NOV2019: how about treating the Enter key as line break when the token is finished
 				/////////outputChar('X');
 				///////inputInfo("Checking for command continuation");
@@ -4019,7 +4020,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						if(aValidCommandIndicator<=0){ // MDH@10MAR2020: use false for the report parameter because isAValidCommand uses outputInfo/Error which we cannot use during user input!
 							/////////inputInfo("User newline break");
 							inputCharType='W';
-							inputChar='\\'; // TODO should we do this more generic????
+							inputChar=M_NEWLINE_CHARACTER; // MDH@13OCT2020 replacing: '\\';
 							switch(aValidCommandIndicator){
 								case   0:inputInfo("Invalid or empty command.");break;
 								case  -1:inputInfo("Erroneous command.");break;

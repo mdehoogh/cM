@@ -69,6 +69,7 @@ long long M_DP=20; // the default decimal precision (initially 20) TODO should t
 const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow for a depth of 15 environments at the same time), the maximum is 60 of course in which case the maximum depth is 1, 8 gives a maximum depth of 7 and 256 at each level
 
 const char M_WHITESPACE_CHARACTER=' '; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
+const char M_ESCAPE_CHARACTER='\\'; // MDH@13OCT2020: the character to use to enter certain characters in text
 const char M_NEWLINE_CHARACTER='\\'; // MDH@31OCT2019: the character to request a newline with!!!
 const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator between map and property
@@ -104,7 +105,7 @@ const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator b
 // MDH@04NOV2019: in order to be able to pass value references (i.e. variables) to a function we define @ as the redirection operator so that not the value but the value reference is returned (unresolved)
 //                by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiihtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+const char INPUTCHARACTERTYPES[]="iiiciiiihtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
 
 // MDH@24MAR2020 BUG FIX: needed to insert an additional "" for TT_PROPERTY which I forgot previously
@@ -992,10 +993,13 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 				}
 				break;
 			case TT_END_OF_DQSTRING:
-				if(string_last_char(lastCommandToken->text)=='\\')newTokenType=TT_DQSTRING;
+				// MDH@13OCT2020: if the last character is a real escape character (and not simply the escape character behind the escape character, and therefore a true \)
+				//                the only way to find out whether this is true is when the number of escape characters at the end is replicated is odd
+				if(string_last_char_count(lastCommandToken->text,M_ESCAPE_CHARACTER)%2)newTokenType=TT_DQSTRING;
 				break;
 			case TT_END_OF_SQSTRING:
-				if(string_last_char(lastCommandToken->text)=='\\')newTokenType=TT_SQSTRING;
+				// MDH@13OCT2020: if the last character is a real escape character (and not simply the escape character behind the escape character, and therefore a true \)
+				if(string_last_char_count(lastCommandToken->text,M_ESCAPE_CHARACTER)%2)newTokenType=TT_SQSTRING;
 				break;
 		}
 

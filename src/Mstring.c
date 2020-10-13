@@ -217,6 +217,19 @@ char string_last_char(const Mstring* const str){
     return(str!=NULL?(str->length>0?str->_chars->chars[str->length-1]:'\0'):'\0');
 }
 
+// MDH@13OCT2020: string_last_char_count() returns the number of times str ends with c
+size_t string_last_char_count(const Mstring* const str,char c){
+    size_t count=0;
+    if(str&&str->_chars){
+        size_t l=str->length;
+        while(l>0){
+            if(str->_chars->chars[--l]!=c)break;  
+            count++;  
+        }
+    }
+    return count;
+}
+
 char string_removed_char(Mstring* const str,size_t pos){
     char rc='\0';
     if(str!=NULL){
