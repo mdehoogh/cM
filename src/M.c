@@ -46,7 +46,7 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="2";char const * const M_DATE="13 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
+char const * const M_BUILD="2a";char const * const M_DATE="13 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
 //char const * const M_BUILD="1";char const * const M_DATE="28 September 2020"; // file capabilities
 
 // char const * const M_VERSION="0.1.3"; // the new version with ownership imposed on all dynamic memory allocation (well, almost all)
@@ -1243,34 +1243,54 @@ typedef struct{
 // MDH@23SEP2020: uses and updates cursormovement
 // MDH@24SEP2020: bool notsuggested replaced by int64_t offset (pass -1 for offset if not in the command)
 //                but be careful here because 
+// MDH@13OCT2020: I thought I already handled the explicit newline characters but don't see that here
 static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,char* textcolor,int64_t commandCharactersWrittenSoFar){
 	if(!_cursormovement)return;
 	size_t numberOfCharactersToOutput=(text?strlen(text):0);
 	if(numberOfCharactersToOutput>0){
+		char *textCharacter=text;
 		setColor(textcolor);
 		uint16_t maximumNumberOfLineCommandCharacters=(numberOfLineCharacters>0?numberOfLineCharacters-promptLength:0); // MDH@23SEP2020: I suppose we have one character more (if we allow a character on the last position of the line)
+		// MDH@13OCT2020: a ha it is possible that all the given characters fit on the current line but contain newline characters
+		// which would not be recognized if we do it this way!!!!!! which means we're forced to output the text one 
+		// character at a time anyway
+		/*
 		if(maximumNumberOfLineCommandCharacters>0&&_cursormovement->position+numberOfCharactersToOutput>maximumNumberOfLineCommandCharacters){
-			unsigned long long leftOnLine=maximumNumberOfLineCommandCharacters-_cursormovement->position; // what we can fit on the line
+		*/
+			/*unsigned*/ long long leftOnLine=(maximumNumberOfLineCommandCharacters>0?maximumNumberOfLineCommandCharacters-_cursormovement->position:-1); // what we can fit on the line
 			// careful: leftOnLine could now be zero, essentially we know that characters will be written on successive lines
-			for(int characterIndex=0;characterIndex<numberOfCharactersToOutput;characterIndex++){
+			while(1){
 				if(leftOnLine==0){
 					size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
 					_cursormovement->skipped+=prompted;
 					leftOnLine=maximumNumberOfLineCommandCharacters; // NOTE: so leftOnLine is the total number of command characters that we can fit after the prompt
 				}
-				size_t written=outputChar(text[characterIndex]);
+				size_t written=outputChar(*textCharacter);
 				if(written){
 					if(commandCharactersWrittenSoFar>=0)commandCharactersWrittenSoFar+=written; // increment offset indicating the number of command characters written so far
-					leftOnLine-=written;
 					_cursormovement->written+=written;
+					if((*textCharacter)==M_NEWLINE_CHARACTER){
+						// outputChar('\n'); // TODO is this the way to force going one line down???????
+						size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,true);setColor(textcolor);
+						_cursormovement->skipped+=prompted;
+						if(leftOnLine>=0)leftOnLine=maximumNumberOfLineCommandCharacters;else _cursormovement->position=0;
+					}else{
+						// outputChar('Y');
+						if(leftOnLine>=0)leftOnLine-=written;else _cursormovement->position+=written;
+					}
 				}
+				if((--numberOfCharactersToOutput)==0)break; // if there are no characters to output left we're done
+				textCharacter++; // increment the pointer that points to the next character
 			}
-			_cursormovement->position=maximumNumberOfLineCommandCharacters-leftOnLine;
+			if(leftOnLine>=0)_cursormovement->position=maximumNumberOfLineCommandCharacters-leftOnLine;
+		/*
 		}else{
+			outputChar('A');
 			size_t charactersOutput=output("%s",text);
 			_cursormovement->position+=charactersOutput;
 			_cursormovement->written+=charactersOutput;
 		}
+		*/
 	}
 }
 
