@@ -1301,6 +1301,7 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 //                output lines based on its position and length (and numberOfLineCharacters and promptLength)
 // MDH@24SEP2020: every function that outputs text on the command line should receive a Mcursormovement reference to be passed along to outputCommandLineText...
 //                NOTE let's allow passing in NULL for _cursormovement which is valid when the result of outputToken is not used (as is often the case)
+// MDH@15OCT2020: because output
 static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Mallocationowner owner=getOwner(__LINE__);
 	if(!_token)return;
 	// MDH@24SEP2020: the following ASSERT still holds except that _cursormovement->position should actually hold the same value
@@ -1314,16 +1315,16 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 		char* tokenText=string(_token->text);
 		// MDH@31OCT2019: by introducing ` as new line request character (whitespace) we'll be having visible whitespace characters at the end of the token which we do not want to show in the same color
 		// ascertain that the token text ends at the first whitespace character (if there is any whitespace) NOTE there's no need to put '\0' back, therefore we use '\0' if we didn't replace the character to start with
-		char firstWhitespaceCharacter;
+		char firstWhitespaceCharacter='\0';
 		size_t significantTokenCharacterCount;
+		// MDH@15OCT2020: if we force the whitespace characters to be written....
+		//                a ha that would result the 'whitespace' to be written in the color of the token type which we do not want to, which means we can (and should) write all of whitespace with a single outputCommandLineText
 		if(isTokenFinished(_token)){
 			significantTokenCharacterCount=getTokenSignificantCharacterCount(_token);
 			firstWhitespaceCharacter=tokenText[significantTokenCharacterCount];
 			tokenText[significantTokenCharacterCount]='\0';
-		}else{
+		}else
 			significantTokenCharacterCount=tokenCharacterCount;
-			firstWhitespaceCharacter='\0';
-		}
 		// if we allow comments in tokens we're in trouble!!!
 		// now done by outputCommandLineText(): outputTokenColor(_token);
 		// MDH@07JUL2020: delegating writing the significant token characters to outputCommandLineText()
@@ -1331,6 +1332,7 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 		// MDH@24SEP2020 with _cursormovement being the added parameter we do not need this anymore (passing &cursormovement to outputCommandLineText): Mcursormovement cursormovement={_token->position};
 		int64_t commandCharactersWrittenSoFar=_token->offset;
 		outputCommandLineText(tokenText,_cursormovement,getTokenColor(_token->type),commandCharactersWrittenSoFar);
+		
 		// MDH@24SEP2020 NOTE: _cursormovement->written now contains the number of token characters written
 		/* replacing:
 		// MDH@24JUN2020: if a token is on multiple lines (due to a limiting number of line characters)
@@ -1352,9 +1354,13 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 		}
 		*/
 		// if there's whitespace text to start with write it in the default output color
-		resetOutputColor();
 		if(firstWhitespaceCharacter){
+			// resetOutputColor();
 			tokenText[significantTokenCharacterCount]=firstWhitespaceCharacter; // put it back
+
+			// MDH@15OCT2020: using outputCommandLineText() to display ALL of the 'whitespace' (incl. the explicit line breaks that might be in there) in the info color, no need to reset the output color (above)
+			outputCommandLineText(tokenText+significantTokenCharacterCount,_cursormovement,getInfoColor(),commandCharactersWrittenSoFar);
+			/* replacing all this lot which is no longer needed as outputCommandLineText now takes care of the explicit line breaks which it didn't do before:
 			// MDH@04OCT2020: with any number of explicit newline characters following the token itself
 			//                and knowing that outputCommandLineText does not take those into account
 			//                we need to 'split' the text by these newline characters
@@ -1379,19 +1385,7 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 					commandCharactersWrittenSoFar+=_cursormovement->written; // update the number of command characters written so far (that is including the token characters we've now written)
 				}
 				// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=cursormovement.position;
-				/*
-				// if spanning multiple lines write one character at a time
-				if(tokenCharacterCount>left+significantTokenCharacterCount){
-					for(size_t tokenCharacterIndex=significantTokenCharacterCount;tokenCharacterIndex<tokenCharacterCount;tokenCharacterIndex++){
-						outputChar(tokenText[tokenCharacterIndex]);
-						if(--left==0){
-							showContinuedPrompt(true);
-							left=maximumNumberOfLineCommandCharacters;
-						}
-					}
-				}else
-					output("%s",tokenText+significantTokenCharacterCount);
-				*/
+
 				// MDH@04JUL2020: the token may end with the explicit newline character!
 				if(!whitespaceEndsWithNewlineCharacter)break; // if not ending with a new line characters 
 				startOfWhitespace=endOfWhitespace; // ready for the next time
@@ -1400,6 +1394,7 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 				_cursormovement->position=0; // MDH@24SEP2020: I guess we're at the beginning of the command line again
 				// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=0;
 			}
+			*/
 		}
 		// resetOutputColor();
 	}
