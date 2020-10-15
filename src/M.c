@@ -424,8 +424,9 @@ size_t returnToUserInputCommandCursorPosition(){
 	outputUserInputCommandTokenColor();
 	return numberOfInputCommandLineCharacters;
 }
-size_t toUserInputCursorPosition(size_t linesDown){
-	while(linesDown>0){oneLineDown();linesDown--;}
+// MDH@15OCT2020: changed to also be able to move up (which we need after showing the suggested text)
+size_t toUserInputCursorPosition(long lines){
+	while(lines!=0){if(lines>0){oneLineDown();lines--;}else{oneLineUp();lines++;}} // replacing: while(linesDown>0){oneLineDown();linesDown--;}
 	return returnToUserInputCommandCursorPosition();
 }
 // MDH@28FEB2020: define inputInfo/inputError as static because Mshell.c also has functions with this name (as defaults to inputInfo/inputError)
@@ -1232,7 +1233,7 @@ void outputText(char* fmt,char* text){resetOutputColor();output(fmt,text);}
 // MDH@23SEP2020: if characters are output from a certain start position we can return an Mcursormovement indicating the final position and the number of characters written
 typedef struct{
 	uint16_t position;
-	size_t written,skipped;
+	size_t written,lines;
 }Mcursormovement;
 
 // MDH@07JUL2020: if you want to output text that wraps to the number of command line characters call outputCommandText()
@@ -1262,7 +1263,7 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 			while(1){
 				if(leftOnLine==0){
 					size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,false);setColor(textcolor); // normally we would use setTokenColor(token) which would also set the background color but we're assuming that the background color won't change
-					_cursormovement->skipped+=prompted;
+					if(prompted)_cursormovement->lines++; // MDH@15OCT2020 replacing:	_cursormovement->skipped+=prompted;
 					leftOnLine=maximumNumberOfLineCommandCharacters; // NOTE: so leftOnLine is the total number of command characters that we can fit after the prompt
 				}
 				size_t written=outputChar(*textCharacter);
@@ -1272,7 +1273,7 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 					if((*textCharacter)==M_NEWLINE_CHARACTER){
 						// outputChar('\n'); // TODO is this the way to force going one line down???????
 						size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,true);setColor(textcolor);
-						_cursormovement->skipped+=prompted;
+						if(prompted)_cursormovement->lines++; // MDH@15OCT2020 replacing: _cursormovement->skipped+=prompted;
 						if(leftOnLine>=0)leftOnLine=maximumNumberOfLineCommandCharacters;else _cursormovement->position=0;
 					}else{
 						// outputChar('Y');
@@ -1394,7 +1395,7 @@ static void outputToken(Mtoken* _token,Mcursormovement* _cursormovement){Malloca
 				if(!whitespaceEndsWithNewlineCharacter)break; // if not ending with a new line characters 
 				startOfWhitespace=endOfWhitespace; // ready for the next time
 				tokenText[startOfWhitespace]=firstWhitespaceCharacter; // put the first whitespace character back
-				_cursormovement->skipped+=showContinuedPrompt(commandCharactersWrittenSoFar,true); // MDH@24SEP2020: the number of prompt characters written now appended to the skipped field of _cursormovement
+				if(showContinuedPrompt(commandCharactersWrittenSoFar,true))_cursormovement->lines++; // MDH@15OCT2020 replacing: _cursormovement->skipped+=showContinuedPrompt(commandCharactersWrittenSoFar,true); // MDH@24SEP2020: the number of prompt characters written now appended to the skipped field of _cursormovement
 				_cursormovement->position=0; // MDH@24SEP2020: I guess we're at the beginning of the command line again
 				// MDH@24SEP2020: passing on _cursormovement, so no need for a separate position local anymore...: position=0;
 			}
@@ -2304,43 +2305,24 @@ void showSuggestedText(){
 
 	outputAutocompletionCharacters(&cursormovement);
 
+	// MDH@15OCT2020: returning to the position where command characters should be input depends on cursor position changes as remembered in cursormovement
+	//                the commented code below did not work when dealing with explicit newlines, therefore we need to use cursormovement explicitly to determine what to do with the cursor
+	//                in order to do so, I added lines field to Mcursormovement (replacing skipped) to contain the number of lines moved down
+
+	toUserInputCursorPosition(-cursormovement.lines);
+
+	/* replacing:
 	numberOfSuggestedCharactersWritten=cursormovement.written+cursormovement.skipped;
 
 	if(amVerboseDebugging())
 		numberOfSuggestedCharactersWritten+=output("[%zd-%zd=%zd,%zd]",getUserInputLength(),numberOfLineCommandCharacters,(_userinputline?_userinputline->offset:0),(_userinputline?_userinputline->index:0));
 
 	moveCursorLeft(numberOfSuggestedCharactersWritten);
-
-	/* replacing:
-	unsigned long long cursorPosition=numberOfLineCommandCharacters+promptLength;
-	// doesn't seem to work: outputControlText("s"); // i.e. store the current cursor position
-
-	// 1. write the identifier continuation first, then the manual feed forward, the immediate feed forward characters and finally the auto completion text
-	resetOutputColor();
-	unsigned long long suggestedCharactersWritten=0; // for storing the result of writing suggested characters (position/number of characters written combination stored in 16/48 bits of a unsigned long long)
-	if(string_length(_manualFeedforwardText)>0)
-		suggestedCharactersWritten=getNumberOfManualFeedforwardCharactersWritten(cursorPosition);
-	else
-		suggestedCharactersWritten=getNumberOfIdentifierContinuationTextCharactersWritten(cursorPosition);
-	cursorPosition=(suggestedCharactersWritten&0xFFFF); // first 16 bits
-	numberOfSuggestedCharactersWritten=(suggestedCharactersWritten>>16); // remove the position part
-	
-	suggestedCharactersWritten=getNumberOfImmediateFeedforwardCharactersWritten(cursorPosition);
-	cursorPosition=(suggestedCharactersWritten&0xFFFF); // first 16 bits
-	numberOfSuggestedCharactersWritten+=(suggestedCharactersWritten>>16); // remove the position part
-	
-	suggestedCharactersWritten=getNumberOfAutocompletionCharactersWritten(cursorPosition);
-	cursorPosition=(suggestedCharactersWritten&0xFFFF); // first 16 bits
-	numberOfSuggestedCharactersWritten+=(suggestedCharactersWritten>>16); // remove the position part
-	// 2. and back to where the cursor is supposed to be
-	// TODO this is an issue
-	// doesn't seem to work: outputControlText("u"); // restoring the cursor position
-	moveCursorLeft(numberOfSuggestedCharactersWritten); // return to where the command ends
-	*/
 	
 	// 3. finalize: remember the actual number of characters written (and therefore will not be blanks)
 	// update numberOfBehindPromptCharactersWritten (we do not need to remember blanks written!!!å)
 	outputUserInputCommandTokenColor(); // replacing: if(_userInputCommand->_lastToken)outputTokenColor(_userInputCommand->_lastToken); // return to the color of the current token
+	*/
 }
 // MDH@23SEP2020 TODO: hiding the suggested text involves removing the prompt characters embedded in the suggested text outputted
 void hideSuggestedText(){
