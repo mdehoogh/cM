@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="3";char const * const M_DATE="15 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
+char const * const M_BUILD="4";char const * const M_DATE="16 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
+//char const * const M_BUILD="3";char const * const M_DATE="15 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
 //char const * const M_BUILD="2a";char const * const M_DATE="13 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
 //char const * const M_BUILD="1";char const * const M_DATE="28 September 2020"; // file capabilities
 
@@ -1269,19 +1270,20 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 					if(prompted)_cursormovement->lines++; // MDH@15OCT2020 replacing:	_cursormovement->skipped+=prompted;
 					leftOnLine=maximumNumberOfLineCommandCharacters; // NOTE: so leftOnLine is the total number of command characters that we can fit after the prompt
 				}
-				size_t written=outputChar(*textCharacter);
-				if(written){
-					if(commandCharactersWrittenSoFar>=0)commandCharactersWrittenSoFar+=written; // increment offset indicating the number of command characters written so far
-					_cursormovement->written+=written;
-					if((*textCharacter)==M_NEWLINE_CHARACTER){
-						// outputChar('\n'); // TODO is this the way to force going one line down???????
-						size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,true);setColor(textcolor);
-						if(prompted)_cursormovement->lines++; // MDH@15OCT2020 replacing: _cursormovement->skipped+=prompted;
-						if(leftOnLine>=0)leftOnLine=maximumNumberOfLineCommandCharacters;else _cursormovement->position=0;
-					}else{
-						// outputChar('Y');
-						if(leftOnLine>=0)leftOnLine-=written;else _cursormovement->position+=written;
-					}
+				
+				// MDH@16OCT2020: we're not supposed to explicitly display newline characters although we do count them??????? yes because they are in the tokens!!!
+				//                TODO this might definitely give problems at some point
+				size_t written=((*textCharacter)!='\n'&&(*textCharacter)!='\r'?outputChar(*textCharacter):0);
+				if(commandCharactersWrittenSoFar>=0)commandCharactersWrittenSoFar++; // it's always a single character that we 'wrote'
+				_cursormovement->written+=written;
+				if((*textCharacter)==M_NEWLINE_CHARACTER){
+					// outputChar('\n'); // TODO is this the way to force going one line down???????
+					size_t prompted=showContinuedPrompt(commandCharactersWrittenSoFar,true);setColor(textcolor);
+					if(prompted)_cursormovement->lines++; // MDH@15OCT2020 replacing: _cursormovement->skipped+=prompted;
+					if(leftOnLine>=0)leftOnLine=maximumNumberOfLineCommandCharacters;else _cursormovement->position=0;
+				}else{
+					// outputChar('Y');
+					if(leftOnLine>=0)leftOnLine-=written;else _cursormovement->position+=written;
 				}
 				if((--numberOfCharactersToOutput)==0)break; // if there are no characters to output left we're done
 				textCharacter++; // increment the pointer that points to the next character
@@ -3190,9 +3192,12 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	// MDH@21SEP2020: if(numberOfLineCommandCharacters+promptLength+1==numberOfLineCharacters){showContinuedPrompt(true);outputTokenColor(_userInputCommand->_lastToken);}
 	// MDH@24APR2019 obsolete: getCommandLength()++; // increment total command length
 	// outputChar('>');
-	outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
 
-	numberOfLineCommandCharacters++;
+	// MDH@16OCT2020: special characters that would typically result in a line break should NOT be written!!
+	if(inputChar!='\n'&&inputChar!='\r'){
+		outputChar(inputChar); ///////// replacing: outputLastTokenChar(_userInputCommand->_lastToken); // echo the last token character
+		numberOfLineCommandCharacters++;
+	}
 
 	// MDH21SEP2020:65th birthday: if the line is now full move the cursor to the next line
 	//                             not to write a newline character because we are supposedly already at the start of the next line
