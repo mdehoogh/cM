@@ -4101,6 +4101,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 				// MDH@03SEP2019: any input character that somehow changes the command needs to ascertain that no previous command is being used (i.e. when commandIndex is not zero)
 				//////////outputStatus(inputChar,inputCharType);
 				if(inputCharType=='d'){ // MDH@18APR2019: delete now always deletes the first character in the behind cursor text
+					clearScreenFromCursor(); // MDH@16OCT2020: this might help
 					/////debugWrite("DELETE");
 					// MDH@20SEP2019: equivalent to removing ANY first character in the first feed forward text (if any)
 					// MDH@27SEP2019: removing the identifier continuation text takes precedence!!!

@@ -105,8 +105,8 @@ const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator b
 // MDH@04NOV2019: in order to be able to pass value references (i.e. variables) to a function we define @ as the redirection operator so that not the value but the value reference is returned (unresolved)
 //                by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiihtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
-// replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~d";
+const char INPUTCHARACTERTYPES[]="iiiciiiidtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+// replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~b";
 
 // MDH@24MAR2020 BUG FIX: needed to insert an additional "" for TT_PROPERTY which I forgot previously
 // now we define all the state transitions i.e. what input character types result in which new token type
