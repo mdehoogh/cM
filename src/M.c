@@ -334,7 +334,7 @@ char* promptinfo[]={"Command mode: clear the command with Ctrl-C.","Control mode
 /**
 call prompt() when ready to receive a new command
  */
-const char OPTION_CHAR='`'; // TODO should this character become part of options????
+// MDH@16OCT2020 not used anymore: const char OPTION_CHAR='`'; // TODO should this character become part of options????
 
 // USER INPUT STUFF
 
