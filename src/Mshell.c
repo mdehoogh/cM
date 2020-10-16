@@ -70,7 +70,7 @@ const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow f
 
 const char M_WHITESPACE_CHARACTER=' '; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 const char M_ESCAPE_CHARACTER='\\'; // MDH@13OCT2020: the character to use to enter certain characters in text
-const char M_NEWLINE_CHARACTER='\n'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@16OCT2020: used to be the same as the escape sequence but that might get us into trouble, so ...
+const char M_NEWLINE_CHARACTER='\\'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@16OCT2020: used to be the same as the escape sequence but that might get us into trouble, so ...
 const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator between map and property
 
