@@ -4249,6 +4249,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 											// we should have suggested (identifier continuation or feed forward (autocompletion)) text
 											// MDH@07OCT2019: manual feed forward text goes first
 											if(_suggestedText&&string_length(_suggestedText)){ // there is suggested text with parts to delete
+												clearScreenFromCursor(); // MDH@17OCT2020 bug fix: ascertaining not to keep seeing the last suggested character
 												// any identifier continuation characters precede manual feed forward text
 												if(string_length(_manualFeedforwardText)){
 													if(getFirstManualFeedforwardCharacterRemoved()){
