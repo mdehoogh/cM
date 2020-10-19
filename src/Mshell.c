@@ -1000,7 +1000,7 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 			newTokenType=TT_ERROR;
 		else{
 			// MDH@26MAR2020: TODO check whether this should be done elsewhere???
-			if(newTokenType==TT_PROPERTY&&tokenType==TT_FUNCTION){
+			if(newTokenType==TT_PROPERTY&&(*tokenType)==TT_FUNCTION){
 				/*
 				if(isTokenUnfinished(lastCommandToken))finishToken(lastCommandToken);
 				changeFunctionTokenToAVariable(command,true);
@@ -1014,10 +1014,10 @@ bool characterStartsToken(Mtoken const * const token,char inputChar,char inputCh
 	if(!token)return true;
 	if(token->type==TT_ERROR||token->type==TT_COMMENT)return false;
 	// ASSERT token is not NULL and neither a error or a comment
-	correctInputCharacterType(token,inputChar,inputCharacterType);
+	correctInputCharacterType(token,inputChar,&inputCharacterType);
 	if(inputCharacterType!='W'){ // whitespace can never start a new token
 		int8_t tokenType;
-		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 
 	} 
 	return false;
@@ -1025,10 +1025,10 @@ bool characterStartsToken(Mtoken const * const token,char inputChar,char inputCh
 bool characterFinishesToken(Mtoken const * const token,char inputChar,char inputCharacterType){
 	if(!token)return true;
 	if(token->type==TT_ERROR||token->type==TT_COMMENT)return false;
-	correctInputCharacterType(token,inputChar,inputCharacterType);
+	correctInputCharacterType(token,inputChar,&inputCharacterType);
 	if(inputCharacterType!='W'){
 		int8_t tokenType;
-		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 		
 	}
 	return false;
