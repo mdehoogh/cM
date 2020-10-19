@@ -1017,9 +1017,9 @@ bool characterContinuesToken(Mtoken const * const token,char inputChar,char inpu
 	// ASSERT token is not NULL and neither a error or a comment
 	correctInputCharacterType(token,inputChar,&inputCharacterType);
 	if(inputCharacterType=='W')return true; // whitespace always continues the current token
-	if(token->type==TT_EXPRESSION)return false; // any non-whitespace characters ends an expression
 	int8_t tokenType;
 	int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+	if(tokenType==TT_EXPRESSION)return false; // any non-whitespace characters ends an expression
 	if(newTokenType<0)return true;
 	if(isTokenFinished(token))return false;
 	return(tokenType==newTokenType);
