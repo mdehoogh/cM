@@ -3257,6 +3257,7 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 }
 // two essential methods for getting and setting referenced values
 // MDH@14NOV2019: itemid can be a multiple index/attribute name list, and I have to make it work
+// MDH@19OCT2020: I thought I had it in here somewhere that if the item id list contains a single element that the result would also be a single value instead of a list
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner owner=getOwner(__LINE__);
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
@@ -3284,18 +3285,19 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 					referencedValue=getValue(getExecutionEnvironment(),_valuereference->_name->chars); // the value at the top level
 			}
 		}
-		// only composite values can be indexex...
+		// only composite values can be indexed...
 		if(referencedValue&&(referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
 			// if(amVerboseDebugging())outputValue("Top level value reference: '",referencedValue,"'.\n");
 			// MDH@14NOV2019: ANY value that evaluates to a list or map can be further indexed
 			// if we have index/attribute names we have to get the final subvalue
 			// MDH@07APR2020: TODO the following is copied over from setReferencedValue, so obviously it's possible to combine the two in a single function in the future
-			Mlist* itemidList=(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST?_valuereference->_itemid->value._list:NULL); // let's assume that is it always a list
+			Mlist* itemidList=(_valuereference->_itemid&&_valuereference->_itemid->type==VT_LIST?_valuereference->_itemid->value._list:NULL); // let's assume that it is always a list
 			if(itemidList&&!itemidList->_first)itemidList=NULL;
 			// empty lists should also return the full element, so only something to do when we actually have list elements!!!
 			// MDH@07APR2020: should be similar to what setReferencedValue does except for the part of setting the value!!!
 			if(itemidList){
-				outputList("Item id list: ",itemidList,"'.\n"); // DEBUG
+				if(amVerboseDebugging())
+					outputList("Item id list: ",itemidList,"'.\n"); // DEBUG
 				Mvalue* *valueholder=&referencedValue; // MDH@07APR2020 replacing what we used in setReferencedValue(): getValueHolder(getExecutionEnvironment(),_valuereference->_name);
 				// MDH@26MAR2020 replacing: Mvalue* _value=getValue(getExecutionEnvironment(),_valuereference->_name); // we'll be needing the value at the top level to start with!!!!
 				if(valueholder&&(isValueUndefined(*valueholder)!=M_FALSE||((*valueholder)->type==VT_LIST||(*valueholder)->type==VT_MAP))){
@@ -3337,8 +3339,10 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
 										if(amVerboseDebugging())outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
-										Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_'):_valueholders);
+										Mvalue*** _newValueholders=_valueholders;
+										if(numberOfNewValueholders>numberOfValueholders)_newValueholders=REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_');
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
+											output("Number of new getReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
 											// MDH@06APR2020: it is very hard to determine what the end result should now be because an 'flattened' list element could now be a list itself, so it is hard to determine what is to be indexed...
@@ -3482,9 +3486,9 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											if(_flattenedIndexList->numberOfElements>1)numberOfValueholders*=_flattenedIndexList->numberOfElements; // because numberOfNewValueholders was consumed, we have to do it this way
 										}else{ // REALLOC failed
 											result=false;
-											numberOfNewValueholders=0;
 											outputError("Failed to reallocate the indexed value references");
 										}
+										numberOfNewValueholders=0; // MDH@19OCT2020: in any case zero numberOfNewValueholders (to ascertain that FREE below will use numberOfValueholders!!!!)
 									}
 									if(_flattenedIndexList)FREE_LIST(_flattenedIndexList,owner);
 								}
@@ -3497,24 +3501,32 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 						if(result){
 							if(amVerboseDebugging())
 								output("Storing the values of %d elements.\n",numberOfValueholders);
-							// convert the values to a list
-							Mlist* _resultList=owned_list(_getListOfType(VT_UNDEFINED),owner);
-							int valueholderIndex=numberOfValueholders;
-							while(--valueholderIndex>=0){
-								if(amVerboseDebugging())
-									{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
-								if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){
-									FREE_LIST(_resultList,owner);
-									_resultList=NULL;
-									output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));
-									break;
+							// MDH@19OCT2020: if the result contains a single element we return the first element (which is an Mvalue* and therefore does not need to be owned here)
+							if(numberOfValueholders>1){
+								// convert the values to a list
+								Mlist* _resultList=owned_list(_getListOfType(VT_UNDEFINED),owner);
+								int valueholderIndex=numberOfValueholders;
+								while(--valueholderIndex>=0){
+									if(amVerboseDebugging())
+										{output("Storing value #%d: ",(valueholderIndex+1));outputValue(": ",*_valueholders[valueholderIndex],".\n");}
+									if(appendedToList(_resultList,owner,*_valueholders[valueholderIndex],0)<=0){
+										FREE_LIST(_resultList,owner);
+										_resultList=NULL;
+										output("%sFailed to store value #%d.",M_ERROR_PREFIX,(valueholderIndex+1));
+										break;
+									}
 								}
-							}
-							referencedValue=_getValueOfList(disowned_list(_resultList,owner)); // the result
+								referencedValue=_getValueOfList(disowned_list(_resultList,owner)); // the result
+							}else
+								referencedValue=*_valueholders[0];
 						}else
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-						FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
+						if(_valueholders){
+							output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
+							FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
+							output("Value holders getReferencedValues() freed!\n"); // DEBUG
+						}
 					}
 				}
 				/* replacing:
@@ -3659,8 +3671,10 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 									// if(amVerboseDebugging())
 									outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n"); // DEBUG
 									// which we now did
-									Mvalue*** _newValueholders=(numberOfNewValueholders>numberOfValueholders?REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_'):_valueholders);
+									Mvalue*** _newValueholders=_valueholders;
+									if(numberOfNewValueholders>numberOfValueholders)_newValueholders=REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_');
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
+										output("Number of new setReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
 										// MDH@06APR2020: it is very hard to determine what the end result should now be because an 'flattened' list element could now be a list itself, so it is hard to determine what is to be indexed...
@@ -3695,7 +3709,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 											// as soon as the list or map valueholder is created we can use it to get the new value reference IFF the value is of the right type, we have to ascertain that all copies are zero
 										}
 										// now we can create the elements
-										// if(amVerboseDebugging())
+										if(amVerboseDebugging())
 											outputList("****** Flattened index list: '",_flattenedIndexList,"'.\n");
 										flattenedIndexListelement=_flattenedIndexList->_first;
 										while(flattenedIndexListelement){
@@ -3736,18 +3750,20 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 																//                we could flatten the value here????? so if it is a list we get the list of indices here
 																Mmap* valueholderMap=(*valueholder)->value._map;
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner); // MDH@06APR2020: if the index is a list we flatten it completely, so each element is a scalar
-																outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
+																if(amVerboseDebugging())
+																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
 																// 'iterating' over all list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																if(valueIndexListelement){
 																	Mvalue** newValueholder;
 																	while(valueholderMap){
 																		output("%c\n",'B'); // DEBUG
-																		outputMap("Value holder map: ",valueholderMap,"."); // DEBUG
+																		outputMap("Value holder map: ",valueholderMap,".\n"); // DEBUG
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																		if(indexorattributenameListelementValue){
-																			Mstring* _attributenameText=_getValueText(indexorattributenameListelementValue,true);
+																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner); // MDH@19OCT2020 bug fix: take ownership
 																			if(_attributenameText){
+																				output("Attribute name text: '%s'.\n",string(_attributenameText)); // DEBUG
 																				newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
 																				if(!newValueholder){
 																					if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)==M_TRUE){
@@ -3835,7 +3851,8 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 											// if we managed to collect all assigned indices we use these to replace the current value in the flattened index list element
 											if(_assignedIndexList){
 												if(_assignedIndexList->_first){
-													outputList("Assigned index list: '",_assignedIndexList,"'.\n"); // DEBUG
+													if(amVerboseDebugging())
+														outputList("Assigned index list: '",_assignedIndexList,"'.\n"); // DEBUG
 													if(_assignedIndexList->_first==_assignedIndexList->_last){
 														assignValue(&flattenedIndexListelement->_value,_assignedIndexList->_first->_value);
 														FREE_LIST(_assignedIndexList,owner);
@@ -3851,14 +3868,15 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 										if(_flattenedIndexList->numberOfElements>1)numberOfValueholders*=_flattenedIndexList->numberOfElements; // because numberOfNewValueholders was consumed, we have to do it this way
 									}else{ // REALLOC failed
 										result=false;
-										numberOfNewValueholders=0;
 										outputError("Failed to reallocate the indexed value references");
 									}
+									numberOfNewValueholders=0; // MDH@19OCT2020: in both cases (whether realloc failed or not we can zero numberOfNewValueholders)
 								}
 								// MDH@19JUN2020 TODO not too happy about using _flattenedIndexList and assignedIndexList to collect the actual ids of the properties or array elements
 								if(_flattenedIndexList){
 									if(_flattenedIndexList->_first){ // at least one element
-										outputList("Flattened index list: '",_flattenedIndexList,"'.\n");
+										if(amVerboseDebugging())
+											outputList("Flattened index list: '",_flattenedIndexList,"'.\n");
 										if(_flattenedIndexList->_first!=_flattenedIndexList->_last){ // more than one element: replace the value by the reversed list (which is disowned to start with!!!!)
 											Mlist* _rereversedIndexList=owned_list(_getReversedList(_flattenedIndexList),owner);
 											if(_rereversedIndexList)assignValue(&indexorattributenameListelement->_value,_getValueOfList(disowned_list(_rereversedIndexList,owner)));else outputBug("Failed to reverse an index list");
@@ -3881,6 +3899,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 						// if(amVerboseDebugging())
 						{output("Setting %llu values",valueholderIndex);outputValue(" to '",_newValue,"'.\n");}
 						while(--valueholderIndex>=0)if(_valueholders[valueholderIndex])assignValue(_valueholders[valueholderIndex],_newValue);
+						output("Values set!\n");
 					}
 					/* MDH@31MAR2020 we've dealt with the last index element as well in the block above, so replacing:
 					if(result){
@@ -3972,7 +3991,11 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 					}
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
-					FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
+					if(_valueholders){
+						output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
+						FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
+						output("Value holders freed!\n"); // DEBUG
+					}
 				}
 				/*
 				}else
