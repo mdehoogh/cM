@@ -4202,8 +4202,9 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						if(numberOfManualFeedforwardCharacters>0)numberOfCharactersToConsume=numberOfManualFeedforwardCharacters;
 						char newInputChar='\0',newInputCharType='\0';
 						// MDH@19OCT2020: is there a way somehow to consume characters until the token is finished or a new token starts??????????
+						//                in essence at least a single character needs to be accepted
 						size_t numberOfSuggestedCharactersAccepted=0;
-						while(numberOfSuggestedCharactersAccepted<numberOfCharactersToConsume){
+						while(1){
 							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersAccepted);
 							if(!newInputChar){
 								inputCharType=switchToControlMode("Suggested characters vanishing somehow.");
@@ -4212,6 +4213,9 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							newInputCharType=INPUTCHARACTERTYPES[newInputChar];
+							// MDH@19OCT2020: stop as soon as we ended a given token
+							if(numberOfSuggestedCharactersAccepted>0&&(characterStartsToken(_userInputCommand->_lastToken,newInputChar,newInputCharType)||characterFinishesToken(_userInputCommand->_lastToken,newInputChar,newInputCharType)))
+								break;
 							uint8_t characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):1);
 							if(!characterAccepted){
 								inputCharType=switchToControlMode("Failed to consume a suggested character.");
@@ -4221,6 +4225,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							if(characterAccepted>1)numberOfCharactersToConsume=numberOfSuggestedCharactersAccepted;
 							if(newInputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing (and improving upon): showContinuedPrompt(true,true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
 							numberOfSuggestedCharactersAccepted+=1;
+							if(numberOfSuggestedCharactersAccepted>=numberOfCharactersToConsume)break;
 						}
 						// remove at most numberOfSuggestedCharactersAccepted from the suggested text
 						if(inputMode==IM_COMMAND){

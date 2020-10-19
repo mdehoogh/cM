@@ -929,11 +929,107 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 
 // MDH@19OCT2020: sometimes we want to know whether or not a certain character will finish the current token or start a new token (like when tabbing through the suggested text)
 //                for that we would need a way to ask for that information
-bool willStartANewToken(Mcommand const * const command,char inputChar,char inputCharacterType){
-
+//                NOTE we're keeping commandCharacterAppended() as it is now although we're replicating code here
+static void correctInputCharacterType(Mtoken const * const token,char inputChar,char* inputCharacterType){
+	if((TOKENTYPE_IDS[token->type]&0x62)==0x62)if(inputChar==string_char(token->text,0))*inputCharacterType='r'; // MDH@04NOV2019: changed into lowercase r as we're now using R for token of type reference!!!
+	// MDH@16APR2019: W indicates a whitespace character BUT it is NOT a functional whitespace character in a comment, an error, or a string literal
+	// MDH@31OCT2019: until now only a blank was identified as a whitespace character, but now I've adapted the backtick as newline character which is also treated as whitespace
+	//                there's no need to act differently here, we can simply check whether the last character in the returned token is a backtick
+	if(*inputCharacterType=='W'){ // whitespace isn't always 'functional' whitespace (i.e. they can be part of the actual command)
+		if(token->type==TT_ERROR||token->type==TT_COMMENT||token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
+	}else
+	if(*inputCharacterType==' '){ // indicating a new line request (but not in a string)
+		if(token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
+	}
 }
-bool willFinishToken(Mcommand const * const command,char inputChar,char inputCharacterType){
-	
+static int8_t getNewTokenType(Mtoken* token,char inputChar,char inputCharacterType){
+	int8_t tokenType=token->type;
+	int8_t newTokenType=nextTokenType(tokenType,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+	switch(newTokenType){
+		case TT_ERROR:
+			// MDH@09MAR2020: interestingly this is also the situation where a variable might have to become a function
+			//                this happens e.g. when an identifier at the end changed from function to variable
+			if(tokenType==TT_FUNCTION){
+				tokenType=TT_VARIABLE;
+				newTokenType=nextTokenType(tokenType,inputCharacterType);
+			}else
+			if(token->type==TT_VARIABLE){
+				if(inputCharacterType=='('&&getFunction(getExecutionEnvironment(),string(token->text))!=NULL){
+					tokenType=TT_FUNCTION;
+					newTokenType=nextTokenType(tokenType,inputCharacterType);
+				}
+			}
+			break;
+		case TT_END_OF_DQSTRING:
+			// MDH@13OCT2020: if the last character is a real escape character (and not simply the escape character behind the escape character, and therefore a true \)
+			//                the only way to find out whether this is true is when the number of escape characters at the end is replicated is odd
+			if(string_last_char_count(token->text,M_ESCAPE_CHARACTER)%2)newTokenType=TT_DQSTRING;
+			break;
+		case TT_END_OF_SQSTRING:
+			// MDH@13OCT2020: if the last character is a real escape character (and not simply the escape character behind the escape character, and therefore a true \)
+			if(string_last_char_count(token->text,M_ESCAPE_CHARACTER)%2)newTokenType=TT_SQSTRING;
+			break;
+	}
+	/////if(amDebugging())(*inputInfoFunction)("C");
+	// TODO just like unary operators expressions, maps and list end immediately
+	// some combinations are (still) not allowed...
+	if(newTokenType<0||newTokenType==tokenType){
+		/* 
+			MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
+			MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
+			MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
+		*/
+		if(newTokenType==tokenType){
+			if(isTokenFinished(token)){
+				// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
+				// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
+				if(token->type!=TT_LIST&&tokenType!=TT_FUNCTION_CALL&&tokenType!=TT_UNARY&&tokenType!=TT_TERNARY_aeru&&tokenType!=TT_LISTELEMENT&&tokenType!=TT_END_OF_FUNCTION_CALL&&tokenType!=TT_END_OF_MAP&&tokenType!=TT_END_OF_LIST){
+					newTokenType=TT_ERROR;
+				}
+			}else{ // MDH@25MAR2020: a property cannot contain a 'dot' (period) other than at the first position
+				// 'finishing' a token forces creating a new one below
+				if(newTokenType==TT_PROPERTY&&inputChar==M_PROPERTY_SEPARATOR_CHARACTER)
+					if(isTokenUnfinished(token))
+						//finishToken(lastCommandToken)
+						;
+			}
+		}
+	}else{ // different token types
+		// a shortcut assignment can NOT be turned into a equality comparison
+		if(inputCharacterType=='='&&tokenType==TT_ASSIGNMENT&&(token->prev->type==TT_BINARY_AeRu||token->prev->type==TT_BINARY_Aeru))
+			newTokenType=TT_ERROR;
+		else{
+			// MDH@26MAR2020: TODO check whether this should be done elsewhere???
+			if(newTokenType==TT_PROPERTY&&tokenType==TT_FUNCTION){
+				/*
+				if(isTokenUnfinished(lastCommandToken))finishToken(lastCommandToken);
+				changeFunctionTokenToAVariable(command,true);
+				*/
+			}
+		}
+	}
+	return newTokenType;
+}
+bool characterStartsToken(Mtoken const * const token,char inputChar,char inputCharacterType){
+	if(!token)return true;
+	if(token->type==TT_ERROR||token->type==TT_COMMENT)return false;
+	// ASSERT token is not NULL and neither a error or a comment
+	correctInputCharacterType(token,inputChar,inputCharacterType);
+	if(inputCharacterType!='W'){ // whitespace can never start a new token
+		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+
+	} 
+	return false;
+}
+bool characterFinishesToken(Mtoken const * const token,char inputChar,char inputCharacterType){
+	if(!token)return true;
+	if(token->type==TT_ERROR||token->type==TT_COMMENT)return false;
+	correctInputCharacterType(token,inputChar,inputCharacterType);
+	if(inputCharacterType!='W'){
+		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		
+	}
+	return false;
 }
 
 // MDH@28OCT2019: in order to implement the eval function the part in commandCharacterAccepted() that can work with any command is moved over to commandCharacterAppended()

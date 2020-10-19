@@ -69,6 +69,10 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput);
 bool existsInCommand(Mcommand* command,char* identifierName,uint64_t identifierEnvironmentId);
 Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCharacterType,bool endOfInput);
 
+// MDH@19OCT2020: some functions that we can use to determine what a character would do to the current token
+bool characterStartsToken(Mtoken const * const token,char inputChar,char inputCharacterType);
+bool characterFinishesToken(Mtoken const * const token,char inputChar,char inputCharacterType);
+
 int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command,bool report); // returns negative values for invalid commands, 0 for invalid input, positive value for valid commands
 
 Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endTokenTypes[],uint8_t endTokenTypeCount);
