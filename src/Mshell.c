@@ -1010,28 +1010,19 @@ static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inp
 	}
 	return newTokenType;
 }
-bool characterStartsToken(Mtoken const * const token,char inputChar,char inputCharacterType){
-	if(!token)return true;
-	if(token->type==TT_ERROR||token->type==TT_COMMENT)return false;
+// MDH@19OCT2020: this is a first approximation
+bool characterContinuesToken(Mtoken const * const token,char inputChar,char inputCharacterType){
+	if(!token)return false;
+	if(token->type==TT_ERROR||token->type==TT_COMMENT)return true;
 	// ASSERT token is not NULL and neither a error or a comment
 	correctInputCharacterType(token,inputChar,&inputCharacterType);
-	if(inputCharacterType!='W'){ // whitespace can never start a new token
-		int8_t tokenType;
-		int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
-
-	} 
-	return false;
-}
-bool characterFinishesToken(Mtoken const * const token,char inputChar,char inputCharacterType){
-	if(!token)return true;
-	if(token->type==TT_ERROR||token->type==TT_COMMENT)return false;
-	correctInputCharacterType(token,inputChar,&inputCharacterType);
-	if(inputCharacterType!='W'){
-		int8_t tokenType;
-		int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
-		
-	}
-	return false;
+	if(inputCharacterType=='W')return true; // whitespace always continues the current token
+	if(token->type==TT_EXPRESSION)return false; // any non-whitespace characters ends an expression
+	int8_t tokenType;
+	int8_t newTokenType=getNewTokenType(token,inputChar,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+	if(newTokenType<0)return true;
+	if(isTokenFinished(token))return false;
+	return(tokenType==newTokenType);
 }
 
 // MDH@28OCT2019: in order to implement the eval function the part in commandCharacterAccepted() that can work with any command is moved over to commandCharacterAppended()

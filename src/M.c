@@ -4213,9 +4213,12 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							newInputCharType=INPUTCHARACTERTYPES[newInputChar];
-							// MDH@19OCT2020: stop as soon as we ended a given token
-							if(numberOfSuggestedCharactersAccepted>0&&(characterStartsToken(_userInputCommand->_lastToken,newInputChar,newInputCharType)||characterFinishesToken(_userInputCommand->_lastToken,newInputChar,newInputCharType)))
+							// MDH@19OCT2020: stop as soon as the character does not continue the current token
+							if(numberOfSuggestedCharactersAccepted>0&&
+									!characterContinuesToken(_userInputCommand->_lastToken,newInputChar,newInputCharType)){
+								numberOfCharactersToConsume=numberOfSuggestedCharactersAccepted;
 								break;
+							}
 							uint8_t characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):1);
 							if(!characterAccepted){
 								inputCharType=switchToControlMode("Failed to consume a suggested character.");
