@@ -942,21 +942,21 @@ static void correctInputCharacterType(Mtoken const * const token,char inputChar,
 		if(token->type==TT_DQSTRING||token->type==TT_SQSTRING)*inputCharacterType='w';
 	}
 }
-static int8_t getNewTokenType(Mtoken* token,char inputChar,char inputCharacterType){
-	int8_t tokenType=token->type;
-	int8_t newTokenType=nextTokenType(tokenType,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+static int8_t getNewTokenType(Mtoken const * const token,char inputChar,char inputCharacterType,int8_t *tokenType){
+	*tokenType=token->type;
+	int8_t newTokenType=nextTokenType(*tokenType,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 	switch(newTokenType){
 		case TT_ERROR:
 			// MDH@09MAR2020: interestingly this is also the situation where a variable might have to become a function
 			//                this happens e.g. when an identifier at the end changed from function to variable
-			if(tokenType==TT_FUNCTION){
-				tokenType=TT_VARIABLE;
-				newTokenType=nextTokenType(tokenType,inputCharacterType);
+			if(*tokenType==TT_FUNCTION){
+				*tokenType=TT_VARIABLE;
+				newTokenType=nextTokenType(*tokenType,inputCharacterType);
 			}else
-			if(token->type==TT_VARIABLE){
+			if(*tokenType==TT_VARIABLE){
 				if(inputCharacterType=='('&&getFunction(getExecutionEnvironment(),string(token->text))!=NULL){
-					tokenType=TT_FUNCTION;
-					newTokenType=nextTokenType(tokenType,inputCharacterType);
+					*tokenType=TT_FUNCTION;
+					newTokenType=nextTokenType(*tokenType,inputCharacterType);
 				}
 			}
 			break;
@@ -973,17 +973,17 @@ static int8_t getNewTokenType(Mtoken* token,char inputChar,char inputCharacterTy
 	/////if(amDebugging())(*inputInfoFunction)("C");
 	// TODO just like unary operators expressions, maps and list end immediately
 	// some combinations are (still) not allowed...
-	if(newTokenType<0||newTokenType==tokenType){
+	if(newTokenType<0||newTokenType==(*tokenType)){
 		/* 
 			MDH@27MAY2019: most of the time we do allow the same one-character token behind another!!!
 			MDH@12JUL2019: BUT NOT ALWAYS (values and binary operator e.g.) I have to think this through again 
 			MDH@14AUG2019: start of list i.e. [ is allowed behind another [ always, also ( behind ( is also allowed, 
 		*/
-		if(newTokenType==tokenType){
+		if(newTokenType==(*tokenType)){
 			if(isTokenFinished(token)){
 				// MDH@16APR2019: most tokens cannot follow each other directly except for unary and TODO ternary operators and list element tokens (although undefined list element cells do not need to be inserted!!)
 				// MDH@23JUL2019: and TT_END_OF_FUNCTION_CALL and all the other end of something tokens!!
-				if(token->type!=TT_LIST&&tokenType!=TT_FUNCTION_CALL&&tokenType!=TT_UNARY&&tokenType!=TT_TERNARY_aeru&&tokenType!=TT_LISTELEMENT&&tokenType!=TT_END_OF_FUNCTION_CALL&&tokenType!=TT_END_OF_MAP&&tokenType!=TT_END_OF_LIST){
+				if((*tokenType)!=TT_LIST&&(*tokenType)!=TT_FUNCTION_CALL&&(*tokenType)!=TT_UNARY&&(*tokenType)!=TT_TERNARY_aeru&&(*tokenType)!=TT_LISTELEMENT&&(*tokenType)!=TT_END_OF_FUNCTION_CALL&&(*tokenType)!=TT_END_OF_MAP&&(*tokenType)!=TT_END_OF_LIST){
 					newTokenType=TT_ERROR;
 				}
 			}else{ // MDH@25MAR2020: a property cannot contain a 'dot' (period) other than at the first position
@@ -996,7 +996,7 @@ static int8_t getNewTokenType(Mtoken* token,char inputChar,char inputCharacterTy
 		}
 	}else{ // different token types
 		// a shortcut assignment can NOT be turned into a equality comparison
-		if(inputCharacterType=='='&&tokenType==TT_ASSIGNMENT&&(token->prev->type==TT_BINARY_AeRu||token->prev->type==TT_BINARY_Aeru))
+		if(inputCharacterType=='='&&(*tokenType)==TT_ASSIGNMENT&&(token->prev->type==TT_BINARY_AeRu||token->prev->type==TT_BINARY_Aeru))
 			newTokenType=TT_ERROR;
 		else{
 			// MDH@26MAR2020: TODO check whether this should be done elsewhere???
@@ -1016,7 +1016,8 @@ bool characterStartsToken(Mtoken const * const token,char inputChar,char inputCh
 	// ASSERT token is not NULL and neither a error or a comment
 	correctInputCharacterType(token,inputChar,inputCharacterType);
 	if(inputCharacterType!='W'){ // whitespace can never start a new token
-		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		int8_t tokenType;
+		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 
 	} 
 	return false;
@@ -1026,7 +1027,8 @@ bool characterFinishesToken(Mtoken const * const token,char inputChar,char input
 	if(token->type==TT_ERROR||token->type==TT_COMMENT)return false;
 	correctInputCharacterType(token,inputChar,inputCharacterType);
 	if(inputCharacterType!='W'){
-		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
+		int8_t tokenType;
+		int8_t newTokenType=getNewTokenType(token->type,inputCharacterType,&tokenType); // MDH@22MAR2019: this is a bit of a quick fix, so whitespace never ends up in nextTokenType() as whitespace never ends the current token, or changes its type
 		
 	}
 	return false;
