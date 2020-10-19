@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="4";char const * const M_DATE="16 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
+char const * const M_BUILD="5";char const * const M_DATE="19 October 2020"; // MDH@19OCT2020: fixed assigning to a new property like z.a=12, and replacing newline character to '\n' and removing it on left arrow
+//char const * const M_BUILD="4";char const * const M_DATE="16 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
 //char const * const M_BUILD="3";char const * const M_DATE="15 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
 //char const * const M_BUILD="2a";char const * const M_DATE="13 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
 //char const * const M_BUILD="1";char const * const M_DATE="28 September 2020"; // file capabilities
@@ -1273,7 +1274,7 @@ static void outputCommandLineText(char* text,Mcursormovement* _cursormovement,ch
 				
 				// MDH@16OCT2020: we're not supposed to explicitly display newline characters although we do count them??????? yes because they are in the tokens!!!
 				//                TODO this might definitely give problems at some point
-				size_t written=((*textCharacter)!='\n'&&(*textCharacter)!='\r'?outputChar(*textCharacter):0);
+				size_t written=((*textCharacter)!=127&&(*textCharacter)>=32?outputChar(*textCharacter):0); // MDH@19OCT2020: not 'writing' any ASCII character that is not 'visible'
 				if(commandCharactersWrittenSoFar>=0)commandCharactersWrittenSoFar++; // it's always a single character that we 'wrote'
 				_cursormovement->written+=written;
 				if((*textCharacter)==M_NEWLINE_CHARACTER){
@@ -3129,7 +3130,10 @@ static void newCommandLine(bool newline){
 //                the endOfInput flag is used to indicate whether this is the end of the input
 //                the aSuggestedCharacter flag tells commandCharacterAccepted() that the input character came from feedforwardText (the feed forward), so it will in that case not alter feedforwardText (by removing the same character that was entered)
 // MDH@26JUN2020: should now also keep track of the total number of command characters on the current user input line (numberOfLineCommandCharacters)
-bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
+// MDH@19OCT2020: we are going to return not just true (1) or false (0) but a value that tells a little more (e.g. whether or not a new token was started)
+const uint8_t NEW_TOKEN_CHARACTER=2;
+const uint8_t FINISHING_TOKEN_CHARACTER=4;
+uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOfInput,bool aSuggestedCharacter){
 	bool initializationsChanged=false;
 	// MDH@21APR2019: there are two situation where we need to get a command
 	/////outputChar('1');
@@ -3141,7 +3145,10 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 		copyUserInputCommand();
 	/////outputChar('2');
 	// if _userInputCommand->_lastToken is now NULL something went wrong (in copyUserInputCommand or createUserInputCommand most likely)
-	if(!_userInputCommand){inputError("%sNo user input command.",M_BUG_PREFIX);return false;}
+	if(!_userInputCommand){inputError("%sNo user input command.",M_BUG_PREFIX);return 0;}
+	
+	uint8_t result=1;
+
 	commandIndex=0; // to indicate we are now working with a NEW command (even if we fail to accept the character!!!)
 	/////outputChar('3');
 	// MDH@21SEP2020: clearInfo() is also responsible for the problem with right arrow because the result is that the character is output one line down with every right arrow
@@ -3166,13 +3173,15 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 	// MDH@28OCT2019: all the code that deals with updating the tokens 
 	//                NOTE passing in the address of _userInputCommand->_lastToken, so it can be changed!!!!
 	Mtoken* newLastCommandToEvaluateToken=commandCharacterAppended(_userInputCommand,inputChar,inputCharacterType,endOfInput);
-	if(!newLastCommandToEvaluateToken)return false;
+	if(!newLastCommandToEvaluateToken)return 0;
 	if(newLastCommandToEvaluateToken!=_userInputCommand->_lastToken){
+		result|=NEW_TOKEN_CHARACTER;
 		_userInputCommand->_lastToken=owned_token(newLastCommandToEvaluateToken,Msubowner(owner_userInputCommand,1)); // MDH@28MAY2020: take over ownership of the new last command token
 		outputUserInputCommandTokenColor();
 	}else{
 		// MDH@31OCT2019: show whitespace in the standard info color!!
 		if(getTokenSignificantCharacterCount(_userInputCommand->_lastToken)>0){
+			result|=FINISHING_TOKEN_CHARACTER;
 			resetOutputColor();
 			if(*inputCharacterType=='W'&&inputChar==M_NEWLINE_CHARACTER)*inputCharacterType=' '; // convert the newlinecharacter (which type should be W to the blank)
 		}
@@ -3287,7 +3296,7 @@ bool commandCharacterAccepted(char inputChar,char *inputCharacterType,bool endOf
 		/////if(amDebugging())inputInfo("O");
 	}
 	/////if(amDebugging())inputInfo("P");
-	return true;
+	return result;
 }
 
 bool COMMAND_PROCESSOR_AVAILABLE=0;
@@ -4192,6 +4201,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						else
 						if(numberOfManualFeedforwardCharacters>0)numberOfCharactersToConsume=numberOfManualFeedforwardCharacters;
 						char newInputChar='\0',newInputCharType='\0';
+						// MDH@19OCT2020: is there a way somehow to consume characters until the token is finished or a new token starts??????????
 						size_t numberOfSuggestedCharactersAccepted=0;
 						while(numberOfSuggestedCharactersAccepted<numberOfCharactersToConsume){
 							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersAccepted);
@@ -4202,11 +4212,13 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							newInputCharType=INPUTCHARACTERTYPES[newInputChar];
-							if(newInputChar!='#'&&!commandCharacterAccepted(newInputChar,&newInputCharType,false,true)){
+							uint8_t characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):1);
+							if(!characterAccepted){
 								inputCharType=switchToControlMode("Failed to consume a suggested character.");
 								newInputChar='\0'; // to indicate some error occurred
 								break;
 							}
+							if(characterAccepted>1)numberOfCharactersToConsume=numberOfSuggestedCharactersAccepted;
 							if(newInputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing (and improving upon): showContinuedPrompt(true,true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
 							numberOfSuggestedCharactersAccepted+=1;
 						}
@@ -4215,7 +4227,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							// if identifier continuation characters were consumed nothing to do, otherwise either to clear the manual
 							// MDH@08OCT2019: have to be careful here because identifier continuation characters might come out of the manual feed forward text
 							if(numberOfSuggestedCharactersAccepted){ // at least one character consumed
-								if(numberOfSuggestedCharactersAccepted==numberOfCharactersToConsume){
+								if(numberOfSuggestedCharactersAccepted>=numberOfCharactersToConsume){
 									if(numberOfManualFeedforwardCharacters){ // some of the manual feed forward characters were consumed
 										if(numberOfSuggestedCharactersAccepted>=string_length(_manualFeedforwardText)){ // all manual feed forward characters were consumed
 											FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
@@ -4363,7 +4375,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 										//                in which case that will be the originating token but only in the situation where c matches the feed forward character of that expression
 										///////Mtoken* startOfExpressionToken=(string_length(_userInputCommand->_lastToken->text)==1?_userInputCommand->_lastToken->expr:NULL); // MDH@25SEP2019: remember what the start of expression token associated with the current last command token is
 										char c=removedTokenCharacter(true); // passing true will force removedTokenCharacter() to actually check an identifier token type
-										if(c){ // removing the character behind the cursor succeeded
+										// MDH@19OCT2020: now, if we consume a nonvisible character (like what we currently use for newline character (.i.e. '\n' instead of '\\' we did before we actually consume it))
+										if(c>=32&&c!=127){ // removing the character behind the cursor succeeded
 											// debugWrite("Character '%c' removed.",c);
 											// MDH@01OCT2019 removed as now done by removedTokenCharacter(): moveCursorLeft(1); // MDH@01OCT2019: TODO will this be sufficient when the identifier token type changed????? probably
 											/* MDH@01OCT2019: no need to perform a tokenChecked... here anymore as we moved that functionality over to removedTokenCharacter(true)
@@ -4425,6 +4438,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 											if(identifierContinuationText)FREE_STRING(identifierContinuationText);
 											*/
 										}else
+										if(!c)
 											inputCharType=switchToControlMode("Failed to remove the last command character.");
 									}else
 										beep();

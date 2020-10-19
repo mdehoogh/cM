@@ -70,7 +70,7 @@ const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow f
 
 const char M_WHITESPACE_CHARACTER=' '; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 const char M_ESCAPE_CHARACTER='\\'; // MDH@13OCT2020: the character to use to enter certain characters in text
-const char M_NEWLINE_CHARACTER='\\'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@16OCT2020: used to be the same as the escape sequence but that might get us into trouble, so ...
+const char M_NEWLINE_CHARACTER='\n'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@19OCT2020: I suppose using a character that will not be displayed is probably best!!!!
 const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator between map and property
 
@@ -926,6 +926,16 @@ void changeFunctionTokenToAVariable(Mcommand* command,bool endOfInput){
 	*/
 	// ready to redetermine the new token type!!!!
 }
+
+// MDH@19OCT2020: sometimes we want to know whether or not a certain character will finish the current token or start a new token (like when tabbing through the suggested text)
+//                for that we would need a way to ask for that information
+bool willStartANewToken(Mcommand const * const command,char inputChar,char inputCharacterType){
+
+}
+bool willFinishToken(Mcommand const * const command,char inputChar,char inputCharacterType){
+	
+}
+
 // MDH@28OCT2019: in order to implement the eval function the part in commandCharacterAccepted() that can work with any command is moved over to commandCharacterAppended()
 //                and is called from commandCharacterAccepted() passing _userInputCommand->_lastToken in as first argument!!
 //                NOTE that commandCharacterAccepted() keeps the part of the code that has to do with the endOfInput and aSuggestedCharacter flag
@@ -3261,7 +3271,13 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner owner=getOwner(__LINE__);
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
-	///////if(amVerbose())outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
+	// if(amVerboseDebugging())
+	{
+			output("Getting the value reference of '%s",_valuereference->_name);
+			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
+			output("'.\n");
+	}
+	// replacing:	outputValuereference("ZZZZZZZZZZ Requesting the value of value reference '",_valuereference,"'.\n");
 	if(_valuereference){
 		referencedValue=_valuereference->_value; // if we do not have a name and and item id that's what we will return
 		// MDH@02NOV2019 replacing: assignValue(&referencedValue,_valuereference->_value); // TODO must we use assignValue here??????????
@@ -3287,7 +3303,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 		}
 		// only composite values can be indexed...
 		if(referencedValue&&(referencedValue->type==VT_LIST||referencedValue->type==VT_MAP)){
-			// if(amVerboseDebugging())outputValue("Top level value reference: '",referencedValue,"'.\n");
+			if(amVerboseDebugging())
+				outputValue("Top level value reference: '",referencedValue,"'.\n");
 			// MDH@14NOV2019: ANY value that evaluates to a list or map can be further indexed
 			// if we have index/attribute names we have to get the final subvalue
 			// MDH@07APR2020: TODO the following is copied over from setReferencedValue, so obviously it's possible to combine the two in a single function in the future
@@ -3321,7 +3338,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								indexorattributenameListelementValue=indexorattributenameListelement->_value;
 								// if no value is defined, it is ignored TODO should we????
 								if(indexorattributenameListelementValue){
-									if(amVerboseDebugging())
+									// if(amVerboseDebugging())
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 									// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 									// NOTE we need to check ALL valueholders
@@ -3337,7 +3354,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
-										if(amVerboseDebugging())outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
+										// if(amVerboseDebugging())
+											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
 										Mvalue*** _newValueholders=_valueholders;
 										if(numberOfNewValueholders>numberOfValueholders)_newValueholders=REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_');
@@ -3358,7 +3376,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 											if(!flattenedIndexListelement)_flattenedIndexList->valuetype=VT_INTEGER; // mark the index list as integer
 											// knowing the index list (element) type already means that we know what the indexed value should be (a list or a map)
 											// now we know whether what we are indexing should be lists or maps we can ascertain that it does
-											int valueholderIndex=numberOfValueholders;
+											long valueholderIndex=numberOfValueholders;
 											while(--valueholderIndex>=0){
 												valueholder=_valueholders[valueholderIndex];
 												if(isValueUndefined(*valueholder)!=M_FALSE){
@@ -3382,7 +3400,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 												numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 												indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
 												if(indexorattributenameListelementValue){
-													if(amVerboseDebugging())outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
+													// if(amVerboseDebugging())
+													outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
 													int valueholderIndex=numberOfValueholders;
 													while(--valueholderIndex>=0){
 														valueholder=_valueholders[valueholderIndex];
@@ -3608,11 +3627,12 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 	return referencedValue;
 }
 // when assigning, we're supposed to assign to something with a variable name (and optional index/attribute name list) associated with it
-bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
+bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner owner_valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
-		if(amVerboseDebugging()){
-			output("\nSetting the value reference of '%s",_valuereference->_name);
+		//if(amVerboseDebugging())
+		{
+			output("Setting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
 			outputValue("' to '",_newValue,"'.\n");
 		}
@@ -3649,6 +3669,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 					if(indexorattributenameListelement){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
 						// NOTE the last one needs to be assigned to
 						while(indexorattributenameListelement){
+							if(_valuereference->_itemid)outputValue("Item id: '",_valuereference->_itemid,"'.\n"); // DEBUG
 							indexorattributenameListelementValue=indexorattributenameListelement->_value;
 							// if no value is defined, it is ignored TODO should we????
 							if(indexorattributenameListelementValue){
@@ -3664,7 +3685,9 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 								//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 								// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 								//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
+								if(_valuereference->_itemid)outputValue("Item id before flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 								Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
+								if(_valuereference->_itemid)outputValue("Item id after  flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 								numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 								if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 									// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
@@ -3761,18 +3784,22 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 																		outputMap("Value holder map: ",valueholderMap,".\n"); // DEBUG
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																		if(indexorattributenameListelementValue){
-																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner); // MDH@19OCT2020 bug fix: take ownership
-																			if(_attributenameText){
-																				output("Attribute name text: '%s'.\n",string(_attributenameText)); // DEBUG
-																				newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));		
+																			// MDH@19OCT2020: if we do not unquote the value we can safely remove the final quote????? by decrementing the length...
+																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,false),owner); // MDH@19OCT2020 bug fix: take ownership
+																			if(_attributenameText&&string_length(_attributenameText)){
+																				string_setlength(_attributenameText,string_length(_attributenameText)-1); // should remove the additional 'quote' we do not need in a text!!!
+																				char* _attributename=string(_attributenameText)+1; // skipping the initial quote
+																				output("Attribute name text: '%s'.\n",_attributename); // DEBUG
+																				newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);		
 																				if(!newValueholder){
-																					if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),string(_attributenameText),NULL)==M_TRUE){
-																						newValueholder=getValueHolderOfAttribute(valueholderMap,string(_attributenameText));
+																					if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),_attributename,NULL)==M_TRUE){
+																						newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);
 																						// register in the assigned index list
+																						// MDH@19OCT2020 bug fix: _getTextValue assumes that _attributenameText starts with the text quote character!!
 																						if(_assignedIndexList&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
 																						{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
 																					}else
-																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,string(_attributenameText));
+																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,_attributename);
 																				}/*else{
 																					//FREE_DISOWNED_1(valueholders,'_');
 																					_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
@@ -3992,9 +4019,11 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
 					if(_valueholders){
+						if(_valuereference->_itemid)outputValue("Item id before freeing the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 						output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
 						FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
 						output("Value holders freed!\n"); // DEBUG
+						if(_valuereference->_itemid)outputValue("Item id after  freeing the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 					}
 				}
 				/*
@@ -4029,6 +4058,7 @@ bool setReferencedValue(Mvaluereference* _valuereference,Mallocationowner owner_
 		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
 	}
+	if(_valuereference->_itemid)outputValue("Item id: '",_valuereference->_itemid,"'.\n");
 	return result;
 }
 

@@ -550,7 +550,7 @@ Mlist* _getReversedList(Mlist const * const list){if(!list)return NULL;Mallocati
 Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _list=NULL;
     if(value){
-        if(amVerboseDebugging())
+        // if(amVerboseDebugging())
             outputValue("Flattening '",value,"'.\n");
         _list=owned_list(_getListOfType(VT_UNDEFINED),owner);
         if(_list){
@@ -578,18 +578,20 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
                             }else
                                 success=false;
                         }else
-                            if(appendedToList(_list,owner,valueListelement->_value,(reversed?0:M_LL_INVALID))<=0)success=false;
+                        if(appendedToList(_list,owner,valueListelement->_value,(reversed?0:M_LL_INVALID))<=0)success=false;
                         if(!success)break; // do NOT continue with appending when failing to do so
                     }
                     valueListelement=valueListelement->_next;
                 }
             }else // a single element to add to the list
-                if(appendedToList(_list,owner,value,M_LL_INVALID)<=0)success=false;
+            if(appendedToList(_list,owner,value,M_LL_INVALID)<=0)success=false;
             if(!success){FREE_LIST(_list,owner);_list=NULL;} // on failure release the list
         }    
     }
-    if(amVerboseDebugging())
-        {if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}}
+    // if(amVerboseDebugging())
+    {
+        if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}
+    }
     return disowned_list(_list,owner);
 }
 
