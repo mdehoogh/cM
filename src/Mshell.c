@@ -3067,7 +3067,11 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 				// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 				Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(_function,functionName,_argumentMap),owner);
 				if(_functionExecutionEnvironment){
-					if(pushExecutionEnvironment(_functionExecutionEnvironment)){
+					// ASSERT now it exists I ALWAYS need to free it 
+					// MDH@21OCT2020: it makes sense to pass a disowned version of environment to pushExecutionEnvironment() so it can take over ownership
+					//                NO because I want to free this given environment push should not take over ownership
+					if(pushExecutionEnvironment(disowned_environment(_functionExecutionEnvironment,owner))){
+						// ASSERT once pushed successfully I am responsible of ALWAYS popping
 						// execute ALL the commands in _bodyCommandList
 						Mlist* functionBodyCommandList=_function->functionunion._userfunction->_bodyCommandList;
 						Mvalue *functionEvaluationValue=NULL,*functionBodyCommandValue=NULL;
@@ -3087,16 +3091,16 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 						}else
 							output("No commands in body of user function '%s' to execute!\n",functionName);
 						// before popping the function execution environment, see if the result was set
-						if(amVerbose())output("Extracting the result of the execution of function '%s'.\n",functionName);
+						if(amVerboseDebugging())output("Extracting the result of the execution of function '%s'.\n",functionName);
 						Mvalue* functionResultValue=getValue(_functionExecutionEnvironment,"$");
-						if(amVerbose())output("Exiting the environment of executing function '%s'.\n",functionName);
+						if(amVerboseDebugging())output("Exiting the environment of executing function '%s'.\n",functionName);
 						popExecutionEnvironment();
 						// the function result value (if set) takes precedence over the function evaluation value
 						return (functionResultValue?functionResultValue:functionEvaluationValue);
-					}else{
-						output("%sFailed to create the function execution environment of function '%s'.\n",M_ERROR_PREFIX,functionName);
-						FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 					}
+					// ASSERT failed to push the created function execution environment which also means it failed to be bound in a value, and thus I need to free it as it will not be garbage-collected like any value would
+					output("%sFailed to create the function execution environment of function '%s'.\n",M_ERROR_PREFIX,functionName);
+					FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 				}else
 					output("%sFailed to create the environment to execute function '%s'.\n",M_ERROR_PREFIX,functionName);
 				return NULL;
@@ -3255,14 +3259,15 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 		Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(function,_functionBodyRequest->_functionName->chars,function->_parameterMap),owner);
 		if(_functionExecutionEnvironment){
 			if(amVerbose())output("Execution environment of function '%s' created.\n",_functionBodyRequest->_functionName);
-			if(pushExecutionEnvironment(_functionExecutionEnvironment))return true;
+			if(pushExecutionEnvironment(disowned_environment(_functionExecutionEnvironment,owner)))return true;
 			outputError("Failed to register the function execution environment.");
-			free_environment(disowned_environment(_functionExecutionEnvironment,owner));
+			FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 		}else
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
 	FREE_DISOWNED_1(_currentFunctionBodyInput,'8',owner_currentFunctionBodyInput);
+	_currentFunctionBodyInput=NULL; // TODO is this a good idea then?????
 	return false;
 }
 bool startFunctionBodyInput(){

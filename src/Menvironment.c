@@ -50,6 +50,7 @@ void outputExecutionEnvironmentName(char* prefix,char* suffix){Mallocationowner 
     FREE_STRING(_environmentName,owner);
 }
 // MDH@14JUN2020: _environment is supposedly disowned when doing this so _getValueOfEnvironment() can take over ownership
+// MDH@21OCT2020: which is a serious problem as it isn't (at least not for function execution environments) but fixed that just now
 bool pushExecutionEnvironment(Menvironment* _environment){Mallocationowner owner=getOwner(__LINE__);
     // MDH@28MAY2020: check if we actually obtain ownership of _environment at all
     // MDH@03FEB2020: wrap the _environment in a value, do NOT free when unsuccessful though (we let the caller take care of that)
