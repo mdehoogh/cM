@@ -1521,10 +1521,13 @@ bool registerCommand(Mcommand* command,Mallocationowner owner_command){if(!comma
 				owned_list(__list("body command list"),Msubowner(owner_currentFunctionBodyInput,2));
 		// MDH@08JUN2020: if we succeed in adding the command value to the function body we still return false as result which will result in command to be freed
 		//                BUT by NULLing command->_firstToken we prevent the tokens from being freed in the command as we should
-		if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,owner_currentFunctionBodyInput,_commandToEvaluateTokenValue,M_LL_INVALID)>0)
+		if(appendedToList(getCurrentFunctionBodyInput()->_function->_bodyCommandList,owner_currentFunctionBodyInput,_commandToEvaluateTokenValue,M_LL_INVALID)>0){
 			command->_firstToken=NULL;
-	}
-	outputError("Failed to add the command to the body of the function");
+			return true;
+		}
+		outputError("Failed to add the command to the body of the function");
+	}else
+		outputError("No token (value) to add to the body of the function");
 	return false;
 }
 // tokenizer constants moved over to Mshell.h
@@ -4708,24 +4711,28 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					// MDH@18JUN2020: if the current command is not an original command 
 					if(!registerCommand(_userInputCommand,(commandIndex>0?owner_registeredcommands:owner_userInputCommand))){
-						// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
-						if(commandIndex==0){ // a new command being registered!!!
-							FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
-							outputError("Failed to register the command! Probable cause: out of memory");
-						}else
-							outputError("Failed to register the command again! Probable cause: out of memory");
+						if(!getCurrentFunctionBodyInput()){ // not inside a function body
+							// if commandIndex (>0) we have evaluated a previous command which should also NEVER be freed
+							if(commandIndex==0){ // a new command being registered!!!
+								FREE_COMMAND(_userInputCommand,owner_userInputCommand); // MDH@29OCT2019 replacing: freeToken(_userInputCommand->_firstToken);
+								outputError("Failed to register the command! Probable cause: out of memory");
+							}else
+								outputError("Failed to register the command again! Probable cause: out of memory");
+						}
 					}else{
-						if(amVerboseDebugging())outputInfo("Command registered!");
-						if(M_value){
-							// perhaps we should store the command text not the command itself?????
-							// NOTE prepend a single quote is essential to get the text enquoted!!!
-							if(!string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
-								outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
-							else
-							if(amVerboseDebugging())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
+						if(!getCurrentFunctionBodyInput()){ // not inside a function body
+							if(amVerboseDebugging())outputInfo("Command registered!");
+							if(M_value){
+								// perhaps we should store the command text not the command itself?????
+								// NOTE prepend a single quote is essential to get the text enquoted!!!
+								if(!string_insert_char(_userInputCommandText,0,'\'')||!registerCommandEvaluation(string(_userInputCommandText),userInputCommandResultValue,commandCount))
+									outputWarning("Failed to store the command and the value it evaluates to for use in subsequent commands.");
+								else
+								if(amVerboseDebugging())output("User input command and result stored in %s.\n",M_VARIABLE_NAME);
+							}
 						}
 					}
-					FREE_STRING(_userInputCommandText,owner); // MDH@14NOV2019: freed
+					if(_userInputCommandText)FREE_STRING(_userInputCommandText,owner); // MDH@14NOV2019: freed
 
 					// start anew (without a current command to evaluate!!!!) NOTE the memory is either still pointed to in `commands` or freed because it failed to bind it in commands so we're free to NULL the pointer here!!!
 					_userInputCommand=NULL; // MDH@29OCT2019 replacing non Mcommand style (before today): _userInputCommand->_lastToken=_userInputCommand->_firstToken=NULL; // remove reference to current command
