@@ -38,7 +38,7 @@ Mcommand* _getNewCommand(bool withFirstToken);
 typedef void InputResponseFunction(char const * const fmt,...);
 typedef size_t OutputTokenFunction(Mtoken* token);
 typedef void ReoutputTokenFunction(Mtoken* token);
-typedef void UpdateLastTokenAutocompletionTextFunction();
+typedef void UpdateLastTokenAutocompletionTextFunction(bool onlyWhenItDoesNotEndTheSuggestedText);
 typedef void OutputCommandInfoFunction(Mcommand* command);
 typedef bool InputCharReadFunction(char* _c);
 /*

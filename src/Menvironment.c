@@ -654,7 +654,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
                                             }
                                         }else{ // completiontype==2
                                             // don't add twice!!!
-                                            if(string_find(_completion,(*(variablename+l)))<0)if(!string_append_char(_completion,*(variablename+l)))completiontype=0;               
+                                            if(string_find_char(_completion,(*(variablename+l)),0)<0)if(!string_append_char(_completion,*(variablename+l)))completiontype=0;               
                                         }
                                         if(completiontype==0)break; // something went wrong
                                     }
@@ -699,7 +699,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
                                             }
                                         }else{ // completiontype==2
                                             // don't add twice!!!
-                                            if(string_find(_completion,(*(functionname+l)))<0)if(!string_append_char(_completion,*(functionname+l)))completiontype=0;               
+                                            if(string_find_char(_completion,(*(functionname+l)),0)<0)if(!string_append_char(_completion,*(functionname+l)))completiontype=0;               
                                         }
                                         if(completiontype==0)break; // something went wrong
                                     }

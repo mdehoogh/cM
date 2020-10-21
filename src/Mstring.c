@@ -424,13 +424,13 @@ char* string(Mstring* const str){
 }
 
 /** Get where the first occurrence of a character in the String is */
-long long string_find(const Mstring* const str,char c){
+long long string_find_char(const Mstring* const str,char c,size_t pos){
     if(str){
         // MDH@16DEC2018: better to increment pos inside the condition
         // MDH@25OCT2019: type of pos changed from long long to size_t and pos<l replaced by pos!=l because I'm not sure if 0<0 evaluates to false for unsigned integers like size_t
-        size_t pos=0,l=str->length; // first character to check
+        size_t l=str->length; // first character to check
         Mchars* strchars=str->_chars; // MDH@17APR2020: replacing str by strchars
-        while(pos!=l){ // still within the text
+        while(pos<l){ // still within the text
             if(strchars->chars[pos]==c)return pos; // if a match return pos
             pos++; // keep looking
         }
@@ -600,4 +600,15 @@ size_t string_trailing(Mstring* str,char c){
         return(l-i-1u);
     }
     return 0;
+}
+
+// MDH@21OCT2020
+bool string_endswith(Mstring const * const str,char const * const pc){
+    size_t l=(str?str->length:0),pcl=(pc?strlen(pc):0);
+    if(pcl>0&&l>=pcl){ // something to compare, and enough characters to compare
+        Mchars* strchars=str->_chars;
+        while(pcl>0)if(pc[--pcl]!=strchars->chars[--l])return false;
+        return true;
+    }
+    return false;
 }

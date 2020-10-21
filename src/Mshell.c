@@ -1191,7 +1191,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
 			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType/*,endOfInput*/);
 			
-			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(); // MDH@28FEB2020: a bit of a nuisance...
+			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(false); // MDH@28FEB2020: a bit of a nuisance...
 
 			if(!lastCommandToken)return NULL;
 			/* replacing:

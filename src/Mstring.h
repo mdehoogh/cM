@@ -54,7 +54,7 @@ char* _stringstart(Mstring const * const str,size_t length); // returns a copy o
 
 bool string_shorten(Mstring * const str,size_t length);
 
-long long string_find(Mstring const * const str,char c);
+long long string_find_char(Mstring const * const str,char c,size_t pos); // MDH@21OCT2020: renamed to string_find_char, and appending pos being the first position to consider, returning -1 on failure
 
 // changing the string
 char string_removed_char(Mstring * const str,size_t pos);
@@ -87,5 +87,7 @@ Mstring* string_append_ld(Mstring* const ms,long double ld);
 Mstring* _string_info(Mstring* str);
 
 size_t string_trailing(Mstring* str,char c);
+
+bool string_endswith(Mstring const * const str,char const * const pc);
 
 #endif /* __MSTRING_H__ */

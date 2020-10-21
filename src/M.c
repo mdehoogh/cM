@@ -2568,11 +2568,16 @@ bool updateNumberOfLineCharacters(){
 
 // MDH@20SEP2019: whenever a token changes the associated feed forward text might change, so it makes sense to update the feed forward text accordingly
 //                assuming that the given type is correct (e.g. an identifier of which has been determined whether it is a function or variable name)
-//MDH@26SEP2019: due to the separation of the identifier continuation text and the other feed forward text we separate getting the identifier continution text from getting the other feed forward text
-void updateLastTokenAutocompletionText(){
+// MDH@26SEP2019: due to the separation of the identifier continuation text and the other feed forward text we separate getting the identifier continution text from getting the other feed forward text
+// MDH@21OCT2020: sometimes when the suggested text already contains the last token auto completion text we do not want to add it again
+void updateLastTokenAutocompletionText(bool onlyWhenNotAlreadyEndingTheSuggestedText){
+	char* _lastTokenAutocompletionText=_getLastTokenAutoCompletionText();
+	if(!_lastTokenAutocompletionText)return;
+	// the following is critical in that we empty _lastTokenAutocompletionText when the suggested text ends with the auto completion text BUT we're still setting the last token auto completion text!!!
+	if(onlyWhenNotAlreadyEndingTheSuggestedText&&string_endswith(_suggestedText,_lastTokenAutocompletionText))_lastTokenAutocompletionText[0]='\0';
 	// MDH@27SEP2019: updating the identifier continuation now moved to writeSuggestedText(true), so JIT update
 	// MDH@25MAY2020: TODO _getLastTokenAutoCompletionText() returns a dynamically allocated char* (using strdup) which therefore is NOT under version control
-	free(setLastTokenAutocompletionText(_getLastTokenAutoCompletionText())); // MDH@24SEP2019: the bool forces setting the identifier continuation characters when available, so we can show them to the user
+	free(setLastTokenAutocompletionText(_lastTokenAutocompletionText));
 	// inputInfo("Last token auto completion text updated.");
 }
 
@@ -2699,7 +2704,7 @@ void createUserInputCommand(){
 	// MDH@29OCT2019: the following is absolutely silly although how about updating 
 	if(_userInputCommand){
 		// MDH@30OCT2019: userInputCommandIdentifierContinuationNeedsUpdating=false; // MDH@29OCT2019: instead of calling setLastUserInputCommandToken()
-		updateLastTokenAutocompletionText(); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
+		updateLastTokenAutocompletionText(false); // TODO perhaps we do not need this after all here????? NOTE used to do that in setTokenType() when endInput was true but not doing that anymore
 		// if(amDebugging())inputInfo("New user input command created.");
 	}else
 		inputError("Failed to create a new user input command.");
@@ -2865,7 +2870,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 			if(amMatchingparentheses())if(_userInputCommand->_lastToken->type==TT_NEW_VARIABLE)if(string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			*/
 			// the minimum we can do is put an opening parenthesis in the behind cursor text
-			setTokenType(lastCommandToken,TT_FUNCTION/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
+			setTokenType(lastCommandToken,TT_FUNCTION/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
 			reoutputToken(lastCommandToken);
 			// insert an opening parenthesis for the function call
 			// MDH@23SEP2019 take care of by setLastTokenType, so removed: if(endOfInput&&amMatchingparentheses())setLastTokenAutocompletionText("(");else deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019: either force the feedforward text to match an opening parenthesis or nothing TODO does endOfInput matter?????
@@ -2877,7 +2882,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		if(!getFunction(getExecutionEnvironment(),_identifierName)){ // no, it ain't
 			// the minimum we can do is remove the opening parenthesis behind it (if it is still there!!!!!)
 			// MDH@11MAR2020: ok, here we have an issue: 
-			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
+			setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
 			reoutputToken(lastCommandToken);
 			inputInfo("'%s' considered to be an existing variable.",_identifierName);
 			//////////outputInfo("Variable redrawn!");
@@ -2937,7 +2942,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		if(lastCommandToken->type==TT_VARIABLE){ // might not exist after all both in the command and in the current environment
 			if(variableExistsIndicator<0){ // apparently does NOT exist
 				// inputInfo("'%s' not an existing variable.",_identifierName);
-				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
+				setTokenType(lastCommandToken,TT_NEW_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
 				reoutputToken(lastCommandToken);
 				// suggested characters should make = show (probably already present in the behind cursor text)
 				// MDH@23SEP2019 take care of by setLastTokenType, so removed: setLastTokenAutocompletionText("="); // MDH@20SEP2019 replacing: if(endOfInput&&!aSuggestedCharacter)if(amMatchingparentheses())if(string_char(feedforwardText,0)!='=')string_insert_char(feedforwardText,0,'=');
@@ -2945,7 +2950,7 @@ bool tokenCheckedForBeingAFunction(Mtoken* lastCommandToken,bool endOfInput/*,bo
 		}else
 		if(lastCommandToken->type==TT_NEW_VARIABLE){ // a new variable
 			if(variableExistsIndicator>0){ // now an existing variable
-				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText();
+				setTokenType(lastCommandToken,TT_VARIABLE/*,endOfInput*/);if(endOfInput)updateLastTokenAutocompletionText(false);
 				reoutputToken(lastCommandToken);
 				///// MDH@23SEP2019 removed: deleteAutocompletionTextOfToken(_userInputCommand->_lastToken); // MDH@20SEP2019 replacing: if(endOfInput)if(amMatchingparentheses())if(string_length(feedforwardText)&&string_char(feedforwardText,0)=='=')string_removed_char(feedforwardText,0);
 			}
@@ -3288,7 +3293,7 @@ uint8_t commandCharacterAccepted(char inputChar,char *inputCharacterType,bool en
 				if(!deleteFirstAutocompletionCharacter(inputChar,true))inputError("Failed to remove the accepted first auto completion character."); // i.e. we're NOT switching to control mode or returning false
 			}
 		}
-		updateLastTokenAutocompletionText(/*acceptedFirstSuggestedCharacterDeleted*/); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
+		updateLastTokenAutocompletionText(/*acceptedFirstSuggestedCharacterDeleted*/false); // it makes sense to update the current token feed forward text just before actually showing it AND to update the identifier continuation first
 		/////////writeSuggestedText(false); // just in case we removed some character (see TT_FUNCTION->TT_VARIABLE)
 		/////if(amDebugging())inputInfo("N");
 		// debugWrite("Command length after writing behind cursor text: %zu.",getCommandLength());
@@ -4201,11 +4206,13 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						else
 						if(numberOfManualFeedforwardCharacters>0)numberOfCharactersToConsume=numberOfManualFeedforwardCharacters;
 						char newInputChar='\0',newInputCharType='\0';
+						// MDH@21OCT2020: decided to make numberOfCharactersToConsume equal to 0 to indicate that not all characters were actually consumed
 						// MDH@19OCT2020: is there a way somehow to consume characters until the token is finished or a new token starts??????????
 						//                in essence at least a single character needs to be accepted
-						size_t numberOfSuggestedCharactersAccepted=0;
-						while(1){
-							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersAccepted);
+						size_t numberOfSuggestedCharactersConsumed=0;
+						uint8_t characterAccepted=0;
+						while(numberOfSuggestedCharactersConsumed<numberOfCharactersToConsume){
+							newInputChar=string_char(_suggestedText,numberOfSuggestedCharactersConsumed);
 							if(!newInputChar){
 								inputCharType=switchToControlMode("Suggested characters vanishing somehow.");
 								break;
@@ -4213,42 +4220,45 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 							// MDH@24APR2019 obsolete: getCommandLength()--; // until we manage to insert the character removed, we have one less character in the total command length
 							// MDH@14AUG2019: suggestedCharacter is set to true now, this makes perfect sense as I'm consuming all characters here and we do not want to remove them, NOTE that characters may still be inserted but only when bc=0 obviously
 							newInputCharType=INPUTCHARACTERTYPES[newInputChar];
+							// MDH@21OCT2020: OOPS the first character SHOULD always be accepted even if it finishes or starts a new token
+							//                it's easiest to only set numberOfCharactersToConsume to suggestedCharacterIndex below when numberOfSuggestedCharactersConsumed is positive
+							//                NOTE also when the character does not continue the token we simply break leaving numberOfCharactersToConsume positive
+							//                TODO improvement possible by switching to control mode if anything goes wrong and not taking care of it 
 							// MDH@19OCT2020: stop as soon as the character does not continue the current token
-							if(numberOfSuggestedCharactersAccepted>0&&
-									!characterContinuesToken(_userInputCommand->_lastToken,newInputChar,newInputCharType)){
-								numberOfCharactersToConsume=numberOfSuggestedCharactersAccepted;
+							if(numberOfSuggestedCharactersConsumed>0&&
+									!characterContinuesToken(_userInputCommand->_lastToken,newInputChar,newInputCharType))
 								break;
-							}
-							uint8_t characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):1);
-							if(!characterAccepted){
-								inputCharType=switchToControlMode("Failed to consume a suggested character.");
-								newInputChar='\0'; // to indicate some error occurred
-								break;
-							}
-							if(characterAccepted>1)numberOfCharactersToConsume=numberOfSuggestedCharactersAccepted;
+							// TODO shouldn't endOfInput equal true instead of false????
+							characterAccepted=(newInputChar!='#'?commandCharacterAccepted(newInputChar,&newInputCharType,false,true):1);
+							if(characterAccepted==0) // the character was not accepted
+								inputCharType=switchToControlMode("Failed to accept a suggested character.");
+							else
+							if(characterAccepted>1&&numberOfSuggestedCharactersConsumed>0)
+								inputCharType=switchToControlMode("Not all suggested characters accepted.");
+							// if some error occurred we're no longer in command mode anymore
+							if(inputMode!=IM_COMMAND)break;
+							numberOfSuggestedCharactersConsumed++; // prepare to process the next character to consume (if any)
 							if(newInputCharType==' ')newCommandLine(true); // MDH@24SEP2020 replacing (and improving upon): showContinuedPrompt(true,true); // MDH@31OCT2019: whenever a newline (request) character is consumed, make a new line
-							numberOfSuggestedCharactersAccepted+=1;
-							if(numberOfSuggestedCharactersAccepted>=numberOfCharactersToConsume)break;
 						}
 						// remove at most numberOfSuggestedCharactersAccepted from the suggested text
-						if(inputMode==IM_COMMAND){
+						if(inputMode==IM_COMMAND){ // all went well
 							// if identifier continuation characters were consumed nothing to do, otherwise either to clear the manual
 							// MDH@08OCT2019: have to be careful here because identifier continuation characters might come out of the manual feed forward text
-							if(numberOfSuggestedCharactersAccepted){ // at least one character consumed
-								if(numberOfSuggestedCharactersAccepted>=numberOfCharactersToConsume){
-									if(numberOfManualFeedforwardCharacters){ // some of the manual feed forward characters were consumed
-										if(numberOfSuggestedCharactersAccepted>=string_length(_manualFeedforwardText)){ // all manual feed forward characters were consumed
-											FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
-										}else{ // not all manual feed forward characters were consumed 
-											// remove numberOfSuggestedCharactersAccepted from the start of the manual feed forward text
-											if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersAccepted))
-												inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
-										}
-									}else
-										deleteTokenautocompletiontexts();
-									updateLastTokenAutocompletionText(); // TODO do we need the following????
+							if(numberOfSuggestedCharactersConsumed>0){ // at least one character consumed
+								if(numberOfManualFeedforwardCharacters){ // some of the manual feed forward characters were consumed
+									if(numberOfSuggestedCharactersConsumed>=string_length(_manualFeedforwardText)){ // all manual feed forward characters were consumed
+										FREE_STRING(_manualFeedforwardText,owner_manualFeedforwardText);_manualFeedforwardText=NULL;
+									}else{ // not all manual feed forward characters were consumed 
+										// remove numberOfSuggestedCharactersAccepted from the start of the manual feed forward text
+										if(!string_removed(_manualFeedforwardText,0,numberOfSuggestedCharactersConsumed))
+											inputCharType=switchToControlMode("Not all accepted suggested characters removed from the suggested text.");
+									}
 								}else
-									inputCharType=switchToControlMode("Not all suggested characters accepted.");
+									deleteTokenautocompletiontexts();
+								// MDH@21OCT2020: this is a very good point because apparently when the last consumed character is ( it's appending ) which is NOT always required
+								//                I suppose that's technically only the case when there's no ) in the remainder of the suggested text left
+								//                essentially the last token auto completion text could be present in the suggested text to start with
+								updateLastTokenAutocompletionText(true); // TODO do we need the following????
 								// we might end up behind some character that produces auto completion stuff like [ or {
 							}else
 								inputCharType=switchToControlMode("No suggested characters accepted.");					
