@@ -3360,7 +3360,7 @@ void outputValuereference(char* prefix,Mvaluereference* _valuereference,char* su
 Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner owner=getOwner(__LINE__);
 	// _itemid now represents the entire list of index/attribute name combinations
 	Mvalue* referencedValue=NULL; // starting out with the actual value in the reference
-	// if(amVerboseDebugging())
+	if(amVerboseDebugging())
 	{
 			output("Getting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
@@ -4362,7 +4362,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 									if(amVerbose())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}else
 								if(strlen(definedFunctionName))
-									output("%sFailed to create function '%s'.",M_ERROR_PREFIX,definedFunctionName);
+									output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,definedFunctionName);
 								else
 									outputError("Name of function to create not defined.");
 							}

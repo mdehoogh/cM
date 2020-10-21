@@ -3630,7 +3630,7 @@ Mvaluereference* getValueReference(char* info,TokenType endTokenTypes[],uint8_t 
 									if(amVerboseDebugging())output("Function '%s' completely specified with single body command!\n",definedFunctionName);
 								}else
 								if(strlen(definedFunctionName)>0)
-									output("%sFailed to create function '%s'.",M_ERROR_PREFIX,definedFunctionName);
+									output("%sFailed to create function '%s'\n.",M_ERROR_PREFIX,definedFunctionName);
 								else
 									outputError("Name of function to create not defined.");
 							}
