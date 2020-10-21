@@ -3236,7 +3236,10 @@ Mallocationowner getCurrentFunctionBodyInputOwner(){return owner_currentFunction
 bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequest){Mallocationowner owner=getOwner(__LINE__);
 	// ASSERT don't call with _firstFunctionBodyRequest equal to NULL
 	///////////if(!_firstFunctionBodyRequest)return false;
-	_currentFunctionBodyInput=OWNED(CALLOC_1(sizeof(FunctionBodyInput),'8',owner),owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
+	// MDH@21OCT2020 BUG FIX: somehow OWNED did't work is that because CALLOC_1 doesn't return a disowned thingie (yes I guess so)????? because it's a module variable it's better to immediately own it correctly
+	_currentFunctionBodyInput=CALLOC_1(sizeof(FunctionBodyInput),'8',owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
+	// replacing: _currentFunctionBodyInput=OWNED(CALLOC_1(sizeof(FunctionBodyInput),'8',owner),owner_currentFunctionBodyInput); // MDH@04JUN2020: given that _currentFunctionBodyInput is global it needs to be owned by a module global owner
+	
 	if(!_currentFunctionBodyInput){outputError("Failed to create function body input");return false;} // TODO improve feedback
 	Mfunction* function=getFunction(getExecutionEnvironment(),_functionBodyRequest->_functionName->chars);
 	if(function&&function->type==FT_USER){
@@ -3259,7 +3262,7 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 			outputError("Failed to create function execution environment for accepting its body commands"); // TODO improve feedback
 	}else
 		output("%sCan't find function '%s' for accepting its body commands.\n",M_ERROR_PREFIX,_functionBodyRequest->_functionName);
-	FREE_DISOWNED_1(_currentFunctionBodyInput,'H',owner_currentFunctionBodyInput);
+	FREE_DISOWNED_1(_currentFunctionBodyInput,'8',owner_currentFunctionBodyInput);
 	return false;
 }
 bool startFunctionBodyInput(){
@@ -3292,12 +3295,15 @@ bool endFunctionBodyInput(){
 	// pop the function body request execution environment we just ended
 	// MDH@20JUL2019: I need to get a reference to the execution environments function map (before the execution environment get's freed and we loose the reference!!)
 	_currentFunctionBodyInput->_function->_functionMap=getExecutionEnvironment()->_functionMap;
-	if(amVerbose())outputExecutionEnvironmentName("End of the body of '","'.\n");
+	if(amVerboseDebugging())outputExecutionEnvironmentName("End of the body of '","'.\n");
 	popExecutionEnvironment();
 	// the new first function body request is the successor of the previous one
 	// TODO shouldn't we free it?
 	_firstFunctionBodyRequest=_currentFunctionBodyInput->_request; // the next function body request as stored in the _request field
-	free(_currentFunctionBodyInput);_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
+	output("Freeing the current function body input...");
+	FREE_DISOWNED_1(_currentFunctionBodyInput,'8',owner_currentFunctionBodyInput); // replacing: free(_currentFunctionBodyInput);
+	_currentFunctionBodyInput=NULL; // I suppose I should get rid of the current function body input in case we're done anyway
+	output(" done!\n");
 	if(!_firstFunctionBodyRequest){_lastFunctionBodyRequest=NULL;return true;} // done with all the requests
 	return startFunctionBodyInput(); // will NULL _firstFunctionBodyInput to ascertain not to get called in the main user input loop
 }

@@ -4649,8 +4649,11 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 			// we should only exit M when not entering a function body
 			if(!getCurrentFunctionBodyInput())break; // break out of user input loop
 			// switch back to command mode
-			endFunctionBodyInput();
-			switchToCommandMode();
+			if(endFunctionBodyInput())
+				output("Function body ended!\n");
+			else
+				outputError("Failed to end the function body");
+			switchToCommandMode(); // NOTE as apparently we're in control mode!!
 		}else
 		// MDH@16APR2019: now if we use n to switch modes as well, we can do that if there's no command
 		if(inputCharType=='n'){
@@ -4685,7 +4688,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand&&_userInputCommand->_firstToken){ // technically something to evaluate
-					if(amVerbose())outputCommandInfo(_userInputCommand);
+					if(amVerboseDebugging())outputCommandInfo(_userInputCommand);
 					// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 					Mvalue* userInputCommandResultValue=NULL;
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
@@ -4706,7 +4709,7 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						continue;
 					}
 					resetOutputColor();
-					if(amVerbose())outputInfo("Command evaluated!");
+					if(amVerboseDebugging())outputInfo("Command evaluated!");
 					deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					// MDH@18JUN2020: if the current command is not an original command 
@@ -4739,9 +4742,9 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 					// garbage collection: remove any values not used anymore...
 					// if(amDebugging())
-					if(amVerbose())outputInfo("Removing unreferenced values.");
+					if(amVerboseDebugging())outputInfo("Removing unreferenced values.");
 					size_t removedValueCount=getNumberOfRemovedValues(amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
-					if(amVerbose())
+					if(amVerboseDebugging())
 					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
 
 					// switch to function body input mode when this command contained at least one user function definition
