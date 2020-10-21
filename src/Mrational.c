@@ -462,7 +462,7 @@ Mrational* _getRationalSum(Mrational const * const q1,Mrational const * const q2
         }
     }else
         outputError("Failed to create the rational for storing the sum of two rationals");
-    return _rational;
+    return disowned_rational(_rational,owner);
 }
 Mrational* _getRationalDifference(Mrational const * const q1,Mrational const * const q2){Mallocationowner owner=getOwner(__LINE__);
     // NOTE leaving it to _qmul to deal with NULL rational input (which should never happen though)
