@@ -276,7 +276,9 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 			if(!addVariable(_functionExecutionEnvironment,owner,"!",VT_UNDEFINED,false)){
 				outputError("Failed to add the exit flag variable to the function execution environment");
 				functionExecutionEnvironmentInitialized=false;
-			}
+			}else // MDH@22OCT2020: fail-through code that will add a list that would normally contain the additional arguments in a function call which we force to be present always this way
+			if(!addVariable(_functionExecutionEnvironment,owner,"_",VT_LIST,false))
+				outputInfo("Failed to add the additional arguments list variable to the function execution environment");
 		}else
 			outputError("Failed to initialize the function execution environment.");
 		if(functionExecutionEnvironmentInitialized)return disowned_environment(_functionExecutionEnvironment,owner);
@@ -536,7 +538,7 @@ mpd_context_t* get_default_mpd_context(){return(M_DECIMALCONTEXT?M_DECIMALCONTEX
 // very special M functions
 Mvalue* Miffunction(Mvalue* _conditionTokenValue,Mvalue* _thenTokenValue,Mvalue* _elseTokenValue){
 	Mvalue* _result=NULL;
-	if(isValueZero(_conditionTokenValue)==M_TRUE){
+	if(isValueUndefined(_conditionTokenValue)==M_TRUE||isValueZero(_conditionTokenValue)==M_TRUE){
 		if(_elseTokenValue&&_elseTokenValue->type==VT_TOKEN){
 			getExecutionEnvironment()->expressionToken=_elseTokenValue->value._token;
 			_result=getValueOfExpression("else clause",'e',NULL,0);
@@ -556,7 +558,8 @@ Mvalue* Mwhilefunction(Mvalue* _conditionTokenValue,Mvalue* _whilebodyTokenValue
 			// evaluate the condition
 			getExecutionEnvironment()->expressionToken=_conditionTokenValue->value._token;
 			Mvalue* _conditionValue=getValueOfExpression("while condition",'w',NULL,0);
-			if(isValueZero(_conditionValue)==M_TRUE)break; // condition evaluates to zero
+			// MDH@22OCT2020: we know that a condition evaluates to M_TRUE, M_FALSE or M_LL_INVALID (undecisive), and the last one (M_LL_INVALID) is not equal zero so testing for being positive is preferred
+			if(isValueZero(_conditionValue)==M_TRUE||isValueUndefined(_conditionValue)==M_TRUE)break; // condition evaluates to zero
 			// evaluate the body
 			getExecutionEnvironment()->expressionToken=_whilebodyTokenValue->value._token;
 			_result=getValueOfExpression("while loop",'l',NULL,0);

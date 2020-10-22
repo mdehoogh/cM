@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="6";char const * const M_DATE="21 October 2020"; // MDH@21OCT2020: user function creation debugged, as well as certain disowned stuff for function execution environments and returned rationals
+char const * const M_BUILD="7";char const * const M_DATE="22 October 2020"; // MDH@22OCT2020: user functions can now have undefined parameter maps, additional arguments are stored in _ variable, so can be used
+//char const * const M_BUILD="6";char const * const M_DATE="21 October 2020"; // MDH@21OCT2020: user function creation debugged, as well as certain disowned stuff for function execution environments and returned rationals
 //char const * const M_BUILD="5";char const * const M_DATE="19 October 2020"; // MDH@19OCT2020: fixed assigning to a new property like z.a=12, and replacing newline character to '\n' and removing it on left arrow
 //char const * const M_BUILD="4";char const * const M_DATE="16 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
 //char const * const M_BUILD="3";char const * const M_DATE="15 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
