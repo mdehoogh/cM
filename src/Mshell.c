@@ -3771,7 +3771,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner owner_valuereference,Mvalue* _newValue){Mallocationowner owner=getOwner(__LINE__);
 	bool result=false;
 	if(_valuereference&&_valuereference->_name){
-		//if(amVerboseDebugging())
+		if(amVerboseDebugging())
 		{
 			output("Setting the value reference of '%s",_valuereference->_name);
 			if(_valuereference->_itemid)outputValue(NULL,_valuereference->_itemid,NULL);
