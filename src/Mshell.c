@@ -74,6 +74,8 @@ const char M_NEWLINE_CHARACTER='\n'; // MDH@31OCT2019: the character to request 
 const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator between map and property
 
+const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
+
 // as needed by the tokenizer (as part of evaluating a command)
 // associated every possible input characters (0 through 127) with a character type where a period denotes a non-command input character
 // t=tab(feedforward variable),n=newline(end of command),U=unary operator,D=double quoted string literal,C=comment,L=letter (in identifiers),l=letter (not at start of identifier)
@@ -205,26 +207,37 @@ const char * const TRANSITIONS[NUMBER_OF_FINISHABLE_TOKEN_TYPES][NUMBER_OF_TOKEN
 
 const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01100000,0b01100101,0b01101010,0b01100110,0b01101000,0b01110000,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,0b1000000,0b11111111};
 
-bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap){
-	bool executionEnvironmentInitialized=true;
-	if(amVerbose())outputMap("Execution environment variable map: ",_variableMap,".\n");
+// MDH@22OCT2020: in order to be able to use any number of function arguments we now allow moving the list of variables that does not have a name to be placed in the variable that starts with _
+//                it's up to the argument map creator to put all arguments that are not expected in the function and put them in the '' argument
+bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap,char const * const defaultVariableName){
+	if(amVerbose())
+		outputMap("Execution environment variable map: ",_variableMap,".\n");
 	Mmapelement* variableMapelement=(_variableMap?_variableMap->_first:NULL);
 	Mvariable* variableMapelementVariable;
-	while(executionEnvironmentInitialized&&variableMapelement){
+	while(variableMapelement){
 		variableMapelementVariable=variableMapelement->_variable;
-		if(strlen(variableMapelementVariable->_name->chars)==0)continue; // no use to create a variable with no name
-		// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
-		if(!addVariable(_executionEnvironment,owner_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->valuetype,false)){
-			output("%sFailed to add variable '%s' as local variable.\n",M_ERROR_PREFIX,variableMapelementVariable->_name->chars);
-			executionEnvironmentInitialized=false;
-		}else
-		if(!setValue(_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->_value)){
-			output("%sFailed to initialize local variable '%s'.\n",M_ERROR_PREFIX,variableMapelementVariable->_name->chars);
-			executionEnvironmentInitialized=false;
-		}else
-			variableMapelement=variableMapelement->_next;
+		if(variableMapelementVariable&&variableMapelementVariable->_name){
+			char *variableName=variableMapelementVariable->_name->chars;
+			if(variableName){
+				if(strlen(variableName)==0&&defaultVariableName)variableName=defaultVariableName; // use the default variable name if the name of the variable is empty
+				if(strlen(variableName)>0){
+					// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
+					if(!addVariable(_executionEnvironment,owner_executionEnvironment,variableName,variableMapelementVariable->valuetype,false)){
+						output("%sFailed to add variable '%s' as local variable.\n",M_ERROR_PREFIX,variableName);
+						return false;
+					}
+					if(!setValue(_executionEnvironment,variableName,variableMapelementVariable->_value)){
+						output("%sFailed to initialize local variable '%s'.\n",M_ERROR_PREFIX,variableName);
+						return false;
+					}
+				}
+			}
+		}
+		variableMapelement=variableMapelement->_next;
 	}
-	return executionEnvironmentInitialized;
+	if(amVerbose())
+		outputInfo("Execution environment initialized.");
+	return true;
 }
 /*
 \brief returns the environment for executing the the function called \p functionName
@@ -233,11 +246,12 @@ obviously when defining the function body there will be no commands to execute
  */
 Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-	if(amVerboseDebugging())
+	if(amVerbose())
 		outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=owned_environment(__environment(),owner); // free asap
 	if(_functionExecutionEnvironment){
-		if(amVerbose())outputInfo("Registering the name of the function execution environment");
+		if(amVerbose())
+			outputInfo("Registering the name of the function execution environment");
 		_functionExecutionEnvironment->_name=owned_chars(_getChars(functionName),Msubowner(owner,1)); // store the name of the function as environment name!!!
 		/* NO, instead, just before popping the function body execution environment, we copy the function map reference
 		// MDH@20JUL2019: this is fun, we're referencing the internal functions defined in the user function, and as we never free the functions
@@ -247,11 +261,13 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		*/
 		// 2. make the definition environment the parent of the function execution environment
 		assignValue(&_functionExecutionEnvironment->_parent,_function->_definitionEnvironmentValue); // MDH@03FEB2020 replacing: _functionExecutionEnvironment->_parent=_function->_definitionEnvironment;
-		if(amVerbose())outputInfo("Parent of function execution environment set to the function definition environment");
+		if(amVerbose())
+			outputInfo("Parent of function execution environment set to the function definition environment");
 		// 3. create the argument map fields as variables in the function execution environment
-		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,owner,_argumentMap);
+		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,owner,_argumentMap,M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME);
 		if(functionExecutionEnvironmentInitialized){
-			if(amVerbose())outputInfo("Function execution environment initialized.");
+			if(amVerbose())
+				outputInfo("Function execution environment initialized");
 			// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
 			if(!addVariable(_functionExecutionEnvironment,owner,"$",VT_UNDEFINED,false)){
 				outputError("Failed to add the result variable to the function execution environment");
@@ -263,9 +279,11 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 			}
 		}else
 			outputError("Failed to initialize the function execution environment.");
-		if(!functionExecutionEnvironmentInitialized){FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);_functionExecutionEnvironment=NULL;}
+		if(functionExecutionEnvironmentInitialized)return disowned_environment(_functionExecutionEnvironment,owner);
+		// ASSERT function execution environment NOT initialized
+		FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
 	}
-	return disowned_environment(_functionExecutionEnvironment,owner);
+	return false;
 }
 
 /* moved back to M.c
@@ -629,7 +647,7 @@ Mvalue* Mforfunction(Mvalue* _initializationTokenValue,Mvalue* _conditionTokenVa
 						// interestingly any text can be used to variables (outside the identifiers allowed by the interpreter)
 						// although perhaps we should exclude using $ and _ well especially _
 						// MDH@08NOV2019: a list is also allowed actually anything
-						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,getOwnerExecutionEnvironment(),initializationValue->value._map)){
+						if(initializationValue&&initializationValue->type==VT_MAP&&!isExecutionEnvironmentInitialized(_forEnvironment,getOwnerExecutionEnvironment(),initializationValue->value._map,NULL)){
 							outputError("Failed to initialize the for loop local variables");
 							forEnvironmentInitialized=false;
 						}
@@ -2933,29 +2951,39 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){Mallocationowner owner=getOwner
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){Mallocationowner owner=getOwner(__LINE__);
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
-	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
+	if(amVerboseDebugging())
+		output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mlist* _list=owned_list(__list("getValueOfList"),owner);
-	if(!_list){output("Failed to create a list to return.\n");return NULL;}
+	if(!_list){
+		outputError("Failed to create a list to return");
+		return NULL;
+	}
 	_list->weak=weak;
 	/* MDH@27MAY2020 replacing:
 	Mvalue* _listValue=_getListValue(VT_UNDEFINED,weak,"getValueOfList"); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
 	*/
-	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.\n");return NULL;}
-	if(amVerbose())output("Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(_list->_first||_list->_last){
+		outputError("Supposedly empty list not initialized correctly");
+		return NULL;
+	}
+	if(amVerboseDebugging())
+		output("Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	unsigned long long listElementIndex=0;
 	uint32_t firstElementToNotEvaluate=(maximumNumberOfElements==0||numberOfElementsToNotEvaluate>maximumNumberOfElements?0:maximumNumberOfElements-numberOfElementsToNotEvaluate+1);
-	if(amVerbose())output("First element not to evaluate: %u.\n",firstElementToNotEvaluate);
+	if(amVerboseDebugging())
+		output("First element not to evaluate: %u.\n",firstElementToNotEvaluate);
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
 	while((expressionToken=nextEnvironmentExpressionToken())){
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
-		if(amVerbose())output("Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerboseDebugging())
+			output("Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		Mvalue* _listElementValue=NULL;
 		if(firstElementToNotEvaluate>0&&listElementIndex>=firstElementToNotEvaluate){ // copy the tokens in the argument
 			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
@@ -2963,11 +2991,11 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
 			Mtoken* _firstUnevaluatedToken=owned_token(_getEvaluatableTokenCopy(expressionToken),owner);
 			if(_firstUnevaluatedToken){
-				if(amVerbose())
-				output("Evaluating special function call argument tokens:");
+				if(amVerboseDebugging())
+					output("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 				while(unevaluatedToken){
-					if(amVerbose())
+					if(amVerboseDebugging())
 						output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(!expressionToken)break; // NOTE shouldn't happen though
@@ -2975,7 +3003,7 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 					unevaluatedToken->next=owned_token(_getEvaluatableTokenCopy(expressionToken),owner); // set next to the copy of the expression token
 					unevaluatedToken=unevaluatedToken->next;
 				}
-				if(amVerbose())
+				if(amVerboseDebugging())
 					outputChar('\n');
 				_listElementValue=_getValueOfToken(disowned_token(_firstUnevaluatedToken,owner));
 			}
@@ -2983,18 +3011,23 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
 			_listElementValue=(expressionToken->type!=TT_LISTELEMENT?getValueOfExpression("list element",'l',(TokenType[]){endTokenType,TT_LISTELEMENT},2):NULL);
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
-			if(amVerboseDebugging())outputValue("List element value: '",_listElementValue,"'.\n");
+			if(amVerboseDebugging())
+				outputValue("List element value: '",_listElementValue,"'.\n");
 		}
 		if(!_listElementValue){
-			if(amVerboseDebugging())output("List element missing!\n");
+			if(amVerboseDebugging())
+				outputInfo("List element missing!");
 			continue;
 		} // undefined list elements should NEVER be added to the list
-		if(expressionToken)if(amVerboseDebugging())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerboseDebugging())
+			if(expressionToken)
+				output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
-			if(amVerboseDebugging())output("Appending list element #%llu.\n",listElementIndex);
+			if(amVerboseDebugging())
+				output("Appending list element #%llu.\n",listElementIndex);
 		    long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex); // TODO
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
 			if(newListElementIndex<=0){
@@ -3002,14 +3035,17 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 				outputValue("Failed to append list element '",_listElementValue,"'.\n");
 				break;
 			}
-			if(amVerbose())output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
+			if(amVerboseDebugging())
+				output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
 		}else
-		if(amVerbose())output("Maximum number of elements reached.\n");
+		if(amVerboseDebugging())
+			output("Maximum number of elements reached.\n");
 		if(!expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
 	Mvalue* _listValue=_getValueOfList(disowned_list(_list,owner));
-	if(amVerboseDebugging())outputValue("List '",_listValue,"' extracted!\n");
+	if(amVerboseDebugging())
+		outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
 
@@ -3192,7 +3228,7 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 // _firstFunctionBodyRequest represents the first one to execute
 FunctionBodyRequest* __functionbodyrequest(char const * const functionName){Mallocationowner owner=getOwner(__LINE__);
 	FunctionBodyRequest* _functionBodyRequest=NULL;
-	if(functionName){
+	if(functionName&&strlen(functionName)){
 		_functionBodyRequest=CALLOC_1(sizeof(FunctionBodyRequest),'9',owner);
 		if(_functionBodyRequest){
 			_functionBodyRequest->_functionName=owned_chars(_getChars(functionName),Msubowner(owner,1));
@@ -3222,10 +3258,12 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 	// ASSERT a 'valid' function name
 	if(getFunctionBodyRequest(functionName)){output("%sDuplicate function name '%s'.",M_ERROR_PREFIX,functionName);return NULL;} // already have it
 	// technically it should not have been requested already (or exist)
-	FunctionBodyRequest* _functionBodyRequest=OWNED(__functionbodyrequest(functionName),owner_functionBodyRequest); // guarantees that functionName is defined
-	if(_functionBodyRequest){		
+	FunctionBodyRequest* _functionBodyRequest=__functionbodyrequest(functionName); // guarantees that functionName is defined
+	if(_functionBodyRequest){ 
+		// check for being disowned (originally we OWNED it immediately in creating it, but we got a bug saying it was not disowned!!!)
+		if(!Misdisowned(_functionBodyRequest))outputBug("Function body request not currently disowned!");
 		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
-		_lastFunctionBodyRequest=_functionBodyRequest;
+		_lastFunctionBodyRequest=OWNED(_functionBodyRequest,owner_functionBodyRequest); // replace _lastFunctionBodyRequest taking over the ownership
 		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
 		if(amVerbose())output("The request for the body of function '%s' was created.\n",functionName);
 	}else
@@ -4317,7 +4355,8 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						Mvalue* _functionArgumentsValue=getValueOfList(TT_END_OF_FUNCTION_CALL,numberOfFunctionParameters,numberOfElementsToNotEvaluate,true);
 						expressionToken=getEnvironmentExpressionToken(); // OOPS always update expressionToken after calling a function that might advance it
 						if(_functionArgumentsValue){
-							if(amVerboseDebugging())outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
+							if(amVerboseDebugging())
+								outputValue("Function argument list: '",_functionArgumentsValue,"'.\n");
 							if(amVerboseDebugging())
 								if(inputCharReadFunction){char c;output("Press any key to continue...");(*inputCharReadFunction)(&c);}
 							// MDH@05AUG2019: if we're dealing with the do function I have to map all the arguments to a single list value
@@ -4352,7 +4391,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 							// MDH@19JUL2019: we need to know when a function is being created, so we can ask for the body commands in command mode
 							// MDH@02MAR2020 BUG FIX: extract the function name BEFORE the function call is evaluated!!!!
 							char* definedFunctionName=(strcmp(_significantTokenText,DEFINEUSERFUNCTION_NAME)?NULL:_functionCallArgumentMap->_first->_variable->_value->value._text->_c);
-							if(amVerbose())
+							// if(amVerbose())
 								if(definedFunctionName){output("Parameter map of function '%s'",definedFunctionName);outputMap(": ",_functionCallArgumentMap,".\n");}
 							Mvalue* functionCallValue=getValueOfFunctionCall(function,_significantTokenText,_functionCallArgumentMap);
 							if(amVerboseDebugging())

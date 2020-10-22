@@ -198,12 +198,13 @@ const uint8_t TOKENTYPE_IDS[NUMBER_OF_TOKEN_TYPES]={0,0b01010000,0b01000000,0b01
 
 bool isExecutionEnvironmentInitialized(Menvironment* _executionEnvironment,Mallocationowner owner_executionEnvironment,Mmap* _variableMap){
 	bool executionEnvironmentInitialized=true;
-	if(amVerbose())outputMap("Execution environment variable map: ",_variableMap,".\n");
+	if(amVerbose())
+		outputMap("Execution environment variable map: ",_variableMap,".\n");
 	Mmapelement* variableMapelement=(_variableMap?_variableMap->_first:NULL);
 	Mvariable* variableMapelementVariable;
 	while(executionEnvironmentInitialized&&variableMapelement){
 		variableMapelementVariable=variableMapelement->_variable;
-		if(strlen(variableMapelementVariable->_name->chars)==0)continue; // no use to create a variable with no name
+		if(!variableMapelementVariable||strlen(variableMapelementVariable->_name->chars)==0)continue; // no use to create a variable with no name
 		// NOTE the map element variable name seems to be enclosed in quotes, and should be dequoted unless we do that when the argument map is created
 		if(!addVariable(_executionEnvironment,owner_executionEnvironment,variableMapelementVariable->_name->chars,variableMapelementVariable->valuetype,false)){
 			output("%sFailed to add variable '%s' as local variable.\n",M_ERROR_PREFIX,variableMapelementVariable->_name->chars);
@@ -224,7 +225,7 @@ obviously when defining the function body there will be no commands to execute
  */
 Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functionName,Mmap* _argumentMap){Mallocationowner owner=getOwner(__LINE__);
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
-	if(amVerboseDebugging())
+	if(amVerbose/*Debugging*/())
 		outputMap("Function execution argument map: ",_argumentMap,".\n");
 	Menvironment* _functionExecutionEnvironment=owned_environment(__environment(),owner); // free asap
 	if(_functionExecutionEnvironment){
@@ -242,7 +243,8 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		// 3. create the argument map fields as variables in the function execution environment
 		bool functionExecutionEnvironmentInitialized=isExecutionEnvironmentInitialized(_functionExecutionEnvironment,owner,_argumentMap);
 		if(functionExecutionEnvironmentInitialized){
-			if(amVerbose())outputInfo("Function execution environment initialized.");
+			if(amVerbose())
+				outputInfo("Function execution environment initialized.");
 			// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
 			if(!addVariable(_functionExecutionEnvironment,owner,"$",VT_UNDEFINED,false)){
 				outputError("Failed to add the result variable to the function execution environment");

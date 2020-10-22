@@ -1087,22 +1087,24 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 }// VALIDATED
 */
 // MDH@05NOV2019: if there are missing elements in _argumentList (what we allow now), there should be an associated map element with value NULL
-Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList,Mallocationowner owner_functionargumentmap){
-    // Mallocationowner owner=getOwner(__LINE__);
+// MDH@22OCT2020: in order to allow for additional arguments all additional arguments provided will be returned in a list associated with key '' in the returned function argument map
+Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList,Mallocationowner owner_functionargumentmap){Mallocationowner owner=getOwner(__LINE__);
     Mmap* _functionArgumentMap=NULL;
     // MDH@03MAR2020: _argumentList should also be allowed to be NULL (because then defaults would be used)
     if(_function/*&&_argumentList*/){
         _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC_1(sizeof(Mmap),'M',owner_functionargumentmap)); // MDH@02NOV2019: force the map to be weak
-        Mmap* functionParameterMap=_function->_parameterMap;
-        if(_functionArgumentMap&&functionParameterMap){
-            if(amVerbose())outputInfo("Matching the function parameters!");
-            Mmapelement* functionParameterMapelement=functionParameterMap->_first;
+        if(_functionArgumentMap){
+            Mmap* functionParameterMap=_function->_parameterMap; // MDH@22OCT2020: now allowing the function parameter map to be undefined (if all arguments are considered additional)
+            if(amVerbose())
+                outputInfo("Matching the function parameters!");
+            Mmapelement* functionParameterMapelement=(functionParameterMap?functionParameterMap->_first:NULL);
             unsigned long long argumentindex=0; // MDH@05NOV2019: because _argumentList could be sparse, i.e. have missing elements, we use an index that is used to find the argument list element with that index!!!
             Mlistelement* argumentListelement=(_argumentList?_argumentList->_first:NULL);
             while(functionParameterMapelement){
                 argumentindex++; // the index of the argument we need
                 // if the current list element has an index below the one we need, get the next argument list element until we have found one with an index at least equal to argument index
                 while(argumentListelement&&argumentListelement->index<argumentindex)argumentListelement=argumentListelement->_next;
+                // NOTE if argumentListelement exists, it's index is at least argumentindex
                 Mmapelement* _argumentmapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner_functionargumentmap);
                 if(!_argumentmapelement)break; // TODO should we return NULL?????
                 // BUG FIX I suppose we need _variable to point to something
@@ -1129,9 +1131,58 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 _functionArgumentMap->numberOfElements++;
                 functionParameterMapelement=functionParameterMapelement->_next;
             }
-        }
-        if(amVerboseDebugging())
-            outputInfo("Argument map created.");
+
+            // MDH@22OCT2020: let force in a list value associated with map key with name ''
+            // let's first determine such a value in the given argument list            
+            Mlist* _additionalFunctionArgumentList=NULL; // the list to populate with additional function arguments
+            /* MDH@22OCT2020: for now let's assume that if the '' attribute is already in there it is supposed to be the default
+            Mvalue* additionalFunctionArgumentListValue=NULL;
+            Mmapelement* additionalFunctionArgumentListMapelement=getMapelement(_functionArgumentMap,"");
+            if(additionalFunctionArgumentListMapelement){
+                additionalFunctionArgumentListValue=additionalFunctionArgumentListMapelement->_variable->_value;
+                if(additionalFunctionArgumentListValue&&additionalFunctionArgumentListValue->type==VT_LIST)_additionalFunctionArgumentList=additionalFunctionArgumentListValue->value._list;
+            }
+            */
+            if(amVerbose())
+                outputInfo("Additional function call argument list created");
+
+            // MDH@22OCT2020: append the additional arguments to the additional function argument list
+            //                argumentindex is now equal to the number of formal function parameters
+            //                determine the argument list element that would be an additional function argument              
+            if(argumentListelement&&argumentListelement->index==argumentindex)argumentListelement=argumentListelement->_next;
+            if(argumentListelement){ // there are additional function call arguments
+                if(amVerbose())
+                    outputInfo("Additional (unnamed) function call arguments defined");
+                // if this list does not yet exist, create it
+                if(!_additionalFunctionArgumentList)
+                    _additionalFunctionArgumentList=owned_list(__list("additional function arguments list"),owner);
+                if(_additionalFunctionArgumentList){
+                    // create and populate the list first to hold the additional arguments
+                    while(argumentListelement&&
+                            appendedToList(_additionalFunctionArgumentList,owner,argumentListelement->_value,M_LL_INVALID)>0)
+                        argumentListelement=argumentListelement->_next;
+                    if(amVerbose())
+                        output("Additional function call argument list initialized with %zd elements.\n",_additionalFunctionArgumentList->numberOfElements);
+                    Mvalue* additionalFunctionArgumentListValue=_getValueOfList(disowned_list(_additionalFunctionArgumentList,owner));
+                    if(!additionalFunctionArgumentListValue){ // list not wrapped
+                        FREE_LIST(_additionalFunctionArgumentList,owner); // it's up to me to get rid of the list
+                        outputError("Failed to wrap the additional function call arguments list");
+                    }else
+                    if(appendedToMap(_functionArgumentMap,owner_functionargumentmap,"",additionalFunctionArgumentListValue)<0)
+                        outputError("Failed to register the additional function call arguments list");
+                    else
+                    if(amVerbose())
+                        outputInfo("Additional function call argument list appended to argument map");
+                }else
+                    outputError("Failed to create the additional function call arguments list");
+            }else
+            if(amVerbose())
+                outputInfo("No additional (unnamed) function call arguments.");
+        }else
+            outputError("Failed to create the additional function call argument list");
+        if(amVerbose())
+            if(_functionArgumentMap)
+                outputInfo("Argument map created.");
     }
     return _functionArgumentMap; // MDH@09JUN2020 OOPS forgot to disown prev.
 }/* VALIDATED */
@@ -1765,31 +1816,47 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* _command,Mal
 Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* _functionValue=NULL;
     if((!_parameterMapValue||_parameterMapValue->type==VT_MAP)&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-        Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
+        // if(amVerbose())outputValue("Anonymous function parameter map: ",_parameterMapValue,".\n");
+        Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',Msubowner(owner,1));
         if(_userfunction){
-            if(amVerbose())if(_parameterMapValue)outputValue("Defining an anonymous function with parameters ",_parameterMapValue,".\n");
+            if(amVerbose())
+                outputValue("Defining an anonymous function with parameter map: ",_parameterMapValue,".\n");
             // user function expects a list of commands, so we have to wrap the single token (if any)
             if(_bodyTokenValue){
-                _userfunction->_bodyCommandList=owned_list(_getListOfType(VT_TOKEN),Msubowner(owner,1));
-                if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
-                    outputError("Failed to store the inline command as body of an anonymous function.");
+                _userfunction->_bodyCommandList=owned_list(_getListOfType(VT_TOKEN),Msubowner(owner,2));
+                if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,2),_bodyTokenValue,M_LL_INVALID)<=0)
+                    outputError("Failed to store the inline command as body of an anonymous function");
                 // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
             }
             Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
             if(_function){
+                if(amVerbose())
+                    outputInfo("Anonymous function created.");
                 // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
                 //                so we have to make a copy of the parameter map
-                if(_parameterMapValue)
+                if(_parameterMapValue&&_parameterMapValue->type==VT_MAP)
                     _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner,1)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
-                _function->functionunion._userfunction=_userfunction;
+                else
+                if(amVerbose())
+                    outputInfo("No parameter map registered.");
+                _function->functionunion._userfunction=_userfunction; // NOTE already owned at the right level
                 // return the result of applying the function to the default parameter map
                 _functionValue=_getValueOfFunction(disowned_function(_function,owner));
-            }else
-                outputError("Failed to create an anonymous function.");
-        }
+                if(amVerbose())
+                    outputInfo("Anonymous function value wrapped");
+            }else{
+                outputError("Failed to create an anonymous function");
+                FREE_USERFUNCTION(_userfunction,owner);
+            }
+        }else
+            outputError("Failed to create the anonymous user function");
     }else
-        outputError("Invalid anonymous function parameter map or body.");
-    if(!_functionValue)outputError("Failed to create an anonymous function.");
+        outputError("Invalid anonymous function parameter map or body");
+    if(!_functionValue)
+        outputError("Failed to create an anonymous function");
+    else
+    if(amVerbose())
+        outputInfo("Anonymous function created!");
     return _functionValue;
 }
 // might make the following obsolete (defun)

@@ -2711,25 +2711,35 @@ Mtoken* _getEvaluatableTokenCopy(Mtoken* _token){
 // NOTE by adding endTokenType and maximumNumberOfElements to getListExpressionValue we can use it as well for getting an arguments list...
 Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,uint32_t numberOfElementsToNotEvaluate,bool weak){
 	Mtoken* expressionToken=getEnvironmentExpressionToken(); // does NOT need to be freed, so no _ in front of it!
-	if(amVerbose())output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
+	if(amVerboseDebugging())
+		output("Composing a list of %u elements with %u unevaluatable elements starting with '%s'.\n",maximumNumberOfElements,numberOfElementsToNotEvaluate,string(expressionToken->text));
 	// MDH@21MAY2019: _getListValue() as opposed to getValueOfExpressionOfType() creates a Mvalue on the value list which will be removed when the reference count of the Mvalue list ends up being 0
 	//                then, the list element values will be dereferenced and if their reference count becomes zero freed as well successfully!!!!
 	Mvalue* _listValue=_getListValue(VT_UNDEFINED,weak,"getValueOfList"); // replacing: getValueOfExpressionOfType(VT_LIST);
 	Mlist* _list=_listValue->value._list; // grab the (empty) list to fill
-	if(!_list){output("Failed to create a list to return.\n");return NULL;}
-	if(_list->_first||_list->_last){output("Supposedly empty list not initialized correctly.\n");return NULL;}
-	if(amVerbose())output("Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+	if(!_list){
+		outputError("Failed to create a list to return.");
+		return NULL;
+	}
+	if(_list->_first||_list->_last){
+		outputInfo("Supposedly empty list not initialized correctly.");
+		return NULL;
+	}
+	if(amVerboseDebugging())
+		output("Composing a list starting with token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 	///////enum TOKENTYPE_ENUM listElementEndTokenTypes[]={TT_END_OF_LIST,TT_LISTELEMENT};
 	// we iterate over the list elements, so at the start we assume expressionToken represents the start token of the list (literal)
 	unsigned long long listElementIndex=0;
 	uint32_t firstElementToNotEvaluate=(maximumNumberOfElements==0||numberOfElementsToNotEvaluate>maximumNumberOfElements?0:maximumNumberOfElements-numberOfElementsToNotEvaluate+1);
-	if(amVerbose())output("First element not to evaluate: %u.\n",firstElementToNotEvaluate);
+	if(amVerboseDebugging())
+		output("First element not to evaluate: %u.\n",firstElementToNotEvaluate);
 	Mtoken* expr=expressionToken; // we need this when we are not to evaluate a list element, this will match the expr of all comma's and the list end token
 	// keep advancing the expression token until we're out of them (MDH@17JUL2019: now getting them from the current execution environment)
 	while((expressionToken=nextEnvironmentExpressionToken())){
 		if(expressionToken->type==endTokenType)break; // missing elements should be skipped but counted
 		listElementIndex++;
-		if(amVerbose())output("Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+		if(amVerboseDebugging())
+			output("Processing list element #%llu starting with token '%s' of type '%s'.\n",listElementIndex,string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 		Mvalue* _listElementValue=NULL;
 		if(firstElementToNotEvaluate>0&&listElementIndex>=firstElementToNotEvaluate){ // copy the tokens in the argument
 			// it's easier to tell getValueOfExpression not to evaluate the tokens and make it copy them by passing in a boolean flag
@@ -2737,21 +2747,21 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			// so it's easier to find where this list element ends by checking expr on a list element or end of list we encounter in forward direction
 			Mtoken* _firstUnevaluatedToken=_getEvaluatableTokenCopy(expressionToken);
 			if(_firstUnevaluatedToken){
-				if(amVerbose())
-				output("Evaluating special function call argument tokens:");
+				if(amVerboseDebugging())
+					output("Evaluating special function call argument tokens:");
 				Mtoken* unevaluatedToken=_firstUnevaluatedToken;
 				while(unevaluatedToken){
-					if(amVerbose())
-					output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
+					if(amVerboseDebugging())
+						output(" %s(%" PRId32 ")",string(unevaluatedToken->text),unevaluatedToken->argument);
 					expressionToken=nextEnvironmentExpressionToken();
 					if(!expressionToken)break; // NOTE shouldn't happen though
 					if(!expressionToken->expr||expressionToken->expr==expr)if(expressionToken->type==endTokenType||expressionToken->type==TT_LISTELEMENT)break;
 					unevaluatedToken->next=_getEvaluatableTokenCopy(expressionToken); // set next to the copy of the expression token
 					unevaluatedToken=unevaluatedToken->next;
 				}
-				if(amVerbose())
-				outputChar('\n');
-				_listElementValue=_getValueOfToken(_firstUnevaluatedToken,true);
+				if(amVerboseDebugging())
+					outputChar('\n');
+				_listElementValue=_getValueOfToken(_firstUnevaluatedToken);
 			}
 		}else{ // evaluate
 			// theoretically it is possible that this list element is empty in which case we should append NULL to the list
@@ -2759,27 +2769,36 @@ Mvalue* getValueOfList(TokenType endTokenType,uint32_t maximumNumberOfElements,u
 			expressionToken=getEnvironmentExpressionToken(); // essential after calling any function that might advance the current token pointer
 			if(amVerbose())outputValue("List element value: '",_listElementValue,"'.\n");
 		}
-		if(!_listElementValue){if(amVerbose())output("List element missing!\n");continue;} // undefined list elements should NEVER be added to the list
-		if(expressionToken)if(amVerbose())output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
+		if(!_listElementValue){
+			if(amVerboseDebugging())output("List element missing!\n");
+			continue;
+		} // undefined list elements should NEVER be added to the list
+		if(expressionToken)
+			if(amVerboseDebugging())
+				output("List element ending token: %s.\n",TOKENTYPE_STRING[expressionToken->type]);
 		// get the next list element value, here's a problem as we're supposed to return the offset not the first token
 		// if we already have the maximum number of elements, we do not append this list element!!!
 		// we're NOT using the number of elements in the list to check agains anymore but the list element index
 		if(maximumNumberOfElements==0||listElementIndex<=maximumNumberOfElements){
-			if(amVerbose())output("Appending list element #%llu.\n",listElementIndex);
-			unsigned long long newListElementIndex=appendedToList(_list,_listElementValue,listElementIndex);
+			if(amVerboseDebugging())
+				output("Appending list element #%llu.\n",listElementIndex);
+			unsigned long long newListElementIndex=appendedToList(_list,owner,_listElementValue,listElementIndex);
 			// MDH@21MAY2019 IMPORTANT: because NULL list elements are NOT stored explicitly in the list (because a list is stored sparse), the list index should be passed in
-			if(newListElementIndex==0){
+			if(newListElementIndex<=0){
 				output("%s",M_ERROR_PREFIX);
 				outputValue("Failed to append list element '",_listElementValue,"'.\n");
 				break;
 			}
-			if(amVerbose())output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
+			if(amVerboseDebugging())
+				output("List element #%lld appended to list with index %lld!\n",listElementIndex,newListElementIndex);
 		}else
-		if(amVerbose())output("Maximum number of elements reached.\n");
+		if(amVerboseDebugging())
+			outputInfo("Maximum number of elements reached.");
 		if(!expressionToken)break; // MDH@15OCT2019: might be useful!! TODO how can we prevent this from happening????????
 		if(expressionToken->type==endTokenType)break; // the list element could have ended with the end token type, in which case we're done!!!
 	}
-	if(amVerbose())outputValue("List '",_listValue,"' extracted!\n");
+	if(amVerboseDebugging())
+		outputValue("List '",_listValue,"' extracted!\n");
 	return _listValue;
 }
 

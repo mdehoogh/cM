@@ -224,8 +224,9 @@ Mallocationowner getValueOwner();
 //////////Mstring* appendld(Mstring* mstr,long double ld);
 Mvalue* getFirstScalarValue(Mvalue* value);
 
-long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,const char* const attributeName,const Mvalue* const _attributeValue);
-long long removedFromMap(Mmap* const _map,Mallocationowner owner_map,const char* const attributeName);
+Mmapelement* getMapelement(Mmap const * const map,char const * const attributeName); // MDH@22OCT2020: useful not only in appendedByMap() but also in _getFunctionArgumentMap()
+long long appendedToMap(Mmap * const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue);
+long long removedFromMap(Mmap * const _map,Mallocationowner owner_map,char const * const attributeName);
 
 long double getValueLongDouble(Mvalue const * const _value);
 Mbiginteger* _getValueBiginteger(Mvalue const * const _value); // converts a value to a big integer (if possible)

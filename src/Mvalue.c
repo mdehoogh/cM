@@ -188,12 +188,13 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
 }/* VALIDATED */
 
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
-    owned_mapelement(_map->_first,Msubowner(owner_map,1));
+    if(!_map)return NULL; // MDH@22OCT2020: this was missing before, which was causing crashes
+    if(_map->_first)owned_mapelement(_map->_first,Msubowner(owner_map,1));
     return OWNED(_map,owner_map);
 }
 Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
     if(!_map)return NULL;
-    disowned_mapelement(_map->_first,owner_map);
+    if(_map->_first)disowned_mapelement(_map->_first,owner_map);
     return DISOWNED(_map,owner_map);
 }
 void free_map(Mmap* _map/*,Mallocationowner owner*/){
@@ -221,6 +222,7 @@ Mvaluereference* owned_valuereference(Mvaluereference* _valuereference,Mallocati
     return OWNED(_valuereference,owner_valuereference);
 }
 void free_valuereference(Mvaluereference* _valuereference/*,Mallocationowner owner*/){
+    if(!_valuereference)return;
     if(_valuereference->_name){freeChars(_valuereference->_name/*,owner*/);_valuereference->_name=NULL;}
     /* MDH@02NOV2019: all values now 'weak' assigned i.e. no need to dereference anymore
     if(_valuereference->_value){assignValue(&_valuereference->_value,NULL);_valuereference->_value=NULL;} // get rid of the reference
@@ -699,7 +701,9 @@ Mvalue* _getTokenValue(Mtoken* _token,bool freeonfailure){
 }*/
 
 // MDH@09JUN2020: interface between _getVariable (now requiring a Mchars name) and all that still use a char* thing
-static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){if(!name||strlen(name)==0)return NULL;//Mallocationowner owner=getOwner(__LINE__);
+static Mvariable* _getVariableWithName(char const * const name,Mvaluetype valuetype,bool immutable,Mallocationowner owner_variable){
+    // MDH@21OCT2020: A HA we should allow the name of a variable to be empty (as in maps)
+    if(!name/*||strlen(name)==0*/)return NULL;//Mallocationowner owner=getOwner(__LINE__);
     return owned_variable(_getVariable(_getChars(name),valuetype,immutable),owner_variable);
 }
 // helper function to create a parameter map with a single value
@@ -1029,13 +1033,18 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
 // LIST STUFF
 Mvalue* _getValueOfList(Mlist* _list/*,Mallocationowner owner_list*/){//Mallocationowner owner=getOwner(__LINE__);
     if(!_list)return NULL;
+    bool disowned_list=Misdisowned(_list);
+    if(amVerbose())
+        output("Wrapping a %s list.\n",(disowned_list?"disowned":"owned"));
     Mvalue* _value=__value(_list->weak?"weak list":"strong list");
     if(!_value){
         if(Misdisowned(_list))free_list(_list);
         return NULL;
     }
-    _value->value._list=(Misdisowned(_list)?owned_list(_list,owner_value_data):_list); // MDH@09JUN2020: _value is to take over ownership of _list
+    _value->value._list=(disowned_list?owned_list(_list,owner_value_data):_list); // MDH@09JUN2020: _value is to take over ownership of _list
     _value->type=VT_LIST;
+    if(amVerbose())
+        output("%s list wrapped.\n",(disowned_list?"disowned":"owned"));
     return _value;
 }/* VALIDATED */
 
@@ -1199,6 +1208,13 @@ Mvalue** getValueHolderAtIndex(Mlist* _list,long long index){
 }/* VALIDATED */// END LIST STUFF
 
 // MAP STUFF
+// MDH@22OCT2020: useful to know if a map contains a certain attribute 
+Mmapelement* getMapelement(Mmap const * const map,char const * const attributeName){
+    Mmapelement* mapelement=(map&&attributeName?map->_first:NULL); // if both map and attribute name are defined, initialize map element to the first map element
+    // as long as the map element is defined, and either it does not hold a variable or the variable's name does not match the given attribute name, select the next map element
+    while(mapelement&&(!mapelement->_variable||strcmp(mapelement->_variable->_name->chars,attributeName)))mapelement=mapelement->_next;
+    return mapelement;
+}
 // MDH@24MAY2019: if already in the map should replace the current value
 long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue){Mallocationowner owner=getOwner(__LINE__);
     long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
@@ -1206,11 +1222,17 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
         if(!_map->immutable){ // the map is mutable
             // MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
             if(!_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
-                if(amVerboseDebugging())
-                {output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
+                if(amVerbose())
+                    {output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
+                // MDH@22OCT2020: get the map element associated with the given attribute name
+                Mmapelement* _mapelement=getMapelement(_map,attributeName);
+                /* replacing:
                 Mmapelement* _mapelement=_map->_first;
-                while(_mapelement&&_mapelement->_variable&&strcmp(_mapelement->_variable->_name->chars,attributeName))_mapelement=_mapelement->_next;
+                while(_mapelement&&(!_mapelement->_variable||strcmp(_mapelement->_variable->_name->chars,attributeName)))_mapelement=_mapelement->_next;
+                */
                 if(!_mapelement){ // not found
+                    if(amVerbose())
+                        outputInfo("Attribute not found");
                     _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
                         // MDH@09JUN2020: we can immediately set the owner of _variable to be in the map because if we succeed in creating it that's where it will go
@@ -1218,6 +1240,8 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                         // MDH@25MAY2020: we're disowning _variable because we 
                         Mvariable* _variable=_getVariableWithName(attributeName,VT_UNDEFINED,false,Msubowner(owner_map,2)); // TODO why would this 'variable' be mutable, and allowing all values????
                         if(_variable){ // the variable was created so attach in map
+                            if(amVerbose())
+                                outputInfo("Map element created");
                              // pass ownership of _mapelement to _map at the first sublevel
                             _mapelement->_variable=_variable; // pass ownership of _variable to the mapelement at the second sublevel in the map
                             if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
@@ -1245,6 +1269,8 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
             outputError("Unable to change the map: it is immutable");
     }else
         outputError("No map or atribute name specified");
+    if(amVerbose())
+        output("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
     return result;
 }/* VALIDATED */
 long long removedFromMap(Mmap* _map,Mallocationowner owner_map,char const * const attributeName){
@@ -2419,21 +2445,21 @@ void free_expressionlist(Mexpressionlist* _expressionlist){
 Mfunction* owned_function(Mfunction* _function,Mallocationowner owner_function){
     if(!_function)return NULL;
     /////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
-    owned_map(_function->_parameterMap,Msubowner(owner_function,1));
+    if(_function->_parameterMap)owned_map(_function->_parameterMap,Msubowner(owner_function,1)); // MDH@22OCT2020: with a parameter map possibly missing, testing might help
     if(_function->type==FT_USER)owned_userfunction(_function->functionunion._userfunction,Msubowner(owner_function,1)); // TODO ?????
     return OWNED(_function,owner_function);
 }
 Mfunction* disowned_function(Mfunction* _function,Mallocationowner owner_function){
     if(!_function)return NULL;
     /////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
-    disowned_map(_function->_parameterMap,owner_function);
+    if(_function->_parameterMap)disowned_map(_function->_parameterMap,owner_function);
     if(_function->type==FT_USER)disowned_userfunction(_function->functionunion._userfunction,owner_function); // TODO ?????
     return DISOWNED(_function,owner_function);
 }
 void free_function(Mfunction* _function/*,Mallocationowner owner_function*/){
     if(!_function)return;
         /////// MDH@10JUL2019: moved over to the map element containing the function! FREE_STRING(_function->_name);
-    free_map(_function->_parameterMap);
+    if(_function->_parameterMap)free_map(_function->_parameterMap);
     if(_function->type==FT_USER)free_userfunction(_function->functionunion._userfunction);
     FREE_1(_function,'F');
 }/* VALIDATED */
@@ -2564,13 +2590,20 @@ Mstring* _getEnvironmentName(Menvironment* _environment){Mallocationowner owner=
 // additional function for wrapping environments and functions
 Mvalue* _getValueOfFunction(Mfunction* _function/*,Mallocationowner owner_function*/){
     if(!_function)return NULL;
+    bool disowned_function=Misdisowned(_function);
+    if(amVerbose())
+        output("Wrapping a %s function.\n",(disowned_function?"disowned":"owned"));
     Mvalue* _value=__value("function");
     if(!_value){
-        if(Misdisowned(_function))free_function(_function);
+        if(disowned_function)free_function(_function);
         return NULL;
     }
+    if(amVerbose())
+        outputInfo("Binding the function to the value");
     _value->type=VT_FUNCTION;
-    _value->value._function=(Misdisowned(_function)?owned_function(_function,owner_value_data):_function);
+    _value->value._function=(disowned_function?owned_function(_function,owner_value_data):_function);
+    if(amVerbose())
+        output("%s function wrapped.\n",(disowned_function?"Disowned":"Owned"));
     return _value;
 }/* VALIDATED */
 
