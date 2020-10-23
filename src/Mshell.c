@@ -3549,7 +3549,9 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 														if(*valueholder){
 															// if we are accessing a map we have to ascertain that the attribute name in a string
 															if((*valueholder)->type==VT_MAP){
-																if(_flattenedIndexList->valuetype!=VT_INTEGER){
+																// MDH@22OCT2020: because the attributes are supposed to be text, we simply convert all indices to text using _getValueText(indexvalue,true)
+																//                which means that even integer keys can be used
+																// removing: if(_flattenedIndexList->valuetype!=VT_INTEGER){
 																	// MDH@06APR2020: if indexorattributenameListelementValue can now also be a list of indices we need to iterate over the list elements and apply each list element as an index
 																	//                so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
 																	//                which means that we can only retrieve successive elements from maps
@@ -3589,8 +3591,9 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 																		_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																	}
 																	if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
+																/*
 																}else
-																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
+																	_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
 																if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 															}else
 															if((*valueholder)->type==VT_LIST){
@@ -3907,7 +3910,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 													if(*valueholder){
 														// if we are accessing a map we have to ascertain that the attribute name in a string
 														if((*valueholder)->type==VT_MAP){
-															if(_flattenedIndexList->valuetype!=VT_INTEGER){
+															// MDH@23OCT2020: same here
+															// removing: if(_flattenedIndexList->valuetype!=VT_INTEGER){
 																// MDH@06APR2020: if indexorattributenameListelementValue can now also be a list of indices we need to iterate over the list elements and apply each list element as an index
 																//                so newValueholder should be the end result of applying several list elements BUT the idea would be that ALL index elements are map attribute names
 																//                which means that we can only retrieve successive elements from maps
@@ -3926,25 +3930,28 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																		if(indexorattributenameListelementValue){
 																			// MDH@19OCT2020: if we do not unquote the value we can safely remove the final quote????? by decrementing the length...
-																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,false),owner); // MDH@19OCT2020 bug fix: take ownership
-																			if(_attributenameText&&string_length(_attributenameText)){
-																				string_setlength(_attributenameText,string_length(_attributenameText)-1); // should remove the additional 'quote' we do not need in a text!!!
-																				char* _attributename=string(_attributenameText)+1; // skipping the initial quote
-																				output("Attribute name text: '%s'.\n",_attributename); // DEBUG
-																				newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);		
-																				if(!newValueholder){
-																					if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),_attributename,NULL)==M_TRUE){
-																						newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);
-																						// register in the assigned index list
-																						// MDH@19OCT2020 bug fix: _getTextValue assumes that _attributenameText starts with the text quote character!!
-																						if(_assignedIndexList&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
-																						{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
-																					}else
-																						output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,_attributename);
-																				}/*else{
-																					//FREE_DISOWNED_1(valueholders,'_');
-																					_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
-																				}*/
+																			// MDH@22OCT2020: however this will get us into trouble when dealing with values that are not text (e.g. integers), so we switch back to getting the text dequoted
+																			Mstring* _attributenameText=owned_string(_getValueText(indexorattributenameListelementValue,true),owner); // MDH@19OCT2020 bug fix: take ownership
+																			if(_attributenameText){ // we need to free _attributenameText when we're done with it
+																				if(string_insert_char(_attributenameText,0,'\'')){ // ascertain that _attributenameText starts with a quote character, so we can use _getTextValue on it
+																					char* _attributename=string(_attributenameText)+1; // skipping the initial quote
+																					if(amVerbose())
+																						output("Attribute name text: '%s'.\n",_attributename); // DEBUG
+																					newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);		
+																					if(!newValueholder){
+																						if(appendedToMap(valueholderMap,Msubowner(getValueOwner(),1),_attributename,NULL)==M_TRUE){
+																							newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);
+																							// register in the assigned index list
+																							// MDH@19OCT2020 bug fix: _getTextValue assumes that _attributenameText starts with the text quote character!!
+																							if(_assignedIndexList&&appendedToList(_assignedIndexList,owner,_getTextValue(string(_attributenameText)),M_LL_INVALID)<=0)
+																							{FREE_LIST(_assignedIndexList,owner);_assignedIndexList=NULL;}
+																						}else
+																							output("%sFailed to add property '%s'.\n",M_ERROR_PREFIX,_attributename);
+																					}/*else{
+																						//FREE_DISOWNED_1(valueholders,'_');
+																						_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
+																					}*/
+																				}
 																				FREE_STRING(_attributenameText,owner);
 																			}else
 																				newValueholder=NULL;
@@ -3958,8 +3965,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																}
 																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
-															}else
-																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;
+															/*}else
+																_valueholders[valueholderIndex+numberOfNewValueholders]=NULL;*/
 															if(!_valueholders[valueholderIndex+numberOfNewValueholders])output("%sFailed to set map element #%zd.\n",M_ERROR_PREFIX,valueholderIndex+numberOfNewValueholders);
 														}else
 														if((*valueholder)->type==VT_LIST){

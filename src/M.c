@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="7";char const * const M_DATE="22 October 2020"; // MDH@22OCT2020: user functions can now have undefined parameter maps, additional arguments are stored in _ variable, so can be used
+char const * const M_BUILD="8";char const * const M_DATE="23 October 2020"; // MDH@23OCT2020: trying to find a way to be able to use the last command evalation result, in the process now allowing to use integers into maps (as they can be converted to text to use as attribute key)
+//char const * const M_BUILD="7";char const * const M_DATE="22 October 2020"; // MDH@22OCT2020: user functions can now have undefined parameter maps, additional arguments are stored in _ variable, so can be used
 //char const * const M_BUILD="6";char const * const M_DATE="21 October 2020"; // MDH@21OCT2020: user function creation debugged, as well as certain disowned stuff for function execution environments and returned rationals
 //char const * const M_BUILD="5";char const * const M_DATE="19 October 2020"; // MDH@19OCT2020: fixed assigning to a new property like z.a=12, and replacing newline character to '\n' and removing it on left arrow
 //char const * const M_BUILD="4";char const * const M_DATE="16 October 2020"; // MDH@Petra's 56th birthday: taking care of using the Enter key inside a command (differentiating between in string or outside string)
@@ -1709,7 +1710,8 @@ void updateUserInputCommandIdentifierContinuation(){Mallocationowner owner=getOw
 									if(string_setlength(lastTokenText,lastTokenLength-1/*,owner_lastTokenText*/)){ // managed to 'cut off' c (although it's still there, because when you set the length only ->length is adjusted nothing yet to the text itself)
 										Mtoken* _errorToken=_getNewCommandToken(_userInputCommand->_lastToken,TT_ERROR); // by passing in NULL all the complicated stuff is not happening!!!
 										if(_errorToken){
-											_userInputCommand->_lastToken=_errorToken; // update the last token assuming we will succeed in doing what needs doing
+											// MDH@23OCT2020 OOPS take over ownership!!!
+											_userInputCommand->_lastToken=owned_token(_errorToken,Msubowner(owner_userInputCommand,1)); // update the last token assuming we will succeed in doing what needs doing
 											if(!string_append_char(_errorToken->text,c)){
 												if(removeLastUserInputCommandToken())
 													inputError("Failed to mark the last invalid reference character as erroneous because it cannot result in a reference to an existing variable.");
