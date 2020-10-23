@@ -1922,8 +1922,38 @@ Mvalue* Mreturn(Mvalue* _value){
     return _value; // echo the input value
 }/*VALIDATED */
 
+// MDH@23OCT2020: it would be neat if we could even refer to an environment in the name of the variable, 
+//                how about returning the previous value?????? but then we wouldn't know it set succeeded????
+Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+    Mvalue* _set=NULL;
+    Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
+    if(_variableName){
+        char* variableName=string(_variableName);
+        Menvironment* executionEnvironment=getExecutionEnvironment();
+        // although we create the variable if it does not exist now, we force it's type to be the type of the value that is going to be assigned to it
+        if(getVariable(executionEnvironment,variableName,false)||addVariable(executionEnvironment,owner,variableName,(_value?_value->type:VT_UNDEFINED),false))
+            if(setValue(getExecutionEnvironment(),variableName,_value))
+                _set=getValue(getExecutionEnvironment(),variableName);
+        FREE_STRING(_variableName,owner);
+    }
+    return _set;
+}
+Mvalue* Mget(Mvalue* _variableNameValue){Mallocationowner owner=getOwner(__LINE__);
+    Mvalue* _get=NULL;
+    Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
+    if(_variableName){
+        _get=getValue(getExecutionEnvironment(),string(_variableName));
+        FREE_STRING(_variableName,owner);
+    }
+    return _get;
+}
+
 // these internal functions do NOT have a body as M defined functions have...
 bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner owner_environment){
+
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"get"),"get",Mget))return false;
+    if(!completedValueValueFunction(_getFunction(_environment,owner_environment,"set"),"set",Mset))return false;
+
     // variable functions
     // math functions
     if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cos"),"cos",Mcos))return false;

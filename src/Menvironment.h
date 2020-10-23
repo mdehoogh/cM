@@ -123,3 +123,7 @@ bool completedListValueIntegerFunction(Mfunction* const _function,const char* co
 Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
 //                the return function returns its value as result of the function it is executing
 Mvalue* Mreturn(Mvalue* _value);
+
+// MDH@23OCT2020: a get and set function might come in handy
+Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value);
+Mvalue* Mget(Mvalue* _variableNameValue);
