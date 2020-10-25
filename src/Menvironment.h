@@ -75,6 +75,8 @@ Mmap* _getValuesMap(Mvalue* variableNamesMapValue);
 Mlist* _getValuesTable(Mvalue* variableNamesMapValue); // MDH@25NOV2019: storing the memory allocations in a table makes it more displayable
 
 bool addVariable(Menvironment * const _environment,Mallocationowner owner_environment,char * const name,Mvaluetype valuetype,bool immutable);
+Menvironment* _getNewEnvironment(); // MDH@25OCT2020: we need this if we want to create an environment with a nameless variable
+
 /*
 // if you want to set a value you have to pass in a pointer to the contents
 bool setValueOfRealVariable(Mvariable* _variable,Mfloat* _real);

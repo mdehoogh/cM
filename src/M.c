@@ -4696,6 +4696,9 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 					// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 					Mvalue* userInputCommandResultValue=NULL;
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
+					// MDH@25OCT2020: immediately bind the result to the '' variable of the environment
+					if(!setVariable(getExecutionEnvironment(),"",(commandEvaluated?userInputCommandResultValue:NULL)))
+						outputError("Failed to store the result of the command execution");
 					newline();
 					// let's mark the allocation directly behind evaluating the command
 					if(allocationMarksAdded>0){

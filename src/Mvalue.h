@@ -420,6 +420,8 @@ typedef struct Menvironment{
 }Menvironment;
 
 Menvironment* __environment(); // creates a new (empty) environment
+Menvironment* _getNewEnvironment(); // MDH@25OCT2020: create environment with a nameless variable
+
 void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/);
 #ifndef __PRODUCTION__
 Menvironment* owned_environment(Menvironment* _environment,Mallocationowner owner_environment);

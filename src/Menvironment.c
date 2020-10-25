@@ -421,7 +421,7 @@ Mvariable* getVariable(Menvironment const * const _environment,char /*const*/ * 
     if(!name){if(report)outputError("No variable name specified");return NULL;}
     // MDH@10MAR2020: taking care of variable names that end with @ which acts as dereference operator
     size_t l=strlen(name);
-    if(l==0){if(report)outputError("Undefined variable name");return NULL;}
+    // MDH@25OCT2020 removing: if(l==0){if(report)outputError("Undefined variable name");return NULL;}
     // MDH@12MAR2020: if `name` refers to a property in a map variable we have to determine if that property exists or not and return it if it does
     //                in combination with containsVariable() we decided to 
     char* nextPropertySeparator=strchr(name,M_PROPERTY_SEPARATOR_CHARACTER);
@@ -738,7 +738,7 @@ Mstring* _getCompletion(char const * const name,bool functionidentifiersaswell){
 // MDH@12MAR2020: we have to also now take care of adding properties for name containing 'dots' i.e. property references
 bool addVariable(Menvironment * const _environment,Mallocationowner owner_environment,char * const name,Mvaluetype valuetype,bool immutable){Mallocationowner owner=getOwner(__LINE__);
     Mvariable* _variable=NULL;
-    if(name&&strlen(name)>0){ // input valid
+    if(name){ // input valid MDH@25OCT2020: variable without name (i.e. strlen(name)==0) now allowed
         // MDH@19MAR2020: if a property reference was accepted (even though the hosting variable does not exist or it's value is currently NULL) we can still create it, the map and the property in the map!!!!
         //                we would need to go from left to right essential at the top level we start with _variableMap of environment
         // MDH@12MAR2020: it's more convenient to take care of adding properties separately because otherwise there would be a lot duplication of code in getVariable() in _getVariable()
@@ -902,6 +902,15 @@ bool addVariable(Menvironment * const _environment,Mallocationowner owner_enviro
     return(_variable!=NULL);
 }/* VALIDATED */
 
+// MDH@25OCT2020: create environment with a nameless variable
+Menvironment* _getNewEnvironment(){Mallocationowner owner=getOwner(__LINE__); 
+    Menvironment* _environment=owned_environment(__environment(),owner);
+    if(_environment&&!addVariable(_environment,owner,"",VT_UNDEFINED,false)){
+        FREE_ENVIRONMENT(_environment,owner);_environment=NULL;
+    }
+    return disowned_environment(_environment,owner);
+} /* VALIDATED */
+
 bool setValue(Menvironment const * const _environment,char /*const*/ * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
     if(!name||strlen(name)==0){outputError("Cannot set the value: no variable name");return false;}
@@ -941,7 +950,8 @@ bool setValue(Menvironment const * const _environment,char /*const*/ * const nam
 // MDH@14NOV2019: sometimes we need a setValue that does not use assignValue() because we do not want to copy the (composite) value passed in
 bool setVariable(Menvironment * const _environment,char * const name,Mvalue const * const _value){Mallocationowner owner=getOwner(__LINE__);
     // NOTE _value is NOT allowed to be NULL, only created and not yet initialized variables have a _value equal to NULL
-    if(!name||strlen(name)==0){outputError("No variable specified to set the value of");return false;}
+    // MDH@25OCT2020: the name of the variable may now be "" but of course it would need to exist!!!
+    if(!name){outputError("No variable specified to set the value of");return false;}
     Mvariable* variable=getVariable(_environment,name,amVerbose());
     if(variable){
         if(!variable->_value||!variable->immutable){
