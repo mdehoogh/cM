@@ -116,7 +116,7 @@ void free_text(Mtext* _text/*,Mallocationowner owner*/);
 #define FREE_TEXT(_text,owner_text) free_text(disowned_text(_text,owner_text))
 Mtext* owned_text(Mtext* _text,Mallocationowner owner_text);
 
-Mtext* _getText(char* _c);
+Mtext* _getText(char const * const _c);
 Mtext* _getCharText(char _char);
 
 ////////Menvironment* getExecutionEnvironment();

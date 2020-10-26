@@ -1210,6 +1210,7 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 			/////if(amDebugging())(*inputInfoFunction)("E");
 			// MDH@23JUL2019: _getToken() will now also use newTokenType to set the (initial) type of the new token
 			// MDH@23SEP2019: replacing _getToken() call by createUserInputCommandToken (and generating an error when this goes wrong somehow)
+			// MDH@26OCT2020 TODO: shouldn't I be owning the new command token?????
 			lastCommandToken=_getNewCommandToken(lastCommandToken,newTokenType/*,endOfInput*/);
 			
 			if(endOfInput)if(updateLastTokenAutocompletionTextFunction)(*updateLastTokenAutocompletionTextFunction)(false); // MDH@28FEB2020: a bit of a nuisance...
@@ -1426,7 +1427,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 // this is a fun method, allowing us to parse and evaluate any command (which we're gonna need when running M starting with commands to execute from a file)
 Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _evalValue=NULL;
-	Mstring* _evalValueText=(Mstring*)OWNED(_getValueText(value,true),owner);
+	Mstring* _evalValueText=owned_string(_getValueText(value,true),owner);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
 		/*
@@ -1451,7 +1452,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 		}
 		*/
 		///* replacing:
-		Mcommand* _evalCommand=(Mcommand*)OWNED(_getNewCommand(true),owner);
+		Mcommand* _evalCommand=owned_command(_getNewCommand(true),owner);
 		if(_evalCommand){
 			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
 			uint32_t pos=0;
@@ -1462,9 +1463,13 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				evalInputChar=string_char(_evalValueText,pos++);
 				if(amVerbose())outputChar(evalInputChar);
 				evalInputCharType=INPUTCHARACTERTYPES[evalInputChar];
+				// MDH@26OCT2020: A HA commandCharacterAppended is the one doing the damage
+				//                because if a new command token is create it is not currently owned
 				newLastEvalCommandToken=commandCharacterAppended(_evalCommand,evalInputChar,&evalInputCharType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
 				// MDH@28MAY2020: take over ownership of the new token returned
-				if(newLastEvalCommandToken!=_evalCommand->_lastToken)_evalCommand->_lastToken=SUBOWNED(OWNED(newLastEvalCommandToken,owner),1); // update our eval command's last token TODO do we need to test here????
+				// MDH@26OCT2020: owned_token replacing SUBOWNED(OWNED()) not completely certain why owned_token is to be used I guess that's because there's text in there as well to be owned!!!!
+				if(newLastEvalCommandToken!=_evalCommand->_lastToken)
+					_evalCommand->_lastToken=owned_token(newLastEvalCommandToken,Msubowner(owner,1)); // update our eval command's last token TODO do we need to test here????
 				if(!_evalCommand->_lastToken)break;
 			}
 			if(amVerbose())outputInfo("'.");
@@ -1480,16 +1485,19 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
 					}else
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
+					/* MDH@25OCT2020: essentially the garbage collector should do that
 					FREE_ENVIRONMENT(_evalEnvironment,owner); // MDH@17JUN2020: TODO check if it is correct to do that here
+					*/
 				}else
 					output("%sUnable to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}else
 				output("%sUnable to evaluate the invalid command '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
-			FREE_TOKEN(_evalCommandToken,owner); // clean up the command
+			FREE_COMMAND(_evalCommand,owner); // clean up the command
 		}
 		//*/
 		FREE_STRING(_evalValueText,owner);
 	}
+	output("Done evaluating...\n");
 	return _evalValue;
 }
 // end very special M functions

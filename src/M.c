@@ -4750,10 +4750,11 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 					// garbage collection: remove any values not used anymore...
 					// if(amDebugging())
-					if(amVerboseDebugging())outputInfo("Removing unreferenced values.");
-					size_t removedValueCount=getNumberOfRemovedValues(amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
-					if(amVerboseDebugging())
-					{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
+					// if(amVerboseDebugging())
+						outputInfo("Removing unreferenced values.");
+					size_t removedValueCount=getNumberOfRemovedValues(true); //amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
+					// if(amVerboseDebugging())
+						{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)

@@ -255,11 +255,14 @@ void free_text(Mtext* _text/*,Mallocationowner owner*/){
     // MDH@07APR2020: BUT the problem is that currently _text is NOT under allocation control TODO we should fix that somehow...
     //                ok, changed _strdup to call MALLOC() and use memcpy to copy the characters over
     if(_text){
-        if(amVerboseDebugging())output("Freeing integer %c%s%c.\n",_text->presuffix,_text->_c,_text->presuffix);
+        // if(amVerboseDebugging())
+            output("Freeing text %c%s%c.\n",_text->presuffix,_text->_c,_text->presuffix);
         // MDH@09APR2020: from now on use REALLOC instead of FREE for anything with variable dynamic memory allocation
         //                _text->_c is an array and yes strlen() can be applied to any char*
         //                TODO let me think, should I use sizeof(Mtext), I suppose so assuming it will also include allocation_index (if present)
-        FREE(_text,strlen(_text->_c)+sizeof(Mtext),-'"'/*,owner*/); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
+        // MDH@25OCT2020: given that most of the time _strdup() is used to create an Mtext instance
+        //                I suppose we should release strlen(_text->_c)+2*sizeof(char)
+        FREE(_text,strlen(_text->_c)+sizeof(char)*2/*sizeof(Mtext)*/,-'"'/*,owner*/); // MDH@26MAY2020 replacing: REALLOC(_text,strlen(_text->_c)+sizeof(Mtext),0,sizeof(char),'"',owner);
         // replacing: FREE(_text,'"'); // replacing (when we used a char pointer (_m) for storing the characters): if(_string){if(_string->_m)FREE_STRING(_string->_m);_string->_m=NULL;free(_string);}
     }else
     if(amVerboseDebugging())outputInfo("No text to free!");
@@ -458,7 +461,7 @@ long long isTextUndefined(Mtext* text){return(text?M_FALSE:M_TRUE);}
 long long isTokenUndefined(Mtoken* token){return(token?M_FALSE:M_TRUE);}
 
 // Mtext is an immutable version of Mstring* in that it cannot be changed
-Mtext* _getText(char* text){//Mallocationowner owner=getOwner(__LINE__);
+Mtext* _getText(char const * const text){//Mallocationowner owner=getOwner(__LINE__);
     return(text?(Mtext*)_strdup(text):NULL); // TODO assuming that _strdup will return a disowned text!!!
     // _text assumed to be string(Mstring*), so we can simply copy it over with the starting quote character (" or ')
 }/* VALIDATED */

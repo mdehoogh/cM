@@ -319,7 +319,7 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
             checked++;
             if(_valueListelement->_value){
                 if(showInfo){
-                    output("Checking value #%llu with id %llu ",checked,_valueListelement->index);
+                    output("Checking value #%llu with id %llu",checked,_valueListelement->index);
                     outputValue(": '",_valueListelement->_value,"'.\n");
                 }
                 // if(showInfo)outputInfo("\tChecking the count!");
@@ -485,6 +485,7 @@ Mvalue* _getIntegerValue(long long ll){
 // MDH@25MAY2020: s is a constant character array that does not need change ownership (because it is supposed to be owned elsewhere or not owned)
 Mvalue* _getTextValue(char const * const s/*,bool freeonfailure*/){
     if(!s)return NULL; // when no input, no go
+    // output("Retrieving the text value of '%s' of length %zd.\n",s,strlen(s)); // DEBUG
     Mvalue* _textValue=__value("text"); // the result, when NULL check freeonfailure
     if(!_textValue)return NULL;
     _textValue->type=VT_TEXT;
@@ -1569,10 +1570,11 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
     */
 }/* VALIDATED */
 // MDH@13MAR2020: now returning the number of characters written
-size_t outputValue(const char* const prefix,const Mvalue* const value,const char* const suffix){Mallocationowner owner=getOwner(__LINE__);
+size_t outputValue(char const * const prefix,Mvalue const * const value,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(value){
+        output("%u",value->type);
         Mstring* _valueText=owned_string(_getValueText(value,false),owner); // free asap
         if(_valueText){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
     }else

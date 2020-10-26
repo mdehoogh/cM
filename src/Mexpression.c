@@ -18,7 +18,7 @@ Mtoken* owned_token(Mtoken* _token,Mallocationowner owner_token){
 Mtoken* disowned_token(Mtoken* _token,Mallocationowner owner_token){
     if(!_token)return NULL;
     disowned_token(_token->next,owner_token);
-    disowned_string(_token->text,owner_token);
+    disowned_string(_token->text,Msubowner(owner_token,1));
     return DISOWNED(_token,owner_token);
 }
 void free_token(Mtoken* _token/*,Mallocationowner owner*/){
