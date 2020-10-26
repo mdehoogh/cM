@@ -248,7 +248,7 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 	// 1. create an environment in which to execute the expression list of the given function initialized with the argument map provided with the current argument variable values
 	if(amVerbose())
 		outputMap("Function execution argument map: ",_argumentMap,".\n");
-	Menvironment* _functionExecutionEnvironment=owned_environment(_getNewEnvironment(true),owner); // free asap
+	Menvironment* _functionExecutionEnvironment=owned_environment(_getNewEnvironment(),owner); // free asap
 	if(_functionExecutionEnvironment){
 		if(amVerbose())
 			outputInfo("Registering the name of the function execution environment");
@@ -3124,6 +3124,8 @@ Mvalue* getValueOfFunctionCall(Mfunction* _function,char* functionName,Mmap* _ar
 								// MDH@24JUL2019: check the function exit flag variable if it is set we're done
 								if(getValue(_functionExecutionEnvironment,"!"))break; // the exit variable is set (by the return statement!!!!)
 								functionEvaluationValue=functionBodyCommandValue; // store command evaluation result as function result
+								if(!setVariable(_functionExecutionEnvironment,"",functionEvaluationValue))
+									outputError("Failed to store the function command execution value");
 								if(amVerbose())outputValue("Function evaluation value so far: '",functionEvaluationValue,"'.\n");
 								functionBodyCommandListelement=functionBodyCommandListelement->_next;
 							}
@@ -7821,7 +7823,7 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 	*/
 
 	if(amVerboseDebugging())output("Creating the root environment.\n"); // DEBUG
-	Menvironment* _Menvironment=owned_environment(_getNewEnvironment(true),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
+	Menvironment* _Menvironment=owned_environment(_getNewEnvironment(),owner); // MDH@17JUL2019: calling the generic 'constructor' that will create a variable map for us automatically
 	if(_Menvironment){
 		if(amVerbose())output("M environment created.\n");
 		_Menvironment->_name=owned_chars(_getChars("M"),Msubowner(owner,1)); // TODO why make a dynamic copy???

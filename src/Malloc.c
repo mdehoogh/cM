@@ -545,9 +545,9 @@ static bool unregisterAllocation(long long allocationTypeIndex,long long count,b
                             histogram[category].count--; // one down
                             result=true;
                         }else
-                            bug("Unable to unregister the allocation of count %zd elements of type #%i '%c' (=%i): no registered allocation count.\n",count,allocationTypeIndex,allocationType.type,allocationType.type);
+                            bug("Unable to unregister the allocation of %zd element%s type #%i '%c' (=%i): none are registered.\n",count,(count!=1?"s":""),allocationTypeIndex,allocationType.type,allocationType.type);
                     }else
-                        bug("Unable to unregister the allocation of count %zd elements of type #%i '%c'(=%i): allocation type category unknown.\n",count,allocationTypeIndex,allocationType.type,allocationType.type);
+                        bug("Unable to unregister the allocation of %zd element%s of type #%i '%c'(=%i): the indicated number of elements has not been allocated.\n",count,(count!=1?"s":""),allocationTypeIndex,allocationType.type,allocationType.type);
                 }
             }else{
                 if(_allocationTypes[allocationTypeIndex].count>=count){

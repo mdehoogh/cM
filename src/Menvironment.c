@@ -1934,28 +1934,32 @@ Mvalue* Mreturn(Mvalue* _value){
 
 // MDH@23OCT2020: it would be neat if we could even refer to an environment in the name of the variable, 
 //                how about returning the previous value?????? but then we wouldn't know it set succeeded????
+// MDH@25OCT2020: setting the '' automatic result variable is NOT allowed
+// MDH@25OCT2020: I suppose it's a good idea to return a 'boolean' (i.e. M_LL_INVALID, M_FALSE or M_TRUE)
 Mvalue* Mset(Mvalue* _variableNameValue,Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
-    Mvalue* _set=NULL;
+    long long success=M_LL_INVALID;
     Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
-    if(_variableName){
+    if(_variableName&&string_length(_variableName)>0){
         char* variableName=string(_variableName);
         Menvironment* executionEnvironment=getExecutionEnvironment();
         // although we create the variable if it does not exist now, we force it's type to be the type of the value that is going to be assigned to it
         if(getVariable(executionEnvironment,variableName,false)||addVariable(executionEnvironment,owner,variableName,(_value?_value->type:VT_UNDEFINED),false))
-            if(setValue(getExecutionEnvironment(),variableName,_value))
-                _set=getValue(getExecutionEnvironment(),variableName);
+            success=(setValue(getExecutionEnvironment(),variableName,_value)?M_TRUE:M_FALSE);
         FREE_STRING(_variableName,owner);
     }
-    return _set;
+    return _getIntegerValue(success);
 }
 Mvalue* Mget(Mvalue* _variableNameValue){Mallocationowner owner=getOwner(__LINE__);
-    Mvalue* _get=NULL;
-    Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
-    if(_variableName){
-        _get=getValue(getExecutionEnvironment(),string(_variableName));
-        FREE_STRING(_variableName,owner);
+    if(_variableNameValue){
+        Mstring* _variableName=owned_string(_getValueText(_variableNameValue,true),owner);
+        if(_variableName){
+            Mvalue* _get=getValue(getExecutionEnvironment(),string(_variableName));
+            FREE_STRING(_variableName,owner);
+            return _get;
+        }
     }
-    return _get;
+    // by default return the value of the last command execution
+    return getValue(getExecutionEnvironment(),"");
 }
 
 // these internal functions do NOT have a body as M defined functions have...
