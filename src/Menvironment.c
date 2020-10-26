@@ -1823,6 +1823,9 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* _command,Mal
 */
 // MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
 //                so these are actually anonymous functions
+// MDH@25OCT2020: it's easier to let _bodyTokenValue not be an actual command but a list of commands (untokenized) i.e. texts
+//                this makes sense when reading commands from a text file, and yes when defining a function we're NOT evaluating the commands yet
+//                which would mean tokenize the commands and NOT execute them
 Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
     Mvalue* _functionValue=NULL;
     if((!_parameterMapValue||_parameterMapValue->type==VT_MAP)&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){

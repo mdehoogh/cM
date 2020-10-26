@@ -1388,19 +1388,72 @@ Mtoken* commandCharacterAppended(Mcommand* command,char inputChar,char *inputCha
 
 }
 
+// MDH@25OCT2020: tokenization consist of converting a text to a command so an immutable commandText is provided to be converted into a command
+//                NOTE that the text is tokenized within the current execution environment whatever that may be at this moment
+Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOwner(__LINE__);
+	Mcommand* _command=NULL;
+	char commandCharacter=(commandText?*commandText:'\0');
+	if(commandCharacter){ // commandText should not be NULL and the first character in it should not be '\0'
+		if(amVerboseDebugging())
+			output("%s","Parsing '");
+		_command=(Mcommand*)OWNED(_getNewCommand(true),owner);
+		if(_command){
+			Mtoken* _commandToken=_command->_firstToken;
+			/* already set: 
+			_evalCommandToken->expr=NULL; // MDH@28OCT2019: essential bto'
+			Mtoken* _lastEvalCommandToken=_evalCommandToken;
+			*/
+			char commandCharacterType;
+			Mtoken* newCommandToken=NULL;
+			while(commandCharacter){
+				if(amVerboseDebugging())
+					outputChar(commandCharacter);
+				commandCharacterType=INPUTCHARACTERTYPES[commandCharacter];
+				newCommandToken=commandCharacterAppended(_command,commandCharacter,&commandCharacterType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
+				// MDH@28MAY2020: take over ownership of the new token returned
+				if(newCommandToken!=_command->_lastToken)_command->_lastToken=SUBOWNED(OWNED(newCommandToken,owner),1); // update our eval command's last token TODO do we need to test here????
+				if(!_command->_lastToken)break;
+				commandCharacter=*(commandText++); // increment the char pointer to point to the next character to consume
+			}
+			if(commandCharacter){FREE_COMMAND(_command,owner);_command=NULL;} // some error occurred
+		}
+		if(amVerboseDebugging())
+			output("'\n.");
+	}
+	return disowned_command(_command,owner);
+}
+
 // this is a fun method, allowing us to parse and evaluate any command (which we're gonna need when running M starting with commands to execute from a file)
 Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _evalValue=NULL;
 	Mstring* _evalValueText=(Mstring*)OWNED(_getValueText(value,true),owner);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
+		/*
+		Mcommand* _evalCommand=owned_command(_getTextCommand(string(_evalValueText)),owner);
+		if(_evalCommand){
+			if(_evalCommand->_lastToken){
+				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
+				if(_evalEnvironment){
+					_evalEnvironment->_name=owned_chars(_getChars("eval"),Msubowner(owner,1));
+					if(pushExecutionEnvironment(_evalEnvironment)){
+						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
+						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
+						_evalValue=getCommandValue(_evalCommand,owner,'e'); // NOTE only place where getCommandValue() is called in Mshell.c
+						popExecutionEnvironment(); // pop the eval environment we successfully pushed
+					}else
+						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
+					FREE_ENVIRONMENT(_evalEnvironment,owner); // MDH@17JUN2020: TODO check if it is correct to do that here
+				}else
+					output("%sFailed to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
+			}
+			FREE_COMMAND(_evalCommand,owner);
+		}
+		*/
+		///* replacing:
 		Mcommand* _evalCommand=(Mcommand*)OWNED(_getNewCommand(true),owner);
 		if(_evalCommand){
 			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
-			/* already set: 
-			_evalCommandToken->expr=NULL; // MDH@28OCT2019: essential bto'
-			Mtoken* _lastEvalCommandToken=_evalCommandToken;
-			*/
 			uint32_t pos=0;
 			char evalInputChar,evalInputCharType;
 			if(amVerbose())output("%s","Parsing '");
@@ -1434,6 +1487,7 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				output("%sUnable to evaluate the invalid command '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			FREE_TOKEN(_evalCommandToken,owner); // clean up the command
 		}
+		//*/
 		FREE_STRING(_evalValueText,owner);
 	}
 	return _evalValue;
