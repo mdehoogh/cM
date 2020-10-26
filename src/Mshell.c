@@ -4698,6 +4698,15 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 					// we have to wrap the property name inside a value as text
 					Mstring* _propertyName=owned_string(_getSignificantTokenText(expressionToken),owner);
 					if(_propertyName){
+						// MDH@25OCT2020: how about allowing property names to be integers as well, as a shortcut for using square bracket notation
+						long long index=_strtoll(string(_propertyName)+1,getNAI()); // NOT including the period of course!!
+						if(index!=getNAI()){
+							Mvalue* indexValue=_getIntegerValue(index);
+							if(!indexValue||appendedToList(itemIdsList,owner,indexValue,M_LL_INVALID)<=0){
+								output("%sFailed to add index '%s' to the index list of '%s'.\n",M_ERROR_PREFIX,string(_propertyName),_valueReference->_name);
+								// TODO can't break here
+							}
+						}else
 						if(string_setchar(_propertyName,'\'',0)){ // replace the period by a single quote (that we need in the VT_TEXT characters)
 							Mvalue* propertyNameValue=_getTextValue(string(_propertyName)); // NOTE _getTextValue() strdup's the text passed in, so we can safely free _propertyName below
 							if(!propertyNameValue||appendedToList(itemIdsList,owner,propertyNameValue,M_LL_INVALID)<=0){
