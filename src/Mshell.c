@@ -460,11 +460,13 @@ int8_t isAValidCommandIndicator(Mcommand* command,Mallocationowner owner_command
 }
 // if a sequence of tokens needs to be evaluated to a value, call getCommandValue()
 Mvalue* getCommandValue(Mcommand* command,Mallocationowner owner_command,char commandType){
-	if(amVerbose())if(outputCommandInfoFunction)outputCommandInfoFunction(command); // MDH@04MAR2020: using the given output command info function
+	if(amVerboseDebugging())
+		if(outputCommandInfoFunction)outputCommandInfoFunction(command); // MDH@04MAR2020: using the given output command info function
 	int8_t aValidCommandIndicator=isAValidCommandIndicator(command,owner_command,amVerbose());
 	if(aValidCommandIndicator<=0)return NULL;
 	getExecutionEnvironment()->expressionToken=command->_firstToken->next; // prepare the current environment for executing the command
-	if(amVerbose())outputInfo("Evaluating...");
+	if(amVerboseDebugging())
+		outputInfo("Evaluating...");
 	return getValueOfExpression(getExecutionEnvironment()->_name->chars,commandType,(TokenType[]){},0);
 }
 
@@ -1503,6 +1505,10 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	// output("Done evaluating...\n"); // DEBUG
 	return _evalValue;
 }
+
+// MDH@27OCT2020: Manonymousfunction and Mdefinefunction moved over here, so we can parse 
+//                the body provided into a list of commands (=tokens) to execute 
+
 // end very special M functions
 
 // MCommand stuff
