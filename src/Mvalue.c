@@ -168,12 +168,14 @@ Mmapelement* disowned_mapelement(Mmapelement* _mapelement,Mallocationowner owner
 long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner owner*/){
     long long result=M_LL_INVALID;
     if(_mapelement){
-        if(amVerboseDebugging())output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
+        if(amVerboseDebugging())
+            output("About to free a %s map attribute!\n",(weak?"weak":"strong"));
         result=(_mapelement->_next?free_mapelement(_mapelement->_next,weak):0);
         _mapelement->_next=NULL;
         if(_mapelement->_variable){
             if(_mapelement->_variable->_name){
-                if(amVerboseDebugging())output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
+                if(amVerboseDebugging())
+                    output("About to free %s map attribute '%s'.\n",(weak?"weak":"strong"),_mapelement->_variable->_name);
             }else
                 outputWarning("Unnamed map attribute!");
             free_variable(_mapelement->_variable,weak);
@@ -182,7 +184,8 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
             outputWarning("No map attribute to free!");
         FREE_1(_mapelement,'m'/*,owner*/);
         result+=1;
-        if(amVerboseDebugging())outputInfo("\tMap element freed!");
+        if(amVerboseDebugging())
+            outputInfo("\tMap element freed!");
     }
     return result;
 }/* VALIDATED */
@@ -324,7 +327,7 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
                 }
                 // if(showInfo)outputInfo("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
-                    if(showInfo)output("\tAbout to free unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+                    if(showInfo)output("\tFreeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                     free_value(_valueListelement->_value);_valueListelement->_value=NULL; // essential to NULL so removing the value list elements below becomes possible
                     tofree++;
                 }else
@@ -1574,7 +1577,7 @@ size_t outputValue(char const * const prefix,Mvalue const * const value,char con
     size_t written=0;
     if(prefix)written=output("%s",prefix);
     if(value){
-        output("%u",value->type);
+        // output("%u",value->type); // DEBUG
         Mstring* _valueText=owned_string(_getValueText(value,false),owner); // free asap
         if(_valueText){written+=output("%s",string(_valueText));FREE_STRING(_valueText,owner);_valueText=NULL;}
     }else
@@ -2549,9 +2552,16 @@ Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner o
 }
 void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/){
     if(_environment){
-        if(_environment->_name){freeChars(_environment->_name/*,owner_environment*/);_environment->_name=NULL;}
+        if(_environment->_name){
+            output("Freeing environment name '%s'.\n",_environment->_name->chars);
+            freeChars(_environment->_name/*,owner_environment*/);
+            _environment->_name=NULL;
+        }
+        output("Releasing the parent.\n"); // DEBUG
         assignValue(&_environment->_parent,NULL); // MDH@03FEB2020 replacing:
+        output("Releasing the execution.\n"); // DEBUG
         assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
+        output("Freeing the variable map.\n"); // DEBUG
         free_map(_environment->_variableMap/*,owner_environment*/);
         // free_map(_environment->_functionMap); // MDH@04MAR2020: TODO do we need this??????
         /* MDH@10JUL2019: only Menvironment has a function map!!   

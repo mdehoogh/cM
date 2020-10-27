@@ -19,7 +19,7 @@ const char M_PATH_SEPARATOR =
 #else
                               '/';
 #endif
-const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference"};
+const char* VALUETYPENAMES[]={"unknown","token","integer","big integer","decimal","rational","float","text","list","map","reference","function","environment"};
 const char* const M_VARIABLE_NAME="M"; // MDH@14NOV2019: the variable to hold the list of remembered commands and the results they evaluated to
 const char* const MFUNCTION_NAME="M"; // MDH@14NOV2019: the name of the function for getting previous results
 const char* const IFFUNCTION_NAME="if";
@@ -70,7 +70,8 @@ const unsigned long long M_BITS_PER_ENV_LEVEL=8; // the minimum is 4 (to allow f
 
 const char M_WHITESPACE_CHARACTER=' '; // MDH@31OCT2019: let's use another character for storing whitespace in tokens (would normally be a blank)
 const char M_ESCAPE_CHARACTER='\\'; // MDH@13OCT2020: the character to use to enter certain characters in text
-const char M_NEWLINE_CHARACTER='\n'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@19OCT2020: I suppose using a character that will not be displayed is probably best!!!!
+// MDH@26OCT2020: if we map the Enter-key (which is essentially ASCII 10 (LF)) to the return key which is also invisible we can still use it
+const char M_NEWLINE_CHARACTER='\r'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@19OCT2020: I suppose using a character that will not be displayed is probably best!!!!
 const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator between map and property
 
@@ -107,7 +108,8 @@ const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
 // MDH@04NOV2019: in order to be able to pass value references (i.e. variables) to a function we define @ as the redirection operator so that not the value but the value reference is returned (unresolved)
 //                by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
-const char INPUTCHARACTERTYPES[]="iiiciiiidtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+// MDH@26OCT2020: all the i input characters can be associated with a macro, e.g. Ctrl-G (7) will insert get() into the command
+const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~b";
 
 // MDH@24MAR2020 BUG FIX: needed to insert an additional "" for TT_PROPERTY which I forgot previously
@@ -1478,15 +1480,18 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
 				if(_evalEnvironment){
 					_evalEnvironment->_name=owned_chars(_getChars("eval"),Msubowner(owner,1));
-					if(pushExecutionEnvironment(_evalEnvironment)){
+					// MDH@27OCT2020: when pushing an environment, it is being wrapped in a value, therefore we need to disown it before passing it
+					if(pushExecutionEnvironment(disowned_environment(_evalEnvironment,owner))){
 						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
 						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
 						_evalValue=getCommandValue(_evalCommand,owner,'e'); // NOTE only place where getCommandValue() is called in Mshell.c
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
-					}else
+					}else{
+						// MDH@27OCT2020: since pushing the (disowned) environment failed we should free it here (otherwise the gc will take care of freeing it)
+						free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
+					}
 					/* MDH@25OCT2020: essentially the garbage collector should do that
-					FREE_ENVIRONMENT(_evalEnvironment,owner); // MDH@17JUN2020: TODO check if it is correct to do that here
 					*/
 				}else
 					output("%sUnable to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
@@ -2670,7 +2675,8 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 // TODO complete with conversion from big integer and rational
 Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
 	long double ld=M_LD_NAN;
-	if(amVerboseDebugging()){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
+	if(amVerboseDebugging())
+	{outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 	switch(_value->type){
 		case VT_INTEGER:ld=(long double)_value->value._integer->ll;break;
 		case VT_BIGINTEGER:if(_value->value._biginteger)ld=mp_get_long_double(_value->value._biginteger);break;

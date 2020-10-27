@@ -70,7 +70,10 @@ bool inputCharReadNonBlocking(char* _c,UpdateFunction updateFunction){
 	while(1){
 		// DEBUG: outputChar(result>0?'A':'B');
 		result=read(STDIN_FILENO,_c,1);
-		if(result!=0)break;
+		if(result!=0){
+			// output("(%u)",*_c); // DEBUG
+			break;
+		}
 		// outputChar('X'); // DEBUG
 		if(updateFunction)(*updateFunction)();
 	}

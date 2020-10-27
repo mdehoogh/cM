@@ -108,6 +108,8 @@ char const * const M_BUILD="9";char const * const M_DATE="25 October 2020"; // M
 //char const * const M_BUILD="17";char const * const M_DATE="14 November 2019, 21:00"; // adding the M variable and M() and variables() function 
 //char const * const M_BUILD="18";char const * const M_DATE="15 November 2019, 14:00"; // keeping track of the amount of memory used by the 'managed' (M) types
 
+static char const * const GET_CALL_CHARACTERS="get()";
+
 // used externally
 //Mvaluetype={VT_UNDEFINED,VT_TOKEN,VT_INTEGER,VT_BIGINTEGER,VT_DECIMAL,VT_RATIONAL,VT_FLOAT,VT_TEXT,VT_LIST,VT_MAP}
 // the list of token type ids in the corresponding order!!!
@@ -4122,6 +4124,21 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 #endif
 				// MDH@03SEP2019: any input character that somehow changes the command needs to ascertain that no previous command is being used (i.e. when commandIndex is not zero)
 				//////////outputStatus(inputChar,inputCharType);
+				// MDH@27OCT2020: Ctrl-G maps to inserting 'get()' as we expect people to use it a lot
+				if(inputCharType=='g'){
+					// TODO should we consume suggested text characters??????
+					//      of course it is also possible to insert these as suggested text??????
+					if(string_length(_suggestedText)==0){
+						char* inputChars=GET_CALL_CHARACTERS;
+						while(*inputChars){
+							inputChar=*inputChars;
+							inputCharType=INPUTCHARACTERTYPES[inputChar];
+							if(!commandCharacterAccepted(inputChar,&inputCharType,true,false))break;
+							inputChars++;
+						}
+					}else
+						beep();
+				}else
 				if(inputCharType=='d'){ // MDH@18APR2019: delete now always deletes the first character in the behind cursor text
 					clearScreenFromCursor(); // MDH@16OCT2020: this might help
 					/////debugWrite("DELETE");
@@ -4693,7 +4710,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 				// if we succeeded in evaluating a command we should register it
 				if(_userInputCommand&&_userInputCommand->_firstToken){ // technically something to evaluate
-					if(amVerboseDebugging())outputCommandInfo(_userInputCommand);
+					if(amVerboseDebugging())
+						outputCommandInfo(_userInputCommand);
 					// MDH@11MAY2020 obsolete: size_t mark=allocationmark();if(amVerbose())output("Mark: %zu.\n",mark);
 					Mvalue* userInputCommandResultValue=NULL;
 					bool commandEvaluated=evaluateCommand(&userInputCommandResultValue);
@@ -4717,7 +4735,8 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 						continue;
 					}
 					resetOutputColor();
-					if(amVerboseDebugging())outputInfo("Command evaluated!");
+					if(amVerboseDebugging())
+						outputInfo("Command evaluated!");
 					deleteTokenautocompletiontexts(); // MDH@20SEP2019 replacing: string_setlength(feedforwardText,0); // clear the autocompletion text NOTE if we fail to evaluate the command it will not be cleared!!!!
 					// if we succeed in registering the command the command tokens should NOT be freed, BUT if we fail to register the command we should free ALL command tokens
 					// MDH@18JUN2020: if the current command is not an original command 
@@ -4750,15 +4769,16 @@ int main(int argc, char **argv){Mallocationowner owner=getOwner(__LINE__); // us
 
 					// garbage collection: remove any values not used anymore...
 					// if(amDebugging())
-					// if(amVerboseDebugging())
+					if(amVerboseDebugging())
 						outputInfo("Removing unreferenced values.");
-					size_t removedValueCount=getNumberOfRemovedValues(true); //amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
-					// if(amVerboseDebugging())
+					size_t removedValueCount=getNumberOfRemovedValues(amVerboseDebugging()); //amVerbose()&&amDebugging()); // MDH@12MAY2020: debugging needs to be set to view information on the values released
+					if(amVerboseDebugging())
 						{if(removedValueCount)output("Number of garbage collected values: %lu.\n",removedValueCount);else outputInfo("No garbage collected values.");}
 
 					// switch to function body input mode when this command contained at least one user function definition
 					// (even when dealing with currently inputting function body commands)
-					if(getFirstFunctionBodyRequest()&&!startFunctionBodyInput())outputError("Failed to start requesting the body of a new function");
+					if(getFirstFunctionBodyRequest()&&!startFunctionBodyInput())
+						outputError("Failed to start requesting the body of a new function");
 
 					// MDH@12MAY2020: output two incremental out
 					if(allocationMarksAdded>0){
