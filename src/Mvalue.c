@@ -556,7 +556,7 @@ Mlist* _getReversedList(Mlist const * const list){if(!list)return NULL;Mallocati
 Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bool reversed){Mallocationowner owner=getOwner(__LINE__);
     Mlist* _list=NULL;
     if(value){
-        // if(amVerboseDebugging())
+        if(amVerboseDebugging())
             outputValue("Flattening '",value,"'.\n");
         _list=owned_list(_getListOfType(VT_UNDEFINED),owner);
         if(_list){
@@ -594,8 +594,7 @@ Mlist* _getFlattenedList(Mvalue const * const value,unsigned int flattenLevel,bo
             if(!success){FREE_LIST(_list,owner);_list=NULL;} // on failure release the list
         }    
     }
-    // if(amVerboseDebugging())
-    {
+    if(amVerboseDebugging()){
         if(_list){if(flattenLevel>0)outputList("Flattened to '",_list,"'.\n");else outputList("Converted to '",_list,"'.\n");}
     }
     return disowned_list(_list,owner);
@@ -2553,15 +2552,15 @@ Menvironment* disowned_environment(Menvironment* _environment,Mallocationowner o
 void free_environment(Menvironment* _environment/*,Mallocationowner owner_environment*/){
     if(_environment){
         if(_environment->_name){
-            output("Freeing environment name '%s'.\n",_environment->_name->chars);
+            // output("Freeing environment name '%s'.\n",_environment->_name->chars); // DEBUG
             freeChars(_environment->_name/*,owner_environment*/);
             _environment->_name=NULL;
         }
-        output("Releasing the parent.\n"); // DEBUG
+        // output("Releasing the parent.\n"); // DEBUG
         assignValue(&_environment->_parent,NULL); // MDH@03FEB2020 replacing:
-        output("Releasing the execution.\n"); // DEBUG
+        // output("Releasing the execution.\n"); // DEBUG
         assignValue(&_environment->execution,NULL); // MDH@03FEB2020 replacing: _environment->_execution=NULL;
-        output("Freeing the variable map.\n"); // DEBUG
+        // output("Freeing the variable map.\n"); // DEBUG
         free_map(_environment->_variableMap/*,owner_environment*/);
         // free_map(_environment->_functionMap); // MDH@04MAR2020: TODO do we need this??????
         /* MDH@10JUL2019: only Menvironment has a function map!!   

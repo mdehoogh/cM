@@ -2387,7 +2387,8 @@ Mvalue* f(Mvalue* _value){
 			default:break;
 		}
 	}
-	if(amVerbose())outputValue("Converted to '",_floatValue,"'.\n");
+	if(amVerboseDebugging())
+		outputValue("Converted to '",_floatValue,"'.\n");
 	return _floatValue;
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)

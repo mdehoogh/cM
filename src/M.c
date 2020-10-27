@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="9";char const * const M_DATE="25 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
+char const * const M_BUILD="10";char const * const M_DATE="27 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
+//char const * const M_BUILD="9";char const * const M_DATE="25 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
 //char const * const M_BUILD="8";char const * const M_DATE="23 October 2020"; // MDH@23OCT2020: trying to find a way to be able to use the last command evalation result, in the process now allowing to use integers into maps (as they can be converted to text to use as attribute key)
 //char const * const M_BUILD="7";char const * const M_DATE="22 October 2020"; // MDH@22OCT2020: user functions can now have undefined parameter maps, additional arguments are stored in _ variable, so can be used
 //char const * const M_BUILD="6";char const * const M_DATE="21 October 2020"; // MDH@21OCT2020: user function creation debugged, as well as certain disowned stuff for function execution environments and returned rationals
@@ -3614,7 +3615,10 @@ uint16_t prepareShellEnvironmentForInteractiveSession(){Mallocationowner owner=g
 void reset(){Mallocationowner owner=getOwner(__LINE__);
 	newline();
 	if(_registeredcommands){ // MDH@18JUN2020: testing commandBlocks is better than testing commandCount, and testing _registeredcommands is perhaps even better
-		output("Delete all remembered commands? ");char c;inputCharRead(&c);outputChar(c);newline();
+		output("Delete all remembered commands? ");
+		char c;
+		while(!inputCharRead(&c))
+		;outputChar(c);newline();
 		if(c=='Y'||c=='y'){
 			if(commandCount>0){
 				output("Deleting %lld command%s.\n",commandCount,(commandCount>1?"s":""));
@@ -3663,8 +3667,9 @@ bool interactiveSessionInitialized(){
 	if(errorflags){
 		output("Errors preparing for running an interactive session (with code %x). Do you want to continue? ",errorflags);
 		char answer;
-		inputCharRead(&answer);
-		if(answer!='Y'||answer!='y')return false;
+		while(!inputCharRead(&answer))
+		;outputChar(answer);newline();
+		if(answer!='Y'&&answer!='y')return false;
 	}
 	outputInfo("Ready for an interactive session.");
 	return true;
@@ -3695,8 +3700,14 @@ signed char getSessionSettingApplied(char sessionSettingCharacter){
 	if(sessionSettingCharacter=='r'||sessionSettingCharacter=='R'){reset();result='n';}else
 	// options
 	// MDH@31MAR2020: with lowercase 'x' let's ask for confirmation
-	if(sessionSettingCharacter=='x')
-	{if(!getCurrentFunctionBodyInput()){char c;output("Do you really want to exit M? ");inputCharRead(&c);outputChar(c);newline();if(c=='Y'||c=='y')result='x';}else result='x';}else
+	if(sessionSettingCharacter=='x'){
+		if(!getCurrentFunctionBodyInput()){
+			output("Do you really want to exit M? ");
+			char c;while(!inputCharRead(&c))
+			;outputChar(c);newline();
+			if(c=='Y'||c=='y')result='x';
+		}else result='x';
+	}else
 	if(sessionSettingCharacter=='X')result='x';else
 	if(sessionSettingCharacter=='s'||sessionSettingCharacter=='S')result=switchToShellMode(NULL);else
 	if(sessionSettingCharacter=='h'||sessionSettingCharacter=='H'){

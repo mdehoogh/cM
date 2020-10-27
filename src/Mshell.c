@@ -1399,7 +1399,7 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 	if(commandCharacter){ // commandText should not be NULL and the first character in it should not be '\0'
 		if(amVerboseDebugging())
 			output("%s","Parsing '");
-		_command=(Mcommand*)OWNED(_getNewCommand(true),owner);
+		_command=owned_command(_getNewCommand(true),owner);
 		if(_command){
 			Mtoken* _commandToken=_command->_firstToken;
 			/* already set: 
@@ -1414,9 +1414,10 @@ Mcommand* _getTextCommand(char const * commandText){Mallocationowner owner=getOw
 				commandCharacterType=INPUTCHARACTERTYPES[commandCharacter];
 				newCommandToken=commandCharacterAppended(_command,commandCharacter,&commandCharacterType,false); // MDH@29OCT2019: we have to pass false all the time TODO not this way please
 				// MDH@28MAY2020: take over ownership of the new token returned
-				if(newCommandToken!=_command->_lastToken)_command->_lastToken=SUBOWNED(OWNED(newCommandToken,owner),1); // update our eval command's last token TODO do we need to test here????
+				if(newCommandToken!=_command->_lastToken)
+					_command->_lastToken=owned_token(newCommandToken,Msubowner(owner,1)); // update our eval command's last token TODO do we need to test here????
 				if(!_command->_lastToken)break;
-				commandCharacter=*(commandText++); // increment the char pointer to point to the next character to consume
+				commandCharacter=*(++commandText); // increment the char pointer to point to the next character to consume
 			}
 			if(commandCharacter){FREE_COMMAND(_command,owner);_command=NULL;} // some error occurred
 		}
@@ -1432,28 +1433,27 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 	Mstring* _evalValueText=owned_string(_getValueText(value,true),owner);
 	if(_evalValueText){
 		if(amVerbose())output("To evaluate: '%s'.\n",string(_evalValueText));
-		/*
+		///*
 		Mcommand* _evalCommand=owned_command(_getTextCommand(string(_evalValueText)),owner);
 		if(_evalCommand){
 			if(_evalCommand->_lastToken){
 				Menvironment* _evalEnvironment=owned_environment(__environment(),owner);
 				if(_evalEnvironment){
 					_evalEnvironment->_name=owned_chars(_getChars("eval"),Msubowner(owner,1));
-					if(pushExecutionEnvironment(_evalEnvironment)){
-						// MDH@28FEB2020: only eval now uses getCommandValue() but getCommandValue() shares using isAValidCommand() with M.c, isAValidCommand() is therefore adjusted to NOT remove any error token at the end, because that was only done to be able to re-use the command (which we do not need to here)
-						//                TODO we might decide to NOT allow comments in evaluated commands but at the moment we do OR we could move the comment out before!!!
-						_evalValue=getCommandValue(_evalCommand,owner,'e'); // NOTE only place where getCommandValue() is called in Mshell.c
+					if(pushExecutionEnvironment(disowned_environment(_evalEnvironment,owner))){
+						_evalValue=getCommandValue(_evalCommand,owner,'e');
 						popExecutionEnvironment(); // pop the eval environment we successfully pushed
-					}else
+					}else{
+						free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
-					FREE_ENVIRONMENT(_evalEnvironment,owner); // MDH@17JUN2020: TODO check if it is correct to do that here
+					}
 				}else
 					output("%sFailed to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}
 			FREE_COMMAND(_evalCommand,owner);
 		}
-		*/
-		///* replacing:
+		//*/
+		/* replacing:
 		Mcommand* _evalCommand=owned_command(_getNewCommand(true),owner);
 		if(_evalCommand){
 			Mtoken* _evalCommandToken=_evalCommand->_firstToken;
@@ -1491,18 +1491,16 @@ Mvalue* Mevalfunction(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 						free_environment(_evalEnvironment); // MDH@17JUN2020: TODO check if it is correct to do that here
 						output("%sUnable to setup the evaluation of '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 					}
-					/* MDH@25OCT2020: essentially the garbage collector should do that
-					*/
 				}else
 					output("%sUnable to evaluate '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			}else
 				output("%sUnable to evaluate the invalid command '%s'.\n",M_ERROR_PREFIX,string(_evalValueText));
 			FREE_COMMAND(_evalCommand,owner); // clean up the command
 		}
-		//*/
+		*/
 		FREE_STRING(_evalValueText,owner);
 	}
-	output("Done evaluating...\n");
+	// output("Done evaluating...\n"); // DEBUG
 	return _evalValue;
 }
 // end very special M functions
@@ -2638,7 +2636,7 @@ Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 		_rationalValue=_getValueOfList(_getLongDoubleRationalList(_value->value._float->ld,250));
 	else
 		_rationalValue=_getValueOfRational(_getValueRational(_value));
-	if(amVerbose())
+	if(amVerboseDebugging())
 		if(_rationalValue)
 			outputValue("Converted to rational '",_rationalValue,"'.");
 	return _rationalValue;
@@ -3549,7 +3547,7 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 								indexorattributenameListelementValue=indexorattributenameListelement->_value;
 								// if no value is defined, it is ignored TODO should we????
 								if(indexorattributenameListelementValue){
-									// if(amVerboseDebugging())
+									if(amVerboseDebugging())
 									{outputValue("Type of index value '",indexorattributenameListelementValue,"': ");output("%s.\n",VALUETYPENAMES[indexorattributenameListelementValue->type]);}
 									// if no value is currently associated with the referenced variable, we need to create one (either a list or a map depending on the type of the index)
 									// NOTE we need to check ALL valueholders
@@ -3565,13 +3563,13 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 									numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 									if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 										// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
-										// if(amVerboseDebugging())
+										if(amVerboseDebugging())
 											outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n");
 										// which we now did
 										Mvalue*** _newValueholders=_valueholders;
 										if(numberOfNewValueholders>numberOfValueholders)_newValueholders=REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_');
 										if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
-											output("Number of new getReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
+											// output("Number of new getReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
 											_valueholders=_newValueholders;
 											// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
 											// MDH@06APR2020: it is very hard to determine what the end result should now be because an 'flattened' list element could now be a list itself, so it is hard to determine what is to be indexed...
@@ -3611,8 +3609,8 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 												numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 												indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
 												if(indexorattributenameListelementValue){
-													// if(amVerboseDebugging())
-													outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
+													if(amVerboseDebugging())
+														outputValue("Inspecting whether or not to initialize element with index/property '",indexorattributenameListelementValue,"'.\n");
 													int valueholderIndex=numberOfValueholders;
 													while(--valueholderIndex>=0){
 														valueholder=_valueholders[valueholderIndex];
@@ -3756,9 +3754,9 @@ Mvalue* getReferencedValue(Mvaluereference* _valuereference){Mallocationowner ow
 							outputError("Failed to obtain the list of referenced values");
 						// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
 						if(_valueholders){
-							output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
+							// output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
 							FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
-							output("Value holders getReferencedValues() freed!\n"); // DEBUG
+							// output("Value holders getReferencedValues() freed!\n"); // DEBUG
 						}
 					}
 				}
@@ -3883,7 +3881,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					if(indexorattributenameListelement){ // MDH@18OCT2019: might NOT happen now (on lists that is), so we need to test for that!!!
 						// NOTE the last one needs to be assigned to
 						while(indexorattributenameListelement){
-							if(_valuereference->_itemid)outputValue("Item id: '",_valuereference->_itemid,"'.\n"); // DEBUG
+							// if(_valuereference->_itemid)outputValue("Item id: '",_valuereference->_itemid,"'.\n"); // DEBUG
 							indexorattributenameListelementValue=indexorattributenameListelement->_value;
 							// if no value is defined, it is ignored TODO should we????
 							if(indexorattributenameListelementValue){
@@ -3899,19 +3897,19 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 								//                we can solve it by flattening the list, which means that we create a queue where we append elements to, so if we come across a list we 
 								// MDH@06APR2020: because I want to allow for sublist representing indices to the current values we should NOT flatten the list anymore...
 								//                so I have added a flattenLevel int argument, representing the flatten depth, when passing 0 the list values remain intact!!!
-								if(_valuereference->_itemid)outputValue("Item id before flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
+								// if(_valuereference->_itemid)outputValue("Item id before flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 								Mlist* _flattenedIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,0,true),owner); // pass in a non-NULL value will only return NULL when an error occurs
-								if(_valuereference->_itemid)outputValue("Item id after  flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
+								// if(_valuereference->_itemid)outputValue("Item id after  flattening the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 								numberOfNewValueholders=(_flattenedIndexList?numberOfValueholders*_flattenedIndexList->numberOfElements:0);
 								if(numberOfNewValueholders>0){ // _flattenedList contains all values in the list that are not lists anymore (MDH@06APR2020: now they can), so each of them will result in a single element to append
 									// we can reuse valueholders iff we go backwards to the list but that's going to be hard unless we also filled the flattened list in reverse order
 									// if(amVerboseDebugging())
-									outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n"); // DEBUG
+									// outputList("Flattened (reversed) index list: ",_flattenedIndexList,".\n"); // DEBUG
 									// which we now did
 									Mvalue*** _newValueholders=_valueholders;
 									if(numberOfNewValueholders>numberOfValueholders)_newValueholders=REALLOC(_valueholders,numberOfValueholders,numberOfNewValueholders,sizeof(void*),-'_');
 									if(_newValueholders){ // REALLOC succeeded (or a single element to assign)
-										output("Number of new setReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
+										// output("Number of new setReferencedValue() value holders: %zd.\n",numberOfNewValueholders); // DEBUG
 										_valueholders=_newValueholders;
 										// we can now consume numberOfNewValueholders by decrementing them by numberOfValueholders each time we iterate over the current value holders
 										// MDH@06APR2020: it is very hard to determine what the end result should now be because an 'flattened' list element could now be a list itself, so it is hard to determine what is to be indexed...
@@ -3936,10 +3934,12 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 												// if the index is a list we will be duplicating
 												if(_flattenedIndexList->valuetype==VT_INTEGER){ // all integers in the index list
 													assignValue(valueholder,_getListValue(VT_UNDEFINED,false,"value holder list creator"));
-													if(amDebugging())output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
+													if(amVerboseDebugging())
+														output("Element #%zd of value of '%s' initialized to a list.\n",valueholderIndex,_valuereference->_name);
 												}else{ // not all integers in the index list
 													assignValue(valueholder,_getMapValue(VT_UNDEFINED,false));
-													if(amDebugging())output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
+													if(amVerboseDebugging())
+														output("Element #%zd of value of '%s' initialized to a map.\n",valueholderIndex,_valuereference->_name);
 												}
 												if(isValueUndefined(*valueholder)!=M_FALSE){_valueholders[valueholderIndex]=NULL;outputError("Failed to create a list or map.");}
 											}
@@ -3950,7 +3950,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 											outputList("****** Flattened index list: '",_flattenedIndexList,"'.\n");
 										flattenedIndexListelement=_flattenedIndexList->_first;
 										while(flattenedIndexListelement){
-											output("%c\n",'A'); // DEBUG
+											// output("%c\n",'A'); // DEBUG
 											Mlist* _assignedIndexList=owned_list(__list("assigned indices"),owner); // where we'll be collecting all indices assigned based on this flattened index list element
 											numberOfNewValueholders-=numberOfValueholders; // now the offset to where to put the new pointer
 											indexorattributenameListelementValue=flattenedIndexListelement->_value; // the index value is the flattened list element, reusing indexorattributenameListelementvalue!!!!!!!
@@ -3995,8 +3995,8 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																if(valueIndexListelement){
 																	Mvalue** newValueholder;
 																	while(valueholderMap){
-																		output("%c\n",'B'); // DEBUG
-																		outputMap("Value holder map: ",valueholderMap,".\n"); // DEBUG
+																		// output("%c\n",'B'); // DEBUG
+																		// outputMap("Value holder map: ",valueholderMap,".\n"); // DEBUG
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																		if(indexorattributenameListelementValue){
 																			// MDH@19OCT2020: if we do not unquote the value we can safely remove the final quote????? by decrementing the length...
@@ -4005,7 +4005,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																			if(_attributenameText){ // we need to free _attributenameText when we're done with it
 																				if(string_insert_char(_attributenameText,0,'\'')){ // ascertain that _attributenameText starts with a quote character, so we can use _getTextValue on it
 																					char* _attributename=string(_attributenameText)+1; // skipping the initial quote
-																					if(amVerbose())
+																					if(amVerboseDebugging())
 																						output("Attribute name text: '%s'.\n",_attributename); // DEBUG
 																					newValueholder=getValueHolderOfAttribute(valueholderMap,_attributename);		
 																					if(!newValueholder){
@@ -4030,7 +4030,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																		if(!valueIndexListelement)break;
 																		// we have another property 'index', so we should have a value holder map
 																		valueholderMap=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_MAP?(*newValueholder)->value._map:NULL);
-																		output("%c\n",'C'); // DEBUG
+																		// output("%c\n",'C'); // DEBUG
 																	}
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;
 																}
@@ -4043,14 +4043,14 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 															if(_flattenedIndexList->valuetype==VT_INTEGER){
 																Mlist* valueholderList=(*valueholder)->value._list;
 																Mlist* _valueIndexList=owned_list(_getFlattenedList(indexorattributenameListelementValue,INT_MAX,false),owner);
-																// if(amVerboseDebugging())
-																outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
+																if(amVerboseDebugging())
+																	outputList("Value index list: ",_valueIndexList,".\n"); // DEBUG
 																// 'iterating' over all index list elements
 																Mlistelement* valueIndexListelement=(_valueIndexList?_valueIndexList->_first:NULL);
 																if(valueIndexListelement){
 																	Mvalue** newValueholder;
 																	while(valueholderList){
-																		output("%c\n",'D');
+																		// output("%c\n",'D'); // DEBUG
 																		// outputList("Value holder list: ",valueholderList,".");
 																		indexorattributenameListelementValue=valueIndexListelement->_value; // if we have a list element use it's value as index
 																		if(indexorattributenameListelementValue){
@@ -4062,7 +4062,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																				if(!newValueholder){
 																					listIndex=appendedToList(valueholderList,owner,NULL,listIndex);
 																					if(listIndex>0){
-																						// if(amVerboseDebugging())
+																						if(amVerboseDebugging())
 																						{output("List after appending NULL at index %lld",listIndex);outputList(": '",valueholderList,"'.\n");}
 																						newValueholder=getValueHolderAtIndex(valueholderList,listIndex);
 																						// if(amVerboseDebugging())output("List element at index #%zd retrieved.\n",listIndex);
@@ -4078,9 +4078,9 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 																		if(!valueIndexListelement)break;
 																		// we have another property 'index', so we should have a value holder map
 																		valueholderList=(newValueholder&&*newValueholder&&(*newValueholder)->type==VT_LIST?(*newValueholder)->value._list:NULL);
-																		output("%c\n",'E'); // DEBUG
+																		// output("%c\n",'E'); // DEBUG
 																	}
-																	output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
+																	// output("Storing value holder #%lld: %p.\n",valueholderIndex+numberOfNewValueholders,newValueholder); // DEBUG
 																	_valueholders[valueholderIndex+numberOfNewValueholders]=newValueholder;									
 																}
 																if(_valueIndexList)FREE_LIST(_valueIndexList,owner);
@@ -4141,10 +4141,10 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					// MDH@31MAR2020: supposedly we have ALL value holders to which _newValue needs to be assigned!!!
 					if(result){
 						long long valueholderIndex=numberOfValueholders;
-						// if(amVerboseDebugging())
+						if(amVerboseDebugging())
 						{output("Setting %llu values",valueholderIndex);outputValue(" to '",_newValue,"'.\n");}
 						while(--valueholderIndex>=0)if(_valueholders[valueholderIndex])assignValue(_valueholders[valueholderIndex],_newValue);
-						output("Values set!\n");
+						// output("Values set!\n"); // DEBUG
 					}
 					/* MDH@31MAR2020 we've dealt with the last index element as well in the block above, so replacing:
 					if(result){
@@ -4237,11 +4237,11 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 					*/
 					// MDH@31MAR2020: essential to free _valueholders (because it was dynamically allocated)
 					if(_valueholders){
-						if(_valuereference->_itemid)outputValue("Item id before freeing the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
-						output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
+						// if(_valuereference->_itemid)outputValue("Item id before freeing the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
+						// output("Freeing %zd value holders.\n",(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders)); // DEBUG
 						FREE_DISOWNED(_valueholders,(numberOfNewValueholders>0?numberOfNewValueholders:numberOfValueholders),-'_',owner);
-						output("Value holders freed!\n"); // DEBUG
-						if(_valuereference->_itemid)outputValue("Item id after  freeing the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
+						// output("Value holders freed!\n"); // DEBUG
+						// if(_valuereference->_itemid)outputValue("Item id after  freeing the index list: '",_valuereference->_itemid,"'.\n"); // DEBUG
 					}
 				}
 				/*
@@ -4276,7 +4276,7 @@ bool setReferencedValue(Mvaluereference * const _valuereference,Mallocationowner
 		}
 		// MDH@20JUL2019: here when we succeed in performing the assigment, we should update the value reference as well!!!!
 	}
-	if(_valuereference->_itemid)outputValue("Item id: '",_valuereference->_itemid,"'.\n");
+	// if(_valuereference->_itemid)outputValue("Item id: '",_valuereference->_itemid,"'.\n"); // DEBUG
 	return result;
 }
 
@@ -5740,9 +5740,10 @@ Mrational* _getRationalBigintegerRootRational(Mrational* rootArgumentRational,Mb
 														mp_set_i64(MP_INT_POINTER(_deltapk),0);
 													bracketingiterations++;
 												}
+												outputChar('.');
 											}
 											// how about showing the brackets
-											output("\tNumber of bracketing iterations=%llu - number of halving iterations=%llu.\n",bracketingiterations,halvingiterations);
+											output("\n\tNumber of bracketing iterations=%llu - number of halving iterations=%llu.\n",bracketingiterations,halvingiterations);
 											outputBiginteger("\tNumerator of approximation on this side of the root: ",_pkonthisside,NULL);outputBiginteger(" with distance ",_distanceonthisside,".\n");
 											outputBiginteger("\tNumerator of approximation on the other side of the root: ",_pkontheotherside,NULL);outputBiginteger(" with distance ",_distanceontheotherside,".\n");
 											// we need the one with a negative distance
@@ -7583,12 +7584,15 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 				endTokenTypeIndex=endTokenTypeCount;
 				while(endTokenTypeIndex&&expressionToken->type!=endTokenTypes[endTokenTypeIndex-1]/*&&expressionToken->type>=8*/)endTokenTypeIndex--;
 				if(endTokenTypeIndex){
-					if(amVerboseDebugging())outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
+					if(amVerboseDebugging())
+						outputInfo("YES"); // replacing: output("Token '%s' of type %s ends the %s expression.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type],info);
 					break;
 				}
-				if(amVerboseDebugging())outputInfo(" NO");
+				if(amVerboseDebugging())
+					outputInfo(" NO");
 
-				if(amVerboseDebugging())output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
+				if(amVerboseDebugging())
+					output("Interpreting operator token '%s' of type '%s'.\n",string(expressionToken->text),TOKENTYPE_STRING[expressionToken->type]);
 				// MDH@12JUL2019: 'remove' non-significant characters
 				_formulaelement->_operator=owned_string(_getSignificantTokenText(expressionToken),Msubowner(owner,1)); // MDH@08JUN2020: take over ownership so we are allowed to free it // replacing: _stringCopy(expressionToken->text);
 				if(!_formulaelement->_operator){outputError("Failed to copy the operator");break;}
@@ -7602,7 +7606,8 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 					expressionToken=nextEnvironmentExpressionToken();
 					string_append_char(_formulaelement->_operator,string_char(expressionToken->text,0)); // CHECK works for assignment operator but not per se for any operator!!!
 				}
-				if(amVerboseDebugging())output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
+				if(amVerboseDebugging())
+					output("Formula element operator: '%s'.\n",string(_formulaelement->_operator));
 				_formulaelement->_next=OWNED(__formulaelement("successor"),owner); // MDH@08JUN2020: similar to all other formula elements this one needs to be owned by me as well otherwise I won't be able to free it myself
 				_formulaelement=_formulaelement->_next;
 				if(!_formulaelement){
@@ -7774,19 +7779,22 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 
 			// the expression value is the value of the first operand!!!
-			if(amVerboseDebugging()){outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
+			if(amVerboseDebugging())
+			{outputValue("Storing '",_result,"'");output(" as value of expression '%s'.\n",info);}
 			
 			_expressionValue=_result; // MDH@02NOV2019 replacing: assignValue(&_expressionValue,_result); // MDH@21MAY2019: this will increment the reference count of _result so it makes sense to actually decrement its reference count after being used
 
 			// free the formula
-			if(amVerboseDebugging())output("Freeing %zd formula elements.\n",formulaElementCount);
+			if(amVerboseDebugging())
+				output("Freeing %zd formula elements.\n",formulaElementCount);
 			
 			// if(amVerbose())outputAllocationTypeMarks();
 
 			// MDH@14MAY2020 think we shouldn't free formula actually as its pointer is passed to a formula element which is freed eventually:
 			size_t numberOfFormulaElementsFreed=free_formulaelement(formula,owner);
 			
-			if(amVerboseDebugging())output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
+			if(amVerboseDebugging())
+				output("Number of formula elements freed: %zd.\n",numberOfFormulaElementsFreed);
 
 			//*/
 			/* replacing:
@@ -7802,11 +7810,14 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 			}
 			newline();
 			*/
-			if(amVerboseDebugging())outputInfo("Formula elements freed.");
+			if(amVerboseDebugging())
+				outputInfo("Formula elements freed.");
 		}else
-		if(amVerboseDebugging())output("No result of expression '%s' to store.",info);
+		if(amVerboseDebugging())
+			output("No result of expression '%s' to store.",info);
 	}
-	if(amVerboseDebugging()){output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
+	if(amVerboseDebugging())
+	{output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
 /**

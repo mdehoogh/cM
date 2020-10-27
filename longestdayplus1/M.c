@@ -3085,7 +3085,7 @@ bool interactiveSessionInitialized(){
 	if(errorflags){
 		output("Errors preparing for running an interactive session (with code %x). Do you want to continue? ",errorflags);
 		char answer;
-		inputCharRead(&answer);
+		while(!inputCharRead(&answer));
 		if(answer!='Y'||answer!='y')return false;
 	}
 	outputInfo("Ready for an interactive session.");

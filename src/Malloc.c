@@ -481,7 +481,7 @@ static long long registerAllocation(signed char type,Mallocationowner owner,size
                         while(--category>=0&&histogram[category].class!=count)
                         ;
                         if(category<0){ // does not yet exist
-                            tell("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",numberOfHistogramCategories+1,count,size,type);
+                            info("Adding category #%lld as %lld units (of size %zd) to the histogram of allocation type '%c'.\n",numberOfHistogramCategories+1,count,size,type);
                             if(histogram)
                                 histogram=realloc(histogram,sizeof(Mallocationsize)*(numberOfHistogramCategories+1));
                             else
@@ -493,7 +493,7 @@ static long long registerAllocation(signed char type,Mallocationowner owner,size
                                 _allocationTypes[allocationTypeIndex].count--; // another histogram category (and count represents the number of categories)
                                 histogram[category].count=0; // will be incremented below!!!!
                                 histogram[category].class=count;
-                                tell("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",-_allocationTypes[allocationTypeIndex].count,count,type);
+                                info("Category #%lld of size %lld added to the histogram of allocation type '%c'.\n",-_allocationTypes[allocationTypeIndex].count,count,type);
                             }else
                                 allocationIndex=-1;
                         }

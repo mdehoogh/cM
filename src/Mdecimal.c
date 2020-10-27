@@ -229,7 +229,7 @@ static void free_bigintegerListelement(MbigintegerListelement* _bile,Mallocation
     // ASSERT assume _bile to not be NULL
     if(_bile->_next)free_bigintegerListelement(_bile->_next,owner);
     if(_bile->_biginteger)FREE_BIGINTEGER(_bile->_biginteger,owner);
-	FREE_DISOWNED_1(_bile,'x',owner);
+	FREE_DISOWNED_1(_bile,'b',owner);
 }/* VALIDATED */
 
 // MDH@17JUN2019: convert a decimal (back) to a rational
