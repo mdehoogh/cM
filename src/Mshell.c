@@ -7917,7 +7917,8 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyValue){Malloc
 												bool whitespace=true;
 												while((inputChar=*bodyCommandCharacter)){
 													inputCharType=INPUTCHARACTERTYPES[inputChar];
-													whitespace&=(inputCharType=='W');
+													// MDH@28OCT2020: we're not expecting any non-printable characters can also be present
+													whitespace&=(inputCharType=='W'||inputChar<=32);
 													if(!whitespace){
 														lastCommandToken=commandCharacterAppended(_command,inputChar,&inputCharType,false);
 														if(!lastCommandToken)break; // some error
