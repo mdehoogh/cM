@@ -111,6 +111,8 @@ bool completedTokenTokenFunction(Mfunction* const _function,const char* const fu
 bool completedValueValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 bool completedListValueFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 bool completedIntegerBooleanFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedMapTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedMapListFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
 bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
@@ -122,7 +124,8 @@ bool completedTokenTokenTokenTokenTokenFunction(Mfunction* const _function,const
 
 bool completedListValueIntegerFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);
 
-Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
+// MDH@28OCT2020 moved over to Mshell.h/c: Mvalue* Mdefinefunction(Mvalue* _name,Mvalue* _parameterMap,Mvalue* _body);
+
 //                the return function returns its value as result of the function it is executing
 Mvalue* Mreturn(Mvalue* _value);
 

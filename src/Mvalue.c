@@ -908,6 +908,7 @@ Mmap* _getIntegerBooleanMap(char* name1,char* name2){return _getTwoArgumentMap(n
 Mmap* _getStringStringMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_TEXT,VT_TEXT);}/* VALIDATED */
 Mmap* _getFloatFloatMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_FLOAT,VT_FLOAT);}/* VALIDATED */
 Mmap* _getMapTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_MAP,VT_TOKEN);}/* VALIDATED */
+Mmap* _getMapListMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_MAP,VT_LIST);}/* VALIDATED */
 Mmap* _getTokenTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 
 Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3){Mallocationowner owner=getOwner(__LINE__);
@@ -1442,7 +1443,7 @@ static Mstring* _nullValueTextRepresentation=NULL;
 Mstring* _getNullValueTextRepresentation(){if(!_nullValueTextRepresentation)_nullValueTextRepresentation=_getString(M_NULL_VALUE_TEXT_REPRESENTATION);return _getNullValueTextRepresentation;}
 */
 Mmap* getFilePropertyMap(Mfile* _file); // prototype
-Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationowner owner=getOwner(__LINE__);
 	// NOTE whatever is returned should be freed
 	Mstring* valueText=NULL;
     ////outputChar('.');
@@ -1527,6 +1528,24 @@ Mstring* _getValueText(const Mvalue* const _value,bool dequoted){Mallocationowne
                                 }
                             }
                             p=string_append_char(p,')');
+                            // TODO perhaps write the body only when amVerboseDebugging()?
+                            Mlist* functionBodyList=(function->type==FT_USER&&function->functionunion._userfunction?function->functionunion._userfunction->_bodyCommandList:NULL);
+                            if(p&&functionBodyList){
+                                size_t l=string_length(p);
+                                Mlistelement* functionBodyListelement=functionBodyList->_first;
+                                if(functionBodyListelement){
+                                    do{
+                                        p=string_append_char(p,',');
+                                        Mstring* _bodyCommandValueText=owned_string(_getValueText(functionBodyListelement->_value,true),owner);
+                                        p=string_append(p,string(_bodyCommandValueText));
+                                        FREE_STRING(_bodyCommandValueText,owner);
+                                        functionBodyListelement=functionBodyListelement->_next;
+                                    }while(p&&functionBodyListelement);
+                                    p=string_setchar(p,'[',l);      
+                                }else
+                                    p=string_append_char(p,'[');
+                                p=string_append_char(p,']');
+                            }
                         }else
                             p=string_append_char(p,'?');
                         if(!p){FREE_STRING(valueText,owner);valueText=NULL;}

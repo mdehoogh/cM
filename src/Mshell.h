@@ -96,6 +96,10 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 
 bool settingApplied(char settingCharacter);
 
+// MDH@28OCT2020: moved over from Menvironment.c/h
+Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyValue);
+Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyValue);
+
 // and finally obtaining a root environment
 // in general initializing the shell with the callbacks and the M setting characters
 bool shellInitialized(

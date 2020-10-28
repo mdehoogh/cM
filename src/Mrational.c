@@ -1092,7 +1092,7 @@ Mstring* _getRationalText(Mrational const * const _rational){Mallocationowner ow
         if(_rationalText){
             ///outputChar('d');
             Mstring* p=_rationalText;
-            p=string_append_char(p,'(');
+            // removing: p=string_append_char(p,'(');
             ///outputChar('e');
             Mstring* _numeratorBigintegerText=owned_string(_getBigintegerText(_rational->num),owner);
             ///outputChar('f');
@@ -1100,11 +1100,12 @@ Mstring* _getRationalText(Mrational const * const _rational){Mallocationowner ow
             ///outputChar('g');
             if(_rational->den){
                 p=string_append_char(p,'/');
+                p=string_append_char(p,'/'); // MDH@28OCT2020: inserted to indicate integer division
                 Mstring* _denominatorBigintegerText=owned_string(_getBigintegerText(_rational->den),owner);
                 if(_denominatorBigintegerText){p=string_append(p,string(_denominatorBigintegerText));FREE_STRING(_denominatorBigintegerText,owner);}
             }
             ///outputChar('k');
-            p=string_append_char(p,')');
+            // removing: p=string_append_char(p,')');
             ///outputChar('l');
             // if a delta is known, append that as well!!!
             if(_rational->delta){

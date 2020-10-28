@@ -74,6 +74,7 @@ const char M_ESCAPE_CHARACTER='\\'; // MDH@13OCT2020: the character to use to en
 const char M_NEWLINE_CHARACTER='\r'; // MDH@31OCT2019: the character to request a newline with!!! # MDH@19OCT2020: I suppose using a character that will not be displayed is probably best!!!!
 const char M_DEREFERENCE_CHARACTER='@'; // MDH@10MAR2020: better to define a constant to that purpose
 const char M_PROPERTY_SEPARATOR_CHARACTER='.'; // MDH@12MAR2020: the separator between map and property
+const char M_COMMAND_CONTINUATION_CHARACTER='`'; // MDH@28OCT2020: the only character unused left to continue a command because I couldn't use \ because that's the escape character in text
 
 const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
 
@@ -109,7 +110,8 @@ const char* const M_ADDITIONAL_FUNCTION_ARGUMENTS_VARIABLE_NAME="_";
 //                by defining @ as of type R we indicate that it refers to an identifier that has to be an existing variable!!!
 //                                -------------------------------- !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~-
 // MDH@26OCT2020: all the i input characters can be associated with a macro, e.g. Ctrl-G (7) will insert get() into the command
-const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[W]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
+// MDH@28OCT2020: type of \ changed from W to e (i.e. the escape character), see what I can do with that elsewhere
+const char INPUTCHARACTERTYPES[]="iiiciiigdtniiriiiiiiiiiiiixmiiiiW!DCL%&S()*+,-.*NNNNNNNNNN:;>=>?RLLLLLLLLLLLLLLLLLLLLLLLLLL[e]%L LLLLELLLLLLLLLLLLLLLLLLLLL{&}~b";
 // replacing: const char INPUTCHARACTERTYPES[]="iiiciiiibtniiniiiiiiiiiiiixmiiiiW!DCL%&S()*+,-./NNNNNNNNNN:;<=>?@LLLLELLLLLLLLLLLLLLLLLLLLL[%]%L`LLLLELLLLLLLLLLLLLLLLLLLLL{|}~b";
 
 // MDH@24MAR2020 BUG FIX: needed to insert an additional "" for TT_PROPERTY which I forgot previously
@@ -1623,8 +1625,18 @@ Mtoken* _getToken(Mtoken* prevToken,TokenType newTokenType){Mallocationowner own
 				// what should now be the argument value? this depends on the name of the function
 				char* _functionName=_getSignificantTokenCharacters(prevToken); // free asap
 				// all new tokens have argument equal to zero (and counting down on each comma encountered, so all variables created are considered global, because only the tokens with argument equal to 1 should be considered local)
+
+				// MDH@28OCT2020: defining user functions is no longer 'special' in that the body should simply be a list of command texts and tokenized by Mdefinefunction and Manonymousfunction itself
+				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME))pNewToken->argument=1;
+				/* replacing:
 				// MDH@11AUG2019: the default now no longer should be zero, because 1 will be toggled to -1 and back, therefore we should not encounter -1s in an ordinary function call
-				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME)||!strcmp(_functionName,DEFINEANONYMOUSFUNCTION_NAME))pNewToken->argument=1;else if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;else pNewToken->argument=-2;
+				if(!strcmp(_functionName,DOFUNCTION_NAME)||!strcmp(_functionName,FORFUNCTION_NAME)||!strcmp(_functionName,DEFINEANONYMOUSFUNCTION_NAME))pNewToken->argument=1;
+				else 
+				if(!strcmp(_functionName,DEFINEUSERFUNCTION_NAME))pNewToken->argument=2;
+				*/
+				else 
+				pNewToken->argument=-2;
+
 				// MDH@09AUG2019: special function calls have arguments that declare local variables explicitly, execution of these function calls will run in their own execution environment in which these local variables are created, 
 				if(pNewToken->argument>0){ // a special function call // MDH@09MAR2020: added >0 TODO is that correct?
 					uint64_t incrementoctet=(prevToken->envid&15),environmentid=prevToken->envid,addendum=16; // addendum: what we need to add to the envid to get a new unique environment id, ander: what we need to and the envid with to make the octet to the left 0 again (ready for having nested special function calls)
@@ -3342,7 +3354,8 @@ static FunctionBodyRequest* registerFunctionBodyRequest(char* functionName){
 		if(_lastFunctionBodyRequest)_lastFunctionBodyRequest->_next=_functionBodyRequest;
 		_lastFunctionBodyRequest=OWNED(_functionBodyRequest,owner_functionBodyRequest); // replace _lastFunctionBodyRequest taking over the ownership
 		if(!_firstFunctionBodyRequest)_firstFunctionBodyRequest=_lastFunctionBodyRequest;
-		if(amVerbose())output("The request for the body of function '%s' was created.\n",functionName);
+		if(amVerbose())
+			output("The request for the body of function '%s' was created.\n",functionName);
 	}else
 		output("%sFailed to create the request for the body of function '%s'.\n",M_ERROR_PREFIX,functionName);
 	return _functionBodyRequest;
@@ -4412,6 +4425,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 						//                it's easiest to define first element not to evaluate (i.e. to store the tokens in the list)
 						// MDH@25JUL2019: adding if, while and for functions
 						unsigned long long numberOfFunctionParameters=(function->_parameterMap?function->_parameterMap->numberOfElements:0),numberOfElementsToNotEvaluate=0;
+						/* MDH@28OCT2020: defining user functions no longer 'special' function (calls)
 						if(!strcmp(_significantTokenText,DEFINEANONYMOUSFUNCTION_NAME)){
 							if(amVerboseDebugging())
 								outputInfo("Definition of an anonymous function encountered!");
@@ -4422,6 +4436,7 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 								outputInfo("Definition of a user function encountered!");
 							numberOfElementsToNotEvaluate=numberOfFunctionParameters-2;	// i.e. evaluate the first two arguments only in the current context
 						}else
+						*/
 						if(!strcmp(_significantTokenText,IFFUNCTION_NAME)||!strcmp(_significantTokenText,WHILEFUNCTION_NAME)){
 							numberOfElementsToNotEvaluate=2;
 						}else
@@ -7826,6 +7841,215 @@ Mvalue* getValueOfExpression(const char* info,char resulttype,TokenType endToken
 	{output("'%s' expression evaluates to",info);outputValue(": '",_expressionValue,"'.\n");}
 	return _expressionValue;
 }
+
+// the functions to create functions are moved here from Menvironment.h/c because they require parsing the command texts
+// MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
+//                so these are actually anonymous functions
+// MDH@25OCT2020: it's easier to let _bodyTokenValue not be an actual command but a list of commands (untokenized) i.e. texts
+//                this makes sense when reading commands from a text file, and yes when defining a function we're NOT evaluating the commands yet
+//                which would mean tokenize the commands and NOT execute them
+// MDH@28OCT2020: the body token value should now be a list of texts where the escape character should be used as last character to indicate that the command continues on the next line
+//                TODO it's better to first create all the required elements first, before parsing the body
+Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyValue){Mallocationowner owner=getOwner(__LINE__);
+    Mvalue* _functionValue=NULL;
+    if((!_parameterMapValue||_parameterMapValue->type==VT_MAP)&&(!_bodyValue||_bodyValue->type==VT_LIST)){
+        // if(amVerbose())outputValue("Anonymous function parameter map: ",_parameterMapValue,".\n");
+        Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',Msubowner(owner,1));
+        if(_userfunction){
+            if(amVerbose())
+                outputValue("Defining an anonymous function with parameter map: ",_parameterMapValue,".\n");
+            Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
+            if(_function){
+                if(amVerbose())
+                    outputInfo("Anonymous function created.");
+                // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
+                //                so we have to make a copy of the parameter map
+                if(_parameterMapValue&&_parameterMapValue->type==VT_MAP)
+                    _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner,1)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+                else
+                if(amVerbose())
+                    outputInfo("No parameter map registered.");
+                _function->functionunion._userfunction=_userfunction; // NOTE already owned at the right level
+
+            	// user function expects a list of commands, so we have to wrap the single token (if any)
+            	if(_bodyValue){
+					// if(amVerboseDebugging())
+						output("Will process the body command texts.\n");
+					Mlist* bodyCommandList=_bodyValue->value._list;
+					Mlistelement* bodyCommandListelement=(bodyCommandList?bodyCommandList->_first:NULL);
+					if(bodyCommandListelement){
+						_userfunction->_bodyCommandList=owned_list(_getListOfType(VT_TOKEN),Msubowner(owner,2));
+						if(_userfunction->_bodyCommandList){
+							Mcommand* _command=NULL; // we'll be using _command to determine afterwards whether or not we succeeded in parsing the body commands
+							// the only way to successively parse the body commands is by creating a temporary environment that will expose the parameters as existing variables
+							// so the code here was taken from getValueOfFunctionCall() but because this is an anonymous function we do not have a name yet
+							// which obviously prevents recursive calls by name (we should find a way to make recursive calls in anonymous functions though)
+							Mmap* _argumentMap=_getFunctionArgumentMap(_function,NULL,owner); // to obtain the defaults (although we don't need them) we simply pass NULL as argument list
+							Menvironment* _functionExecutionEnvironment=owned_environment(_getFunctionExecutionEnvironment(_function,"",_argumentMap),owner);
+							if(_functionExecutionEnvironment){
+								if(pushExecutionEnvironment(disowned_environment(_functionExecutionEnvironment,owner))){
+									// if(amVerboseDebugging())
+										output("Ready to parse %zd body command texts.\n",bodyCommandList->numberOfElements);
+									// which is similar to what _getValueOfFunctionCall does
+									bool commandContinued;
+									char inputChar,inputCharType;
+									while(bodyCommandListelement){
+										// convert the body command to a text (to be tokenized)
+										Mstring* _bodyCommandText=owned_string(_getValueText(bodyCommandListelement->_value,true),owner);
+										// TODO should we simply skip the command?????
+										if(_bodyCommandText){
+											char *bodyCommandCharacter=string(_bodyCommandText);
+											// immediately determine whether this command is continued on the next command text
+											// if it does cut off the continuation character as we do not consider it to be part of the actual command text
+											// TODO how about if the escape character does not indicate a continuation?????? e.g. when used in a string literal
+											//      this actually means that we cannot enter a string literal over multiple lines
+											commandContinued=(string_last_char(_bodyCommandText)==M_COMMAND_CONTINUATION_CHARACTER);
+											if(commandContinued)string_setlength(_bodyCommandText,string_length(_bodyCommandText)-1);
+											// if(amVerboseDebugging())
+												output("Characters of command text%s '%s' parsed: '",(_command?" continuation":""),string(_bodyCommandText));
+											// ascertain to have a command (we will have one if this command text is considered a continuation of the command so far)
+											if(!_command)_command=owned_command(_getNewCommand(true),owner);
+											// can't break here if the command is NULL because we haven't freed _bodyCommandText yet
+											if(_command){ // a command to parse into in which inputChar will always be set
+												// ignore whitespace at the beginning of the command
+												// MDH@28OCT2020 NOTE: following the same approach as used in Mevalfunction()
+												Mtoken* lastCommandToken=_command->_firstToken;
+												bool whitespace=true;
+												while((inputChar=*bodyCommandCharacter)){
+													inputCharType=INPUTCHARACTERTYPES[inputChar];
+													whitespace&=(inputCharType=='W');
+													if(!whitespace){
+														lastCommandToken=commandCharacterAppended(_command,inputChar,&inputCharType,false);
+														if(!lastCommandToken)break; // some error
+														if(lastCommandToken!=_command->_lastToken){
+															_command->_lastToken=lastCommandToken;
+															// if(amVerboseDebugging())
+																outputChar('|');
+														}
+														// if(amVerboseDebugging())
+															outputChar(inputChar);
+													}
+													bodyCommandCharacter++; // advance the body command character pointer
+												}
+											}
+											FREE_STRING(_bodyCommandText,owner);
+											// if we either do not have a command, or inputChar is still nonzero
+											if(!_command){outputError("Failed to create a body command");break;}
+											if(inputChar){outputError("Failed to parse a body command");break;}
+											if(!commandContinued){ // command not continued on the next line, therefore we should register the command
+												// ASSERT _command needs to be freed no matter what
+												Mvalue* tokenValue=_getValueOfToken(_command->_firstToken);
+												// if we fail to wrap the token, or append it to the body we free the command and break
+												if(tokenValue){ // the command's first token is NOW bound to a (garbage collectable) value
+													// to ascertain that freeing the command won't free the tokens bound to the value, NULL the first token
+													// NOTE we can forget about _lastToken because it's not freed when the command is freed
+													_command->_firstToken=NULL;
+													if(appendedToList(_userfunction->_bodyCommandList,owner,tokenValue,M_LL_INVALID)<=0)
+														// by NULLing tokenValue (note that it's still referenced in the list that stores all the values and therefore garbage collected later on)
+														tokenValue=NULL; // by doing this, after freeing the command below, we'll break and _command will be NULL and recognized as error below
+												}
+												// we need to free the command anyway, to ascertain that the next command text will start with a new command altogether
+												if(!tokenValue){outputError("Failed to store the body command!");break;} // storing the command somehow failed, therefore _command will not be NULL and therefore indicate erroneous body command parsing
+												// prepare for parsing the next command text
+												FREE_COMMAND(_command,owner);_command=NULL;
+											}
+											// if(amVerboseDebugging())
+												output("'.\n");
+										}
+										bodyCommandListelement=bodyCommandListelement->_next;
+									}
+									popExecutionEnvironment();
+									_functionExecutionEnvironment=NULL;
+									// if parsing somehow failed, get rid of the body
+								}
+							}
+							// free the execution environment, if either failing to push or pop the execution environment
+							if(_functionExecutionEnvironment)FREE_ENVIRONMENT(_functionExecutionEnvironment,owner);
+							if(_argumentMap)FREE_MAP(_argumentMap,owner);
+							// if _command is not currently defined parsing and storing the body commands failed somehow!!
+							// OOPS that's not true because after registration of a command, the command is NULLed, so I guess that if there's a pending command something went wrong
+							if(_command){
+								FREE_COMMAND(_command,owner);
+								FREE_LIST(_userfunction->_bodyCommandList,owner);
+								_userfunction->_bodyCommandList=NULL;
+								outputWarning("Function body removed because of parsing errors");
+							}
+						}else
+							outputError("Failed to store the inline command as body of an anonymous function");
+					}else
+						outputWarning("No commands in body.");
+                // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
+            	}
+
+                // return the result of applying the function to the default parameter map NO NO NO the function wrapped in a value
+                _functionValue=_getValueOfFunction(disowned_function(_function,owner));
+                if(amVerbose())
+                    outputInfo("Anonymous function value wrapped");
+            }else{
+                outputError("Failed to create an anonymous function");
+                FREE_USERFUNCTION(_userfunction,owner);
+            }
+        }else
+            outputError("Failed to create the anonymous user function");
+    }else{
+		if(_parameterMapValue&&_parameterMapValue->type!=VT_MAP){outputError(NULL);outputValue("Parameter argument '",_parameterMapValue,"' of the anonymous function definition not a map");output(" but a %s.\n",VALUETYPENAMES[_parameterMapValue->type]);}
+		if(_bodyValue&&_bodyValue->type!=VT_LIST){outputError(NULL);outputValue("Body argument '",_bodyValue,"' of the anonymous function definition not a list");output(" but a %s.\n",VALUETYPENAMES[_bodyValue->type]);}
+        // replacing: outputError("Invalid anonymous function parameter map or body");
+	}
+    if(!_functionValue)
+        outputError("Failed to create an anonymous function");
+    else
+    if(amVerbose())
+        outputInfo("Anonymous function created!");
+    return _functionValue;
+}
+// might make the following obsolete (defun)
+Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
+    // the user specifies the body as a text (to prevent evaluation during defining the function)
+    // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
+    // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
+    if(_nameValue&&_parameterMapValue){
+        if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
+            Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
+            if(_userfunction){
+                if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
+                Mtext* functionName=_nameValue->value._text;
+                // user function expects a list of commands, so we have to wrap the single token (if any)
+                if(_bodyTokenValue){
+                    _userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
+                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
+                        output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
+                    // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
+                }
+                //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
+                ///////if(_userfunctionValue){
+                    // MDH@17JUL2019: the map needs to be stored with the Mfunction
+                Mallocationowner owner_environment=getOwnerExecutionEnvironment();
+                Mfunction* _function=owned_function(_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c),owner);
+                if(_function){
+                    // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
+                    //                so we have to make a copy of the parameter map
+                    _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,3)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
+                    _function->functionunion._userfunction=owned_userfunction(disowned_userfunction(_userfunction,owner),Msubowner(owner_environment,3));
+                    // return the result of applying the function to the default parameter map
+
+                    return _getIntegerValue(1);
+                }
+                ///////////free_value(_userfunctionValue); // freed
+                output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,functionName);
+                ///////}
+            }
+        }else
+            outputError("Invalid user function name, parameter map or body");
+    }else{
+        if(!_nameValue)outputError("No name defined of function");
+        if(!_parameterMapValue)outputError("No (formal) parameter map defined for function");
+        ////////if(!_bodyTokenValue)outputError("No body (expression) defined of function");
+    }
+    return _getIntegerValue(0); // indicating failure...
+}/*VALIDATED */
+
+
 /**
  * getValueOfExpression() is the work horse for evaluating individual (simple i.e. non composite expressions) expressions 
  * the first token is being passed in which of course should represent a value somehow, evaluateExpression needs 
@@ -8025,6 +8249,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			// MDH@05AUG2019: the do function has a single token to process
 		    if(!completedTokenListFunction(_getFunction(_Menvironment,owner,DOFUNCTION_NAME),DOFUNCTION_NAME,Mdofunction))return false;
 		    if(!completedValueFunction(_getFunction(_Menvironment,owner,EVALFUNCTION_NAME),EVALFUNCTION_NAME,Mevalfunction))return false;
+			// MDH@28OCT2020: no longer internal functions as defined in Menvironment.h/c but moved over here because they need command parsing features
+		    if(!completedStringMapTokenFunction(_getFunction(_Menvironment,owner,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
+    		if(!completedMapListFunction(_getFunction(_Menvironment,owner,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
 
 			// // MDH@27FEB2020: Min is special as it used inputCharRead to read single characters, so it should only be available in sessions
 		    // if(!completedValueFunction(_getFunction(_Menvironment,"in"),"in",Min))return false; // moved out of registerInternalFunctions!!!!

@@ -1659,6 +1659,20 @@ bool completedMapTokenFunction(Mfunction* const _function,const char* const func
     }
     return false;
 }/* VALIDATED */
+bool completedMapListFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        _function->_parameterMap=owned_map(_getMapListMap("parameter defaults:map","body command texts:list"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register map list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 bool completedValueTextValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);
@@ -1821,102 +1835,6 @@ bool registerFunctionCommand(const char* const functionName,Mtoken* _command,Mal
     return false;
 }
 */
-// MDH@04MAR2020: user functions now no longer need a internal name (but are typically assigned to a variable, so they can be)
-//                so these are actually anonymous functions
-// MDH@25OCT2020: it's easier to let _bodyTokenValue not be an actual command but a list of commands (untokenized) i.e. texts
-//                this makes sense when reading commands from a text file, and yes when defining a function we're NOT evaluating the commands yet
-//                which would mean tokenize the commands and NOT execute them
-Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
-    Mvalue* _functionValue=NULL;
-    if((!_parameterMapValue||_parameterMapValue->type==VT_MAP)&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-        // if(amVerbose())outputValue("Anonymous function parameter map: ",_parameterMapValue,".\n");
-        Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',Msubowner(owner,1));
-        if(_userfunction){
-            if(amVerbose())
-                outputValue("Defining an anonymous function with parameter map: ",_parameterMapValue,".\n");
-            // user function expects a list of commands, so we have to wrap the single token (if any)
-            if(_bodyTokenValue){
-                _userfunction->_bodyCommandList=owned_list(_getListOfType(VT_TOKEN),Msubowner(owner,2));
-                if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,2),_bodyTokenValue,M_LL_INVALID)<=0)
-                    outputError("Failed to store the inline command as body of an anonymous function");
-                // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
-            }
-            Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
-            if(_function){
-                if(amVerbose())
-                    outputInfo("Anonymous function created.");
-                // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
-                //                so we have to make a copy of the parameter map
-                if(_parameterMapValue&&_parameterMapValue->type==VT_MAP)
-                    _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner,1)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
-                else
-                if(amVerbose())
-                    outputInfo("No parameter map registered.");
-                _function->functionunion._userfunction=_userfunction; // NOTE already owned at the right level
-                // return the result of applying the function to the default parameter map
-                _functionValue=_getValueOfFunction(disowned_function(_function,owner));
-                if(amVerbose())
-                    outputInfo("Anonymous function value wrapped");
-            }else{
-                outputError("Failed to create an anonymous function");
-                FREE_USERFUNCTION(_userfunction,owner);
-            }
-        }else
-            outputError("Failed to create the anonymous user function");
-    }else
-        outputError("Invalid anonymous function parameter map or body");
-    if(!_functionValue)
-        outputError("Failed to create an anonymous function");
-    else
-    if(amVerbose())
-        outputInfo("Anonymous function created!");
-    return _functionValue;
-}
-// might make the following obsolete (defun)
-Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyTokenValue){Mallocationowner owner=getOwner(__LINE__);
-    // the user specifies the body as a text (to prevent evaluation during defining the function)
-    // but perhaps it could also be a list of tokens????? i.e. already tokenized (that is not evaluated)
-    // of course, tokenizing is a problem later on, but this means that we need to prevent evaluation of the second argument before calling this function on it
-    if(_nameValue&&_parameterMapValue){
-        if(_nameValue->type==VT_TEXT&&_parameterMapValue->type==VT_MAP&&(!_bodyTokenValue||_bodyTokenValue->type==VT_TOKEN)){
-            Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',owner);
-            if(_userfunction){
-                if(amVerbose()){outputValue("Defining function '",_nameValue,"' with ");outputValue(" parameters ",_parameterMapValue,".\n");}
-                Mtext* functionName=_nameValue->value._text;
-                // user function expects a list of commands, so we have to wrap the single token (if any)
-                if(_bodyTokenValue){
-                    _userfunction->_bodyCommandList=SUBOWNED(owned_list(_getListOfType(VT_TOKEN),owner),1);
-                    if(!_userfunction->_bodyCommandList||appendedToList(_userfunction->_bodyCommandList,Msubowner(owner,1),_bodyTokenValue,M_LL_INVALID)<=0)
-                        output("%sFailed to store the inline command as body of function definition of '%s'.\n",M_ERROR_PREFIX,functionName->_c);
-                    // replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
-                }
-                //////////Mvalue* _userfunctionValue=_getUserfunctionValue(_userfunction,true); // free asap or bound
-                ///////if(_userfunctionValue){
-                    // MDH@17JUL2019: the map needs to be stored with the Mfunction
-                Mallocationowner owner_environment=getOwnerExecutionEnvironment();
-                Mfunction* _function=owned_function(_getFunction(getExecutionEnvironment(),owner_environment,functionName->_c),owner);
-                if(_function){
-                    // MDH@02MAR2020: the following is dangerous, because the value might be freed in which case the map would be freed as well!!!!
-                    //                so we have to make a copy of the parameter map
-                    _function->_parameterMap=owned_map(_getMapCopy(_parameterMapValue->value._map),Msubowner(owner_environment,3)); // MDH@03MAR2020: making a copy of the map wrapped in the value passed in
-                    _function->functionunion._userfunction=owned_userfunction(disowned_userfunction(_userfunction,owner),Msubowner(owner_environment,3));
-                    // return the result of applying the function to the default parameter map
-
-                    return _getIntegerValue(1);
-                }
-                ///////////free_value(_userfunctionValue); // freed
-                output("%sFailed to create function '%s'.\n",M_ERROR_PREFIX,functionName);
-                ///////}
-            }
-        }else
-            outputError("Invalid user function name, parameter map or body");
-    }else{
-        if(!_nameValue)outputError("No name defined of function");
-        if(!_parameterMapValue)outputError("No (formal) parameter map defined for function");
-        ////////if(!_bodyTokenValue)outputError("No body (expression) defined of function");
-    }
-    return _getIntegerValue(0); // indicating failure...
-}/*VALIDATED */
 
 Mvalue* Mreturn(Mvalue* _value){
     // sets the value of the function execution result variable to _value
@@ -1994,9 +1912,6 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"type"),"type",Mtype))return false;
     if(!completedValueTextValueFunction(_getFunction(_environment,owner_environment,"settype"),"settype",Msettype))return false;
     if(!completedFloatFloatFunction(_getFunction(_environment,owner_environment,"pow"),"pow",Mpow))return false;
-
-    if(!completedStringMapTokenFunction(_getFunction(_environment,owner_environment,DEFINEUSERFUNCTION_NAME),DEFINEUSERFUNCTION_NAME,Mdefinefunction))return false;
-    if(!completedMapTokenFunction(_getFunction(_environment,owner_environment,DEFINEANONYMOUSFUNCTION_NAME),DEFINEANONYMOUSFUNCTION_NAME,Manonymousfunction))return false;
 
     if(!completedValueFunction(_getFunction(_environment,owner_environment,"return"),"return",Mreturn))return false;
 

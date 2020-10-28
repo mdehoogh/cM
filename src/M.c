@@ -46,7 +46,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="10";char const * const M_DATE="27 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
+char const * const M_BUILD="11";char const * const M_DATE="28 October 2020"; // MDH@23OCT2020: passing the body of function() as list of command texts when creating it!!
+//char const * const M_BUILD="10";char const * const M_DATE="27 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
 //char const * const M_BUILD="9";char const * const M_DATE="25 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
 //char const * const M_BUILD="8";char const * const M_DATE="23 October 2020"; // MDH@23OCT2020: trying to find a way to be able to use the last command evalation result, in the process now allowing to use integers into maps (as they can be converted to text to use as attribute key)
 //char const * const M_BUILD="7";char const * const M_DATE="22 October 2020"; // MDH@22OCT2020: user functions can now have undefined parameter maps, additional arguments are stored in _ variable, so can be used
@@ -1830,12 +1831,17 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
 			case VT_RATIONAL:
 				if(_value->value._rational){
-					written+=outputChar('(');
+					// removing: written+=outputChar('(');
 					outputTokenTypeColor(TT_INTEGER);written+=outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
-					written+=outputChar('/');outputTokenTypeColor(TT_INTEGER);
-					if(_value->value._rational->den)written+=outputBiginteger(NULL,_value->value._rational->den,NULL);else written+=outputChar('1'); // a missing denominator means it's equal to 1
+					written+=outputChar('/');
+					written+=outputChar('/'); // MDH@28OCT2020: inserting
+					outputTokenTypeColor(TT_INTEGER);
+					if(_value->value._rational->den){
+						written+=outputBiginteger(NULL,_value->value._rational->den,NULL);
+					}
+					else written+=outputChar('1'); // a missing denominator means it's equal to 1
 					resetOutputColor();
-					written+=outputChar(')');
+					// removing: written+=outputChar(')');
 					if(_value->value._rational->delta){
 						outputTokenTypeColor(TT_REAL);
 						if(_value->value._rational->delta->ld>=0)written+=outputChar('+');
