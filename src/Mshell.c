@@ -272,6 +272,11 @@ Menvironment* _getFunctionExecutionEnvironment(Mfunction* _function,char* functi
 		if(functionExecutionEnvironmentInitialized){
 			if(amVerbose())
 				outputInfo("Function execution environment initialized");
+			// add the function itself variable $_ so a function can call itself without knowing the name is is stored under or passed elsewhere
+			if(!addVariable(_functionExecutionEnvironment,owner,"$_",VT_FUNCTION,true)||!setValue(_functionExecutionEnvironment,"$_",_getValueOfFunction(_function))){
+				outputError("Failed to add the this variable to the function execution environment");
+				functionExecutionEnvironmentInitialized=false;
+			}else
 			// add the result variable ($ or perhaps later a variable with empty name????) TODO make a predefined constant char* out of it
 			if(!addVariable(_functionExecutionEnvironment,owner,"$",VT_UNDEFINED,false)){
 				outputError("Failed to add the result variable to the function execution environment");
@@ -7893,11 +7898,11 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 	}
 	// ASSERT at this point all arguments are processed and accepted
 	// if(amVerbose())outputValue("Anonymous function parameter map: ",_parameterMapValue,".\n");
-	Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'-',Msubowner(owner,1));
+	Muserfunction* _userfunction=(Muserfunction*)CALLOC_1(sizeof(Muserfunction),'U',Msubowner(owner,1)); // TODO check why I need to use U here
 	if(_userfunction){
 		if(report)
 		{outputMap("Processing the declaration of a function with parameters ",parameterMap," and ");outputMap("local variables ",localMap,".\n");}
-		Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'=',owner);
+		Mfunction* _function=(Mfunction*)CALLOC_1(sizeof(Mfunction),'F',owner); // TODO check why I need to use F here
 		if(_function){
 			if(report)outputInfo("Function created.");
 
