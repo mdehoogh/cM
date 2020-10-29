@@ -8095,6 +8095,62 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
     return _getIntegerValue(0); // indicating failure...
 }/*VALIDATED */
 
+// MDH@29OCT2020: the famous array functions of JS: foreach, map, reduce, filter
+Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccumulatedValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _accumulatedValue=_initialAccumulatedValue;
+	// it's up to the user to supply an initial accumulated value like a default
+    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+    if(list){
+        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+        if(function){
+			Mlist* _reduceFunctionArgumentList=owned_list(__list("reduce"),owner);
+			if(_reduceFunctionArgumentList){
+				// we are to append a total of 
+				Mlistelement* listelement=list->_first;
+				if(listelement){
+					long long listelementIndex=0;
+					if(appendedToList(_reduceFunctionArgumentList,owner,_accumulatedValue,M_LL_INVALID)>0
+					 &&appendedToList(_reduceFunctionArgumentList,owner,listelement->_value,M_LL_INVALID)>0
+					 &&appendedToList(_reduceFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID)>0){
+						// function argument list initialized, ready to execute the function on each element of the given list
+						do{
+							// compute the accumulated value
+							Mmap* _reduceFunctionArgumentMap=_getFunctionArgumentMap(function,_reduceFunctionArgumentList,owner);
+							_accumulatedValue=getValueOfFunctionCall(function,"",_reduceFunctionArgumentMap);
+							FREE_MAP(_reduceFunctionArgumentMap,owner); // TODO is this right??????
+							if(appendedToList(_reduceFunctionArgumentList,owner,_accumulatedValue,0)<=0)break;
+							listelement=listelement->_next;
+							if(!listelement)break;
+							if(appendedToList(_reduceFunctionArgumentList,owner,listelement->_value,1)<=0)break;
+							listelementIndex++;
+							if(appendedToList(_reduceFunctionArgumentList,owner,_getIntegerValue(listelementIndex),2)<=0)break;					
+						}while(listelement);
+					}
+				}
+				FREE_LIST(_reduceFunctionArgumentList,owner);
+			}else
+				outputError("Failed to create the reduce function argument list");
+        }else
+            outputError("No reduce function specified");
+    }else
+        outputError("No list to reduce specified.");
+    return _accumulatedValue;
+}
+
+Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _mapValue=NULL;
+	return _mapValue;
+}
+
+Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _filterValue=NULL;
+	return _filterValue;
+}
+
+Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* _foreachValue=NULL;
+	return _foreachValue;
+}
 
 /**
  * getValueOfExpression() is the work horse for evaluating individual (simple i.e. non composite expressions) expressions 
@@ -8410,6 +8466,14 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			}
 			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,owner,"find"),"find",Mfind)){
 				outputError("Failed to register the find function");
+				return NULL;
+			}
+			// MDH@29OCT2020: can't do without them
+			if(!completedListFunctionValueFunction(_getFunction(_Menvironment,owner,"reduce"),"reduce",Mlreduce)
+					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"map"),"map",Mlmap)
+					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"filter"),"filter",Mlfilter)
+					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"foreach"),"foreach",Mlforeach)){
+				outputError("Failed to register the infamous reduce, map, filter and foreach list functions");
 				return NULL;
 			}
 

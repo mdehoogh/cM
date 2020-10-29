@@ -1620,6 +1620,21 @@ bool completedIntegerBooleanFunction(Mfunction* const _function,const char* cons
     }
     return false;
 }/* NOT VALIDATED */
+bool completedListFunctionFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
+        _function->_parameterMap=owned_map(_getListFunctionMap("list","function"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered list function function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register integer boolean argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* NOT VALIDATED */
 bool completedStringStringFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);
@@ -1673,6 +1688,20 @@ bool completedMapTokenFunction(Mfunction* const _function,const char* const func
             return true;
         }
         output("%sFailed to register map token argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
+bool completedListFunctionValueFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=owned_map(_getListFunctionValueMap("list","function","initial value"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register list function value function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */

@@ -101,6 +101,12 @@ bool settingApplied(char settingCharacter);
 Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mvalue* _bodyValue);
 Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyValue);
 
+// MDH@28OCT2020: the famous array functions reduce, map, filter and foreach
+Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccumulatedValue);
+Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue);
+Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue);
+Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue);
+
 // and finally obtaining a root environment
 // in general initializing the shell with the callbacks and the M setting characters
 bool shellInitialized(
