@@ -1098,14 +1098,16 @@ Muserfunction* getUserfunction(const Menvironment* const _environment,const char
 */
 // MDH@05NOV2019: if there are missing elements in _argumentList (what we allow now), there should be an associated map element with value NULL
 // MDH@22OCT2020: in order to allow for additional arguments all additional arguments provided will be returned in a list associated with key '' in the returned function argument map
+// MDH@29OCT2020: with a local variables map now stored with the user function as well, we need to add these local variables to the returned function 'argument' map in which case they will mask any external variable with the same name
 Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* const _argumentList,Mallocationowner owner_functionargumentmap){Mallocationowner owner=getOwner(__LINE__);
+    bool report=amVerboseDebugging();
     Mmap* _functionArgumentMap=NULL;
     // MDH@03MAR2020: _argumentList should also be allowed to be NULL (because then defaults would be used)
     if(_function/*&&_argumentList*/){
         _functionArgumentMap=mapMadeWeak((Mmap*)CALLOC_1(sizeof(Mmap),'M',owner_functionargumentmap)); // MDH@02NOV2019: force the map to be weak
         if(_functionArgumentMap){
             Mmap* functionParameterMap=_function->_parameterMap; // MDH@22OCT2020: now allowing the function parameter map to be undefined (if all arguments are considered additional)
-            if(amVerbose())
+            if(amVerboseDebugging())
                 outputInfo("Matching the function parameters!");
             Mmapelement* functionParameterMapelement=(functionParameterMap?functionParameterMap->_first:NULL);
             unsigned long long argumentindex=0; // MDH@05NOV2019: because _argumentList could be sparse, i.e. have missing elements, we use an index that is used to find the argument list element with that index!!!
@@ -1153,16 +1155,14 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                 if(additionalFunctionArgumentListValue&&additionalFunctionArgumentListValue->type==VT_LIST)_additionalFunctionArgumentList=additionalFunctionArgumentListValue->value._list;
             }
             */
-            if(amVerbose())
-                outputInfo("Additional function call argument list created");
+            if(report)outputInfo("Additional function call argument list created");
 
             // MDH@22OCT2020: append the additional arguments to the additional function argument list
             //                argumentindex is now equal to the number of formal function parameters
             //                determine the argument list element that would be an additional function argument              
             if(argumentListelement&&argumentListelement->index==argumentindex)argumentListelement=argumentListelement->_next;
             if(argumentListelement){ // there are additional function call arguments
-                if(amVerbose())
-                    outputInfo("Additional (unnamed) function call arguments defined");
+                if(report)outputInfo("Additional (unnamed) function call arguments defined");
                 // if this list does not yet exist, create it
                 if(!_additionalFunctionArgumentList)
                     _additionalFunctionArgumentList=owned_list(__list("additional function arguments list"),owner);
@@ -1171,8 +1171,7 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                     while(argumentListelement&&
                             appendedToList(_additionalFunctionArgumentList,owner,argumentListelement->_value,M_LL_INVALID)>0)
                         argumentListelement=argumentListelement->_next;
-                    if(amVerbose())
-                        output("Additional function call argument list initialized with %zd elements.\n",_additionalFunctionArgumentList->numberOfElements);
+                    if(report)output("Additional function call argument list initialized with %zd elements.\n",_additionalFunctionArgumentList->numberOfElements);
                     Mvalue* additionalFunctionArgumentListValue=_getValueOfList(disowned_list(_additionalFunctionArgumentList,owner));
                     if(!additionalFunctionArgumentListValue){ // list not wrapped
                         FREE_LIST(_additionalFunctionArgumentList,owner); // it's up to me to get rid of the list
@@ -1181,16 +1180,34 @@ Mmap* _getFunctionArgumentMap(Mfunction const * const _function,const Mlist* con
                     if(appendedToMap(_functionArgumentMap,owner_functionargumentmap,"",additionalFunctionArgumentListValue)<0)
                         outputError("Failed to register the additional function call arguments list");
                     else
-                    if(amVerbose())
-                        outputInfo("Additional function call argument list appended to argument map");
+                    if(report)outputInfo("Additional function call argument list appended to argument map");
                 }else
                     outputError("Failed to create the additional function call arguments list");
             }else
-            if(amVerbose())
-                outputInfo("No additional (unnamed) function call arguments.");
+            if(report)outputInfo("No additional (unnamed) function call arguments.");
+
+            // MDH@29OCT2020: user functions have local variables defined in the declaration
+            if(_function->type==FT_USER){
+                Muserfunction* userfunction=_function->functionunion._userfunction;
+                Mmapelement* localMapelement=(userfunction&&userfunction->_localMap?userfunction->_localMap->_first:NULL);
+                if(localMapelement){
+                    // ASSERT _argumentMap is not NULL which means we have to free it if we fail to add all specified local variables
+                    Mvariable* localVariable;
+                    do{
+                        localVariable=localMapelement->_variable;
+                        if(localVariable&&localVariable->_name&&!appendedToMap(_functionArgumentMap,owner_functionargumentmap,localVariable->_name->chars,localVariable->_value))break;
+                        localMapelement=localMapelement->_next;
+                    }while(localMapelement);
+                    // if _localMapelement is still defined, apparently appending the local variable to the argument map failed
+                    if(localMapelement){
+                        FREE_MAP(_functionArgumentMap,owner_functionargumentmap);_functionArgumentMap=NULL;
+                        outputError("Failed to register all specified local variables of the function");
+                    }
+                }
+            }
         }else
             outputError("Failed to create the additional function call argument list");
-        if(amVerbose())
+        if(report)
             if(_functionArgumentMap)
                 outputInfo("Argument map created.");
     }
@@ -1659,17 +1676,17 @@ bool completedMapTokenFunction(Mfunction* const _function,const char* const func
     }
     return false;
 }/* VALIDATED */
-bool completedMapListFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+bool completedMapMapListFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);
-        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
-        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
-        _function->_parameterMap=owned_map(_getMapListMap("parameter defaults:map","body command texts:list"),Msubowner(owner,1));
+        _function->type=FT_INTERNAL_THREE_ARGUMENTS;
+        _function->functionunion.threeArgumentFunction=threeArgumentFunction;
+        _function->_parameterMap=owned_map(_getMapMapListMap("parameters:map","local variables:map","commands:list"),Msubowner(owner,1));
         if(_function->_parameterMap){
             if(amVerbose())output("Registered function '%s' completed.\n",functionName);
             return true;
         }
-        output("%sFailed to register map list argument function '%s'.\n",M_ERROR_PREFIX,functionName);
+        output("%sFailed to register map map list function '%s'.\n",M_ERROR_PREFIX,functionName);
     }
     return false;
 }/* VALIDATED */

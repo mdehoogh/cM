@@ -97,7 +97,8 @@ bool createFunctionBodyInput(FunctionBodyRequest const * const _functionBodyRequ
 bool settingApplied(char settingCharacter);
 
 // MDH@28OCT2020: moved over from Menvironment.c/h
-Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _bodyValue);
+// MDH@29OCT2020: added _localMapValue to the anonymous function call
+Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mvalue* _bodyValue);
 Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _bodyValue);
 
 // and finally obtaining a root environment

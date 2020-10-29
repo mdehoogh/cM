@@ -264,6 +264,7 @@ Mmap* _getTokenTokenTokenTokenTokenMap(char* name1,char* name2,char* name3,char 
 
 Mmap* _getListValueIntegerMap(char* name1,char* name2,char* name3);
 Mmap* _getIntegerBooleanMap(char* name1,char* name2);
+Mmap* _getMapMapListMap(char* name1,char* name2,char* name3);
 
 // list to map (list) conversions
 bool listAppendedToMap(Mmap * const _map,Mallocationowner owner_map,Mlist const * const _list); // append a list to a (possibly empty) map using the indices as attribute name
@@ -346,6 +347,7 @@ bool areValuesEqual(Mvalue const * const value1,Mvalue const * const value2); //
 struct Mfunctionmap; // prototype of Mfunctionap
 typedef struct Muserfunction{
     //////////struct Mmap* _parameterMap;
+    Mmap* _localMap; // MDH@29OCT2020: the local map is typically only defined on user functions
     struct Mfunctionmap* _functionMap; // to contain the list of (user) functions defined inside the function
     struct Mlist* _bodyCommandList; // a list of body commands
 }Muserfunction;
