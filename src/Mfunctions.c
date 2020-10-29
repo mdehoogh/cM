@@ -514,13 +514,21 @@ Mvalue* Mzero(Mvalue* _value){
     return(_getIntegerValue(_value?(isValueZero(_value)==M_TRUE?M_TRUE:M_FALSE):M_LL_INVALID));
 }/* VALIDATED */
 Mvalue* Mpositive(Mvalue* _value){
-    return(_value?_getIntegerValue(isValuePositive(_value)?1:0):NULL);
+    return _getIntegerValue(_value?(isValuePositive(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
 Mvalue* Mnegative(Mvalue* _value){
-    return(_value?_getIntegerValue(isValueNegative(_value)?1:0):NULL);
+    return _getIntegerValue(_value?(isValueNegative(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
 Mvalue* Mscalar(Mvalue* _value){
-    return(_value?_getIntegerValue(isValueScalar(_value)?1:0):NULL);
+    return _getIntegerValue(_value?(isValueScalar(_value)?M_TRUE:M_FALSE):M_LL_INVALID);
+}/* VALIDATED */
+
+// MDH@29OCT2020: might come in handy
+Mvalue* Misnumeric(Mvalue* _value){
+    return _getIntegerValue(_value?(_value->type==VT_BIGINTEGER||_value->type==VT_DECIMAL||_value->type==VT_FLOAT||_value->type==VT_INTEGER||_value->type==VT_RATIONAL?M_TRUE:M_FALSE):M_LL_INVALID);
+}/* VALIDATED */
+Mvalue* Misalist(Mvalue* _value){
+    return _getIntegerValue(_value?(_value->type==VT_LIST?M_TRUE:M_FALSE):M_LL_INVALID);
 }/* VALIDATED */
 
 // TODO the length of a text is the number of characters in a text????

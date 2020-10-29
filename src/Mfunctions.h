@@ -12,6 +12,9 @@ Mvalue* Msign(Mvalue* value);
 Mvalue* Mpositive(Mvalue* _value);
 Mvalue* Mnegative(Mvalue* _value);
 Mvalue* Mscalar(Mvalue* _value);
+// MDH@28OCT2020: might come in handy
+Mvalue* Misnumeric(Mvalue* _value);
+Mvalue* Misalist(Mvalue* _value);
 
 Mvalue* Msum(Mvalue* _value); // sum (typically of a list)
 Mvalue* Mlen(Mvalue* _value); // length (typically of a list)
