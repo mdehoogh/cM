@@ -8246,42 +8246,42 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 	// similar to map but returning the number of elements the function was applied to
 	// it's up to the user to supply an initial accumulated value like a default
     Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-    if(list){
+    if(list){ // there is a list to iterate
+		Mlistelement* listelement=list->_first;
+		// let's allow the function to be NULL
         Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-        if(function){
+		if(function){
 			Mlist* _foreachFunctionArgumentList=owned_list(__list("lforeach"),owner);
 			if(_foreachFunctionArgumentList){
 				// we are to append a total of 
-				Mlistelement* listelement=list->_first;
 				if(listelement){
 					long long listelementIndex=listelement->index;
-					long long valueIndex=appendedToList(_foreachFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
-					long long indexIndex=appendedToList(_foreachFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID);
-					if(valueIndex>0&&indexIndex>0){
+					// passing the list as first argument, and the index into the list as second argument on every call to the given function
+					long long listIndex=appendedToList(_foreachFunctionArgumentList,owner,_listValue,M_LL_INVALID);
+					long long indexIndex=appendedToList(_foreachFunctionArgumentList,owner,_getIntegerValue(listelement->index),M_LL_INVALID);
+					if(listIndex>0&&indexIndex>0){
 						// function argument list initialized, ready to execute the function on each element of the given list
 						foreachCount=0;
 						do{
-							// compute the accumulated value
 							Mmap* _foreachFunctionArgumentMap=_getFunctionArgumentMap(function,_foreachFunctionArgumentList,owner);
 							Mvalue* _foreachFunctionValue=getValueOfFunctionCall(function,"",_foreachFunctionArgumentMap);
-							if(report){outputMap("Result of applying the foreach function to '",_foreachFunctionArgumentMap,"'");outputValue(": '",_foreachFunctionValue,"'.\n");}
 							FREE_MAP(_foreachFunctionArgumentMap,owner);
-							foreachCount--;
+							foreachCount++; // successfully applied the function to this element
+							if(report){outputMap("Result of applying the foreach function to '",_foreachFunctionArgumentMap,"'");outputValue(": '",_foreachFunctionValue,"'.\n");}
 							listelement=listelement->_next;
 							if(!listelement)break;
-							if(appendedToList(_foreachFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
-							listelementIndex=listelement->index;
-							if(appendedToList(_foreachFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
+							if(appendedToList(_foreachFunctionArgumentList,owner,_getIntegerValue(listelement->index),indexIndex)<=0)break;
 						}while(listelement);
-						// managed to get here TODO will we not always get here????
-						foreachCount=-foreachCount;
+						if(listelement)foreachCount=-foreachCount;
 					}
 				}
 				FREE_LIST(_foreachFunctionArgumentList,owner);
 			}else
 				outputError("Failed to create the foreach function argument list");
-        }else
-            outputError("No foreach function specified");
+
+		}else{ // no function, simply return the number of elements in the list
+			foreachCount=0;while(listelement){foreachCount++;listelement=listelement->_next;}
+		}
     }else
         outputError("No list to foreach specified.");
 	return _getIntegerValue(foreachCount);
