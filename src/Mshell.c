@@ -5,6 +5,8 @@
 
 #include "Mshell.h"
 
+static bool DEBUGGING=true; // whether or not debugging this module
+
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
@@ -7984,25 +7986,20 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 											if(inputChar){outputError("Failed to parse a body command");break;}
 											if(!commandContinued){ // command not continued on the next line, therefore we should register the command
 												// if the command is somehow invalid we should abort, and discard the result, this is done by ascertaining tokenValue to be NULL
-												Mvalue* tokenValue=NULL;
-												if(isAValidCommandIndicator(_command,owner,report)>0)tokenValue=_getValueOfToken(_command->_firstToken);else outputError("Invalid command encountered in body");
-												// ASSERT _command needs to be freed no matter what
-												// if we fail to wrap the token, or append it to the body we free the command and break
-												if(tokenValue){ // the command's first token is NOW bound to a (garbage collectable) value
-													// to ascertain that freeing the command won't free the tokens bound to the value, NULL the first token
-													// NOTE we can forget about _lastToken because it's not freed when the command is freed
-													_command->_firstToken=NULL;
-													if(appendedToList(_userfunction->_bodyCommandList,owner,tokenValue,M_LL_INVALID)<=0)
-														// by NULLing tokenValue (note that it's still referenced in the list that stores all the values and therefore garbage collected later on)
-														tokenValue=NULL; // by doing this, after freeing the command below, we'll break and _command will be NULL and recognized as error below
+												bool aValidCommandIndicator=isAValidCommandIndicator(_command,owner,false);
+												// 0 means an empty command (e.g. a comment)
+												if(aValidCommandIndicator!=0){
+													Mvalue* tokenValue=(aValidCommandIndicator>0?_getValueOfToken(_command->_firstToken):NULL);
+													// if the command is bound i.e. tokenValue is not NULL ascertain that the tokens will not be freed when freeing the command (below)
+													if(tokenValue)_command->_firstToken=NULL;
+													if(tokenValue&&appendedToList(_userfunction->_bodyCommandList,owner,tokenValue,M_LL_INVALID)<=0)tokenValue=NULL; // by doing this, after freeing the command below, we'll break and _command will be NULL and recognized as error below
+													// we need to free the command anyway, to ascertain that the next command text will start with a new command altogether
+													if(!tokenValue){outputError("Failed to store the body command!");break;} // storing the command somehow failed, therefore _command will not be NULL and therefore indicate erroneous body command parsing
 												}
-												// we need to free the command anyway, to ascertain that the next command text will start with a new command altogether
-												if(!tokenValue){outputError("Failed to store the body command!");break;} // storing the command somehow failed, therefore _command will not be NULL and therefore indicate erroneous body command parsing
 												// prepare for parsing the next command text
 												FREE_COMMAND(_command,owner);_command=NULL;
 											}
-											// if(amVerboseDebugging())
-												output("'.\n");
+											if(report)output("'.\n");
 										}
 										bodyCommandListelement=bodyCommandListelement->_next;
 									}
@@ -8021,20 +8018,19 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
 								FREE_LIST(_userfunction->_bodyCommandList,owner);
 								_userfunction->_bodyCommandList=NULL;
 								outputWarning("Function body discarded because of parsing errors");
-							}
+							}else
+							if(report)output("Number of commands in the body: %zd.\n",_userfunction->_bodyCommandList->numberOfElements);
 						}else
 							outputError("Failed to initialize the argument and local variables map");
 					}else
 						outputError("Failed to store the inline command as body of an anonymous function");
 				}else
-					outputWarning("No commands in body.");
+					outputWarning("No commands in body");
 			// replacing: assignValue(&_userfunction->_bodyTokenValue,_bodyTokenValue);
 			}
-
 			// return the result of applying the function to the default parameter map NO NO NO the function wrapped in a value
 			_functionValue=_getValueOfFunction(disowned_function(_function,owner));
-			if(amVerbose())
-				outputInfo("Anonymous function value wrapped");
+			if(report)outputInfo("Anonymous function value wrapped");
 		}else{
 			outputError("Failed to create an anonymous function");
 			FREE_USERFUNCTION(_userfunction,owner);
@@ -8045,8 +8041,7 @@ Mvalue* Manonymousfunction(Mvalue* _parameterMapValue,Mvalue* _localMapValue,Mva
     if(!_functionValue)
         outputError("Failed to create an anonymous function");
     else
-    if(amVerbose())
-        outputInfo("Anonymous function created!");
+    if(report)outputInfo("Anonymous function created!");
     return _functionValue;
 }
 // might make the following obsolete (defun)
@@ -8097,6 +8092,7 @@ Mvalue* Mdefinefunction(Mvalue* _nameValue,Mvalue* _parameterMapValue,Mvalue* _b
 
 // MDH@29OCT2020: the famous array functions of JS: foreach, map, reduce, filter
 Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccumulatedValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
 	Mvalue* _accumulatedValue=_initialAccumulatedValue;
 	// it's up to the user to supply an initial accumulated value like a default
     Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
@@ -8109,21 +8105,23 @@ Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccum
 				Mlistelement* listelement=list->_first;
 				if(listelement){
 					long long listelementIndex=0;
-					if(appendedToList(_reduceFunctionArgumentList,owner,_accumulatedValue,M_LL_INVALID)>0
-					 &&appendedToList(_reduceFunctionArgumentList,owner,listelement->_value,M_LL_INVALID)>0
-					 &&appendedToList(_reduceFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID)>0){
+					long long accumulatedValueIndex=appendedToList(_reduceFunctionArgumentList,owner,_accumulatedValue,M_LL_INVALID);
+					long long valueIndex=appendedToList(_reduceFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
+					long long indexIndex=appendedToList(_reduceFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID);
+					if(accumulatedValueIndex>0&&valueIndex>0&&indexIndex>0){
 						// function argument list initialized, ready to execute the function on each element of the given list
 						do{
 							// compute the accumulated value
 							Mmap* _reduceFunctionArgumentMap=_getFunctionArgumentMap(function,_reduceFunctionArgumentList,owner);
 							_accumulatedValue=getValueOfFunctionCall(function,"",_reduceFunctionArgumentMap);
+							if(report){outputMap("Result of applying the reduce function to '",_reduceFunctionArgumentMap,"'");outputValue(": '",_accumulatedValue,"'.\n");}
 							FREE_MAP(_reduceFunctionArgumentMap,owner); // TODO is this right??????
-							if(appendedToList(_reduceFunctionArgumentList,owner,_accumulatedValue,0)<=0)break;
+							if(appendedToList(_reduceFunctionArgumentList,owner,_accumulatedValue,accumulatedValueIndex)<=0)break;
 							listelement=listelement->_next;
 							if(!listelement)break;
-							if(appendedToList(_reduceFunctionArgumentList,owner,listelement->_value,1)<=0)break;
+							if(appendedToList(_reduceFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
 							listelementIndex++;
-							if(appendedToList(_reduceFunctionArgumentList,owner,_getIntegerValue(listelementIndex),2)<=0)break;					
+							if(appendedToList(_reduceFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
 						}while(listelement);
 					}
 				}
@@ -8138,18 +8136,155 @@ Mvalue* Mlreduce(Mvalue* _listValue,Mvalue* _functionValue,Mvalue* _initialAccum
 }
 
 Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
 	Mvalue* _mapValue=NULL;
+	// it's up to the user to supply an initial accumulated value like a default
+    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+    if(list){
+        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+        if(function){
+			Mlist* _mapFunctionArgumentList=owned_list(__list("lmap"),owner);
+			if(_mapFunctionArgumentList){
+				Mlist* _mapList=owned_list(__list("lmap"),owner);
+				if(_mapList){
+					// we are to append a total of 
+					Mlistelement* listelement=list->_first;
+					if(listelement){
+						long long listelementIndex=listelement->index;
+						long long valueIndex=appendedToList(_mapFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
+						long long indexIndex=appendedToList(_mapFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID);
+						if(valueIndex>0&&indexIndex>0){
+							// function argument list initialized, ready to execute the function on each element of the given list
+							do{
+								// compute the accumulated value
+								Mmap* _mapFunctionArgumentMap=_getFunctionArgumentMap(function,_mapFunctionArgumentList,owner);
+								Mvalue* _mapFunctionValue=getValueOfFunctionCall(function,"",_mapFunctionArgumentMap);
+								if(report){outputMap("Result of applying the map function to '",_mapFunctionArgumentMap,"'");outputValue(": '",_mapFunctionValue,"'.\n");}
+								FREE_MAP(_mapFunctionArgumentMap,owner);
+								// if we fail to add the result of applying the map function, we report that but we do not break, the length of the result list should be the same as that of the input list
+								if(appendedToList(_mapList,owner,_mapFunctionValue,listelementIndex)<=0)outputError("Failed to add the result of applying the map function");
+								listelement=listelement->_next;
+								if(!listelement)break;
+								if(appendedToList(_mapFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
+								listelementIndex=listelement->index;
+								if(appendedToList(_mapFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
+							}while(listelement);
+						}
+					}
+					_mapValue=_getValueOfList(disowned_list(_mapList,owner));
+					if(!_mapValue)free_list(_mapList); // if not bound (but already disowned) free the list myself
+				}else
+					outputError("Failed to create the map result list");
+				FREE_LIST(_mapFunctionArgumentList,owner);
+			}else
+				outputError("Failed to create the map function argument list");
+        }else
+            outputError("No map function specified");
+    }else
+        outputError("No list to map specified.");
 	return _mapValue;
 }
 
 Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
 	Mvalue* _filterValue=NULL;
+	// it's up to the user to supply an initial accumulated value like a default
+    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+    if(list){
+        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+        if(function){
+			Mlist* _filterFunctionArgumentList=owned_list(__list("lfilter"),owner);
+			if(_filterFunctionArgumentList){
+				Mlist* _filterList=owned_list(__list("lfilter"),owner);
+				if(_filterList){
+					// we are to append a total of 
+					Mlistelement* listelement=list->_first;
+					if(listelement){
+						long long listelementIndex=listelement->index;
+						long long valueIndex=appendedToList(_filterFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
+						long long indexIndex=appendedToList(_filterFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID);
+						if(valueIndex>0&&indexIndex>0){
+							// function argument list initialized, ready to execute the function on each element of the given list
+							do{
+								// compute the accumulated value
+								Mmap* _filterFunctionArgumentMap=_getFunctionArgumentMap(function,_filterFunctionArgumentList,owner);
+								Mvalue* _filterFunctionValue=getValueOfFunctionCall(function,"",_filterFunctionArgumentMap);
+								if(report){outputMap("Result of applying the filter function to '",_filterFunctionArgumentMap,"'");outputValue(": '",_filterFunctionValue,"'.\n");}
+								FREE_MAP(_filterFunctionArgumentMap,owner);
+								// if _filterFunctionValue is 'true' the current value should be appended to the result list
+								// now the question is whether or not the filter function returned something that can be tested for being M_TRUE
+								// I guess when the filter function value is positive let consider the list value valid
+								if(isValuePositive(_filterFunctionValue)==M_TRUE&&appendedToList(_filterList,owner,listelement->_value,M_LL_INVALID)<=0){
+									outputError("Failed to add the result of applying the filter function");
+									break;
+								}
+								listelement=listelement->_next;
+								if(!listelement)break;
+								if(appendedToList(_filterFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
+								listelementIndex=listelement->index;
+								if(appendedToList(_filterFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
+							}while(listelement);
+						}
+					}
+					_filterValue=_getValueOfList(disowned_list(_filterList,owner));
+					if(!_filterValue)free_list(_filterList); // if not bound (but already disowned) free the list myself
+				}else
+					outputError("Failed to create the filter result list");
+				FREE_LIST(_filterFunctionArgumentList,owner);
+			}else
+				outputError("Failed to create the filter function argument list");
+        }else
+            outputError("No filter function specified");
+    }else
+        outputError("No list to filter specified");
 	return _filterValue;
 }
-
+// NOTE how does foreach compare to map???? as it seems that foreach does not return a value as opposed to map
 Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
-	Mvalue* _foreachValue=NULL;
-	return _foreachValue;
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long foreachCount=M_LL_INVALID; // counting the number of times the function was applied
+	// similar to map but returning the number of elements the function was applied to
+	// it's up to the user to supply an initial accumulated value like a default
+    Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+    if(list){
+        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+        if(function){
+			Mlist* _foreachFunctionArgumentList=owned_list(__list("lforeach"),owner);
+			if(_foreachFunctionArgumentList){
+				// we are to append a total of 
+				Mlistelement* listelement=list->_first;
+				if(listelement){
+					long long listelementIndex=listelement->index;
+					long long valueIndex=appendedToList(_foreachFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
+					long long indexIndex=appendedToList(_foreachFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID);
+					if(valueIndex>0&&indexIndex>0){
+						// function argument list initialized, ready to execute the function on each element of the given list
+						foreachCount=0;
+						do{
+							// compute the accumulated value
+							Mmap* _foreachFunctionArgumentMap=_getFunctionArgumentMap(function,_foreachFunctionArgumentList,owner);
+							Mvalue* _foreachFunctionValue=getValueOfFunctionCall(function,"",_foreachFunctionArgumentMap);
+							if(report){outputMap("Result of applying the foreach function to '",_foreachFunctionArgumentMap,"'");outputValue(": '",_foreachFunctionValue,"'.\n");}
+							FREE_MAP(_foreachFunctionArgumentMap,owner);
+							foreachCount--;
+							listelement=listelement->_next;
+							if(!listelement)break;
+							if(appendedToList(_foreachFunctionArgumentList,owner,listelement->_value,valueIndex)<=0)break;
+							listelementIndex=listelement->index;
+							if(appendedToList(_foreachFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
+						}while(listelement);
+						// managed to get here TODO will we not always get here????
+						foreachCount=-foreachCount;
+					}
+				}
+				FREE_LIST(_foreachFunctionArgumentList,owner);
+			}else
+				outputError("Failed to create the foreach function argument list");
+        }else
+            outputError("No foreach function specified");
+    }else
+        outputError("No list to foreach specified.");
+	return _getIntegerValue(foreachCount);
 }
 
 /**
