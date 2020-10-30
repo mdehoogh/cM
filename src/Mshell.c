@@ -8291,18 +8291,76 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 	return _getIntegerValue(foreachCount);
 }
 
-Mvalue* Mlsorted(Mvalue* _listValue){
-	bool report=amVerboseDebugging()||DEBUGGING;
-	long long swapCount=M_LL_INVALID;
-	Mlist* _list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
-	if(_list){
-		swapCount=0;
-		Mlistelement* listelement=_list->_first;
-		if(listelement&&listelement!=_list->_last){ // at least two items
-
+static void swap(Mlistelement* const listelement1,Mlistelement* const listelement2){
+	// normally we would not be allowed to do it this way, but the reference count
+	// of both values remains the same when we exchange their position in the list
+	// output("Swapping element #%llu and #%llu.\n",listelement1->index,listelement2->index);
+	Mvalue* value=listelement1->_value;
+	listelement1->_value=listelement2->_value;
+	listelement2->_value=value;
+}
+// it's best to pass l-1 instead of l, then we will always be able to compute l
+static Mlistelement* partition(Mlist* const list,Mlistelement* const lmin1,Mlistelement* const h){
+	Mlistelement* l=(lmin1?lmin1->_next:list->_first);
+	// output("Partitioning elements #%llu through #%llu.\n",l->index,h->index);
+	Mvalue* x=h->_value; //* x=list[h] // x is set once, as the value at index h
+	Mlistelement* i=lmin1; //* i=l-1
+	for(Mlistelement* j=l;j->index<h->index;j=j->_next){ //* int j=1;j<h;j++
+		// output("Comparing element #%zd with element #%zd.\n",j->index,h->index);
+		Mvalue* v=smallerthanorequalto(j->_value,x);
+		if(v&&v->type==VT_INTEGER&&v->value._integer->ll==M_TRUE){
+			i=(i?i->_next:list->_first); //* i++; // make i start at index l otherwise increment
+			swap(i,j);
 		}
 	}
-	return _getIntegerValue(swapCount);
+	Mlistelement* iplus1=(i?i->_next:list->_first);
+	swap(iplus1,h); //* swap(list[i+1],list[h])
+	return i; //* i+1 but actually we are returning i itself because that's the first value used
+}
+Mvalue* Mlsorted(Mvalue* _listValue){
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long result=M_LL_INVALID;
+	Mlist* _list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(_list){
+		Mlistelement* listelement=_list->_first;
+		if(listelement&&listelement!=_list->_last){ // at least two items
+			// we need a stack of integers with the same size as the list length
+			if(report)output("Sorting a list with %zd elements.\n",_list->numberOfElements);
+			Mlistelement** stack=calloc(_list->numberOfElements,sizeof(Mlistelement*));
+			if(stack){
+				result=M_TRUE;
+				stack[0]=NULL; // i.e. the first lmin1
+				stack[1]=_list->_last;
+				// it's better to store the number of elements in the stack instead of the top index
+				// so that the smallest value of top will be 0
+				unsigned long long top=2;
+				Mlistelement *lmin1,*l,*h,*pmin1,*p,*pplus1; // two list elements
+				// as long as there are two elements on the stack
+				while(top>1){ // two or more elements on the stack
+					h=stack[--top];
+					lmin1=stack[--top];
+					pmin1=partition(_list,lmin1,h); // NOTE p is actually p-1
+					//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
+					l=(lmin1?lmin1->_next:_list->_first);
+					if(pmin1&&pmin1->index>l->index){
+						stack[top++]=lmin1;
+						stack[top++]=pmin1;
+					}
+					// move p two elements up
+					p=(pmin1?pmin1->_next:_list->_first);
+					pplus1=(p?p->_next:_list->_first);
+					if(pplus1&&pplus1->index<h->index){
+						stack[top++]=p; // which is actually lmin1
+						stack[top++]=h;
+					}
+				}
+				free(stack);
+			}else
+				outputError("Not enough memory to sort the list");
+		}else // no need to sort so success
+			result=M_TRUE;
+	}
+	return _getIntegerValue(result);
 }
 
 /**
@@ -8613,8 +8671,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Mlsorted)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)){
-				outputError("Failed to register the removed, push(=drop), shove and pop functions");
+				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");
 				return NULL;
 			}
 			if(!completedListValueIntegerFunction(_getFunction(_Menvironment,owner,"find"),"find",Mfind)){
