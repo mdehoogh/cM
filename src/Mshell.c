@@ -8184,22 +8184,21 @@ Mvalue* Mlmap(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=
         outputError("No list to map specified.");
 	return _mapValue;
 }
-
 Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	Mvalue* _filterValue=NULL;
 	// it's up to the user to supply an initial accumulated value like a default
     Mlist* list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
     if(list){
-        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
-        if(function){
-			Mlist* _filterFunctionArgumentList=owned_list(__list("lfilter"),owner);
-			if(_filterFunctionArgumentList){
-				Mlist* _filterList=owned_list(__list("lfilter"),owner);
-				if(_filterList){
-					// we are to append a total of 
-					Mlistelement* listelement=list->_first;
-					if(listelement){
+		Mlist* _filterList=owned_list(__list("lfilter"),owner);
+		if(_filterList){
+			Mlistelement* listelement=list->_first;
+			if(listelement){
+		        Mfunction* function=(_functionValue&&_functionValue->type==VT_FUNCTION?_functionValue->value._function:NULL);
+    		    if(function){
+					Mlist* _filterFunctionArgumentList=owned_list(__list("lfilter"),owner);
+					if(_filterFunctionArgumentList){
+						// we are to append a total of 
 						long long listelementIndex=listelement->index;
 						long long valueIndex=appendedToList(_filterFunctionArgumentList,owner,listelement->_value,M_LL_INVALID);
 						long long indexIndex=appendedToList(_filterFunctionArgumentList,owner,_getIntegerValue(listelementIndex),M_LL_INVALID);
@@ -8225,16 +8224,21 @@ Mvalue* Mlfilter(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner own
 								if(appendedToList(_filterFunctionArgumentList,owner,_getIntegerValue(listelementIndex),indexIndex)<=0)break;					
 							}while(listelement);
 						}
-					}
-					_filterValue=_getValueOfList(disowned_list(_filterList,owner));
-					if(!_filterValue)free_list(_filterList); // if not bound (but already disowned) free the list myself
-				}else
-					outputError("Failed to create the filter result list");
-				FREE_LIST(_filterFunctionArgumentList,owner);
-			}else
-				outputError("Failed to create the filter function argument list");
+						FREE_LIST(_filterFunctionArgumentList,owner);
+					}else
+						outputError("Failed to create the filter function argument list");
+				}else{ // no filter function specified 
+					do{
+						if(appendedToList(_filterList,owner,listelement->_value,M_LL_INVALID)<=0)
+							output("%sFailed to append a filter list element #%llu.\n",M_ERROR_PREFIX,listelement->index);
+						listelement=listelement->_next;
+					}while(listelement);
+				}
+			}
+			_filterValue=_getValueOfList(disowned_list(_filterList,owner));
+			if(!_filterValue)free_list(_filterList); // if not bound (but already disowned) free the list myself
         }else
-            outputError("No filter function specified");
+			outputError("Failed to create the filter result list");
     }else
         outputError("No list to filter specified");
 	return _filterValue;
@@ -8285,6 +8289,20 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
     }else
         outputError("No list to foreach specified.");
 	return _getIntegerValue(foreachCount);
+}
+
+Mvalue* Mlsorted(Mvalue* _listValue){
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long swapCount=M_LL_INVALID;
+	Mlist* _list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
+	if(_list){
+		swapCount=0;
+		Mlistelement* listelement=_list->_first;
+		if(listelement&&listelement!=_list->_last){ // at least two items
+
+		}
+	}
+	return _getIntegerValue(swapCount);
 }
 
 /**
