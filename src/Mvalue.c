@@ -6,6 +6,8 @@
 
 #include "Mvalue.h"
 
+static bool DEBUGGING=false;
+
 static uint16_t const MODULE_ID=13;
 static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MODULE_ID,id};}
 
@@ -1235,13 +1237,14 @@ Mmapelement* getMapelement(Mmap const * const map,char const * const attributeNa
 }
 // MDH@24MAY2019: if already in the map should replace the current value
 long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue){Mallocationowner owner=getOwner(__LINE__);
+    bool report=amVerboseDebugging()||DEBUGGING;
     long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
     if(result!=M_LL_INVALID){
         if(!_map->immutable){ // the map is mutable
             // MDH@05NOV2019: let's always allow adding NULL or undefined values to a map, but otherwise the type of _attributeValue should match the type of values the map allows
             if(!_attributeValue||_attributeValue->type==VT_UNDEFINED||_map->valuetype==VT_UNDEFINED||_attributeValue->type==_map->valuetype){
-                if(amVerbose())
-                    {output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
+                if(report)
+                {output("Setting the value of attribute '%s'",attributeName);outputValue(" to '",_attributeValue,"'.\n");}
                 // MDH@22OCT2020: get the map element associated with the given attribute name
                 Mmapelement* _mapelement=getMapelement(_map,attributeName);
                 /* replacing:
@@ -1249,8 +1252,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                 while(_mapelement&&(!_mapelement->_variable||strcmp(_mapelement->_variable->_name->chars,attributeName)))_mapelement=_mapelement->_next;
                 */
                 if(!_mapelement){ // not found
-                    if(amVerbose())
-                        outputInfo("Attribute not found");
+                    if(report)outputInfo("Attribute not found");
                     _mapelement=(Mmapelement*)CALLOC_1(sizeof(Mmapelement),'m',owner); // NOTE no need to set _next because it is now NULL
                     if(_mapelement){
                         // MDH@09JUN2020: we can immediately set the owner of _variable to be in the map because if we succeed in creating it that's where it will go
@@ -1258,8 +1260,7 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                         // MDH@25MAY2020: we're disowning _variable because we 
                         Mvariable* _variable=_getVariableWithName(attributeName,VT_UNDEFINED,false,Msubowner(owner_map,2)); // TODO why would this 'variable' be mutable, and allowing all values????
                         if(_variable){ // the variable was created so attach in map
-                            if(amVerbose())
-                                outputInfo("Map element created");
+                            if(report)outputInfo("Map element created");
                              // pass ownership of _mapelement to _map at the first sublevel
                             _mapelement->_variable=_variable; // pass ownership of _variable to the mapelement at the second sublevel in the map
                             if(_map->numberOfElements)_map->_last->_next=_mapelement;else _map->_first=_mapelement;
@@ -1281,14 +1282,13 @@ long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const *
                     result=M_TRUE;
                 }
             }else{
-                output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a map: it is of the wrong type.\n");
+                output(M_ERROR_PREFIX);outputValue("Unable to add '",_attributeValue,"' to a map: it is of the wrong type.\n");
             }
         }else 
             outputError("Unable to change the map: it is immutable");
     }else
         outputError("No map or atribute name specified");
-    if(amVerbose())
-        output("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
+    if(report)output("Value %sappended to map.\n",(result==M_TRUE?"":"NOT "));
     return result;
 }/* VALIDATED */
 long long removedFromMap(Mmap* _map,Mallocationowner owner_map,char const * const attributeName){

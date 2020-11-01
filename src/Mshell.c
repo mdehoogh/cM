@@ -8411,6 +8411,9 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 											outputError("");outputValue("Failed to register '",listelementValue,"' in group");
 											output(" '%s'.\n",group);
 											// NOTE groupListValue will be freed by the gc, along with its list (groupList)
+										}else{ // success
+											groupMapelement=getMapelement(_groupMap,group);
+											if(report)output("New group list registered.\n");
 										}
 									}else{ // groupList is not bound in a group list value, so we have to free it ourselves
 										FREE_LIST(groupList,owner);groupList=NULL;
@@ -8418,14 +8421,19 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 									}
 								}else
 									outputError("Failed to create a group list");
-							}else // we may safely assume that the group list is in the value of the group map element
-								groupList=groupMapelement->_variable->_value->value._list;
-							long long groupListelementIndex=(groupList?appendedToList(groupList,owner,listelementValue,M_LL_INVALID):M_LL_INVALID);
-							if(groupListelementIndex<=0){
-								output(M_ERROR_PREFIX);outputValue("Failed to register '",listelementValue,"'");
-								output(" in group '%s'.\n",group);	
+							} // we may safely assume that the group list is in the value of the group map element
+							groupList=(groupMapelement?groupMapelement->_variable->_value->value._list:NULL);
+							if(groupList){
+								if(report)output("Number of elements in group list: %zd.\n",groupList->numberOfElements);
+								long long groupListelementIndex=
+											appendedToList(groupList,owner,listelementValue,M_LL_INVALID);
+								if(groupListelementIndex<=0){
+									output(M_ERROR_PREFIX);outputValue("Failed to register '",listelementValue,"'");
+									output(" in group '%s'.\n",group);	
+								}else
+								if(report)output("Index in group list with %zd elements: %lld.\n",groupList->numberOfElements,groupListelementIndex);
 							}else
-							if(report)output("Index in group list with %zd elements: %lld.\n",groupList->numberOfElements,groupListelementIndex);
+								outputError("Failed to obtain the group list");							
 						}else{
 							output(M_WARNING_PREFIX);outputValue("'",listelementValue,"' was not grouped.\n");
 						}
