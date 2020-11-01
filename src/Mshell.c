@@ -8400,29 +8400,49 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 						// I suppose that when the function returns NULL, we can't group
 						if(group){
 							if(report){outputValue("Group of '",listelementValue,"'");output(": '%s'.\n",group);}
-							Mlist* groupList=NULL; // the list to store the list element value in
 							Mmapelement* groupMapelement=getMapelement(_groupMap,group);
 							if(!groupMapelement){ // the given group is not yet present
-								groupList=owned_list(__list("Mlgroup"),owner);
+								Mlist* groupList=owned_list(__list("Mlgroup"),owner);
 								if(groupList){
 									Mvalue* groupListValue=_getValueOfList(disowned_list(groupList,owner));
 									if(groupListValue){
-										if(appendedToMap(_groupMap,owner,group,groupListValue)<=0){
-											outputError("");outputValue("Failed to register '",listelementValue,"' in group");
+										// NOTE unfortunately appendedToMap() will copy the list in groupListValue
+										//      TODO I have to think about whether this is correct or not
+										//      DONE it seems correct in that assignValue() will create a new
+										//           value wrapping a copy of the (currently) empty list
+										//           as a result groupListValue's reference count will still be 1
+										if(appendedToMap(_groupMap,owner,group,groupListValue)!=M_TRUE){
+											output(M_ERROR_PREFIX);
+											outputValue("Failed to register '",listelementValue,"' in group");
 											output(" '%s'.\n",group);
 											// NOTE groupListValue will be freed by the gc, along with its list (groupList)
 										}else{ // success
 											groupMapelement=getMapelement(_groupMap,group);
 											if(report)output("New group list registered.\n");
 										}
-									}else{ // groupList is not bound in a group list value, so we have to free it ourselves
-										FREE_LIST(groupList,owner);groupList=NULL;
+									}else // groupList is not bound in a group list value, so we have to free it ourselves
 										outputError("Failed to wrap a group list");
-									}
+									// NOTE the following is a bit elaborate because we know that
+									//      groupListValue will NOT be referenced (count==0) when it exists
+									//      so in any normal situation, we either get the warning or the list is freed
+									if(groupListValue){
+										// can't free groupList anyway because it is now owned
+										if(groupListValue->count==0){
+											if(Misdisowned(groupList)){
+												groupListValue->value._list=NULL;
+												free_list(groupList);
+											}else
+											if(report)
+												outputWarning("Can't free the wrapped group list!");
+										}else
+											outputError("Can't free the group list now!");
+									}else // groupList not bound to groupListValue
+										FREE_LIST(groupList,owner); // groupList is most likely disowned already 
 								}else
 									outputError("Failed to create a group list");
-							} // we may safely assume that the group list is in the value of the group map element
-							groupList=(groupMapelement?groupMapelement->_variable->_value->value._list:NULL);
+							} 
+							// we may safely assume that the group list is in the value of the group map element
+							Mlist* groupList=(groupMapelement?groupMapelement->_variable->_value->value._list:NULL);
 							if(groupList){
 								if(report)output("Number of elements in group list: %zd.\n",groupList->numberOfElements);
 								long long groupListelementIndex=
