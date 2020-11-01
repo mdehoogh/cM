@@ -189,7 +189,6 @@ long long free_mapelement(Mmapelement* _mapelement,bool weak/*,Mallocationowner 
     }
     return result;
 }/* VALIDATED */
-
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map){
     if(!_map)return NULL; // MDH@22OCT2020: this was missing before, which was causing crashes
     if(_map->_first)owned_mapelement(_map->_first,Msubowner(owner_map,1));
@@ -199,6 +198,19 @@ Mmap* disowned_map(Mmap* _map,Mallocationowner owner_map){
     if(!_map)return NULL;
     if(_map->_first)disowned_mapelement(_map->_first,owner_map);
     return DISOWNED(_map,owner_map);
+}
+// MDH@01NOV2020: why wasn't this here before?
+Mmap* __map(char* source){Mallocationowner owner=getOwner(__LINE__);
+    Mmap* _map=CALLOC_1(sizeof(Mmap),'M',owner);
+    if(source){
+        _map->_creator=owned_chars(_getChars(source),Msubowner(owner,1)); 
+        if(!_map->_creator)
+            output("%sFailed to register map creator '%s'.\n",M_ERROR_PREFIX,source);
+        else
+        if(amVerboseDebugging())
+            output("Map creator: '%s'.\n",_map->_creator->chars);
+    }
+    return disowned_map(_map,owner);
 }
 void free_map(Mmap* _map/*,Mallocationowner owner*/){
     if(!_map)return;

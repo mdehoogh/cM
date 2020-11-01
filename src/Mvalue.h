@@ -142,6 +142,7 @@ Mmapelement* disowned_mapelement(Mmapelement * const _mapelement,Mallocationowne
 #endif
 
 typedef struct Mmap{
+    Mchars* _creator; // MDH@01NOV2020: replacing: char *_creator;
     unsigned long long numberOfElements; // keep track of the total number of variables
     Mvaluetype valuetype; // the type all values in the map should have
     Mmapelement* _first;
@@ -150,6 +151,7 @@ typedef struct Mmap{
     bool immutable:1;
 }Mmap;
 
+Mmap* __map(char* source); // MDH@01NOV2020
 void free_map(Mmap* _map);
 #ifndef __PRODUCTION__
 Mmap* owned_map(Mmap* _map,Mallocationowner owner_map);

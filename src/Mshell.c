@@ -8363,6 +8363,90 @@ Mvalue* Mlsorted(Mvalue* _listValue){
 	return _getIntegerValue(result);
 }
 
+// MDH@01NOV2020: grouping can make seperate sublists from a list either into a list or a map
+Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owner=getOwner(__LINE__);
+	bool report=amVerboseDebugging()||DEBUGGING;
+	if((!_listValue||_listValue->type==VT_LIST)&&(!_functionValue||_functionValue->type==VT_FUNCTION)){
+		Mlist* list=(_listValue?_listValue->value._list:NULL);
+		if(list){
+			// if no function is specified Mlgroup essentially uses the value type to construct the groups
+			Mmap* _groupMap=owned_map(__map("Mlgroup"),owner);
+			if(_groupMap){
+				Mfunction* function=(_functionValue?_functionValue->value._function:NULL);
+				long long functionArgumentIndex=0;
+				Mlist* _functionArgumentList=(function?owned_list(__list("Mlgroup"),owner):NULL);
+				if(_functionArgumentList)functionArgumentIndex=appendedToList(_functionArgumentList,owner,NULL,M_LL_INVALID);
+				if(!function||functionArgumentIndex>0){
+					Mvalue* listelementValue;
+					Mlistelement* listelement=list->_first;
+					while(listelement){
+						// does it make sense to group NULL values?????
+						listelementValue=listelement->_value;
+						char* group=NULL;
+						if(listelementValue){
+							if(function){
+								if(appendedToList(_functionArgumentList,owner,listelementValue,functionArgumentIndex)>0){
+									Mmap* _functionArgumentMap=_getFunctionArgumentMap(function,_functionArgumentList,owner);
+									Mvalue* groupValue=getValueOfFunctionCall(function,"",_functionArgumentMap);
+									FREE_MAP(_functionArgumentMap,owner);
+									Mstring* _groupValueText=owned_string(_getValueText(groupValue,true),owner);
+									group=string(_groupValueText);
+									FREE_STRING(_groupValueText,owner);
+								}
+							}else // no function, all NULL values will end up in the "" map element
+								group=VALUETYPENAMES[listelementValue->type];
+						}else
+							group="";
+						// I suppose that when the function returns NULL, we can't group
+						if(group){
+							if(report){outputValue("Group of '",listelementValue,"'");output(": '%s'.\n",group);}
+							Mlist* groupList=NULL; // the list to store the list element value in
+							Mmapelement* groupMapelement=getMapelement(_groupMap,group);
+							if(!groupMapelement){ // the given group is not yet present
+								groupList=owned_list(__list("Mlgroup"),owner);
+								if(groupList){
+									Mvalue* groupListValue=_getValueOfList(disowned_list(groupList,owner));
+									if(groupListValue){
+										if(appendedToMap(_groupMap,owner,group,groupListValue)<=0){
+											outputError("");outputValue("Failed to register '",listelementValue,"' in group");
+											output(" '%s'.\n",group);
+											// NOTE groupListValue will be freed by the gc, along with its list (groupList)
+										}
+									}else{ // groupList is not bound in a group list value, so we have to free it ourselves
+										FREE_LIST(groupList,owner);groupList=NULL;
+										outputError("Failed to wrap a group list");
+									}
+								}else
+									outputError("Failed to create a group list");
+							}else // we may safely assume that the group list is in the value of the group map element
+								groupList=groupMapelement->_variable->_value->value._list;
+							long long groupListelementIndex=(groupList?appendedToList(groupList,owner,listelementValue,M_LL_INVALID):M_LL_INVALID);
+							if(groupListelementIndex<=0){
+								output(M_ERROR_PREFIX);outputValue("Failed to register '",listelementValue,"'");
+								output(" in group '%s'.\n",group);	
+							}else
+							if(report)output("Index in group list with %zd elements: %lld.\n",groupList->numberOfElements,groupListelementIndex);
+						}else{
+							output(M_WARNING_PREFIX);outputValue("'",listelementValue,"' was not grouped.\n");
+						}
+						listelement=listelement->_next;
+					}
+					return _getValueOfMap(disowned_map(_groupMap,owner));
+				}else{ // we have a function, but not a valid function argument list
+					if(_functionArgumentList)FREE_LIST(_functionArgumentList,owner);
+					outputError("Failed to prepare for calling the group function");
+				}
+
+			}else
+				outputError("Failed to create the group map");
+		}
+	}else{
+		if(_listValue)outputError("First argument to the group function not a list");
+		if(_functionValue)outputError("Second argument to the group function not a function");
+	}
+
+	return NULL;
+}
 /**
  * getValueOfExpression() is the work horse for evaluating individual (simple i.e. non composite expressions) expressions 
  * the first token is being passed in which of course should represent a value somehow, evaluateExpression needs 
@@ -8684,7 +8768,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			if(!completedListFunctionValueFunction(_getFunction(_Menvironment,owner,"reduce"),"reduce",Mlreduce)
 					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"map"),"map",Mlmap)
 					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"filter"),"filter",Mlfilter)
-					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"foreach"),"foreach",Mlforeach)){
+					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"foreach"),"foreach",Mlforeach)
+					||!completedListFunctionFunction(_getFunction(_Menvironment,owner,"group"),"group",Mlgroup)
+					){
 				outputError("Failed to register the infamous reduce, map, filter and foreach list functions");
 				return NULL;
 			}
