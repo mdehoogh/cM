@@ -4638,7 +4638,9 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=owned_list(_getListOfType(_list->valuetype),owner);
+		// MDH@01NOV2020: a ha, using the same type is not a good idea if applying the operator results in a different type
+		//                better to use undefined if the type of value and of the list are different
+		_result=owned_list(_getListOfType(_list->valuetype!=_value->type?VT_UNDEFINED:_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index)>0)
 			_listelement=_listelement->_next;
@@ -4651,7 +4653,7 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=owned_list(_getListOfType(_list->valuetype),owner);
+		_result=owned_list(_getListOfType(_list->valuetype!=_value->type?VT_UNDEFINED:_list->valuetype),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index)>0)
 			_listelement=_listelement->_next;

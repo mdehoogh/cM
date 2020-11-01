@@ -4959,10 +4959,16 @@ Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryope
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=owned_list(_getListOfType(_list->valuetype),owner);
+		bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
+		_result=owned_list(_getListOfType(VT_UNDEFINED),owner);
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,owner,binaryoperator(_listelement->_value,_value),_listelement->index)>0)
+		while(_listelement){
+			Mvalue* resultValue=binaryoperator(_listelement->_value,_value);
+			if(appendedToList(_result,owner,resultValue,_listelement->index)<=0)break;
+			if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
 			_listelement=_listelement->_next;
+		}
+		if(resultsOfSameType)_result->valuetype=_list->valuetype;
 	}else
 		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
 	return _getValueOfList(disowned_list(_result,owner));
@@ -4972,10 +4978,16 @@ Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryop
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		_result=owned_list(_getListOfType(_list->valuetype),owner);
+		bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
+		_result=owned_list(_getListOfType(VT_UNDEFINED),owner);
 		Mlistelement* _listelement=_list->_first;
-		while(_listelement&&appendedToList(_result,owner,binaryoperator(_value,_listelement->_value),_listelement->index)>0)
+		while(_listelement){
+			Mvalue* resultValue=binaryoperator(_value,_listelement->_value);
+			if(appendedToList(_result,owner,resultValue,_listelement->index)<=0)break;
+			if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
 			_listelement=_listelement->_next;
+		}
+		if(resultsOfSameType)_result->valuetype=_list->valuetype;
 	}else
 		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
 	return _getValueOfList(disowned_list(_result,owner));
