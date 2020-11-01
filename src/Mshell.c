@@ -8318,10 +8318,10 @@ static Mlistelement* partition(Mlist* const list,Mlistelement* const lmin1,Mlist
 	return i; //* i+1 but actually we are returning i itself because that's the first value used
 }
 // Mlsort performs an inline sort i.e. the input list is rearranged
-Mvalue* Mlsort(Mvalue* _listValue){
+// helper function to sort a list
+static long long lsort(Mlist* _list){
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
-	Mlist* _list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
 	if(_list){
 		Mlistelement* listelement=_list->_first;
 		if(listelement&&listelement!=_list->_last){ // at least two items
@@ -8360,6 +8360,29 @@ Mvalue* Mlsort(Mvalue* _listValue){
 				outputError("Not enough memory to sort the list");
 		}else // no need to sort so success
 			result=M_TRUE;
+	}
+	return result;
+}
+Mvalue* Mlsort(Mvalue* _listValue){
+	long long result=M_LL_INVALID;
+	// can either sort a list or the list elements in a map
+	if(_listValue){
+		if(_listValue->type==VT_MAP){
+			// will return the number of successfully sorted elements
+			result=0;
+			Mmapelement* mapelement=(_listValue->value._map?_listValue->value._map->_first:NULL);
+			while(mapelement){
+				Mvalue* mapelementValue=(mapelement->_variable?mapelement->_variable->_value:NULL);
+				if(mapelementValue){
+					Mvalue* mapelementValueSortResult=Mlsort(mapelementValue);
+					long long mapelementSortResult=(mapelementValueSortResult->value._integer->ll);
+					if(mapelementSortResult>0)result+=mapelementValueSortResult->value._integer->ll;
+				}
+				mapelement=mapelement->_next;
+			}
+		}else
+		if(_listValue->type==VT_LIST)
+			result=lsort(_listValue->value._list);
 	}
 	return _getIntegerValue(result);
 }
