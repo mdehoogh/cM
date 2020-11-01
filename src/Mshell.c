@@ -8317,7 +8317,8 @@ static Mlistelement* partition(Mlist* const list,Mlistelement* const lmin1,Mlist
 	swap(iplus1,h); //* swap(list[i+1],list[h])
 	return i; //* i+1 but actually we are returning i itself because that's the first value used
 }
-Mvalue* Mlsorted(Mvalue* _listValue){
+// Mlsort performs an inline sort i.e. the input list is rearranged
+Mvalue* Mlsort(Mvalue* _listValue){
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
 	Mlist* _list=(_listValue&&_listValue->type==VT_LIST?_listValue->value._list:NULL);
@@ -8775,7 +8776,8 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 			}
 			if(!completedListFunction(_getFunction(_Menvironment,owner,"statistics"),"statistics",Mstats)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"first"),"first",Mfirst)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"last"),"last",Mlast)){
+					||!completedListFunction(_getFunction(_Menvironment,owner,"last"),"last",Mlast)
+				){
 				outputError("Failed to register the statistics, first and last list functions");
 				return NULL;
 			}
@@ -8783,8 +8785,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Mlsorted)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)){
+					||!completedListFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Mlsort)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)
+				){
 				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");
 				return NULL;
 			}
