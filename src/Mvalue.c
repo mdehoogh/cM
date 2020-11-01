@@ -1112,8 +1112,12 @@ void checkList(Mlist* _list){
     if(_list->immutable){outputError("Unable to change the list: it is immutable");return 0;}
     // MDH@05NOV2019: let's always allow adding NULL or undefined values to a list
     if(_value&&_value->type!=VT_UNDEFINED&&_list->valuetype!=VT_UNDEFINED)
-    if(_value->type!=_list->valuetype)
-    {output("%s",M_ERROR_PREFIX);outputValue("Unable to add '",_value,"' to a list: it is of the wrong type.\n");return 0;}
+    if(_value->type!=_list->valuetype){
+        output(M_ERROR_PREFIX);
+        outputValue("Unable to add '",_value,"'");
+        output(" of type '%s' to a list of type '%s'.\n",VALUETYPENAMES[_value->type],VALUETYPENAMES[_list->valuetype]);
+        return 0;
+    }
     // check validity of index first
     long long lastindex=(_list->_last?_list->_last->index:0); // ASSERT lastindex nonnegative
     // MDH@17OCT2019: index 0 now does not indicate to append to the end anymore but now indicates that the given value should be prepended!!!!
