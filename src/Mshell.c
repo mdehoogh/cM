@@ -8390,6 +8390,15 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 	return _getIntegerValue(foreachCount);
 }
 
+// MDH@02NOV2020: we can speed up sorting if we can somehow reverse parts of a list
+static void reverse(Mlist* _list){
+	// because a list of forward linked we simply have to make every successor point to its predecessor list element
+	Mlistelement *predecessor=(_list?_list->_first:NULL);
+	while(predecessor){
+		successor=predecessor->_next;
+		successor->next=
+	}
+}
 static void swap(Mlistelement* const listelement1,Mlistelement* const listelement2){
 	// normally we would not be allowed to do it this way, but the reference count
 	// of both values remains the same when we exchange their position in the list
