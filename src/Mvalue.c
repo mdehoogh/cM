@@ -11,7 +11,7 @@ static bool DEBUGGING=true;
 static uint16_t const MODULE_ID=13;
 static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MODULE_ID,id};}
 
-extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO;
+extern const long long M_LL_INVALID,M_LL_MIN,M_LL_MAX,M_TRUE,M_FALSE,M_POSITIVE,M_NEGATIVE,M_ZERO,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END;
 extern const char * const VALUETYPENAMES[]; // the characters associated with each of the value types
 extern const char * const MUTABLEVALUETYPECHARS; // the characters associated with each of the value types
 extern const char * const IMMUTABLEVALUETYPECHARS; // the characters associated with each of the value types
@@ -1363,8 +1363,10 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
     return _rationalValue;
 }/* VALIDATED */
 
+// MDH@02NOV2020: because lists can be very large, we adapt _getListText with a value telling it the maximum
+//                number of elements to display from the start and at the end
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
-Mstring* _getListText(Mlist const * const _list){Mallocationowner owner=getOwner(__LINE__);
+Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
     ///////output("List to output.");char c;inputCharRead(&c);
 	Mstring* result=owned_string(__string(),owner);
     if(result){
@@ -1375,10 +1377,37 @@ Mstring* _getListText(Mlist const * const _list){Mallocationowner owner=getOwner
         unsigned long long listindex=1;
 		Mlistelement* _listelement=(_list?_list->_first:NULL);
 		Mvalue* _listelementValue;
-		while(p&&_listelement){
+        long long firstAtEnd=_list->numberOfElements+1;firstAtEnd-=showAtEnd;
+        long long elementsNotIncluded=firstAtEnd-showAtStart-1;
+        // output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
+		while(p&&_listelement&&listindex<=_list->_last->index){
             ///////outputChar('$');
             // increment listindex until it is equal to _listelement->index
             if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
+            if(listindex==_listelement->index){
+                if(listindex<=showAtStart||listindex>=firstAtEnd){ // a displayable value
+                    if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
+				    Mstring* _listelementValueText=owned_string(_getValueText(_listelement->_value,false),owner); // to be freed asap
+				    if(_listelementValueText){
+					    p=string_append(p,string(_listelementValueText));
+					    FREE_STRING(_listelementValueText,owner); // release AFTER copying over
+				    }
+                    if(_listelement->_next)p=string_append_char(p,',');
+                }
+                _listelement=_listelement->_next;
+                // append a comma as there's a next element coming up
+            }
+            listindex++;
+            // output("(%llu)",listindex); // DEBUG
+            if(elementsNotIncluded>0&&listindex>=firstAtEnd){ // the first to show at the end coming up next
+                p=string_append(p,"(");
+                p=appendll(p,elementsNotIncluded);
+                p=string_append(p," element");
+                if(elementsNotIncluded>1)p=string_append_char(p,'s');
+                p=string_append(p," not shown),");
+                elementsNotIncluded=0; // for safety
+            }
+            /*
             while(listindex<_listelement->index){listindex++;p=string_append_char(p,',');}
             if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
             // MDH@17JUN2020: because weak list values can be freed without the list knowing about it we cannot display it without possibly crashing...
@@ -1395,6 +1424,7 @@ Mstring* _getListText(Mlist const * const _list){Mallocationowner owner=getOwner
             }else
             if(!amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
 			_listelement=_listelement->_next;
+            */
 		}
 		p=string_append_char(p,']');
 		/////output("List=%s",string(p));
@@ -1403,9 +1433,10 @@ Mstring* _getListText(Mlist const * const _list){Mallocationowner owner=getOwner
 	}
 	return disowned_string(result,owner);
 }/* VALIDATED */
-// MDH@02MAR2020: utility function to output a map
+// MDH@02MAR2020: utility function to output a list
+// MDH@02NOV2020: outputList() is typically used in debugging and we want it to show all elements
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _listText=owned_string(_getListText(list),owner);
+    Mstring* _listText=owned_string(_getListText(list,0,0),owner);
     output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
     FREE_STRING(_listText,owner);
 }/* VALIDATED */
@@ -1486,7 +1517,7 @@ Mstring* _getValueText(Mvalue const * const _value,bool dequoted){Mallocationown
 			case VT_FLOAT:valueText=owned_string(_getFloatText(_value->value._float),owner);break;
 			case VT_TEXT:valueText=owned_string(_getStringText(_value->value._text,dequoted),owner);break; // TODO don't dequote the text!!
 			case VT_MAP:valueText=owned_string(_getMapText(_value->value._map,true,true,true),owner);break;
-			case VT_LIST:valueText=owned_string(_getListText(_value->value._list),owner);break;
+			case VT_LIST:valueText=owned_string(_getListText(_value->value._list,M_LIST_ELEMENTS_AT_START,M_LIST_ELEMENTS_AT_END),owner);break;
             case VT_TOKEN:
                 { // can't just show the single token because we could have following ones
                     valueText=owned_string(__string(),owner);

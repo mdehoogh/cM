@@ -241,7 +241,8 @@ Mvalue* getValueOfAttribute(Mmap* _map,char* attributeName);
 Mvalue** getValueHolderAtIndex(Mlist* _list,long long index); // helper function that can be used on any Mlist even if defined outside an environment (as getResult() defined in M.c does!!!)
 Mvalue** getValueHolderOfAttribute(Mmap* _map,char* attributeName);
 
-Mstring* _getListText(Mlist const * const _list);
+// MDH@02NOV2020: limiting the number of values from the list to actually show...
+Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long showAtEnd);
 Mstring* _getMapText(Mmap const * const _map,bool showcurlybraces,bool showquotes,bool showmissings);
 
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix); // MDH@02MAR2020: utility function to output a list

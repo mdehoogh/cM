@@ -50,6 +50,9 @@ const char* const M_NULL_VARIABLE_NAME="NULL";
 const char* const M_UNDEFINED_VALUE_TEXT="UNDEFINED"; // the text to represent values that are undefined...
 const char* const M_UNDEFINED_VARIABLE_NAME="UNDEFINED";
 
+// MDH@02NOV2020: because lists can be very long, we only show a limited amount of elements at the start and end
+const long long M_LIST_ELEMENTS_AT_START=50;
+const long long M_LIST_ELEMENTS_AT_END=50;
 const long long M_LL_INVALID=LLONG_MIN; // the invalid long long defaults to LLONG_MIN
 // it's preferable if the allowed range of integer (long long) values, does not include LLONG_MIN
 const long long M_LL_MIN=LLONG_MIN+1;
@@ -8393,11 +8396,13 @@ Mvalue* Mlforeach(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner ow
 // MDH@02NOV2020: we can speed up sorting if we can somehow reverse parts of a list
 static void reverse(Mlist* _list){
 	// because a list of forward linked we simply have to make every successor point to its predecessor list element
+	/*
 	Mlistelement *predecessor=(_list?_list->_first:NULL);
 	while(predecessor){
 		successor=predecessor->_next;
 		successor->next=
 	}
+	*/
 }
 static void swap(Mlistelement* const listelement1,Mlistelement* const listelement2){
 	// normally we would not be allowed to do it this way, but the reference count
