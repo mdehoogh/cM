@@ -56,3 +56,8 @@ Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3); // get rgb text 
 
 // math two-argument functions
 Mvalue* Mpow(Mvalue* _value,Mvalue* _exponentValue);
+
+// MDH@02MAY2020
+Mvalue* Mrand(); // to return a random value between 0 and 1
+Mvalue* Mrands(Mvalue* _countValue); // returns a list of _countValue random numbers
+Mvalue* Msrand(Mvalue* _seedValue);

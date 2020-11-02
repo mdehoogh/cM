@@ -1,5 +1,7 @@
 #include "Mrational.h"
 
+static bool DEBUGGING=true;
+
 static uint16_t const MODULE_ID=11;
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}
 
@@ -1092,7 +1094,7 @@ Mstring* _getRationalText(Mrational const * const _rational){Mallocationowner ow
         if(_rationalText){
             ///outputChar('d');
             Mstring* p=_rationalText;
-            // removing: p=string_append_char(p,'(');
+            p=string_append_char(p,'(');
             ///outputChar('e');
             Mstring* _numeratorBigintegerText=owned_string(_getBigintegerText(_rational->num),owner);
             ///outputChar('f');
@@ -1100,12 +1102,12 @@ Mstring* _getRationalText(Mrational const * const _rational){Mallocationowner ow
             ///outputChar('g');
             if(_rational->den){
                 p=string_append_char(p,'/');
-                p=string_append_char(p,'/'); // MDH@28OCT2020: inserted to indicate integer division
+                // p=string_append_char(p,'/'); // MDH@28OCT2020: inserted to indicate integer division
                 Mstring* _denominatorBigintegerText=owned_string(_getBigintegerText(_rational->den),owner);
                 if(_denominatorBigintegerText){p=string_append(p,string(_denominatorBigintegerText));FREE_STRING(_denominatorBigintegerText,owner);}
             }
             ///outputChar('k');
-            // removing: p=string_append_char(p,')');
+            p=string_append_char(p,')');
             ///outputChar('l');
             // if a delta is known, append that as well!!!
             if(_rational->delta){
@@ -1223,13 +1225,15 @@ Mrational* _getLongDoubleRational(long double ld,int maxiter){Mallocationowner o
 // MDH@07JUN2019: converting a rational to a double
 // MDH@19SEP2019: TODO the conversion of the numerator or denominator big integer might fail if the big integer is too large, therefore actually performing the division of the big integers seems a better approach 
 long double getRationalLongDouble(Mrational const * const _rational){
+    bool report=amVerboseDebugging()||DEBUGGING;
+    long double result=M_LD_NAN;
     if(_rational){
         // as you can see up we're storing the delta in our rationals as well, so if we want to get ld back out of it the formula is: (numerator+delta)/denominator
         // but with the numerator and denominator possibly big integers adding delta to the numerator means adding a double to a big integer (of course delta typically is very small)
         // it's easiest to turn the numerator big integer into a long double and add delta to it, and divide by the long double stored in the denominator
         // TODO find a better way to do this
         long double ldNumerator=mp_get_long_double(_rational->num); // NOTE also shortcuts when _rational->num equals 0 but we have to add the delta, so we have to do it this way
-        if(amVerbose())output("Rational numerator converted to long double '%.*Lf'.\n",LDBL_DIG,ldNumerator);
+        if(report)output("Rational numerator converted to long double '%.*Lf'.\n",LDBL_DIG,ldNumerator);
         if(isLongDoubleUndefined(ldNumerator)==M_FALSE){ // not undefined i.e. supposedly defined (although it could still be infinity theoretically)
             // if we do NOT have a denominator (i.e. the denominator equals one we only need to add the delta (if any))
             if(!_rational->den){if(_rational->delta)ldNumerator+=_rational->delta->ld;return ldNumerator;}
@@ -1237,13 +1241,16 @@ long double getRationalLongDouble(Mrational const * const _rational){
             long double ldDenominator=mp_get_long_double(_rational->den);
             if(isFloatUndefined(_rational->delta)!=M_TRUE&&isFloatZero(_rational->delta)!=M_TRUE)ldNumerator+=(ldDenominator*_rational->delta->ld); // if delta is NOT undefined and NOT zero, add the denominator multiplied by the delta to the numerator
             // a denominator which is not equal to 1
-            if(amVerbose())output("Rational denominator converted to long double '%.*Lf'.\n",LDBL_DIG,ldDenominator);
-            if(isLongDoubleUndefined(ldDenominator)!=M_TRUE&&isLongDoubleZero(ldDenominator)!=M_TRUE)return ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok but testing it just the same
-            if(amVerbose())outputError("Failed to convert a rational denominator to a long double");
-        }
-        if(amVerbose())outputError("Failed to convert a rational numerator to a long double");
+            if(report)output("Rational denominator converted to long double '%.*Lf'.\n",LDBL_DIG,ldDenominator);
+            if(isLongDoubleUndefined(ldDenominator)!=M_TRUE&&isLongDoubleZero(ldDenominator)!=M_TRUE){
+                result=ldNumerator/ldDenominator; // NOTE the denominator won't equal 0 so this should be Ok but testing it just the same
+                if(report)output("Rational converted to long double %.*Lf'.\n",LDBL_DIG,result);
+            }else
+                outputError("Failed to convert a rational denominator to a long double");
+        }else
+            outputError("Failed to convert a rational numerator to a long double");
     }
-    return M_LD_NAN; // if something went wrong
+    return result;
 }/* VALIDATED */
 
 // functions for testing the sign that return false if rational is not defined, and assume that the sign of the numerator is the sign of the rational (i.e. the denominator should never be negative!!)

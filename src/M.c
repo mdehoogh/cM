@@ -1832,17 +1832,17 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 			case VT_DECIMAL:outputTokenTypeColor(TT_REAL);outputDecimal(NULL,_value->value._decimal,NULL);break;
 			case VT_RATIONAL:
 				if(_value->value._rational){
-					// removing: written+=outputChar('(');
+					written+=outputChar('(');
 					outputTokenTypeColor(TT_INTEGER);written+=outputBiginteger(NULL,_value->value._rational->num,NULL);resetOutputColor();
 					written+=outputChar('/');
-					written+=outputChar('/'); // MDH@28OCT2020: inserting
+					// written+=outputChar('/'); // MDH@28OCT2020: inserting
 					outputTokenTypeColor(TT_INTEGER);
 					if(_value->value._rational->den){
 						written+=outputBiginteger(NULL,_value->value._rational->den,NULL);
 					}
 					else written+=outputChar('1'); // a missing denominator means it's equal to 1
 					resetOutputColor();
-					// removing: written+=outputChar(')');
+					written+=outputChar(')');
 					if(_value->value._rational->delta){
 						outputTokenTypeColor(TT_REAL);
 						if(_value->value._rational->delta->ld>=0)written+=outputChar('+');
@@ -1863,15 +1863,40 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				// TODO not using _getListText() as defined in Mexecution
 				/////////if(amVerbose())outputValue("List value '",_value,"'.");
 				{
+					// MDH@02NOV2020: given that a list can be very large, let's stick to displaying at most 100 values
+					//                that's like 50 starting values and 50 ending values
 					written+=outputChar('[');
 					Mlist* _list=_value->value._list;
 					if(_list&&_list->numberOfElements){
+						long long numberOfElementsNotWritten=_list->numberOfElements;
+						numberOfElementsNotWritten-=100;
 						Mlistelement* _listelement=_list->_first;
 						unsigned long long listitemindex=1;
-						while(_listelement){
-							if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
-							written+=outputValueColored(_listelement->_value);
-							_listelement=_listelement->_next;
+						if(numberOfElementsNotWritten<=0){
+							while(_listelement){
+								if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
+								written+=outputValueColored(_listelement->_value);
+								_listelement=_listelement->_next;
+							}							
+						}else{
+							// show the first 50 elements
+							while(_listelement){
+								if(_listelement->index)while(listitemindex<MIN(50,_listelement->index)){listitemindex++;written+=outputChar(',');} // missing elements
+								if(listitemindex!=_listelement->index)break; // if we didn't reach the list element, don't display it
+								written+=outputValueColored(_listelement->_value);
+								_listelement=_listelement->_next;
+							}
+							// show how many elements are not displayed
+							written+=output(",(%lld elements not displayed)",numberOfElementsNotWritten);
+							// and skip them
+							while(--numberOfElementsNotWritten>=0){listitemindex=_listelement->index;_listelement=_listelement->_next;}
+							// show all further elements
+							while(_listelement){
+								if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
+								if(listitemindex!=_listelement->index)break; // if we didn't reach the list element, don't display it
+								written+=outputValueColored(_listelement->_value);
+								_listelement=_listelement->_next;
+							}
 						}
 					}
 					written+=outputChar(']');

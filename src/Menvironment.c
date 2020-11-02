@@ -1936,6 +1936,12 @@ bool registerInternalFunctions(Menvironment* const _environment,Mallocationowner
     if(!completedValueValueFunction(_getFunction(_environment,owner_environment,"set"),"set",Mset))return false;
 
     // variable functions
+
+    // MDH@02NOV2020: random functions
+    if(!completedFunction(_getFunction(_environment,owner_environment,"rand"),"rand",Mrand))return false;
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"rands"),"rands",Mrands))return false;
+    if(!completedValueFunction(_getFunction(_environment,owner_environment,"srand"),"srand",Msrand))return false;
+
     // math functions
     if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cos"),"cos",Mcos))return false;
     if(!completedFloatFunction(_getFunction(_environment,owner_environment,"cordiccos"),"cordiccos",Mcordiccos))return false;

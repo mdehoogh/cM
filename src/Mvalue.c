@@ -6,7 +6,7 @@
 
 #include "Mvalue.h"
 
-static bool DEBUGGING=false;
+static bool DEBUGGING=true;
 
 static uint16_t const MODULE_ID=13;
 static Mallocationowner getOwner(int16_t id){return(Mallocationowner){MODULE_ID,id};}
@@ -326,31 +326,31 @@ extern const char* const VALUETYPENAMES[];
 size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(__LINE__);
     unsigned long long tofree=0,removed=0;
     if(_valueList){
-        if(showInfo)output("Garbage collecting unused values.\n");
+        if(showInfo||DEBUGGING)output("Garbage collecting unused values.\n");
         Mallocationowner owner_valueListelement=Msubowner(owner_valueList,1);
         Mallocationowner owner_value=Msubowner(owner_valueList,2);
         Mlistelement* _valueListelement=_valueList->_first;
-        if(showInfo)output("Number of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
+        if(showInfo||DEBUGGING)output("Number of values to check: %llu.\n",_valueList->numberOfElements); // MDH@11NOV2019: no longer the actual number of elements to check
         unsigned long long checked=0;
         while(_valueListelement){
             checked++;
             if(_valueListelement->_value){
                 if(showInfo){
-                    output("Checking value #%llu with id %llu",checked,_valueListelement->index);
+                    output("\nChecking value #%llu with id %llu",checked,_valueListelement->index);
                     outputValue(": '",_valueListelement->_value,"'.\n");
                 }
                 // if(showInfo)outputInfo("\tChecking the count!");
                 if(_valueListelement->_value->count==0){ // unused
-                    if(showInfo)output("\tFreeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
+                    if(showInfo)output("Freeing unused value #%llu of type '%s'.\n",checked,VALUETYPENAMES[_valueListelement->_value->type]);
                     free_value(_valueListelement->_value);_valueListelement->_value=NULL; // essential to NULL so removing the value list elements below becomes possible
                     tofree++;
                 }else
-                if(showInfo)outputInfo("\tStill in use!");
+                if(showInfo)outputInfo("Still in use!");
             }else
                 output("%sNo value stored in value #%llu.\n",M_BUG_PREFIX,checked); // technically a bug not an error
             _valueListelement=_valueListelement->_next;
         }
-        if(showInfo)output("Number of values checked: %llu.\nNumber of value list elements to free: %llu.\n",checked,tofree);
+        if(showInfo||DEBUGGING)output("Number of values checked: %llu.\nNumber of values to remove: %llu.\n",checked,tofree);
         // the list is now intact, are we going to correct the links??????
         if(tofree>0){ // some values were freed
             Mlistelement* _firstValueListelement=NULL; // the first value list element to remain
@@ -371,14 +371,23 @@ size_t getNumberOfRemovedValues(bool showInfo){Mallocationowner owner=getOwner(_
                     if(_valueList->numberOfElements>0)_valueList->numberOfElements--;else output("BUG: Trying to free a value list element that is not counted!");  // one less element in the list!!!
                     */
                     FREE_DISOWNED_1(_valueListelement,'l',owner_valueListelement);
+                    if(showInfo)if(removed%1000==0)output("Removed values so far: %llu.\n",removed);
                 }
                 // next to check!!!
                 _valueListelement=_nextValueListelement;
             }
-            if(showInfo)output("Actual number of values freed: %llu.\n",removed);
+            if(showInfo||DEBUGGING)output("Actual number of values removed: %llu.\n",removed);
             // update the first and last in the list (could both be NULL!!!)
             _valueList->_first=_firstValueListelement;
             _valueList->_last=_lastValueListelement;
+            // let's check how many we have left
+            if(showInfo||DEBUGGING){
+                unsigned long long left=0;
+                _valueListelement=_valueList->_first;
+                while(_valueListelement){left++;_valueListelement=_valueListelement->_next;}
+                long long unaccounted=checked;unaccounted-=(left+removed);
+                output("Number of values left: %llu (unaccounted: %lld).\n",left,unaccounted);
+            }
         }
     }
     if(tofree>0){

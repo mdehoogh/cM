@@ -656,3 +656,30 @@ Mvalue* Mtrgb(Mvalue* _value1,Mvalue* _value2,Mvalue* _value3){
     ////////output("ANSI foreground color code: '%s'.\n",s);
     return _getTextValue(s);
 }
+
+// random functions
+Mvalue* Mrand(){ // to return a random value between 0 and 1
+    return _getValueOfRational(_getRational(_getBiginteger(rand()),_getBiginteger(RAND_MAX),M_LD_NAN,false));
+}
+// if you want a list of random values call Mrands()
+Mvalue* Mrands(Mvalue* _countValue){Mallocationowner owner=getOwner(__LINE__);
+    long long count=getValueInteger(_countValue);
+    if(count>0){
+        Mlist* _randList=owned_list(__list("Mrands"),owner);
+        while(--count>=0&&appendedToList(_randList,owner,Mrand(),M_LL_INVALID)>0);
+        return _getValueOfList(disowned_list(_randList,owner));
+    }
+    return NULL;
+}
+Mvalue* Msrand(Mvalue* _seedValue){
+    long long result=M_LL_INVALID;
+    long long seed=(_seedValue?getValueInteger(_seedValue):time(NULL));
+    long long seedmax=UINT_MAX;
+    if(seed>0&&seed<=seedmax){
+        srand(seed);
+        result=M_TRUE;
+    }else
+    if(seed>0)
+        result=M_FALSE;
+    return _getIntegerValue(result);
+}

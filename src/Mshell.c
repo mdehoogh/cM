@@ -2655,6 +2655,7 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 // TODO how many iterations would we accept at most?????
 Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
+	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Q));
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
 	Mvalue* _rationalValue=NULL;
 	if(_value->type==VT_FLOAT)
@@ -2669,6 +2670,7 @@ Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 // MDH@09OCT2019: TODO=DONE how about turning a unpure rational into a pure rational???? yes, that's a good idea
 Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
+	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,q));
 	if(_value->type==VT_RATIONAL){
 		Mrational* rational=_value->value._rational;
 		if(!rational||floatIsUndefinedOrZero(rational->delta))return _value;
@@ -2696,10 +2698,12 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // TODO complete with conversion from big integer and rational
-Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
+Mvalue* f(Mvalue* _value){
+	if(!_value||_value->type==VT_FLOAT)return _value;
+	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,f));
+	bool report=amVerboseDebugging()||DEBUGGING;
 	long double ld=M_LD_NAN;
-	if(amVerboseDebugging())
-	{outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
+	if(report){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 	switch(_value->type){
 		case VT_INTEGER:ld=(long double)_value->value._integer->ll;break;
 		case VT_BIGINTEGER:if(_value->value._biginteger)ld=mp_get_long_double(_value->value._biginteger);break;
@@ -2708,7 +2712,7 @@ Mvalue* f(Mvalue* _value){if(!_value||_value->type==VT_FLOAT)return _value;
 		case VT_TEXT:ld=_strtold(_value->value._text->_c,getNAR());break;
 		default:return NAF_value; // if NAF_value is returned, we do NOT disown it as we would with _floatValue being created here!!!
 	}
-	return(isLongDoubleUndefined(ld)?_getFloatValue(ld):NULL);
+	return(isLongDoubleUndefined(ld)==M_FALSE?_getFloatValue(ld):NULL);
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
 Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
@@ -4914,12 +4918,20 @@ Mvaluereference* _getValueReference(char* info,TokenType endTokenTypes[],uint8_t
 
 // BINARY OPERATOR + functions
 
-Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
+// helper functions that apply binary operators to value of which at least one is a list
+// MDH@03NOV2020: I suppose we can have a method that will provide us with the value type for applying binary operators that maintain type
+static Mvaluetype getMatchingListValuetype(Mvaluetype listValuetype,Mvaluetype valueValuetype){
+	// essentially the matching list value type is listValuetype unless valueValuetype is different
+	// TODO we might improve on this if we select the 'highest' of the two value types as the result type
+	return(listValuetype!=valueValuetype?VT_UNDEFINED:listValuetype);
+}
+Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	if(!_list1)return _list2;if(!_list2)return _list1;
 	// MDH@30OCT2019: ALWAYS apply the binary operator i.e. do NOT just return the value!!! (which makes perfect sense for equality / unequality)
 	//                TODO if the result equals NULL, should we then NOT add the given element?????
 	// ASSERT neither are NULL
-	Mlist* _result=owned_list(_getListOfType(_list1->valuetype==_list2->valuetype?_list1->valuetype:VT_UNDEFINED),owner); // TODO if the types are the same use that?
+	// MDH@03NOV2020: the return type of the list really depends on the binary operator applied, whether or not it maintains type integrity, so it makes sense to actually pass in the list result type as a separate argument
+	Mlist* _result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list1->valuetype,_list2->valuetype):VT_UNDEFINED),owner); // TODO if the types are the same use that?
 	// elements with the same index are to be added and stored under that index
 	Mlistelement* _listelement1=_list1->_first;
 	Mlistelement* _listelement2=_list2->_first;
@@ -4954,42 +4966,42 @@ Mlist* _appliedToLists(Mlist* _list1,Mlist* _list2,TwoArgumentFunction binaryope
 	return disowned_list(_result,owner);
 }
 // we can use a single function to apply a certain binary operator because the functions have the same signature as a TwoArgumentFunction!!
-Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* _appliedToList(Mlist* _list,Mvalue* _value,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
-		_result=owned_list(_getListOfType(VT_UNDEFINED),owner);
+		// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
+		_result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement){
 			Mvalue* resultValue=binaryoperator(_listelement->_value,_value);
 			if(appendedToList(_result,owner,resultValue,_listelement->index)<=0)break;
-			if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
+			// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
 			_listelement=_listelement->_next;
 		}
-		if(resultsOfSameType)_result->valuetype=_list->valuetype;
+		// if(resultsOfSameType)_result->valuetype=_list->valuetype;
 	}else
-		_result=_appliedToLists(_list,_value->value._list,binaryoperator);
+		_result=_appliedToLists(_list,_value->value._list,binaryoperator,maintainsValuetype);
 	return _getValueOfList(disowned_list(_result,owner));
 }
-Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* _appliedToList2(Mvalue* _value,Mlist* _list,TwoArgumentFunction binaryoperator,bool maintainsValuetype){Mallocationowner owner=getOwner(__LINE__);
 	// scalars are to be added to each element of the original list
 	// lists are to be added to the elements at the same position, so listwise
 	Mlist* _result=NULL;
 	if(_value->type!=VT_LIST){
-		bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
-		_result=owned_list(_getListOfType(VT_UNDEFINED),owner);
+		// bool resultsOfSameType=(_list->valuetype!=VT_UNDEFINED);
+		_result=owned_list(_getListOfType(maintainsValuetype?getMatchingListValuetype(_list->valuetype,_value->type):VT_UNDEFINED),owner);
 		Mlistelement* _listelement=_list->_first;
 		while(_listelement){
 			Mvalue* resultValue=binaryoperator(_value,_listelement->_value);
 			if(appendedToList(_result,owner,resultValue,_listelement->index)<=0)break;
-			if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
+			// if(resultValue)if(resultValue->type!=_list->valuetype)resultsOfSameType=false;
 			_listelement=_listelement->_next;
 		}
-		if(resultsOfSameType)_result->valuetype=_list->valuetype;
+		// if(resultsOfSameType)_result->valuetype=_list->valuetype;
 	}else
-		_result=_appliedToLists(_value->value._list,_list,binaryoperator);
+		_result=_appliedToLists(_value->value._list,_list,binaryoperator,maintainsValuetype);
 	return _getValueOfList(disowned_list(_result,owner));
 }
 
@@ -5007,8 +5019,8 @@ Mbiginteger* _getBigintegerCopy(Mbiginteger* _biginteger){
 Mvalue* add(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL; // MDH@24OCT2019: propagate NULL
 	// if either is a list apply 'add' to the list (NOTE scalar addition is NOT the same as list addition)
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add);
-	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,add,true);
+	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,add,true);
 	// MDH@24OCT2019: isValueZero() can now also return M_LL_INVALID and we do NOT want the value to be considered a 'true' zero when that happens!!!!!
 	if(isValueZero(_value1)==M_TRUE)return _value2;
 	if(isValueZero(_value2)==M_TRUE)return _value1;
@@ -5149,8 +5161,8 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 	if(!_value1||!_value2)return NULL;
 	if(amVerboseDebugging())
 		{outputValue("Subtracting '",_value2,"'");outputValue(" from '",_value1,"'.\n");}
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,subtract,true);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,subtract,true);
 	// if either is zero, result is easy to determine
 	if(isValueZero(_value1)==M_TRUE)return Mneg(_value2);
 	if(isValueZero(_value2)==M_TRUE)return _value1;
@@ -5246,8 +5258,8 @@ Mvalue* subtract(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwne
 
 Mvalue* multiply(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply);
-	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,multiply,true);
+	if(_value2->type==VT_LIST)return _appliedToList(_value2->value._list,_value1,multiply,true);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE||isValueOne(_value1)==M_TRUE)return _value2;
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
@@ -6032,8 +6044,8 @@ Mvalue* _getBigintegerRootValue(Mvalue* rootArgumentValue,Mbiginteger* rootDegre
 }
 Mvalue* power(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,power,false); // MDH@02NOV2020 TODO: the input type is not always maintained for certain type combinations but sometimes it is
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,power,false);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return _getValueOneOfType(_value1->type); // if the power is zero, we return the value 1 with the same type as 
 	// MDH@26OCT2019: TODO same approach with any integer as in the other binary operators??????
@@ -6300,8 +6312,8 @@ Mvalue* epower(Mvalue* _value1,Mvalue* _value2){
 // MDH@07JUN2019: when two integers are presented to divide instead of actually computing the division we can store the division as a rational (so we kind of have a slow evaluation of the division, and we maintain accuracy as long as possible)
 Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divide,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divide,false);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO shouldn't we return infinity?????
 	// MDH@26OCT2019: dealing with any integer conform as we did in the other binary operators
@@ -6361,8 +6373,8 @@ Mvalue* divide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 }
 Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,integerdivide,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,integerdivide,false);
 	if(isValueZero(_value1)==M_TRUE||isValueOne(_value2)==M_TRUE)return _value1;
 	if(isValueZero(_value2)==M_TRUE)return NULL; // TODO or should we return some form of infinity?????
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
@@ -6479,8 +6491,8 @@ Mvalue* integerdivide(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=ge
 }
 Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,divideremainder,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,divideremainder,false);
 	if(isValueZero(_value1)==M_TRUE)return _value1;
 	if(isValueOne(_value2)==M_TRUE)return(_value2->type==VT_INTEGER?_getIntegerValue(0):_getFloatValue(0));
 	// MDH@26OCT2019: adapted from dealing with any integer type from add()
@@ -6594,12 +6606,12 @@ Mvalue* divideremainder(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=
 
 // integer arithmetic 
 // TODO yet to complete for big integers, rationals, decimals etc.
-long long not(long long boolean){return(boolean==M_LL_INVALID?M_LL_INVALID:(boolean==M_TRUE?M_FALSE:M_TRUE));} // if invalid, stays invalid, otherwise return M_FALSE when M_TRUE and vice versa
+static long long not(long long boolean){return(boolean==M_LL_INVALID?M_LL_INVALID:(boolean==M_TRUE?M_FALSE:M_TRUE));} // if invalid, stays invalid, otherwise return M_FALSE when M_TRUE and vice versa
 // bitwise operators (and, or, xor)
 Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwisexor);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwisexor);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwisexor,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwisexor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 		return _getIntegerValue(_value1->value._integer->ll^_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
@@ -6623,8 +6635,8 @@ Mvalue* bitwisexor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 }
 Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseand);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseand);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseand,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseand,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)return _getIntegerValue(_value1->value._integer->ll&_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		Mbiginteger* _bitwiseandbiginteger=owned_biginteger(__biginteger(),owner);
@@ -6647,8 +6659,8 @@ Mvalue* bitwiseand(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 }
 Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseor);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseor);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,bitwiseor,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,bitwiseor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 	return _getIntegerValue(_value1->value._integer->ll|_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
@@ -6674,8 +6686,8 @@ Mvalue* bitwiseor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 // logical binary operators
 Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicaland);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicaland,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicaland,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 		return _getIntegerValue(_value1->value._integer->ll&&_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
@@ -6695,8 +6707,8 @@ Mvalue* logicaland(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 }
 Mvalue* logicalor(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicalor);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicalor);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,logicalor,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,logicalor,false);
 	if(_value1->type==VT_INTEGER&&_value2->type==VT_INTEGER)
 		return _getIntegerValue(_value1->value._integer->ll||_value2->value._integer->ll);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
@@ -6724,8 +6736,8 @@ long long integerShift(long long integer,long long shift){
 }
 Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftleft,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftleft,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@25OCT2019: if either value is zero the result is the first value
 	// ASSERT neither value zero
 	// TODO deal with integers separately
@@ -6799,8 +6811,8 @@ Mvalue* shiftleft(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 }
 Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright);
+	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,shiftright,false);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,shiftright,false);
 	if(isValueZero(_value1)==M_TRUE||isValueZero(_value2)==M_TRUE)return _value1; // MDH@26OCT2019: if either value is zero return _value1
 	// ASSERT neither value is zero
 	// do NOT allow shifting by anything that cannot be converted to an integer
@@ -6889,20 +6901,30 @@ Mvalue* shiftright(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 }
 
 // binary comparison operators
+// MDH@03NOV2020: helper functions that do the heavy lifting
+// let's start with the one used by Msort and Msorted
+
 // TODO these should return either TRUE, FALSE or UNDEFINED independent of the input type
-Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return _getIntegerValue(M_LL_INVALID);
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthan);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthan);
+static long long smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	// ASSERT do not call when either is a list
+	if(!_value1&&!_value2)return M_FALSE; // both NULL, so equal, and therefore not smaller than
+	if(!_value1||!_value2)return(_value1?M_TRUE:M_FALSE); // if _value1 is NULL yes always smaller, otherwise _value2 is NULL and _value1 is never smaller
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result<0?M_TRUE:M_FALSE); 
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llsmallerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return _getIntegerValue(llsmallerthan);
+		return llsmallerthan;
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -6920,7 +6942,7 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
@@ -6940,23 +6962,35 @@ Mvalue* smallerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getO
 			outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
-	return NULL;
+	return M_LL_INVALID;
 }
-Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthan);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthan);
+Mvalue* Msmallerthan(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthan,false);
+	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthan,false);
+	return _getIntegerValue(smallerthan(_value1,_value2));
+}
+
+static long long largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	if(!_value1&&!_value2)return M_FALSE; // both NULL, so not larger than
+	if(!_value1||!_value2)return(_value1?M_TRUE:M_FALSE); // if at least one of them is NULL the result is M_TRUE if _value1 is __not__ NULL (and _value2 is NULL therefore), otherwise both are NULL and they are equal
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result>0?M_TRUE:M_FALSE);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long lllargerthan=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return _getIntegerValue(lllargerthan);
+		return(lllargerthan);
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -6974,7 +7008,7 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		}else
 			outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
@@ -6992,23 +7026,35 @@ Mvalue* largerthan(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOw
 		}else
 			outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
-	return NULL;
+	return M_LL_INVALID;
 }
-Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,largerthanorequalto);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,largerthanorequalto);
+Mvalue* Mlargerthan(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthan,false);
+	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthan,false);
+	return _getIntegerValue(largerthan(_value1,_value2));
+}
+
+long long largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	if(!_value1&&!_value2)return M_TRUE; // both NULL
+	if(!_value1||!_value2)return(_value1?M_FALSE:M_TRUE); // if _value1 is NULL, it is smaller, so false, otherwise _value2 is NULL and yes _value1 is larger
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result>=0?M_TRUE:M_FALSE);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)>=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long lllargerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_LT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return _getIntegerValue(lllargerthanorequalto);
+		return lllargerthanorequalto;
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -7027,7 +7073,7 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 			outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
@@ -7046,24 +7092,35 @@ Mvalue* largerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner ow
 			outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
-	return NULL;
+	return M_LL_INVALID;
 }
-Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1&&!_value2)return _getIntegerValue(M_FALSE); // NULL == NULL
-	if(!_value1||!_value2)return _getIntegerValue(M_TRUE); // !NULL != NULL
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,unequalto);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,unequalto);
+Mvalue* Mlargerthanorequalto(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mlargerthanorequalto,false);
+	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mlargerthanorequalto,false);
+	return _getIntegerValue(largerthanorequalto(_value1,_value2));
+}
+
+static long long unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	if(!_value1&&!_value2)return M_FALSE; // both NULL, so not unequal
+	if(!_value1||!_value2)return M_TRUE; // not both NULL, so unequal
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result!=0?M_TRUE:M_FALSE);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)!=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llunequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return _getIntegerValue(llunequalto);
+		return llunequalto;
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -7082,7 +7139,7 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
@@ -7101,24 +7158,35 @@ Mvalue* unequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwn
 			outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
-	return NULL;
+	return M_LL_INVALID;
 }
-Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1&&!_value2)return _getIntegerValue(M_TRUE); // NULL == NULL
-	if(!_value1||!_value2)return _getIntegerValue(M_FALSE); // !NULL != NULL
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,equalto);
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,equalto);
+Mvalue* Munequalto(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Munequalto,false);
+	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Munequalto,false);
+	return _getIntegerValue(unequalto(_value1,_value2));
+}
+
+static long long equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	if(!_value1&&!_value2)return M_TRUE; // both NULL, so equal
+	if(!_value1||!_value2)return M_FALSE; // either NULL but not both, definitely not equal
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result==0?M_TRUE:M_FALSE);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)==(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){		Mbiginteger* _equaltobiginteger=NULL;
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_EQ?M_TRUE:M_FALSE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return _getIntegerValue(llequalto);
+		return llequalto;
 	}
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
 		long long result=M_LL_INVALID;
@@ -7136,7 +7204,7 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 			outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
@@ -7155,8 +7223,9 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 			outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
+	/* see above
 	// MDH@29OCT2020: comparing texts
 	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
 		Mstring *_text1=owned_string(_getValueText(_value1,true),owner),*_text2=owned_string(_getValueText(_value2,true),owner);
@@ -7165,21 +7234,34 @@ Mvalue* equalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner
 		FREE_STRING(_text1,owner);FREE_STRING(_text2,owner);
 		return _getIntegerValue(result);
 	}
-	return NAI_value;
+	*/
+	return M_LL_INVALID;
 }
+Mvalue* Mequalto(Mvalue* _value1,Mvalue* _value2){
+	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Mequalto,false);
+	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mequalto,false);
+	return _getIntegerValue(equalto(_value1,_value2));
+}
+
 // MDH@21OCT2019: first comparison method dealing with decimals and rationals from which the rest was produced
-Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
-	if(!_value1||!_value2)return NULL;
-	if(_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,smallerthanorequalto);if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,smallerthanorequalto);
+static long long smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	if(!_value1||!_value2)return(_value1?M_FALSE:M_TRUE); // if at least one of them is NULL, if _value1 is, the result should be false, true otherwise
+	// MDH@02NOV2020: comparing texts
+	if(_value1->type==VT_TEXT||_value2->type==VT_TEXT){
+		Mstring *_value1text=owned_string(_getValueText(_value1,true),owner),*_value2text=owned_string(_getValueText(_value2,true),owner);
+		int result=(_value1text&&_value2text?strcmp(string(_value1text),string(_value2text)):(_value1text?1:(_value2text?-1:0))); // NULL is always supposedly smaller
+		FREE_STRING(_value1text,owner);FREE_STRING(_value2text,owner);
+		return(result<=0?M_TRUE:M_FALSE);
+	}
 	if((_value1->type==VT_INTEGER||_value1->type==VT_FLOAT)&&(_value2->type==VT_INTEGER||_value2->type==VT_FLOAT))
-		return _getIntegerValue((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?1:0);
+		return((_value1->type==VT_INTEGER?_value1->value._integer->ll:_value1->value._float->ld)<=(_value2->type==VT_INTEGER?_value2->value._integer->ll:_value2->value._float->ld)?M_TRUE:M_FALSE);
 	if((_value1->type==VT_INTEGER||_value1->type==VT_BIGINTEGER)&&(_value2->type==VT_INTEGER||_value2->type==VT_BIGINTEGER)){
 		// creating two intermediate big integers that need to be freed asap
 		Mbiginteger* _biginteger1=owned_biginteger(_value1->type==VT_INTEGER?_getBiginteger(_value1->value._integer->ll):_getBigintegerCopy(_value1->value._biginteger),owner);
 		Mbiginteger* _biginteger2=owned_biginteger(_value2->type==VT_INTEGER?_getBiginteger(_value2->value._integer->ll):_getBigintegerCopy(_value2->value._biginteger),owner);
 		long long llsmallerthanorequalto=(_biginteger1&&_biginteger2?(mp_cmp(MP_INT_POINTER(_biginteger1),MP_INT_POINTER(_biginteger2))==MP_GT?M_FALSE:M_TRUE):M_LL_INVALID); // if either is not zero, the result is 1 otherwise 0, NOTE using || is better than using &&???
 		FREE_BIGINTEGER(_biginteger1,owner);FREE_BIGINTEGER(_biginteger2,owner); // free the created copies
-		return _getIntegerValue(llsmallerthanorequalto);
+		return llsmallerthanorequalto;
 	}
 	// MDH@23OCT2019: if we can rationalize at least one of the values, we should work with rationals (so we get the highest possible accuracy in the comparison)
 	if((_value1->type==VT_RATIONAL||(_value1->type==VT_DECIMAL&&_value1->value._decimal->repeating>0))||(_value2->type==VT_RATIONAL||(_value2->type==VT_DECIMAL&&_value2->value._decimal->repeating>0))){
@@ -7198,7 +7280,7 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 			outputError("Failed to convert comparison operator arguments to rationals");
 		if(_value1->type!=VT_RATIONAL)FREE_RATIONAL(_rational1,owner);
 		if(_value2->type!=VT_RATIONAL)FREE_RATIONAL(_rational2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
 	if(_value1->type==VT_DECIMAL||_value2->type==VT_DECIMAL){
 		// creating two intermediate decimals that need to be freed asap
@@ -7217,9 +7299,14 @@ Mvalue* smallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner o
 			outputError("Failed to convert comparison arguments to decimals");
 		if(_value1->type!=VT_DECIMAL)FREE_DECIMAL(_decimal1,owner);
 		if(_value2->type!=VT_DECIMAL)FREE_DECIMAL(_decimal2,owner);
-		return _getIntegerValue(result);
+		return result;
 	}
-	return NULL;
+	return M_LL_INVALID;
+}
+Mvalue* Msmallerthanorequalto(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(__LINE__);
+	if(_value1&&_value1->type==VT_LIST)return _appliedToList(_value1->value._list,_value2,Msmallerthanorequalto,false);
+	if(_value2&&_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Msmallerthanorequalto,false);
+	return _getIntegerValue(smallerthanorequalto(_value1,_value2));
 }
 // end comparison operator implementation
 
@@ -7231,9 +7318,9 @@ static Mlist* _getRangeList(Mlist* start,Mlist* delta,long long count){
 static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue, bool *up){Mallocationowner owner=getOwner(__LINE__);
 	Mlist* _scalarRangeList=(firstRangeValue&&lastRangeValue?owned_list(_getListOfType(VT_INTEGER),owner):NULL);
 	if(_scalarRangeList){
-		Mvalue* upValue=smallerthanorequalto(firstRangeValue,lastRangeValue); // the direction we'll be going
-		if(upValue&&upValue->type==VT_INTEGER){
-			*up=(upValue->value._integer->ll!=0);
+		long long direction=smallerthanorequalto(firstRangeValue,lastRangeValue);
+		if(direction!=M_LL_INVALID){
+			*up=(direction==M_TRUE);
 			// if going up the first value is the ceil of _value1, otherwise it's the floor of _value1
 			// I suppose there's no need to determine the last integer because we can use _value2 itself in the comparisons!!!
 			Mvalue* firstIntegerRangeValue=(up?Mceil(firstRangeValue):Mfloor(firstRangeValue));
@@ -7254,9 +7341,9 @@ static Mlist* _getScalarRangeList(Mvalue* firstRangeValue,Mvalue* lastRangeValue
 						Mvalue* inrangeValue;
 						while(integerrangeValue){
 							// determine whether this value does not exceed the last value
-							inrangeValue=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
-							if(!inrangeValue||inrangeValue->type!=VT_INTEGER||inrangeValue->value._integer->ll==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
-							if(inrangeValue->value._integer->ll==0)break; // not in range
+							long long inrange=(*up?smallerthanorequalto(integerrangeValue,lastRangeValue):largerthanorequalto(integerrangeValue,lastRangeValue));
+							if(inrange==M_LL_INVALID){outputError("Unable to determine whether the integer is inside the integer range");break;}
+							if(inrange==M_FALSE)break; // not in range
 							if(appendedToList(_scalarRangeList,owner,integerrangeValue,M_LL_INVALID)<=0)
 							{FREE_LIST(_scalarRangeList,owner);_scalarRangeList=NULL;outputError("Failed to add an integer to an integer range");break;}
 							// determine the next value to insert into the integer range
@@ -7287,7 +7374,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 	//                I suppose we can stick to the original approach if there are less than 2 elements in the list
 	bool up;
 	if(_value1->type==VT_LIST){
-		if(!_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange);
+		if(!_value1->value._list||_value1->value._list->numberOfElements<2)return _appliedToList(_value1->value._list,_value2,Mrange,false);
 
 		// with at least two elements in the list we could use the second argument as the count if it is not a list, this would give us additional functionality
 		// because normally we would expect value2 to be an end point somehow and therefore a list
@@ -7395,7 +7482,7 @@ Mvalue* Mrange(Mvalue* _value1,Mvalue* _value2){Mallocationowner owner=getOwner(
 		return _getValueOfList(disowned_list(_resultList,owner));
 		// replacing: return _appliedToList(_value1->value._list,_value2,Mrange);
 	}
-	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange);
+	if(_value2->type==VT_LIST)return _appliedToList2(_value1,_value2->value._list,Mrange,false);
 	// now we're dealing with scalars
 	return _getValueOfList(_getScalarRangeList(_value1,_value2,&up));
 	// it depends on whether _value1 is smaller than _value2 whether we'll be going up or down
@@ -7420,10 +7507,10 @@ Mvalue* applyBinaryOperator(char* operator,Mvalue* _value1,Mvalue* _value2){
 			case '&' :result=(strlen(operator)-1?logicaland(_value1,_value2):bitwiseand(_value1,_value2));break;
 			case '|' :result=(strlen(operator)-1?logicalor(_value1,_value2):bitwiseor(_value1,_value2));break;
 			// comparison operators
-			case '<' :result=(strlen(operator)-1?(operator[1]=='<'?shiftleft(_value1,_value2):smallerthanorequalto(_value1,_value2)):smallerthan(_value1,_value2));break;
-			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):largerthanorequalto(_value1,_value2)):largerthan(_value1,_value2));break;
-			case '!' :result=unequalto(_value1,_value2);break;
-			case '=' :result=equalto(_value1,_value2);break;
+			case '<' :result=(strlen(operator)-1?(operator[1]=='<'?shiftleft(_value1,_value2):Msmallerthanorequalto(_value1,_value2)):Msmallerthan(_value1,_value2));break;
+			case '>' :result=(strlen(operator)-1?(operator[1]=='>'?shiftright(_value1,_value2):Mlargerthanorequalto(_value1,_value2)):Mlargerthan(_value1,_value2));break;
+			case '!' :result=Munequalto(_value1,_value2);break;
+			case '=' :result=Mequalto(_value1,_value2);break;
 			case ':' :result=Mrange(_value1,_value2);break; // MDH@18OCT2019: added the 'range' binary operator to generate a list with all integers between _value1 and _value2
 			default:output("%sUnknown binary operator '%s'.\n",M_ERROR_PREFIX,operator);
 		}
@@ -8317,12 +8404,20 @@ static Mlistelement* partition(Mlist* const list,Mlistelement* const lmin1,Mlist
 	// output("Partitioning elements #%llu through #%llu.\n",l->index,h->index);
 	Mvalue* x=h->_value; //* x=list[h] // x is set once, as the value at index h
 	Mlistelement* i=lmin1; //* i=l-1
-	for(Mlistelement* j=l;j->index<h->index;j=j->_next){ //* int j=1;j<h;j++
-		// output("Comparing element #%zd with element #%zd.\n",j->index,h->index);
-		Mvalue* v=smallerthanorequalto(j->_value,x);
-		if(v&&v->type==VT_INTEGER&&v->value._integer->ll==M_TRUE){
-			i=(i?i->_next:list->_first); //* i++; // make i start at index l otherwise increment
-			swap(i,j);
+	// MDH@02NOV2020: in order to be able to call helper function smallerthanorequalto() x should not be a list, essentially list bubble up to the top I suppose
+	if(x->type!=VT_LIST){
+		for(Mlistelement* j=l;j->index<h->index;j=j->_next){ //* int j=1;j<h;j++
+			// output("Comparing element #%zd with element #%zd.\n",j->index,h->index);
+			// MDH@02NOV2020: every comparison this way creates a new value which will need to be discarded by the gc which is very wasteful
+			//                as such it would make sense to actually not do it this way but prevent the wrapping of the integer result by letting these functions delegate to a function that does not do the wrapping
+			//                unless we can find a way to NOT gc this value immediately as it's only a wrapper for the comparison??????
+			//                SOLUTION all comparison functions now have a helper function that does the actual comparison but does not wrap the returned result (M_TRUE, M_FALSE or M_LL_INVALID)
+			//                careful we have to ascertain that neither is a list
+			long long notlarger=(j->_value->type!=VT_LIST?smallerthanorequalto(j->_value,x):M_LL_INVALID);
+			if(notlarger==M_TRUE){
+				i=(i?i->_next:list->_first); //* i++; // make i start at index l otherwise increment
+				swap(i,j);
+			}
 		}
 	}
 	Mlistelement* iplus1=(i?i->_next:list->_first);
@@ -8331,7 +8426,7 @@ static Mlistelement* partition(Mlist* const list,Mlistelement* const lmin1,Mlist
 }
 // Mlsort performs an inline sort i.e. the input list is rearranged
 // helper function to sort a list
-static long long lsort(Mlist* _list){
+static long long lsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
 	if(_list){
@@ -8339,7 +8434,8 @@ static long long lsort(Mlist* _list){
 		if(listelement&&listelement!=_list->_last){ // at least two items
 			// we need a stack of integers with the same size as the list length
 			if(report)output("Sorting a list with %zd elements.\n",_list->numberOfElements);
-			Mlistelement** stack=calloc(_list->numberOfElements,sizeof(Mlistelement*));
+			// MDH@02NOV2020: best to use CALLOC not calloc
+			Mlistelement** stack=CALLOC(sizeof(Mlistelement*),_list->numberOfElements,'l',owner);
 			if(stack){
 				result=M_TRUE;
 				stack[0]=NULL; // i.e. the first lmin1
@@ -8367,7 +8463,7 @@ static long long lsort(Mlist* _list){
 						stack[top++]=h;
 					}
 				}
-				free(stack);
+				FREE_DISOWNED(stack,_list->numberOfElements,'l',owner);
 			}else
 				outputError("Not enough memory to sort the list");
 		}else // no need to sort so success
@@ -8375,28 +8471,63 @@ static long long lsort(Mlist* _list){
 	}
 	return result;
 }
-Mvalue* Mlsort(Mvalue* _listValue){
+Mvalue* Msort(Mvalue* _tosortValue){
 	long long result=M_LL_INVALID;
 	// can either sort a list or the list elements in a map
-	if(_listValue){
-		if(_listValue->type==VT_MAP){
+	if(_tosortValue){
+		if(_tosortValue->type==VT_MAP){
 			// will return the number of successfully sorted elements
 			result=0;
-			Mmapelement* mapelement=(_listValue->value._map?_listValue->value._map->_first:NULL);
+			Mmapelement* mapelement=(_tosortValue->value._map?_tosortValue->value._map->_first:NULL);
 			while(mapelement){
 				Mvalue* mapelementValue=(mapelement->_variable?mapelement->_variable->_value:NULL);
 				if(mapelementValue){
-					Mvalue* mapelementValueSortResult=Mlsort(mapelementValue);
-					long long mapelementSortResult=(mapelementValueSortResult->value._integer->ll);
+					Mvalue* mapelementValueSortResult=Msort(mapelementValue);
+					long long mapelementSortResult=(mapelementValueSortResult?mapelementValueSortResult->value._integer->ll:M_LL_INVALID);
 					if(mapelementSortResult>0)result+=mapelementValueSortResult->value._integer->ll;
 				}
 				mapelement=mapelement->_next;
 			}
 		}else
-		if(_listValue->type==VT_LIST)
-			result=lsort(_listValue->value._list);
+		if(_tosortValue->type==VT_LIST)
+			result=lsort(_tosortValue->value._list);
 	}
 	return _getIntegerValue(result);
+}
+// similar to Msort but does not change the input in any way, returns NULL on failure
+Mvalue* Msorted(Mvalue* _tosortValue){Mallocationowner owner=getOwner(__LINE__);
+	Mvalue* sortedValue=NULL;
+	if(_tosortValue){
+		if(_tosortValue->type==VT_MAP){
+			// make a copy of the map, which means that we can sort the map elements in place
+			Mmap* _tosortMap=owned_map(_getMapCopy(_tosortValue->value._map),owner);
+			long long result=0;
+			// will return the number of successfully sorted elements
+			Mmapelement* mapelement=(_tosortMap?_tosortMap->_first:NULL);
+			while(mapelement){
+				Mvalue* mapelementValue=(mapelement->_variable?mapelement->_variable->_value:NULL);
+				if(mapelementValue){
+					Mvalue* mapelementValueSortResult=Msort(mapelementValue);
+					long long mapelementSortResult=(mapelementValueSortResult?mapelementValueSortResult->value._integer->ll:M_LL_INVALID);
+					if(mapelementSortResult<=0)break; // if failing to sort this map element value
+				}
+				mapelement=mapelement->_next;
+			}
+			if(mapelement){ // something left unsorted
+				FREE_MAP(_tosortMap,owner);
+				outputError("");outputValue("Failed to sort '",mapelement->_variable->_value,"'.\n");
+			}else
+				sortedValue=_getValueOfMap(disowned_map(_tosortMap,owner));
+		}else
+		if(_tosortValue->type==VT_LIST){
+			Mlist* _tosortList=owned_list(_getListCopy(_tosortValue->value._list),owner);
+			if(lsort(_tosortList)==M_TRUE) // _tosortList was successfully sorted
+				sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
+			else
+				FREE_LIST(_tosortList,owner);
+		}
+	}
+	return sortedValue;
 }
 
 // MDH@01NOV2020: grouping can make seperate sublists from a list either into a list or a map
@@ -8558,6 +8689,10 @@ bool settingApplied(char settingCharacter){
 
 // MDH@04MAR2020: good idea to have to plug in all callback in a call to getShellEnvironment instead of having specific setters for that
 bool shellInitialized(char const * const settingCharacters,InputCharReadFunction _inputCharReadFunction,InputResponseFunction _inputInfoFunction,InputResponseFunction _inputErrorFunction,OutputTokenFunction _outputTokenFunction,ReoutputTokenFunction _reoutputTokenFunction,UpdateLastTokenAutocompletionTextFunction* _updateLastTokenAutocompletionTextFunction,OutputCommandInfoFunction _outputCommandInfoFunction){Mallocationowner owner=getOwner(__LINE__);
+
+	// initialize the random generator
+	long long randomSeedGeneratorInitializationResult=getValueInteger(Msrand(NULL));
+	if(randomSeedGeneratorInitializationResult!=M_TRUE)outputWarning("Failed to initialize the random seed generator");else outputInfo("Random generator initialized.");
 
 	size_t numberOfSettingCharacters=(settingCharacters?strlen(settingCharacters):0);
 	while(numberOfSettingCharacters>0)settingApplied(settingCharacters[--numberOfSettingCharacters]);
@@ -8820,7 +8955,8 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Mlsort)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Msort)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"sorted"),"sorted",Msorted)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)
 				){
 				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");

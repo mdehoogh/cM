@@ -7,6 +7,8 @@
 
 #include "Malloc.h"
 
+static bool DEBUGGING=false;
+
 static uint16_t const MODULE_ID=3;
 static Mallocationowner getOwner(uint16_t id){return (Mallocationowner){MODULE_ID,id};}
 
@@ -25,7 +27,7 @@ static void tell(char const * fmt,...){
     va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
 }
 static void info(char const * fmt,...){
-    // va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);
+    if(DEBUGGING){va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);}
 }
 static void warning(char const * fmt,...){printf("%s",M_WARNING_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
 static void error(char const * fmt,...){printf("%s",M_ERROR_PREFIX);va_list args;va_start(args,fmt);vprintf(fmt,args);va_end(args);printf("%c",'\n');}
@@ -1004,7 +1006,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
     if(!ptr||allocationType==0||count<=0)return;
     Malloc* _alloc=(Malloc*)(((char*)ptr)-sizeof(Malloc)); // MDH@20MAY2020 added because we have moved the allocation record to the start instead of the end!!!
     info("\n*************************** Freeing dynamic memory of type '%c' ***************************\n",abs(allocationType));
-    info("%p: owned by %s:%u(%s%u%s%s) being freed.\n",_alloc // replacing: by %s:%u(%s%u%s%s).\n",_alloc
+    info("%p: of type '%c' owned by %s:%u(%s%u%s%s) being freed.\n",_alloc,abs(allocationType) // replacing: by %s:%u(%s%u%s%s).\n",_alloc
         ,MODULE_NAMES[_alloc->owner.module],_alloc->owner.id,GLOBAL_FLAG_TEXTS[_alloc->owner.global],_alloc->owner.level,DISOWNED_FLAG_TEXTS[_alloc->owner.disowned],FREED_FLAG_TEXTS[_alloc->owner.freed]
         // ,MODULE_NAMES[owner.module],owner.id,GLOBAL_FLAG_TEXTS[owner.global],owner.level,DISOWNED_FLAG_TEXTS[owner.disowned],FREED_FLAG_TEXTS[owner.freed]
         );
@@ -1017,7 +1019,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
         if(allocations._owners[_alloc->allocationIndex].owner.freed!=0)
             bug("\tFreed before!");
     }else
-        bug("Invalid allocation index %i.",_alloc->allocationIndex);
+        bug("\tInvalid allocation index %i.",_alloc->allocationIndex);
     /////info("Freeing type '%c' data",type);
     // determine the amount of items to free which depends on the type size!!
     // MDH@14APR2020: size_t nitems=0,typesize=0,allocationtypecountoffset=0;
@@ -1028,7 +1030,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
         if(allocationTypeIndex>=0){ // MDH@07APR2020: better to NOT create the new allocation type if not currently known!!!!
             size=_allocationTypes[allocationTypeIndex]/*.allocationsizeunion*/.size; // extract the (fixed) size
             if(!unregisterAllocation(allocationTypeIndex,count,allocationType>0))
-                bug("Failed to free the dynamic memory of %llu allocation%s of type '%c' (size: %zd).",count,(count>1?"s":""),allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
+                bug("\tFailed to free the dynamic memory of %llu allocation%s of type '%c' (size: %zd).",count,(count>1?"s":""),allocationType,size); // MDH@02MAY2020: we have to decrement the count (representing the number of allocated instances) by 1
             /* replacing what would no longer work:
             _allocationTypes[allocationTypeIndex].count--;
             // assuming this is a fixed size allocation type
@@ -1043,7 +1045,7 @@ void Mfree(void const * const ptr,long long count,signed char allocationType/*,M
             }
             */
         }else
-            bug("Memory of unknown type '%c' to be freed!",allocationType);
+            bug("\tMemory of unknown type '%c' to be freed!",allocationType);
     }
     // MDH@14APR2020 NOTE: the following is about removing the allocation
 #ifndef __PRODUCTION__
