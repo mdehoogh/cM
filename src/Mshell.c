@@ -8551,14 +8551,45 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	}
 }
 static void lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanother,Mlistelement* lastanother){
-	// we have to merge two blocks, one starting at the first element after beforefirst
-	// the next of firstlast and ending at last
+	// this is a real challenge as we cannot change the order of the list elements we received
+	// but what we can do is create new list elements if we need them and link them to beforeone
+	// the main problem is that we do not want to destroy the links in the original
+
+	Mlistelement* mergedlistelement=beforeone; // this would be the head
+	// we're going to fix the successive index values when we're done as we have to keep the same sequence
+	// (which yes is a nuisance)
+	// we know that the indices are ascending that is the index of one is always smaller than the index of another
 	Mlistelement *one=(beforeone?beforeone->_next:_list->_first),*another=beforeanother->_next;
+	Mvalue *oneValue=one->_value,*anotherValue=another->_value;
 	do{
-		if(smallerthan(another->_value,one->_value)==M_TRUE){ // the one in the second block is smaller
-			if(another==lastanother)another=NULL;else another=another->_next;
-		}else{ // the one in the second block is not smaller
-			if(one==beforeanother)one=NULL;else one=one->_next;
+		// it makes sense to give precedence to the values from one because they are in front of another in the 
+		// original list, so that when they are equal the earlier elements 
+		// are we merging one value at a time? I suppose we could do two BUT it's better not to 
+		// because in theory multiple values could have the same value and we want to maintain the 
+		// original order as much as possible
+		if(smallerthanorequalto(oneValue,anotherValue)==M_TRUE){ // one<=another
+			// consume one
+			mergedlistelement->_next=one;
+			if(one->index>another->index){
+				mergedlistelement->index=another->index; // we know the index of one is smaller than the index of another
+				another->index=one->index;
+			}else
+				mergedlistelement->index=one->index; // we know the index of one is smaller than the index of another
+			mergedlistelement=one;
+			if(one!=beforeanother){
+				one=one->_next;
+				oneValue=one->_value;
+			}else // all one elements consumed
+				one=NULL;
+		}
+		if(smallerthanorequalto(anotherValue,oneValue)==M_TRUE){ // another<=one
+			mergedlistelement->_next=another; // make the head of the merged list point to another
+			// use the lower index (from one), and put the index from another in one (still to be merged in)
+			mergedlistelement->index=one->index;
+			one->index=another->index;
+			mergedlistelement=another;
+
+			another=another->_next;
 		}
 	}while(one&&another);
 }
