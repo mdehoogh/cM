@@ -8522,6 +8522,8 @@ static long long lmergesort(Mlist* _list){
 // whereas the original algorithm determines the insertion point going back
 const unsigned long long M_RUN_LENGTH=32;
 static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
+	bool report=amVerboseDebugging()||DEBUGGING;
+	if(report){outputValue("Insertion sorting '",first->_value,"'");outputValue(" through '",last->_value,"'.\n");}
 	Mlistelement* listelement=first->_next; // the first element to insert
 	while(listelement){ // safety check
 		Mvalue* temp=listelement->_value; // the value to insert into what's in front of it
@@ -8554,14 +8556,22 @@ static void lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanot
 	// this is a real challenge as we cannot change the order of the list elements we received
 	// but what we can do is create new list elements if we need them and link them to beforeone
 	// the main problem is that we do not want to destroy the links in the original
-
+	bool report=amVerboseDebugging()||DEBUGGING;
 	Mlistelement* mergedlistelement=beforeone; // this would be the head
 	// we're going to fix the successive index values when we're done as we have to keep the same sequence
 	// (which yes is a nuisance)
 	// we know that the indices are ascending that is the index of one is always smaller than the index of another
 	Mlistelement *one=(beforeone?beforeone->_next:_list->_first),*another=beforeanother->_next;
 	Mvalue *oneValue=one->_value,*anotherValue=another->_value;
-	do{
+	if(report){
+		outputValue("First value to first sequence to merge: '",oneValue,"'.\n");
+		outputValue("Last value of first sequence to merge: '",beforeanother->_value,"'.\n");
+		outputValue("First value of second sequence to merge: '",beforeanother->_next->_value,"'.\n");
+		outputValue("Last value of second sequence to merge: '",lastanother->_value,"'.\n");
+	}
+	unsigned long long index; // temp to store an index
+	while(1){
+		if(report){outputValue("Comparing '",oneValue,"'");outputValue(" with '",anotherValue,"'.\n");}
 		// it makes sense to give precedence to the values from one because they are in front of another in the 
 		// original list, so that when they are equal the earlier elements 
 		// are we merging one value at a time? I suppose we could do two BUT it's better not to 
@@ -8569,29 +8579,55 @@ static void lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanot
 		// original order as much as possible
 		if(smallerthanorequalto(oneValue,anotherValue)==M_TRUE){ // one<=another
 			// consume one
-			mergedlistelement->_next=one;
-			if(one->index>another->index){
-				mergedlistelement->index=another->index; // we know the index of one is smaller than the index of another
-				another->index=one->index;
-			}else
-				mergedlistelement->index=one->index; // we know the index of one is smaller than the index of another
+			if(mergedlistelement)mergedlistelement->_next=one;
 			mergedlistelement=one;
-			if(one!=beforeanother){
-				one=one->_next;
-				oneValue=one->_value;
-			}else // all one elements consumed
-				one=NULL;
-		}
-		if(smallerthanorequalto(anotherValue,oneValue)==M_TRUE){ // another<=one
-			mergedlistelement->_next=another; // make the head of the merged list point to another
-			// use the lower index (from one), and put the index from another in one (still to be merged in)
-			mergedlistelement->index=one->index;
-			one->index=another->index;
+			if(report)outputValue("Merged value: '",mergedlistelement->_value,"'.\n");
+		// if the index of what we're consuming is above the other one, use the other one
+			if(one->index>another->index){
+				index=one->index;one->index=another->index;another->index=index;
+			}
+			if(one==beforeanother){one=NULL;break;}
+			one=one->_next;
+			oneValue=one->_value;
+		}else{ // another<one
+			if(mergedlistelement)mergedlistelement->_next=another;
 			mergedlistelement=another;
-
+			if(report)outputValue("Merged value: '",mergedlistelement->_value,"'.\n");
+			if(another->index>one->index){
+				index=another->index;another->index=one->index;one->index=index;
+			}
+			if(another==lastanother){another=NULL;break;}
+			another=another->_next;
+			anotherValue=another->_value;
+		}
+	}
+	if(one){ // we've got one elements left
+		while(1){
+			mergedlistelement->_next=one; // for sure
+			mergedlistelement=one;
+			if(report)outputValue("Merged value: '",mergedlistelement->_value,"'.\n");
+			// if we added the last one, we're done
+			if(one==beforeanother)break;
+			if(one->_next->index<one->index){
+				index=one->index;one->index=one->_next->index;one->_next->index=index;
+			}
+			one=one->_next;
+		}
+	}else{ // we've got another elements left
+		while(1){
+			mergedlistelement->_next=another; // for sure
+			mergedlistelement=another;			
+			if(report)outputValue("Merged value: '",mergedlistelement->_value,"'.\n");
+			// if we added the last one, we're done
+			if(another==lastanother)break;
+			if(another->_next->index<another->index){
+				index=another->index;another->index=another->_next->index;another->_next->index=index;
+			}
 			another=another->_next;
 		}
-	}while(one&&another);
+	}
+	// ascertain that the last merged elements points to the successor of the last element
+	mergedlistelement->_next=lastanother->_next;
 }
 static long long ltimsort(Mlist* _list){
 	bool report=amVerboseDebugging()||DEBUGGING;
@@ -8613,17 +8649,18 @@ static long long ltimsort(Mlist* _list){
 		// as long as the size of a block is less than the number of elements there are blocks to merge
 		while(size<_list->numberOfElements){
 			size<<=1; // double the size
+			if(report)output("Merging %llu elements each time.\n",size);
 			numberOfMerges=1+(_list->numberOfElements-1)/size; // will at least equal 2
 			if(report)output("Number of merges to execute: %llu.\n",numberOfMerges);
 			Mlistelement *beforeone,*beforeanother,*lastanother=NULL;
 			do{
 				beforeone=lastanother;
 				long long left=size; // the number of elements we need
-				while(left+size){
+				do{
 					lastanother=(lastanother?lastanother->_next:_list->_first);
 					left--;
-					if(left==0)beforeanother=lastanother;
-				}
+					if(left*2==size)beforeanother=lastanother;
+				}while(left>0);
 				// do we have something to merge???? (it is possible that there is an odd number of blocks)
 				if(beforeanother&&beforeanother!=lastanother)lmerge(_list,beforeone,beforeanother,lastanother);
 				numberOfMerges--;
