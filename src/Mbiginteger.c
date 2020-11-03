@@ -16,7 +16,7 @@ Mbiginteger* _getNegatedBiginteger(Mbiginteger* _biginteger){Mallocationowner ow
 long long getBigintegerSign(Mbiginteger const * const biginteger){
     if(!biginteger)return M_LL_INVALID;
     long long result=(mp_iszero(MP_INT_POINTER(biginteger))==MP_YES?M_ZERO:(mp_isneg(MP_INT_POINTER(biginteger))==MP_YES?M_NEGATIVE:M_POSITIVE)); // OOPS, comparing with MP_YES essential!!!
-    if(amVerbose()){outputBiginteger("Sign of big integer '",biginteger,"':");output("%lld.\n",result);}
+    if(amVerboseDebugging()){outputBiginteger("Sign of big integer '",biginteger,"':");output("%lld.\n",result);}
     return result;
 }
 long long isBigintegerZero(Mbiginteger const * const biginteger){

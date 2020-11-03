@@ -2704,7 +2704,7 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 Mvalue* f(Mvalue* _value){
 	if(!_value||_value->type==VT_FLOAT)return _value;
 	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,f));
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging(); //||DEBUGGING;
 	long double ld=M_LD_NAN;
 	if(report){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
 	switch(_value->type){
@@ -8440,18 +8440,23 @@ static Mlistelement* partition(Mlist* const list,Mlistelement* const lmin1,Mlist
 }
 // Mlsort performs an inline sort i.e. the input list is rearranged
 // helper function to sort a list
-static long long lsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
+// MDH@02NOV2020: how about returning the number of stack values we actually needed to give some additional information
+static long long lquicksort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
 	if(_list){
 		Mlistelement* listelement=_list->_first;
 		if(listelement&&listelement!=_list->_last){ // at least two items
 			// we need a stack of integers with the same size as the list length
-			if(report)output("Sorting a list with %zd elements.\n",_list->numberOfElements);
+			if(report)output("Sorting a list of %zd elements with quicksort.\n",_list->numberOfElements);
 			// MDH@02NOV2020: best to use CALLOC not calloc
-			Mlistelement** stack=CALLOC(sizeof(Mlistelement*),_list->numberOfElements,'l',owner);
+			// MDH@03NOV2020: if there are many many list elements allocating all at once is an issue
+			//                how about re-allocating in
+			unsigned long long maxtop,initialmaxtop=2*((unsigned long long)ceil(log10(_list->numberOfElements)));
+			Mlistelement** stack=MALLOC(sizeof(Mlistelement*),maxtop=initialmaxtop,-'l',owner);
 			if(stack){
-				result=M_TRUE;
+				if(report)output("Initial quicksort stack size: %llu.\n",maxtop);
+				result=2; // the current amount of stack elements used
 				stack[0]=NULL; // i.e. the first lmin1
 				stack[1]=_list->_last;
 				// it's better to store the number of elements in the stack instead of the top index
@@ -8466,27 +8471,142 @@ static long long lsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 					//if(!p){result=M_FALSE;outputError("Failed to partition");break;}
 					l=(lmin1?lmin1->_next:_list->_first);
 					if(pmin1&&pmin1->index>l->index){
+						if(top>=maxtop){
+							if(report)output("Expanding the stack.\n");
+							stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
+							if(!stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
+							maxtop+=initialmaxtop;
+							if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+						}
 						stack[top++]=lmin1;
 						stack[top++]=pmin1;
+						if(top>result)result=top;
 					}
 					// move p two elements up
 					p=(pmin1?pmin1->_next:_list->_first);
 					pplus1=(p?p->_next:_list->_first);
 					if(pplus1&&pplus1->index<h->index){
+						if(top>=maxtop){
+							if(report)output("Expanding the stack.\n");
+							stack=REALLOC(stack,maxtop,maxtop+initialmaxtop,sizeof(Mlistelement*),-'l');
+							if(!stack){output("%sNot enough memory for a stack of %llu list elements in quicksort.\n",M_ERROR_PREFIX,maxtop+initialmaxtop);break;}
+							maxtop+=initialmaxtop;
+							if(report)output("Stack of quicksort expanded to contain %llu elements.\n",maxtop);
+						}
 						stack[top++]=p; // which is actually lmin1
 						stack[top++]=h;
+						if(top>result)result=top;
 					}
 				}
-				FREE_DISOWNED(stack,_list->numberOfElements,'l',owner);
+				if(report)output("Freeing the quicksort stack.\n");
+				FREE_DISOWNED(stack,maxtop,-'l',owner);
+				if(report)output("Quicksort stack freed.\n");
 			}else
-				outputError("Not enough memory to sort the list");
+				outputError("Not enough memory to sort the list with quicksort");
 		}else // no need to sort so success
-			result=M_TRUE;
+			result=M_TRUE; // will always be different from top (which is always even)
 	}
 	return result;
 }
-Mvalue* Msort(Mvalue* _tosortValue){
+static long long lmergesort(Mlist* _list){
 	long long result=M_LL_INVALID;
+	if(_list){
+		
+	}
+	return result;
+}
+
+// timsort implementation (based on geeksforgeeks.org/timsort)
+// helper functions
+// we have to implement the insertion sort a little different because we know first and can go up from there
+// whereas the original algorithm determines the insertion point going back
+const unsigned long long M_RUN_LENGTH=32;
+static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
+	Mlistelement* listelement=first->_next; // the first element to insert
+	while(listelement){ // safety check
+		Mvalue* temp=listelement->_value; // the value to insert into what's in front of it
+		Mlistelement* checklistelement=first;
+		while(smallerthan(checklistelement->_value,temp)==M_TRUE){
+			checklistelement=checklistelement->_next;
+			// we're done comparing when the element to check is the element to compare with
+			if(checklistelement==listelement){checklistelement=NULL;break;} 
+		}
+		if(checklistelement){ // checklistelement>=listelement
+			// we have to insert the value of listelement in front of checklistelement
+			// alternatively we can simply move up the value of checklist element
+			Mlistelement* tomovelistelement=checklistelement;
+			Mvalue *valuetomovenext,*valuetomove=tomovelistelement->_value;
+			while(1){
+				valuetomovenext=tomovelistelement->_next->_value; // remember the value that's to be replaced
+				tomovelistelement->_next->_value=valuetomove; // replace remembered value with the previous one
+				tomovelistelement=tomovelistelement->_next; // increment the list element
+				if(tomovelistelement==listelement)break; // if we've overwritten listelement->_value (remembered in temp) we're done
+				valuetomove=valuetomovenext; // update valuetomove with what we remembered
+			}
+			// we can now insert listelement's value (i.e. temp) where checklistelement is pointing
+			checklistelement->_value=temp;
+		}
+		if(listelement==last)break; // once we've inserted the last one, quit
+		listelement=listelement->_next;
+	}
+}
+static void lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanother,Mlistelement* lastanother){
+	// we have to merge two blocks, one starting at the first element after beforefirst
+	// the next of firstlast and ending at last
+	Mlistelement *one=(beforeone?beforeone->_next:_list->_first),*another=beforeanother->_next;
+	do{
+		if(smallerthan(another->_value,one->_value)==M_TRUE){ // the one in the second block is smaller
+			if(another==lastanother)another=NULL;else another=another->_next;
+		}else{ // the one in the second block is not smaller
+			if(one==beforeanother)one=NULL;else one=one->_next;
+		}
+	}while(one&&another);
+}
+static long long ltimsort(Mlist* _list){
+	bool report=amVerboseDebugging()||DEBUGGING;
+	long long result=M_LL_INVALID;
+	if(_list){
+		Mlistelement *runlast,*runfirst=_list->_first;
+		while(runfirst){
+			// determine runlast at most M_RUN_LENGTH elements further
+			runlast=runfirst;
+			unsigned long long runsize=1;
+			while(runsize<M_RUN_LENGTH&&runlast->_next){runlast=runlast->_next;runsize++;}
+			linsertionSort(_list,runfirst,runlast);
+			runfirst=runlast->_next; // the first in the next run is the successor of runlast (if any)
+		}
+		// the general idea of merging is to merge two successive blocks, until all blocks are merged
+		// then the size of the block is doubled and all blocks are merged again
+	 	// initialize size to the number of elements in a each block
+		unsigned long long numberOfMerges,size=M_RUN_LENGTH;
+		// as long as the size of a block is less than the number of elements there are blocks to merge
+		while(size<_list->numberOfElements){
+			size<<=1; // double the size
+			numberOfMerges=1+(_list->numberOfElements-1)/size; // will at least equal 2
+			if(report)output("Number of merges to execute: %llu.\n",numberOfMerges);
+			Mlistelement *beforeone,*beforeanother,*lastanother=NULL;
+			do{
+				beforeone=lastanother;
+				long long left=size; // the number of elements we need
+				while(left+size){
+					lastanother=(lastanother?lastanother->_next:_list->_first);
+					left--;
+					if(left==0)beforeanother=lastanother;
+				}
+				// do we have something to merge???? (it is possible that there is an odd number of blocks)
+				if(beforeanother&&beforeanother!=lastanother)lmerge(_list,beforeone,beforeanother,lastanother);
+				numberOfMerges--;
+			}while(numberOfMerges>0);
+		}
+		result=M_TRUE;
+	}
+	return result;
+}
+// Msort is the generic entry point for sorting lists
+Mvalue* Msort(Mvalue* _tosortValue,Mvalue* _sortMethodValue){
+	long long result=M_LL_INVALID;
+	// we've got merge, tim and quick sort, below you can see what the default is
+	char sortMethod='\0';if(_sortMethodValue&&_sortMethodValue->type==VT_TEXT)sortMethod=_sortMethodValue->value._text->_c[0];
 	// can either sort a list or the list elements in a map
 	if(_tosortValue){
 		if(_tosortValue->type==VT_MAP){
@@ -8496,20 +8616,25 @@ Mvalue* Msort(Mvalue* _tosortValue){
 			while(mapelement){
 				Mvalue* mapelementValue=(mapelement->_variable?mapelement->_variable->_value:NULL);
 				if(mapelementValue){
-					Mvalue* mapelementValueSortResult=Msort(mapelementValue);
+					Mvalue* mapelementValueSortResult=Msort(mapelementValue,_sortMethodValue);
 					long long mapelementSortResult=(mapelementValueSortResult?mapelementValueSortResult->value._integer->ll:M_LL_INVALID);
 					if(mapelementSortResult>0)result+=mapelementValueSortResult->value._integer->ll;
 				}
 				mapelement=mapelement->_next;
 			}
 		}else
-		if(_tosortValue->type==VT_LIST)
-			result=lsort(_tosortValue->value._list);
+		if(_tosortValue->type==VT_LIST){
+			switch(sortMethod){
+				case 'm':result=lmergesort(_tosortValue->value._list);break;
+				case 't':result=ltimsort(_tosortValue->value._list);break;
+				default:result=lquicksort(_tosortValue->value._list);break;
+			}
+		}
 	}
 	return _getIntegerValue(result);
 }
 // similar to Msort but does not change the input in any way, returns NULL on failure
-Mvalue* Msorted(Mvalue* _tosortValue){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* sortedValue=NULL;
 	if(_tosortValue){
 		if(_tosortValue->type==VT_MAP){
@@ -8521,7 +8646,7 @@ Mvalue* Msorted(Mvalue* _tosortValue){Mallocationowner owner=getOwner(__LINE__);
 			while(mapelement){
 				Mvalue* mapelementValue=(mapelement->_variable?mapelement->_variable->_value:NULL);
 				if(mapelementValue){
-					Mvalue* mapelementValueSortResult=Msort(mapelementValue);
+					Mvalue* mapelementValueSortResult=Msort(mapelementValue,_sortMethodValue);
 					long long mapelementSortResult=(mapelementValueSortResult?mapelementValueSortResult->value._integer->ll:M_LL_INVALID);
 					if(mapelementSortResult<=0)break; // if failing to sort this map element value
 				}
@@ -8535,10 +8660,20 @@ Mvalue* Msorted(Mvalue* _tosortValue){Mallocationowner owner=getOwner(__LINE__);
 		}else
 		if(_tosortValue->type==VT_LIST){
 			Mlist* _tosortList=owned_list(_getListCopy(_tosortValue->value._list),owner);
-			if(lsort(_tosortList)==M_TRUE) // _tosortList was successfully sorted
-				sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
-			else
-				FREE_LIST(_tosortList,owner);
+			if(_tosortList){
+				char sortMethod=(_sortMethodValue&&_sortMethodValue->type==VT_TEXT?_sortMethodValue->value._text->_c[0]:'\0');
+				long long sortResult=M_LL_INVALID;
+				switch(sortMethod){
+					case 't':sortResult=ltimsort(_tosortList);
+					case 'm':sortResult=lmergesort(_tosortList);
+					default:sortResult=lquicksort(_tosortList);
+				}
+				if(sortResult>0) // _tosortList was successfully sorted
+					sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
+				else
+					FREE_LIST(_tosortList,owner);
+			}else
+				outputError("Failed to create a copy of the list to sort");
 		}
 	}
 	return sortedValue;
@@ -8654,6 +8789,50 @@ Mvalue* Mlgroup(Mvalue* _listValue,Mvalue* _functionValue){Mallocationowner owne
 		if(_functionValue)outputError("Second argument to the group function not a function");
 	}
 
+	return NULL;
+}
+// MDH@03NOV2020: runs tells you how many runs there are in a given list and what length they are
+//                it's more convenient to return the points where the direction changes
+Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__);
+	if(_listValue&&_listValue->type==VT_LIST){
+		Mlist* list=_listValue->value._list;
+		Mlistelement* listelement=(list?list->_first:NULL);
+		if(listelement){ // at least one element in the list
+			Mlist* _runsList=owned_list(__list("Mrunpoints"),owner);
+			if(_runsList){
+				// the first and last list element will always be in the list
+				if(appendedToList(_runsList,owner,listelement->_value,listelement->index)>0){
+					// if all elements are equal direction will remain 0, in which case the returned list will remain empty
+					int direction,rundirection=0;
+					unsigned long long valueindex;
+					Mvalue *value,*nextvalue=listelement->_value;
+					while(listelement->_next){
+						value=nextvalue;
+						valueindex=listelement->index;
+						// update direction to indicate whether the next element is down or up or equal
+						listelement=listelement->_next;
+						nextvalue=listelement->_value;
+						// if value equals nextvalue, we simply continue, because an equal value can never end a run
+						if(smallerthan(nextvalue,value)==M_TRUE)direction=-1;else if(largerthan(nextvalue,value)==M_TRUE)direction=1;else continue;
+						// NOTE an equal value (direction) 0 can never end a run!!!
+						if(direction!=rundirection){ // end of a run
+							if(appendedToList(_runsList,owner,value,valueindex)<=0){
+								outputError("Failed to update the runs list");
+								break;
+							}
+							rundirection=direction;
+						}
+					}
+					// add the last one (because it's can never be a direction change point)
+					if(appendedToList(_runsList,owner,list->_last->_value,list->_last->index)>0)
+						return _getValueOfList(disowned_list(_runsList,owner));
+					outputError("Failed to add the last list element to the list of run points");
+				}
+				FREE_LIST(_runsList,owner);
+			}
+			outputError("Failed to create the runs list");
+		}
+	}
 	return NULL;
 }
 /**
@@ -8969,8 +9148,9 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"push"),"push",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"drop"),"drop",Mpush)
 					||!completedListValueFunction(_getFunction(_Menvironment,owner,"shove"),"shove",Mshove)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Msort)
-					||!completedListFunction(_getFunction(_Menvironment,owner,"sorted"),"sorted",Msorted)
+					||!completedListTextFunction(_getFunction(_Menvironment,owner,"sort"),"sort",Msort)
+					||!completedListTextFunction(_getFunction(_Menvironment,owner,"sorted"),"sorted",Msorted)
+					||!completedListFunction(_getFunction(_Menvironment,owner,"runpoints"),"runpoints",Mrunpoints)
 					||!completedListFunction(_getFunction(_Menvironment,owner,"pop"),"pop",Mpop)
 				){
 				outputError("Failed to register the removed, push(=drop), shove, sort and pop functions");

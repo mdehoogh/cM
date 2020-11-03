@@ -262,6 +262,7 @@ Mmap* _getMapListMap(char* name1,char* name2); // MDH@28OCT2020
 Mmap* _getTokenTokenMap(char* name1,char* name2);
 Mmap* _getListFunctionMap(char* name1,char* name2);
 Mmap* _getIntegerBooleanMap(char* name1,char* name2);
+Mmap* _getListTextMap(char* name1,char* name2);
 
 Mmap* _getValueTokenTokenMap(char* name1,char* name2,char* name3);
 Mmap* _getThreeIntegerMap(char* name1,char* name2,char* name3);

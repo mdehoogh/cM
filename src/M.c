@@ -42,11 +42,15 @@ extern const Mvalue* NULL_value;
 extern const long long M_LL_INVALID;
 extern const long long M_TRUE;
 extern const long long M_FALSE;
+extern const long long M_LIST_ELEMENTS_AT_START;
+extern const long long M_LIST_ELEMENTS_AT_END;
 extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="12";char const * const M_DATE="1 November 2020"; // MDH@23OCT2020: passing the body of function() as list of command texts when creating it!!
+char const * const M_BUILD="14";char const * const M_DATE="3 November 2020"; // MDH@03NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
+//char const * const M_BUILD="13";char const * const M_DATE="2 November 2020"; // MDH@02NOV2020: wasn't really there though
+//char const * const M_BUILD="12";char const * const M_DATE="1 November 2020"; // MDH@23OCT2020: passing the body of function() as list of command texts when creating it!!
 //char const * const M_BUILD="11";char const * const M_DATE="28 October 2020"; // MDH@23OCT2020: passing the body of function() as list of command texts when creating it!!
 //char const * const M_BUILD="10";char const * const M_DATE="27 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
 //char const * const M_BUILD="9";char const * const M_DATE="25 October 2020"; // MDH@23OCT2020: allowing the use of the '' automatic result variable in function calls as well
@@ -1865,37 +1869,51 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 				{
 					// MDH@02NOV2020: given that a list can be very large, let's stick to displaying at most 100 values
 					//                that's like 50 starting values and 50 ending values
+					// MDH@03NOV2020: it makes sense when dealing with sparse arrays to not show all the comma's
+					//                but show the index numbers instead (obviously it's hard to count)
+					//                let's decide to only write the set elements, and if the index difference is not 1 with the previous element write the index in front of the value
 					written+=outputChar('[');
 					Mlist* _list=_value->value._list;
 					if(_list&&_list->numberOfElements){
 						long long numberOfElementsNotWritten=_list->numberOfElements;
-						numberOfElementsNotWritten-=100;
+						numberOfElementsNotWritten-=(M_LIST_ELEMENTS_AT_START+M_LIST_ELEMENTS_AT_END);
 						Mlistelement* _listelement=_list->_first;
-						unsigned long long listitemindex=1;
-						if(numberOfElementsNotWritten<=0){
+						unsigned long long listitemindex=1; // the expected list item index
+						if(numberOfElementsNotWritten<=0){ // all elements will be written
 							while(_listelement){
-								if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
+								if(listitemindex!=_listelement->index)written+=output("%llu:",_listelement->index);
+								// replacing: if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
 								written+=outputValueColored(_listelement->_value);
+								listitemindex=_listelement->index+1; // the index of the excepted next element
 								_listelement=_listelement->_next;
-							}							
+								if(_listelement)written+=outputChar(','); // something will follow
+							}						
 						}else{
 							// show the first 50 elements
-							while(_listelement){
-								if(_listelement->index)while(listitemindex<MIN(50,_listelement->index)){listitemindex++;written+=outputChar(',');} // missing elements
+							long long leftToWrite=M_LIST_ELEMENTS_AT_START;
+							while(_listelement&&--leftToWrite>=0){
+								if(listitemindex!=_listelement->index)written+=output("%llu:",_listelement->index);
+								// replacing: f(_listelement->index)while(listitemindex<MIN(50,_listelement->index)){listitemindex++;written+=outputChar(',');} // missing elements
 								if(listitemindex!=_listelement->index)break; // if we didn't reach the list element, don't display it
 								written+=outputValueColored(_listelement->_value);
+								listitemindex=_listelement->index+1;
 								_listelement=_listelement->_next;
+								written+=outputChar(','); // something will follow
 							}
 							// show how many elements are not displayed
-							written+=output(",(%lld elements not displayed)",numberOfElementsNotWritten);
+							written+=output("(%lld elements not displayed),",numberOfElementsNotWritten);
 							// and skip them
-							while(--numberOfElementsNotWritten>=0){listitemindex=_listelement->index;_listelement=_listelement->_next;}
+							while(--numberOfElementsNotWritten>=0)_listelement=_listelement->_next;
+							listitemindex=_listelement->index;
 							// show all further elements
 							while(_listelement){
-								if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
+								if(listitemindex!=_listelement->index)written+=output("%llu:",_listelement->index);								
+								// replacing: if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
 								if(listitemindex!=_listelement->index)break; // if we didn't reach the list element, don't display it
 								written+=outputValueColored(_listelement->_value);
+								listitemindex=_listelement->index+1;
 								_listelement=_listelement->_next;
+								if(_listelement)written+=outputChar(','); // something will follow
 							}
 						}
 					}

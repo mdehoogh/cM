@@ -1,6 +1,6 @@
 #include "Mrational.h"
 
-static bool DEBUGGING=true;
+static bool DEBUGGING=false;
 
 static uint16_t const MODULE_ID=11;
 static Mallocationowner getOwner(uint16_t id){return(Mallocationowner){MODULE_ID,id};}

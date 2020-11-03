@@ -933,6 +933,8 @@ Mmap* _getFloatFloatMap(char* name1,char* name2){return _getTwoArgumentMap(name1
 Mmap* _getMapTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_MAP,VT_TOKEN);}/* VALIDATED */
 Mmap* _getTokenTokenMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_TOKEN,VT_TOKEN);}/* VALIDATED */
 Mmap* _getListFunctionMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_LIST,VT_FUNCTION);}/* VALIDATED */
+// MDH@03NOV2020: allowing to specify the sort method to use (now 't' for timsort, 'm' for mergesort and 'q' (default) for quicksort)
+Mmap* _getListTextMap(char* name1,char* name2){return _getTwoArgumentMap(name1,name2,VT_LIST,VT_TEXT);}/* VALIDATED */
 
 Mmap* _getThreeArgumentMap(char* name1,char* name2,char* name3,Mvaluetype valuetype1,Mvaluetype valuetype2,Mvaluetype valuetype3){Mallocationowner owner=getOwner(__LINE__);
     if(name1&&name2&&name3){
@@ -1250,7 +1252,7 @@ Mmapelement* getMapelement(Mmap const * const map,char const * const attributeNa
 }
 // MDH@24MAY2019: if already in the map should replace the current value
 long long appendedToMap(Mmap* const _map,Mallocationowner owner_map,char const * const attributeName,Mvalue const * const _attributeValue){Mallocationowner owner=getOwner(__LINE__);
-    bool report=amVerboseDebugging()||DEBUGGING;
+    bool report=amVerboseDebugging(); //||DEBUGGING;
     long long result=(_map&&attributeName?M_FALSE:M_LL_INVALID);
     if(result!=M_LL_INVALID){
         if(!_map->immutable){ // the map is mutable
@@ -1365,48 +1367,50 @@ Mvalue* _getValueOfRational(Mrational* _rational/*,Mallocationowner owner_ration
 
 // MDH@02NOV2020: because lists can be very large, we adapt _getListText with a value telling it the maximum
 //                number of elements to display from the start and at the end
+// MDH@03NOV2020: showing all elements but prefixing the index when it differs from the expected list index (which is one above the last one shown)
 //////////Mstring* _getValueText(Mvalue* _value); // forward prototype used in getListText() and getMapText()
 Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long showAtEnd){Mallocationowner owner=getOwner(__LINE__);
     ///////output("List to output.");char c;inputCharRead(&c);
+    bool report=amVerboseDebugging()||DEBUGGING;
 	Mstring* result=owned_string(__string(),owner);
     if(result){
         Mstring* p=result;
         if(amDebugging())p=string_append_char(p,'l');
 		p=string_append_char(p,'['); // switch to using p in appends
 		/////////size_t l=_list->numberOfElements;
-        unsigned long long listindex=1;
+        unsigned long long listelementindex=0,expectedlistindex=1; // this would be the expected list index
 		Mlistelement* _listelement=(_list?_list->_first:NULL);
 		Mvalue* _listelementValue;
         long long firstAtEnd=_list->numberOfElements+1;firstAtEnd-=showAtEnd;
         long long elementsNotIncluded=firstAtEnd-showAtStart-1;
         // output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
-		while(p&&_listelement&&listindex<=_list->_last->index){
-            ///////outputChar('$');
-            // increment listindex until it is equal to _listelement->index
-            if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
-            if(listindex==_listelement->index){
-                if(listindex<=showAtStart||listindex>=firstAtEnd){ // a displayable value
-                    if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
-				    Mstring* _listelementValueText=owned_string(_getValueText(_listelement->_value,false),owner); // to be freed asap
-				    if(_listelementValueText){
-					    p=string_append(p,string(_listelementValueText));
-					    FREE_STRING(_listelementValueText,owner); // release AFTER copying over
-				    }
-                    if(_listelement->_next)p=string_append_char(p,',');
-                }
-                _listelement=_listelement->_next;
-                // append a comma as there's a next element coming up
-            }
-            listindex++;
-            // output("(%llu)",listindex); // DEBUG
-            if(elementsNotIncluded>0&&listindex>=firstAtEnd){ // the first to show at the end coming up next
+		while(p&&_listelement){
+            listelementindex++;
+            if(elementsNotIncluded>0&&listelementindex>=firstAtEnd){ // the first to show at the end coming up next
                 p=string_append(p,"(");
                 p=appendll(p,elementsNotIncluded);
                 p=string_append(p," element");
                 if(elementsNotIncluded>1)p=string_append_char(p,'s');
-                p=string_append(p," not shown),");
+                p=string_append(p," not displayed),");
                 elementsNotIncluded=0; // for safety
             }
+            ///////outputChar('$');
+            // increment listindex until it is equal to _listelement->index
+            if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
+            if(listelementindex<=showAtStart||listelementindex>=firstAtEnd){ // a displayable value
+                if(expectedlistindex!=_listelement->index){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
+                // replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
+                Mstring* _listelementValueText=owned_string(_getValueText(_listelement->_value,false),owner); // to be freed asap
+                if(_listelementValueText){
+                    p=string_append(p,string(_listelementValueText));
+                    FREE_STRING(_listelementValueText,owner); // release AFTER copying over
+                }
+                // if there's more coming write a comma
+                if(_listelement->_next)p=string_append_char(p,',');
+            }
+            expectedlistindex=_listelement->index+1; // expected next
+            _listelement=_listelement->_next;
+            // output("(%llu)",listindex); // DEBUG
             /*
             while(listindex<_listelement->index){listindex++;p=string_append_char(p,',');}
             if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
@@ -2276,18 +2280,21 @@ void assignValue(Mvalue** _valueholder, Mvalue const * _value){//Mallocationowne
     if(*_valueholder)decrementReferenceCount(*_valueholder); // if the value holder points to something, decrement that value's reference count
     // MDH@01NOV2019: it's a leap of faith to let assignValue() create copies of composite values i.e. instead of assigning _value to the *_valueholder we assign a new map or list value
     if(_value){
-        // create a copy of the map or list and assign it to the value holder however it would then copy the map again, and that's not what should happen!!!
-        // NOTE the new map and list value get a reference count of 1 below as soon as they are bound to the value holder (as should be the case)
-        //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
-        if(_value->type==VT_MAP){
-            // if(amVerbose()&&amDebugging())outputValue("Copying map ",_value,".\n");
-            _value=_getValueOfMap(_getMapCopy(_value->value._map));
-            // if(!_value)free_map(_mapCopy,owner);
-        }else
-        if(_value->type==VT_LIST){
-            // if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
-            _value=_getValueOfList(_getListCopy(_value->value._list));
-            // if(!_value)free_list(_listCopy,owner);
+        // MDH@03NOV2020 (US president election day): we can prevent unnecesary duplications by not copying unbound values (which would be literals most likely)
+        if(_value->count>0){
+            // create a copy of the map or list and assign it to the value holder however it would then copy the map again, and that's not what should happen!!!
+            // NOTE the new map and list value get a reference count of 1 below as soon as they are bound to the value holder (as should be the case)
+            //      wait a minute a forgot to take care of the reference count of the values in _getMapCopy() and _getListCopy(), NO no need to that if they use assignValue() to 'copy' the values
+            if(_value->type==VT_MAP){
+                // if(amVerbose()&&amDebugging())outputValue("Copying map ",_value,".\n");
+                _value=_getValueOfMap(_getMapCopy(_value->value._map));
+                // if(!_value)free_map(_mapCopy,owner);
+            }else
+            if(_value->type==VT_LIST){
+                // if(amVerbose()&&amDebugging())outputValue("Copying list ",_value,".\n");
+                _value=_getValueOfList(_getListCopy(_value->value._list));
+                // if(!_value)free_list(_listCopy,owner);
+            }
         }
     }
     *_valueholder=_value; // replace what's being pointed to

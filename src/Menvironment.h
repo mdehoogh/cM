@@ -114,6 +114,7 @@ bool completedIntegerBooleanFunction(Mfunction* const _function,const char* cons
 bool completedMapTokenFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 bool completedMapListFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 bool completedListFunctionFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
+bool completedListTextFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction);
 
 // MDH@09JUL2019: a user function is defined as a two-parameter function containing the parameter map and a body (list)
 bool completedStringMapTokenFunction(Mfunction* const _function,const char* const functionName,ThreeArgumentFunction threeArgumentFunction);

@@ -1589,6 +1589,21 @@ bool completedListFunction(Mfunction* const _function,const char* const function
     }
     return false;
 }/* VALIDATED */
+bool completedListTextFunction(Mfunction* const _function,const char* const functionName,TwoArgumentFunction twoArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
+    if(_function){
+        // OWNED(_function,owner);
+        _function->type=FT_INTERNAL_TWO_ARGUMENTS;
+        _function->functionunion.twoArgumentFunction=twoArgumentFunction;
+        // NOTE _getIntegerValue(0) will be bound to the variable "i" in the single integer map, and will be freed by free_variable() if this variable is not bound to the map!!
+        _function->_parameterMap=owned_map(_getListTextMap("tosort:list|map","sortmethod:text"),Msubowner(owner,1));
+        if(_function->_parameterMap){
+            if(amVerbose())output("Registered sort list|map function '%s' completed.\n",functionName);
+            return true;
+        }
+        output("%sFailed to register sort list|map function '%s'.\n",M_ERROR_PREFIX,functionName);
+    }
+    return false;
+}/* VALIDATED */
 bool completedTokenListFunction(Mfunction* const _function,const char* const functionName,OneArgumentFunction oneArgumentFunction){Mallocationowner owner=getOwner(__LINE__);
     if(_function){
         // OWNED(_function,owner);
