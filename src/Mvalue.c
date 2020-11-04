@@ -153,6 +153,22 @@ Mlist* __list(char* source/*,Mallocationowner owner_list*/){Mallocationowner own
     }
     return DISOWNED_LIST(_list,owner);
 }
+
+// MDH@04NOV2020: soon in this theater
+Marray* __array(char* source/*,Mallocationowner owner_list*/){
+    return NULL;
+}
+void free_array(Mlist* _array/*,Mallocationowner owner*/){
+}
+#ifndef __PRODUCTION__
+Marray* owned_array(Marray * const _array,Mallocationowner owner_array){
+    return _array;
+}
+Marray* disowned_array(Marray * const _array,Mallocationowner owner_array){
+    return _array;
+}
+#endif
+
 #ifndef __PRODUCTION__
 Mmapelement* owned_mapelement(Mmapelement* _mapelement,Mallocationowner owner_mapelement){
     if(!_mapelement)return NULL;
@@ -1375,13 +1391,13 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 	Mstring* result=owned_string(__string(),owner);
     if(result){
         Mstring* p=result;
-        if(amDebugging())p=string_append_char(p,'l');
+        if(report){p=string_append_char(p,'l');p=string_append_char(p,'(');p=appendll(p,_list->numberOfElements);p=string_append_char(p,')');}
 		p=string_append_char(p,'['); // switch to using p in appends
 		/////////size_t l=_list->numberOfElements;
-        unsigned long long listelementindex=0,expectedlistindex=1; // this would be the expected list index
+        long long listelementindex=0,expectedlistindex=1; // this would be the expected list index
 		Mlistelement* _listelement=(_list?_list->_first:NULL);
 		Mvalue* _listelementValue;
-        long long firstAtEnd=_list->numberOfElements+1;firstAtEnd-=showAtEnd;
+        long long firstAtEnd=_list->numberOfElements+1;if(showAtEnd<firstAtEnd)firstAtEnd-=showAtEnd;
         long long elementsNotIncluded=firstAtEnd-showAtStart-1;
         // output("First at end: %lld - elements not include: %lld.\n",firstAtEnd,elementsNotIncluded); // DEBUG
 		while(p&&_listelement){
@@ -1440,7 +1456,7 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
 // MDH@02MAR2020: utility function to output a list
 // MDH@02NOV2020: outputList() is typically used in debugging and we want it to show all elements
 void outputList(char const * const prefix,Mlist const * const list,char const * const suffix){Mallocationowner owner=getOwner(__LINE__);
-    Mstring* _listText=owned_string(_getListText(list,0,0),owner);
+    Mstring* _listText=owned_string(_getListText(list,LLONG_MAX,LLONG_MAX),owner);
     output("%s%s%s",(prefix?prefix:""),string(_listText),(suffix?suffix:""));
     FREE_STRING(_listText,owner);
 }/* VALIDATED */

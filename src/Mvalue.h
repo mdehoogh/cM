@@ -5,6 +5,7 @@
 #include "Mdecimal.h"
 
 struct Mlist;
+struct Marray; // MDH@04NOV2020: we're going to have an array after all (so we can speed up sorting)
 struct Mmap;
 struct Mreference;
 // MDH@03MAR2020: if we want to be able to wrap a function or an environment in a value we have to add them here
@@ -20,6 +21,7 @@ typedef union Mvalueunion{
     Mfloat* _float;
     Mtext* _text;
     struct Mlist* _list;
+    struct Marray* _array;
     struct Mmap* _map;
     struct Mreference* _reference; // MDH@04NOV2019: for now a reference is simply a pointer to a variable
     struct Mfunction* _function; // MDH@03MAR2020
@@ -126,6 +128,32 @@ Mlist* _getFlattenedList(Mvalue const * const _value,unsigned int flattenLevel,b
 long long isListUndefined(Mlist* list);
 
 /*unsigned */long long appendedToList(Mlist * const _list,Mallocationowner owner_list,Mvalue const * const _value,long long index); // helper function to append to a list with a certain index (possibly undefined), index must not be negative, if zero first available index will be used, otherwise it should be at least the first available index!!
+
+// MDH@04NOV2020: similar definitions for Marray
+typedef struct Marray{
+    Mchars* _creator; // MDH@17APR2020: replacing: char *_creator;
+    unsigned long long numberOfElements; // keep track of the total number of elements
+    Mvaluetype valuetype; // we can force a list to have elements of the same type
+    Mvalue** values; // I suppose we need to have a pointer to an array of Mvalue pointers, alternatively if the number of elements is fixed, we could point to the Mvalue structures themselves?????
+    bool weak:1;
+    bool immutable:1;
+}Marray;
+
+Marray* __array(char* source/*,Mallocationowner owner_list*/);
+void free_array(Mlist* _array/*,Mallocationowner owner*/);
+#ifndef __PRODUCTION__
+Marray* owned_array(Marray * const _array,Mallocationowner owner_array);
+Marray* disowned_array(Marray * const _array,Mallocationowner owner_array);
+#define OWNED_ARRAY(_array,owner_array) owned_array(_array,owner_array)
+#define __ARRAY(source,owner_array) owned_list(__array(source),owner_array)
+#define DISOWNED_ARRAY(_array,owner_array) disowned_array(_array,owner_array)
+#define FREE_ARRAY(_array,owner_array) free_array(disowned_array(_array,owner_array))
+#else
+#define OWNED_ARRAY(_array,owner_array) _array
+#define __ARRAY(source,owner_array) __array(source)
+#define DISOWNED_ARRAY(_array,owner_array) _array
+#define FREE_ARRAY(_array,owner_array) free_array(_array)
+#endif
 
 typedef struct Mmapelement{
     Mvariable* _variable;

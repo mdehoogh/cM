@@ -8520,57 +8520,38 @@ static long long lmergesort(Mlist* _list){
 // helper functions
 // we have to implement the insertion sort a little different because we know first and can go up from there
 // whereas the original algorithm determines the insertion point going back
-const unsigned long long M_RUN_LENGTH=32;
-static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
-	bool report=amVerboseDebugging()||DEBUGGING;
-	if(report){outputValue("Insertion sorting '",first->_value,"'");outputValue(" through '",last->_value,"'.\n");}
-	Mlistelement* listelement=first->_next; // the first element to insert
-	while(listelement){ // safety check
-		Mvalue* temp=listelement->_value; // the value to insert into what's in front of it
-		Mlistelement* checklistelement=first;
-		while(smallerthan(checklistelement->_value,temp)==M_TRUE){
-			checklistelement=checklistelement->_next;
-			// we're done comparing when the element to check is the element to compare with
-			if(checklistelement==listelement){checklistelement=NULL;break;} 
-		}
-		if(checklistelement){ // checklistelement>=listelement
-			// we have to insert the value of listelement in front of checklistelement
-			// alternatively we can simply move up the value of checklist element
-			Mlistelement* tomovelistelement=checklistelement;
-			Mvalue *valuetomovenext,*valuetomove=tomovelistelement->_value;
-			while(1){
-				valuetomovenext=tomovelistelement->_next->_value; // remember the value that's to be replaced
-				tomovelistelement->_next->_value=valuetomove; // replace remembered value with the previous one
-				tomovelistelement=tomovelistelement->_next; // increment the list element
-				if(tomovelistelement==listelement)break; // if we've overwritten listelement->_value (remembered in temp) we're done
-				valuetomove=valuetomovenext; // update valuetomove with what we remembered
-			}
-			// we can now insert listelement's value (i.e. temp) where checklistelement is pointing
-			checklistelement->_value=temp;
-		}
-		if(listelement==last)break; // once we've inserted the last one, quit
-		listelement=listelement->_next;
-	}
-}
-static void lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanother,Mlistelement* lastanother){
-	// this is a real challenge as we cannot change the order of the list elements we received
-	// but what we can do is create new list elements if we need them and link them to beforeone
-	// the main problem is that we do not want to destroy the links in the original
-	bool report=amVerboseDebugging()||DEBUGGING;
-	Mlistelement* mergedlistelement=beforeone; // this would be the head
+// due to the merge the last element (containing the maximum could have changed), so we return it
+static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanother,Mlistelement* lastanother){
+	
+	bool report=amVerboseDebugging(); //||DEBUGGING;
+
+	// 1. merging may result in a new smallest and largest element therefore it makes sense to actually take care of that first
+	// if the minimum of the second sequence is the actual minimum we're going to remember this element as beforeone has to point to that element afterwards
+	Mlistelement* mergedlistelement=beforeone; // any list element merged should set the _next on mergedlistelement to it
+
+	Mlistelement* lastnext=(lastanother?lastanother->_next:NULL); // remember the successor of the last to merge
+
 	// we're going to fix the successive index values when we're done as we have to keep the same sequence
 	// (which yes is a nuisance)
-	// we know that the indices are ascending that is the index of one is always smaller than the index of another
+	// currently the index field values are ascending AND we have to keep them ascending in the end result
+	// this means that whenever a value is merged and therefore consumed the index of the consumed element should ALWAYS be less than whatever remains to be merged
+	// I think we can't guarantee that the index of what is to be consumed is less than what is still to be consumed, so we really need to compare them with the successor
+	// but if the index of one is above a successor we know that the index of one is from an another that was consumed and therefore it must be below the another's that are not yet consumed!!!
+	Mlistelement *nextone;
+	unsigned long long index;
+
+	// initialize the first two elements to compare (one and another)
 	Mlistelement *one=(beforeone?beforeone->_next:_list->_first),*another=beforeanother->_next;
+	// and the values to compare
 	Mvalue *oneValue=one->_value,*anotherValue=another->_value;
 	if(report){
 		outputValue("First value to first sequence to merge: '",oneValue,"'.\n");
 		outputValue("Last value of first sequence to merge: '",beforeanother->_value,"'.\n");
-		outputValue("First value of second sequence to merge: '",beforeanother->_next->_value,"'.\n");
+		outputValue("First value of second sequence to merge: '",another->_value,"'.\n");
 		outputValue("Last value of second sequence to merge: '",lastanother->_value,"'.\n");
 	}
-	unsigned long long index; // temp to store an index
-	while(1){
+	
+	while(one&&another){
 		if(report){outputValue("Comparing '",oneValue,"'");outputValue(" with '",anotherValue,"'.\n");}
 		// it makes sense to give precedence to the values from one because they are in front of another in the 
 		// original list, so that when they are equal the earlier elements 
@@ -8579,26 +8560,33 @@ static void lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanot
 		// original order as much as possible
 		if(smallerthanorequalto(oneValue,anotherValue)==M_TRUE){ // one<=another
 			// consume one
-			if(mergedlistelement)mergedlistelement->_next=one;
+			if(mergedlistelement)mergedlistelement->_next=one;else _list->_first=another;
 			mergedlistelement=one;
 			if(report)outputValue("Merged value: '",mergedlistelement->_value,"'.\n");
-		// if the index of what we're consuming is above the other one, use the other one
-			if(one->index>another->index){
-				index=one->index;one->index=another->index;another->index=index;
-			}
-			if(one==beforeanother){one=NULL;break;}
-			one=one->_next;
-			oneValue=one->_value;
+			// we have kept the index values in the right ascending order, therefore we do not need to change the index of the consumed one!!!!
+			if(one!=beforeanother){
+				one=one->_next;
+				oneValue=one->_value;
+			}else // first sequence consumed
+				one=NULL;
 		}else{ // another<one
-			if(mergedlistelement)mergedlistelement->_next=another;
+			if(mergedlistelement)mergedlistelement->_next=another;else _list->_first=another;
 			mergedlistelement=another;
-			if(report)outputValue("Merged value: '",mergedlistelement->_value,"'.\n");
-			if(another->index>one->index){
-				index=another->index;another->index=one->index;one->index=index;
+			// we do not need to compare another->index with its successor because another->index will always be smaller (it cannot get the index from a successor as the sucessor is not yet consumed)
+			if(one->index<another->index){ // we have consume the index of one->index, one->index needs to become the larger index from another->index
+				// we cannot simply set one->index to another->index because another->index is larger than any of the one's indices, so unfortunately we have to shift all indices up
+				index=one->index; // remember the index to set on the consumed another
+				// shift all the index values of the ones down except for the last one
+				nextone=one;while(nextone!=beforeanother){nextone->index=nextone->_next->index;nextone=nextone->_next;}
+				nextone->index=another->index; // ASSERT nextone should now equal beforeanother
+				another->index=index; // the lower index is consumed!!!
 			}
-			if(another==lastanother){another=NULL;break;}
-			another=another->_next;
-			anotherValue=another->_value;
+			if(report)outputValue("Merged value: '",mergedlistelement->_value,"'.\n");
+			if(another!=lastanother){
+				another=another->_next;
+				anotherValue=another->_value;
+			}else // second sequence consumed
+				another=NULL;
 		}
 	}
 	if(one){ // we've got one elements left
@@ -8627,45 +8615,98 @@ static void lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* beforeanot
 		}
 	}
 	// ascertain that the last merged elements points to the successor of the last element
-	mergedlistelement->_next=lastanother->_next;
+	mergedlistelement->_next=lastnext;
+	if(!lastnext)_list->_last=mergedlistelement; // if there was no successor of the second sequence, we've merged up until the end of the list and we need to set the last of the list to mergedlistelement!!!!
+	return mergedlistelement; // returning the last merged element (therefore the maximum)
 }
+// NOTE linsertionSort moves the values NOT the list elements, therefore there's no need to change the index
+static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
+	// ASSERT last should NOT be NULL
+	bool report=amVerboseDebugging(); //||DEBUGGING;
+	Mlistelement *afterlast=last->_next; // remember the successor of the last element
+	// keep track of the smallest and largest list element found so far (that we need to link afterwards to the elements in front and behind)
+	Mvalue* largestValue=first->_value;
+	if(report){outputValue("Insertion sorting '",first->_value,"'");outputValue(" through '",last->_value,"'.\n");}
+	
+	// to speed up inserting we keep track of the last inserted value, to be compared with the value to insert before comparing with the rest
+	Mvalue* listelementValue;
+	// the first element to insert is the successor of the current smallest list element
+	Mlistelement *checklistelement,*listelement=first->_next; // the first element to insert is the successor of the smallest list element
+	while(listelement){ // safety check
+		listelementValue=listelement->_value; // the value to insert into what's in front of it
+		// MDH@04NOV2020: we can speed things up a little bit by comparing with the largest value so far
+		//                if toinsertValue is smaller than lastinsertedValue, we have to insert it
+		if(smallerthan(listelementValue,largestValue)==M_TRUE){ // listelementValue<largest value
+			// NOTE we can never jump over the current largest value, so at some point the test will fail
+			checklistelement=first;
+			while(smallerthanorequalto(checklistelement->_value,listelementValue)==M_TRUE)checklistelement=checklistelement->_next;
+			// checklistelement>listelement
+			// we have to insert the value of listelement in front of checklistelement
+			// we can consume checklistelement i.e. we can use it to move the values up
+			Mlistelement *nextchecklistelement=checklistelement->_next;
+			Mvalue *nextvaluetomoveup,*valuetomoveup=checklistelement->_value;
+			checklistelement->_value=listelementValue; // with the value to move up remembered, we can safely replace its value with the value to insert (and consume checklistelement)
+			while(1){
+				checklistelement=checklistelement->_next;
+				nextvaluetomoveup=checklistelement->_value; // remember the value that's to be replaced
+				checklistelement->_value=valuetomoveup; // replace remembered value with the previous one
+				if(checklistelement==listelement)break; // if we've overwritten listelement->_value (remembered in temp) we're done
+				valuetomoveup=nextvaluetomoveup; // update valuetomove with what we remembered
+			}
+		}else{ // listelementValue>=largest value, so replaces largestValue, and there's no need to exchange any values
+			largestValue=listelement->_value;
+			if(report)outputValue("New largest value: '",largestValue,"'.\n");
+		}
+		if(listelement==last)break; // once we've inserted the last one, quit
+		listelement=listelement->_next; // the list element to insert next, is the one we remembered at the beginning of the loop
+	}
+}
+const unsigned long long M_RUN_LENGTH=32;
 static long long ltimsort(Mlist* _list){
-	bool report=amVerboseDebugging()||DEBUGGING;
+	bool report=amVerboseDebugging(); //||DEBUGGING;
 	long long result=M_LL_INVALID;
 	if(_list){
-		Mlistelement *runlast,*runfirst=_list->_first;
-		while(runfirst){
-			// determine runlast at most M_RUN_LENGTH elements further
-			runlast=runfirst;
-			unsigned long long runsize=1;
-			while(runsize<M_RUN_LENGTH&&runlast->_next){runlast=runlast->_next;runsize++;}
-			linsertionSort(_list,runfirst,runlast);
-			runfirst=runlast->_next; // the first in the next run is the successor of runlast (if any)
-		}
-		// the general idea of merging is to merge two successive blocks, until all blocks are merged
-		// then the size of the block is doubled and all blocks are merged again
-	 	// initialize size to the number of elements in a each block
-		unsigned long long numberOfMerges,size=M_RUN_LENGTH;
-		// as long as the size of a block is less than the number of elements there are blocks to merge
-		while(size<_list->numberOfElements){
-			size<<=1; // double the size
-			if(report)output("Merging %llu elements each time.\n",size);
-			numberOfMerges=1+(_list->numberOfElements-1)/size; // will at least equal 2
-			if(report)output("Number of merges to execute: %llu.\n",numberOfMerges);
-			Mlistelement *beforeone,*beforeanother,*lastanother=NULL;
-			do{
-				beforeone=lastanother;
-				long long left=size; // the number of elements we need
+		if(_list->_first!=_list->_last){ // a list with at least two elements
+			// sort the (fixed-size) runs with insertion sort
+			Mlistelement *runlast,*runfirst=_list->_first;
+			unsigned long long runsize; 
+			while(runfirst){
+				runsize=0;
+				runlast=runfirst;
+				// ascertain that runlast is never NULL (as required by linsertionSort)
+				while(++runsize<M_RUN_LENGTH&&runlast->_next)runlast=runlast->_next;
+				linsertionSort(_list,runfirst,runlast);
+				runfirst=runlast->_next;
+			}
+			if(report)outputList("List with sorted runs: '",_list,"'.\n");
+			// the general idea of merging is to merge two successive blocks, until all blocks are merged
+			// then the size of the block is doubled and all blocks are merged again
+			// initialize size to the number of elements in a each block
+			unsigned long long numberOfMerges,size=M_RUN_LENGTH;
+			// as long as the size of a block is less than the number of elements there are blocks to merge
+			while(size<_list->numberOfElements){
+				size<<=1; // double the size
+				if(report)output("Merging %llu elements each time.\n",size);
+				numberOfMerges=1+(_list->numberOfElements-1)/size; // will at least equal 2
+				if(report)output("Number of merges to execute: %llu.\n",numberOfMerges);
+				Mlistelement *beforeone,*beforeanother,*lastanother=NULL;
 				do{
-					lastanother=(lastanother?lastanother->_next:_list->_first);
-					left--;
-					if(left*2==size)beforeanother=lastanother;
-				}while(left>0);
-				// do we have something to merge???? (it is possible that there is an odd number of blocks)
-				if(beforeanother&&beforeanother!=lastanother)lmerge(_list,beforeone,beforeanother,lastanother);
-				numberOfMerges--;
-			}while(numberOfMerges>0);
-		}
+					beforeone=lastanother;
+					long long left=size; // the number of elements we need
+					do{
+						lastanother=(lastanother?lastanother->_next:_list->_first);
+						left--;
+						if(left*2==size)beforeanother=lastanother;
+					}while(left>0);
+					// do we have something to merge???? (it is possible that there is an odd number of blocks)
+					// assign the result of lmerge (the list element containing the maximum) to lastanother!!!
+					if(beforeanother&&beforeanother!=lastanother)
+						lastanother=lmerge(_list,beforeone,beforeanother,lastanother);
+					numberOfMerges--;
+				}while(numberOfMerges>0);
+			}
+		}else
+		if(report)outputWarning("No need to sort a list with less than 2 elements");
 		result=M_TRUE;
 	}
 	return result;
