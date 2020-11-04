@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=true; // whether or not debugging this module
+static bool DEBUGGING=false; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8734,13 +8734,16 @@ static long long ltimsort(Mlist* _list){
 				do{
 					// firstone is the successor of lastanother (if any)
 					firstone=(lastanother?lastanother->_next:_list->_first);
+					lastone=NULL;
 					long long left=size; // the number of elements we need
 					lastanother=firstone;
 					while(--left>0&&lastanother->_next){
 						if(left*2==size)lastone=lastanother;
 						lastanother=lastanother->_next;
 					}
-					lmerge(_list,firstone,lastone,lastanother);
+					// only sort if there are two sequences
+					if(lastone&&lastone!=lastanother)
+						lmerge(_list,firstone,lastone,lastanother);
 					numberOfMerges--;
 				}while(numberOfMerges>0);
 				/* replacing:
