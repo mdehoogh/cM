@@ -8521,8 +8521,8 @@ static long long lmergesort(Mlist* _list){
 // MDH@04NOV2020: due to the problem with the index values (which we need to keep in ascending order)
 //                it's easier to simply merge in all second sequence values into the first sequence values
 static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mlistelement* lastanother){
-	bool report=amVerboseDebugging(); //||DEBUGGING;
-	Mlistelement *one=lastone,*another=lastone->_next,*nextone;
+	bool report=amVerboseDebugging()||DEBUGGING;
+	Mlistelement *one=firstone,*another=lastone->_next,*nextone;
 	if(report){
 		outputValue("First value to first sequence to merge: '",firstone->_value,"'.\n");
 		outputValue("Last value of first sequence to merge: '",lastone->_value,"'.\n");
@@ -8540,6 +8540,7 @@ static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mli
 		}
 		if(!one)break; // all ones consumed
 		// ASSERT oneValue>anotherValue
+		if(report){outputValue("Inserting '",anotherValue,"'");outputValue(" in front of '",oneValue,"'.\n");}
 		one->_value=anotherValue; // replace one->_value with anotherValue
 		tomoveupValue=oneValue; // the first one to move on position up
 		nextone=one;
@@ -8551,6 +8552,7 @@ static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mli
 			tomoveupValue=nexttomoveupValue; // update the value to move up
 		}
 		if(another==lastanother)break; // all another's inserted, so done
+		one=one->_next;oneValue=one->_value;
 		another=another->_next;
 	}
 }
@@ -8660,7 +8662,7 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 // NOTE linsertionSort moves the values NOT the list elements, therefore there's no need to change the index
 static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	// ASSERT last should NOT be NULL
-	bool report=amVerboseDebugging(); //||DEBUGGING;
+	bool report=amVerboseDebugging()||DEBUGGING;
 	Mlistelement *afterlast=last->_next; // remember the successor of the last element
 	// keep track of the smallest and largest list element found so far (that we need to link afterwards to the elements in front and behind)
 	Mvalue* largestValue=first->_value;
@@ -8701,7 +8703,7 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 }
 const unsigned long long M_RUN_LENGTH=32;
 static long long ltimsort(Mlist* _list){
-	bool report=amVerboseDebugging(); //||DEBUGGING;
+	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
 	if(_list){
 		if(_list->_first!=_list->_last){ // a list with at least two elements
@@ -8722,21 +8724,22 @@ static long long ltimsort(Mlist* _list){
 			// initialize size to the number of elements in a each block
 			unsigned long long numberOfMerges,size=M_RUN_LENGTH;
 			// as long as the size of a block is less than the number of elements there are blocks to merge
+			Mlistelement *firstone,*lastone,*lastanother;
 			while(size<_list->numberOfElements){
 				size<<=1; // double the size
 				if(report)output("Merging %llu elements each time.\n",size);
 				numberOfMerges=1+(_list->numberOfElements-1)/size; // will at least equal 2
 				if(report)output("Number of merges to execute: %llu.\n",numberOfMerges);
-				Mlistelement *firstone,*lastone,*lastanother=NULL;
+				lastanother=NULL;
 				do{
+					// firstone is the successor of lastanother (if any)
 					firstone=(lastanother?lastanother->_next:_list->_first);
 					long long left=size; // the number of elements we need
 					lastanother=firstone;
-					do{
-						lastanother=lastanother->_next;
-						left--;
+					while(--left>0&&lastanother->_next){
 						if(left*2==size)lastone=lastanother;
-					}while(left>0);
+						lastanother=lastanother->_next;
+					}
 					lmerge(_list,firstone,lastone,lastanother);
 					numberOfMerges--;
 				}while(numberOfMerges>0);
