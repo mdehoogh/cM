@@ -8518,6 +8518,43 @@ static long long lmergesort(Mlist* _list){
 
 // timsort implementation (based on geeksforgeeks.org/timsort)
 // helper functions
+// MDH@04NOV2020: due to the problem with the index values (which we need to keep in ascending order)
+//                it's easier to simply merge in all second sequence values into the first sequence values
+static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mlistelement* lastanother){
+	bool report=amVerboseDebugging(); //||DEBUGGING;
+	Mlistelement *one=lastone,*another=lastone->_next,*nextone;
+	if(report){
+		outputValue("First value to first sequence to merge: '",firstone->_value,"'.\n");
+		outputValue("Last value of first sequence to merge: '",lastone->_value,"'.\n");
+		outputValue("First value of second sequence to merge: '",another->_value,"'.\n");
+		outputValue("Last value of second sequence to merge: '",lastanother->_value,"'.\n");
+	}
+	Mvalue *oneValue=one->_value,*anotherValue,*tomoveupValue,*nexttomoveupValue;
+	while(another){
+		anotherValue=another->_value;
+		// determine the first one that is larger than another
+		while(smallerthanorequalto(oneValue,anotherValue)==M_TRUE){
+			if(one==lastone){one=NULL;break;}
+			one=one->_next;
+			oneValue=one->_value;
+		}
+		if(!one)break; // all ones consumed
+		// ASSERT oneValue>anotherValue
+		one->_value=anotherValue; // replace one->_value with anotherValue
+		tomoveupValue=oneValue; // the first one to move on position up
+		nextone=one;
+		while(1){
+			nextone=nextone->_next;
+			nexttomoveupValue=nextone->_value; // remeber the one to move up next
+			nextone->_value=tomoveupValue; // store the one to move up
+			if(nextone==another)break; // when replaced the value associated with another done
+			tomoveupValue=nexttomoveupValue; // update the value to move up
+		}
+		if(another==lastanother)break; // all another's inserted, so done
+		another=another->_next;
+	}
+}
+/* replacing:
 // we have to implement the insertion sort a little different because we know first and can go up from there
 // whereas the original algorithm determines the insertion point going back
 // due to the merge the last element (containing the maximum could have changed), so we return it
@@ -8619,6 +8656,7 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 	if(!lastnext)_list->_last=mergedlistelement; // if there was no successor of the second sequence, we've merged up until the end of the list and we need to set the last of the list to mergedlistelement!!!!
 	return mergedlistelement; // returning the last merged element (therefore the maximum)
 }
+*/
 // NOTE linsertionSort moves the values NOT the list elements, therefore there's no need to change the index
 static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	// ASSERT last should NOT be NULL
@@ -8689,6 +8727,20 @@ static long long ltimsort(Mlist* _list){
 				if(report)output("Merging %llu elements each time.\n",size);
 				numberOfMerges=1+(_list->numberOfElements-1)/size; // will at least equal 2
 				if(report)output("Number of merges to execute: %llu.\n",numberOfMerges);
+				Mlistelement *firstone,*lastone,*lastanother=NULL;
+				do{
+					firstone=(lastanother?lastanother->_next:_list->_first);
+					long long left=size; // the number of elements we need
+					lastanother=firstone;
+					do{
+						lastanother=lastanother->_next;
+						left--;
+						if(left*2==size)lastone=lastanother;
+					}while(left>0);
+					lmerge(_list,firstone,lastone,lastanother);
+					numberOfMerges--;
+				}while(numberOfMerges>0);
+				/* replacing:
 				Mlistelement *beforeone,*beforeanother,*lastanother=NULL;
 				do{
 					beforeone=lastanother;
@@ -8704,6 +8756,7 @@ static long long ltimsort(Mlist* _list){
 						lastanother=lmerge(_list,beforeone,beforeanother,lastanother);
 					numberOfMerges--;
 				}while(numberOfMerges>0);
+				*/
 			}
 		}else
 		if(report)outputWarning("No need to sort a list with less than 2 elements");
