@@ -2432,7 +2432,8 @@ Mvalue* getLongDoubleDecimalListValue(long double ld,bool littleEndianOrder){Mal
 
 // we need d to compute the decimal from a given value instead of digitizing, so I suppose we'll rename d to b (for getting the bytes)
 // TODO we should delegate to (_)getValueDecimal
-Mvalue* d(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Md(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
+	if(value&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Md));
 	Mvalue* dValue=value;
 	if(value&&value->type!=VT_DECIMAL){
 		Mdecimal* _decimal=NULL;
@@ -2450,9 +2451,10 @@ Mvalue* d(Mvalue* value){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // MDH@18NOV2019: b/B renamed to o/O (for octets), and we're gonna create a b function for transforming to big integer
-Mvalue* o(Mvalue* value){ // little-endian representation list to return
+Mvalue* Mo(Mvalue* value){ // little-endian representation list to return
 	if(value){
 		switch(value->type){
+			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,Mo));
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,true);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,true);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,true);
@@ -2462,9 +2464,10 @@ Mvalue* o(Mvalue* value){ // little-endian representation list to return
 	return NULL;
 } 
 
-Mvalue* O(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endian decimal representation list to return
+Mvalue* MO(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endian decimal representation list to return
 	if(value){
 		switch(value->type){
+			case VT_LIST:return _getValueOfList(appliedToList(value->value._list,MO));
 			case VT_INTEGER:return getIntegerDecimalListValue(value->value._integer->ll,false);
 			case VT_FLOAT:return getLongDoubleDecimalMapValue(value->value._float->ld,false);
 			case VT_TEXT:return getTextDecimalMapValue(value->value._text,false);
@@ -2475,15 +2478,17 @@ Mvalue* O(Mvalue* value){Mallocationowner owner=getOwner(__LINE__); // big endia
 }
 // TODO to add h/H and b/B functions
 
-Mvalue* i(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
-	if(amVerbose())
-		outputValue("Converting '",value,"' to an integer.\n");
+Mvalue* Mi(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
+	if(value&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mi));
+	if(amVerboseDebugging())outputValue("Converting '",value,"' to an integer.\n");
 	long long ll=getValueInteger(value);
 	return(ll!=M_LL_INVALID?_getIntegerValue(ll):NULL);
 }
 
 // convert to a big integer
-Mvalue* b(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mb(Mvalue* value){//Mallocationowner owner=getOwner(__LINE__);
+	if(value&&value->type==VT_LIST)return _getValueOfList(appliedToList(value->value._list,Mb));
+	if(amVerboseDebugging())outputValue("Converting '",value,"' to a big integer.\n");
 	Mvalue* bValue=value;
 	if(value&&value->type!=VT_BIGINTEGER)bValue=_getValueOfBiginteger(_getValueBiginteger(value));
 	return bValue;
@@ -2596,8 +2601,7 @@ Mrational* _getRationalCopy(Mrational* _rational){Mallocationowner owner=getOwne
 Mrational* _getValueRational(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	Mrational* _rational=NULL;
 	if(_value){
-		if(amVerbose())
-			outputValue("Extracting the rational from '",_value,"'.\n");
+		if(amVerboseDebugging())outputValue("Extracting the rational from '",_value,"'.\n");
 		switch(_value->type){
 			case VT_INTEGER:
 			case VT_BIGINTEGER:
@@ -2656,9 +2660,9 @@ Mrational* _getPurifiedRational(Mrational* pureRational,long double delta){Mallo
 }
 
 // TODO how many iterations would we accept at most?????
-Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* MQ(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
-	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Q));
+	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,MQ));
 	if(_value->type==VT_RATIONAL)return _value; // if the value holds a rational itself, return just that
 	Mvalue* _rationalValue=NULL;
 	if(_value->type==VT_FLOAT)
@@ -2671,9 +2675,9 @@ Mvalue* Q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	return _rationalValue;
 }
 // MDH@09OCT2019: TODO=DONE how about turning a unpure rational into a pure rational???? yes, that's a good idea
-Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mq(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 	if(!_value)return NULL;
-	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,q));
+	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mq));
 	if(_value->type==VT_RATIONAL){
 		Mrational* rational=_value->value._rational;
 		if(!rational||floatIsUndefinedOrZero(rational->delta))return _value;
@@ -2701,9 +2705,9 @@ Mvalue* q(Mvalue* _value){Mallocationowner owner=getOwner(__LINE__);
 }
 
 // TODO complete with conversion from big integer and rational
-Mvalue* f(Mvalue* _value){
+Mvalue* Mf(Mvalue* _value){
 	if(!_value||_value->type==VT_FLOAT)return _value;
-	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,f));
+	if(_value->type==VT_LIST)return _getValueOfList(appliedToList(_value->value._list,Mf));
 	bool report=amVerboseDebugging(); //||DEBUGGING;
 	long double ld=M_LD_NAN;
 	if(report){outputValue("Converting '",_value,"'");output(" of type %s to a floating point value.\n",VALUETYPENAMES[_value->type]);}
@@ -2718,7 +2722,7 @@ Mvalue* f(Mvalue* _value){
 	return(isLongDoubleUndefined(ld)==M_FALSE?_getFloatValue(ld):NULL);
 }
 // MDH@build 2: text representation of a value with a given format (either an integer denoting the number of positions to place the text in)
-Mvalue* t(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
+Mvalue* Mt(Mvalue* value,Mvalue* format){if(!format||format->type!=VT_INTEGER)return NULL;Mallocationowner owner=getOwner(__LINE__);
 	Mvalue* _result=NULL;
 	Mstring* _valueText=owned_string(_getValueText(value,true),owner); // typically dequoted
 	if(_valueText){
@@ -9414,15 +9418,15 @@ bool shellInitialized(char const * const settingCharacters,InputCharReadFunction
 				return NULL;
 			}
 			// conversions (MDH@30OCT2019: real renamed to float because we actually have multiple representations of a real (like decimals and rationals))
-			if(!completedValueFunction(_getFunction(_Menvironment,owner,"i"),"i",i)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"b"),"b",b)
-					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"t"),"t",t)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"f"),"f",f)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"q"),"q",q)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"Q"),"Q",Q)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"d"),"d",d)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"o"),"o",o)
-					||!completedValueFunction(_getFunction(_Menvironment,owner,"O"),"O",O)){
+			if(!completedValueFunction(_getFunction(_Menvironment,owner,"i"),"i",Mi)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"b"),"b",Mb)
+					||!completedValueValueFunction(_getFunction(_Menvironment,owner,"t"),"t",Mt)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"f"),"f",Mf)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"q"),"q",Mq)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"Q"),"Q",MQ)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"d"),"d",Md)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"o"),"o",Mo)
+					||!completedValueFunction(_getFunction(_Menvironment,owner,"O"),"O",MO)){
 				outputError("Failed to register value type conversion functions");
 				return NULL;
 			}
