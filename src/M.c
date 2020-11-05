@@ -48,7 +48,8 @@ extern const char M_DEREFERENCE_CHARACTER; // MDH@10MAR2020: defined in Mshell.c
 extern const char M_PROPERTY_SEPARATOR_CHARACTER; // MDH@12MAR2020: defined in Mshell.c
 
 char const * const M_VERSION="0.1.4"; // the new version with file access capabilities (as of 28 September 2020)
-char const * const M_BUILD="14";char const * const M_DATE="3 November 2020"; // MDH@03NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
+char const * const M_BUILD="15";char const * const M_DATE="5 November 2020"; // MDH@03NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
+//char const * const M_BUILD="14";char const * const M_DATE="3 November 2020"; // MDH@03NOV2020: assignValue() changed to only copy maps and lists when currently bounded somehow
 //char const * const M_BUILD="13";char const * const M_DATE="2 November 2020"; // MDH@02NOV2020: wasn't really there though
 //char const * const M_BUILD="12";char const * const M_DATE="1 November 2020"; // MDH@23OCT2020: passing the body of function() as list of command texts when creating it!!
 //char const * const M_BUILD="11";char const * const M_DATE="28 October 2020"; // MDH@23OCT2020: passing the body of function() as list of command texts when creating it!!
