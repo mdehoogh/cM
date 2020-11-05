@@ -1893,9 +1893,12 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 							// show the first 50 elements
 							long long leftToWrite=M_LIST_ELEMENTS_AT_START;
 							while(_listelement&&--leftToWrite>=0){
-								if(listitemindex!=_listelement->index)written+=output("%llu:",_listelement->index);
+								// let's write the index on the first element, the last element
+								if(_listelement==_list->_first
+									||leftToWrite==0
+									||listitemindex!=_listelement->index)
+									written+=output("%llu:",_listelement->index);
 								// replacing: f(_listelement->index)while(listitemindex<MIN(50,_listelement->index)){listitemindex++;written+=outputChar(',');} // missing elements
-								if(listitemindex!=_listelement->index)break; // if we didn't reach the list element, don't display it
 								written+=outputValueColored(_listelement->_value);
 								listitemindex=_listelement->index+1;
 								_listelement=_listelement->_next;
@@ -1906,11 +1909,12 @@ size_t outputValueColored(Mvalue* _value){Mallocationowner owner=getOwner(__LINE
 							// and skip them
 							while(--numberOfElementsNotWritten>=0)_listelement=_listelement->_next;
 							listitemindex=_listelement->index;
+							written+=output("%llu:",_listelement->index); // write the index on the first element
 							// show all further elements
 							while(_listelement){
-								if(listitemindex!=_listelement->index)written+=output("%llu:",_listelement->index);								
+								if(_listelement==_list->_last||listitemindex!=_listelement->index)
+									written+=output("%llu:",_listelement->index);								
 								// replacing: if(_listelement->index)while(listitemindex<_listelement->index){listitemindex++;written+=outputChar(',');} // missing elements
-								if(listitemindex!=_listelement->index)break; // if we didn't reach the list element, don't display it
 								written+=outputValueColored(_listelement->_value);
 								listitemindex=_listelement->index+1;
 								_listelement=_listelement->_next;

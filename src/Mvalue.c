@@ -1414,7 +1414,15 @@ Mstring* _getListText(Mlist const * const _list,long long showAtStart,long long 
             // increment listindex until it is equal to _listelement->index
             if(_listelement->index==0)break; // VERY UNLIKELY AS field index should be monotonically increasing
             if(listelementindex<=showAtStart||listelementindex>=firstAtEnd){ // a displayable value
-                if(expectedlistindex!=_listelement->index){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
+                if(_listelement==_list->_first
+                    ||_listelement==_list->_last
+                    ||listelementindex==showAtStart
+                    ||listelementindex==firstAtEnd
+                    ||expectedlistindex!=_listelement->index
+                    ){
+                    p=appendll(p,_listelement->index);
+                    p=string_append_char(p,':');
+                }
                 // replacing: if(amVerbose()){p=appendll(p,_listelement->index);p=string_append_char(p,':');}
                 Mstring* _listelementValueText=owned_string(_getValueText(_listelement->_value,false),owner); // to be freed asap
                 if(_listelementValueText){
