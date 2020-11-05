@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=false; // whether or not debugging this module
+static bool DEBUGGING=true; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8522,11 +8522,50 @@ static long long lmergesort(Mlist* _list){
 //                it's easier to simply merge in all second sequence values into the first sequence values
 // MDH@05NOV2020: linsertingmerge does not need to keep the index values ascending so it can safely
 //                exchange the position of list elements in the list
-static Mlistelement* linsertingmerge(Mlist* _list,Mlistelement* beforefirstone,Mlistelement* lastone,Mlistelement* lastanother){
+static Mlistelement* linsertingmerge(Mlist * const _list,Mlistelement * const beforefirstone,Mlistelement * const lastone,Mlistelement * const lastanother){
 	bool report=amVerboseDebugging()||DEBUGGING;
-	Mlistelement* firstone=(beforefirstone?beforefirstone->_next:_list->_first);
-	
-	return lastanother;
+
+	Mlistelement* nextlastanother=lastanother->_next; // remember the successor of the current last another
+
+	// as compared to lmerge (which simply is sort of an insertion algorithm at the moment (although it could be improved on though))
+	Mlistelement* mergedlistelement=beforefirstone; // the current head of the merged list elements
+
+	// initialize one and another to the first two elements we will need to compare
+	Mlistelement *one=(beforefirstone?beforefirstone->_next:_list->_first),*another=lastone->_next;
+	if(report){
+		outputValue("First value to first sequence to merge: '",one->_value,"'.\n");
+		outputValue("Last value of first sequence to merge: '",lastone->_value,"'.\n");
+		outputValue("First value of second sequence to merge: '",another->_value,"'.\n");
+		outputValue("Last value of second sequence to merge: '",lastanother->_value,"'.\n");
+	}
+
+	// initialize the two values to compare 
+	Mvalue *oneValue=one->_value,*anotherValue=another->_value;
+
+	Mlistelement *smallest=one; // keep track of the smallest list element as we will need to 
+	while(one&&another){
+		// determine the first one that is larger than another
+		if(smallerthanorequalto(oneValue,anotherValue)==M_TRUE){ // one<=another
+			if(mergedlistelement)mergedlistelement->_next=one;else _list->_first=one;
+			mergedlistelement=one;
+			if(one!=lastone){one=one->_next;oneValue=one->_value;}else one=NULL;
+		}else{
+			if(mergedlistelement)mergedlistelement->_next=another;else _list->_first=another;
+			mergedlistelement=another;
+			if(another!=lastanother){another=another->_next;anotherValue=another->_value;}else another=NULL;
+		}
+	}
+	// consume the rest of the ones or anothers (either one is left), which is easy because all the ones are already linked correctly
+	if(one){ // rest of the ones to consume
+		if(mergedlistelement)mergedlistelement->_next=one;else _list->_first=one;
+		mergedlistelement=lastone;
+	}else{ // rest of the anothers to consume
+		if(mergedlistelement)mergedlistelement->_next=another;else _list->_first=another;
+		mergedlistelement=lastanother;
+	}
+	// link the head of the merged list elements to the successor of the original last another
+	mergedlistelement->_next=nextlastanother;
+	return mergedlistelement;
 }
 static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mlistelement* lastanother){
 	bool report=amVerboseDebugging()||DEBUGGING;
@@ -8667,8 +8706,59 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 	return mergedlistelement; // returning the last merged element (therefore the maximum)
 }
 */
-static Mlistelement* linsertinginsertionSort(Mlist* _list,Mlistelement* beforefirst,Mlistelement* last){
-	return last;
+// linsertinginsertionSort works the same way linsertionSort does, except that it rearranges the list elements instead of moving the values
+// and it returns the new last (if any)
+static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * const beforefirst,Mlistelement * const last){
+	bool report=amVerboseDebugging()||DEBUGGING;
+	// ASSERT last should NOT be NULL
+	Mlistelement* smallest=(beforefirst?beforefirst->_next:_list->_first); // called first in linsertionSort
+	if(report){outputValue("Insertion sorting '",smallest->_value,"'");outputValue(" through '",last->_value,"'.\n");}
+
+	Mlistelement *afterlast=last->_next; // remember the successor of the last element
+
+	// keep track of the largest list element found so far (that we need to link afterwards to the elements in front and behind)
+	Mlistelement* largest=smallest;
+	
+	// to speed up inserting we keep track of the last inserted value, to be compared with the value to insert before comparing with the rest
+	Mvalue* toinsertValue;
+	// the first element to insert is the successor of the first element
+	Mlistelement *larger,*notlarger,*nexttoinsert,*toinsert=smallest->_next;
+	while(toinsert){ // safety check
+		nexttoinsert=toinsert->_next; // remember the next to insert
+		toinsertValue=toinsert->_value; // the value to insert into what's in front of it
+		// MDH@04NOV2020: we can speed things up a little bit by comparing with the largest value so far
+		//                if toinsertValue is smaller than lastinsertedValue, we have to insert it
+		if(smallerthan(toinsertValue,largest->_value)==M_TRUE){ // listelementValue<largest value
+			// we compare toinsertValue with all values ordered so far to find the first value that is larger
+			notlarger=NULL;
+			larger=smallest;
+			// determine the first element with value larger than the value to insert
+			while(smallerthanorequalto(larger->_value,toinsertValue)==M_TRUE){
+				if(larger==largest){outputBug("");outputValue("'",toinsertValue,"' seems to be larger than the largest so far: ");outputValue("'",largest->_value,"'.\n");break;}
+				if(report){outputValue("'",larger->_value,"'<");outputValue("='",toinsertValue,"'.\n");}
+				notlarger=larger;
+				larger=larger->_next;
+			}
+			// larger>toinsert
+			// larger should become the successor of toinsert (we haven't remembered toinsert->_next for nothing)
+			toinsert->_next=larger;
+			// toinsert has to become the successor of notlarger
+			if(!notlarger){ // we have a new minimum
+				smallest=toinsert; // update what we consider to contain the smallest value
+				if(report)outputValue("New smallest value: '",smallest->_value,"'.\n");
+				if(beforefirst)beforefirst->_next=smallest;else _list->_first=smallest; // we have to ascertain that beforefirst points to this new smallest value
+			}else
+				notlarger->_next=toinsert;
+		}else{ // listelementValue>=largest value, so replaces largestValue, and there's no need to insert toinsert anywhere
+			largest=toinsert;
+			if(report)outputValue("New largest value: '",largest->_value,"'.\n");
+		}
+		if(toinsert==last)break; // once we've inserted the last one, quit
+		toinsert=nexttoinsert; // the list element to insert next, is the one we remembered at the beginning of the loop
+	}
+	largest->_next=afterlast; // ascertain that the successor of largest is the successor of the original last
+	if(!afterlast)_list->_last=largest; // if there is no afterlast we should update the last element of the list
+	return largest;
 }
 // NOTE linsertionSort moves the values NOT the list elements, therefore there's no need to change the index
 static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
@@ -8743,16 +8833,26 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 			}else
 				nextindexrange->last=_list->_last->index;
 			// sort the (fixed-size) runs with insertion sort
-			Mlistelement *runlast,*runfirst=_list->_first;
 			unsigned long long runsize; 
+			Mlistelement *runbeforefirst=NULL,*runlast=_list->_first;
+			while(runlast){
+				runsize=0;
+				// ascertain that runlast is never NULL (as required by linsertionSort)
+				while(++runsize<M_RUN_LENGTH&&runlast->_next)runlast=runlast->_next;
+				runbeforefirst=linsertinginsertionSort(_list,runbeforefirst,runlast); // execute the run insertion sort that returns the new last element (which will exist)
+				runlast=runbeforefirst->_next; // now equal to the first element of the next run to insertion sort
+			}
+			/* replacing:
+			Mlistelement *runlast,*runfirst=_list->_first;
 			while(runfirst){
 				runsize=0;
 				runlast=runfirst;
 				// ascertain that runlast is never NULL (as required by linsertionSort)
 				while(++runsize<M_RUN_LENGTH&&runlast->_next)runlast=runlast->_next;
-				runlast=linsertinginsertionSort(_list,runfirst,runlast); // replacing: linsertionSort(_list,runfirst,runlast);
+				linsertionSort(_list,runfirst,runlast);
 				runfirst=runlast->_next;
 			}
+			*/
 			if(report)outputList("List with sorted runs: '",_list,"'.\n");
 			// the general idea of merging is to merge two successive blocks, until all blocks are merged
 			// then the size of the block is doubled and all blocks are merged again
