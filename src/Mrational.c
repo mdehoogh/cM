@@ -180,6 +180,7 @@ mp_err _qdiv_bi(Mrational * const c,Mallocationowner owner_c,Mrational const * c
  * \brief computes the difference of \p a and \p b and puts the result in \p c
  */
 mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * const a,Mrational const * const b){Mallocationowner owner=getOwner(__LINE__);
+    bool report=amVerboseDebugging()||DEBUGGING;
     mp_err status=((c&&!c->num&&!c->den)&&(a||b)?MP_OKAY:MP_ERR); // MDH@24MAY2020: demanding that c->num and c->den are currently undefined!!!
     if(status==MP_OKAY){ // c and at least a or b provided
         // should we NULL the numerator and denominator of c?????
@@ -187,35 +188,60 @@ mp_err _qsub(Mrational * const c,Mallocationowner owner_c,Mrational const * cons
         // TODO do we need to NULL the denominator????? if(c->den){FREE_BIGINTEGER(c->den);c->den=NULL;}
         // if b is not defined, or zero, copy a into c
         if(!b||!b->num||isBigintegerZero(b->num)==M_TRUE){ // b is undefined or zero: return a
-            if(amVerbose())outputInfo("Second rational argument undefined or zero.");
+            if(report)outputInfo("Second rational argument undefined or zero.");
             if(a->num){c->num=owned_biginteger(_getBigintegerCopy(a->num),Msubowner(owner_c,1));if(!c->num)return MP_ERR;}
             if(a->den){c->den=owned_biginteger(_getBigintegerCopy(a->den),Msubowner(owner_c,1));if(!c->den){FREE_BIGINTEGER(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
         }else
         if(!a||!a->num||isBigintegerZero(a->num)==M_TRUE){ // a is undefined or zero: return b
-            if(amVerbose())outputInfo("First rational argument undefined or zero.");
+            if(report)outputInfo("First rational argument undefined or zero.");
             if(b->num){c->num=owned_biginteger(_getBigintegerCopy(b->num),Msubowner(owner_c,1));if(!c->num)return MP_ERR;}
             if(b->den){c->den=owned_biginteger(_getBigintegerCopy(b->den),Msubowner(owner_c,1));if(!c->den){FREE_BIGINTEGER(c->num,owner);return MP_ERR;}} // MDH@24MAY2020: do NOT forget to free c->num
         }else{
-            if(amVerbose())outputInfo("Subtracting two pure rationals.");
             // ASSERT a and b both defined
-            Mbiginteger *_num=NULL,*_num1=NULL,*_num2=NULL,*_den=NULL;
-            if(a->den||b->den){status=_bimul(a->den,b->den,&_den);owned_biginteger(_den,owner);} // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
-            if(status==MP_OKAY)if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
-            if(status==MP_OKAY){status=_bimul(a->num,b->den,&_num1);owned_biginteger(_num1,owner);} // multiply numerator of a with denominator of b for the plus term of the result numerator
-            if(status==MP_OKAY){status=_bimul(a->den,b->num,&_num2);owned_biginteger(_num2,owner);} // multiply denominator of a with numerator of b for the min term of the result numerator
-            if(status==MP_OKAY){status=_bisub(_num1,_num2,&_num);owned_biginteger(_num,owner);}
-            // loose the numerator parts (are not stored in the result rational anyway)
-            if(_num1)FREE_BIGINTEGER(_num1,owner);
-            if(_num2)FREE_BIGINTEGER(_num2,owner);
-            if(status!=MP_OKAY){ // numerator and denominator not computed both
-                if(_num)FREE_BIGINTEGER(_num,owner);
-                if(_den)FREE_BIGINTEGER(_den,owner);
-            }else{ // numerator and denominator computed
-                c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
-                c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
-                /////// not on pure rationals!!!! c->delta=_floatdifference(a->delta,b->delta);
-                if(!c->normalized&&!normalizeRational(c,owner_c))
-                {output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+            if(report)outputInfo("Subtracting two pure rationals.");
+            Mbiginteger *_num=NULL;
+            // MDH@05NOV2020: how about speeding things up by checking whether the denominators are the same?
+            if((!a->den&&!b->den)||(mp_cmp(MP_INT_POINTER(a->den),MP_INT_POINTER(b->den))==MP_EQ)){ // denominators are the same
+                // NOTE c is supposed to be a rational with num and den undefined i.e. NULL as __rational() creates it
+                // TODO check validity of computation/ownership
+                status=_bisub(a->num,b->num,&_num);
+                if(_num){
+                    owned_biginteger(_num,owner); // start with taking ownership
+                    if(status==MP_OKAY){
+                        // before we pass _num into c->num we try to set c->den
+                        if(a->den){
+                            c->den=owned_biginteger(_getBigintegerCopy(a->den),Msubowner(owner_c,1));
+                            if(!c->den){FREE_BIGINTEGER(_num,owner);return MP_ERR;}
+                        }
+                        c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
+                    }
+                    // if _num was not bound to c->num free _num here, otherwise leave it alone
+                    if(c->num){ // success
+                        if(!c->normalized&&!normalizeRational(c,owner_c))
+                        {output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+                    }else
+                        FREE_BIGINTEGER(_num,owner);
+                }
+            }else{
+                Mbiginteger *_num1=NULL,*_num2=NULL,*_den=NULL;
+                if(a->den||b->den){status=_bimul(a->den,b->den,&_den);owned_biginteger(_den,owner);} // we have to be careful here as _bimul requires at least one argument to be non-NULL!!!
+                if(status==MP_OKAY)if(_den&&mp_iszero(MP_INT_POINTER(_den))==MP_YES)status=MP_ERR; // and the denominator should be non-zero (division by zero is not possible)
+                if(status==MP_OKAY){status=_bimul(a->num,b->den,&_num1);owned_biginteger(_num1,owner);} // multiply numerator of a with denominator of b for the plus term of the result numerator
+                if(status==MP_OKAY){status=_bimul(a->den,b->num,&_num2);owned_biginteger(_num2,owner);} // multiply denominator of a with numerator of b for the min term of the result numerator
+                if(status==MP_OKAY){status=_bisub(_num1,_num2,&_num);owned_biginteger(_num,owner);}
+                // loose the numerator parts (are not stored in the result rational anyway)
+                if(_num1)FREE_BIGINTEGER(_num1,owner);
+                if(_num2)FREE_BIGINTEGER(_num2,owner);
+                if(status!=MP_OKAY){ // numerator and denominator not computed both
+                    if(_num)FREE_BIGINTEGER(_num,owner);
+                    if(_den)FREE_BIGINTEGER(_den,owner);
+                }else{ // numerator and denominator computed
+                    c->num=owned_biginteger(disowned_biginteger(_num,owner),Msubowner(owner_c,1));
+                    c->den=owned_biginteger(disowned_biginteger(_den,owner),Msubowner(owner_c,1));
+                    /////// not on pure rationals!!!! c->delta=_floatdifference(a->delta,b->delta);
+                    if(!c->normalized&&!normalizeRational(c,owner_c))
+                    {output("%s",M_ERROR_PREFIX);outputRational("Failed to normalize rational ",c,".\n");}
+                }
             }
         }
     }else

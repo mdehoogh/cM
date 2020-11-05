@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=true; // whether or not debugging this module
+static bool DEBUGGING=false; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8731,7 +8731,7 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 		toinsertValue=toinsert->_value; // the value to insert into what's in front of it
 		// MDH@04NOV2020: we can speed things up a little bit by comparing with the largest value so far
 		//                if toinsertValue is smaller than lastinsertedValue, we have to insert it
-		if(smallerthan(toinsertValue,largest->_value)==M_TRUE){ // listelementValue<largest value
+		if(smallerthan(toinsertValue,largest->_value)==M_TRUE){ // toinsertValue<largest value
 			// we compare toinsertValue with all values ordered so far to find the first value that is larger
 			notlarger=NULL;
 			larger=smallest;
@@ -8753,6 +8753,7 @@ static Mlistelement* linsertinginsertionSort(Mlist * const _list,Mlistelement * 
 			}else
 				notlarger->_next=toinsert;
 		}else{ // listelementValue>=largest value, so replaces largestValue, and there's no need to insert toinsert anywhere
+			largest->_next=toinsert; // TODO do we need this?????
 			largest=toinsert;
 			if(report)outputValue("New largest value: '",largest->_value,"'.\n");
 		}
@@ -8997,9 +8998,9 @@ Mvalue* Msorted(Mvalue* _tosortValue,Mvalue* _sortMethodValue){Mallocationowner 
 				char sortMethod=(_sortMethodValue&&_sortMethodValue->type==VT_TEXT?_sortMethodValue->value._text->_c[0]:'\0');
 				long long sortResult=M_LL_INVALID;
 				switch(sortMethod){
-					case 't':sortResult=ltimsort(_tosortList);
-					case 'm':sortResult=lmergesort(_tosortList);
-					default:sortResult=lquicksort(_tosortList);
+					case 't':sortResult=ltimsort(_tosortList);break;
+					case 'm':sortResult=lmergesort(_tosortList);break;
+					default:sortResult=lquicksort(_tosortList);break;
 				}
 				if(sortResult>0) // _tosortList was successfully sorted
 					sortedValue=_getValueOfList(disowned_list(_tosortList,owner)); // NOTE will automatically
