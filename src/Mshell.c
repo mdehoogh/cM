@@ -9151,10 +9151,14 @@ Mvalue* Mrunpoints(Mvalue* _listValue){Mallocationowner owner=getOwner(__LINE__)
 						listelement=listelement->_next;
 						nextvalue=listelement->_value;
 						// if value equals nextvalue, we simply continue, because an equal value can never end a run
-						if(smallerthan(nextvalue,value)==M_TRUE)direction=-1;else if(largerthan(nextvalue,value)==M_TRUE)direction=1;else continue;
+						if(smallerthan(nextvalue,value)==M_TRUE)direction=-1;
+						else
+						if(largerthan(nextvalue,value)==M_TRUE)direction=1;
+						else // never change the rundirection to 0, although it starts with 0!!
+							continue;
 						// NOTE an equal value (direction) 0 can never end a run!!!
-						if(direction!=rundirection){ // end of a run
-							if(appendedToList(_runsList,owner,value,valueindex)<=0){
+						if(direction!=rundirection){ // change of direction sign
+							if(rundirection!=0&&appendedToList(_runsList,owner,value,valueindex)<=0){
 								outputError("Failed to update the runs list");
 								break;
 							}
