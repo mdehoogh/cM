@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=false; // whether or not debugging this module
+static bool DEBUGGING=true; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8565,8 +8565,10 @@ static Mlistelement* linsertingmerge(Mlist * const _list,Mlistelement * const be
 	}
 	// link the head of the merged list elements to the successor of the original last another
 	mergedlistelement->_next=nextlastanother;
+	if(!nextlastanother)_list->_last=mergedlistelement;
 	return mergedlistelement;
 }
+/* replacing:
 static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mlistelement* lastanother){
 	bool report=amVerboseDebugging()||DEBUGGING;
 	Mlistelement *one=firstone,*another=lastone->_next,*nextone;
@@ -8603,6 +8605,7 @@ static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mli
 		another=another->_next;
 	}
 }
+*/
 /* replacing:
 // we have to implement the insertion sort a little different because we know first and can go up from there
 // whereas the original algorithm determines the insertion point going back
@@ -8840,6 +8843,7 @@ static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__
 				// ascertain that runlast is never NULL (as required by linsertionSort)
 				while(++runsize<M_RUN_LENGTH&&runlast->_next)runlast=runlast->_next;
 				runbeforefirst=linsertinginsertionSort(_list,runbeforefirst,runlast); // execute the run insertion sort that returns the new last element (which will exist)
+				// if(report)output("Last value: '",_list->_last->_value,"'.\n");
 				runlast=runbeforefirst->_next; // now equal to the first element of the next run to insertion sort
 			}
 			/* replacing:
