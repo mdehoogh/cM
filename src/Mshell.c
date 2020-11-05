@@ -8520,6 +8520,14 @@ static long long lmergesort(Mlist* _list){
 // helper functions
 // MDH@04NOV2020: due to the problem with the index values (which we need to keep in ascending order)
 //                it's easier to simply merge in all second sequence values into the first sequence values
+// MDH@05NOV2020: linsertingmerge does not need to keep the index values ascending so it can safely
+//                exchange the position of list elements in the list
+static Mlistelement* linsertingmerge(Mlist* _list,Mlistelement* beforefirstone,Mlistelement* lastone,Mlistelement* lastanother){
+	bool report=amVerboseDebugging()||DEBUGGING;
+	Mlistelement* firstone=(beforefirstone?beforefirstone->_next:_list->_first);
+	
+	return lastanother;
+}
 static void lmerge(Mlist* _list,Mlistelement* firstone,Mlistelement* lastone,Mlistelement* lastanother){
 	bool report=amVerboseDebugging()||DEBUGGING;
 	Mlistelement *one=firstone,*another=lastone->_next,*nextone;
@@ -8659,6 +8667,9 @@ static Mlistelement* lmerge(Mlist* _list,Mlistelement* beforeone,Mlistelement* b
 	return mergedlistelement; // returning the last merged element (therefore the maximum)
 }
 */
+static Mlistelement* linsertinginsertionSort(Mlist* _list,Mlistelement* beforefirst,Mlistelement* last){
+	return last;
+}
 // NOTE linsertionSort moves the values NOT the list elements, therefore there's no need to change the index
 static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	// ASSERT last should NOT be NULL
@@ -8702,11 +8713,35 @@ static void linsertionSort(Mlist* _list,Mlistelement* first,Mlistelement* last){
 	}
 }
 const unsigned long long M_RUN_LENGTH=32;
-static long long ltimsort(Mlist* _list){
+// MDH@05NOV2020: changing timsort by registering the index ranges first, and writing the indices at the end
+typedef struct Mindexrange{
+	unsigned long long first,last;
+	struct Mindexrange* _next;
+}Mindexrange;
+static long long ltimsort(Mlist* _list){Mallocationowner owner=getOwner(__LINE__);
 	bool report=amVerboseDebugging()||DEBUGGING;
 	long long result=M_LL_INVALID;
 	if(_list){
 		if(_list->_first!=_list->_last){ // a list with at least two elements
+			// determine the index ranges
+			Mindexrange indexrange={_list->_first->index,_list->_first->index};
+			Mindexrange* nextindexrange=&indexrange;
+			if(_list->_last->index>_list->numberOfElements){ // possibly multiple range
+				Mlistelement* listelement=_list->_first;
+				while(1){
+					listelement=listelement->_next;
+					if(!listelement)break;
+					if(listelement->index!=nextindexrange->last+1){ // there's a gap
+						nextindexrange->_next=CALLOC_1(sizeof(Mindexrange),'~',owner);
+						nextindexrange=nextindexrange->_next;
+						if(!nextindexrange)break; // TODO serious problem
+						nextindexrange->first=listelement->index;
+					}
+					// update last
+					nextindexrange->last=listelement->index;
+				}
+			}else
+				nextindexrange->last=_list->_last->index;
 			// sort the (fixed-size) runs with insertion sort
 			Mlistelement *runlast,*runfirst=_list->_first;
 			unsigned long long runsize; 
@@ -8715,7 +8750,7 @@ static long long ltimsort(Mlist* _list){
 				runlast=runfirst;
 				// ascertain that runlast is never NULL (as required by linsertionSort)
 				while(++runsize<M_RUN_LENGTH&&runlast->_next)runlast=runlast->_next;
-				linsertionSort(_list,runfirst,runlast);
+				runlast=linsertinginsertionSort(_list,runfirst,runlast); // replacing: linsertionSort(_list,runfirst,runlast);
 				runfirst=runlast->_next;
 			}
 			if(report)outputList("List with sorted runs: '",_list,"'.\n");
@@ -8725,6 +8760,7 @@ static long long ltimsort(Mlist* _list){
 			unsigned long long numberOfMerges,size=M_RUN_LENGTH;
 			// as long as the size of a block is less than the number of elements there are blocks to merge
 			Mlistelement *firstone,*lastone,*lastanother;
+			Mlistelement *beforefirstone; // the one we need to pass to linsertingmerge instead of firstone
 			while(size<_list->numberOfElements){
 				size<<=1; // double the size
 				if(report)output("Merging %llu elements each time.\n",size);
@@ -8733,7 +8769,8 @@ static long long ltimsort(Mlist* _list){
 				lastanother=NULL;
 				do{
 					// firstone is the successor of lastanother (if any)
-					firstone=(lastanother?lastanother->_next:_list->_first);
+					beforefirstone=lastanother;
+					firstone=(beforefirstone?beforefirstone->_next:_list->_first);
 					lastone=NULL;
 					long long left=size; // the number of elements we need
 					lastanother=firstone;
@@ -8742,8 +8779,10 @@ static long long ltimsort(Mlist* _list){
 						lastanother=lastanother->_next;
 					}
 					// only sort if there are two sequences
-					if(lastone&&lastone!=lastanother)
-						lmerge(_list,firstone,lastone,lastanother);
+					if(lastone&&lastone!=lastanother){
+						lastanother=linsertingmerge(_list,beforefirstone,lastone,lastanother);
+						// replacing: lmerge(_list,firstone,lastone,lastanother);
+					}
 					numberOfMerges--;
 				}while(numberOfMerges>0);
 				/* replacing:
@@ -8763,6 +8802,28 @@ static long long ltimsort(Mlist* _list){
 					numberOfMerges--;
 				}while(numberOfMerges>0);
 				*/
+			}
+			// reapply the collected indices from the index ranges
+			nextindexrange=&indexrange;
+			unsigned long long index=nextindexrange->first; // the fist index to assign
+			Mlistelement* listelement=_list->_first;
+			while(1){
+				listelement->index=index;
+				listelement=listelement->_next;
+				if(!listelement)break;
+				// update the index to assign
+				if(index==nextindexrange->last){
+					nextindexrange=nextindexrange->_next;
+					index=nextindexrange->first;
+				}else
+					index++;
+			}
+			// free all dynamically allocated index ranges
+			Mindexrange* indexrangetofree=indexrange._next;
+			while(indexrangetofree){
+				nextindexrange=indexrangetofree->_next;
+				FREE_DISOWNED_1(indexrangetofree,'~',owner);
+				indexrangetofree=nextindexrange;
 			}
 		}else
 		if(report)outputWarning("No need to sort a list with less than 2 elements");
