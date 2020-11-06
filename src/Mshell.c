@@ -5,7 +5,7 @@
 
 #include "Mshell.h"
 
-static bool DEBUGGING=false; // whether or not debugging this module
+static bool DEBUGGING=true; // whether or not debugging this module
 
 // MDH@18MAY2020: every 'module' i.e. file should get a unique module id to be used for generating pointer ownership ids
 static uint16_t const MODULE_ID=17;
@@ -8653,13 +8653,16 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 							// ASSERT all the elements in \ (largest to smallest) are larger than smallest so we know the following loop always ends
 							runlargest=previous;
 							if(report)outputValue("Up run maximum: '",previousValue,"'.\n");
-							// both the main run is up, as well as the run we just finished
-							// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
-							if(largest)linsertingmerge(_list,NULL,largest,previous);
-							smallest=_list->_first;
-							if(previous->_next==current)largest=previous;
-							if(report)outputValue("Maximum so far: '",largest->_value,"'.\n");
-							if(report)outputList("List so far: '",_list,"'.\n");
+							if(!smallest||smallest->_next!=previous){
+								// both the main run is up, as well as the run we just finished
+								// if we have a main run we have a largest, if we do not have a largest this up run is to become the main run
+								if(largest)linsertingmerge(_list,NULL,largest,previous);
+								smallest=_list->_first;
+								if(previous->_next==current)largest=previous;
+								if(report)outputValue("Maximum so far: '",largest->_value,"'.\n");
+								if(report)outputList("List so far: '",_list,"'.\n");
+							}else
+							if(report)output("The up run is empty!\n");
 						}
 						rundirection=-1;
 					}else
@@ -8667,17 +8670,22 @@ static long long lharmonicasort(Mlist* _list){Mallocationowner owner=getOwner(__
 						if(rundirection<0){ // direction switched from down to up
 							runsmallest=previous;
 							if(report)outputValue("Down run minimum: '",previousValue,"'.\n");
-							// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
-							// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
-							if(largest)previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
-							lreverse(_list,largest,runsmallest); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
-							// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
-							// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
-							if(largest)linsertingmerge(_list,NULL,largest,previous); // NOTE previous still contains the smallest element in the run
-							// smallest=_list->_first; // TODO we might not need to do this actually
-							// ASSERT we've successfully merged the down run into the up run that we're going to end up with
-							if(report)outputValue("Minimum so far: '",smallest->_value,"'.\n");
-							if(report)outputList("List so far: '",_list,"'.\n");
+							// if there's nothing in between the down run is empty
+							if(!largest||largest->_next!=previous){
+								// we have to reverse the down sequence i.e. the successor of largest through runsmallest (previous)
+								// NOTE previous->_next will change and no longer point to current, but largest will subsequently point to current (as it should)
+								if(largest)previous=largest->_next; // is the element containing the maximum of the down run (we can do this because previous is not used anymore until it is reset at the end of the loop)
+								lreverse(_list,largest,runsmallest); // NOTE if this is the first run, largest will be NULL, so we have to pass the list to lreverse so it can determine the successor of beforefirst
+								// now that the down run is transformed into an up run we can merge the sorted part so far with the upped run
+								// oops, due to the reverse previous is no longer the largest value in the down run, you should use the successor of largest
+								if(largest)linsertingmerge(_list,NULL,largest,previous); // NOTE previous still contains the smallest element in the run
+								// smallest=_list->_first; // TODO we might not need to do this actually
+								// ASSERT we've successfully merged the down run into the up run that we're going to end up with
+								if(report)outputValue("Minimum so far: '",smallest->_value,"'.\n");
+								if(report)outputList("List so far: '",_list,"'.\n");
+							}else
+							if(report)
+								output("The down run is empty!\n");
 						}
 						rundirection=1; // going up!!!!
 					}
